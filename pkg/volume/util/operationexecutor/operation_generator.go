@@ -160,7 +160,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 		}
 
 		var volumePlugin volume.VolumePlugin
-		if useCSIPlugin(og.volumePluginMgr, volumeAttached.VolumeSpec) && nu {
+		if useCSIPlugin(og.volumePluginMgr, volumeAttached.VolumeSpec, &volumeAttached.NodeName) && nu {
 			// The volume represented by this spec is CSI and thus should be migrated
 			volumePlugin, err = og.volumePluginMgr.FindPluginByName(csi.CSIPluginName)
 			if err != nil || volumePlugin == nil {
@@ -336,7 +336,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 		}
 
 		// useCSIPlugin will check both CSIMigration and the plugin specific feature gates
-		if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
+		if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec, &volumeToAttach.NodeName) && nu {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
@@ -423,7 +423,7 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 
 	// Need to translate the spec here if the plugin is migrated so that the metrics
 	// emitted show the correct (migrated) plugin
-	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
+	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec, &volumeToAttach.NodeName) && nu {
 		csiSpec, err := translateSpec(volumeToAttach.VolumeSpec)
 		if err == nil {
 			volumeToAttach.VolumeSpec = csiSpec
@@ -473,7 +473,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		}
 
 		// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
-		if useCSIPlugin(og.volumePluginMgr, volumeToDetach.VolumeSpec) && nu {
+		if useCSIPlugin(og.volumePluginMgr, volumeToDetach.VolumeSpec, &volumeToDetach.NodeName) && nu {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
@@ -572,6 +572,15 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 	}, nil
 }
 
+func getNodeNameFromVolumeToMount(volumeToMount VolumeToMount) *types.NodeName {
+	if volumeToMount.Pod != nil {
+		var nodeName types.NodeName
+		nodeName = types.NodeName(volumeToMount.Pod.Spec.NodeName)
+		return &nodeName
+	}
+	return nil
+}
+
 func (og *operationGenerator) GenerateMountVolumeFunc(
 	waitForAttachTimeout time.Duration,
 	volumeToMount VolumeToMount,
@@ -582,7 +591,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	volumePluginName := unknownVolumePlugin
 	// Need to translate the spec here if the plugin is migrated so that the metrics
 	// emitted show the correct (migrated) plugin
-	if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
+	if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec, getNodeNameFromVolumeToMount(volumeToMount)) {
 		csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
 		if err == nil {
 			volumeToMount.VolumeSpec = csiSpec
@@ -601,7 +610,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	mountVolumeFunc := func() (error, error) {
 
 		// Get mounter plugin
-		if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
+		if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec, getNodeNameFromVolumeToMount(volumeToMount)) {
 			csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
 			if err != nil {
 				return volumeToMount.GenerateError("MountVolume.TranslateSpec failed", err)
@@ -861,7 +870,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 	podsDir string) (volumetypes.GeneratedOperations, error) {
 
 	var pluginName string
-	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.volumePluginMgr, volumeToUnmount.VolumeSpec) {
+	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.volumePluginMgr, volumeToUnmount.VolumeSpec, nil) {
 		pluginName = csi.CSIPluginName
 	} else {
 		pluginName = volumeToUnmount.PluginName
@@ -929,7 +938,7 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 	hostutil mount.HostUtils) (volumetypes.GeneratedOperations, error) {
 
 	var pluginName string
-	if useCSIPlugin(og.volumePluginMgr, deviceToDetach.VolumeSpec) {
+	if useCSIPlugin(og.volumePluginMgr, deviceToDetach.VolumeSpec, &deviceToDetach.NodeName) {
 		pluginName = csi.CSIPluginName
 		csiSpec, err := translateSpec(deviceToDetach.VolumeSpec)
 		if err != nil {
@@ -1031,7 +1040,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 
 	originalSpec := volumeToMount.VolumeSpec
 	// Translate to CSI spec if migration enabled
-	if useCSIPlugin(og.volumePluginMgr, originalSpec) {
+	if useCSIPlugin(og.volumePluginMgr, originalSpec, getNodeNameFromVolumeToMount(volumeToMount)) {
 		csiSpec, err := translateSpec(originalSpec)
 		if err != nil {
 			return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.TranslateSpec failed", err)
@@ -1209,7 +1218,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 	var err error
 	// Translate to CSI spec if migration enabled
 	// And get block volume unmapper plugin
-	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.volumePluginMgr, volumeToUnmount.VolumeSpec) {
+	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.volumePluginMgr, volumeToUnmount.VolumeSpec, nil) {
 		csiSpec, err := translateSpec(volumeToUnmount.VolumeSpec)
 		if err != nil {
 			return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.TranslateSpec failed", err)
@@ -1305,7 +1314,7 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 	var blockVolumePlugin volume.BlockVolumePlugin
 	var err error
 	// Translate to CSI spec if migration enabled
-	if useCSIPlugin(og.volumePluginMgr, deviceToDetach.VolumeSpec) {
+	if useCSIPlugin(og.volumePluginMgr, deviceToDetach.VolumeSpec, &deviceToDetach.NodeName) {
 		csiSpec, err := translateSpec(deviceToDetach.VolumeSpec)
 		if err != nil {
 			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.TranslateSpec failed", err)
@@ -1620,7 +1629,7 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 	fsResizeFunc := func() (error, error) {
 		// Need to translate the spec here if the plugin is migrated so that the metrics
 		// emitted show the correct (migrated) plugin
-		if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
+		if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec, getNodeNameFromVolumeToMount(volumeToMount)) {
 			csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
 			if err != nil {
 				return volumeToMount.GenerateError("VolumeFSResize.translateSpec failed", err)
@@ -1692,7 +1701,7 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 
 	// Need to translate the spec here if the plugin is migrated so that the metrics
 	// emitted show the correct (migrated) plugin
-	if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
+	if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec, getNodeNameFromVolumeToMount(volumeToMount)) {
 		csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
 		if err == nil {
 			volumeToMount.VolumeSpec = csiSpec
@@ -1789,48 +1798,31 @@ func isDeviceOpened(deviceToDetach AttachedVolume, hostUtil mount.HostUtils) (bo
 	return deviceOpened, nil
 }
 
-func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
-	// TODO(#75146) Check whether the driver is installed as well so that
-	// we can throw a better error when the driver is not installed.
-	// The error should be of the approximate form:
-	// fmt.Errorf("in-tree plugin %s is migrated on node %s but driver %s is not installed", pluginName, string(nodeName), driverName)
+func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec, nodeName *types.NodeName) bool {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		return false
 	}
 	if csilib.IsPVMigratable(spec.PersistentVolume) || csilib.IsInlineMigratable(spec.Volume) {
 		migratable, err := vpm.IsPluginMigratableBySpec(spec)
 		if err == nil && migratable {
+			// nodeName would be nil for mount operations where check for driver is not applicable
+			if nodeName == nil {
+				return true
+			}
+			// we are only interested in whether the driver is installed. If the
+			// driver is not installed, err would not be nil
+			if _, err = isDriverMigratedAndInstalledOnNode(vpm, spec, *nodeName); err != nil {
+				if strings.Contains(err.Error(), "is not installed") {
+					klog.Warningf("the driver is not installed %v", err)
+				}
+			}
 			return true
 		}
 	}
 	return false
 }
 
-func nodeUsingCSIPlugin(og OperationGenerator, spec *volume.Spec, nodeName types.NodeName) (bool, error) {
-	vpm := og.GetVolumePluginMgr()
-
-	migratable, err := vpm.IsPluginMigratableBySpec(spec)
-	if err != nil {
-		return false, err
-	}
-	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) ||
-		!utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) ||
-		!migratable {
-		return false, nil
-	}
-
-	if len(nodeName) == 0 {
-		return false, goerrors.New("nodeName is empty")
-	}
-
-	kubeClient := vpm.Host.GetKubeClient()
-	if kubeClient == nil {
-		// Don't handle the controller/kubelet version skew check and fallback
-		// to just checking the feature gates. This can happen if
-		// we are in a standalone (headless) Kubelet
-		return true, nil
-	}
-
+func isDriverMigratedAndInstalledOnNode(vpm *volume.VolumePluginMgr, spec *volume.Spec, nodeName types.NodeName) (isMigratedOnNode bool, err error) {
 	adcHost, ok := vpm.Host.(volume.AttachDetachVolumeHost)
 	if !ok {
 		// Don't handle the controller/kubelet version skew check and fallback
@@ -1872,7 +1864,7 @@ func nodeUsingCSIPlugin(og OperationGenerator, spec *volume.Spec, nodeName types
 		return false, nil
 	}
 
-	isMigratedOnNode := mpaSet.Has(pluginName)
+	isMigratedOnNode = mpaSet.Has(pluginName)
 
 	if isMigratedOnNode {
 		installed := false
@@ -1892,7 +1884,35 @@ func nodeUsingCSIPlugin(og OperationGenerator, spec *volume.Spec, nodeName types
 	}
 
 	return isMigratedOnNode, nil
+}
 
+func nodeUsingCSIPlugin(og OperationGenerator, spec *volume.Spec, nodeName types.NodeName) (bool, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) ||
+		!utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		return false, nil
+	}
+	vpm := og.GetVolumePluginMgr()
+
+	migratable, err := vpm.IsPluginMigratableBySpec(spec)
+	if err != nil {
+		return false, err
+	}
+	if !migratable {
+		return false, nil
+	}
+
+	if len(nodeName) == 0 {
+		return false, goerrors.New("nodeName is empty")
+	}
+
+	kubeClient := vpm.Host.GetKubeClient()
+	if kubeClient == nil {
+		// Don't handle the controller/kubelet version skew check and fallback
+		// to just checking the feature gates. This can happen if
+		// we are in a standalone (headless) Kubelet
+		return true, nil
+	}
+	return isDriverMigratedAndInstalledOnNode(vpm, spec, nodeName)
 }
 
 func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
