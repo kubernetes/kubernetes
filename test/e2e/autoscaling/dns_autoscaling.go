@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
@@ -258,7 +257,7 @@ func getScheduableCores(nodes []v1.Node) int64 {
 
 	scInt64, scOk := sc.AsInt64()
 	if !scOk {
-		e2elog.Logf("Unable to compute integer values of schedulable cores in the cluster")
+		framework.Logf("Unable to compute integer values of schedulable cores in the cluster")
 		return 0
 	}
 	return scInt64
@@ -276,7 +275,7 @@ func deleteDNSScalingConfigMap(c clientset.Interface) error {
 	if err := c.CoreV1().ConfigMaps(metav1.NamespaceSystem).Delete(DNSAutoscalerLabelName, nil); err != nil {
 		return err
 	}
-	e2elog.Logf("DNS autoscaling ConfigMap deleted.")
+	framework.Logf("DNS autoscaling ConfigMap deleted.")
 	return nil
 }
 
@@ -303,7 +302,7 @@ func updateDNSScalingConfigMap(c clientset.Interface, configMap *v1.ConfigMap) e
 	if err != nil {
 		return err
 	}
-	e2elog.Logf("DNS autoscaling ConfigMap updated.")
+	framework.Logf("DNS autoscaling ConfigMap updated.")
 	return nil
 }
 
@@ -337,14 +336,14 @@ func deleteDNSAutoscalerPod(c clientset.Interface) error {
 	if err := c.CoreV1().Pods(metav1.NamespaceSystem).Delete(podName, nil); err != nil {
 		return err
 	}
-	e2elog.Logf("DNS autoscaling pod %v deleted.", podName)
+	framework.Logf("DNS autoscaling pod %v deleted.", podName)
 	return nil
 }
 
 func waitForDNSReplicasSatisfied(c clientset.Interface, getExpected getExpectReplicasFunc, timeout time.Duration) (err error) {
 	var current int
 	var expected int
-	e2elog.Logf("Waiting up to %v for kube-dns to reach expected replicas", timeout)
+	framework.Logf("Waiting up to %v for kube-dns to reach expected replicas", timeout)
 	condition := func() (bool, error) {
 		current, err = getDNSReplicas(c)
 		if err != nil {
@@ -352,7 +351,7 @@ func waitForDNSReplicasSatisfied(c clientset.Interface, getExpected getExpectRep
 		}
 		expected = getExpected(c)
 		if current != expected {
-			e2elog.Logf("Replicas not as expected: got %v, expected %v", current, expected)
+			framework.Logf("Replicas not as expected: got %v, expected %v", current, expected)
 			return false, nil
 		}
 		return true, nil
@@ -361,12 +360,12 @@ func waitForDNSReplicasSatisfied(c clientset.Interface, getExpected getExpectRep
 	if err = wait.Poll(2*time.Second, timeout, condition); err != nil {
 		return fmt.Errorf("err waiting for DNS replicas to satisfy %v, got %v: %v", expected, current, err)
 	}
-	e2elog.Logf("kube-dns reaches expected replicas: %v", expected)
+	framework.Logf("kube-dns reaches expected replicas: %v", expected)
 	return nil
 }
 
 func waitForDNSConfigMapCreated(c clientset.Interface, timeout time.Duration) (configMap *v1.ConfigMap, err error) {
-	e2elog.Logf("Waiting up to %v for DNS autoscaling ConfigMap got re-created", timeout)
+	framework.Logf("Waiting up to %v for DNS autoscaling ConfigMap got re-created", timeout)
 	condition := func() (bool, error) {
 		configMap, err = fetchDNSScalingConfigMap(c)
 		if err != nil {
