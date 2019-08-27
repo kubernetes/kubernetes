@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -157,7 +156,7 @@ while true; do sleep 1; done
 				framework.ExpectEqual(GetContainerState(status.State), ContainerStateTerminated)
 
 				ginkgo.By("the termination message should be set")
-				e2elog.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
+				framework.Logf("Expected: %v to match Container's Termination Message: %v --", expectedMsg, status.State.Terminated.Message)
 				gomega.Expect(status.State.Terminated.Message).Should(expectedMsg)
 
 				ginkgo.By("delete the container")
@@ -348,9 +347,9 @@ while true; do sleep 1; done
 						break
 					}
 					if i < flakeRetry {
-						e2elog.Logf("No.%d attempt failed: %v, retrying...", i, err)
+						framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
 					} else {
-						e2elog.Failf("All %d attempts failed: %v", flakeRetry, err)
+						framework.Failf("All %d attempts failed: %v", flakeRetry, err)
 					}
 				}
 			}
