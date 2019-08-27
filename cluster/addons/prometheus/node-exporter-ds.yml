@@ -46,8 +46,6 @@ spec:
             requests:
               cpu: 100m
               memory: 50Mi
-      hostNetwork: true
-      hostPID: true
       volumes:
         - name: proc
           hostPath:
