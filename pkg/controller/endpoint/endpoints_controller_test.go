@@ -749,7 +749,7 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 			defer close(stopCh)
 			go endpoints.Run(1, stopCh)
 
-			// cache.WaitForCacheSync has a 100ms poll period, and the endpoints worker has a 10ms period.
+			// cache.WaitForNamedCacheSync has a 100ms poll period, and the endpoints worker has a 10ms period.
 			// To ensure we get all updates, including unexpected ones, we need to wait at least as long as
 			// a single cache sync period and worker period, with some fudge room.
 			time.Sleep(150 * time.Millisecond)

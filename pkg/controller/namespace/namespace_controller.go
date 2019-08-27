@@ -186,7 +186,7 @@ func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting namespace controller")
 	defer klog.Infof("Shutting down namespace controller")
 
-	if !controller.WaitForCacheSync("namespace", stopCh, nm.listerSynced) {
+	if !cache.WaitForNamedCacheSync("namespace", stopCh, nm.listerSynced) {
 		return
 	}
 

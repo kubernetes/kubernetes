@@ -16,7 +16,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/serviceaccount",
     deps = [
-        "//pkg/controller:go_default_library",
         "//pkg/registry/core/secret:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//pkg/util/metrics:go_default_library",

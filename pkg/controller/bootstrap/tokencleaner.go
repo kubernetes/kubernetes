@@ -117,7 +117,7 @@ func (tc *TokenCleaner) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting token cleaner controller")
 	defer klog.Infof("Shutting down token cleaner controller")
 
-	if !controller.WaitForCacheSync("token_cleaner", stopCh, tc.secretSynced) {
+	if !cache.WaitForNamedCacheSync("token_cleaner", stopCh, tc.secretSynced) {
 		return
 	}
 
