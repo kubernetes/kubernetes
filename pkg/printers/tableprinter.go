@@ -35,8 +35,13 @@ import (
 
 var _ ResourcePrinter = &HumanReadablePrinter{}
 
+type printHandler struct {
+	columnDefinitions []metav1beta1.TableColumnDefinition
+	printFunc         reflect.Value
+}
+
 var (
-	statusHandlerEntry = &handlerEntry{
+	statusHandlerEntry = &printHandler{
 		columnDefinitions: statusColumnDefinitions,
 		printFunc:         reflect.ValueOf(printStatus),
 	}
@@ -47,7 +52,7 @@ var (
 		{Name: "Message", Type: "string"},
 	}
 
-	defaultHandlerEntry = &handlerEntry{
+	defaultHandlerEntry = &printHandler{
 		columnDefinitions: objectMetaColumnDefinitions,
 		printFunc:         reflect.ValueOf(printObjectMeta),
 	}
@@ -142,7 +147,7 @@ func (h *HumanReadablePrinter) PrintObj(obj runtime.Object, output io.Writer) er
 
 	// Could not find print handler for "obj"; use the default or status print handler.
 	// Print with the default or status handler, and use the columns from the last time
-	var handler *handlerEntry
+	var handler *printHandler
 	if _, isStatus := obj.(*metav1.Status); isStatus {
 		handler = statusHandlerEntry
 	} else {
@@ -380,7 +385,7 @@ func decorateTable(table *metav1beta1.Table, options PrintOptions) error {
 // printRowsForHandlerEntry prints the incremental table output (headers if the current type is
 // different from lastType) including all the rows in the object. It returns the current type
 // or an error, if any.
-func printRowsForHandlerEntry(output io.Writer, handler *handlerEntry, eventType string, obj runtime.Object, options PrintOptions, includeHeaders bool) error {
+func printRowsForHandlerEntry(output io.Writer, handler *printHandler, eventType string, obj runtime.Object, options PrintOptions, includeHeaders bool) error {
 	var results []reflect.Value
 
 	args := []reflect.Value{reflect.ValueOf(obj), reflect.ValueOf(options)}
