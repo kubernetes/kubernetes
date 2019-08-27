@@ -22,15 +22,14 @@ import (
 	"net/http"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
