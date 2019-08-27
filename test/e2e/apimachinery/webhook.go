@@ -42,7 +42,6 @@ import (
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -537,7 +536,7 @@ func createAuthReaderRoleBinding(f *framework.Framework, namespace string) {
 		},
 	})
 	if err != nil && errors.IsAlreadyExists(err) {
-		e2elog.Logf("role binding %s already exists", roleBindingName)
+		framework.Logf("role binding %s already exists", roleBindingName)
 	} else {
 		framework.ExpectNoError(err, "creating role binding %s:webhook to access configMap", namespace)
 	}
@@ -787,7 +786,7 @@ func testMutatingConfigMapWebhook(f *framework.Framework) {
 		"mutation-stage-2": "yes",
 	}
 	if !reflect.DeepEqual(expectedConfigMapData, mutatedConfigMap.Data) {
-		e2elog.Failf("\nexpected %#v\n, got %#v\n", expectedConfigMapData, mutatedConfigMap.Data)
+		framework.Failf("\nexpected %#v\n, got %#v\n", expectedConfigMapData, mutatedConfigMap.Data)
 	}
 }
 
@@ -848,13 +847,13 @@ func testMutatingPodWebhook(f *framework.Framework) {
 	mutatedPod, err := client.CoreV1().Pods(f.Namespace.Name).Create(configMap)
 	gomega.Expect(err).To(gomega.BeNil())
 	if len(mutatedPod.Spec.InitContainers) != 1 {
-		e2elog.Failf("expect pod to have 1 init container, got %#v", mutatedPod.Spec.InitContainers)
+		framework.Failf("expect pod to have 1 init container, got %#v", mutatedPod.Spec.InitContainers)
 	}
 	if got, expected := mutatedPod.Spec.InitContainers[0].Name, "webhook-added-init-container"; got != expected {
-		e2elog.Failf("expect the init container name to be %q, got %q", expected, got)
+		framework.Failf("expect the init container name to be %q, got %q", expected, got)
 	}
 	if got, expected := mutatedPod.Spec.InitContainers[0].TerminationMessagePolicy, v1.TerminationMessageReadFile; got != expected {
-		e2elog.Failf("expect the init terminationMessagePolicy to be default to %q, got %q", expected, got)
+		framework.Failf("expect the init terminationMessagePolicy to be default to %q, got %q", expected, got)
 	}
 }
 
@@ -883,11 +882,11 @@ func testWebhook(f *framework.Framework) {
 	framework.ExpectError(err, "create pod %s in namespace %s should have been denied by webhook", pod.Name, f.Namespace.Name)
 	expectedErrMsg1 := "the pod contains unwanted container name"
 	if !strings.Contains(err.Error(), expectedErrMsg1) {
-		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
 	}
 	expectedErrMsg2 := "the pod contains unwanted label"
 	if !strings.Contains(err.Error(), expectedErrMsg2) {
-		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg2, err.Error())
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg2, err.Error())
 	}
 
 	ginkgo.By("create a pod that causes the webhook to hang")
@@ -898,15 +897,15 @@ func testWebhook(f *framework.Framework) {
 	framework.ExpectError(err, "create pod %s in namespace %s should have caused webhook to hang", pod.Name, f.Namespace.Name)
 	// ensure the error is webhook-related, not client-side
 	if !strings.Contains(err.Error(), "webhook") {
-		e2elog.Failf("expect error %q, got %q", "webhook", err.Error())
+		framework.Failf("expect error %q, got %q", "webhook", err.Error())
 	}
 	// ensure the error is a timeout
 	if !strings.Contains(err.Error(), "deadline") {
-		e2elog.Failf("expect error %q, got %q", "deadline", err.Error())
+		framework.Failf("expect error %q, got %q", "deadline", err.Error())
 	}
 	// ensure the pod was not actually created
 	if _, err := client.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{}); !errors.IsNotFound(err) {
-		e2elog.Failf("expect notfound error looking for rejected pod, got %v", err)
+		framework.Failf("expect notfound error looking for rejected pod, got %v", err)
 	}
 
 	ginkgo.By("create a configmap that should be denied by the webhook")
@@ -916,7 +915,7 @@ func testWebhook(f *framework.Framework) {
 	framework.ExpectError(err, "create configmap %s in namespace %s should have been denied by the webhook", configmap.Name, f.Namespace.Name)
 	expectedErrMsg := "the configmap contains unwanted key and value"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
-		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
 
 	ginkgo.By("create a configmap that should be admitted by the webhook")
@@ -942,7 +941,7 @@ func testWebhook(f *framework.Framework) {
 	_, err = updateConfigMap(client, f.Namespace.Name, allowedConfigMapName, toNonCompliantFn)
 	framework.ExpectError(err, "update (PUT) admitted configmap %s in namespace %s to a non-compliant one should be rejected by webhook", allowedConfigMapName, f.Namespace.Name)
 	if !strings.Contains(err.Error(), expectedErrMsg) {
-		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
 
 	ginkgo.By("update (PATCH) the admitted configmap to a non-compliant one should be rejected by the webhook")
@@ -950,7 +949,7 @@ func testWebhook(f *framework.Framework) {
 	_, err = client.CoreV1().ConfigMaps(f.Namespace.Name).Patch(allowedConfigMapName, types.StrategicMergePatchType, []byte(patch))
 	framework.ExpectError(err, "update admitted configmap %s in namespace %s by strategic merge patch to a non-compliant one should be rejected by webhook. Patch: %+v", allowedConfigMapName, f.Namespace.Name, patch)
 	if !strings.Contains(err.Error(), expectedErrMsg) {
-		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
 
 	ginkgo.By("create a namespace that bypass the webhook")
@@ -983,7 +982,7 @@ func testBlockingConfigmapDeletion(f *framework.Framework) {
 	framework.ExpectError(err, "deleting configmap %s in namespace: %s should be denied", configmap.Name, f.Namespace.Name)
 	expectedErrMsg1 := "the configmap cannot be deleted because it contains unwanted key and value"
 	if !strings.Contains(err.Error(), expectedErrMsg1) {
-		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
 	}
 
 	ginkgo.By("remove the offending key and value from the configmap data")
@@ -1016,7 +1015,7 @@ func testAttachingPodWebhook(f *framework.Framework) {
 	_, err = framework.NewKubectlCommand("attach", fmt.Sprintf("--namespace=%v", f.Namespace.Name), pod.Name, "-i", "-c=container1").WithTimeout(timer.C).Exec()
 	framework.ExpectError(err, "'kubectl attach' the pod, should be denied by the webhook")
 	if e, a := "attaching to pod 'to-be-attached-pod' is not allowed", err.Error(); !strings.Contains(a, e) {
-		e2elog.Failf("unexpected 'kubectl attach' error message. expected to contain %q, got %q", e, a)
+		framework.Failf("unexpected 'kubectl attach' error message. expected to contain %q, got %q", e, a)
 	}
 }
 
@@ -1112,7 +1111,7 @@ func testFailClosedWebhook(f *framework.Framework) {
 	_, err = client.CoreV1().ConfigMaps(failNamespaceName).Create(configmap)
 	framework.ExpectError(err, "create configmap in namespace: %s should be unconditionally rejected by the webhook", failNamespaceName)
 	if !errors.IsInternalError(err) {
-		e2elog.Failf("expect an internal error, got %#v", err)
+		framework.Failf("expect an internal error, got %#v", err)
 	}
 }
 
@@ -1293,7 +1292,7 @@ func testWebhooksForWebhookConfigurations(f *framework.Framework, configName str
 	})
 	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", configName, namespace)
 	if mutatedValidatingWebhookConfiguration.ObjectMeta.Labels != nil && mutatedValidatingWebhookConfiguration.ObjectMeta.Labels[addedLabelKey] == addedLabelValue {
-		e2elog.Failf("expected %s not to be mutated by mutating webhooks but it was", configName)
+		framework.Failf("expected %s not to be mutated by mutating webhooks but it was", configName)
 	}
 
 	err = waitWebhookConfigurationReady(f)
@@ -1349,7 +1348,7 @@ func testWebhooksForWebhookConfigurations(f *framework.Framework, configName str
 	})
 	framework.ExpectNoError(err, "registering webhook config %s with namespace %s", configName, namespace)
 	if mutatedMutatingWebhookConfiguration.ObjectMeta.Labels != nil && mutatedMutatingWebhookConfiguration.ObjectMeta.Labels[addedLabelKey] == addedLabelValue {
-		e2elog.Failf("expected %s not to be mutated by mutating webhooks but it was", configName)
+		framework.Failf("expected %s not to be mutated by mutating webhooks but it was", configName)
 	}
 
 	err = waitWebhookConfigurationReady(f)
@@ -1671,7 +1670,7 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1.Cust
 	framework.ExpectError(err, "create custom resource %s in namespace %s should be denied by webhook", crInstanceName, f.Namespace.Name)
 	expectedErrMsg := "the custom resource contains unwanted data"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
-		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
 }
 
@@ -1699,7 +1698,7 @@ func testBlockingCustomResourceDeletion(f *framework.Framework, crd *apiextensio
 	framework.ExpectError(err, "deleting custom resource %s in namespace: %s should be denied", crInstanceName, f.Namespace.Name)
 	expectedErrMsg1 := "the custom resource cannot be deleted because it contains unwanted key and value"
 	if !strings.Contains(err.Error(), expectedErrMsg1) {
-		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg1, err.Error())
 	}
 
 	ginkgo.By("Remove the offending key and value from the custom resource data")
@@ -1745,7 +1744,7 @@ func testMutatingCustomResourceWebhook(f *framework.Framework, crd *apiextension
 		expectedCRData["mutation-stage-2"] = "yes"
 	}
 	if !reflect.DeepEqual(expectedCRData, mutatedCR.Object["data"]) {
-		e2elog.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
+		framework.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
 	}
 }
 
@@ -1878,12 +1877,12 @@ func testCRDDenyWebhook(f *framework.Framework) {
 	// Creating a custom resource definition for use by assorted tests.
 	config, err := framework.LoadConfig()
 	if err != nil {
-		e2elog.Failf("failed to load config: %v", err)
+		framework.Failf("failed to load config: %v", err)
 		return
 	}
 	apiExtensionClient, err := crdclientset.NewForConfig(config)
 	if err != nil {
-		e2elog.Failf("failed to initialize apiExtensionClient: %v", err)
+		framework.Failf("failed to initialize apiExtensionClient: %v", err)
 		return
 	}
 	crd := &apiextensionsv1.CustomResourceDefinition{
@@ -1911,7 +1910,7 @@ func testCRDDenyWebhook(f *framework.Framework) {
 	framework.ExpectError(err, "create custom resource definition %s should be denied by webhook", crd.Name)
 	expectedErrMsg := "the crd contains unwanted label"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
-		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
 }
 
@@ -1994,7 +1993,7 @@ func testSlowWebhookTimeoutFailEarly(f *framework.Framework) {
 	isTimeoutError := strings.Contains(err.Error(), `context deadline exceeded`) || strings.Contains(err.Error(), `timeout`)
 	isErrorQueryingWebhook := strings.Contains(err.Error(), `/always-allow-delay-5s?timeout=1s`)
 	if !isTimeoutError || !isErrorQueryingWebhook {
-		e2elog.Failf("expect an HTTP/dial timeout error querying the slow webhook, got: %q", err.Error())
+		framework.Failf("expect an HTTP/dial timeout error querying the slow webhook, got: %q", err.Error())
 	}
 }
 
@@ -2060,7 +2059,7 @@ func createValidatingWebhookConfiguration(f *framework.Framework, config *admiss
 		if webhook.ObjectSelector != nil && webhook.ObjectSelector.MatchLabels[f.UniqueName] == "true" {
 			continue
 		}
-		e2elog.Failf(`webhook %s in config %s has no namespace or object selector with %s="true", and can interfere with other tests`, webhook.Name, config.Name, f.UniqueName)
+		framework.Failf(`webhook %s in config %s has no namespace or object selector with %s="true", and can interfere with other tests`, webhook.Name, config.Name, f.UniqueName)
 	}
 	return f.ClientSet.AdmissionregistrationV1().ValidatingWebhookConfigurations().Create(config)
 }
@@ -2075,7 +2074,7 @@ func createMutatingWebhookConfiguration(f *framework.Framework, config *admissio
 		if webhook.ObjectSelector != nil && webhook.ObjectSelector.MatchLabels[f.UniqueName] == "true" {
 			continue
 		}
-		e2elog.Failf(`webhook %s in config %s has no namespace or object selector with %s="true", and can interfere with other tests`, webhook.Name, config.Name, f.UniqueName)
+		framework.Failf(`webhook %s in config %s has no namespace or object selector with %s="true", and can interfere with other tests`, webhook.Name, config.Name, f.UniqueName)
 	}
 	return f.ClientSet.AdmissionregistrationV1().MutatingWebhookConfigurations().Create(config)
 }
