@@ -195,6 +195,7 @@ func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
 		}
 	} else {
 		// Add our entry for each of the supported container registry URLs
+		// TODO: we should check if the ACR repo is anonymous before adding it here
 		for _, url := range containerRegistryUrls {
 			cred := &credentialprovider.DockerConfigEntry{
 				Username: a.config.AADClientID,
@@ -203,14 +204,14 @@ func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
 			}
 			cfg[url] = *cred
 		}
+		// add ACR anonymous repo support: use empty username and password for anonymous access
+		cfg["*.azurecr.*"] = credentialprovider.DockerConfigEntry{
+			Username: "",
+			Password: "",
+			Email:    dummyRegistryEmail,
+		}
 	}
 
-	// add ACR anonymous repo support: use empty username and password for anonymous access
-	cfg["*.azurecr.*"] = credentialprovider.DockerConfigEntry{
-		Username: "",
-		Password: "",
-		Email:    dummyRegistryEmail,
-	}
 	return cfg
 }
 
