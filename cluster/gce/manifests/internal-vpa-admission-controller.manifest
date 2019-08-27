@@ -13,7 +13,7 @@
         "containers": [
             {
                 "name": "vpa-admission-controller",
-                "image":"gcr.io/gke-autoscaling-gcr/vpa-admission-controller:0.6.3-gke.1",
+                "image":"gcr.io/gke-master-images/vpa-admission-controller:0.6.4-gke.1",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",
