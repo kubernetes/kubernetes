@@ -202,6 +202,67 @@ func TestSetCRDCondition(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "set new condition which doesn't have lastTransitionTime set",
+			crdCondition: []CustomResourceDefinitionCondition{
+				{
+					Type:               Established,
+					Status:             ConditionTrue,
+					Reason:             "Accepted",
+					Message:            "the initial names have been accepted",
+					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+			newCondition: CustomResourceDefinitionCondition{
+				Type:    Established,
+				Status:  ConditionFalse,
+				Reason:  "NotAccepted",
+				Message: "Not accepted",
+			},
+			expectedcrdCondition: []CustomResourceDefinitionCondition{
+				{
+					Type:               Established,
+					Status:             ConditionFalse,
+					Reason:             "NotAccepted",
+					Message:            "Not accepted",
+					LastTransitionTime: metav1.Date(2018, 1, 2, 0, 0, 0, 0, time.UTC),
+				},
+			},
+		},
+		{
+			name: "append new condition which doesn't have lastTransitionTime set",
+			crdCondition: []CustomResourceDefinitionCondition{
+				{
+					Type:               Established,
+					Status:             ConditionTrue,
+					Reason:             "Accepted",
+					Message:            "the initial names have been accepted",
+					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+			newCondition: CustomResourceDefinitionCondition{
+				Type:    Terminating,
+				Status:  ConditionFalse,
+				Reason:  "NeverEstablished",
+				Message: "resource was never established",
+			},
+			expectedcrdCondition: []CustomResourceDefinitionCondition{
+				{
+					Type:               Established,
+					Status:             ConditionTrue,
+					Reason:             "Accepted",
+					Message:            "the initial names have been accepted",
+					LastTransitionTime: metav1.Date(2018, 1, 1, 0, 0, 0, 0, time.UTC),
+				},
+				{
+					Type:               Terminating,
+					Status:             ConditionFalse,
+					Reason:             "NeverEstablished",
+					Message:            "resource was never established",
+					LastTransitionTime: metav1.Date(2018, 2, 1, 0, 0, 0, 0, time.UTC),
+				},
+			},
+		},
 	}
 	for _, tc := range tests {
 		crd := generateCRDwithCondition(tc.crdCondition)
@@ -212,6 +273,9 @@ func TestSetCRDCondition(t *testing.T) {
 		for i := range tc.expectedcrdCondition {
 			if !IsCRDConditionEquivalent(&tc.expectedcrdCondition[i], &crd.Status.Conditions[i]) {
 				t.Errorf("%v expected %v, got %v", tc.name, tc.expectedcrdCondition, crd.Status.Conditions)
+			}
+			if crd.Status.Conditions[i].LastTransitionTime.IsZero() {
+				t.Errorf("%q lastTransitionTime should not be null: %v", tc.name, i, crd.Status.Conditions)
 			}
 		}
 	}
