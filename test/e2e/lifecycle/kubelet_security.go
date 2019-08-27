@@ -29,7 +29,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
@@ -82,7 +82,7 @@ func portClosedTest(f *framework.Framework, pickNode *v1.Node, port int) {
 		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", addr, port), 1*time.Minute)
 		if err == nil {
 			conn.Close()
-			e2elog.Failf("port %d is not disabled", port)
+			framework.Failf("port %d is not disabled", port)
 		}
 	}
 }
