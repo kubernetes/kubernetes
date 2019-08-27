@@ -22,12 +22,15 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"net/http"
 	"os"
 	goruntime "runtime"
 	"strings"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	v1 "k8s.io/api/core/v1"
 	v1meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,6 +50,8 @@ import (
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog"
 	"k8s.io/kube-proxy/config/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
@@ -73,11 +78,6 @@ import (
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/utils/exec"
 	utilpointer "k8s.io/utils/pointer"
-
-	"github.com/fsnotify/fsnotify"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"k8s.io/klog"
 )
 
 const (

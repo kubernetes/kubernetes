@@ -17,12 +17,13 @@ limitations under the License.
 package winkernel
 
 import (
-	"k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const kubeProxySubsystem = "kubeproxy"
