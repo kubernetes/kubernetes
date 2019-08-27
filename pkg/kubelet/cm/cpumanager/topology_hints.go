@@ -20,7 +20,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
@@ -72,26 +71,18 @@ func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) map[strin
 // bits set as the narrowest matching SocketAffinity with 'Preferred: true', and
 // marking all others with 'Preferred: false'.
 func (m *manager) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
-	// Discover topology in order to establish the number
-	// of available CPUs per socket.
-	topo, err := topology.Discover(m.machineInfo)
-	if err != nil {
-		klog.Warningf("[cpu manager] Error discovering topology for TopologyHint generation")
-		return nil
-	}
-
 	// Initialize minAffinity to a full affinity mask.
 	minAffinity, _ := socketmask.NewSocketMask()
 	minAffinity.Fill()
 
 	// Iterate through all combinations of socketMasks and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	socketmask.IterateSocketMasks(topo.CPUDetails.Sockets().ToSlice(), func(mask socketmask.SocketMask) {
+	socketmask.IterateSocketMasks(m.topology.CPUDetails.Sockets().ToSlice(), func(mask socketmask.SocketMask) {
 		// Check to see if we have enough CPUs available on the current
 		// SocketMask to satisfy the CPU request.
 		numMatching := 0
 		for _, c := range availableCPUs.ToSlice() {
-			if mask.IsSet(topo.CPUDetails[c].SocketID) {
+			if mask.IsSet(m.topology.CPUDetails[c].SocketID) {
 				numMatching++
 			}
 		}

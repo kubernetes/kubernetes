@@ -23,6 +23,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
@@ -49,30 +50,36 @@ func TestGetTopologyHints(t *testing.T) {
 	secondSocketMask, _ := socketmask.NewSocketMask(1)
 	crossSocketMask, _ := socketmask.NewSocketMask(0, 1)
 
-	m := manager{
-		policy: &staticPolicy{},
-		machineInfo: &cadvisorapi.MachineInfo{
-			NumCores: 12,
-			Topology: []cadvisorapi.Node{
-				{Id: 0,
-					Cores: []cadvisorapi.Core{
-						{Id: 0, Threads: []int{0, 6}},
-						{Id: 1, Threads: []int{1, 7}},
-						{Id: 2, Threads: []int{2, 8}},
-					},
-				},
-				{Id: 1,
-					Cores: []cadvisorapi.Core{
-						{Id: 0, Threads: []int{3, 9}},
-						{Id: 1, Threads: []int{4, 10}},
-						{Id: 2, Threads: []int{5, 11}},
-					},
+	machineInfo := cadvisorapi.MachineInfo{
+		NumCores: 12,
+		Topology: []cadvisorapi.Node{
+			{Id: 0,
+				Cores: []cadvisorapi.Core{
+					{Id: 0, Threads: []int{0, 6}},
+					{Id: 1, Threads: []int{1, 7}},
+					{Id: 2, Threads: []int{2, 8}},
 				},
 			},
+			{Id: 1,
+				Cores: []cadvisorapi.Core{
+					{Id: 0, Threads: []int{3, 9}},
+					{Id: 1, Threads: []int{4, 10}},
+					{Id: 2, Threads: []int{5, 11}},
+				},
+			},
+		},
+	}
+
+	topology, _ := topology.Discover(&machineInfo)
+
+	m := manager{
+		policy: &staticPolicy{
+			topology: topology,
 		},
 		state: &mockState{
 			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
+		topology: topology,
 	}
 
 	tcases := []struct {
