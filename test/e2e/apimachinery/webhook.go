@@ -104,6 +104,77 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		cleanWebhookTest(client, namespaceName)
 	})
 
+	ginkgo.It("should include webhook resources in discovery documents", func() {
+		{
+			ginkgo.By("fetching the /apis discovery document")
+			apiGroupList := &metav1.APIGroupList{}
+			err := client.Discovery().RESTClient().Get().AbsPath("/apis").Do().Into(apiGroupList)
+			framework.ExpectNoError(err, "fetching /apis")
+
+			ginkgo.By("finding the admissionregistration.k8s.io API group in the /apis discovery document")
+			var group *metav1.APIGroup
+			for _, g := range apiGroupList.Groups {
+				if g.Name == admissionregistrationv1.GroupName {
+					group = &g
+					break
+				}
+			}
+			framework.ExpectNotEqual(group, nil, "admissionregistration.k8s.io API group not found in /apis discovery document")
+
+			ginkgo.By("finding the admissionregistration.k8s.io/v1 API group/version in the /apis discovery document")
+			var version *metav1.GroupVersionForDiscovery
+			for _, v := range group.Versions {
+				if v.Version == admissionregistrationv1.SchemeGroupVersion.Version {
+					version = &v
+					break
+				}
+			}
+			framework.ExpectNotEqual(version, nil, "admissionregistration.k8s.io/v1 API group version not found in /apis discovery document")
+		}
+
+		{
+			ginkgo.By("fetching the /apis/admissionregistration.k8s.io discovery document")
+			group := &metav1.APIGroup{}
+			err := client.Discovery().RESTClient().Get().AbsPath("/apis/admissionregistration.k8s.io").Do().Into(group)
+			framework.ExpectNoError(err, "fetching /apis/admissionregistration.k8s.io")
+			framework.ExpectEqual(group.Name, admissionregistrationv1.GroupName, "verifying API group name in /apis/admissionregistration.k8s.io discovery document")
+
+			ginkgo.By("finding the admissionregistration.k8s.io/v1 API group/version in the /apis/admissionregistration.k8s.io discovery document")
+			var version *metav1.GroupVersionForDiscovery
+			for _, v := range group.Versions {
+				if v.Version == admissionregistrationv1.SchemeGroupVersion.Version {
+					version = &v
+					break
+				}
+			}
+			framework.ExpectNotEqual(version, nil, "admissionregistration.k8s.io/v1 API group version not found in /apis/admissionregistration.k8s.io discovery document")
+		}
+
+		{
+			ginkgo.By("fetching the /apis/admissionregistration.k8s.io/v1 discovery document")
+			apiResourceList := &metav1.APIResourceList{}
+			err := client.Discovery().RESTClient().Get().AbsPath("/apis/admissionregistration.k8s.io/v1").Do().Into(apiResourceList)
+			framework.ExpectNoError(err, "fetching /apis/admissionregistration.k8s.io/v1")
+			framework.ExpectEqual(apiResourceList.GroupVersion, admissionregistrationv1.SchemeGroupVersion.String(), "verifying API group/version in /apis/admissionregistration.k8s.io/v1 discovery document")
+
+			ginkgo.By("finding mutatingwebhookconfigurations and validatingwebhookconfigurations resources in the /apis/admissionregistration.k8s.io/v1 discovery document")
+			var (
+				mutatingWebhookResource   *metav1.APIResource
+				validatingWebhookResource *metav1.APIResource
+			)
+			for i := range apiResourceList.APIResources {
+				if apiResourceList.APIResources[i].Name == "mutatingwebhookconfigurations" {
+					mutatingWebhookResource = &apiResourceList.APIResources[i]
+				}
+				if apiResourceList.APIResources[i].Name == "validatingwebhookconfigurations" {
+					validatingWebhookResource = &apiResourceList.APIResources[i]
+				}
+			}
+			framework.ExpectNotEqual(mutatingWebhookResource, nil, "mutatingwebhookconfigurations resource not found in /apis/admissionregistration.k8s.io/v1 discovery document")
+			framework.ExpectNotEqual(validatingWebhookResource, nil, "validatingwebhookconfigurations resource not found in /apis/admissionregistration.k8s.io/v1 discovery document")
+		}
+	})
+
 	ginkgo.It("Should be able to deny pod and configmap creation", func() {
 		webhookCleanup := registerWebhook(f, f.UniqueName, context, servicePort)
 		defer webhookCleanup()
@@ -501,14 +572,6 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		})
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s this is not mutated", f.Namespace.Name)
 	})
-
-	// TODO: add more e2e tests for mutating webhooks
-	// 1. mutating webhook that mutates pod
-	// 2. mutating webhook that sends empty patch
-	//   2.1 and sets status.allowed=true
-	//   2.2 and sets status.allowed=false
-	// 3. mutating webhook that sends patch, but also sets status.allowed=false
-	// 4. mutating webhook that fail-open v.s. fail-closed
 })
 
 func createAuthReaderRoleBinding(f *framework.Framework, namespace string) {
