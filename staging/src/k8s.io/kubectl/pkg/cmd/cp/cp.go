@@ -68,9 +68,10 @@ var (
 
 // CopyOptions have the data required to perform the copy operation
 type CopyOptions struct {
-	Container  string
-	Namespace  string
-	NoPreserve bool
+	Container       string
+	Namespace       string
+	NoPreserve      bool
+	ExtractSymlinks bool
 
 	ClientConfig *restclient.Config
 	Clientset    kubernetes.Interface
@@ -102,6 +103,7 @@ func NewCmdCp(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.C
 	}
 	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, "Container name. If omitted, the first container in the pod will be chosen")
 	cmd.Flags().BoolVarP(&o.NoPreserve, "no-preserve", "", false, "The copied file/directory's ownership and permissions will not be preserved in the container")
+	cmd.Flags().BoolVarP(&o.ExtractSymlinks, "extract-symlinks", "", false, "Whether to preserve symlinks when copying from a container. Not recommended on untrusted containers.")
 
 	return cmd
 }
@@ -469,6 +471,9 @@ func (o *CopyOptions) untarAll(reader io.Reader, destDir, prefix string) error {
 		}
 
 		if mode&os.ModeSymlink != 0 {
+			if !o.ExtractSymlinks {
+				continue
+			}
 			linkname := header.Linkname
 			// We need to ensure that the link destination is always within boundries
 			// of the destination directory. This prevents any kind of path traversal

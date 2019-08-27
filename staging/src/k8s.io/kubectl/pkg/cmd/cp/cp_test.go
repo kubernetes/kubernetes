@@ -351,6 +351,7 @@ func TestTarUntar(t *testing.T) {
 	}
 
 	opts := NewCopyOptions(genericclioptions.NewTestIOStreamsDiscard())
+	opts.ExtractSymlinks = true
 
 	writer := &bytes.Buffer{}
 	if err := makeTar(dir, dir, writer); err != nil {
@@ -741,6 +742,22 @@ func TestValidate(t *testing.T) {
 }
 
 func TestUntar(t *testing.T) {
+	tests := []struct {
+		name string
+		opts *CopyOptions
+	}{
+		{"default", &CopyOptions{}},
+		{"extract-symlinks", &CopyOptions{ExtractSymlinks: true}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			testUntar(t, test.opts)
+		})
+	}
+}
+
+func testUntar(t *testing.T, opts *CopyOptions) {
 	testdir, err := ioutil.TempDir("", "test-untar")
 	require.NoError(t, err)
 	defer os.RemoveAll(testdir)
@@ -862,7 +879,7 @@ func TestUntar(t *testing.T) {
 	tw := tar.NewWriter(buf)
 	expectations := map[string]bool{}
 	for _, f := range files {
-		if f.expected != "" {
+		if f.expected != "" && (opts.ExtractSymlinks || f.linkTarget == "") {
 			expectations[f.expected] = false
 		}
 		if f.linkTarget == "" {
@@ -890,7 +907,7 @@ func TestUntar(t *testing.T) {
 
 	// Capture warnings to stderr for debugging.
 	output := (*testWriter)(t)
-	opts := NewCopyOptions(genericclioptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
+	opts.IOStreams = genericclioptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output}
 
 	require.NoError(t, opts.untarAll(buf, filepath.Join(basedir), ""))
 
