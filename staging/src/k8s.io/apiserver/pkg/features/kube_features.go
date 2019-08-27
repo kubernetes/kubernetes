@@ -155,7 +155,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
 	APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
 	DryRun:                  {Default: true, PreRelease: featuregate.Beta},
-	RemainingItemCount:      {Default: false, PreRelease: featuregate.Alpha},
+	RemainingItemCount:      {Default: true, PreRelease: featuregate.Beta},
 	ServerSideApply:         {Default: false, PreRelease: featuregate.Alpha},
 	StorageVersionHash:      {Default: true, PreRelease: featuregate.Beta},
 	WinOverlay:              {Default: false, PreRelease: featuregate.Alpha},
