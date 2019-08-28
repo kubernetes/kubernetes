@@ -117,7 +117,24 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		t := time.Now()
 
 		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, o)
-		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "admit", hook.Name)
+		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
+		rejected := false
+		if err != nil {
+			switch err := err.(type) {
+			case *webhookutil.ErrCallingWebhook:
+				if !ignoreClientCallFailures {
+					rejected = true
+					admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, 0)
+				}
+			case *webhookutil.ErrWebhookRejection:
+				rejected = true
+				admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionNoError, int(err.Status.ErrStatus.Code))
+			default:
+				rejected = true
+				admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionAPIServerInternalError, 0)
+			}
+		}
+		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), rejected, versionedAttr.Attributes, "admit", hook.Name)
 		if changed {
 			// Patch had changed the object. Prepare to reinvoke all previous webhooks that are eligible for re-invocation.
 			webhookReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
@@ -130,7 +147,6 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			continue
 		}
 
-		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
 		if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 			if ignoreClientCallFailures {
 				klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
@@ -139,6 +155,9 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			}
 			klog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
 			return apierrors.NewInternalError(err)
+		}
+		if rejectionErr, ok := err.(*webhookutil.ErrWebhookRejection); ok {
+			return rejectionErr.Status
 		}
 		return err
 	}
@@ -196,7 +215,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	}
 
 	if !response.Response.Allowed {
-		return false, webhookerrors.ToStatusErr(h.Name, response.Response.Result)
+		return false, &webhookutil.ErrWebhookRejection{Status: webhookerrors.ToStatusErr(h.Name, response.Response.Result)}
 	}
 
 	patchJS := response.Response.Patch
