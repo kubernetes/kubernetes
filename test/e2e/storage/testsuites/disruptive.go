@@ -21,6 +21,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -97,7 +98,7 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 	cleanup := func() {
 		if l.pod != nil {
 			ginkgo.By("Deleting pod")
-			err := framework.DeletePodWithWait(f, f.ClientSet, l.pod)
+			err := e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 			framework.ExpectNoError(err, "while deleting pod")
 			l.pod = nil
 		}
@@ -153,7 +154,7 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 						pvcs = append(pvcs, l.resource.pvc)
 					}
 					ginkgo.By("Creating a pod with pvc")
-					l.pod, err = framework.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, pvcs, inlineSources, false, "", false, false, framework.SELinuxLabel, nil, framework.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, pvcs, inlineSources, false, "", false, false, framework.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 					framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 
 					if pattern.VolMode == v1.PersistentVolumeBlock {

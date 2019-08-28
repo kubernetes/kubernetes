@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -63,7 +64,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 
 		ginkgo.By("Creating a Pod that becomes Running and therefore is actively using the PVC")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
-		pod, err = framework.CreatePod(client, nameSpace, nil, pvcClaims, false, "")
+		pod, err = e2epod.CreatePod(client, nameSpace, nil, pvcClaims, false, "")
 		framework.ExpectNoError(err, "While creating pod that uses the PVC or waiting for the Pod to become Running")
 
 		ginkgo.By("Waiting for PVC to become Bound")
@@ -84,7 +85,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 
 	ginkgo.It("Verify \"immediate\" deletion of a PVC that is not in active use by a pod", func() {
 		ginkgo.By("Deleting the pod using the PVC")
-		err = framework.DeletePodWithWait(f, client, pod)
+		err = e2epod.DeletePodWithWait(client, pod)
 		framework.ExpectNoError(err, "Error terminating and deleting pod")
 
 		ginkgo.By("Deleting the PVC")
@@ -105,7 +106,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNotEqual(pvc.ObjectMeta.DeletionTimestamp, nil)
 
 		ginkgo.By("Deleting the pod that uses the PVC")
-		err = framework.DeletePodWithWait(f, client, pod)
+		err = e2epod.DeletePodWithWait(client, pod)
 		framework.ExpectNoError(err, "Error terminating and deleting pod")
 
 		ginkgo.By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")
@@ -124,11 +125,11 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNotEqual(pvc.ObjectMeta.DeletionTimestamp, nil)
 
 		ginkgo.By("Creating second Pod whose scheduling fails because it uses a PVC that is being deleted")
-		secondPod, err2 := framework.CreateUnschedulablePod(client, nameSpace, nil, []*v1.PersistentVolumeClaim{pvc}, false, "")
+		secondPod, err2 := e2epod.CreateUnschedulablePod(client, nameSpace, nil, []*v1.PersistentVolumeClaim{pvc}, false, "")
 		framework.ExpectNoError(err2, "While creating second pod that uses a PVC that is being deleted and that is Unschedulable")
 
 		ginkgo.By("Deleting the second pod that uses the PVC that is being deleted")
-		err = framework.DeletePodWithWait(f, client, secondPod)
+		err = e2epod.DeletePodWithWait(client, secondPod)
 		framework.ExpectNoError(err, "Error terminating and deleting pod")
 
 		ginkgo.By("Checking again that the PVC status is Terminating")
@@ -137,7 +138,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNotEqual(pvc.ObjectMeta.DeletionTimestamp, nil)
 
 		ginkgo.By("Deleting the first pod that uses the PVC")
-		err = framework.DeletePodWithWait(f, client, pod)
+		err = e2epod.DeletePodWithWait(client, pod)
 		framework.ExpectNoError(err, "Error terminating and deleting pod")
 
 		ginkgo.By("Checking that the PVC is automatically removed from the system because it's no longer in active use by a pod")

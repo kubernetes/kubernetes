@@ -175,7 +175,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 			Prefix:    "nfs",
 			Framework: f,
 		}, func() {
-			framework.ExpectNoError(framework.DeletePodWithWait(f, cs, n.externalProvisionerPod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
 			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
 			cs.RbacV1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
 		}
@@ -324,7 +324,7 @@ func (v *glusterVolume) DeleteVolume() {
 		e2elog.Logf("Gluster endpoints %q not found, assuming deleted", name)
 	}
 	e2elog.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
-	err = framework.DeletePodWithWait(f, cs, v.serverPod)
+	err = e2epod.DeletePodWithWait(cs, v.serverPod)
 	if err != nil {
 		e2elog.Failf("Gluster server pod delete failed: %v", err)
 	}
@@ -872,7 +872,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err, "while waiting for hostPath init pod to succeed")
 
-	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
+	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting hostPath init pod")
 	return &hostPathSymlinkVolume{
 		sourcePath: sourcePath,
@@ -894,7 +894,7 @@ func (v *hostPathSymlinkVolume) DeleteVolume() {
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err, "while waiting for hostPath teardown pod to succeed")
 
-	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
+	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting hostPath teardown pod")
 }
 

@@ -51,6 +51,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -401,8 +402,8 @@ func CleanUpVolumeServerWithSecret(f *framework.Framework, serverPod *v1.Pod, se
 		}
 	}
 
-	framework.Logf("Deleting server pod %q...", serverPod.Name)
-	err := framework.DeletePodWithWait(f, cs, serverPod)
+	e2elog.Logf("Deleting server pod %q...", serverPod.Name)
+	err := e2epod.DeletePodWithWait(cs, serverPod)
 	if err != nil {
 		framework.Logf("Server pod delete failed: %v", err)
 	}
@@ -416,11 +417,11 @@ func TestCleanup(f *framework.Framework, config TestConfig) {
 
 	cs := f.ClientSet
 
-	err := framework.DeletePodWithWaitByName(f, cs, config.Prefix+"-client", config.Namespace)
+	err := e2epod.DeletePodWithWaitByName(cs, config.Prefix+"-client", config.Namespace)
 	gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-client", config.Namespace)
 
 	if config.ServerImage != "" {
-		err := framework.DeletePodWithWaitByName(f, cs, config.Prefix+"-server", config.Namespace)
+		err := e2epod.DeletePodWithWaitByName(cs, config.Prefix+"-server", config.Namespace)
 		gomega.Expect(err).To(gomega.BeNil(), "Failed to delete pod %v in namespace %v", config.Prefix+"-server", config.Namespace)
 	}
 }

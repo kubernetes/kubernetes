@@ -156,7 +156,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 	cleanup := func() {
 		if l.pod != nil {
 			ginkgo.By("Deleting pod")
-			err := framework.DeletePodWithWait(f, f.ClientSet, l.pod)
+			err := e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 			framework.ExpectNoError(err, "while deleting pod")
 			l.pod = nil
 		}
@@ -436,7 +436,7 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		framework.ExpectNoError(err, "while creating pod")
 		defer func() {
 			ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
-			framework.DeletePodWithWait(f, f.ClientSet, pod)
+			e2epod.DeletePodWithWait(f.ClientSet, pod)
 		}()
 
 		// Wait for pod to be running
@@ -468,7 +468,7 @@ func TestBasicSubpathFile(f *framework.Framework, contents string, pod *v1.Pod, 
 	f.TestContainerOutput("atomic-volume-subpath", pod, 0, []string{contents})
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
-	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
+	err := e2epod.DeletePodWithWait(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting pod")
 }
 
@@ -707,7 +707,7 @@ func testReadFile(f *framework.Framework, file string, pod *v1.Pod, containerInd
 	})
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
-	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
+	err := e2epod.DeletePodWithWait(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting pod")
 }
 
@@ -721,7 +721,7 @@ func testPodFailSubpathError(f *framework.Framework, pod *v1.Pod, errorMsg strin
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	framework.ExpectNoError(err, "while creating pod")
 	defer func() {
-		framework.DeletePodWithWait(f, f.ClientSet, pod)
+		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
 	ginkgo.By("Checking for subpath error in container status")
 	err = waitForPodSubpathError(f, pod, allowContainerTerminationError)
@@ -800,7 +800,7 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 	pod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	framework.ExpectNoError(err, "while creating pod")
 	defer func() {
-		framework.DeletePodWithWait(f, f.ClientSet, pod)
+		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
 	err = e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while waiting for pod to be running")
@@ -910,7 +910,7 @@ func formatVolume(f *framework.Framework, pod *v1.Pod) {
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err, "while waiting for volume init pod to succeed")
 
-	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
+	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting volume init pod")
 }
 
