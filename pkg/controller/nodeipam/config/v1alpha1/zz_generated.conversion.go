@@ -92,12 +92,14 @@ func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, ou
 
 func autoConvert_v1alpha1_NodeIPAMControllerConfiguration_To_config_NodeIPAMControllerConfiguration(in *v1alpha1.NodeIPAMControllerConfiguration, out *config.NodeIPAMControllerConfiguration, s conversion.Scope) error {
 	out.ServiceCIDR = in.ServiceCIDR
+	out.SecondaryServiceCIDR = in.SecondaryServiceCIDR
 	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
 	return nil
 }
 
 func autoConvert_config_NodeIPAMControllerConfiguration_To_v1alpha1_NodeIPAMControllerConfiguration(in *config.NodeIPAMControllerConfiguration, out *v1alpha1.NodeIPAMControllerConfiguration, s conversion.Scope) error {
 	out.ServiceCIDR = in.ServiceCIDR
+	out.SecondaryServiceCIDR = in.SecondaryServiceCIDR
 	out.NodeCIDRMaskSize = in.NodeCIDRMaskSize
 	return nil
 }

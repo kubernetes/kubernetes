@@ -5142,6 +5142,11 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = new(SessionAffinityConfig)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.IPFamily != nil {
+		in, out := &in.IPFamily, &out.IPFamily
+		*out = new(IPFamily)
+		**out = **in
+	}
 	return
 }
 

@@ -36,6 +36,7 @@ spec:
   externalName: "27"
   externalTrafficPolicy: ʤ脽ěĂ凗蓏Ŋ蛊ĉy緅縕>Ž
   healthCheckNodePort: -1095807277
+  ipFamily: ³-Ǐ忄*齧獚敆ȎțêɘĲ斬
   loadBalancerIP: "25"
   loadBalancerSourceRanges:
   - "26"
