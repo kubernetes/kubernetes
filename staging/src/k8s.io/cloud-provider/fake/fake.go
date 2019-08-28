@@ -59,8 +59,8 @@ type Cloud struct {
 	Exists bool
 	Err    error
 
-	ExistsByProviderID      bool
-	ErrByProviderID         error
+	ErrInstanceID           error
+	ExistsByProviderIDFunc  func(string) (bool, error)
 	NodeShutdown            bool
 	ErrShutdownByProviderID error
 
@@ -255,7 +255,7 @@ func (f *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string
 // InstanceID returns the cloud provider ID of the node with the specified Name.
 func (f *Cloud) InstanceID(ctx context.Context, nodeName types.NodeName) (string, error) {
 	f.addCall("instance-id")
-	return f.ExtID[nodeName], nil
+	return f.ExtID[nodeName], f.ErrInstanceID
 }
 
 // InstanceType returns the type of the specified instance.
@@ -274,7 +274,10 @@ func (f *Cloud) InstanceTypeByProviderID(ctx context.Context, providerID string)
 // If false is returned with no error, the instance will be immediately deleted by the cloud controller manager.
 func (f *Cloud) InstanceExistsByProviderID(ctx context.Context, providerID string) (bool, error) {
 	f.addCall("instance-exists-by-provider-id")
-	return f.ExistsByProviderID, f.ErrByProviderID
+	if f.ExistsByProviderIDFunc == nil {
+		return false, nil
+	}
+	return f.ExistsByProviderIDFunc(providerID)
 }
 
 // InstanceShutdownByProviderID returns true if the instances is in safe state to detach volumes

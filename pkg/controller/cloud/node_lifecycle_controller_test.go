@@ -67,7 +67,9 @@ func Test_NodesDeleted(t *testing.T) {
 				Clientset:    fake.NewSimpleClientset(),
 			},
 			fakeCloud: &fakecloud.Cloud{
-				ExistsByProviderID: false,
+				ExistsByProviderIDFunc: func(providerID string) (bool, error) {
+					return false, nil
+				},
 			},
 			deleteNodes: []*v1.Node{
 				testutil.NewNode("node0"),
@@ -101,8 +103,9 @@ func Test_NodesDeleted(t *testing.T) {
 				Clientset:    fake.NewSimpleClientset(),
 			},
 			fakeCloud: &fakecloud.Cloud{
-				ExistsByProviderID: false,
-				ErrByProviderID:    errors.New("err!"),
+				ExistsByProviderIDFunc: func(providerID string) (bool, error) {
+					return false, errors.New("err!")
+				},
 			},
 			deleteNodes: []*v1.Node{},
 		},
@@ -134,7 +137,9 @@ func Test_NodesDeleted(t *testing.T) {
 				Clientset:    fake.NewSimpleClientset(),
 			},
 			fakeCloud: &fakecloud.Cloud{
-				ExistsByProviderID: true,
+				ExistsByProviderIDFunc: func(providerID string) (bool, error) {
+					return true, nil
+				},
 			},
 			deleteNodes: []*v1.Node{},
 		},
@@ -163,7 +168,9 @@ func Test_NodesDeleted(t *testing.T) {
 				Clientset:    fake.NewSimpleClientset(),
 			},
 			fakeCloud: &fakecloud.Cloud{
-				ExistsByProviderID: false,
+				ExistsByProviderIDFunc: func(providerID string) (bool, error) {
+					return false, nil
+				},
 			},
 			deleteNodes: []*v1.Node{
 				testutil.NewNode("node0"),
@@ -194,8 +201,10 @@ func Test_NodesDeleted(t *testing.T) {
 				Clientset:    fake.NewSimpleClientset(),
 			},
 			fakeCloud: &fakecloud.Cloud{
-				NodeShutdown:       false,
-				ExistsByProviderID: true,
+				NodeShutdown: false,
+				ExistsByProviderIDFunc: func(providerID string) (bool, error) {
+					return true, nil
+				},
 				ExtID: map[types.NodeName]string{
 					types.NodeName("node0"): "foo://12345",
 				},
@@ -230,7 +239,9 @@ func Test_NodesDeleted(t *testing.T) {
 				Clientset:    fake.NewSimpleClientset(),
 			},
 			fakeCloud: &fakecloud.Cloud{
-				ExistsByProviderID: false,
+				ExistsByProviderIDFunc: func(providerID string) (bool, error) {
+					return false, nil
+				},
 			},
 			deleteNodes: []*v1.Node{},
 		},

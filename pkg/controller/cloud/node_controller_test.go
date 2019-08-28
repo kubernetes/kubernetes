@@ -43,21 +43,24 @@ import (
 func TestEnsureNodeExistsByProviderID(t *testing.T) {
 
 	testCases := []struct {
-		testName           string
-		node               *v1.Node
-		expectedCalls      []string
-		expectedNodeExists bool
-		hasInstanceID      bool
-		existsByProviderID bool
-		nodeNameErr        error
-		providerIDErr      error
+		testName               string
+		node                   *v1.Node
+		expectedCalls          []string
+		expectedNodeExists     bool
+		hasInstanceID          bool
+		errInstanceID          error
+		existsByProviderID     bool
+		providerIDErr          error
+		existsByProviderIDFunc func(string) (bool, error)
 	}{
 		{
 			testName:           "node exists by provider id",
 			existsByProviderID: true,
 			providerIDErr:      nil,
+			existsByProviderIDFunc: func(providerID string) (bool, error) {
+				return true, nil
+			},
 			hasInstanceID:      true,
-			nodeNameErr:        errors.New("unimplemented"),
 			expectedCalls:      []string{"instance-exists-by-provider-id"},
 			expectedNodeExists: true,
 			node: &v1.Node{
@@ -73,8 +76,10 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 			testName:           "does not exist by provider id",
 			existsByProviderID: false,
 			providerIDErr:      nil,
+			existsByProviderIDFunc: func(providerID string) (bool, error) {
+				return false, nil
+			},
 			hasInstanceID:      true,
-			nodeNameErr:        errors.New("unimplemented"),
 			expectedCalls:      []string{"instance-exists-by-provider-id"},
 			expectedNodeExists: false,
 			node: &v1.Node{
@@ -90,8 +95,13 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 			testName:           "exists by instance id",
 			existsByProviderID: true,
 			providerIDErr:      nil,
+			existsByProviderIDFunc: func(providerID string) (bool, error) {
+				if providerID == "fake://node0" {
+					return true, nil
+				}
+				return false, errors.New("err!")
+			},
 			hasInstanceID:      true,
-			nodeNameErr:        nil,
 			expectedCalls:      []string{"instance-id", "instance-exists-by-provider-id"},
 			expectedNodeExists: true,
 			node: &v1.Node{
@@ -103,9 +113,23 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 		{
 			testName:           "does not exist by no instance id",
 			existsByProviderID: true,
+			errInstanceID:      cloudprovider.InstanceNotFound,
 			providerIDErr:      nil,
 			hasInstanceID:      false,
-			nodeNameErr:        cloudprovider.InstanceNotFound,
+			expectedCalls:      []string{"instance-id"},
+			expectedNodeExists: false,
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "node0",
+				},
+			},
+		},
+		{
+			testName:           "instance id returns error",
+			existsByProviderID: true,
+			errInstanceID:      errors.New("err!"),
+			providerIDErr:      errors.New("err!"),
+			hasInstanceID:      false,
 			expectedCalls:      []string{"instance-id"},
 			expectedNodeExists: false,
 			node: &v1.Node{
@@ -118,8 +142,13 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 			testName:           "provider id returns error",
 			existsByProviderID: false,
 			providerIDErr:      errors.New("unimplemented"),
+			existsByProviderIDFunc: func(providerID string) (bool, error) {
+				if providerID == "node0" {
+					return false, errors.New("unimplemented")
+				}
+				return false, errors.New("err!")
+			},
 			hasInstanceID:      true,
-			nodeNameErr:        cloudprovider.InstanceNotFound,
 			expectedCalls:      []string{"instance-exists-by-provider-id"},
 			expectedNodeExists: false,
 			node: &v1.Node{
@@ -136,19 +165,18 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.testName, func(t *testing.T) {
 			fc := &fakecloud.Cloud{
-				ExistsByProviderID: tc.existsByProviderID,
-				Err:                tc.nodeNameErr,
-				ErrByProviderID:    tc.providerIDErr,
+				ErrInstanceID:          tc.errInstanceID,
+				ExistsByProviderIDFunc: tc.existsByProviderIDFunc,
 			}
 
 			if tc.hasInstanceID {
 				fc.ExtID = map[types.NodeName]string{
-					types.NodeName(tc.node.Name): "provider-id://a",
+					types.NodeName(tc.node.Name): "node0",
 				}
 			}
 
 			instances, _ := fc.Instances()
-			exists, err := ensureNodeExistsByProviderID(instances, tc.node)
+			exists, err := ensureNodeExistsByProviderID(instances, tc.node, fc)
 			assert.Equal(t, err, tc.providerIDErr)
 
 			assert.EqualValues(t, tc.expectedCalls, fc.Calls,
@@ -532,8 +560,10 @@ func TestNodeAddresses(t *testing.T) {
 			FailureDomain: "us-west-1a",
 			Region:        "us-west",
 		},
-		ExistsByProviderID: true,
-		Err:                nil,
+		Err: nil,
+		ExistsByProviderIDFunc: func(providerID string) (bool, error) {
+			return true, nil
+		},
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -644,8 +674,10 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 			FailureDomain: "us-west-1a",
 			Region:        "us-west",
 		},
-		ExistsByProviderID: true,
-		Err:                nil,
+		Err: nil,
+		ExistsByProviderIDFunc: func(providerID string) (bool, error) {
+			return true, nil
+		},
 	}
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -855,8 +887,10 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 				Address: "132.143.154.163",
 			},
 		},
-		ExistsByProviderID: false,
-		Err:                nil,
+		Err: nil,
+		ExistsByProviderIDFunc: func(providerID string) (bool, error) {
+			return false, nil
+		},
 	}
 
 	cloudNodeController := &CloudNodeController{

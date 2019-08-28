@@ -100,7 +100,12 @@ func GetInstanceProviderID(ctx context.Context, cloud Interface, nodeName types.
 	if err != nil {
 		return "", fmt.Errorf("failed to get instance ID from cloud provider: %v", err)
 	}
-	return cloud.ProviderName() + "://" + instanceID, nil
+	return GenerateProviderID(cloud.ProviderName(), instanceID), nil
+}
+
+// GenerateProviderID generate a ProviderID.
+func GenerateProviderID(providerName string, instanceID string) string {
+	return providerName + "://" + instanceID
 }
 
 // LoadBalancer is an abstract, pluggable interface for load balancers.
