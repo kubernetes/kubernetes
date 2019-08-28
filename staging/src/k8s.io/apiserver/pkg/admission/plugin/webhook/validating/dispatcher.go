@@ -101,12 +101,20 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 			versionedAttr := versionedAttrs[invocation.Kind]
 			t := time.Now()
 			err := d.callHook(ctx, hook, invocation, versionedAttr)
-			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "validating", hook.Name)
+			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
+			rejected := false
+			if err != nil {
+				// ErrCallingWebhook is ignored if the webhook is configured to failopen.
+				// Otherwise the request is rejected.
+				if _, ok := err.(*webhookutil.ErrCallingWebhook); !ok || !ignoreClientCallFailures {
+					rejected = true
+				}
+			}
+			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), rejected, versionedAttr.Attributes, "validating", hook.Name)
 			if err == nil {
 				return
 			}
 
-			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
 			if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
 					klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)

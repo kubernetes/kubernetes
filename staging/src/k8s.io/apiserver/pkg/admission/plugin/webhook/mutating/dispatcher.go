@@ -133,7 +133,16 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			round = 1
 		}
 		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, o, round, i)
-		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "admit", hook.Name)
+		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
+		rejected := false
+		if err != nil {
+			// ErrCallingWebhook is ignored if the webhook is configured to failopen.
+			// Otherwise the request is rejected.
+			if _, ok := err.(*webhookutil.ErrCallingWebhook); !ok || !ignoreClientCallFailures {
+				rejected = true
+			}
+		}
+		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), rejected, versionedAttr.Attributes, "admit", hook.Name)
 		if changed {
 			// Patch had changed the object. Prepare to reinvoke all previous webhooks that are eligible for re-invocation.
 			webhookReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
@@ -146,7 +155,6 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			continue
 		}
 
-		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
 		if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 			if ignoreClientCallFailures {
 				klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
