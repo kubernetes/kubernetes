@@ -1102,6 +1102,10 @@ type ManagedFieldsEntry struct {
 	// Time is timestamp of when these fields were set. It should always be empty if Operation is 'Apply'
 	// +optional
 	Time *Time `json:"time,omitempty" protobuf:"bytes,4,opt,name=time"`
+
+	// Fields is tombstoned to show why 5 is a reserved protobuf tag.
+	//Fields *Fields `json:"fields,omitempty" protobuf:"bytes,5,opt,name=fields,casttype=Fields"`
+
 	// FieldsType is the discriminator for the different fields format and version.
 	// There is currently only one possible value: "FieldsV1"
 	FieldsType string `json:"fieldsType,omitempty" protobuf:"bytes,6,opt,name=fieldsType"`
