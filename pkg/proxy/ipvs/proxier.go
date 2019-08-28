@@ -473,7 +473,7 @@ func NewDualStackProxier(
 	healthzServer healthcheck.HealthzUpdater,
 	scheduler string,
 	nodePortAddresses []string,
-) (*metaProxier, error) {
+) (proxy.Provider, error) {
 
 	safeIpset := newSafeIpset(ipset)
 

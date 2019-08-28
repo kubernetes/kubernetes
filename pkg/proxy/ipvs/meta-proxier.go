@@ -39,11 +39,11 @@ const (
 // NewMetaProxier returns a dual-stack "meta-proxier". Proxier API
 // calls will be dispatched to the ProxyProvider instances depending
 // on address family.
-func NewMetaProxier(ipv4Proxier, ipv6Proxier proxy.Provider) *metaProxier {
-	return &metaProxier{
+func NewMetaProxier(ipv4Proxier, ipv6Proxier proxy.Provider) proxy.Provider {
+	return proxy.Provider(&metaProxier{
 		ipv4Proxier: ipv4Proxier,
 		ipv6Proxier: ipv6Proxier,
-	}
+	})
 }
 
 // Sync immediately synchronizes the ProxyProvider's current state to
