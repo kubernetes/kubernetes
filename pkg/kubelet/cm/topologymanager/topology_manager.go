@@ -62,10 +62,10 @@ type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHint
 }
 
-//TopologyHint is a struct containing a SocketMask for a Container
+//TopologyHint is a struct containing the NUMANodeAffinity for a Container
 type TopologyHint struct {
-	SocketAffinity socketmask.SocketMask
-	// Preferred is set to true when the SocketMask encodes a preferred
+	NUMANodeAffinity socketmask.SocketMask
+	// Preferred is set to true when the NUMANodeAffinity encodes a preferred
 	// allocation for the Container. It is set to false otherwise.
 	Preferred bool
 }
@@ -149,7 +149,7 @@ func (m *manager) iterateAllProviderTopologyHints(allProviderHints [][]TopologyH
 
 // Merge the hints from all hint providers to find the best one.
 func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) TopologyHint {
-	// Set the default hint to return from this function as an any-socket
+	// Set the default hint to return from this function as an any-numa
 	// affinity with an unpreferred allocation. This will only be returned if
 	// no better hint can be found when merging hints from each hint provider.
 	defaultAffinity, _ := socketmask.NewSocketMask()
@@ -164,9 +164,9 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		// Get the TopologyHints from a provider.
 		hints := provider.GetTopologyHints(pod, container)
 
-		// If hints is empty, insert a single, preferred any-socket hint into allProviderHints.
+		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
-			klog.Infof("[topologymanager] Hint Provider has no preference for socket affinity with any resource")
+			klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with any resource")
 			affinity, _ := socketmask.NewSocketMask()
 			affinity.Fill()
 			allProviderHints = append(allProviderHints, []TopologyHint{{affinity, true}})
@@ -176,7 +176,7 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		// Otherwise, accumulate the hints for each resource type into allProviderHints.
 		for resource := range hints {
 			if hints[resource] == nil {
-				klog.Infof("[topologymanager] Hint Provider has no preference for socket affinity with resource '%s'", resource)
+				klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with resource '%s'", resource)
 				affinity, _ := socketmask.NewSocketMask()
 				affinity.Fill()
 				allProviderHints = append(allProviderHints, []TopologyHint{{affinity, true}})
@@ -184,7 +184,7 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 			}
 
 			if len(hints[resource]) == 0 {
-				klog.Infof("[topologymanager] Hint Provider has no possible socket affinities for resource '%s'", resource)
+				klog.Infof("[topologymanager] Hint Provider has no possible NUMA affinities for resource '%s'", resource)
 				affinity, _ := socketmask.NewSocketMask()
 				affinity.Fill()
 				allProviderHints = append(allProviderHints, []TopologyHint{{affinity, false}})
@@ -197,37 +197,37 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 
 	// Iterate over all permutations of hints in 'allProviderHints'. Merge the
 	// hints in each permutation by taking the bitwise-and of their affinity masks.
-	// Return the hint with the narrowest SocketAffinity of all merged
-	// permutations that have at least one socket set. If no merged mask can be
-	// found that has at least one socket set, return the 'defaultHint'.
+	// Return the hint with the narrowest NUMANodeAffinity of all merged
+	// permutations that have at least one NUMA ID set. If no merged mask can be
+	// found that has at least one NUMA ID set, return the 'defaultHint'.
 	bestHint := defaultHint
 	m.iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
-		// Get the SocketAffinity from each hint in the permutation and see if any
+		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
 		preferred := true
-		var socketAffinities []socketmask.SocketMask
+		var numaAffinities []socketmask.SocketMask
 		for _, hint := range permutation {
-			// Only consider hints that have an actual SocketAffinity set.
-			if hint.SocketAffinity != nil {
+			// Only consider hints that have an actual NUMANodeAffinity set.
+			if hint.NUMANodeAffinity != nil {
 				if !hint.Preferred {
 					preferred = false
 				}
-				socketAffinities = append(socketAffinities, hint.SocketAffinity)
+				numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
 			}
 		}
 
 		// Merge the affinities using a bitwise-and operation.
 		mergedAffinity, _ := socketmask.NewSocketMask()
 		mergedAffinity.Fill()
-		mergedAffinity.And(socketAffinities...)
+		mergedAffinity.And(numaAffinities...)
 
 		// Build a mergedHintfrom the merged affinity mask, indicating if an
 		// preferred allocation was used to generate the affinity mask or not.
 		mergedHint := TopologyHint{mergedAffinity, preferred}
 
-		// Only consider mergedHints that result in a SocketAffinity > 0 to
+		// Only consider mergedHints that result in a NUMANodeAffinity > 0 to
 		// replace the current bestHint.
-		if mergedHint.SocketAffinity.Count() == 0 {
+		if mergedHint.NUMANodeAffinity.Count() == 0 {
 			return
 		}
 
@@ -246,9 +246,9 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		}
 
 		// If mergedHint and bestHint has the same preference, only consider
-		// mergedHints that have a narrower SocketAffinity than the
-		// SocketAffinity in the current bestHint.
-		if !mergedHint.SocketAffinity.IsNarrowerThan(bestHint.SocketAffinity) {
+		// mergedHints that have a narrower NUMANodeAffinity than the
+		// NUMANodeAffinity in the current bestHint.
+		if !mergedHint.NUMANodeAffinity.IsNarrowerThan(bestHint.NUMANodeAffinity) {
 			return
 		}
 
