@@ -179,8 +179,6 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager 
 	accessor, err := meta.Accessor(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
-	} else if objMeta.GetManagedFields() != nil && len(objMeta.GetManagedFields()) != 0 {
-		return nil, fmt.Errorf("apply is not allowed with managed fields set but was: %v", objMeta.GetManagedFields())
 	}
 	missingManagedFields := (len(accessor.GetManagedFields()) == 0)
 
