@@ -109,6 +109,8 @@ go_test(
             "//pkg/util/iptables/testing:go_default_library",
             "//pkg/util/sysctl/testing:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+            "//vendor/github.com/containernetworking/cni/libcni:go_default_library",
+            "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
             "//vendor/github.com/stretchr/testify/assert:go_default_library",
             "//vendor/github.com/stretchr/testify/mock:go_default_library",
             "//vendor/k8s.io/utils/exec:go_default_library",
