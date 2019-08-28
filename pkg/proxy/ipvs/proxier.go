@@ -453,6 +453,7 @@ func NewProxier(ipt utiliptables.Interface,
 	return proxier, nil
 }
 
+// NewDualStackProxier returns a new Proxier for dual-stack operation
 func NewDualStackProxier(
 	ipt [2]utiliptables.Interface,
 	ipvs utilipvs.Interface,
@@ -472,7 +473,7 @@ func NewDualStackProxier(
 	healthzServer healthcheck.HealthzUpdater,
 	scheduler string,
 	nodePortAddresses []string,
-) (*MetaProxier, error) {
+) (*metaProxier, error) {
 
 	safeIpset := newSafeIpset(ipset)
 

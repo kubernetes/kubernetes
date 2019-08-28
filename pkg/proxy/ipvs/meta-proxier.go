@@ -23,7 +23,7 @@ import (
 	utilnet "k8s.io/utils/net"
 )
 
-type MetaProxier struct {
+type metaProxier struct {
 	ipv4Proxier proxy.Provider
 	ipv6Proxier proxy.Provider
 }
@@ -39,8 +39,8 @@ const (
 // NewMetaProxier returns a dual-stack "meta-proxier". Proxier API
 // calls will be dispatched to the ProxyProvider instances depending
 // on address family.
-func NewMetaProxier(ipv4Proxier, ipv6Proxier proxy.Provider) *MetaProxier {
-	return &MetaProxier{
+func NewMetaProxier(ipv4Proxier, ipv6Proxier proxy.Provider) *metaProxier {
+	return &metaProxier{
 		ipv4Proxier: ipv4Proxier,
 		ipv6Proxier: ipv6Proxier,
 	}
@@ -48,20 +48,20 @@ func NewMetaProxier(ipv4Proxier, ipv6Proxier proxy.Provider) *MetaProxier {
 
 // Sync immediately synchronizes the ProxyProvider's current state to
 // proxy rules.
-func (proxier *MetaProxier) Sync() {
+func (proxier *metaProxier) Sync() {
 	proxier.ipv4Proxier.Sync()
 	proxier.ipv6Proxier.Sync()
 }
 
 // SyncLoop runs periodic work.  This is expected to run as a
 // goroutine or as the main loop of the app.  It does not return.
-func (proxier *MetaProxier) SyncLoop() {
+func (proxier *metaProxier) SyncLoop() {
 	go proxier.ipv6Proxier.SyncLoop() // Use go-routine here!
 	proxier.ipv4Proxier.SyncLoop()    // never returns
 }
 
 // OnServiceAdd is called whenever creation of new service object is observed.
-func (proxier *MetaProxier) OnServiceAdd(service *v1.Service) {
+func (proxier *metaProxier) OnServiceAdd(service *v1.Service) {
 	family := proxier.serviceFamily(service)
 	switch family {
 	case familyIpv4:
@@ -73,7 +73,7 @@ func (proxier *MetaProxier) OnServiceAdd(service *v1.Service) {
 
 // OnServiceUpdate is called whenever modification of an existing
 // service object is observed.
-func (proxier *MetaProxier) OnServiceUpdate(oldService, service *v1.Service) {
+func (proxier *metaProxier) OnServiceUpdate(oldService, service *v1.Service) {
 	family := proxier.serviceFamily(service)
 	if family == familyUnknown {
 		family = proxier.serviceFamily(oldService)
@@ -88,7 +88,7 @@ func (proxier *MetaProxier) OnServiceUpdate(oldService, service *v1.Service) {
 
 // OnServiceDelete is called whenever deletion of an existing service
 // object is observed.
-func (proxier *MetaProxier) OnServiceDelete(service *v1.Service) {
+func (proxier *metaProxier) OnServiceDelete(service *v1.Service) {
 	switch proxier.serviceFamily(service) {
 	case familyIpv4:
 		proxier.ipv4Proxier.OnServiceDelete(service)
@@ -99,12 +99,12 @@ func (proxier *MetaProxier) OnServiceDelete(service *v1.Service) {
 
 // OnServiceSynced is called once all the initial event handlers were
 // called and the state is fully propagated to local cache.
-func (proxier *MetaProxier) OnServiceSynced() {
+func (proxier *metaProxier) OnServiceSynced() {
 	proxier.ipv4Proxier.OnServiceSynced()
 	proxier.ipv6Proxier.OnServiceSynced()
 }
 
-func (proxier *MetaProxier) serviceFamily(service *v1.Service) ipFamily {
+func (proxier *metaProxier) serviceFamily(service *v1.Service) ipFamily {
 	if service.Spec.ClusterIP == "" {
 		return familyUnknown
 	}
@@ -116,7 +116,7 @@ func (proxier *MetaProxier) serviceFamily(service *v1.Service) ipFamily {
 
 // OnEndpointsAdd is called whenever creation of new endpoints object
 // is observed.
-func (proxier *MetaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
+func (proxier *metaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 	switch endpointsFamily(endpoints) {
 	case familyIpv4:
 		proxier.ipv4Proxier.OnEndpointsAdd(endpoints)
@@ -127,7 +127,7 @@ func (proxier *MetaProxier) OnEndpointsAdd(endpoints *v1.Endpoints) {
 
 // OnEndpointsUpdate is called whenever modification of an existing
 // endpoints object is observed.
-func (proxier *MetaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
+func (proxier *metaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoints) {
 	family := endpointsFamily(endpoints)
 	if family == familyUnknown {
 		family = endpointsFamily(oldEndpoints)
@@ -142,7 +142,7 @@ func (proxier *MetaProxier) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoi
 
 // OnEndpointsDelete is called whenever deletion of an existing
 // endpoints object is observed.
-func (proxier *MetaProxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
+func (proxier *metaProxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 	switch endpointsFamily(endpoints) {
 	case familyIpv4:
 		proxier.ipv4Proxier.OnEndpointsDelete(endpoints)
@@ -153,7 +153,7 @@ func (proxier *MetaProxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 
 // OnEndpointsSynced is called once all the initial event handlers
 // were called and the state is fully propagated to local cache.
-func (proxier *MetaProxier) OnEndpointsSynced() {
+func (proxier *metaProxier) OnEndpointsSynced() {
 	proxier.ipv4Proxier.OnEndpointsSynced()
 	proxier.ipv6Proxier.OnEndpointsSynced()
 }
@@ -184,9 +184,8 @@ func endpointsAddressesFamily(addresses []v1.EndpointAddress) ipFamily {
 		if adr.IP != "" {
 			if utilnet.IsIPv6String(adr.IP) {
 				return familyIpv6
-			} else {
-				return familyIpv4
 			}
+			return familyIpv4
 		}
 	}
 	return familyUnknown
