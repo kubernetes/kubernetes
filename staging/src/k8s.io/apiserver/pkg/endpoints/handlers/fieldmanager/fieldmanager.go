@@ -179,8 +179,6 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager 
 	accessor, err := meta.Accessor(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
-	} else if objMeta.GetManagedFields() != nil && len(objMeta.GetManagedFields()) != 0 {
-		return nil, fmt.Errorf("apply is not allowed with managed fields set but was: %v", objMeta.GetManagedFields())
 	}
 	missingManagedFields := (len(accessor.GetManagedFields()) == 0)
 
@@ -194,6 +192,11 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager 
 	if err := yaml.Unmarshal(patch, &patchObj.Object); err != nil {
 		return nil, fmt.Errorf("error decoding YAML: %v", err)
 	}
+
+	if patchObj.GetManagedFields() != nil {
+		return nil, fmt.Errorf("managed fields must be nil but was %v", patchObj.GetManagedFields())
+	}
+
 	if patchObj.GetAPIVersion() != f.groupVersion.String() {
 		return nil,
 			errors.NewBadRequest(
