@@ -550,7 +550,8 @@ func TestApplyManagedFields(t *testing.T) {
 					"operation": "Apply",
 					"apiVersion": "v1",
 					"time": "` + accessor.GetManagedFields()[0].Time.UTC().Format(time.RFC3339) + `",
-					"fields": {
+					"fieldsType": "FieldsV1",
+					"fieldsV1": {
 						"f:metadata": {
 							"f:labels": {
 								"f:test-label": {}
@@ -563,7 +564,8 @@ func TestApplyManagedFields(t *testing.T) {
 					"operation": "Update",
 					"apiVersion": "v1",
 					"time": "` + accessor.GetManagedFields()[1].Time.UTC().Format(time.RFC3339) + `",
-					"fields": {
+					"fieldsType": "FieldsV1",
+					"fieldsV1": {
 						"f:data": {
 							"f:key": {},
 							"f:new-key": {}
@@ -778,7 +780,7 @@ func TestApplyRemoveContainerPort(t *testing.T) {
 	}
 
 	if len(deployment.Spec.Template.Spec.Containers[0].Ports) > 0 {
-		t.Fatalf("Expected no container ports but got: %v", deployment.Spec.Template.Spec.Containers[0].Ports)
+		t.Fatalf("Expected no container ports but got: %v, object: \n%#v", deployment.Spec.Template.Spec.Containers[0].Ports, deployment)
 	}
 }
 
@@ -898,7 +900,7 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 					"manager": "sidecar_controller",
 					"operation": "Apply",
 					"apiVersion": "extensions/v1beta1",
-					"fields": {
+					"fieldsV1": {
 						"f:metadata": {
 							"f:labels": {
 								"f:sidecar_version": {}
@@ -1012,7 +1014,8 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		Operation:  metav1.ManagedFieldsOperationApply,
 		APIVersion: "apps/v1",
 		Time:       actual.Time,
-		Fields: &metav1.Fields{
+		FieldsType: "FieldsV1",
+		FieldsV1: &metav1.FieldsV1{
 			Raw: []byte(`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{".":{},"f:image":{},"f:name":{}}}}}}}`),
 		},
 	}

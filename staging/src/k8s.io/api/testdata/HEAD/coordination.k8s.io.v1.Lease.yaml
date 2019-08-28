@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -29,6 +30,6 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  holderIdentity: "18"
+  holderIdentity: "19"
   leaseDurationSeconds: 896585016
   leaseTransitions: 1305381319

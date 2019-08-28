@@ -35,21 +35,22 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
   "subjects": [
     {
-      "kind": "18",
-      "apiGroup": "19",
-      "name": "20",
-      "namespace": "21"
+      "kind": "19",
+      "apiGroup": "20",
+      "name": "21",
+      "namespace": "22"
     }
   ],
   "roleRef": {
-    "apiGroup": "22",
-    "kind": "23",
-    "name": "24"
+    "apiGroup": "23",
+    "kind": "24",
+    "name": "25"
   }
 }
