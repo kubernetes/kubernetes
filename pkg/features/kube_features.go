@@ -109,6 +109,7 @@ const (
 
 	// owner: @gnufied
 	// alpha: v1.14
+	// beta: v1.16
 	// Ability to expand CSI volumes
 	ExpandCSIVolumes featuregate.Feature = "ExpandCSIVolumes"
 
@@ -495,7 +496,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	QOSReserved:                         {Default: false, PreRelease: featuregate.Alpha},
 	ExpandPersistentVolumes:             {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
-	ExpandCSIVolumes:                    {Default: false, PreRelease: featuregate.Alpha},
+	ExpandCSIVolumes:                    {Default: true, PreRelease: featuregate.Beta},
 	AttachVolumeLimit:                   {Default: true, PreRelease: featuregate.Beta},
 	CPUManager:                          {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:                   {Default: false, PreRelease: featuregate.Alpha},
