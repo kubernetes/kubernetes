@@ -105,7 +105,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 
 			ginkgo.By("verify node lease exists for every nodes")
 			originalNodes := framework.GetReadySchedulableNodesOrDie(c)
-			gomega.Expect(len(originalNodes.Items)).To(gomega.Equal(framework.TestContext.CloudConfig.NumNodes))
+			framework.ExpectEqual(len(originalNodes.Items), framework.TestContext.CloudConfig.NumNodes)
 
 			gomega.Eventually(func() error {
 				pass := true
