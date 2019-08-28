@@ -305,6 +305,9 @@ func TestSyncEndpointsProtocolTCP(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -346,6 +349,9 @@ func TestSyncEndpointsProtocolUDP(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -387,6 +393,9 @@ func TestSyncEndpointsProtocolSCTP(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -424,6 +433,9 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAll(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -461,6 +473,9 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllNotReady(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			NotReadyAddresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -498,6 +513,9 @@ func TestSyncEndpointsItemsEmptySelectorSelectsAllMixed(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses:         []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -539,6 +557,9 @@ func TestSyncEndpointsItemsPreexisting(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -610,6 +631,9 @@ func TestSyncEndpointsItems(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: "",
 			Name:            "foo",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: endptspkg.SortSubsets(expectedSubsets),
 	})
@@ -651,6 +675,8 @@ func TestSyncEndpointsItemsWithLabels(t *testing.T) {
 			{Name: "port1", Port: 8088, Protocol: "TCP"},
 		},
 	}}
+
+	serviceLabels[v1.IsHeadlessService] = ""
 	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			ResourceVersion: "",
@@ -697,6 +723,7 @@ func TestSyncEndpointsItemsPreexistingLabelsChange(t *testing.T) {
 	})
 	endpoints.syncService(ns + "/foo")
 
+	serviceLabels[v1.IsHeadlessService] = ""
 	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:            "foo",
@@ -797,6 +824,9 @@ func TestSyncEndpointsHeadlessService(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -837,6 +867,9 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseFail
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{},
 	})
@@ -873,6 +906,9 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyNeverAndPhaseSucc
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{},
 	})
@@ -909,6 +945,9 @@ func TestSyncEndpointsItemsExcludeNotReadyPodsWithRestartPolicyOnFailureAndPhase
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{},
 	})
@@ -934,6 +973,9 @@ func TestSyncEndpointsHeadlessWithoutPort(t *testing.T) {
 	data := runtime.EncodeOrDie(testapi.Default.Codec(), &v1.Endpoints{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "foo",
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -1222,6 +1264,9 @@ func TestLastTriggerChangeTimeAnnotation(t *testing.T) {
 			Annotations: map[string]string{
 				v1.EndpointsLastChangeTriggerTime: triggerTimeString,
 			},
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -1269,6 +1314,9 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationOverridden(t *testing.T) {
 			Annotations: map[string]string{
 				v1.EndpointsLastChangeTriggerTime: triggerTimeString,
 			},
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			},
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
@@ -1314,7 +1362,9 @@ func TestLastTriggerChangeTimeAnnotation_AnnotationCleared(t *testing.T) {
 			Name:            "foo",
 			Namespace:       ns,
 			ResourceVersion: "1",
-			Annotations:     map[string]string{}, // Annotation not set anymore.
+			Labels: map[string]string{
+				v1.IsHeadlessService: "",
+			}, // Annotation not set anymore.
 		},
 		Subsets: []v1.EndpointSubset{{
 			Addresses: []v1.EndpointAddress{{IP: "1.2.3.4", NodeName: &emptyNodeName, TargetRef: &v1.ObjectReference{Kind: "Pod", Name: "pod0", Namespace: ns}}},
