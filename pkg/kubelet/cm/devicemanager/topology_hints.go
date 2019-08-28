@@ -73,8 +73,8 @@ func (m *ManagerImpl) getAvailableDevices(resource string) sets.String {
 }
 
 func (m *ManagerImpl) generateDeviceTopologyHints(resource string, devices sets.String, request int) []topologymanager.TopologyHint {
-	// Initialize minAffinity to a full affinity mask.
-	minAffinity, _ := socketmask.NewSocketMask(m.numaNodes...)
+	// Initialize minPossibleAffinitySize to include all NUMA Nodes
+	minPossibleAffinitySize := len(m.numaNodes)
 
 	// Iterate through all combinations of NUMA Nodes and build hints from them.
 	hints := []topologymanager.TopologyHint{}
@@ -107,9 +107,21 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, devices sets.
 			Preferred:        false,
 		})
 
-		// Update minAffinity if relevant
-		if mask.IsNarrowerThan(minAffinity) {
-			minAffinity = mask
+		// Update minPossibleAffinitySize if relevant
+		devicesInMask := 0
+		for _, device := range m.allDevices[resource] {
+			if device.Topology == nil {
+				continue
+			}
+			for _, node := range device.Topology.Nodes {
+				if mask.IsSet(int(node.ID)) {
+					devicesInMask++
+					break
+				}
+			}
+		}
+		if devicesInMask >= request && mask.Count() < minPossibleAffinitySize {
+			minPossibleAffinitySize = mask.Count()
 		}
 	})
 
@@ -118,7 +130,7 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, devices sets.
 	// to the minAffinity. Only those with an equal number of bits set will be
 	// considered preferred.
 	for i := range hints {
-		if hints[i].NUMANodeAffinity.Count() == minAffinity.Count() {
+		if hints[i].NUMANodeAffinity.Count() == minPossibleAffinitySize {
 			hints[i].Preferred = true
 		}
 	}

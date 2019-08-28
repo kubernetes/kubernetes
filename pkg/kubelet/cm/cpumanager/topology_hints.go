@@ -71,9 +71,8 @@ func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) map[strin
 // bits set as the narrowest matching NUMANodeAffinity with 'Preferred: true', and
 // marking all others with 'Preferred: false'.
 func (m *manager) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
-	// Initialize minAffinity to a full affinity mask.
-	minAffinity, _ := socketmask.NewSocketMask()
-	minAffinity.Fill()
+	// Initialize minPossibleAffinitySize to include all NUMA Nodes
+	minPossibleAffinitySize := m.topology.CPUDetails.NUMANodes().Size()
 
 	// Iterate through all combinations of socketMasks and build hints from them.
 	hints := []topologymanager.TopologyHint{}
@@ -100,9 +99,13 @@ func (m *manager) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request 
 			Preferred:        false,
 		})
 
-		// Update minAffinity if relevant
-		if mask.IsNarrowerThan(minAffinity) {
-			minAffinity = mask
+		// Update minPossibleAffinitySize if relevant
+		cpusInMask := 0
+		for _, node := range mask.GetSockets() {
+			cpusInMask += m.topology.CPUDetails.CPUsInNUMANode(node).Size()
+		}
+		if cpusInMask >= request && mask.Count() < minPossibleAffinitySize {
+			minPossibleAffinitySize = mask.Count()
 		}
 	})
 
@@ -111,7 +114,7 @@ func (m *manager) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request 
 	// to the minAffinity. Only those with an equal number of bits set will be
 	// considered preferred.
 	for i := range hints {
-		if hints[i].NUMANodeAffinity.Count() == minAffinity.Count() {
+		if hints[i].NUMANodeAffinity.Count() == minPossibleAffinitySize {
 			hints[i].Preferred = true
 		}
 	}
