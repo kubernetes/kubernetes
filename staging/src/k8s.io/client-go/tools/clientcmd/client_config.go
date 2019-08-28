@@ -210,6 +210,7 @@ func getServerIdentificationPartialConfig(configAuthInfo clientcmdapi.AuthInfo, 
 	configClientConfig.CAFile = configClusterInfo.CertificateAuthority
 	configClientConfig.CAData = configClusterInfo.CertificateAuthorityData
 	configClientConfig.Insecure = configClusterInfo.InsecureSkipTLSVerify
+	configClientConfig.ServerName = configClusterInfo.TLSServerName
 	mergo.MergeWithOverwrite(mergedConfig, configClientConfig)
 
 	return mergedConfig, nil
@@ -458,6 +459,10 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 		mergedClusterInfo.InsecureSkipTLSVerify = config.overrides.ClusterInfo.InsecureSkipTLSVerify
 		mergedClusterInfo.CertificateAuthority = config.overrides.ClusterInfo.CertificateAuthority
 		mergedClusterInfo.CertificateAuthorityData = config.overrides.ClusterInfo.CertificateAuthorityData
+	}
+
+	if config.overrides.ClusterInfo.TLSServerName != "" {
+		mergedClusterInfo.TLSServerName = config.overrides.ClusterInfo.TLSServerName
 	}
 
 	return *mergedClusterInfo, nil
