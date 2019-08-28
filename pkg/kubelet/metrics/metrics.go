@@ -89,7 +89,7 @@ const (
 )
 
 var (
-	// NodeName is a Gauge that tracks the ode's name. The count is always 1.
+	// NodeName is a Gauge that tracks the node's name. The count is always 1.
 	NodeName = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      KubeletSubsystem,
