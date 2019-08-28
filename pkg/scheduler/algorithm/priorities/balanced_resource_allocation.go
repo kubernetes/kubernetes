@@ -19,14 +19,14 @@ package priorities
 import (
 	"math"
 
+	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 var (
-	balancedResourcePriority = &ResourceAllocationPriority{"BalancedResourceAllocation", balancedResourceScorer}
+	balancedResourcePriority = &ResourceAllocationPriority{"BalancedResourceAllocation", balancedResourceScorer, DefaultRequestedRatioResources}
 
 	// BalancedResourceAllocationMap favors nodes with balanced resource usage rate.
 	// BalancedResourceAllocationMap should **NOT** be used alone, and **MUST** be used together
@@ -38,9 +38,10 @@ var (
 	BalancedResourceAllocationMap = balancedResourcePriority.PriorityMap
 )
 
-func balancedResourceScorer(requested, allocable *schedulernodeinfo.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
-	cpuFraction := fractionOfCapacity(requested.MilliCPU, allocable.MilliCPU)
-	memoryFraction := fractionOfCapacity(requested.Memory, allocable.Memory)
+// todo: use resource weights in the scorer function
+func balancedResourceScorer(requested, allocable ResourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+	cpuFraction := fractionOfCapacity(requested[v1.ResourceCPU], allocable[v1.ResourceCPU])
+	memoryFraction := fractionOfCapacity(requested[v1.ResourceMemory], allocable[v1.ResourceMemory])
 	// This to find a node which has most balanced CPU, memory and volume usage.
 	if cpuFraction >= 1 || memoryFraction >= 1 {
 		// if requested >= capacity, the corresponding host should never be preferred.
