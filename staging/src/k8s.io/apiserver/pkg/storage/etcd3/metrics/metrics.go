@@ -20,29 +20,41 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
+/*
+ * By default, all the following metrics are defined as falling under
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ *
+ * Promoting the stability level of the metric is a responsibility of the component owner, since it
+ * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
+ * the metric stability policy.
+ */
 var (
-	etcdRequestLatency = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name: "etcd_request_duration_seconds",
-			Help: "Etcd request latency in seconds for each operation and object type.",
+	etcdRequestLatency = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "etcd_request_duration_seconds",
+			Help:           "Etcd request latency in seconds for each operation and object type.",
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"operation", "type"},
 	)
-	objectCounts = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "etcd_object_counts",
-			Help: "Number of stored objects at the time of last check split by kind.",
+	objectCounts = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name:           "etcd_object_counts",
+			Help:           "Number of stored objects at the time of last check split by kind.",
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"resource"},
 	)
 
-	deprecatedEtcdRequestLatenciesSummary = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Name: "etcd_request_latencies_summary",
-			Help: "(Deprecated) Etcd request latency summary in microseconds for each operation and object type.",
+	deprecatedEtcdRequestLatenciesSummary = compbasemetrics.NewSummaryVec(
+		&compbasemetrics.SummaryOpts{
+			Name:           "etcd_request_latencies_summary",
+			Help:           "(Deprecated) Etcd request latency summary in microseconds for each operation and object type.",
+			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"operation", "type"},
 	)
@@ -54,11 +66,11 @@ var registerMetrics sync.Once
 func Register() {
 	// Register the metrics.
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(etcdRequestLatency)
-		prometheus.MustRegister(objectCounts)
+		legacyregistry.MustRegister(etcdRequestLatency)
+		legacyregistry.MustRegister(objectCounts)
 
 		// TODO(danielqsj): Remove the following metrics, they are deprecated
-		prometheus.MustRegister(deprecatedEtcdRequestLatenciesSummary)
+		legacyregistry.MustRegister(deprecatedEtcdRequestLatenciesSummary)
 	})
 }
 
