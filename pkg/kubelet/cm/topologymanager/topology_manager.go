@@ -103,6 +103,9 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 	case PolicyRestricted:
 		policy = NewRestrictedPolicy()
 
+	case PolicySingleNumaNode:
+		policy = NewSingleNumaNodePolicy()
+
 	default:
 		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
 	}
