@@ -145,6 +145,7 @@ const (
 	FlagContext          = "context"
 	FlagNamespace        = "namespace"
 	FlagAPIServer        = "server"
+	FlagAPIServerName    = "server-name"
 	FlagInsecure         = "insecure-skip-tls-verify"
 	FlagCertFile         = "client-certificate"
 	FlagKeyFile          = "client-key"

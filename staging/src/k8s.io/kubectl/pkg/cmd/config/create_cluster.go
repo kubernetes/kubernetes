@@ -37,6 +37,7 @@ type createClusterOptions struct {
 	configAccess          clientcmd.ConfigAccess
 	name                  string
 	server                cliflag.StringFlag
+	serverName            cliflag.StringFlag
 	insecureSkipTLSVerify cliflag.Tristate
 	certificateAuthority  cliflag.StringFlag
 	embedCAData           cliflag.Tristate
@@ -79,6 +80,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options.insecureSkipTLSVerify.Default(false)
 
 	cmd.Flags().Var(&options.server, clientcmd.FlagAPIServer, clientcmd.FlagAPIServer+" for the cluster entry in kubeconfig")
+	cmd.Flags().Var(&options.serverName, clientcmd.FlagAPIServerName, clientcmd.FlagAPIServerName+" for the cluster entry in kubeconfig")
 	f := cmd.Flags().VarPF(&options.insecureSkipTLSVerify, clientcmd.FlagInsecure, "", clientcmd.FlagInsecure+" for the cluster entry in kubeconfig")
 	f.NoOptDefVal = "true"
 	cmd.Flags().Var(&options.certificateAuthority, clientcmd.FlagCAFile, "Path to "+clientcmd.FlagCAFile+" file for the cluster entry in kubeconfig")
@@ -120,6 +122,9 @@ func (o *createClusterOptions) modifyCluster(existingCluster clientcmdapi.Cluste
 
 	if o.server.Provided() {
 		modifiedCluster.Server = o.server.Value()
+	}
+	if o.serverName.Provided() {
+		modifiedCluster.ServerName = o.serverName.Value()
 	}
 	if o.insecureSkipTLSVerify.Provided() {
 		modifiedCluster.InsecureSkipTLSVerify = o.insecureSkipTLSVerify.Value()
