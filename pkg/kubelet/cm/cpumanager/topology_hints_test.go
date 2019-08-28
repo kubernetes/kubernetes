@@ -75,28 +75,18 @@ func TestGetTopologyHints(t *testing.T) {
 		1: cpuset.NewCPUSet(3, 9, 4, 10, 5, 11),
 	}
 
-	topology, _ := topology.Discover(&machineInfo, numaNodeInfo)
-
-	m := manager{
-		policy: &staticPolicy{
-			topology: topology,
-		},
-		state: &mockState{
-			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
-		},
-		topology: topology,
-	}
-
 	tcases := []struct {
 		name          string
 		pod           v1.Pod
 		container     v1.Container
+		defaultCPUSet cpuset.CPUSet
 		expectedHints []topologymanager.TopologyHint
 	}{
 		{
-			name:      "Request 2 CPUs; 4 available on Socket 0, 6 available on Socket 1",
-			pod:       *testPod1,
-			container: *testContainer1,
+			name:          "Request 2 CPUs, 4 available on NUMA 0, 6 available on NUMA 1",
+			pod:           *testPod1,
+			container:     *testContainer1,
+			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expectedHints: []topologymanager.TopologyHint{
 				{
 					NUMANodeAffinity: firstSocketMask,
@@ -113,9 +103,10 @@ func TestGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
-			name:      "Request 5 CPUs; 4 available on Socket 0, 6 available on Socket 1",
-			pod:       *testPod2,
-			container: *testContainer2,
+			name:          "Request 5 CPUs, 4 available on NUMA 0, 6 available on NUMA 1",
+			pod:           *testPod2,
+			container:     *testContainer2,
+			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expectedHints: []topologymanager.TopologyHint{
 				{
 					NUMANodeAffinity: secondSocketMask,
@@ -128,9 +119,10 @@ func TestGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
-			name:      "Request 7 CPUs, 4 available on Socket 0, 6 available on Socket 1",
-			pod:       *testPod3,
-			container: *testContainer3,
+			name:          "Request 7 CPUs, 4 available on NUMA 0, 6 available on NUMA 1",
+			pod:           *testPod3,
+			container:     *testContainer3,
+			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expectedHints: []topologymanager.TopologyHint{
 				{
 					NUMANodeAffinity: crossSocketMask,
@@ -139,13 +131,38 @@ func TestGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
-			name:          "Request 11 CPUs, 4 available on Socket 0, 6 available on Socket 1",
+			name:          "Request 11 CPUs, 4 available on NUMA 0, 6 available on NUMA 1",
 			pod:           *testPod4,
 			container:     *testContainer4,
+			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expectedHints: nil,
+		},
+		{
+			name:          "Request 2 CPUs, 1 available on NUMA 0, 1 available on NUMA 1",
+			pod:           *testPod1,
+			container:     *testContainer1,
+			defaultCPUSet: cpuset.NewCPUSet(0, 3),
+			expectedHints: []topologymanager.TopologyHint{
+				{
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        false,
+				},
+			},
 		},
 	}
 	for _, tc := range tcases {
+		topology, _ := topology.Discover(&machineInfo, numaNodeInfo)
+
+		m := manager{
+			policy: &staticPolicy{
+				topology: topology,
+			},
+			state: &mockState{
+				defaultCPUSet: tc.defaultCPUSet,
+			},
+			topology: topology,
+		}
+
 		hints := m.GetTopologyHints(tc.pod, tc.container)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue

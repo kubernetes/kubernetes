@@ -58,10 +58,11 @@ func makeSocketMask(sockets ...int) socketmask.SocketMask {
 
 func TestGetTopologyHints(t *testing.T) {
 	tcases := []struct {
-		description   string
-		request       map[string]string
-		devices       map[string][]pluginapi.Device
-		expectedHints map[string][]topologymanager.TopologyHint
+		description      string
+		request          map[string]string
+		devices          map[string][]pluginapi.Device
+		allocatedDevices map[string][]string
+		expectedHints    map[string][]topologymanager.TopologyHint
 	}{
 		{
 			description: "Single Request, no alignment",
@@ -181,6 +182,31 @@ func TestGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
+			description: "Request for 2, optimal on 1 NUMA node, forced cross-NUMA",
+			request: map[string]string{
+				"testdevice": "2",
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 1),
+					makeNUMADevice("Dev3", 0),
+					makeNUMADevice("Dev4", 1),
+				},
+			},
+			allocatedDevices: map[string][]string{
+				"testdevice": {"Dev1", "Dev2"},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
 			description: "2 device types, mixed configuration",
 			request: map[string]string{
 				"testdevice1": "2",
@@ -254,6 +280,14 @@ func TestGetTopologyHints(t *testing.T) {
 			}
 		}
 
+		for r := range tc.allocatedDevices {
+			m.allocatedDevices[r] = sets.NewString()
+
+			for _, d := range tc.allocatedDevices[r] {
+				m.allocatedDevices[r].Insert(d)
+			}
+		}
+
 		hints := m.GetTopologyHints(*pod, pod.Spec.Containers[0])
 
 		for r := range tc.expectedHints {
@@ -276,6 +310,7 @@ func TestTopologyAlignedAllocation(t *testing.T) {
 		resource           string
 		request            int
 		devices            []pluginapi.Device
+		allocatedDevices   []string
 		hint               topologymanager.TopologyHint
 		expectedAllocation int
 		expectedAlignment  map[int]int

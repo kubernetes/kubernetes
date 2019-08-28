@@ -73,13 +73,30 @@ func (m *ManagerImpl) getAvailableDevices(resource string) sets.String {
 }
 
 func (m *ManagerImpl) generateDeviceTopologyHints(resource string, devices sets.String, request int) []topologymanager.TopologyHint {
-	// Initialize minAffinity to a full affinity mask.
-	minAffinity, _ := socketmask.NewSocketMask(m.numaNodes...)
+	// Initialize minAffinitySize to include all NUMA Nodes
+	minAffinitySize := len(m.numaNodes)
 
 	// Iterate through all combinations of NUMA Nodes and build hints from them.
 	hints := []topologymanager.TopologyHint{}
 	socketmask.IterateSocketMasks(m.numaNodes, func(mask socketmask.SocketMask) {
-		// Check to see if we have enough devices available on the current
+		// First, update minAffinitySize for the current request size.
+		devicesInMask := 0
+		for _, device := range m.allDevices[resource] {
+			if device.Topology == nil {
+				continue
+			}
+			for _, node := range device.Topology.Nodes {
+				if mask.IsSet(int(node.ID)) {
+					devicesInMask++
+					break
+				}
+			}
+		}
+		if devicesInMask >= request && mask.Count() < minAffinitySize {
+			minAffinitySize = mask.Count()
+		}
+
+		// Then check to see if we have enough devices available on the current
 		// NUMA Node combination to satisfy the device request.
 		numMatching := 0
 		for d := range devices {
@@ -106,11 +123,6 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, devices sets.
 			NUMANodeAffinity: mask,
 			Preferred:        false,
 		})
-
-		// Update minAffinity if relevant
-		if mask.IsNarrowerThan(minAffinity) {
-			minAffinity = mask
-		}
 	})
 
 	// Loop back through all hints and update the 'Preferred' field based on
@@ -118,7 +130,7 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, devices sets.
 	// to the minAffinity. Only those with an equal number of bits set will be
 	// considered preferred.
 	for i := range hints {
-		if hints[i].NUMANodeAffinity.Count() == minAffinity.Count() {
+		if hints[i].NUMANodeAffinity.Count() == minAffinitySize {
 			hints[i].Preferred = true
 		}
 	}
