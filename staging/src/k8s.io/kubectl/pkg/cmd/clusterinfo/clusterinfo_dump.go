@@ -112,15 +112,15 @@ var (
     kubectl cluster-info dump --namespaces default,kube-system --output-directory=/path/to/cluster-state`))
 )
 
-func setupOutputWriter(dir string, defaultWriter io.Writer, filename string) io.Writer {
+func setupOutputWriter(dir string, defaultWriter io.Writer, filename string, fileExtension string) io.Writer {
 	if len(dir) == 0 || dir == "-" {
 		return defaultWriter
 	}
-	fullFile := path.Join(dir, filename)
+	fullFile := path.Join(dir, filename) + fileExtension
 	parent := path.Dir(fullFile)
 	cmdutil.CheckErr(os.MkdirAll(parent, 0755))
 
-	file, err := os.Create(path.Join(dir, filename))
+	file, err := os.Create(fullFile)
 	cmdutil.CheckErr(err)
 	return file
 }
@@ -170,7 +170,17 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		return err
 	}
 
-	if err := o.PrintObj(nodes, setupOutputWriter(o.OutputDir, o.Out, "nodes.json")); err != nil {
+	fileExtension := ".txt"
+	if o.PrintFlags.OutputFormat != nil {
+		switch *o.PrintFlags.OutputFormat {
+		case "json":
+			fileExtension = ".json"
+		case "yaml":
+			fileExtension = ".yaml"
+		}
+	}
+
+	if err := o.PrintObj(nodes, setupOutputWriter(o.OutputDir, o.Out, "nodes", fileExtension)); err != nil {
 		return err
 	}
 
@@ -198,7 +208,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(events, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "events.json"))); err != nil {
+		if err := o.PrintObj(events, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "events"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -206,7 +216,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(rcs, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "replication-controllers.json"))); err != nil {
+		if err := o.PrintObj(rcs, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "replication-controllers"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -214,7 +224,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(svcs, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "services.json"))); err != nil {
+		if err := o.PrintObj(svcs, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "services"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -222,7 +232,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(sets, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "daemonsets.json"))); err != nil {
+		if err := o.PrintObj(sets, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "daemonsets"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -230,7 +240,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(deps, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "deployments.json"))); err != nil {
+		if err := o.PrintObj(deps, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "deployments"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -238,7 +248,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		if err != nil {
 			return err
 		}
-		if err := o.PrintObj(rps, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "replicasets.json"))); err != nil {
+		if err := o.PrintObj(rps, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "replicasets"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -247,7 +257,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 			return err
 		}
 
-		if err := o.PrintObj(pods, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "pods.json"))); err != nil {
+		if err := o.PrintObj(pods, setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, "pods"), fileExtension)); err != nil {
 			return err
 		}
 
@@ -276,7 +286,7 @@ func (o *ClusterInfoDumpOptions) Run() error {
 		for ix := range pods.Items {
 			pod := &pods.Items[ix]
 			containers := pod.Spec.Containers
-			writer := setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, pod.Name, "logs.txt"))
+			writer := setupOutputWriter(o.OutputDir, o.Out, path.Join(namespace, pod.Name, "logs"), ".txt")
 
 			for i := range containers {
 				printContainer(writer, containers[i], pod)
