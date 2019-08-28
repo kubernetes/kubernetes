@@ -110,6 +110,12 @@ type ActualStateOfWorld interface {
 	// volumes that do not need to update contents should not fail.
 	PodExistsInVolume(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) (bool, string, error)
 
+	// VolumeExistsWithOuterSpecName returns true if the given volume specified with the
+	// OuterVolumeSpecName exists in the list of volumes that should be attached to this node.
+	// If a pod with the same name does not exist under the specified
+	// volume, false is returned.
+	VolumeExistsWithiOuterVolumeSpecName(podName volumetypes.UniquePodName, outerVolumeSpecName string) bool
+
 	// VolumeExistsWithSpecName returns true if the given volume specified with the
 	// volume spec name (a.k.a., InnerVolumeSpecName) exists in the list of
 	// volumes that should be attached to this node.
@@ -642,6 +648,19 @@ func (asw *actualStateOfWorld) PodExistsInVolume(
 	}
 
 	return podExists, volumeObj.devicePath, nil
+}
+
+func (asw *actualStateOfWorld) VolumeExistsWithiOuterVolumeSpecName(podName volumetypes.UniquePodName, outerVolumeSpecName string) bool {
+	asw.RLock()
+	defer asw.RUnlock()
+	for _, volumeObj := range asw.attachedVolumes {
+		for name, podObj := range volumeObj.mountedPods {
+			if podName == name && podObj.outerVolumeSpecName == outerVolumeSpecName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (asw *actualStateOfWorld) VolumeExistsWithSpecName(podName volumetypes.UniquePodName, volumeSpecName string) bool {

@@ -285,6 +285,89 @@ func TestGetExtraSupplementalGroupsForPod(t *testing.T) {
 	}
 }
 
+func TestUnattachedUnmountedLists(t *testing.T) {
+	tmpDir, err := utiltesting.MkTmpdir("volumeManagerTest")
+	if err != nil {
+		t.Fatalf("can't make a temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	cpm := podtest.NewMockCheckpointManager()
+	podManager := kubepod.NewBasicPodManager(podtest.NewFakeMirrorClient(), secret.NewFakeManager(), configmap.NewFakeManager(), cpm)
+
+	node, pod, _, claim := createObjects(v1.PersistentVolumeFilesystem, v1.PersistentVolumeFilesystem)
+	cases := []struct {
+		claimStatus v1.PersistentVolumeClaimStatus
+		expectError bool
+	}{
+		{
+			claimStatus: v1.PersistentVolumeClaimStatus{
+				Phase: v1.ClaimPending,
+			},
+			expectError: false,
+		},
+		{
+			claimStatus: v1.PersistentVolumeClaimStatus{
+				Phase: v1.ClaimBound,
+			},
+			expectError: true,
+		},
+	}
+	for _, tc := range cases {
+		claim.Status = v1.PersistentVolumeClaimStatus{
+			Phase: tc.claimStatus.Phase,
+		}
+		fs := v1.PersistentVolumeFilesystem
+		pv := &v1.PersistentVolume{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "pvA",
+			},
+			Spec: v1.PersistentVolumeSpec{
+				PersistentVolumeSource: v1.PersistentVolumeSource{
+					GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+						PDName: "fake-device",
+					},
+				},
+				ClaimRef: &v1.ObjectReference{
+					Name: claim.ObjectMeta.Name,
+				},
+				VolumeMode: &fs,
+			},
+		}
+
+		kubeClient := fake.NewSimpleClientset(node, pod, pv, claim)
+
+		manager := newTestVolumeManager(tmpDir, podManager, kubeClient)
+
+		stopCh := runVolumeManager(manager)
+		defer close(stopCh)
+
+		podManager.SetPods([]*v1.Pod{pod})
+
+		go simulateVolumeInUseUpdate(
+			v1.UniqueVolumeName(node.Status.VolumesAttached[0].Name),
+			stopCh,
+			manager)
+
+		err = manager.WaitForAttachAndMount(pod)
+		if (err == nil) != tc.expectError {
+			t.Errorf("Expected failure: %v", err)
+		}
+
+		vm := manager.(*volumeManager)
+		uniquePodName := util.GetUniquePodName(pod)
+		expectedVolumes := getExpectedVolumes(pod)
+		unmountedVolumes := vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
+		unattachedVolumes := vm.getUnattachedVolumes(uniquePodName, expectedVolumes)
+
+		if (len(unmountedVolumes) == 0) != tc.expectError {
+			t.Errorf("Unmounted volumes: expected error: %v, but got %v", tc.expectError, !tc.expectError)
+		}
+		if (len(unattachedVolumes) == 0) != tc.expectError {
+			t.Errorf("Unattached volumes: expected error: %v, but got %v", tc.expectError, !tc.expectError)
+		}
+	}
+}
+
 func newTestVolumeManager(tmpDir string, podManager kubepod.Manager, kubeClient clientset.Interface) VolumeManager {
 	plug := &volumetest.FakeVolumePlugin{PluginName: "fake", Host: nil}
 	fakeRecorder := &record.FakeRecorder{}

@@ -371,7 +371,7 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 			vm.getUnmountedVolumes(uniquePodName, expectedVolumes)
 		// Also get unattached volumes for error message
 		unattachedVolumes :=
-			vm.getUnattachedVolumes(expectedVolumes)
+			vm.getUnattachedVolumes(uniquePodName, expectedVolumes)
 
 		if len(unmountedVolumes) == 0 {
 			return nil
@@ -390,10 +390,10 @@ func (vm *volumeManager) WaitForAttachAndMount(pod *v1.Pod) error {
 
 // getUnattachedVolumes returns a list of the volumes that are expected to be attached but
 // are not currently attached to the node
-func (vm *volumeManager) getUnattachedVolumes(expectedVolumes []string) []string {
+func (vm *volumeManager) getUnattachedVolumes(podName types.UniquePodName, expectedVolumes []string) []string {
 	unattachedVolumes := []string{}
 	for _, volume := range expectedVolumes {
-		if !vm.actualStateOfWorld.VolumeExists(v1.UniqueVolumeName(volume)) {
+		if !vm.actualStateOfWorld.VolumeExistsWithiOuterVolumeSpecName(podName, volume) {
 			unattachedVolumes = append(unattachedVolumes, volume)
 		}
 	}
