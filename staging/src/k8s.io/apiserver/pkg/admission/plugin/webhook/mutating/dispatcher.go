@@ -58,13 +58,30 @@ var _ generic.Dispatcher = &mutatingDispatcher{}
 func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.VersionedAttributes, o admission.ObjectInterfaces, relevantHooks []*v1beta1.Webhook) error {
 	for _, hook := range relevantHooks {
 		t := time.Now()
+
 		err := a.callAttrMutatingHook(ctx, hook, attr, o)
-		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, attr.Attributes, "admit", hook.Name)
+		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
+		rejected := false
+		if err != nil {
+			switch err := err.(type) {
+			case *webhook.ErrCallingWebhook:
+				if !ignoreClientCallFailures {
+					rejected = true
+					admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "admit", string(attr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, 0)
+				}
+			case *webhook.ErrWebhookRejection:
+				rejected = true
+				admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "admit", string(attr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionNoError, int(err.Status.ErrStatus.Code))
+			default:
+				rejected = true
+				admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "admit", string(attr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionAPIServerInternalError, 0)
+			}
+		}
+		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), rejected, attr.Attributes, "admit", hook.Name)
 		if err == nil {
 			continue
 		}
 
-		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
 		if callErr, ok := err.(*webhook.ErrCallingWebhook); ok {
 			if ignoreClientCallFailures {
 				klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
@@ -72,8 +89,12 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr *generic.Version
 				continue
 			}
 			klog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
+			return apierrors.NewInternalError(err)
 		}
-		return apierrors.NewInternalError(err)
+		if rejectionErr, ok := err.(*webhook.ErrWebhookRejection); ok {
+			return rejectionErr.Status
+		}
+		return err
 	}
 
 	// convert attr.VersionedObject to the internal version in the underlying admission.Attributes
@@ -127,7 +148,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	}
 
 	if !response.Response.Allowed {
-		return webhookerrors.ToStatusErr(h.Name, response.Response.Result)
+		return &webhook.ErrWebhookRejection{Status: webhookerrors.ToStatusErr(h.Name, response.Response.Result)}
 	}
 
 	patchJS := response.Response.Patch

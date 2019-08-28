@@ -57,12 +57,28 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.Versi
 
 			t := time.Now()
 			err := d.callHook(ctx, hook, attr)
-			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, attr.Attributes, "validating", hook.Name)
+			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
+			rejected := false
+			if err != nil {
+				switch err := err.(type) {
+				case *webhook.ErrCallingWebhook:
+					if !ignoreClientCallFailures {
+						rejected = true
+						admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "validating", string(attr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, 0)
+					}
+				case *webhook.ErrWebhookRejection:
+					rejected = true
+					admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "validating", string(attr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionNoError, int(err.Status.ErrStatus.Code))
+				default:
+					rejected = true
+					admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "validating", string(attr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionAPIServerInternalError, 0)
+				}
+			}
+			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), rejected, attr.Attributes, "validating", hook.Name)
 			if err == nil {
 				return
 			}
 
-			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
 			if callErr, ok := err.(*webhook.ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
 					klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
@@ -75,6 +91,9 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr *generic.Versi
 				return
 			}
 
+			if rejectionErr, ok := err.(*webhook.ErrWebhookRejection); ok {
+				err = rejectionErr.Status
+			}
 			klog.Warningf("rejected by webhook %q: %#v", hook.Name, err)
 			errCh <- err
 		}(relevantHooks[i])
@@ -141,5 +160,5 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Webhook,
 	if response.Response.Allowed {
 		return nil
 	}
-	return webhookerrors.ToStatusErr(h.Name, response.Response.Result)
+	return &webhook.ErrWebhookRejection{Status: webhookerrors.ToStatusErr(h.Name, response.Response.Result)}
 }
