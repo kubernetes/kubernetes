@@ -25,7 +25,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -444,23 +443,15 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 func TestApplyFailsWithManagedFields(t *testing.T) {
 	f := NewTestFieldManager()
 
-	obj := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			ManagedFields: []metav1.ManagedFieldsEntry{
-				{
-					Manager: "test",
-				},
-			},
-		},
-	}
-
-	_, err := f.Apply(obj, []byte(`{
+	_, err := f.Apply(&corev1.Pod{}, []byte(`{
 		"apiVersion": "apps/v1",
 		"kind": "Pod",
 		"metadata": {
-			"labels": {
-				"a": "b"
-			},
+			"managedFields": [
+				{
+				  "manager": "test",
+				}
+			]
 		}
 	}`), "fieldmanager_test", false)
 
@@ -469,36 +460,10 @@ func TestApplyFailsWithManagedFields(t *testing.T) {
 	}
 }
 
-func TestApplySuccessWithEmptyManagedFields(t *testing.T) {
+func TestApplySuccessWithNoManagedFields(t *testing.T) {
 	f := NewTestFieldManager()
 
-	obj := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			ManagedFields: []metav1.ManagedFieldsEntry{},
-		},
-	}
-
-	_, err := f.Apply(obj, []byte(`{
-		"apiVersion": "apps/v1",
-		"kind": "Pod",
-		"metadata": {
-			"labels": {
-				"a": "b"
-			},
-		}
-	}`), "fieldmanager_test", false)
-
-	if err != nil {
-		t.Fatalf("failed to apply object: %v", err)
-	}
-}
-
-func TestApplySuccessWithNilManagedFields(t *testing.T) {
-	f := NewTestFieldManager()
-
-	obj := &corev1.Pod{}
-
-	_, err := f.Apply(obj, []byte(`{
+	_, err := f.Apply(&corev1.Pod{}, []byte(`{
 		"apiVersion": "apps/v1",
 		"kind": "Pod",
 		"metadata": {
