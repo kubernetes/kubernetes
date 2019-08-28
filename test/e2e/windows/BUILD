@@ -6,6 +6,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "density.go",
+        "dns.go",
         "framework.go",
         "gmsa.go",
         "hybrid_network.go",

@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -189,11 +190,11 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 	start = time.Now()
 	for i, pvclaims := range totalpvclaims {
 		nodeSelector := nodeSelectorList[i%len(nodeSelectorList)]
-		pod, err := framework.CreatePod(client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
+		pod, err := e2epod.CreatePod(client, namespace, map[string]string{nodeSelector.labelKey: nodeSelector.labelValue}, pvclaims, false, "")
 		framework.ExpectNoError(err)
 		totalpods = append(totalpods, pod)
 
-		defer framework.DeletePodWithWait(f, client, pod)
+		defer e2epod.DeletePodWithWait(client, pod)
 	}
 	elapsed = time.Since(start)
 	latency[AttachOp] = elapsed.Seconds()
@@ -205,7 +206,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 	ginkgo.By("Deleting pods")
 	start = time.Now()
 	for _, pod := range totalpods {
-		err := framework.DeletePodWithWait(f, client, pod)
+		err := e2epod.DeletePodWithWait(client, pod)
 		framework.ExpectNoError(err)
 	}
 	elapsed = time.Since(start)

@@ -40,7 +40,6 @@ import (
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/util"
 	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	utiltrace "k8s.io/utils/trace"
@@ -197,7 +196,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	// Make the webhook request
-	client, err := a.cm.HookClient(util.HookClientConfigForWebhook(invocation.Webhook))
+	client, err := invocation.Webhook.GetRESTClient(a.cm)
 	if err != nil {
 		return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}

@@ -54,12 +54,12 @@ const (
 	// WatchChangeDetectionStrategy is a mode in which kubelet uses
 	// watches to observe changes to objects that are in its interest.
 	WatchChangeDetectionStrategy ResourceChangeDetectionStrategy = "Watch"
-	// StrictTopologyManagerPolicy is a mode in which kubelet only allows
+	// RestrictedTopologyManagerPolicy is a mode in which kubelet only allows
+	// pods with a single NUMA alignment of CPU and device resources.
+	RestrictedTopologyManagerPolicy = "restricted"
+	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
 	// pods with NUMA alignment of CPU and device resources.
-	StrictTopologyManagerPolicy = "strict"
-	// PreferredTopologyManagerPolicy is a mode in which kubelet will favour
-	// pods with NUMA alignment of CPU and device resources.
-	PreferredTopologyManagerPolicy = "preferred"
+	BestEffortTopologyManagerPolicy = "best-effort"
 	// NoneTopologyManager Policy is a mode in which kubelet has no knowledge
 	// of NUMA alignment of a pod's CPU and device resources.
 	NoneTopologyManagerPolicy = "none"

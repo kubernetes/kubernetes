@@ -45,7 +45,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 const (
@@ -197,7 +196,7 @@ func (s *ServiceController) Run(stopCh <-chan struct{}, workers int) {
 	klog.Info("Starting service controller")
 	defer klog.Info("Shutting down service controller")
 
-	if !controller.WaitForCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
 		return
 	}
 
@@ -818,11 +817,23 @@ func (s *ServiceController) removeFinalizer(service *v1.Service) error {
 
 	// Make a copy so we don't mutate the shared informer cache.
 	updated := service.DeepCopy()
-	updated.ObjectMeta.Finalizers = slice.RemoveString(updated.ObjectMeta.Finalizers, servicehelper.LoadBalancerCleanupFinalizer, nil)
+	updated.ObjectMeta.Finalizers = removeString(updated.ObjectMeta.Finalizers, servicehelper.LoadBalancerCleanupFinalizer)
 
 	klog.V(2).Infof("Removing finalizer from service %s/%s", updated.Namespace, updated.Name)
 	_, err := patch(s.kubeClient.CoreV1(), service, updated)
 	return err
+}
+
+// removeString returns a newly created []string that contains all items from slice that
+// are not equal to s.
+func removeString(slice []string, s string) []string {
+	var newSlice []string
+	for _, item := range slice {
+		if item != s {
+			newSlice = append(newSlice, item)
+		}
+	}
+	return newSlice
 }
 
 // patchStatus patches the service with the given LoadBalancerStatus.

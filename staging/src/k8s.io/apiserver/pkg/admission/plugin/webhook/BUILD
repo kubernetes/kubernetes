@@ -9,6 +9,9 @@ go_library(
     deps = [
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
+        "//staging/src/k8s.io/client-go/rest:go_default_library",
     ],
 )
 

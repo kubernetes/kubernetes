@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -32,7 +33,7 @@ spec:
   drivers:
   - allocatable:
       count: 1305381319
-    name: "18"
-    nodeID: "19"
+    name: "19"
+    nodeID: "20"
     topologyKeys:
-    - "20"
+    - "21"

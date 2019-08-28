@@ -109,6 +109,7 @@ const (
 
 	// owner: @gnufied
 	// alpha: v1.14
+	// beta: v1.16
 	// Ability to expand CSI volumes
 	ExpandCSIVolumes featuregate.Feature = "ExpandCSIVolumes"
 
@@ -427,7 +428,7 @@ const (
 	deprecatedGCERegionalPersistentDisk featuregate.Feature = "GCERegionalPersistentDisk"
 
 	// owner: @MrHohn
-	// alpha: v1.15
+	// beta: v1.16
 	//
 	// Enables Finalizer Protection for Service LoadBalancers.
 	ServiceLoadBalancerFinalizer featuregate.Feature = "ServiceLoadBalancerFinalizer"
@@ -495,7 +496,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	QOSReserved:                         {Default: false, PreRelease: featuregate.Alpha},
 	ExpandPersistentVolumes:             {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
-	ExpandCSIVolumes:                    {Default: false, PreRelease: featuregate.Alpha},
+	ExpandCSIVolumes:                    {Default: true, PreRelease: featuregate.Beta},
 	AttachVolumeLimit:                   {Default: true, PreRelease: featuregate.Beta},
 	CPUManager:                          {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:                   {Default: false, PreRelease: featuregate.Alpha},
@@ -539,7 +540,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	KubeletPodResources:                 {Default: true, PreRelease: featuregate.Beta},
 	WindowsGMSA:                         {Default: false, PreRelease: featuregate.Alpha},
 	WindowsRunAsUserName:                {Default: false, PreRelease: featuregate.Alpha},
-	ServiceLoadBalancerFinalizer:        {Default: false, PreRelease: featuregate.Alpha},
+	ServiceLoadBalancerFinalizer:        {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
 	VolumePVCDataSource:                            {Default: false, PreRelease: featuregate.Alpha},

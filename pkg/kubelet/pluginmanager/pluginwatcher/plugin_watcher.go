@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
+	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
 )
 
@@ -190,7 +192,11 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 	}
 
 	if !fi.IsDir() {
-		if fi.Mode()&os.ModeSocket == 0 {
+		isSocket, err := util.IsUnixDomainSocket(util.NormalizePath(event.Name))
+		if err != nil {
+			return fmt.Errorf("failed to determine if file: %s is a unix domain socket: %v", event.Name, err)
+		}
+		if !isSocket {
 			klog.V(5).Infof("Ignoring non socket file %s", fi.Name())
 			return nil
 		}
@@ -202,6 +208,9 @@ func (w *Watcher) handleCreateEvent(event fsnotify.Event) error {
 }
 
 func (w *Watcher) handlePluginRegistration(socketPath string) error {
+	if runtime.GOOS == "windows" {
+		socketPath = util.NormalizePath(socketPath)
+	}
 	//TODO: Implement rate limiting to mitigate any DOS kind of attacks.
 	// Update desired state of world list of plugins
 	// If the socket path does exist in the desired world cache, there's still

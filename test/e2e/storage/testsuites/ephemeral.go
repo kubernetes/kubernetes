@@ -96,7 +96,7 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 			Client:     l.config.Framework.ClientSet,
 			Namespace:  f.Namespace.Name,
 			DriverName: eDriver.GetCSIDriverName(l.config),
-			Node:       framework.NodeSelection{Name: l.config.ClientNodeName},
+			Node:       e2epod.NodeSelection{Name: l.config.ClientNodeName},
 			GetVolumeAttributes: func(volumeNumber int) map[string]string {
 				return eDriver.GetVolumeAttributes(l.config, volumeNumber)
 			},
@@ -124,7 +124,7 @@ type EphemeralTest struct {
 	Client     clientset.Interface
 	Namespace  string
 	DriverName string
-	Node       framework.NodeSelection
+	Node       e2epod.NodeSelection
 
 	// GetVolumeAttributes returns the volume attributes for a
 	// certain inline ephemeral volume, enumerated starting with
@@ -187,7 +187,7 @@ func (t EphemeralTest) TestEphemeral() {
 
 // StartInPodWithInlineVolume starts a command in a pod with given volume mounted to /mnt/test directory.
 // The caller is responsible for checking the pod and deleting it.
-func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command string, csiVolume v1.CSIVolumeSource, node framework.NodeSelection) *v1.Pod {
+func StartInPodWithInlineVolume(c clientset.Interface, ns, podName, command string, csiVolume v1.CSIVolumeSource, node e2epod.NodeSelection) *v1.Pod {
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",

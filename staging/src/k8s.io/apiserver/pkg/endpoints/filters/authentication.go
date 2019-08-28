@@ -21,29 +21,38 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/klog"
-
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog"
 )
 
+/*
+ * By default, all the following metrics are defined as falling under
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ *
+ * Promoting the stability level of the metric is a responsibility of the component owner, since it
+ * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
+ * the metric stability policy.
+ */
 var (
-	authenticatedUserCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "authenticated_user_requests",
-			Help: "Counter of authenticated requests broken out by username.",
+	authenticatedUserCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "authenticated_user_requests",
+			Help:           "Counter of authenticated requests broken out by username.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"username"},
 	)
 )
 
 func init() {
-	prometheus.MustRegister(authenticatedUserCounter)
+	legacyregistry.MustRegister(authenticatedUserCounter)
 }
 
 // WithAuthentication creates an http handler that tries to authenticate the given request as a user, and then

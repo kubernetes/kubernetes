@@ -62,6 +62,7 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 
 	obj := fixtures.NewNoxuInstance("default", "foo")
 	unstructured.SetNestedField(obj.UnstructuredContent(), int64(42), "metadata", "unknown")
+	unstructured.SetNestedField(obj.UnstructuredContent(), nil, "metadata", "generation")
 	unstructured.SetNestedField(obj.UnstructuredContent(), map[string]interface{}{"foo": int64(42), "bar": "abc"}, "metadata", "labels")
 	_, err = instantiateCustomResource(t, obj, noxuResourceClient, noxuDefinition)
 	if err == nil {
@@ -85,6 +86,14 @@ func TestPostInvalidObjectMeta(t *testing.T) {
 		t.Errorf("unexpected error getting metadata.unknown: %v", err)
 	} else if found {
 		t.Errorf("unexpected metadata.unknown=%#v: expected this to be pruned", unknown)
+	}
+
+	if generation, found, err := unstructured.NestedInt64(obj.UnstructuredContent(), "metadata", "generation"); err != nil {
+		t.Errorf("unexpected error getting metadata.generation: %v", err)
+	} else if !found {
+		t.Errorf("expected metadata.generation=1: got: %d", generation)
+	} else if generation != 1 {
+		t.Errorf("unexpected metadata.generation=%d: expected this to be set to 1", generation)
 	}
 }
 
@@ -150,6 +159,8 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 
 	original := fixtures.NewNoxuInstance("default", "foo")
 	unstructured.SetNestedField(original.UnstructuredContent(), int64(42), "metadata", "unknown")
+	unstructured.SetNestedField(original.UnstructuredContent(), nil, "metadata", "generation")
+
 	unstructured.SetNestedField(original.UnstructuredContent(), map[string]interface{}{"foo": int64(42), "bar": "abc"}, "metadata", "annotations")
 	unstructured.SetNestedField(original.UnstructuredContent(), map[string]interface{}{"invalid": "x y"}, "metadata", "labels")
 	unstructured.SetNestedField(original.UnstructuredContent(), int64(42), "embedded", "metadata", "unknown")
@@ -191,6 +202,16 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	} else if found {
 		t.Errorf("Unexpected to find embedded.metadata.unknown=%#v", unknown)
+	}
+
+	t.Logf("Checking that metadata.generation=1")
+
+	if generation, found, err := unstructured.NestedInt64(obj.UnstructuredContent(), "metadata", "generation"); err != nil {
+		t.Errorf("unexpected error getting metadata.generation: %v", err)
+	} else if !found {
+		t.Errorf("expected metadata.generation=1: got: %d", generation)
+	} else if generation != 1 {
+		t.Errorf("unexpected metadata.generation=%d: expected this to be set to 1", generation)
 	}
 
 	t.Logf("Checking that ObjectMeta is pruned from wrongly-typed annotations")

@@ -35,11 +35,12 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
-  "handler": "18",
+  "handler": "19",
   "overhead": {
     "podFixed": {
       "qJ枊a8衍`Ĩ": "652"
@@ -47,12 +48,12 @@
   },
   "scheduling": {
     "nodeSelector": {
-      "19": "20"
+      "20": "21"
     },
     "tolerations": [
       {
-        "key": "21",
-        "value": "22",
+        "key": "22",
+        "value": "23",
         "effect": "6ċ",
         "tolerationSeconds": -5658031457286093454
       }

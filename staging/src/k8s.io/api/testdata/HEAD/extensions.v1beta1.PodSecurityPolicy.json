@@ -35,7 +35,8 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
@@ -64,10 +65,10 @@
     "seLinux": {
       "rule": "S",
       "seLinuxOptions": {
-        "user": "18",
-        "role": "19",
-        "type": "20",
-        "level": "21"
+        "user": "19",
+        "role": "20",
+        "type": "21",
+        "level": "22"
       }
     },
     "runAsUser": {
@@ -110,34 +111,34 @@
     "allowPrivilegeEscalation": false,
     "allowedHostPaths": [
       {
-        "pathPrefix": "22",
+        "pathPrefix": "23",
         "readOnly": true
       }
     ],
     "allowedFlexVolumes": [
       {
-        "driver": "23"
+        "driver": "24"
       }
     ],
     "allowedCSIDrivers": [
       {
-        "name": "24"
+        "name": "25"
       }
     ],
     "allowedUnsafeSysctls": [
-      "25"
+      "26"
     ],
     "forbiddenSysctls": [
-      "26"
+      "27"
     ],
     "allowedProcMountTypes": [
       "ǣ偐圠=l畣潁"
     ],
     "runtimeClass": {
       "allowedRuntimeClassNames": [
-        "27"
+        "28"
       ],
-      "defaultRuntimeClassName": "28"
+      "defaultRuntimeClassName": "29"
     }
   }
 }

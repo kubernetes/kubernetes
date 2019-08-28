@@ -657,7 +657,7 @@ func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 	// Below logic can be executed only on master as VC details are present.
 	addrs := []v1.NodeAddress{}
 	// Create context
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	vsi, err := vs.getVSphereInstance(nodeName)
 	if err != nil {
@@ -1640,6 +1640,10 @@ func (vs *VSphere) GetVolumeLabels(volumePath string) (map[string]string, error)
 		return nil, err
 	}
 	dsZones, err = vs.collapseZonesInRegion(ctx, dsZones)
+	if err != nil {
+		klog.Errorf("Failed to collapse zones. %v", err)
+		return nil, err
+	}
 	// FIXME: For now, pick the first zone of datastore as the zone of volume
 	labels := make(map[string]string)
 	if len(dsZones) > 0 {

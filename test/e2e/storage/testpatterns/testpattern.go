@@ -221,7 +221,6 @@ var (
 	DefaultFsDynamicPVAllowExpansion = TestPattern{
 		Name:           "Dynamic PV (default fs)(allowExpansion)",
 		VolType:        DynamicPV,
-		BindingMode:    storagev1.VolumeBindingWaitForFirstConsumer,
 		AllowExpansion: true,
 	}
 	// BlockVolModeDynamicPVAllowExpansion is TestPattern for "Dynamic PV (block volmode)(allowExpansion)"
@@ -229,7 +228,6 @@ var (
 		Name:           "Dynamic PV (block volmode)(allowExpansion)",
 		VolType:        DynamicPV,
 		VolMode:        v1.PersistentVolumeBlock,
-		BindingMode:    storagev1.VolumeBindingWaitForFirstConsumer,
 		AllowExpansion: true,
 	}
 )

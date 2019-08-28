@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/api"
 )
@@ -94,12 +95,44 @@ func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArguments(t *testi
 			{Utilization: 10, Score: 1},
 			{Utilization: 30, Score: 5},
 			{Utilization: 70, Score: 2},
-		}}
-	builtShape := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(&arguments)
+		},
+		Resources: []api.ResourceSpec{
+			{Name: v1.ResourceCPU},
+			{Name: v1.ResourceMemory},
+		},
+	}
+	builtShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(&arguments)
 	expectedShape, _ := priorities.NewFunctionShape([]priorities.FunctionShapePoint{
 		{Utilization: 10, Score: 1},
 		{Utilization: 30, Score: 5},
 		{Utilization: 70, Score: 2},
 	})
+	expectedResources := priorities.ResourceToWeightMap{
+		v1.ResourceCPU:    1,
+		v1.ResourceMemory: 1,
+	}
 	assert.Equal(t, expectedShape, builtShape)
+	assert.Equal(t, expectedResources, resources)
+}
+
+func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArgumentsNilResourceToWeightMap(t *testing.T) {
+	arguments := api.RequestedToCapacityRatioArguments{
+		UtilizationShape: []api.UtilizationShapePoint{
+			{Utilization: 10, Score: 1},
+			{Utilization: 30, Score: 5},
+			{Utilization: 70, Score: 2},
+		},
+	}
+	builtShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(&arguments)
+	expectedShape, _ := priorities.NewFunctionShape([]priorities.FunctionShapePoint{
+		{Utilization: 10, Score: 1},
+		{Utilization: 30, Score: 5},
+		{Utilization: 70, Score: 2},
+	})
+	expectedResources := priorities.ResourceToWeightMap{
+		v1.ResourceCPU:    1,
+		v1.ResourceMemory: 1,
+	}
+	assert.Equal(t, expectedShape, builtShape)
+	assert.Equal(t, expectedResources, resources)
 }

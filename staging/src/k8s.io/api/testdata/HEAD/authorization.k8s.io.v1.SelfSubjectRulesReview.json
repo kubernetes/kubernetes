@@ -35,41 +35,42 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
   "spec": {
-    "namespace": "18"
+    "namespace": "19"
   },
   "status": {
     "resourceRules": [
       {
         "verbs": [
-          "19"
-        ],
-        "apiGroups": [
           "20"
         ],
-        "resources": [
+        "apiGroups": [
           "21"
         ],
-        "resourceNames": [
+        "resources": [
           "22"
+        ],
+        "resourceNames": [
+          "23"
         ]
       }
     ],
     "nonResourceRules": [
       {
         "verbs": [
-          "23"
+          "24"
         ],
         "nonResourceURLs": [
-          "24"
+          "25"
         ]
       }
     ],
     "incomplete": true,
-    "evaluationError": "25"
+    "evaluationError": "26"
   }
 }

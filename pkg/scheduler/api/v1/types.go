@@ -127,18 +127,27 @@ type LabelPreference struct {
 	Presence bool `json:"presence"`
 }
 
-// RequestedToCapacityRatioArguments holds arguments specific to RequestedToCapacityRatio priority function
+// RequestedToCapacityRatioArguments holds arguments specific to RequestedToCapacityRatio priority function.
 type RequestedToCapacityRatioArguments struct {
-	// Array of point defining priority function shape
+	// Array of point defining priority function shape.
 	UtilizationShape []UtilizationShapePoint `json:"shape"`
+	Resources        []ResourceSpec          `json:"resources,omitempty"`
 }
 
-// UtilizationShapePoint represents single point of priority function shape
+// UtilizationShapePoint represents single point of priority function shape.
 type UtilizationShapePoint struct {
 	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
 	Utilization int `json:"utilization"`
 	// Score assigned to given utilization (y axis). Valid values are 0 to 10.
 	Score int `json:"score"`
+}
+
+// ResourceSpec represents single resource and weight for bin packing of priority RequestedToCapacityRatioArguments.
+type ResourceSpec struct {
+	// Name of the resource to be managed by RequestedToCapacityRatio function.
+	Name apiv1.ResourceName `json:"name,casttype=ResourceName"`
+	// Weight of the resource.
+	Weight int `json:"weight,omitempty"`
 }
 
 // ExtenderManagedResource describes the arguments of extended resources

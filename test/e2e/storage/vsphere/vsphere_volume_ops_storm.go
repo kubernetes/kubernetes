@@ -27,6 +27,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -103,14 +104,14 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating pod to attach PVs to the node")
-		pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
+		pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, "")
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Verify all volumes are accessible and available in the pod")
 		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 
 		ginkgo.By("Deleting pod")
-		framework.ExpectNoError(framework.DeletePodWithWait(f, client, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(client, pod))
 
 		ginkgo.By("Waiting for volumes to be detached from the node")
 		for _, pv := range persistentvolumes {

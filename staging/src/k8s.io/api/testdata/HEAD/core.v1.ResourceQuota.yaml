@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -36,7 +37,7 @@ spec:
     - operator: 獚敆ȎțêɘĲ斬³;Ơ歿:狞夌碕ʂɭ
       scopeName: ʕVŚ(ĿȊ甞谐颋ǅSǡƏS$+½H牗
       values:
-      - "18"
+      - "19"
   scopes:
   - Ĩɘ.蘯6ċV夸eɑeʤ脽ěĂ
 status:

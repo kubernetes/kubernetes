@@ -267,7 +267,7 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting daemon sets controller")
 	defer klog.Infof("Shutting down daemon sets controller")
 
-	if !controller.WaitForCacheSync("daemon sets", stopCh, dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
+	if !cache.WaitForNamedCacheSync("daemon sets", stopCh, dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
 		return
 	}
 

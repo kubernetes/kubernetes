@@ -1,4 +1,4 @@
-// Copyright 2018 Google Inc. All rights reserved.
+// Copyright 2019 Google LLC.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
@@ -8,13 +8,39 @@
 //
 // This package is DEPRECATED. Use package cloud.google.com/go/monitoring/apiv3 instead.
 //
-// See https://cloud.google.com/monitoring/api/
+// For product documentation, see: https://cloud.google.com/monitoring/api/
+//
+// Creating a client
 //
 // Usage example:
 //
 //   import "google.golang.org/api/monitoring/v3"
 //   ...
-//   monitoringService, err := monitoring.New(oauthHttpClient)
+//   ctx := context.Background()
+//   monitoringService, err := monitoring.NewService(ctx)
+//
+// In this example, Google Application Default Credentials are used for authentication.
+//
+// For information on how to create and obtain Application Default Credentials, see https://developers.google.com/identity/protocols/application-default-credentials.
+//
+// Other authentication options
+//
+// By default, all available scopes (see "Constants") are used to authenticate. To restrict scopes, use option.WithScopes:
+//
+//   monitoringService, err := monitoring.NewService(ctx, option.WithScopes(monitoring.MonitoringWriteScope))
+//
+// To use an API key for authentication (note: some APIs do not support API keys), use option.WithAPIKey:
+//
+//   monitoringService, err := monitoring.NewService(ctx, option.WithAPIKey("AIza..."))
+//
+// To use an OAuth token (e.g., a user token obtained via a three-legged OAuth flow), use option.WithTokenSource:
+//
+//   config := &oauth2.Config{...}
+//   // ...
+//   token, err := config.Exchange(ctx, ...)
+//   monitoringService, err := monitoring.NewService(ctx, option.WithTokenSource(config.TokenSource(ctx, token)))
+//
+// See https://godoc.org/google.golang.org/api/option/ for details on options.
 package monitoring // import "google.golang.org/api/monitoring/v3"
 
 import (
@@ -31,6 +57,8 @@ import (
 
 	gensupport "google.golang.org/api/gensupport"
 	googleapi "google.golang.org/api/googleapi"
+	option "google.golang.org/api/option"
+	htransport "google.golang.org/api/transport/http"
 )
 
 // Always reference these packages, just in case the auto-generated code
@@ -69,6 +97,35 @@ const (
 	MonitoringWriteScope = "https://www.googleapis.com/auth/monitoring.write"
 )
 
+// NewService creates a new Service.
+func NewService(ctx context.Context, opts ...option.ClientOption) (*Service, error) {
+	scopesOption := option.WithScopes(
+		"https://www.googleapis.com/auth/cloud-platform",
+		"https://www.googleapis.com/auth/monitoring",
+		"https://www.googleapis.com/auth/monitoring.read",
+		"https://www.googleapis.com/auth/monitoring.write",
+	)
+	// NOTE: prepend, so we don't override user-specified scopes.
+	opts = append([]option.ClientOption{scopesOption}, opts...)
+	client, endpoint, err := htransport.NewClient(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	s, err := New(client)
+	if err != nil {
+		return nil, err
+	}
+	if endpoint != "" {
+		s.BasePath = endpoint
+	}
+	return s, nil
+}
+
+// New creates a new Service. It uses the provided http.Client for requests.
+//
+// Deprecated: please use NewService instead.
+// To provide a custom HTTP client, use option.WithHTTPClient.
+// If you are using google.golang.org/api/googleapis/transport.APIKey, use option.WithAPIKey with NewService instead.
 func New(client *http.Client) (*Service, error) {
 	if client == nil {
 		return nil, errors.New("client is nil")
@@ -1237,10 +1294,10 @@ type Empty struct {
 // origin, etc.
 type Exemplar struct {
 	// Attachments: Contextual information about the example value. Examples
-	// are:Trace ID:
-	// type.googleapis.com/google.devtools.cloudtrace.v1.TraceLiteral
-	// string: type.googleapis.com/google.protobuf.StringValueLabels dropped
-	// during aggregation:
+	// are:Trace:
+	// type.googleapis.com/google.monitoring.v3.SpanContextLiteral string:
+	// type.googleapis.com/google.protobuf.StringValueLabels dropped during
+	// aggregation:
 	// type.googleapis.com/google.monitoring.v3.DroppedLabelsThere may be
 	// only a single attachment of any given message type in a single
 	// exemplar, and this is enforced by the system.
@@ -1651,7 +1708,8 @@ type HttpCheck struct {
 
 	// Path: The path to the page to run the check against. Will be combined
 	// with the host (specified within the MonitoredResource) and port to
-	// construct the full URL. Optional (defaults to "/").
+	// construct the full URL. Optional (defaults to "/"). If the provided
+	// path does not begin with "/", it will be prepended automatically.
 	Path string `json:"path,omitempty"`
 
 	// Port: The port to the page to run the check against. Will be combined
@@ -2368,6 +2426,39 @@ type MetricDescriptor struct {
 	// failed.
 	Labels []*LabelDescriptor `json:"labels,omitempty"`
 
+	// LaunchStage: Optional. The launch stage of the metric definition.
+	//
+	// Possible values:
+	//   "LAUNCH_STAGE_UNSPECIFIED" - Do not use this default value.
+	//   "EARLY_ACCESS" - Early Access features are limited to a closed
+	// group of testers. To use these features, you must sign up in advance
+	// and sign a Trusted Tester agreement (which includes confidentiality
+	// provisions). These features may be unstable, changed in
+	// backward-incompatible ways, and are not guaranteed to be released.
+	//   "ALPHA" - Alpha is a limited availability test for releases before
+	// they are cleared for widespread use. By Alpha, all significant design
+	// issues are resolved and we are in the process of verifying
+	// functionality. Alpha customers need to apply for access, agree to
+	// applicable terms, and have their projects whitelisted. Alpha releases
+	// don’t have to be feature complete, no SLAs are provided, and there
+	// are no technical support obligations, but they will be far enough
+	// along that customers can actually use them in test environments or
+	// for limited-use tests -- just like they would in normal production
+	// cases.
+	//   "BETA" - Beta is the point at which we are ready to open a release
+	// for any customer to use. There are no SLA or technical support
+	// obligations in a Beta release. Products will be complete from a
+	// feature perspective, but may have some open outstanding issues. Beta
+	// releases are suitable for limited production use cases.
+	//   "GA" - GA features are open to all developers and are considered
+	// stable and fully qualified for production use.
+	//   "DEPRECATED" - Deprecated features are scheduled to be shut down
+	// and removed. For more information, see the “Deprecation Policy”
+	// section of our Terms of Service (https://cloud.google.com/terms/) and
+	// the Google Cloud Platform Subject to the Deprecation Policy
+	// (https://cloud.google.com/terms/deprecation) documentation.
+	LaunchStage string `json:"launchStage,omitempty"`
+
 	// Metadata: Optional. Metadata which can be used to guide usage of the
 	// metric.
 	Metadata *MetricDescriptorMetadata `json:"metadata,omitempty"`
@@ -2506,7 +2597,8 @@ type MetricDescriptorMetadata struct {
 	// available to be read, excluding data loss due to errors.
 	IngestDelay string `json:"ingestDelay,omitempty"`
 
-	// LaunchStage: The launch stage of the metric definition.
+	// LaunchStage: Deprecated. Please use the MetricDescriptor.launch_stage
+	// instead. The launch stage of the metric definition.
 	//
 	// Possible values:
 	//   "LAUNCH_STAGE_UNSPECIFIED" - Do not use this default value.
@@ -2753,7 +2845,7 @@ func (s *MonitoredResource) MarshalJSON() ([]byte, error) {
 // the labels "instance_id" and "zone" to identify particular VM
 // instances.Different APIs can support different monitored resource
 // types. APIs generally provide a list method that returns the
-// monitored resource descriptors used by the API.
+// monitored resource descriptors used by the API.Next ID: 10
 type MonitoredResourceDescriptor struct {
 	// Description: Optional. A detailed description of the monitored
 	// resource type that might be used in documentation.
@@ -2770,6 +2862,40 @@ type MonitoredResourceDescriptor struct {
 	// database is identified by values for the labels "database_id" and
 	// "zone".
 	Labels []*LabelDescriptor `json:"labels,omitempty"`
+
+	// LaunchStage: Optional. The launch stage of the monitored resource
+	// definition.
+	//
+	// Possible values:
+	//   "LAUNCH_STAGE_UNSPECIFIED" - Do not use this default value.
+	//   "EARLY_ACCESS" - Early Access features are limited to a closed
+	// group of testers. To use these features, you must sign up in advance
+	// and sign a Trusted Tester agreement (which includes confidentiality
+	// provisions). These features may be unstable, changed in
+	// backward-incompatible ways, and are not guaranteed to be released.
+	//   "ALPHA" - Alpha is a limited availability test for releases before
+	// they are cleared for widespread use. By Alpha, all significant design
+	// issues are resolved and we are in the process of verifying
+	// functionality. Alpha customers need to apply for access, agree to
+	// applicable terms, and have their projects whitelisted. Alpha releases
+	// don’t have to be feature complete, no SLAs are provided, and there
+	// are no technical support obligations, but they will be far enough
+	// along that customers can actually use them in test environments or
+	// for limited-use tests -- just like they would in normal production
+	// cases.
+	//   "BETA" - Beta is the point at which we are ready to open a release
+	// for any customer to use. There are no SLA or technical support
+	// obligations in a Beta release. Products will be complete from a
+	// feature perspective, but may have some open outstanding issues. Beta
+	// releases are suitable for limited production use cases.
+	//   "GA" - GA features are open to all developers and are considered
+	// stable and fully qualified for production use.
+	//   "DEPRECATED" - Deprecated features are scheduled to be shut down
+	// and removed. For more information, see the “Deprecation Policy”
+	// section of our Terms of Service (https://cloud.google.com/terms/) and
+	// the Google Cloud Platform Subject to the Deprecation Policy
+	// (https://cloud.google.com/terms/deprecation) documentation.
+	LaunchStage string `json:"launchStage,omitempty"`
 
 	// Name: Optional. The resource name of the monitored resource
 	// descriptor:
@@ -2897,7 +3023,7 @@ type NotificationChannel struct {
 	// Description: An optional human-readable description of this
 	// notification channel. This description may provide additional
 	// details, beyond the display name, for the channel. This may not
-	// exceeed 1024 Unicode characters.
+	// exceed 1024 Unicode characters.
 	Description string `json:"description,omitempty"`
 
 	// DisplayName: An optional human-readable name for this notification
@@ -3313,43 +3439,11 @@ func (s *SpanContext) MarshalJSON() ([]byte, error) {
 
 // Status: The Status type defines a logical error model that is
 // suitable for different programming environments, including REST APIs
-// and RPC APIs. It is used by gRPC (https://github.com/grpc). The error
-// model is designed to be:
-// Simple to use and understand for most users
-// Flexible enough to meet unexpected needsOverviewThe Status message
-// contains three pieces of data: error code, error message, and error
-// details. The error code should be an enum value of google.rpc.Code,
-// but it may accept additional error codes if needed. The error message
-// should be a developer-facing English message that helps developers
-// understand and resolve the error. If a localized user-facing error
-// message is needed, put the localized message in the error details or
-// localize it in the client. The optional error details may contain
-// arbitrary information about the error. There is a predefined set of
-// error detail types in the package google.rpc that can be used for
-// common error conditions.Language mappingThe Status message is the
-// logical representation of the error model, but it is not necessarily
-// the actual wire format. When the Status message is exposed in
-// different client libraries and different wire protocols, it can be
-// mapped differently. For example, it will likely be mapped to some
-// exceptions in Java, but more likely mapped to some error codes in
-// C.Other usesThe error model and the Status message can be used in a
-// variety of environments, either with or without APIs, to provide a
-// consistent developer experience across different environments.Example
-// uses of this error model include:
-// Partial errors. If a service needs to return partial errors to the
-// client, it may embed the Status in the normal response to indicate
-// the partial errors.
-// Workflow errors. A typical workflow has multiple steps. Each step may
-// have a Status message for error reporting.
-// Batch operations. If a client uses batch request and batch response,
-// the Status message should be used directly inside batch response, one
-// for each error sub-response.
-// Asynchronous operations. If an API call embeds asynchronous operation
-// results in its response, the status of those operations should be
-// represented directly using the Status message.
-// Logging. If some API errors are stored in logs, the message Status
-// could be used directly after any stripping needed for
-// security/privacy reasons.
+// and RPC APIs. It is used by gRPC (https://github.com/grpc). Each
+// Status message contains three pieces of data: error code, error
+// message, and error details.You can find out more about this error
+// model and how to work with it in the API Design Guide
+// (https://cloud.google.com/apis/design/errors).
 type Status struct {
 	// Code: The status code, which should be an enum value of
 	// google.rpc.Code.
@@ -3728,13 +3822,6 @@ type UptimeCheckConfig struct {
 	// owns this CheckConfig.
 	InternalCheckers []*InternalChecker `json:"internalCheckers,omitempty"`
 
-	// IsInternal: If this is true, then checks are made only from the
-	// 'internal_checkers'. If it is false, then checks are made only from
-	// the 'selected_regions'. It is an error to provide 'selected_regions'
-	// when is_internal is true, or to provide 'internal_checkers' when
-	// is_internal is false.
-	IsInternal bool `json:"isInternal,omitempty"`
-
 	// MonitoredResource: The monitored resource
 	// (https://cloud.google.com/monitoring/api/resources) associated with
 	// the configuration. The following monitored resource types are
@@ -3752,7 +3839,7 @@ type UptimeCheckConfig struct {
 	// Period: How often, in seconds, the uptime check is performed.
 	// Currently, the only supported values are 60s (1 minute), 300s (5
 	// minutes), 600s (10 minutes), and 900s (15 minutes). Optional,
-	// defaults to 300s.
+	// defaults to 60s.
 	Period string `json:"period,omitempty"`
 
 	// ResourceGroup: The group resource associated with the configuration.
@@ -5025,6 +5112,15 @@ func (r *ProjectsGroupsService) Delete(name string) *ProjectsGroupsDeleteCall {
 	return c
 }
 
+// Recursive sets the optional parameter "recursive": If this field is
+// true, then the request means to delete a group with all its
+// descendants. Otherwise, the request means to delete a group only when
+// it has no descendants. The default value is false.
+func (c *ProjectsGroupsDeleteCall) Recursive(recursive bool) *ProjectsGroupsDeleteCall {
+	c.urlParams_.Set("recursive", fmt.Sprint(recursive))
+	return c
+}
+
 // Fields allows partial responses to be retrieved. See
 // https://developers.google.com/gdata/docs/2.0/basics#PartialResponse
 // for more information.
@@ -5124,6 +5220,11 @@ func (c *ProjectsGroupsDeleteCall) Do(opts ...googleapi.CallOption) (*Empty, err
 	//       "pattern": "^projects/[^/]+/groups/[^/]+$",
 	//       "required": true,
 	//       "type": "string"
+	//     },
+	//     "recursive": {
+	//       "description": "If this field is true, then the request means to delete a group with all its descendants. Otherwise, the request means to delete a group only when it has no descendants. The default value is false.",
+	//       "location": "query",
+	//       "type": "boolean"
 	//     }
 	//   },
 	//   "path": "v3/{+name}",
@@ -8774,7 +8875,7 @@ func (c *ProjectsTimeSeriesListCall) AggregationPerSeriesAligner(aggregationPerS
 // specify a single metric type, and can additionally specify metric
 // labels and other information. For example:
 // metric.type = "compute.googleapis.com/instance/cpu/usage_time" AND
-//     metric.label.instance_name = "my-instance-name"
+//     metric.labels.instance_name = "my-instance-name"
 func (c *ProjectsTimeSeriesListCall) Filter(filter string) *ProjectsTimeSeriesListCall {
 	c.urlParams_.Set("filter", filter)
 	return c
@@ -9001,7 +9102,7 @@ func (c *ProjectsTimeSeriesListCall) Do(opts ...googleapi.CallOption) (*ListTime
 	//       "type": "string"
 	//     },
 	//     "filter": {
-	//       "description": "A monitoring filter that specifies which time series should be returned. The filter must specify a single metric type, and can additionally specify metric labels and other information. For example:\nmetric.type = \"compute.googleapis.com/instance/cpu/usage_time\" AND\n    metric.label.instance_name = \"my-instance-name\"\n",
+	//       "description": "A monitoring filter that specifies which time series should be returned. The filter must specify a single metric type, and can additionally specify metric labels and other information. For example:\nmetric.type = \"compute.googleapis.com/instance/cpu/usage_time\" AND\n    metric.labels.instance_name = \"my-instance-name\"\n",
 	//       "location": "query",
 	//       "type": "string"
 	//     },

@@ -43,7 +43,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
@@ -343,7 +342,7 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 		synced = append(synced, adc.csiDriversSynced)
 	}
 
-	if !controller.WaitForCacheSync("attach detach", stopCh, synced...) {
+	if !kcache.WaitForNamedCacheSync("attach detach", stopCh, synced...) {
 		return
 	}
 

@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 
@@ -131,7 +132,7 @@ func (gc *GarbageCollector) Run(workers int, stopCh <-chan struct{}) {
 
 	go gc.dependencyGraphBuilder.Run(stopCh)
 
-	if !controller.WaitForCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.IsSynced) {
+	if !cache.WaitForNamedCacheSync("garbage collector", stopCh, gc.dependencyGraphBuilder.IsSynced) {
 		return
 	}
 
@@ -225,7 +226,7 @@ func (gc *GarbageCollector) Sync(discoveryClient discovery.ServerResourcesInterf
 			// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
 			// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
 			// note that workers stay paused until we successfully resync.
-			if !controller.WaitForCacheSync("garbage collector", waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) {
+			if !cache.WaitForNamedCacheSync("garbage collector", waitForStopOrTimeout(stopCh, period), gc.dependencyGraphBuilder.IsSynced) {
 				utilruntime.HandleError(fmt.Errorf("timed out waiting for dependency graph builder sync during GC sync (attempt %d)", attempt))
 				return false, nil
 			}
