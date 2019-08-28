@@ -27,9 +27,21 @@ import (
 	"k8s.io/component-base/metrics/legacyregistry"
 )
 
+// WebhookRejectionErrorType defines different error types that happen in a webhook rejection.
+type WebhookRejectionErrorType string
+
 const (
 	namespace = "apiserver"
 	subsystem = "admission"
+
+	// WebhookRejectionCallingWebhookError identifies a calling webhook error which causes
+	// a webhook admission to reject a request
+	WebhookRejectionCallingWebhookError WebhookRejectionErrorType = "calling_webhook_error"
+	// WebhookRejectionAPIServerInternalError identifies an apiserver internal error which
+	// causes a webhook admission to reject a request
+	WebhookRejectionAPIServerInternalError WebhookRejectionErrorType = "apiserver_internal_error"
+	// WebhookRejectionNoError identifies a webhook properly rejected a request
+	WebhookRejectionNoError WebhookRejectionErrorType = "no_error"
 )
 
 var (
@@ -103,9 +115,10 @@ func (p pluginHandlerWithMetrics) Validate(ctx context.Context, a admission.Attr
 
 // AdmissionMetrics instruments admission with prometheus metrics.
 type AdmissionMetrics struct {
-	step       *metricSet
-	controller *metricSet
-	webhook    *metricSet
+	step             *metricSet
+	controller       *metricSet
+	webhook          *metricSet
+	webhookRejection *metrics.CounterVec
 }
 
 // newAdmissionMetrics create a new AdmissionMetrics, configured with default metric names.
@@ -126,10 +139,21 @@ func newAdmissionMetrics() *AdmissionMetrics {
 		[]string{"name", "type", "operation", "rejected"},
 		"Admission webhook %s, identified by name and broken out for each operation and API resource and type (validate or admit).", false)
 
+	webhookRejection := metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Namespace:      namespace,
+			Subsystem:      subsystem,
+			Name:           "webhook_rejection_count",
+			Help:           "Admission webhook rejection count, identified by name and broken out for each admission type (validating or admit) and operation. Additional labels specify an error type (calling_webhook_error or apiserver_internal_error if an error occurred; no_error otherwise) and optionally a non-zero rejection code if the webhook rejects the request with an HTTP status code (honored by the apiserver when the code is greater or equal to 400). Codes greater than 600 are truncated to 600, to keep the metrics cardinality bounded.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"name", "type", "operation", "error_type", "rejection_code"})
+
 	step.mustRegister()
 	controller.mustRegister()
 	webhook.mustRegister()
-	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook}
+	legacyregistry.MustRegister(webhookRejection)
+	return &AdmissionMetrics{step: step, controller: controller, webhook: webhook, webhookRejection: webhookRejection}
 }
 
 func (m *AdmissionMetrics) reset() {
@@ -151,6 +175,16 @@ func (m *AdmissionMetrics) ObserveAdmissionController(elapsed time.Duration, rej
 // ObserveWebhook records admission related metrics for a admission webhook.
 func (m *AdmissionMetrics) ObserveWebhook(elapsed time.Duration, rejected bool, attr admission.Attributes, stepType string, extraLabels ...string) {
 	m.webhook.observe(elapsed, append(extraLabels, stepType, string(attr.GetOperation()), strconv.FormatBool(rejected))...)
+}
+
+// ObserveWebhookRejection records admission related metrics for an admission webhook rejection.
+func (m *AdmissionMetrics) ObserveWebhookRejection(name, stepType, operation string, errorType WebhookRejectionErrorType, rejectionCode int) {
+	// We truncate codes greater than 600 to keep the cardinality bounded.
+	// This should be rarely done by a malfunctioning webhook server.
+	if rejectionCode > 600 {
+		rejectionCode = 600
+	}
+	m.webhookRejection.WithLabelValues(name, stepType, operation, string(errorType), strconv.Itoa(rejectionCode)).Inc()
 }
 
 type metricSet struct {
