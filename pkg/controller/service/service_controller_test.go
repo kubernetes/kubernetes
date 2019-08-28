@@ -618,7 +618,7 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 }
 
 // TestProcessServiceCreateOrUpdateK8sError tests processServiceCreateOrUpdate
-// with various kubernetes errors.
+// with various kubernetes errors when patching status.
 func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 	svcName := "svc-k8s-err"
 	conflictErr := apierrors.NewConflict(schema.GroupResource{}, svcName, errors.New("object conflict"))
@@ -644,6 +644,8 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			svc := newService(svcName, types.UID("123"), v1.ServiceTypeLoadBalancer)
+			// Preset finalizer so k8s error only happens when patching status.
+			svc.Finalizers = []string{servicehelper.LoadBalancerCleanupFinalizer}
 			controller, _, client := newController()
 			client.PrependReactor("patch", "services", func(action core.Action) (bool, runtime.Object, error) {
 				return true, nil, tc.k8sErr
