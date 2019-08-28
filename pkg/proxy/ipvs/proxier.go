@@ -475,8 +475,10 @@ func NewDualStackProxier(
 	nodePortAddresses []string,
 ) (*MetaProxier, error) {
 
+	safeIpset := newSafeIpset(ipset)
+
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ipt, ipvs, ipset, sysctl,
+	ipv4Proxier, err := NewProxier(ipt, ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, excludeCIDRs, strictARP,
 		masqueradeAll, masqueradeBit, clusterCIDR, hostname, nodeIP,
 		recorder, healthzServer, scheduler, nodePortAddresses)
@@ -496,7 +498,7 @@ func NewDualStackProxier(
 	dbus := utildbus.New()
 	ipt = utiliptables.New(exec, dbus, utiliptables.ProtocolIpv6)
 
-	ipv6Proxier, err := NewProxier(ipt, ipvs, ipset, sysctl,
+	ipv6Proxier, err := NewProxier(ipt, ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, excludeCIDRs, strictARP,
 		masqueradeAll, masqueradeBit, clusterCIDR, hostname, nodeIP,
 		nil, nil, scheduler, nodePortAddresses)
