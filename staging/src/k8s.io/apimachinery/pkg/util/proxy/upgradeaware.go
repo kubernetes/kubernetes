@@ -223,7 +223,14 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 	}
 
 	// WithContext creates a shallow clone of the request with the new context.
-	newReq := req.WithContext(context.Background())
+	ctx := context.Background()
+	// if the original request has a deadline, we should honor that deadline for our proxied request
+	if deadline, ok := req.Context().Deadline(); ok {
+		var cancelFn context.CancelFunc
+		ctx, cancelFn = context.WithDeadline(ctx, deadline)
+		defer cancelFn()
+	}
+	newReq := req.WithContext(ctx)
 	newReq.Header = utilnet.CloneHeader(req.Header)
 	if !h.UseRequestLocation {
 		newReq.URL = &loc
