@@ -33,6 +33,7 @@ source "${KUBE_ROOT}/cluster/kube-util.sh"
 
 function usage() {
   echo "!!! EXPERIMENTAL !!!"
+  echo "!!! This upgrade script is not meant to be run in production !!!"
   echo ""
   echo "${0} [-M | -N | -P] [-o] (-l | <version number or publication>)"
   echo "  Upgrades master and nodes by default"
@@ -491,6 +492,14 @@ function update-coredns-config() {
   # Download the CoreDNS migration tool
   echo "== Downloading the CoreDNS migration tool =="
   wget -P ${download_dir} "https://github.com/coredns/corefile-migration/releases/download/v1.0.2/corefile-tool-${host_arch}" >/dev/null 2>&1
+  wget -P ${download_dir} "https://github.com/coredns/corefile-migration/releases/download/v1.0.2/corefile-tool-${host_arch}.sha256" >/dev/null 2>&1
+
+  local -r checkSHA=$(echo "$(cat ${download_dir}/corefile-tool-${host_arch}.sha256 | cut -d " " -f 1) ${download_dir}/corefile-tool-${host_arch}" | sha256sum --check | cut -d " " -f 2)
+  if [[ "${checkSHA}" != "corefile-tool-${host_arch}: OK" ]]; then
+    echo "!!! CheckSum for the CoreDNS migration tool did not match !!!" >&2
+    exit 1
+  fi
+
   chmod +x ${download_dir}/corefile-tool-${host_arch}
 
   # Migrate the CoreDNS ConfigMap depending on whether it is being downgraded or upgraded.
@@ -498,7 +507,7 @@ function update-coredns-config() {
 
   if test "$(printf '%s\n' ${CURRENT_COREDNS_VERSION} ${NEW_COREDNS_VERSION} | sort -V | head -n 1)" != ${NEW_COREDNS_VERSION}; then
      echo "== Upgrading the CoreDNS ConfigMap =="
-     ./corefile-tool-${host_arch} migrate --from ${CURRENT_COREDNS_VERSION} --to ${NEW_COREDNS_VERSION} --corefile ${download_dir}/Corefile-old > ${download_dir}/Corefile
+     ${download_dir}/corefile-tool-${host_arch} migrate --from ${CURRENT_COREDNS_VERSION} --to ${NEW_COREDNS_VERSION} --corefile ${download_dir}/Corefile-old > ${download_dir}/Corefile
      ${KUBE_ROOT}/cluster/kubectl.sh -n kube-system create configmap coredns --from-file ${download_dir}/Corefile -o yaml --dry-run | ${KUBE_ROOT}/cluster/kubectl.sh apply -f -
   else
      # In case of a downgrade, a custom CoreDNS Corefile will be overwritten by a default Corefile. In that case,
@@ -509,7 +518,10 @@ function update-coredns-config() {
   fi
 
   # clean up
-  rm -rf ${download_dir}
+  cleanup() {
+    rm -rf "${download_dir}"
+  }
+  trap cleanup EXIT
 
   echo "== The CoreDNS Config has been updated =="
 }
