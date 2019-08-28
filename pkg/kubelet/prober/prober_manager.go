@@ -168,7 +168,7 @@ func (m *manager) AddPod(pod *v1.Pod) {
 	for _, c := range pod.Spec.Containers {
 		key.containerName = c.Name
 
-		if c.StartupProbe != nil && utilfeature.DefaultFeatureGate.Enabled(features.StartupProbeEnabled) {
+		if c.StartupProbe != nil && utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) {
 			key.probeType = startup
 			if _, ok := m.workers[key]; ok {
 				klog.Errorf("Startup probe already exists! %v - %v",
@@ -248,7 +248,7 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 		podStatus.ContainerStatuses[i].Ready = ready
 
 		var started bool
-		if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbeEnabled) {
+		if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) {
 			started = true
 		} else if c.State.Running == nil {
 			started = false

@@ -1701,8 +1701,8 @@ func describeContainerProbe(container corev1.Container, w PrefixWriter) {
 		probe := DescribeProbe(container.ReadinessProbe)
 		w.Write(LEVEL_2, "Readiness:\t%s\n", probe)
 	}
-	// Avoid cyclic dependency on k8s.io/kubernetes by not using features.StartupProbeEnabled
-	if container.StartupProbe != nil && utilfeature.DefaultFeatureGate.Enabled("StartupProbeEnabled") {
+	// Avoid cyclic dependency on k8s.io/kubernetes by not using features.StartupProbe
+	if container.StartupProbe != nil && utilfeature.DefaultFeatureGate.Enabled("StartupProbe") {
 		probe := DescribeProbe(container.StartupProbe)
 		w.Write(LEVEL_2, "Startup:\t%s\n", probe)
 	}

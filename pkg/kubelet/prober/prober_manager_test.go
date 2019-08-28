@@ -92,7 +92,7 @@ func TestAddRemovePods(t *testing.T) {
 	}
 
 	m := newTestManager()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbeEnabled, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbe, true)()
 	defer cleanup(t, m)
 	if err := expectProbes(m, nil); err != nil {
 		t.Error(err)
@@ -139,7 +139,7 @@ func TestAddRemovePods(t *testing.T) {
 
 func TestCleanupPods(t *testing.T) {
 	m := newTestManager()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbeEnabled, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbe, true)()
 	defer cleanup(t, m)
 	podToCleanup := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
@@ -202,7 +202,7 @@ func TestCleanupPods(t *testing.T) {
 
 func TestCleanupRepeated(t *testing.T) {
 	m := newTestManager()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbeEnabled, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.StartupProbe, true)()
 	defer cleanup(t, m)
 	podTemplate := v1.Pod{
 		Spec: v1.PodSpec{

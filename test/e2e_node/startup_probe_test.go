@@ -51,7 +51,7 @@ var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive] [NodeFeature:
 			if initialConfig.FeatureGates == nil {
 				initialConfig.FeatureGates = make(map[string]bool)
 			}
-			initialConfig.FeatureGates[string(features.StartupProbeEnabled)] = true
+			initialConfig.FeatureGates[string(features.StartupProbe)] = true
 		})
 
 		/*
