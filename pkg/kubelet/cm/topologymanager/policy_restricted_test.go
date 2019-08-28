@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-func TestPolicyStrictCanAdmitPodResult(t *testing.T) {
+func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 	tcases := []struct {
 		name     string
 		admit    bool
@@ -39,7 +39,7 @@ func TestPolicyStrictCanAdmitPodResult(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		policy := NewStrictPolicy()
+		policy := NewRestrictedPolicy()
 		admit := tc.admit
 		result := policy.CanAdmitPodResult(admit)
 

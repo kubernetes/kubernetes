@@ -20,23 +20,23 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-type strictPolicy struct{}
+type restrictedPolicy struct{}
 
-var _ Policy = &strictPolicy{}
+var _ Policy = &restrictedPolicy{}
 
-// PolicyStrict policy name.
-const PolicyStrict string = "strict"
+// PolicyRestricted policy name.
+const PolicyRestricted string = "restricted"
 
-// NewStrictPolicy returns strict policy.
-func NewStrictPolicy() Policy {
-	return &strictPolicy{}
+// NewRestrictedPolicy returns restricted policy.
+func NewRestrictedPolicy() Policy {
+	return &restrictedPolicy{}
 }
 
-func (p *strictPolicy) Name() string {
-	return PolicyStrict
+func (p *restrictedPolicy) Name() string {
+	return PolicyRestricted
 }
 
-func (p *strictPolicy) CanAdmitPodResult(admit bool) lifecycle.PodAdmitResult {
+func (p *restrictedPolicy) CanAdmitPodResult(admit bool) lifecycle.PodAdmitResult {
 	if !admit {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
