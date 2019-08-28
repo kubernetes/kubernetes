@@ -172,11 +172,23 @@ const (
 	// Enable pods to set sysctls on a pod
 	Sysctls featuregate.Feature = "Sysctls"
 
+	// owner @smarterclayton
+	// alpha: v1.16
+	//
+	// Enable legacy behavior to vary cluster functionality on the node-role.kubernetes.io labels. On by default (legacy), will be turned off in 1.18.
+	LegacyNodeRoleBehavior featuregate.Feature = "LegacyNodeRoleBehavior"
+
 	// owner @brendandburns
 	// alpha: v1.9
 	//
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion featuregate.Feature = "ServiceNodeExclusion"
+
+	// owner @smarterclayton
+	// alpha: v1.16
+	//
+	// Enable nodes to exclude themselves from network disruption checks
+	NodeDisruptionExclusion featuregate.Feature = "NodeDisruptionExclusion"
 
 	// owner: @jsafrane
 	// alpha: v1.9
@@ -502,6 +514,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CPUCFSQuotaPeriod:                   {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                     {Default: false, PreRelease: featuregate.Alpha},
 	ServiceNodeExclusion:                {Default: false, PreRelease: featuregate.Alpha},
+	NodeDisruptionExclusion:             {Default: false, PreRelease: featuregate.Alpha},
 	MountContainers:                     {Default: false, PreRelease: featuregate.Alpha},
 	CSIDriverRegistry:                   {Default: true, PreRelease: featuregate.Beta},
 	CSINodeInfo:                         {Default: true, PreRelease: featuregate.Beta},
@@ -570,5 +583,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
-	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
+	HPAScaleToZero:         {Default: false, PreRelease: featuregate.Alpha},
+	LegacyNodeRoleBehavior: {Default: true, PreRelease: featuregate.Alpha},
 }

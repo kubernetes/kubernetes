@@ -58,23 +58,38 @@ const (
 	minRetryDelay = 5 * time.Second
 	maxRetryDelay = 300 * time.Second
 
-	// LabelNodeRoleMaster specifies that a node is a master
-	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
-	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+	// labelNodeRoleMaster specifies that a node is a master. The use of this label within the
+	// controller is deprecated and only considered when the LegacyNodeRoleBehavior feature gate
+	// is on.
+	labelNodeRoleMaster = "node-role.kubernetes.io/master"
 
-	// LabelNodeRoleExcludeBalancer specifies that the node should be
-	// exclude from load balancers created by a cloud provider.
-	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
+	// labelNodeRoleExcludeBalancer specifies that the node should not be considered as a target
+	// for external load-balancers which use nodes as a second hop (e.g. many cloud LBs which only
+	// understand nodes). For services that use externalTrafficPolicy=Local, this may mean that
+	// any backends on excluded nodes are not reachable by those external load-balancers.
+	// Implementations of this exclusion may vary based on provider. This label is honored starting
+	// in 1.16 when the ServiceNodeExclusion gate is on.
+	labelNodeRoleExcludeBalancer = "node.kubernetes.io/exclude-from-external-load-balancers"
+
+	// labelAlphaNodeRoleExcludeBalancer specifies that the node should be
+	// exclude from load balancers created by a cloud provider. This label is deprecated and will
+	// be removed in 1.17.
+	labelAlphaNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
 
 	// serviceNodeExclusionFeature is the feature gate name that
 	// enables nodes to exclude themselves from service load balancers
 	// originated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L178
 	serviceNodeExclusionFeature = "ServiceNodeExclusion"
 
-	// ServiceLoadBalancerFinalizerFeature is the feature gate name that
+	// serviceLoadBalancerFinalizerFeature is the feature gate name that
 	// enables Finalizer Protection for Service LoadBalancers.
 	// orginated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L433
 	serviceLoadBalancerFinalizerFeature = "ServiceLoadBalancerFinalizer"
+
+	// legacyNodeRoleBehaviro is the feature gate name that enables legacy
+	// behavior to vary cluster functionality on the node-role.kubernetes.io
+	// labels.
+	legacyNodeRoleBehaviorFeature = "LegacyNodeRoleBehavior"
 )
 
 type cachedService struct {
@@ -625,14 +640,19 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 			return false
 		}
 
-		// As of 1.6, we will taint the master, but not necessarily mark it unschedulable.
-		// Recognize nodes labeled as master, and filter them also, as we were doing previously.
-		if _, hasMasterRoleLabel := node.Labels[LabelNodeRoleMaster]; hasMasterRoleLabel {
-			return false
+		if utilfeature.DefaultFeatureGate.Enabled(legacyNodeRoleBehaviorFeature) {
+			// As of 1.6, we will taint the master, but not necessarily mark it unschedulable.
+			// Recognize nodes labeled as master, and filter them also, as we were doing previously.
+			if _, hasMasterRoleLabel := node.Labels[labelNodeRoleMaster]; hasMasterRoleLabel {
+				return false
+			}
 		}
-
 		if utilfeature.DefaultFeatureGate.Enabled(serviceNodeExclusionFeature) {
-			if _, hasExcludeBalancerLabel := node.Labels[LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+			// Will be removed in 1.17
+			if _, hasExcludeBalancerLabel := node.Labels[labelAlphaNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+				return false
+			}
+			if _, hasExcludeBalancerLabel := node.Labels[labelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
 				return false
 			}
 		}
