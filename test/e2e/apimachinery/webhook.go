@@ -125,7 +125,7 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		webhookCleanup := registerWebhookForCustomResource(f, f.UniqueName, context, testcrd, servicePort)
 		defer webhookCleanup()
 		testCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"])
-		testBlockingCustomResourceDeletion(f, testcrd.Crd, testcrd.DynamicClients["v1"])
+		testBlockingCustomResourceUpdateDeletion(f, testcrd.Crd, testcrd.DynamicClients["v1"])
 	})
 
 	ginkgo.It("Should unconditionally reject operations on fail closed webhook", func() {
@@ -844,8 +844,8 @@ func registerMutatingWebhookForPod(f *framework.Framework, configName string, co
 func testMutatingPodWebhook(f *framework.Framework) {
 	ginkgo.By("create a pod that should be updated by the webhook")
 	client := f.ClientSet
-	configMap := toBeMutatedPod(f)
-	mutatedPod, err := client.CoreV1().Pods(f.Namespace.Name).Create(configMap)
+	pod := toBeMutatedPod(f)
+	mutatedPod, err := client.CoreV1().Pods(f.Namespace.Name).Create(pod)
 	gomega.Expect(err).To(gomega.BeNil())
 	if len(mutatedPod.Spec.InitContainers) != 1 {
 		e2elog.Failf("expect pod to have 1 init container, got %#v", mutatedPod.Spec.InitContainers)
@@ -1675,7 +1675,7 @@ func testCustomResourceWebhook(f *framework.Framework, crd *apiextensionsv1.Cust
 	}
 }
 
-func testBlockingCustomResourceDeletion(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
+func testBlockingCustomResourceUpdateDeletion(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClient dynamic.ResourceInterface) {
 	ginkgo.By("Creating a custom resource whose deletion would be denied by the webhook")
 	crInstanceName := "cr-instance-2"
 	crInstance := &unstructured.Unstructured{
@@ -1693,6 +1693,22 @@ func testBlockingCustomResourceDeletion(f *framework.Framework, crd *apiextensio
 	}
 	_, err := customResourceClient.Create(crInstance, metav1.CreateOptions{})
 	framework.ExpectNoError(err, "failed to create custom resource %s in namespace: %s", crInstanceName, f.Namespace.Name)
+
+	ginkgo.By("Updating the custom resource with disallowed data should be denied")
+	toNonCompliantFn := func(cr *unstructured.Unstructured) {
+		if _, ok := cr.Object["data"]; !ok {
+			cr.Object["data"] = map[string]interface{}{}
+		}
+		data := cr.Object["data"].(map[string]interface{})
+		data["webhook-e2e-test"] = "webhook-disallow"
+	}
+	_, err = updateCustomResource(customResourceClient, f.Namespace.Name, crInstanceName, toNonCompliantFn)
+	framework.ExpectError(err, "updating custom resource %s in namespace: %s should be denied", crInstanceName, f.Namespace.Name)
+
+	expectedErrMsg := "the custom resource contains unwanted data"
+	if !strings.Contains(err.Error(), expectedErrMsg) {
+		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+	}
 
 	ginkgo.By("Deleting the custom resource should be denied")
 	err = customResourceClient.Delete(crInstanceName, &metav1.DeleteOptions{})
@@ -1797,8 +1813,19 @@ func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.
 
 	ginkgo.By("Patching the custom resource while v2 is storage version")
 	crDummyPatch := fmt.Sprint(`[{ "op": "add", "path": "/dummy", "value": "test" }]`)
-	_, err = testcrd.DynamicClients["v2"].Patch(crName, types.JSONPatchType, []byte(crDummyPatch), metav1.PatchOptions{})
+	mutatedCR, err := testcrd.DynamicClients["v2"].Patch(crName, types.JSONPatchType, []byte(crDummyPatch), metav1.PatchOptions{})
 	framework.ExpectNoError(err, "failed to patch custom resource %s in namespace: %s", crName, f.Namespace.Name)
+	expectedCRData := map[string]interface{}{
+		"mutation-start":   "yes",
+		"mutation-stage-1": "yes",
+		"mutation-stage-2": "yes",
+	}
+	if !reflect.DeepEqual(expectedCRData, mutatedCR.Object["data"]) {
+		e2elog.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
+	}
+	if !reflect.DeepEqual("test", mutatedCR.Object["dummy"]) {
+		e2elog.Failf("\nexpected %#v\n, got %#v\n", "test", mutatedCR.Object["dummy"])
+	}
 }
 
 func registerValidatingWebhookForCRD(f *framework.Framework, configName string, context *certContext, servicePort int32) func() {
