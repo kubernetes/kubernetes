@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -211,7 +210,7 @@ var _ = SIGDescribe("Proxy", func() {
 				errs = append(errs, s)
 			}
 			d := time.Since(start)
-			e2elog.Logf("setup took %v, starting test cases", d)
+			framework.Logf("setup took %v, starting test cases", d)
 			numberTestCases := len(expectations)
 			totalAttempts := numberTestCases * proxyAttempts
 			ginkgo.By(fmt.Sprintf("running %v cases, %v attempts per case, %v total attempts", numberTestCases, proxyAttempts, totalAttempts))
@@ -250,12 +249,12 @@ var _ = SIGDescribe("Proxy", func() {
 			if len(errs) != 0 {
 				body, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).GetLogs(pods[0].Name, &v1.PodLogOptions{}).Do().Raw()
 				if err != nil {
-					e2elog.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
+					framework.Logf("Error getting logs for pod %s: %v", pods[0].Name, err)
 				} else {
-					e2elog.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
+					framework.Logf("Pod %s has the following error logs: %s", pods[0].Name, body)
 				}
 
-				e2elog.Failf(strings.Join(errs, "\n"))
+				framework.Failf(strings.Join(errs, "\n"))
 			}
 		})
 	})
@@ -272,9 +271,9 @@ func doProxy(f *framework.Framework, path string, i int) (body []byte, statusCod
 	body, err = f.ClientSet.CoreV1().RESTClient().Get().AbsPath(path).Do().StatusCode(&statusCode).Raw()
 	d = time.Since(start)
 	if len(body) > 0 {
-		e2elog.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
+		framework.Logf("(%v) %v: %s (%v; %v)", i, path, truncate(body, maxDisplayBodyLen), statusCode, d)
 	} else {
-		e2elog.Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
+		framework.Logf("%v: %s (%v; %v)", path, "no body", statusCode, d)
 	}
 	return
 }
@@ -306,7 +305,7 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 	for i := 0; i < proxyAttempts; i++ {
 		_, status, d, err := doProxy(f, prefix+node+nodeDest, i)
 		if status == http.StatusServiceUnavailable {
-			e2elog.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)
+			framework.Logf("ginkgo.Failed proxying node logs due to service unavailable: %v", err)
 			time.Sleep(time.Second)
 			serviceUnavailableErrors++
 		} else {
@@ -316,7 +315,7 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 		}
 	}
 	if serviceUnavailableErrors > 0 {
-		e2elog.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
+		framework.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
 	}
 	maxFailures := int(math.Floor(0.1 * float64(proxyAttempts)))
 	gomega.Expect(serviceUnavailableErrors).To(gomega.BeNumerically("<", maxFailures))
@@ -329,12 +328,12 @@ func waitForEndpoint(c clientset.Interface, ns, name string) error {
 	for t := time.Now(); time.Since(t) < registerTimeout; time.Sleep(framework.Poll) {
 		endpoint, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
 		if errors.IsNotFound(err) {
-			e2elog.Logf("Endpoint %s/%s is not ready yet", ns, name)
+			framework.Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
 		}
 		framework.ExpectNoError(err, "Failed to get endpoints for %s/%s", ns, name)
 		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
-			e2elog.Logf("Endpoint %s/%s is not ready yet", ns, name)
+			framework.Logf("Endpoint %s/%s is not ready yet", ns, name)
 			continue
 		}
 		return nil
