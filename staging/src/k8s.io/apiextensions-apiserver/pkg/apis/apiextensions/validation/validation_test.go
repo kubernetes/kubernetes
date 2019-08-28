@@ -6572,6 +6572,56 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			opts:      validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
 			wantError: true,
 		},
+		{
+			name: "invalid type with list type extension set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "object",
+					XListType: strPtr("map"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "unset type with list type extension set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					XListType: strPtr("map"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "invalid list type extension with list map keys extension set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("set"),
+					XListMapKeys: []string{"key"},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "unset list type extension with list map keys extension set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListMapKeys: []string{"key"},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "invalid list type",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("invalid"),
+				},
+			},
+			wantError: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

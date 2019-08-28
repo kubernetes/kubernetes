@@ -77,6 +77,10 @@ type APIGroupInfo struct {
 	NegotiatedSerializer runtime.NegotiatedSerializer
 	// ParameterCodec performs conversions for query parameters passed to API calls
 	ParameterCodec runtime.ParameterCodec
+
+	// StaticOpenAPISpec is the spec derived from the definitions of all resources installed together.
+	// It is set during InstallAPIGroups, InstallAPIGroup, and InstallLegacyAPIGroup.
+	StaticOpenAPISpec *spec.Swagger
 }
 
 // GenericAPIServer contains state for a Kubernetes cluster api server.
@@ -551,6 +555,9 @@ func (s *GenericAPIServer) getOpenAPIModels(apiPrefix string, apiGroupInfos ...*
 	openAPISpec, err := openapibuilder.BuildOpenAPIDefinitionsForResources(s.openAPIConfig, resourceNames...)
 	if err != nil {
 		return nil, err
+	}
+	for _, apiGroupInfo := range apiGroupInfos {
+		apiGroupInfo.StaticOpenAPISpec = openAPISpec
 	}
 	return utilopenapi.ToProtoModels(openAPISpec)
 }
