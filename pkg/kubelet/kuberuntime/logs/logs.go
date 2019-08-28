@@ -26,6 +26,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/docker/docker/daemon/logger/jsonfilelog/jsonlog"
@@ -271,6 +272,16 @@ func (w *logWriter) write(msg *logMessage) error {
 // Note that containerID is only needed when following the log, or else
 // just pass in empty string "".
 func ReadLogs(ctx context.Context, path, containerID string, opts *LogOptions, runtimeService internalapi.RuntimeService, stdout, stderr io.Writer) error {
+	// fsnotify has different behavior for symlinks in different platform,
+	// for example it follows symlink on Linux, but not on Windows,
+	// so we explicitly resolve symlinks before reading the logs.
+	// There shouldn't be security issue because the container log
+	// path is owned by kubelet and the container runtime.
+	evaluated, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return fmt.Errorf("failed to try resolving symlinks in path %q: %v", path, err)
+	}
+	path = evaluated
 	f, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("failed to open log file %q: %v", path, err)
