@@ -37,7 +37,7 @@ import (
 
 var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 
-	f := framework.NewDefaultFramework("custom-resource-definition")
+	framework.NewDefaultFramework("custom-resource-definition")
 
 	ginkgo.Context("Simple CustomResourceDefinition", func() {
 		/*
@@ -55,7 +55,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 			randomDefinition := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
 
 			// Create CRD and waits for the resource to be recognized and available.
-			randomDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(randomDefinition, apiExtensionClient, f.DynamicClient)
+			randomDefinition, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(randomDefinition, apiExtensionClient)
 			framework.ExpectNoError(err, "creating CustomResourceDefinition")
 
 			defer func() {
@@ -84,14 +84,14 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 			for i := 0; i < testListSize; i++ {
 				crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
 				crd.Labels = map[string]string{"e2e-list-test-uuid": testUUID}
-				crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
+				crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 				framework.ExpectNoError(err, "creating CustomResourceDefinition")
 				crds[i] = crd
 			}
 
 			// Create a crd w/o the label to ensure the label selector matching works correctly
 			crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
-			crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
+			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 			framework.ExpectNoError(err, "creating CustomResourceDefinition")
 			defer func() {
 				err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
@@ -140,7 +140,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 
 			// Create CRD and waits for the resource to be recognized and available.
 			crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
-			crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
+			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 			framework.ExpectNoError(err, "creating CustomResourceDefinition")
 			defer func() {
 				err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
