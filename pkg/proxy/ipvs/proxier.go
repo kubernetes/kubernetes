@@ -479,7 +479,7 @@ func NewDualStackProxier(
 
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(ipt, ipvs, safeIpset, sysctl,
-		exec, syncPeriod, minSyncPeriod, excludeCIDRs, strictARP,
+		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		masqueradeAll, masqueradeBit, clusterCIDR[0], hostname, nodeIP[0],
 		recorder, healthzServer, scheduler, nodePortAddresses)
 	if err != nil {
@@ -491,7 +491,7 @@ func NewDualStackProxier(
 	ipt = utiliptables.New(exec, dbus, utiliptables.ProtocolIpv6)
 
 	ipv6Proxier, err := NewProxier(ipt, ipvs, safeIpset, sysctl,
-		exec, syncPeriod, minSyncPeriod, excludeCIDRs, strictARP,
+		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		masqueradeAll, masqueradeBit, clusterCIDR[1], hostname, nodeIP[1],
 		nil, nil, scheduler, nodePortAddresses)
 	if err != nil {
@@ -501,6 +501,16 @@ func NewDualStackProxier(
 	// Return a meta-proxier that dispatch calls between the two
 	// single-stack proxier instances
 	return NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
+}
+
+func filterCIDRs(wantIPv6 bool, cidrs []string) []string {
+	var filteredCIDRs []string
+	for _, cidr := range cidrs {
+		if utilnet.IsIPv6CIDRString(cidr) == wantIPv6 {
+			filteredCIDRs = append(filteredCIDRs, cidr)
+		}
+	}
+	return filteredCIDRs
 }
 
 // internal struct for string service information
