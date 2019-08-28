@@ -308,7 +308,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	if pod.Status.QOSClass == v1.PodQOSGuaranteed {
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 			result := m.calculateAffinity(*pod, container)
-			admitPod := m.policy.CanAdmitPodResult(result.Preferred)
+			admitPod := m.policy.CanAdmitPodResult(&result)
 			if !admitPod.Admit {
 				return admitPod
 			}
