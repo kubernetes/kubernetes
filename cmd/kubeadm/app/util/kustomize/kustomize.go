@@ -25,15 +25,25 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/pkg/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	yamlutil "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/cli-runtime/pkg/kustomize"
+	"sigs.k8s.io/kustomize/pkg/constants"
 	"sigs.k8s.io/kustomize/pkg/fs"
+	"sigs.k8s.io/kustomize/pkg/ifc"
 	"sigs.k8s.io/kustomize/pkg/loader"
+	"sigs.k8s.io/kustomize/pkg/patch"
+	"sigs.k8s.io/kustomize/pkg/types"
+	"sigs.k8s.io/yaml"
 )
 
 // Manager define a manager that allow access to kustomize capabilities
 type Manager struct {
-	kustomizeDir string
-	us           UnstructuredSlice
+	kustomizeDir          string
+	kustomizationFile     *types.Kustomization
+	strategicMergePatches strategicMergeSlice
+	json6902Patches       json6902Slice
 }
 
 var (
@@ -42,6 +52,8 @@ var (
 )
 
 // GetManager return the KustomizeManager singleton instance
+// NB. this is done at singleton instance level because kubeadm has a unique pool
+// of patches that are applied to different content, at different time
 func GetManager(kustomizeDir string) (*Manager, error) {
 	lock.Lock()
 	defer lock.Unlock()
@@ -52,11 +64,30 @@ func GetManager(kustomizeDir string) (*Manager, error) {
 			kustomizeDir: kustomizeDir,
 		}
 
-		// loads the UnstructuredSlice with all the patches into the Manager
-		// NB. this is done at singleton instance level because kubeadm has a unique pool
-		// of patches that are applied to different content, at different time
-		if err := km.getUnstructuredSlice(); err != nil {
+		// Create a loader that mimics the behavior of kubectl kustomize, including support for reading from
+		// a local folder or git repository like git@github.com:someOrg/someRepo.git or https://github.com/someOrg/someRepo?ref=someHash
+		// in order to do so you must use ldr.Root() instead of km.kustomizeDir and ldr.Load instead of other ways to read files
+		fSys := fs.MakeRealFS()
+		ldr, err := loader.NewLoader(km.kustomizeDir, fSys)
+		if err != nil {
 			return nil, err
+		}
+		defer ldr.Cleanup()
+
+		// read the Kustomization file and all the patches it is
+		// referencing (either stategicMerge or json6902 patches)
+		if err := km.loadFromKustomizationFile(ldr); err != nil {
+			return nil, err
+		}
+
+		// if a Kustomization file was not found, kubeadm creates
+		// one using all the patches in the folder; however in this
+		// case only stategicMerge patches are supported
+		if km.kustomizationFile == nil {
+			km.kustomizationFile = &types.Kustomization{}
+			if err := km.loadFromFolder(ldr); err != nil {
+				return nil, err
+			}
 		}
 
 		instances[kustomizeDir] = km
@@ -65,78 +96,103 @@ func GetManager(kustomizeDir string) (*Manager, error) {
 	return instances[kustomizeDir], nil
 }
 
-// getUnstructuredSlice returns a UnstructuredSlice with all the patches.
-func (km *Manager) getUnstructuredSlice() error {
-	// kubeadm does not require a kustomization.yaml file listing all the resources/patches, so it is necessary
-	// to rebuild the list of patches manually
-	// TODO: make this git friendly - currently this works only for patches in local folders -
-	files, err := ioutil.ReadDir(km.kustomizeDir)
+// loadFromKustomizationFile reads a Kustomization file and all the patches it is
+// referencing (either stategicMerge or json6902 patches)
+func (km *Manager) loadFromKustomizationFile(ldr ifc.Loader) error {
+	// Kustomize support different KustomizationFileNames, so we try to read all
+	var content []byte
+	match := 0
+	for _, kf := range constants.KustomizationFileNames {
+		c, err := ldr.Load(kf)
+		if err == nil {
+			match++
+			content = c
+		}
+	}
+
+	// if no kustomization file is found return
+	if match == 0 {
+		return nil
+	}
+
+	// if more that one kustomization file is found, return error
+	if match > 1 {
+		return errors.Errorf("Found multiple kustomization files under: %s\n", ldr.Root())
+	}
+
+	// Decode the kustomization file
+	decoder := yamlutil.NewYAMLOrJSONDecoder(bytes.NewReader(content), 1024)
+	var k = &types.Kustomization{}
+	if err := decoder.Decode(k); err != nil {
+		return errors.Wrap(err, "Error decoding kustomization file")
+	}
+	km.kustomizationFile = k
+
+	// gets all the strategic merge patches
+	for _, f := range km.kustomizationFile.PatchesStrategicMerge {
+		smp, err := newStrategicMergeSliceFromFile(ldr, string(f))
+		if err != nil {
+			return err
+		}
+		km.strategicMergePatches = append(km.strategicMergePatches, smp...)
+	}
+
+	// gets all the json6902 patches
+	for _, f := range km.kustomizationFile.PatchesJson6902 {
+		jp, err := newJSON6902FromFile(f, ldr, f.Path)
+		if err != nil {
+			return err
+		}
+		km.json6902Patches = append(km.json6902Patches, jp)
+	}
+
+	return nil
+}
+
+// loadFromFolder returns all the stategicMerge patches in a folder
+func (km *Manager) loadFromFolder(ldr ifc.Loader) error {
+	files, err := ioutil.ReadDir(ldr.Root())
 	if err != nil {
 		return err
 	}
-
-	var paths = []string{}
-	for _, file := range files {
-		if file.IsDir() {
+	for _, fileInfo := range files {
+		if fileInfo.IsDir() {
 			continue
 		}
-		paths = append(paths, file.Name())
-	}
 
-	// Create a loader that mimics the behavior of kubectl kustomize, including support for reading from
-	// a local git repository like git@github.com:someOrg/someRepo.git or https://github.com/someOrg/someRepo?ref=someHash
-	fSys := fs.MakeRealFS()
-	ldr, err := loader.NewLoader(km.kustomizeDir, fSys)
-	if err != nil {
-		return err
+		smp, err := newStrategicMergeSliceFromFile(ldr, fileInfo.Name())
+		if err != nil {
+			return err
+		}
+		km.strategicMergePatches = append(km.strategicMergePatches, smp...)
 	}
-	defer ldr.Cleanup()
-
-	// read all the kustomizations and build the UnstructuredSlice
-	us, err := NewUnstructuredSliceFromFiles(ldr, paths)
-	if err != nil {
-		return err
-	}
-
-	km.us = us
 	return nil
 }
 
 // Kustomize apply a set of patches to a resource.
 // Portions of the kustomize logic in this function are taken from the kubernetes-sigs/kind project
-func (km *Manager) Kustomize(res []byte) ([]byte, error) {
-	// create a loader that mimics the behavior of kubectl kustomize
-	// and converts the resource into a UnstructuredSlice
-	// Nb. in kubeadm we are controlling resource generation, and so we
-	// we are expecting 1 object into each resource, eg. the static pod.
-	// Nevertheless, this code is ready for more than one object per resource
-	resList, err := NewUnstructuredSliceFromBytes(res)
-	if err != nil {
+func (km *Manager) Kustomize(data []byte) ([]byte, error) {
+	// parse the resource to kustomize
+	decoder := yamlutil.NewYAMLOrJSONDecoder(bytes.NewReader(data), 1024)
+	var resource *unstructured.Unstructured
+	if err := decoder.Decode(&resource); err != nil {
 		return nil, err
 	}
 
-	// create a list of resource and corresponding patches
-	var resources, patches UnstructuredSlice
-	for _, r := range resList {
-		resources = append(resources, r)
-
-		resourcePatches := km.us.FilterResource(r.GroupVersionKind(), r.GetNamespace(), r.GetName())
-
-		if len(resourcePatches) > 0 {
-			fmt.Printf("[kustomize] Applying %d patches to %s Resource=%s/%s\n", len(resourcePatches), r.GroupVersionKind(), r.GetNamespace(), r.GetName())
-			patches = append(patches, resourcePatches...)
-		}
-	}
+	// get patches corresponding to this resource
+	strategicMerge := km.strategicMergePatches.filterByResource(resource)
+	json6902 := km.json6902Patches.filterByResource(resource)
 
 	// if there are no patches, for the target resources, exit
-	if len(patches) == 0 {
-		return res, nil
+	if len(strategicMerge)+len(json6902) == 0 {
+		return data, nil
 	}
+
+	fmt.Printf("[kustomize] Applying %d patches to %s Resource=%s/%s\n", len(strategicMerge)+len(json6902), resource.GroupVersionKind(), resource.GetNamespace(), resource.GetName())
 
 	// create an in memory fs to use for the kustomization
 	memFS := fs.MakeFakeFS()
 
-	var kustomization bytes.Buffer
 	fakeDir := "/"
 	// for Windows we need this to be a drive because kustomize uses filepath.Abs()
 	// which will add a drive letter if there is none. which drive letter is
@@ -145,33 +201,44 @@ func (km *Manager) Kustomize(res []byte) ([]byte, error) {
 		fakeDir = `C:\`
 	}
 
-	// write resources and patches to the in memory fs, generate the kustomization.yaml
-	// that ties everything together
-	kustomization.WriteString("resources:\n")
-	for i, r := range resources {
-		b, err := r.MarshalJSON()
+	// writes the resource to a file in the temp file system
+	b, err := yaml.Marshal(resource)
+	if err != nil {
+		return nil, err
+	}
+	name := "resource.yaml"
+	_ = memFS.WriteFile(filepath.Join(fakeDir, name), b)
+
+	km.kustomizationFile.Resources = []string{name}
+
+	// writes strategic merge patches to files in the temp file system
+	km.kustomizationFile.PatchesStrategicMerge = []patch.StrategicMerge{}
+	for i, p := range strategicMerge {
+		b, err := yaml.Marshal(p)
 		if err != nil {
 			return nil, err
 		}
-
-		name := fmt.Sprintf("resource-%d.json", i)
+		name := fmt.Sprintf("patch-%d.yaml", i)
 		_ = memFS.WriteFile(filepath.Join(fakeDir, name), b)
-		fmt.Fprintf(&kustomization, " - %s\n", name)
+
+		km.kustomizationFile.PatchesStrategicMerge = append(km.kustomizationFile.PatchesStrategicMerge, patch.StrategicMerge(name))
 	}
 
-	kustomization.WriteString("patches:\n")
-	for i, p := range patches {
-		b, err := p.MarshalJSON()
-		if err != nil {
-			return nil, err
-		}
+	// writes json6902 patches to files in the temp file system
+	km.kustomizationFile.PatchesJson6902 = []patch.Json6902{}
+	for i, p := range json6902 {
+		name := fmt.Sprintf("patchjson-%d.yaml", i)
+		_ = memFS.WriteFile(filepath.Join(fakeDir, name), []byte(p.Patch))
 
-		name := fmt.Sprintf("patch-%d.json", i)
-		_ = memFS.WriteFile(filepath.Join(fakeDir, name), b)
-		fmt.Fprintf(&kustomization, " - %s\n", name)
+		km.kustomizationFile.PatchesJson6902 = append(km.kustomizationFile.PatchesJson6902, patch.Json6902{Target: p.Target, Path: name})
 	}
 
-	memFS.WriteFile(filepath.Join(fakeDir, "kustomization.yaml"), kustomization.Bytes())
+	// writes the kustomization file to the temp file system
+	kbytes, err := yaml.Marshal(km.kustomizationFile)
+	if err != nil {
+		return nil, err
+	}
+	memFS.WriteFile(filepath.Join(fakeDir, "kustomization.yaml"), kbytes)
 
 	// Finally customize the target resource
 	var out bytes.Buffer

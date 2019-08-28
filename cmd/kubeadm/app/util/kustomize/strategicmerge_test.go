@@ -20,20 +20,21 @@ import (
 	"testing"
 
 	"github.com/lithammer/dedent"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-func TestNewUnstructuredSliceFromBytes(t *testing.T) {
+func TestNewStategicMergeSliceFromBytes(t *testing.T) {
 	var useCases = []struct {
-		name                 string
-		in                   string
-		expectedUnctructured int
-		expectedError        bool
+		name            string
+		in              string
+		expectedPatches int
+		expectedError   bool
 	}{
 		{
-			name:                 "empty",
-			in:                   "",
-			expectedUnctructured: 0,
+			name:            "empty",
+			in:              "",
+			expectedPatches: 0,
 		},
 		{
 			name: "single patch",
@@ -43,7 +44,7 @@ func TestNewUnstructuredSliceFromBytes(t *testing.T) {
             metadata:
               name: kube-apiserver
             `),
-			expectedUnctructured: 1,
+			expectedPatches: 1,
 		},
 		{
 			name: "two patches as separated yaml documents",
@@ -58,7 +59,7 @@ func TestNewUnstructuredSliceFromBytes(t *testing.T) {
             metadata:
               name: kube-apiserver
             `),
-			expectedUnctructured: 2,
+			expectedPatches: 2,
 		},
 		{
 			name: "two patches as a k8s list",
@@ -75,7 +76,7 @@ func TestNewUnstructuredSliceFromBytes(t *testing.T) {
               metadata:
                 name: kube-apiserver
             `),
-			expectedUnctructured: 2,
+			expectedPatches: 2,
 		},
 		{
 			name: "nested k8s lists",
@@ -95,7 +96,7 @@ func TestNewUnstructuredSliceFromBytes(t *testing.T) {
                 metadata:
                   name: kube-apiserver
             `),
-			expectedUnctructured: 2,
+			expectedPatches: 2,
 		},
 		{
 			name:          "invalid yaml",
@@ -125,18 +126,18 @@ func TestNewUnstructuredSliceFromBytes(t *testing.T) {
 	}
 	for _, rt := range useCases {
 		t.Run(rt.name, func(t *testing.T) {
-			r, err := NewUnstructuredSliceFromBytes([]byte(rt.in))
+			r, err := newStrategicMergeSliceFromBytes([]byte(rt.in))
 			if err != nil {
 				if !rt.expectedError {
-					t.Errorf("NewUnstructuredSliceFromBytes returned unexpected error: %v", err)
+					t.Errorf("newStrategicMergeSliceFromBytes returned unexpected error: %v", err)
 				}
 				return
 			}
 			if err == nil && rt.expectedError {
-				t.Error("NewUnstructuredSliceFromBytes does not returned expected error")
+				t.Error("newStrategicMergeSliceFromBytes does not returned expected error")
 			}
-			if len(r) != rt.expectedUnctructured {
-				t.Errorf("Expected %d Unstructured items in the slice, actual %d", rt.expectedUnctructured, len(r))
+			if len(r) != rt.expectedPatches {
+				t.Errorf("Expected %d strategic merge patches in the slice, actual %d", rt.expectedPatches, len(r))
 			}
 		})
 	}
@@ -162,60 +163,65 @@ func TestFilterResource(t *testing.T) {
       name: kube-scheduler
       namespace: kube-system
     `)
-	u, err := NewUnstructuredSliceFromBytes([]byte(in))
+	u, err := newStrategicMergeSliceFromBytes([]byte(in))
 	if err != nil {
-		t.Fatalf("NewUnstructuredSliceFromBytes returned unexpected error: %v", err)
+		t.Fatalf("newStategicMergeSliceFromBytes returned unexpected error: %v", err)
 	}
 
 	var useCases = []struct {
-		name                 string
-		rgvk                 schema.GroupVersionKind
-		rnamespace           string
-		rname                string
-		expectedUnctructured int
+		name            string
+		rgvk            schema.GroupVersionKind
+		rnamespace      string
+		rname           string
+		expectedPatches int
 	}{
 		{
-			name:                 "match 1",
-			rgvk:                 schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
-			rnamespace:           "kube-system",
-			rname:                "kube-apiserver",
-			expectedUnctructured: 1,
+			name:            "match 1",
+			rgvk:            schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
+			rnamespace:      "kube-system",
+			rname:           "kube-apiserver",
+			expectedPatches: 1,
 		},
 		{
-			name:                 "match 2",
-			rgvk:                 schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
-			rnamespace:           "kube-system",
-			rname:                "kube-scheduler",
-			expectedUnctructured: 2,
+			name:            "match 2",
+			rgvk:            schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
+			rnamespace:      "kube-system",
+			rname:           "kube-scheduler",
+			expectedPatches: 2,
 		},
 		{
-			name:                 "match 0 (wrong gvk)",
-			rgvk:                 schema.GroupVersionKind{Group: "something", Version: "v1", Kind: "Pod"},
-			rnamespace:           "kube-system",
-			rname:                "kube-scheduler",
-			expectedUnctructured: 0,
+			name:            "match 0 (wrong gvk)",
+			rgvk:            schema.GroupVersionKind{Group: "something", Version: "v1", Kind: "Pod"},
+			rnamespace:      "kube-system",
+			rname:           "kube-scheduler",
+			expectedPatches: 0,
 		},
 		{
-			name:                 "match 0 (wrong namespace)",
-			rgvk:                 schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
-			rnamespace:           "kube-something",
-			rname:                "kube-scheduler",
-			expectedUnctructured: 0,
+			name:            "match 0 (wrong namespace)",
+			rgvk:            schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
+			rnamespace:      "kube-something",
+			rname:           "kube-scheduler",
+			expectedPatches: 0,
 		},
 		{
-			name:                 "match 0 (wrong namr)",
-			rgvk:                 schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
-			rnamespace:           "kube-system",
-			rname:                "kube-something",
-			expectedUnctructured: 0,
+			name:            "match 0 (wrong namr)",
+			rgvk:            schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"},
+			rnamespace:      "kube-system",
+			rname:           "kube-something",
+			expectedPatches: 0,
 		},
 	}
 	for _, rt := range useCases {
 		t.Run(rt.name, func(t *testing.T) {
-			r := u.FilterResource(rt.rgvk, rt.rnamespace, rt.rname)
+			resource := &unstructured.Unstructured{}
+			resource.SetGroupVersionKind(rt.rgvk)
+			resource.SetNamespace(rt.rnamespace)
+			resource.SetName(rt.rname)
 
-			if len(r) != rt.expectedUnctructured {
-				t.Errorf("Expected %d Unstructured items in the slice, actual %d", rt.expectedUnctructured, len(r))
+			r := u.filterByResource(resource)
+
+			if len(r) != rt.expectedPatches {
+				t.Errorf("Expected %d strategic merge patches in the slice, actual %d", rt.expectedPatches, len(r))
 			}
 		})
 	}
