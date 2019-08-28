@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package main
 
 import (
-	"k8s.io/apiserver/pkg/admission/plugin/webhook"
+	"fmt"
+
+	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
 )
 
-// HasAdmissionReviewVersion check whether a version is accepted by a given webhook.
-func HasAdmissionReviewVersion(a string, w webhook.WebhookAccessor) bool {
-	for _, b := range w.GetAdmissionReviewVersions() {
-		if b == a {
-			return true
-		}
-	}
-	return false
+func main() {
+	server := webhooktesting.NewTestServer(nil)
+	server.StartTLS()
+	fmt.Println("serving on", server.URL)
+	select {}
 }

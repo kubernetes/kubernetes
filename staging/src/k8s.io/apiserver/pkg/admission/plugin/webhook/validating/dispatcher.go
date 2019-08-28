@@ -32,7 +32,6 @@ import (
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/util"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/klog"
 	utiltrace "k8s.io/utils/trace"
@@ -158,7 +157,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Validati
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	// Make the webhook request
-	client, err := d.cm.HookClient(util.HookClientConfigForWebhook(invocation.Webhook))
+	client, err := invocation.Webhook.GetRESTClient(d.cm)
 	if err != nil {
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
