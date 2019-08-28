@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -81,12 +82,15 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 			AllowVolumeExpansion: true,
 			DelayBinding:         true,
 		}
-		resizableSc, err = createStorageClass(test, ns, "resizing", c)
+		resizableSc, err = c.StorageV1().StorageClasses().Create(newStorageClass(test, ns, "resizing"))
 		framework.ExpectNoError(err, "Error creating resizable storage class")
 		gomega.Expect(*resizableSc.AllowVolumeExpansion).To(gomega.BeTrue())
 
-		pvc = newClaim(test, ns, "default")
-		pvc.Spec.StorageClassName = &resizableSc.Name
+		pvc = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			ClaimSize:        test.ClaimSize,
+			StorageClassName: &(resizableSc.Name),
+			VolumeMode:       &test.VolumeMode,
+		}, ns)
 		pvc, err = c.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err, "Error creating pvc")
 	})
@@ -128,8 +132,9 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 
 		ginkgo.By("Expanding current pvc")
 		newSize := resource.MustParse("6Gi")
-		pvc, err = expandPVCSize(pvc, newSize, c)
+		newPVC, err := testsuites.ExpandPVCSize(pvc, newSize, c)
 		framework.ExpectNoError(err, "While updating pvc for more size")
+		pvc = newPVC
 		gomega.Expect(pvc).NotTo(gomega.BeNil())
 
 		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
@@ -138,7 +143,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		}
 
 		ginkgo.By("Waiting for cloudprovider resize to finish")
-		err = waitForControllerVolumeResize(pvc, c, totalResizeWaitPeriod)
+		err = testsuites.WaitForControllerVolumeResize(pvc, c, totalResizeWaitPeriod)
 		framework.ExpectNoError(err, "While waiting for pvc resize to finish")
 
 		ginkgo.By("Getting a pod from deployment")
@@ -147,7 +152,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		pod := podList.Items[0]
 
 		ginkgo.By("Deleting the pod from deployment")
-		err = framework.DeletePodWithWait(f, c, &pod)
+		err = e2epod.DeletePodWithWait(c, &pod)
 		framework.ExpectNoError(err, "while deleting pod for resizing")
 
 		ginkgo.By("Waiting for deployment to create new pod")
@@ -155,7 +160,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		framework.ExpectNoError(err, "While waiting for pod to be recreated")
 
 		ginkgo.By("Waiting for file system resize to finish")
-		pvc, err = waitForFSResize(pvc, c)
+		pvc, err = testsuites.WaitForFSResize(pvc, c)
 		framework.ExpectNoError(err, "while waiting for fs resize to finish")
 
 		pvcConditions := pvc.Status.Conditions

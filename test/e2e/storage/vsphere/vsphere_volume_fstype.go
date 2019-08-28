@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -125,7 +126,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	// Create pod to attach Volume to Node
-	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, ExecCommand)
+	pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, ExecCommand)
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(namespace).List(metav1.ListOptions{})
@@ -147,7 +148,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 }
 
 func createVolume(client clientset.Interface, namespace string, scParameters map[string]string) (*v1.PersistentVolumeClaim, []*v1.PersistentVolume) {
-	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("fstype", scParameters, nil))
+	storageclass, err := client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec("fstype", scParameters, nil, ""))
 	framework.ExpectNoError(err)
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
@@ -168,7 +169,7 @@ func createPodAndVerifyVolumeAccessible(client clientset.Interface, namespace st
 	pvclaims = append(pvclaims, pvclaim)
 	ginkgo.By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
-	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, ExecCommand)
+	pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, ExecCommand)
 	framework.ExpectNoError(err)
 
 	// Asserts: Right disk is attached to the pod
@@ -183,7 +184,7 @@ func detachVolume(f *framework.Framework, client clientset.Interface, pod *v1.Po
 	gomega.Expect(err).To(gomega.BeNil())
 	nodeName := pod.Spec.NodeName
 	ginkgo.By("Deleting pod")
-	framework.DeletePodWithWait(f, client, pod)
+	e2epod.DeletePodWithWait(client, pod)
 
 	ginkgo.By("Waiting for volumes to be detached from the node")
 	waitForVSphereDiskToDetach(volPath, nodeName)

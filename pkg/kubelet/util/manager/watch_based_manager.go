@@ -61,7 +61,7 @@ type objectCache struct {
 	newObject     newObjectFunc
 	groupResource schema.GroupResource
 
-	lock  sync.Mutex
+	lock  sync.RWMutex
 	items map[objectKey]*objectCacheItem
 }
 
@@ -117,7 +117,7 @@ func (c *objectCache) AddReference(namespace, name string) {
 	key := objectKey{namespace: namespace, name: name}
 
 	// AddReference is called from RegisterPod thus it needs to be efficient.
-	// Thus, it is only increaisng refCount and in case of first registration
+	// Thus, it is only increasing refCount and in case of first registration
 	// of a given object it starts corresponding reflector.
 	// It's responsibility of the first Get operation to wait until the
 	// reflector propagated the store.
@@ -158,15 +158,15 @@ func (c *objectCache) key(namespace, name string) string {
 func (c *objectCache) Get(namespace, name string) (runtime.Object, error) {
 	key := objectKey{namespace: namespace, name: name}
 
-	c.lock.Lock()
+	c.lock.RLock()
 	item, exists := c.items[key]
-	c.lock.Unlock()
+	c.lock.RUnlock()
 
 	if !exists {
 		return nil, fmt.Errorf("object %q/%q not registered", namespace, name)
 	}
 	if err := wait.PollImmediate(10*time.Millisecond, time.Second, item.hasSynced); err != nil {
-		return nil, fmt.Errorf("couldn't propagate object cache: %v", err)
+		return nil, fmt.Errorf("failed to sync %s cache: %v", c.groupResource.String(), err)
 	}
 
 	obj, exists, err := item.store.GetByKey(c.key(namespace, name))

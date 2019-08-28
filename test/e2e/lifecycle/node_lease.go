@@ -130,7 +130,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			err = e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
 			gomega.Expect(err).To(gomega.BeNil())
 			targetNodes := framework.GetReadySchedulableNodesOrDie(c)
-			gomega.Expect(len(targetNodes.Items)).To(gomega.Equal(int(targetNumNodes)))
+			framework.ExpectEqual(len(targetNodes.Items), int(targetNumNodes))
 
 			ginkgo.By("verify node lease is deleted for the deleted node")
 			var deletedNodeName string
@@ -144,7 +144,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 				deletedNodeName = originalNodeName
 				break
 			}
-			gomega.Expect(deletedNodeName).NotTo(gomega.Equal(""))
+			framework.ExpectNotEqual(deletedNodeName, "")
 			gomega.Eventually(func() error {
 				if _, err := leaseClient.Get(deletedNodeName, metav1.GetOptions{}); err == nil {
 					return fmt.Errorf("node lease is not deleted yet for node %q", deletedNodeName)

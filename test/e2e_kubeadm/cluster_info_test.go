@@ -22,8 +22,8 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -53,23 +53,23 @@ var _ = KubeadmDescribe("cluster-info ConfigMap", func() {
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	It("should exist and be properly configured", func() {
+	ginkgo.It("should exist and be properly configured", func() {
 		// Nb. this is technically implemented a part of the bootstrap-token phase
 		cm := GetConfigMap(f.ClientSet, kubePublicNamespace, clusterInfoConfigMapName)
 
-		Expect(cm.Data).To(HaveKey(HavePrefix(bootstrapapi.JWSSignatureKeyPrefix)))
-		Expect(cm.Data).To(HaveKey(bootstrapapi.KubeConfigKey))
+		gomega.Expect(cm.Data).To(gomega.HaveKey(gomega.HavePrefix(bootstrapapi.JWSSignatureKeyPrefix)))
+		gomega.Expect(cm.Data).To(gomega.HaveKey(bootstrapapi.KubeConfigKey))
 
 		//TODO: What else? server?
 	})
 
-	It("should have related Role and RoleBinding", func() {
+	ginkgo.It("should have related Role and RoleBinding", func() {
 		// Nb. this is technically implemented a part of the bootstrap-token phase
 		ExpectRole(f.ClientSet, kubePublicNamespace, clusterInfoRoleName)
 		ExpectRoleBinding(f.ClientSet, kubePublicNamespace, clusterInfoRoleBindingName)
 	})
 
-	It("should be accessible for anonymous", func() {
+	ginkgo.It("should be accessible for anonymous", func() {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.UserKind, anonymousUser,
 			clusterInfoConfigMapResource,

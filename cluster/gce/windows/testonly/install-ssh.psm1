@@ -206,7 +206,7 @@ while($true) {
     if (-not (Test-Path $user_dir)) {
       # If for some reason Create-NewProfile failed to create the user profile
       # directory just continue on to the next user.
-      continue
+      return
     }
 
     # NOTE: there is a race condition here where someone could try to ssh to

@@ -31,7 +31,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -43,10 +43,10 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/apiserver/pkg/util/term"
 	cacheddiscovery "k8s.io/client-go/discovery/cached"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
+	"k8s.io/client-go/metadata/metadatainformer"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	"k8s.io/client-go/tools/leaderelection"
@@ -126,10 +126,7 @@ controller, and serviceaccounts controller.`,
 	namedFlagSets := s.Flags(KnownControllers(), ControllersDisabledByDefault.List())
 	verflag.AddFlags(namedFlagSets.FlagSet("global"))
 	globalflag.AddGlobalFlags(namedFlagSets.FlagSet("global"), cmd.Name())
-	// hoist this flag from the global flagset to preserve the commandline until
-	// the gce cloudprovider is removed.
-	globalflag.Register(namedFlagSets.FlagSet("generic"), "cloud-provider-gce-lb-src-cidrs")
-	namedFlagSets.FlagSet("generic").MarkDeprecated("cloud-provider-gce-lb-src-cidrs", "This flag will be removed once the GCE Cloud Provider is removed from kube-controller-manager")
+	registerLegacyGlobalFlags(namedFlagSets)
 	for _, f := range namedFlagSets.FlagSets {
 		fs.AddFlagSet(f)
 	}
@@ -166,11 +163,11 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	if cfgz, err := configz.New(ConfigzName); err == nil {
 		cfgz.Set(c.ComponentConfig)
 	} else {
-		klog.Errorf("unable to register configz: %c", err)
+		klog.Errorf("unable to register configz: %v", err)
 	}
 
 	// Setup any healthz checks we will want to use.
-	var checks []healthz.HealthzChecker
+	var checks []healthz.HealthChecker
 	var electionChecker *leaderelection.HealthzAdaptor
 	if c.ComponentConfig.Generic.LeaderElection.LeaderElect {
 		electionChecker = leaderelection.NewLeaderHealthzAdaptor(time.Second * 20)
@@ -239,7 +236,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		}
 
 		controllerContext.InformerFactory.Start(controllerContext.Stop)
-		controllerContext.GenericInformerFactory.Start(controllerContext.Stop)
+		controllerContext.ObjectOrMetadataInformerFactory.Start(controllerContext.Stop)
 		close(controllerContext.InformersStarted)
 
 		select {}
@@ -257,9 +254,10 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 
 	// add a uniquifier so that two processes on the same host don't accidentally both become active
 	id = id + "_" + string(uuid.NewUUID())
+
 	rl, err := resourcelock.New(c.ComponentConfig.Generic.LeaderElection.ResourceLock,
-		"kube-system",
-		"kube-controller-manager",
+		c.ComponentConfig.Generic.LeaderElection.ResourceNamespace,
+		c.ComponentConfig.Generic.LeaderElection.ResourceName,
 		c.LeaderElectionClient.CoreV1(),
 		c.LeaderElectionClient.CoordinationV1(),
 		resourcelock.ResourceLockConfig{
@@ -295,9 +293,11 @@ type ControllerContext struct {
 	// InformerFactory gives access to informers for the controller.
 	InformerFactory informers.SharedInformerFactory
 
-	// GenericInformerFactory gives access to informers for typed resources
-	// and dynamic resources.
-	GenericInformerFactory controller.InformerFactory
+	// ObjectOrMetadataInformerFactory gives access to informers for typed resources
+	// and dynamic resources by their metadata. All generic controllers currently use
+	// object metadata - if a future controller needs access to the full object this
+	// would become GenericInformerFactory and take a dynamic client.
+	ObjectOrMetadataInformerFactory controller.InformerFactory
 
 	// ComponentConfig provides access to init options for a given controller
 	ComponentConfig kubectrlmgrconfig.KubeControllerManagerConfiguration
@@ -360,6 +360,7 @@ func KnownControllers() []string {
 // ControllersDisabledByDefault is the set of controllers which is disabled by default
 var ControllersDisabledByDefault = sets.NewString(
 	"bootstrapsigner",
+	"endpointslice",
 	"tokencleaner",
 )
 
@@ -372,6 +373,7 @@ const (
 func NewControllerInitializers(loopMode ControllerLoopMode) map[string]InitFunc {
 	controllers := map[string]InitFunc{}
 	controllers["endpoint"] = startEndpointController
+	controllers["endpointslice"] = startEndpointSliceController
 	controllers["replicationcontroller"] = startReplicationController
 	controllers["podgc"] = startPodGCController
 	controllers["resourcequota"] = startResourceQuotaController
@@ -448,8 +450,8 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 	versionedClient := rootClientBuilder.ClientOrDie("shared-informers")
 	sharedInformers := informers.NewSharedInformerFactory(versionedClient, ResyncPeriod(s)())
 
-	dynamicClient := dynamic.NewForConfigOrDie(rootClientBuilder.ConfigOrDie("dynamic-informers"))
-	dynamicInformers := dynamicinformer.NewDynamicSharedInformerFactory(dynamicClient, ResyncPeriod(s)())
+	metadataClient := metadata.NewForConfigOrDie(rootClientBuilder.ConfigOrDie("metadata-informers"))
+	metadataInformers := metadatainformer.NewSharedInformerFactory(metadataClient, ResyncPeriod(s)())
 
 	// If apiserver is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and controller manager at the same time.
@@ -477,17 +479,17 @@ func CreateControllerContext(s *config.CompletedConfig, rootClientBuilder, clien
 	}
 
 	ctx := ControllerContext{
-		ClientBuilder:          clientBuilder,
-		InformerFactory:        sharedInformers,
-		GenericInformerFactory: controller.NewInformerFactory(sharedInformers, dynamicInformers),
-		ComponentConfig:        s.ComponentConfig,
-		RESTMapper:             restMapper,
-		AvailableResources:     availableResources,
-		Cloud:                  cloud,
-		LoopMode:               loopMode,
-		Stop:                   stop,
-		InformersStarted:       make(chan struct{}),
-		ResyncPeriod:           ResyncPeriod(s),
+		ClientBuilder:                   clientBuilder,
+		InformerFactory:                 sharedInformers,
+		ObjectOrMetadataInformerFactory: controller.NewInformerFactory(sharedInformers, metadataInformers),
+		ComponentConfig:                 s.ComponentConfig,
+		RESTMapper:                      restMapper,
+		AvailableResources:              availableResources,
+		Cloud:                           cloud,
+		LoopMode:                        loopMode,
+		Stop:                            stop,
+		InformersStarted:                make(chan struct{}),
+		ResyncPeriod:                    ResyncPeriod(s),
 	}
 	return ctx, nil
 }

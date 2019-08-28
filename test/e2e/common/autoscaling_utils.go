@@ -32,9 +32,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -255,7 +255,7 @@ func (rc *ResourceConsumer) sendConsumeCPURequest(millicores int) {
 	defer cancel()
 
 	err := wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
-		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
+		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
@@ -282,7 +282,7 @@ func (rc *ResourceConsumer) sendConsumeMemRequest(megabytes int) {
 	defer cancel()
 
 	err := wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
-		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
+		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
@@ -309,7 +309,7 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 	defer cancel()
 
 	err := wait.PollImmediate(serviceInitializationInterval, serviceInitializationTimeout, func() (bool, error) {
-		proxyRequest, err := framework.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
+		proxyRequest, err := e2eservice.GetServicesProxyRequest(rc.clientSet, rc.clientSet.CoreV1().RESTClient().Post())
 		framework.ExpectNoError(err)
 		req := proxyRequest.Namespace(rc.nsName).
 			Context(ctx).
@@ -478,7 +478,10 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		dpConfig := testutils.DeploymentConfig{
 			RCConfig: rcConfig,
 		}
-		framework.ExpectNoError(e2edeploy.RunDeployment(dpConfig))
+		ginkgo.By(fmt.Sprintf("creating deployment %s in namespace %s", dpConfig.Name, dpConfig.Namespace))
+		dpConfig.NodeDumpFunc = framework.DumpNodeDebugInfo
+		dpConfig.ContainerDumpFunc = framework.LogFailedContainers
+		framework.ExpectNoError(testutils.RunDeployment(dpConfig))
 		break
 	case KindReplicaSet:
 		rsConfig := testutils.ReplicaSetConfig{

@@ -83,6 +83,9 @@ func (c *fakeCsiDriverClient) NodeGetVolumeStats(ctx context.Context, volID stri
 		return nil, nil
 	}
 	for _, usage := range usages {
+		if usage == nil {
+			continue
+		}
 		unit := usage.GetUnit()
 		switch unit {
 		case csipbv1.VolumeUsage_BYTES:
@@ -175,6 +178,7 @@ func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 	accessMode api.PersistentVolumeAccessMode,
 	secrets map[string]string,
 	volumeContext map[string]string,
+	mountOptions []string,
 ) error {
 	c.t.Log("calling fake.NodeStageVolume...")
 	req := &csipbv1.NodeStageVolumeRequest{
@@ -187,7 +191,8 @@ func (c *fakeCsiDriverClient) NodeStageVolume(ctx context.Context,
 			},
 			AccessType: &csipbv1.VolumeCapability_Mount{
 				Mount: &csipbv1.VolumeCapability_MountVolume{
-					FsType: fsType,
+					FsType:     fsType,
+					MountFlags: mountOptions,
 				},
 			},
 		},
@@ -448,10 +453,11 @@ func TestClientNodeStageVolume(t *testing.T) {
 		stagingTargetPath string
 		fsType            string
 		secrets           map[string]string
+		mountOptions      []string
 		mustFail          bool
 		err               error
 	}{
-		{name: "test ok", volID: "vol-test", stagingTargetPath: "/test/path", fsType: "ext4"},
+		{name: "test ok", volID: "vol-test", stagingTargetPath: "/test/path", fsType: "ext4", mountOptions: []string{"unvalidated"}},
 		{name: "missing volID", stagingTargetPath: "/test/path", mustFail: true},
 		{name: "missing target path", volID: "vol-test", mustFail: true},
 		{name: "bad fs", volID: "vol-test", stagingTargetPath: "/test/path", fsType: "badfs", mustFail: true},
@@ -479,6 +485,7 @@ func TestClientNodeStageVolume(t *testing.T) {
 			api.ReadWriteOnce,
 			tc.secrets,
 			map[string]string{"attr0": "val0"},
+			tc.mountOptions,
 		)
 		checkErr(t, tc.mustFail, err)
 
@@ -657,14 +664,16 @@ func TestVolumeStats(t *testing.T) {
 		},
 	}
 	for _, tc := range tests {
-		ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
-		defer cancel()
-		csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
-		csClient := setupClientWithVolumeStats(t, tc.volumeStatsSet)
-		_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
-		if err != nil && tc.success {
-			t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
+			defer cancel()
+			csiSource, _ := getCSISourceFromSpec(tc.volumeData.VolumeSpec)
+			csClient := setupClientWithVolumeStats(t, tc.volumeStatsSet)
+			_, err := csClient.NodeGetVolumeStats(ctx, csiSource.VolumeHandle, tc.volumeData.DeviceMountPath)
+			if err != nil && tc.success {
+				t.Errorf("For %s : expected %v got %v", tc.name, tc.success, err)
+			}
+		})
 	}
 
 }

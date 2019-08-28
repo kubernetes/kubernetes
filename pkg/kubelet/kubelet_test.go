@@ -76,6 +76,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/volume/hostpath"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
 
@@ -162,7 +163,7 @@ func newTestKubeletWithImageList(
 	kubelet.heartbeatClient = fakeKubeClient
 	kubelet.os = &containertest.FakeOS{}
 	kubelet.mounter = &mount.FakeMounter{}
-	kubelet.hostutil = &mount.FakeHostUtil{}
+	kubelet.hostutil = hostutil.NewFakeHostUtil(nil)
 	kubelet.subpather = &subpath.FakeSubpath{}
 
 	kubelet.hostname = testKubeletHostname
@@ -326,7 +327,8 @@ func newTestKubeletWithImageList(
 		kubelet.getPodsDir(),
 		kubelet.recorder,
 		false, /* experimentalCheckNodeCapabilitiesBeforeMount*/
-		false /* keepTerminatedPodVolumes */)
+		false, /* keepTerminatedPodVolumes */
+		volumetest.NewBlockVolumePathHandler())
 
 	kubelet.pluginManager = pluginmanager.NewPluginManager(
 		kubelet.getPluginsRegistrationDir(), /* sockDir */

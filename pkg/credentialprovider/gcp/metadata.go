@@ -20,6 +20,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -115,12 +117,27 @@ func init() {
 // Returns true if it finds a local GCE VM.
 // Looks at a product file that is an undocumented API.
 func onGCEVM() bool {
-	data, err := ioutil.ReadFile(gceProductNameFile)
-	if err != nil {
-		klog.V(2).Infof("Error while reading product_name: %v", err)
-		return false
+	var name string
+
+	if runtime.GOOS == "windows" {
+		data, err := exec.Command("wmic", "computersystem", "get", "model").Output()
+		if err != nil {
+			return false
+		}
+		fields := strings.Split(strings.TrimSpace(string(data)), "\r\n")
+		if len(fields) != 2 {
+			klog.V(2).Infof("Received unexpected value retrieving system model: %q", string(data))
+			return false
+		}
+		name = fields[1]
+	} else {
+		data, err := ioutil.ReadFile(gceProductNameFile)
+		if err != nil {
+			klog.V(2).Infof("Error while reading product_name: %v", err)
+			return false
+		}
+		name = strings.TrimSpace(string(data))
 	}
-	name := strings.TrimSpace(string(data))
 	return name == "Google" || name == "Google Compute Engine"
 }
 

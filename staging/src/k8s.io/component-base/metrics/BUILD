@@ -5,6 +5,7 @@ load(
     "go_library",
     "go_test",
 )
+load("//staging/src/k8s.io/component-base/version:def.bzl", "version_x_defs")
 
 go_library(
     name = "go_default_library",
@@ -17,6 +18,7 @@ go_library(
         "processstarttime.go",
         "registry.go",
         "summary.go",
+        "version.go",
         "version_parser.go",
         "wrappers.go",
     ],
@@ -24,6 +26,7 @@ go_library(
     importpath = "k8s.io/component-base/metrics",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
+        "//staging/src/k8s.io/component-base/version:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
@@ -64,6 +67,9 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:all-srcs",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/clientgo:all-srcs",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/restclient:all-srcs",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/workqueue:all-srcs",
     ],
     tags = ["automanaged"],
 )

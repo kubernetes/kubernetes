@@ -35,6 +35,8 @@ import (
 )
 
 func TestVisitContainers(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
 	testCases := []struct {
 		description string
 		haveSpec    *api.PodSpec
@@ -80,6 +82,37 @@ func TestVisitContainers(t *testing.T) {
 			[]string{"i1", "i2", "c1", "c2"},
 		},
 		{
+			"ephemeral containers",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+				},
+			},
+			[]string{"c1", "c2", "e1"},
+		},
+		{
+			"all container types",
+			&api.PodSpec{
+				Containers: []api.Container{
+					{Name: "c1"},
+					{Name: "c2"},
+				},
+				InitContainers: []api.Container{
+					{Name: "i1"},
+					{Name: "i2"},
+				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2"}},
+				},
+			},
+			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
+		},
+		{
 			"dropping fields",
 			&api.PodSpec{
 				Containers: []api.Container{
@@ -90,8 +123,12 @@ func TestVisitContainers(t *testing.T) {
 					{Name: "i1"},
 					{Name: "i2", SecurityContext: &api.SecurityContext{}},
 				},
+				EphemeralContainers: []api.EphemeralContainer{
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e1"}},
+					{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "e2", SecurityContext: &api.SecurityContext{}}},
+				},
 			},
-			[]string{"i1", "i2", "c1", "c2"},
+			[]string{"i1", "i2", "c1", "c2", "e1", "e2"},
 		},
 	}
 
@@ -117,10 +154,17 @@ func TestVisitContainers(t *testing.T) {
 				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for init container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
 			}
 		}
+		for _, c := range tc.haveSpec.EphemeralContainers {
+			if c.SecurityContext != nil {
+				t.Errorf("VisitContainers() for test case %q: got SecurityContext %#v for ephemeral container %v, wanted nil", tc.description, c.SecurityContext, c.Name)
+			}
+		}
 	}
 }
 
 func TestPodSecrets(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
 	// Stub containing all possible secret references in a pod.
 	// The names of the referenced secrets match struct paths detected by reflection.
 	pod := &api.Pod{
@@ -195,6 +239,17 @@ func TestPodSecrets(t *testing.T) {
 					CSI: &api.CSIVolumeSource{
 						NodePublishSecretRef: &api.LocalObjectReference{
 							Name: "Spec.Volumes[*].VolumeSource.CSI.NodePublishSecretRef"}}}}},
+			EphemeralContainers: []api.EphemeralContainer{{
+				EphemeralContainerCommon: api.EphemeralContainerCommon{
+					EnvFrom: []api.EnvFromSource{{
+						SecretRef: &api.SecretEnvSource{
+							LocalObjectReference: api.LocalObjectReference{
+								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].SecretRef"}}}},
+					Env: []api.EnvVar{{
+						ValueFrom: &api.EnvVarSource{
+							SecretKeyRef: &api.SecretKeySelector{
+								LocalObjectReference: api.LocalObjectReference{
+									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.SecretKeyRef"}}}}}}}},
 		},
 	}
 	extractedNames := sets.NewString()
@@ -212,6 +267,8 @@ func TestPodSecrets(t *testing.T) {
 	expectedSecretPaths := sets.NewString(
 		"Spec.Containers[*].EnvFrom[*].SecretRef",
 		"Spec.Containers[*].Env[*].ValueFrom.SecretKeyRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].SecretRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.SecretKeyRef",
 		"Spec.ImagePullSecrets",
 		"Spec.InitContainers[*].EnvFrom[*].SecretRef",
 		"Spec.InitContainers[*].Env[*].ValueFrom.SecretKeyRef",
@@ -290,6 +347,8 @@ func collectResourcePaths(t *testing.T, resourcename string, path *field.Path, n
 }
 
 func TestPodConfigmaps(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
+
 	// Stub containing all possible ConfigMap references in a pod.
 	// The names of the referenced ConfigMaps match struct paths detected by reflection.
 	pod := &api.Pod{
@@ -304,6 +363,17 @@ func TestPodConfigmaps(t *testing.T) {
 						ConfigMapKeyRef: &api.ConfigMapKeySelector{
 							LocalObjectReference: api.LocalObjectReference{
 								Name: "Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}},
+			EphemeralContainers: []api.EphemeralContainer{{
+				EphemeralContainerCommon: api.EphemeralContainerCommon{
+					EnvFrom: []api.EnvFromSource{{
+						ConfigMapRef: &api.ConfigMapEnvSource{
+							LocalObjectReference: api.LocalObjectReference{
+								Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].ConfigMapRef"}}}},
+					Env: []api.EnvVar{{
+						ValueFrom: &api.EnvVarSource{
+							ConfigMapKeyRef: &api.ConfigMapKeySelector{
+								LocalObjectReference: api.LocalObjectReference{
+									Name: "Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef"}}}}}}}},
 			InitContainers: []api.Container{{
 				EnvFrom: []api.EnvFromSource{{
 					ConfigMapRef: &api.ConfigMapEnvSource{
@@ -338,6 +408,8 @@ func TestPodConfigmaps(t *testing.T) {
 	expectedPaths := sets.NewString(
 		"Spec.Containers[*].EnvFrom[*].ConfigMapRef",
 		"Spec.Containers[*].Env[*].ValueFrom.ConfigMapKeyRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.EnvFrom[*].ConfigMapRef",
+		"Spec.EphemeralContainers[*].EphemeralContainerCommon.Env[*].ValueFrom.ConfigMapKeyRef",
 		"Spec.InitContainers[*].EnvFrom[*].ConfigMapRef",
 		"Spec.InitContainers[*].Env[*].ValueFrom.ConfigMapKeyRef",
 		"Spec.Volumes[*].VolumeSource.Projected.Sources[*].ConfigMap",
@@ -1545,6 +1617,180 @@ func TestDropGMSAFields(t *testing.T) {
 	}
 }
 
+func TestDropWindowsRunAsUserNameFields(t *testing.T) {
+	defaultContainerSecurityContextFactory := func() *api.SecurityContext {
+		defaultProcMount := api.DefaultProcMount
+		return &api.SecurityContext{ProcMount: &defaultProcMount}
+	}
+	podWithoutWindowsOptionsFactory := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:   api.RestartPolicyNever,
+				SecurityContext: &api.PodSecurityContext{},
+				Containers:      []api.Container{{Name: "container1", Image: "testimage", SecurityContext: defaultContainerSecurityContextFactory()}},
+				InitContainers:  []api.Container{{Name: "initContainer1", Image: "testimage", SecurityContext: defaultContainerSecurityContextFactory()}},
+			},
+		}
+	}
+
+	type podFactoryInfo struct {
+		description           string
+		hasRunAsUserNameField bool
+		// this factory should generate the input pod whose spec will be fed to dropDisabledFields
+		podFactory func() *api.Pod
+		// this factory should generate the expected pod after the RunAsUserName fields have been dropped
+		// we can't just use podWithoutWindowsOptionsFactory as is for this, since in some cases
+		// we'll be left with a WindowsSecurityContextOptions struct with no RunAsUserName field set,
+		// as oposed to a nil pointer in the pod generated by podWithoutWindowsOptionsFactory
+		// if this field is not set, it will default to the podFactory
+		strippedPodFactory func() *api.Pod
+	}
+
+	toPtr := func(s string) *string {
+		return &s
+	}
+
+	podFactoryInfos := []podFactoryInfo{
+		{
+			description:           "is nil",
+			hasRunAsUserNameField: false,
+			podFactory:            func() *api.Pod { return nil },
+		},
+		{
+			description:           "does not have any RunAsUserName field set",
+			hasRunAsUserNameField: false,
+			podFactory:            podWithoutWindowsOptionsFactory,
+		},
+		{
+			description:           "has a pod-level WindowsSecurityContextOptions struct with no RunAsUserName field set",
+			hasRunAsUserNameField: false,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:           "has a WindowsSecurityContextOptions struct with no RunAsUserName field set on a container",
+			hasRunAsUserNameField: false,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.Containers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:           "has a WindowsSecurityContextOptions struct with no RunAsUserName field set on an init container",
+			hasRunAsUserNameField: false,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:           "has RunAsUserName field set in the PodSecurityContext",
+			hasRunAsUserNameField: true,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{RunAsUserName: toPtr("foo-lish")}
+				return pod
+			},
+			strippedPodFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:           "has RunAsUserName field set in a container's SecurityContext",
+			hasRunAsUserNameField: true,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.Containers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{RunAsUserName: toPtr("foo-lish")}
+				return pod
+			},
+			strippedPodFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.Containers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+		{
+			description:           "has RunAsUserName field set in an init container's PodSecurityContext",
+			hasRunAsUserNameField: true,
+			podFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{RunAsUserName: toPtr("foo-lish")}
+				return pod
+			},
+			strippedPodFactory: func() *api.Pod {
+				pod := podWithoutWindowsOptionsFactory()
+				pod.Spec.InitContainers[0].SecurityContext.WindowsOptions = &api.WindowsSecurityContextOptions{}
+				return pod
+			},
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodFactoryInfo := range podFactoryInfos {
+			for _, newPodFactoryInfo := range podFactoryInfos {
+				newPodHasRunAsUserNameField, newPod := newPodFactoryInfo.hasRunAsUserNameField, newPodFactoryInfo.podFactory()
+				if newPod == nil {
+					continue
+				}
+				oldPodHasRunAsUserNameField, oldPod := oldPodFactoryInfo.hasRunAsUserNameField, oldPodFactoryInfo.podFactory()
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %s, new pod %s", enabled, oldPodFactoryInfo.description, newPodFactoryInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.WindowsRunAsUserName, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodFactoryInfo.podFactory()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodFactoryInfo.podFactory()))
+					}
+
+					switch {
+					case enabled || oldPodHasRunAsUserNameField:
+						// new pod should not be changed if the feature is enabled, or if the old pod had the RunAsUserName field set
+						if !reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodFactoryInfo.podFactory()))
+						}
+					case newPodHasRunAsUserNameField:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
+							t.Errorf("%v", oldPod)
+							t.Errorf("%v", newPod)
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have the RunAsUserName field set
+						var expectedStrippedPod *api.Pod
+						if newPodFactoryInfo.strippedPodFactory == nil {
+							expectedStrippedPod = newPodFactoryInfo.podFactory()
+						} else {
+							expectedStrippedPod = newPodFactoryInfo.strippedPodFactory()
+						}
+
+						if !reflect.DeepEqual(newPod, expectedStrippedPod) {
+							t.Errorf("new pod had some RunAsUserName field set: %v", diff.ObjectReflectDiff(newPod, expectedStrippedPod))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodFactoryInfo.podFactory()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodFactoryInfo.podFactory()))
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
 func TestDropPodSysctls(t *testing.T) {
 	podWithSysctls := func() *api.Pod {
 		return &api.Pod{
@@ -1837,5 +2083,94 @@ func TestDropStatusPodIPs(t *testing.T) {
 				t.Errorf("%v: unexpected pod status: %v", tc.name, diff.ObjectReflectDiff(tc.podStatus, tc.comparePodStatus))
 			}
 		}()
+	}
+}
+
+func TestDropEphemeralContainers(t *testing.T) {
+	podWithEphemeralContainers := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy:       api.RestartPolicyNever,
+				EphemeralContainers: []api.EphemeralContainer{{EphemeralContainerCommon: api.EphemeralContainerCommon{Name: "container1", Image: "testimage"}}},
+			},
+		}
+	}
+	podWithoutEphemeralContainers := func() *api.Pod {
+		return &api.Pod{
+			Spec: api.PodSpec{
+				RestartPolicy: api.RestartPolicyNever,
+			},
+		}
+	}
+
+	podInfo := []struct {
+		description            string
+		hasEphemeralContainers bool
+		pod                    func() *api.Pod
+	}{
+		{
+			description:            "has subpaths",
+			hasEphemeralContainers: true,
+			pod:                    podWithEphemeralContainers,
+		},
+		{
+			description:            "does not have subpaths",
+			hasEphemeralContainers: false,
+			pod:                    podWithoutEphemeralContainers,
+		},
+		{
+			description:            "is nil",
+			hasEphemeralContainers: false,
+			pod:                    func() *api.Pod { return nil },
+		},
+	}
+
+	for _, enabled := range []bool{true, false} {
+		for _, oldPodInfo := range podInfo {
+			for _, newPodInfo := range podInfo {
+				oldPodHasEphemeralContainers, oldPod := oldPodInfo.hasEphemeralContainers, oldPodInfo.pod()
+				newPodHasEphemeralContainers, newPod := newPodInfo.hasEphemeralContainers, newPodInfo.pod()
+				if newPod == nil {
+					continue
+				}
+
+				t.Run(fmt.Sprintf("feature enabled=%v, old pod %v, new pod %v", enabled, oldPodInfo.description, newPodInfo.description), func(t *testing.T) {
+					defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, enabled)()
+
+					var oldPodSpec *api.PodSpec
+					if oldPod != nil {
+						oldPodSpec = &oldPod.Spec
+					}
+					dropDisabledFields(&newPod.Spec, nil, oldPodSpec, nil)
+
+					// old pod should never be changed
+					if !reflect.DeepEqual(oldPod, oldPodInfo.pod()) {
+						t.Errorf("old pod changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.pod()))
+					}
+
+					switch {
+					case enabled || oldPodHasEphemeralContainers:
+						// new pod should not be changed if the feature is enabled, or if the old pod had subpaths
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					case newPodHasEphemeralContainers:
+						// new pod should be changed
+						if reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod was not changed")
+						}
+						// new pod should not have subpaths
+						if !reflect.DeepEqual(newPod, podWithoutEphemeralContainers()) {
+							t.Errorf("new pod had subpaths: %v", diff.ObjectReflectDiff(newPod, podWithoutEphemeralContainers()))
+						}
+					default:
+						// new pod should not need to be changed
+						if !reflect.DeepEqual(newPod, newPodInfo.pod()) {
+							t.Errorf("new pod changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.pod()))
+						}
+					}
+				})
+			}
+		}
 	}
 }

@@ -18,6 +18,8 @@ package metrics
 
 import (
 	"fmt"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"sync"
 	"time"
 
@@ -30,6 +32,7 @@ import (
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
+// This const block defines the metric names for the kubelet metrics.
 const (
 	KubeletSubsystem                     = "kubelet"
 	NodeNameKey                          = "node_name"
@@ -41,6 +44,7 @@ const (
 	PLEGRelistDurationKey                = "pleg_relist_duration_seconds"
 	PLEGDiscardEventsKey                 = "pleg_discard_events"
 	PLEGRelistIntervalKey                = "pleg_relist_interval_seconds"
+	EvictionsKey                         = "evictions"
 	EvictionStatsAgeKey                  = "eviction_stats_age_seconds"
 	DeprecatedPodWorkerLatencyKey        = "pod_worker_latency_microseconds"
 	DeprecatedPodStartLatencyKey         = "pod_start_latency_microseconds"
@@ -85,326 +89,449 @@ const (
 )
 
 var (
-	NodeName = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      NodeNameKey,
-			Help:      "The node's name. The count is always 1.",
+	// NodeName is a Gauge that tracks the ode's name. The count is always 1.
+	NodeName = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           NodeNameKey,
+			Help:           "The node's name. The count is always 1.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{NodeLabelKey},
 	)
-	ContainersPerPodCount = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      "containers_per_pod_count",
-			Help:      "The number of containers per pod.",
-			Buckets:   prometheus.DefBuckets,
+	// ContainersPerPodCount is a Counter that tracks the number of containers per pod.
+	ContainersPerPodCount = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "containers_per_pod_count",
+			Help:           "The number of containers per pod.",
+			Buckets:        prometheus.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	PodWorkerDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      PodWorkerDurationKey,
-			Help:      "Duration in seconds to sync a single pod. Broken down by operation type: create, update, or sync",
-			Buckets:   prometheus.DefBuckets,
-		},
-		[]string{"operation_type"},
-	)
-	PodStartDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      PodStartDurationKey,
-			Help:      "Duration in seconds for a single pod to go from pending to running.",
-			Buckets:   prometheus.DefBuckets,
-		},
-	)
-	CgroupManagerDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      CgroupManagerOperationsKey,
-			Help:      "Duration in seconds for cgroup manager operations. Broken down by method.",
-			Buckets:   prometheus.DefBuckets,
+	// PodWorkerDuration is a Histogram that tracks the duration (in seconds) in takes to sync a single pod.
+	// Broken down by the operation type.
+	PodWorkerDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodWorkerDurationKey,
+			Help:           "Duration in seconds to sync a single pod. Broken down by operation type: create, update, or sync",
+			Buckets:        prometheus.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
 	)
-	PodWorkerStartDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      PodWorkerStartDurationKey,
-			Help:      "Duration in seconds from seeing a pod to starting a worker.",
-			Buckets:   prometheus.DefBuckets,
+	// PodStartDuration is a Histogram that tracks the duration (in seconds) it takes for a single pod to go from pending to running.
+	PodStartDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodStartDurationKey,
+			Help:           "Duration in seconds for a single pod to go from pending to running.",
+			Buckets:        prometheus.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	PLEGRelistDuration = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      PLEGRelistDurationKey,
-			Help:      "Duration in seconds for relisting pods in PLEG.",
-			Buckets:   prometheus.DefBuckets,
+	// CgroupManagerDuration is a Histogram that tracks the duration (in seconds) it takes for cgroup manager operations to complete.
+	// Broken down by method.
+	CgroupManagerDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           CgroupManagerOperationsKey,
+			Help:           "Duration in seconds for cgroup manager operations. Broken down by method.",
+			Buckets:        prometheus.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type"},
+	)
+	// PodWorkerStartDuration is a Histogram that tracks the duration (in seconds) it takes from seeing a pod to starting a worker.
+	PodWorkerStartDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PodWorkerStartDurationKey,
+			Help:           "Duration in seconds from seeing a pod to starting a worker.",
+			Buckets:        prometheus.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	PLEGDiscardEvents = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      PLEGDiscardEventsKey,
-			Help:      "The number of discard events in PLEG.",
+	// PLEGRelistDuration is a Histogram that tracks the duration (in seconds) it takes for relisting pods in the Kubelet's
+	// Pod Lifecycle Event Generator (PLEG).
+	PLEGRelistDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PLEGRelistDurationKey,
+			Help:           "Duration in seconds for relisting pods in PLEG.",
+			Buckets:        prometheus.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// PLEGDiscardEvents is a Histogram that tracks the duration (in seconds) it takes for discarding events in the Kubelet's
+	// Pod Lifecycle Event Generator (PLEG).
+	PLEGDiscardEvents = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PLEGDiscardEventsKey,
+			Help:           "The number of discard events in PLEG.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{},
 	)
-	PLEGRelistInterval = prometheus.NewHistogram(
-		prometheus.HistogramOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      PLEGRelistIntervalKey,
-			Help:      "Interval in seconds between relisting in PLEG.",
-			Buckets:   prometheus.DefBuckets,
+	// PLEGRelistInterval is a Histogram that tracks the intervals (in seconds) between relisting in the Kubelet's
+	// Pod Lifecycle Event Generator (PLEG).
+	PLEGRelistInterval = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           PLEGRelistIntervalKey,
+			Help:           "Interval in seconds between relisting in PLEG.",
+			Buckets:        prometheus.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	// Metrics of remote runtime operations.
-	RuntimeOperations = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      RuntimeOperationsKey,
-			Help:      "Cumulative number of runtime operations by operation type.",
-		},
-		[]string{"operation_type"},
-	)
-	RuntimeOperationsDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      RuntimeOperationsDurationKey,
-			Help:      "Duration in seconds of runtime operations. Broken down by operation type.",
-			Buckets:   prometheus.DefBuckets,
+	// RuntimeOperations is a Counter that tracks the cumulative number of remote runtime operations.
+	// Broken down by operation type.
+	RuntimeOperations = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           RuntimeOperationsKey,
+			Help:           "Cumulative number of runtime operations by operation type.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
 	)
-	RuntimeOperationsErrors = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      RuntimeOperationsErrorsKey,
-			Help:      "Cumulative number of runtime operation errors by operation type.",
+	// RuntimeOperationsDuration is a Histogram that tracks the duration (in seconds) for remote runtime operations to complete.
+	// Broken down by operation type.
+	RuntimeOperationsDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           RuntimeOperationsDurationKey,
+			Help:           "Duration in seconds of runtime operations. Broken down by operation type.",
+			Buckets:        prometheus.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
 	)
-	EvictionStatsAge = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      EvictionStatsAgeKey,
-			Help:      "Time between when stats are collected, and when pod is evicted based on those stats by eviction signal",
-			Buckets:   prometheus.DefBuckets,
+	// RuntimeOperationsErrors is a Counter that tracks the cumulative number of remote runtime operations errors.
+	// Broken down by operation type.
+	RuntimeOperationsErrors = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           RuntimeOperationsErrorsKey,
+			Help:           "Cumulative number of runtime operation errors by operation type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type"},
+	)
+	// Evictions is a Counter that tracks the cumulative number of pod evictions initiated by the kubelet.
+	// Broken down by eviction signal.
+	Evictions = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           EvictionsKey,
+			Help:           "Cumulative number of pod evictions by eviction signal",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"eviction_signal"},
 	)
-	DevicePluginRegistrationCount = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DevicePluginRegistrationCountKey,
-			Help:      "Cumulative number of device plugin registrations. Broken down by resource name.",
-		},
-		[]string{"resource_name"},
-	)
-	DevicePluginAllocationDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DevicePluginAllocationDurationKey,
-			Help:      "Duration in seconds to serve a device plugin Allocation request. Broken down by resource name.",
-			Buckets:   prometheus.DefBuckets,
-		},
-		[]string{"resource_name"},
-	)
-
-	DeprecatedPodWorkerLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedPodWorkerLatencyKey,
-			Help:      "(Deprecated) Latency in microseconds to sync a single pod. Broken down by operation type: create, update, or sync",
-		},
-		[]string{"operation_type"},
-	)
-	DeprecatedPodStartLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedPodStartLatencyKey,
-			Help:      "(Deprecated) Latency in microseconds for a single pod to go from pending to running.",
-		},
-	)
-	DeprecatedCgroupManagerLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedCgroupManagerOperationsKey,
-			Help:      "(Deprecated) Latency in microseconds for cgroup manager operations. Broken down by method.",
-		},
-		[]string{"operation_type"},
-	)
-	DeprecatedPodWorkerStartLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedPodWorkerStartLatencyKey,
-			Help:      "(Deprecated) Latency in microseconds from seeing a pod to starting a worker.",
-		},
-	)
-	DeprecatedPLEGRelistLatency = prometheus.NewSummary(
-		prometheus.SummaryOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedPLEGRelistLatencyKey,
-			Help:      "(Deprecated) Latency in microseconds for relisting pods in PLEG.",
-		},
-	)
-	DeprecatedPLEGRelistInterval = prometheus.NewSummary(
-		prometheus.SummaryOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedPLEGRelistIntervalKey,
-			Help:      "(Deprecated) Interval in microseconds between relisting in PLEG.",
-		},
-	)
-	DeprecatedRuntimeOperations = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedRuntimeOperationsKey,
-			Help:      "(Deprecated) Cumulative number of runtime operations by operation type.",
-		},
-		[]string{"operation_type"},
-	)
-	DeprecatedRuntimeOperationsLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedRuntimeOperationsLatencyKey,
-			Help:      "(Deprecated) Latency in microseconds of runtime operations. Broken down by operation type.",
-		},
-		[]string{"operation_type"},
-	)
-	DeprecatedRuntimeOperationsErrors = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedRuntimeOperationsErrorsKey,
-			Help:      "(Deprecated) Cumulative number of runtime operation errors by operation type.",
-		},
-		[]string{"operation_type"},
-	)
-	DeprecatedEvictionStatsAge = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedEvictionStatsAgeKey,
-			Help:      "(Deprecated) Time between when stats are collected, and when pod is evicted based on those stats by eviction signal",
+	// EvictionStatsAge is a Histogram that tracks the time (in seconds) between when stats are collected and when a pod is evicted
+	// based on those stats. Broken down by eviction signal.
+	EvictionStatsAge = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           EvictionStatsAgeKey,
+			Help:           "Time between when stats are collected, and when pod is evicted based on those stats by eviction signal",
+			Buckets:        prometheus.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"eviction_signal"},
 	)
-	DeprecatedDevicePluginRegistrationCount = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedDevicePluginRegistrationCountKey,
-			Help:      "(Deprecated) Cumulative number of device plugin registrations. Broken down by resource name.",
+	// DevicePluginRegistrationCount is a Counter that tracks the cumulative number of device plugin registrations.
+	// Broken down by resource name.
+	DevicePluginRegistrationCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DevicePluginRegistrationCountKey,
+			Help:           "Cumulative number of device plugin registrations. Broken down by resource name.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"resource_name"},
 	)
-	DeprecatedDevicePluginAllocationLatency = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      DeprecatedDevicePluginAllocationLatencyKey,
-			Help:      "(Deprecated) Latency in microseconds to serve a device plugin Allocation request. Broken down by resource name.",
+	// DevicePluginAllocationDuration is a Histogram that tracks the duration (in seconds) to serve a device plugin allocation request.
+	// Broken down by resource name.
+	DevicePluginAllocationDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DevicePluginAllocationDurationKey,
+			Help:           "Duration in seconds to serve a device plugin Allocation request. Broken down by resource name.",
+			Buckets:        prometheus.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource_name"},
+	)
+	// DeprecatedPodWorkerLatency is a Summary that tracks the latency (in microseconds) to sync a single pod.
+	// Broken down by operation type. This metric is deprecated.
+	DeprecatedPodWorkerLatency = metrics.NewSummaryVec(
+		&metrics.SummaryOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedPodWorkerLatencyKey,
+			Help:           "(Deprecated) Latency in microseconds to sync a single pod. Broken down by operation type: create, update, or sync",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type"},
+	)
+	// DeprecatedPodStartLatency is a Summary that tracks the latency (in microseconds) for a single pod to go from pending to running.
+	// This metric is deprecated.
+	DeprecatedPodStartLatency = metrics.NewSummary(
+		&metrics.SummaryOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedPodStartLatencyKey,
+			Help:           "(Deprecated) Latency in microseconds for a single pod to go from pending to running.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// DeprecatedCgroupManagerLatency is a Summary that tracks the latency (in microseconds) for cgroup manager operations to complete.
+	// Broken down by operation type. This metric is deprecated.
+	DeprecatedCgroupManagerLatency = metrics.NewSummaryVec(
+		&metrics.SummaryOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedCgroupManagerOperationsKey,
+			Help:           "(Deprecated) Latency in microseconds for cgroup manager operations. Broken down by method.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type"},
+	)
+	// DeprecatedPodWorkerStartLatency is a Summary that tracks the latency (in microseconds) from seeing a pod to starting a worker.
+	// This metric is deprecated.
+	DeprecatedPodWorkerStartLatency = metrics.NewSummary(
+		&metrics.SummaryOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedPodWorkerStartLatencyKey,
+			Help:           "(Deprecated) Latency in microseconds from seeing a pod to starting a worker.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// DeprecatedPLEGRelistLatency is a Summary that tracks the latency (in microseconds) for relisting pods in PLEG.
+	// This metric is deprecated.
+	DeprecatedPLEGRelistLatency = metrics.NewSummary(
+		&metrics.SummaryOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedPLEGRelistLatencyKey,
+			Help:           "(Deprecated) Latency in microseconds for relisting pods in PLEG.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// DeprecatedPLEGRelistInterval is a Summary that tracks the interval (in microseconds) between relistings in PLEG.
+	// This metric is deprecated.
+	DeprecatedPLEGRelistInterval = metrics.NewSummary(
+		&metrics.SummaryOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedPLEGRelistIntervalKey,
+			Help:           "(Deprecated) Interval in microseconds between relisting in PLEG.",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// DeprecatedRuntimeOperations is a Counter that tracks the cumulative number of remote runtime operations.
+	// Broken down by operation type. This metric is deprecated.
+	DeprecatedRuntimeOperations = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedRuntimeOperationsKey,
+			Help:           "(Deprecated) Cumulative number of runtime operations by operation type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type"},
+	)
+	// DeprecatedRuntimeOperationsLatency is a Summary that tracks the latency (in microseconds) of remote runtime operations
+	// to complete. Broken down by operation type. This metric is deprecated.
+	DeprecatedRuntimeOperationsLatency = metrics.NewSummaryVec(
+		&metrics.SummaryOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedRuntimeOperationsLatencyKey,
+			Help:           "(Deprecated) Latency in microseconds of runtime operations. Broken down by operation type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type"},
+	)
+	// DeprecatedRuntimeOperationsErrors is a Counter that tracks the cumulative number of remote runtime operation errors.
+	// Broken down by operation type. This metric is deprecated.
+	DeprecatedRuntimeOperationsErrors = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedRuntimeOperationsErrorsKey,
+			Help:           "(Deprecated) Cumulative number of runtime operation errors by operation type.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"operation_type"},
+	)
+	// DeprecatedEvictionStatsAge is a Summary that tracks the time (in microseconds) between when stats are collected and when a pod
+	// is evicted based on those stats. Broken down by eviction signal. This metric is deprecated.
+	DeprecatedEvictionStatsAge = metrics.NewSummaryVec(
+		&metrics.SummaryOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedEvictionStatsAgeKey,
+			Help:           "(Deprecated) Time between when stats are collected, and when pod is evicted based on those stats by eviction signal",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"eviction_signal"},
+	)
+	// DeprecatedDevicePluginRegistrationCount is a Counter that tracks the cumulative number of device plugin registrations.
+	// Broken down by resource name. This metric is deprecated.
+	DeprecatedDevicePluginRegistrationCount = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedDevicePluginRegistrationCountKey,
+			Help:           "(Deprecated) Cumulative number of device plugin registrations. Broken down by resource name.",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"resource_name"},
+	)
+	// DeprecatedDevicePluginAllocationLatency is a Summary that tracks the latncy (in microseconds) for serving device plugin allocation requests.
+	// Broken down by resource name. This metric is deprecated.
+	DeprecatedDevicePluginAllocationLatency = metrics.NewSummaryVec(
+		&metrics.SummaryOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           DeprecatedDevicePluginAllocationLatencyKey,
+			Help:           "(Deprecated) Latency in microseconds to serve a device plugin Allocation request. Broken down by resource name.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"resource_name"},
 	)
 
 	// Metrics for node config
 
-	AssignedConfig = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      AssignedConfigKey,
-			Help:      "The node's understanding of intended config. The count is always 1.",
+	// AssignedConfig is a Gauge that is set 1 if the Kubelet has a NodeConfig assigned.
+	AssignedConfig = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           AssignedConfigKey,
+			Help:           "The node's understanding of intended config. The count is always 1.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
 	)
-	ActiveConfig = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      ActiveConfigKey,
-			Help:      "The config source the node is actively using. The count is always 1.",
+	// ActiveConfig is a Gauge that is set to 1 if the Kubelet has an active NodeConfig.
+	ActiveConfig = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ActiveConfigKey,
+			Help:           "The config source the node is actively using. The count is always 1.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
 	)
-	LastKnownGoodConfig = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      LastKnownGoodConfigKey,
-			Help:      "The config source the node will fall back to when it encounters certain errors. The count is always 1.",
+	// LastKnownGoodConfig is a Gauge that is set to 1 if the Kubelet has a NodeConfig it can fall back to if there
+	// are certain errors.
+	LastKnownGoodConfig = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           LastKnownGoodConfigKey,
+			Help:           "The config source the node will fall back to when it encounters certain errors. The count is always 1.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{ConfigSourceLabelKey, ConfigUIDLabelKey, ConfigResourceVersionLabelKey, KubeletConfigKeyLabelKey},
 	)
-	ConfigError = prometheus.NewGauge(
-		prometheus.GaugeOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      ConfigErrorKey,
-			Help:      "This metric is true (1) if the node is experiencing a configuration-related error, false (0) otherwise.",
+	// ConfigError is a Gauge that is set to 1 if the node is experiencing a configuration-related error.
+	ConfigError = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           ConfigErrorKey,
+			Help:           "This metric is true (1) if the node is experiencing a configuration-related error, false (0) otherwise.",
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	RunPodSandboxDuration = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
+	// RunPodSandboxDuration is a Histogram that tracks the duration (in seconds) it takes to run Pod Sandbox operations.
+	// Broken down by RuntimeClass.
+	RunPodSandboxDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
 			Subsystem: KubeletSubsystem,
 			Name:      RunPodSandboxDurationKey,
 			Help:      "Duration in seconds of the run_podsandbox operations. Broken down by RuntimeClass.",
 			// Use DefBuckets for now, will customize the buckets if necessary.
-			Buckets: prometheus.DefBuckets,
+			Buckets:        prometheus.DefBuckets,
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"runtime_handler"},
 	)
-	RunPodSandboxErrors = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: KubeletSubsystem,
-			Name:      RunPodSandboxErrorsKey,
-			Help:      "Cumulative number of the run_podsandbox operation errors by RuntimeClass.",
+	// RunPodSandboxErrors is a Counter that tracks the cumulative number of Pod Sandbox operations errors.
+	// Broken down by RuntimeClass.
+	RunPodSandboxErrors = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           RunPodSandboxErrorsKey,
+			Help:           "Cumulative number of the run_podsandbox operation errors by RuntimeClass.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"runtime_handler"},
+	)
+
+	// RunningPodCount is a gauge that tracks the number of Pods currently running
+	RunningPodCount = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "running_pod_count",
+			Help:           "Number of pods currently running",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// RunningContainerCount is a gauge that tracks the number of containers currently running
+	RunningContainerCount = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "running_container_count",
+			Help:           "Number of containers currently running",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_state"},
 	)
 )
 
 var registerMetrics sync.Once
 
-// Register all metrics.
+// Register registers all metrics.
 func Register(containerCache kubecontainer.RuntimeCache, collectors ...prometheus.Collector) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(NodeName)
-		prometheus.MustRegister(PodWorkerDuration)
-		prometheus.MustRegister(PodStartDuration)
-		prometheus.MustRegister(CgroupManagerDuration)
-		prometheus.MustRegister(PodWorkerStartDuration)
-		prometheus.MustRegister(ContainersPerPodCount)
-		prometheus.MustRegister(newPodAndContainerCollector(containerCache))
-		prometheus.MustRegister(PLEGRelistDuration)
-		prometheus.MustRegister(PLEGDiscardEvents)
-		prometheus.MustRegister(PLEGRelistInterval)
-		prometheus.MustRegister(RuntimeOperations)
-		prometheus.MustRegister(RuntimeOperationsDuration)
-		prometheus.MustRegister(RuntimeOperationsErrors)
-		prometheus.MustRegister(EvictionStatsAge)
-		prometheus.MustRegister(DevicePluginRegistrationCount)
-		prometheus.MustRegister(DevicePluginAllocationDuration)
-		prometheus.MustRegister(DeprecatedPodWorkerLatency)
-		prometheus.MustRegister(DeprecatedPodStartLatency)
-		prometheus.MustRegister(DeprecatedCgroupManagerLatency)
-		prometheus.MustRegister(DeprecatedPodWorkerStartLatency)
-		prometheus.MustRegister(DeprecatedPLEGRelistLatency)
-		prometheus.MustRegister(DeprecatedPLEGRelistInterval)
-		prometheus.MustRegister(DeprecatedRuntimeOperations)
-		prometheus.MustRegister(DeprecatedRuntimeOperationsLatency)
-		prometheus.MustRegister(DeprecatedRuntimeOperationsErrors)
-		prometheus.MustRegister(DeprecatedEvictionStatsAge)
-		prometheus.MustRegister(DeprecatedDevicePluginRegistrationCount)
-		prometheus.MustRegister(DeprecatedDevicePluginAllocationLatency)
+		legacyregistry.MustRegister(NodeName)
+		legacyregistry.MustRegister(PodWorkerDuration)
+		legacyregistry.MustRegister(PodStartDuration)
+		legacyregistry.MustRegister(CgroupManagerDuration)
+		legacyregistry.MustRegister(PodWorkerStartDuration)
+		legacyregistry.MustRegister(ContainersPerPodCount)
+		legacyregistry.MustRegister(PLEGRelistDuration)
+		legacyregistry.MustRegister(PLEGDiscardEvents)
+		legacyregistry.MustRegister(PLEGRelistInterval)
+		legacyregistry.MustRegister(RuntimeOperations)
+		legacyregistry.MustRegister(RuntimeOperationsDuration)
+		legacyregistry.MustRegister(RuntimeOperationsErrors)
+		legacyregistry.MustRegister(Evictions)
+		legacyregistry.MustRegister(EvictionStatsAge)
+		legacyregistry.MustRegister(DevicePluginRegistrationCount)
+		legacyregistry.MustRegister(DevicePluginAllocationDuration)
+		legacyregistry.MustRegister(DeprecatedPodWorkerLatency)
+		legacyregistry.MustRegister(DeprecatedPodStartLatency)
+		legacyregistry.MustRegister(DeprecatedCgroupManagerLatency)
+		legacyregistry.MustRegister(DeprecatedPodWorkerStartLatency)
+		legacyregistry.MustRegister(DeprecatedPLEGRelistLatency)
+		legacyregistry.MustRegister(DeprecatedPLEGRelistInterval)
+		legacyregistry.MustRegister(DeprecatedRuntimeOperations)
+		legacyregistry.MustRegister(DeprecatedRuntimeOperationsLatency)
+		legacyregistry.MustRegister(DeprecatedRuntimeOperationsErrors)
+		legacyregistry.MustRegister(DeprecatedEvictionStatsAge)
+		legacyregistry.MustRegister(DeprecatedDevicePluginRegistrationCount)
+		legacyregistry.MustRegister(DeprecatedDevicePluginAllocationLatency)
+		legacyregistry.MustRegister(RunningContainerCount)
+		legacyregistry.MustRegister(RunningPodCount)
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
-			prometheus.MustRegister(AssignedConfig)
-			prometheus.MustRegister(ActiveConfig)
-			prometheus.MustRegister(LastKnownGoodConfig)
-			prometheus.MustRegister(ConfigError)
+			legacyregistry.MustRegister(AssignedConfig)
+			legacyregistry.MustRegister(ActiveConfig)
+			legacyregistry.MustRegister(LastKnownGoodConfig)
+			legacyregistry.MustRegister(ConfigError)
 		}
 		for _, collector := range collectors {
-			prometheus.MustRegister(collector)
+			legacyregistry.RawMustRegister(collector)
 		}
 	})
 }
 
-// Gets the time since the specified start in microseconds.
+// SinceInMicroseconds gets the time since the specified start in microseconds.
 func SinceInMicroseconds(start time.Time) float64 {
 	return float64(time.Since(start).Nanoseconds() / time.Microsecond.Nanoseconds())
 }
@@ -412,56 +539,6 @@ func SinceInMicroseconds(start time.Time) float64 {
 // SinceInSeconds gets the time since the specified start in seconds.
 func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
-}
-
-func newPodAndContainerCollector(containerCache kubecontainer.RuntimeCache) *podAndContainerCollector {
-	return &podAndContainerCollector{
-		containerCache: containerCache,
-	}
-}
-
-// Custom collector for current pod and container counts.
-type podAndContainerCollector struct {
-	// Cache for accessing information about running containers.
-	containerCache kubecontainer.RuntimeCache
-}
-
-// TODO(vmarmol): Split by source?
-var (
-	runningPodCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", KubeletSubsystem, "running_pod_count"),
-		"Number of pods currently running",
-		nil, nil)
-	runningContainerCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", KubeletSubsystem, "running_container_count"),
-		"Number of containers currently running",
-		nil, nil)
-)
-
-func (pc *podAndContainerCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- runningPodCountDesc
-	ch <- runningContainerCountDesc
-}
-
-func (pc *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
-	runningPods, err := pc.containerCache.GetPods()
-	if err != nil {
-		klog.Warningf("Failed to get running container information while collecting metrics: %v", err)
-		return
-	}
-
-	runningContainers := 0
-	for _, p := range runningPods {
-		runningContainers += len(p.Containers)
-	}
-	ch <- prometheus.MustNewConstMetric(
-		runningPodCountDesc,
-		prometheus.GaugeValue,
-		float64(len(runningPods)))
-	ch <- prometheus.MustNewConstMetric(
-		runningContainerCountDesc,
-		prometheus.GaugeValue,
-		float64(runningContainers))
 }
 
 const configMapAPIPathFmt = "/api/v1/namespaces/%s/configmaps/%s"
@@ -488,8 +565,10 @@ func configLabels(source *corev1.NodeConfigSource) (map[string]string, error) {
 }
 
 // track labels across metric updates, so we can delete old label sets and prevent leaks
-var assignedConfigLabels map[string]string = map[string]string{}
+var assignedConfigLabels map[string]string
 
+// SetAssignedConfig tracks labels according to the assigned NodeConfig. It also tracks labels
+// across metric updates so old labels can be safely deleted.
 func SetAssignedConfig(source *corev1.NodeConfigSource) error {
 	// compute the timeseries labels from the source
 	labels, err := configLabels(source)
@@ -497,7 +576,9 @@ func SetAssignedConfig(source *corev1.NodeConfigSource) error {
 		return err
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
-	AssignedConfig.Delete(assignedConfigLabels)
+	if !AssignedConfig.Delete(assignedConfigLabels) {
+		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different assigned configs.", assignedConfigLabels)
+	}
 	// record the new timeseries
 	assignedConfigLabels = labels
 	// expose the new timeseries with a constant count of 1
@@ -506,8 +587,10 @@ func SetAssignedConfig(source *corev1.NodeConfigSource) error {
 }
 
 // track labels across metric updates, so we can delete old label sets and prevent leaks
-var activeConfigLabels map[string]string = map[string]string{}
+var activeConfigLabels map[string]string
 
+// SetActiveConfig tracks labels according to the NodeConfig that is currently used by the Kubelet.
+// It also tracks labels across metric updates so old labels can be safely deleted.
 func SetActiveConfig(source *corev1.NodeConfigSource) error {
 	// compute the timeseries labels from the source
 	labels, err := configLabels(source)
@@ -515,7 +598,9 @@ func SetActiveConfig(source *corev1.NodeConfigSource) error {
 		return err
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
-	ActiveConfig.Delete(activeConfigLabels)
+	if !ActiveConfig.Delete(activeConfigLabels) {
+		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different active configs.", activeConfigLabels)
+	}
 	// record the new timeseries
 	activeConfigLabels = labels
 	// expose the new timeseries with a constant count of 1
@@ -524,8 +609,10 @@ func SetActiveConfig(source *corev1.NodeConfigSource) error {
 }
 
 // track labels across metric updates, so we can delete old label sets and prevent leaks
-var lastKnownGoodConfigLabels map[string]string = map[string]string{}
+var lastKnownGoodConfigLabels map[string]string
 
+// SetLastKnownGoodConfig tracks labels according to the NodeConfig that was successfully applied last.
+// It also tracks labels across metric updates so old labels can be safely deleted.
 func SetLastKnownGoodConfig(source *corev1.NodeConfigSource) error {
 	// compute the timeseries labels from the source
 	labels, err := configLabels(source)
@@ -533,7 +620,9 @@ func SetLastKnownGoodConfig(source *corev1.NodeConfigSource) error {
 		return err
 	}
 	// clean up the old timeseries (WithLabelValues creates a new one for each distinct label set)
-	LastKnownGoodConfig.Delete(lastKnownGoodConfigLabels)
+	if !LastKnownGoodConfig.Delete(lastKnownGoodConfigLabels) {
+		klog.Warningf("Failed to delete metric for labels %v. This may result in ambiguity from multiple metrics concurrently indicating different last known good configs.", lastKnownGoodConfigLabels)
+	}
 	// record the new timeseries
 	lastKnownGoodConfigLabels = labels
 	// expose the new timeseries with a constant count of 1
@@ -541,6 +630,7 @@ func SetLastKnownGoodConfig(source *corev1.NodeConfigSource) error {
 	return nil
 }
 
+// SetConfigError sets a the ConfigError metric to 1 in case any errors were encountered.
 func SetConfigError(err bool) {
 	if err {
 		ConfigError.Set(1)
@@ -549,6 +639,7 @@ func SetConfigError(err bool) {
 	}
 }
 
+// SetNodeName sets the NodeName Gauge to 1.
 func SetNodeName(name types.NodeName) {
 	NodeName.WithLabelValues(string(name)).Set(1)
 }

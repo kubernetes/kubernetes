@@ -18,6 +18,7 @@ package controlplane
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -25,13 +26,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/lithammer/dedent"
+
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/apimachinery/pkg/util/version"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
-	authzmodes "k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes"
-
+	staticpodutil "k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
 )
 
@@ -49,11 +50,7 @@ func TestGetStaticPodSpecs(t *testing.T) {
 	}
 
 	// Executes GetStaticPodSpecs
-
-	// TODO: Move the "pkg/util/version".Version object into the internal API instead of always parsing the string
-	k8sVersion, _ := version.ParseSemantic(cfg.KubernetesVersion)
-
-	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{}, k8sVersion)
+	specs := GetStaticPodSpecs(cfg, &kubeadmapi.APIEndpoint{})
 
 	var tests = []struct {
 		name          string
@@ -127,7 +124,7 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 
 			// Execute createStaticPodFunction
 			manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
-			err := CreateStaticPodFiles(manifestPath, cfg, &kubeadmapi.APIEndpoint{}, test.components...)
+			err := CreateStaticPodFiles(manifestPath, "", cfg, &kubeadmapi.APIEndpoint{}, test.components...)
 			if err != nil {
 				t.Errorf("Error executing createStaticPodFunction: %v", err)
 				return
@@ -140,6 +137,56 @@ func TestCreateStaticPodFilesAndWrappers(t *testing.T) {
 				testutil.AssertFileExists(t, manifestPath, fileName+".yaml")
 			}
 		})
+	}
+}
+
+func TestCreateStaticPodFilesKustomize(t *testing.T) {
+	// Create temp folder for the test case
+	tmpdir := testutil.SetupTempDir(t)
+	defer os.RemoveAll(tmpdir)
+
+	// Creates a Cluster Configuration
+	cfg := &kubeadmapi.ClusterConfiguration{
+		KubernetesVersion: "v1.9.0",
+	}
+
+	kustomizePath := filepath.Join(tmpdir, "kustomize")
+	err := os.MkdirAll(kustomizePath, 0777)
+	if err != nil {
+		t.Fatalf("Couldn't create %s", kustomizePath)
+	}
+
+	patchString := dedent.Dedent(`
+    apiVersion: v1
+    kind: Pod
+    metadata:
+        name: kube-apiserver
+        namespace: kube-system
+        annotations:
+            kustomize: patch for kube-apiserver
+    `)
+
+	err = ioutil.WriteFile(filepath.Join(kustomizePath, "patch.yaml"), []byte(patchString), 0644)
+	if err != nil {
+		t.Fatalf("WriteFile returned unexpected error: %v", err)
+	}
+
+	// Execute createStaticPodFunction with kustomizations
+	manifestPath := filepath.Join(tmpdir, kubeadmconstants.ManifestsSubDirName)
+	err = CreateStaticPodFiles(manifestPath, kustomizePath, cfg, &kubeadmapi.APIEndpoint{}, kubeadmconstants.KubeAPIServer)
+	if err != nil {
+		t.Errorf("Error executing createStaticPodFunction: %v", err)
+		return
+	}
+
+	pod, err := staticpodutil.ReadStaticPodFromDisk(filepath.Join(manifestPath, fmt.Sprintf("%s.yaml", kubeadmconstants.KubeAPIServer)))
+	if err != nil {
+		t.Errorf("Error executing ReadStaticPodFromDisk: %v", err)
+		return
+	}
+
+	if _, ok := pod.ObjectMeta.Annotations["kustomize"]; !ok {
+		t.Error("Kustomize did not apply patches corresponding to the resource")
 	}
 }
 
@@ -365,7 +412,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
 						ExtraArgs: map[string]string{
-							"authorization-mode": authzmodes.ModeABAC,
+							"authorization-mode": kubeadmconstants.ModeABAC,
 						},
 					},
 				},
@@ -453,7 +500,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
 						ExtraArgs: map[string]string{
-							"authorization-mode": authzmodes.ModeWebhook,
+							"authorization-mode": kubeadmconstants.ModeWebhook,
 						},
 					},
 				},
@@ -672,7 +719,7 @@ func TestGetControllerManagerCommand(t *testing.T) {
 
 	for _, rt := range tests {
 		t.Run(rt.name, func(t *testing.T) {
-			actual := getControllerManagerCommand(rt.cfg, version.MustParseSemantic(rt.cfg.KubernetesVersion))
+			actual := getControllerManagerCommand(rt.cfg)
 			sort.Strings(actual)
 			sort.Strings(rt.expected)
 			if !reflect.DeepEqual(actual, rt.expected) {
@@ -848,7 +895,7 @@ func TestGetControllerManagerCommandExternalCA(t *testing.T) {
 				}
 			}
 
-			actual := getControllerManagerCommand(&test.cfg.ClusterConfiguration, version.MustParseSemantic(test.cfg.KubernetesVersion))
+			actual := getControllerManagerCommand(&test.cfg.ClusterConfiguration)
 			expected := test.expectedArgFunc(tmpdir)
 			sort.Strings(actual)
 			sort.Strings(expected)
@@ -873,6 +920,8 @@ func TestGetSchedulerCommand(t *testing.T) {
 				"--bind-address=127.0.0.1",
 				"--leader-elect=true",
 				"--kubeconfig=" + kubeadmconstants.KubernetesDir + "/scheduler.conf",
+				"--authentication-kubeconfig=" + kubeadmconstants.KubernetesDir + "/scheduler.conf",
+				"--authorization-kubeconfig=" + kubeadmconstants.KubernetesDir + "/scheduler.conf",
 			},
 		},
 	}
@@ -902,37 +951,37 @@ func TestGetAuthzModes(t *testing.T) {
 		},
 		{
 			name:     "add missing Node",
-			authMode: []string{authzmodes.ModeRBAC},
+			authMode: []string{kubeadmconstants.ModeRBAC},
 			expected: "Node,RBAC",
 		},
 		{
 			name:     "add missing RBAC",
-			authMode: []string{authzmodes.ModeNode},
+			authMode: []string{kubeadmconstants.ModeNode},
 			expected: "Node,RBAC",
 		},
 		{
 			name:     "add defaults to ABAC",
-			authMode: []string{authzmodes.ModeABAC},
+			authMode: []string{kubeadmconstants.ModeABAC},
 			expected: "Node,RBAC,ABAC",
 		},
 		{
 			name:     "add defaults to RBAC+Webhook",
-			authMode: []string{authzmodes.ModeRBAC, authzmodes.ModeWebhook},
+			authMode: []string{kubeadmconstants.ModeRBAC, kubeadmconstants.ModeWebhook},
 			expected: "Node,RBAC,Webhook",
 		},
 		{
 			name:     "add default to Webhook",
-			authMode: []string{authzmodes.ModeWebhook},
+			authMode: []string{kubeadmconstants.ModeWebhook},
 			expected: "Node,RBAC,Webhook",
 		},
 		{
 			name:     "AlwaysAllow ignored",
-			authMode: []string{authzmodes.ModeAlwaysAllow},
+			authMode: []string{kubeadmconstants.ModeAlwaysAllow},
 			expected: "Node,RBAC",
 		},
 		{
 			name:     "AlwaysDeny ignored",
-			authMode: []string{authzmodes.ModeAlwaysDeny},
+			authMode: []string{kubeadmconstants.ModeAlwaysDeny},
 			expected: "Node,RBAC",
 		},
 		{
@@ -942,12 +991,12 @@ func TestGetAuthzModes(t *testing.T) {
 		},
 		{
 			name:     "Multiple ignored",
-			authMode: []string{authzmodes.ModeAlwaysAllow, authzmodes.ModeAlwaysDeny, "foo"},
+			authMode: []string{kubeadmconstants.ModeAlwaysAllow, kubeadmconstants.ModeAlwaysDeny, "foo"},
 			expected: "Node,RBAC",
 		},
 		{
 			name:     "all",
-			authMode: []string{authzmodes.ModeNode, authzmodes.ModeRBAC, authzmodes.ModeWebhook, authzmodes.ModeABAC},
+			authMode: []string{kubeadmconstants.ModeNode, kubeadmconstants.ModeRBAC, kubeadmconstants.ModeWebhook, kubeadmconstants.ModeABAC},
 			expected: "Node,RBAC,ABAC,Webhook",
 		},
 	}

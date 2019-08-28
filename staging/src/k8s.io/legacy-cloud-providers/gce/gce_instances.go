@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -109,7 +111,7 @@ func (g *Cloud) NodeAddresses(_ context.Context, _ types.NodeName) ([]v1.NodeAdd
 // NodeAddressesByProviderID will not be called from the node that is requesting this ID.
 // i.e. metadata service and other local methods cannot be used here
 func (g *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string) ([]v1.NodeAddress, error) {
-	ctx, cancel := cloud.ContextWithCallTimeout()
+	timeoutCtx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
 	_, zone, name, err := splitProviderID(providerID)
@@ -117,7 +119,7 @@ func (g *Cloud) NodeAddressesByProviderID(ctx context.Context, providerID string
 		return []v1.NodeAddress{}, err
 	}
 
-	instance, err := g.c.Instances().Get(ctx, meta.ZonalKey(canonicalizeInstanceName(name), zone))
+	instance, err := g.c.Instances().Get(timeoutCtx, meta.ZonalKey(canonicalizeInstanceName(name), zone))
 	if err != nil {
 		return []v1.NodeAddress{}, fmt.Errorf("error while querying for providerID %q: %v", providerID, err)
 	}
@@ -426,6 +428,19 @@ func (g *Cloud) AddAliasToInstance(nodeName types.NodeName, alias *net.IPNet) er
 // Gets the named instances, returning cloudprovider.InstanceNotFound if any
 // instance is not found
 func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
+	foundInstances, err := g.getFoundInstanceByNames(names)
+	if err != nil {
+		return nil, err
+	}
+	if len(foundInstances) != len(names) {
+		return nil, cloudprovider.InstanceNotFound
+	}
+	return foundInstances, nil
+}
+
+// Gets the named instances, returning a list of gceInstances it was able to find from the provided
+// list of names.
+func (g *Cloud) getFoundInstanceByNames(names []string) ([]*gceInstance, error) {
 	ctx, cancel := cloud.ContextWithCallTimeout()
 	defer cancel()
 
@@ -472,20 +487,17 @@ func (g *Cloud) getInstancesByNames(names []string) ([]*gceInstance, error) {
 		}
 	}
 
-	if remaining > 0 {
-		var failed []string
-		for k := range found {
-			if found[k] == nil {
-				failed = append(failed, k)
-			}
-		}
-		klog.Errorf("Failed to retrieve instances: %v", failed)
-		return nil, cloudprovider.InstanceNotFound
-	}
-
 	var ret []*gceInstance
-	for _, instance := range found {
-		ret = append(ret, instance)
+	var failed []string
+	for name, instance := range found {
+		if instance != nil {
+			ret = append(ret, instance)
+		} else {
+			failed = append(failed, name)
+		}
+	}
+	if len(failed) > 0 {
+		klog.Errorf("Failed to retrieve instances: %v", failed)
 	}
 
 	return ret, nil

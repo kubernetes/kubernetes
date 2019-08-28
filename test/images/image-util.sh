@@ -88,7 +88,7 @@ build() {
         if [[ $(id -u) != 0 ]]; then
           sudo=sudo
         fi
-        "${sudo}" "${KUBE_ROOT}/third_party/multiarch/qemu-user-static/register/register.sh" --reset
+        ${sudo} "${KUBE_ROOT}/third_party/multiarch/qemu-user-static/register/register.sh" --reset
         curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/"${QEMUVERSION}"/x86_64_qemu-"${QEMUARCHS[$arch]}"-static.tar.gz | tar -xz -C "${temp_dir}"
         # Ensure we don't get surprised by umask settings
         chmod 0755 "${temp_dir}/qemu-${QEMUARCHS[$arch]}-static"
@@ -140,13 +140,17 @@ push() {
 
 # This function is for building the go code
 bin() {
+  local arch_prefix=""
+  if [[ "${ARCH}" == "arm" ]]; then
+    arch_prefix="GOARM=${GOARM:-7}"
+  fi
   for SRC in $@;
   do
   docker run --rm -it -v "${TARGET}:${TARGET}:Z" -v "${KUBE_ROOT}":/go/src/k8s.io/kubernetes:Z \
         golang:"${GOLANG_VERSION}" \
         /bin/bash -c "\
                 cd /go/src/k8s.io/kubernetes/test/images/${SRC_DIR} && \
-                CGO_ENABLED=0 GOARM=${GOARM} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags '-w' -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
+                CGO_ENABLED=0 ${arch_prefix} GOARCH=${ARCH} go build -a -installsuffix cgo --ldflags '-w' -o ${TARGET}/${SRC} ./$(dirname "${SRC}")"
   done
 }
 

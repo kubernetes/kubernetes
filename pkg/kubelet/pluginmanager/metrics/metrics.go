@@ -25,7 +25,6 @@ import (
 )
 
 const (
-	pluginNameNotAvailable = "N/A"
 	// Metric keys for Plugin Manager.
 	pluginManagerTotalPlugins = "plugin_manager_total_plugins"
 )

@@ -40,7 +40,11 @@ func newStorage(t *testing.T) (*REST, *etcd3testing.EtcdTestServer) {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "priorityclasses",
 	}
-	return NewREST(restOptions), server
+	rest, err := NewREST(restOptions)
+	if err != nil {
+		t.Fatalf("unable to create REST %v", err)
+	}
+	return rest, server
 }
 
 func validNewPriorityClass() *scheduling.PriorityClass {

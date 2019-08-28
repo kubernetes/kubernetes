@@ -18,9 +18,10 @@ package priorities
 
 import (
 	"fmt"
+	"math"
 
+	"k8s.io/klog"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // FunctionShape represents shape of scoring function.
@@ -84,23 +85,39 @@ func NewFunctionShape(points []FunctionShapePoint) (FunctionShape, error) {
 	return pointsCopy, nil
 }
 
+func validateResourceWeightMap(resourceToWeightMap ResourceToWeightMap) error {
+	if len(resourceToWeightMap) == 0 {
+		return fmt.Errorf("resourceToWeightMap cannot be nil")
+	}
+
+	for resource, weight := range resourceToWeightMap {
+		if weight < 1 {
+			return fmt.Errorf("resource %s weight %d must not be less than 1", string(resource), weight)
+		}
+	}
+	return nil
+}
+
 // RequestedToCapacityRatioResourceAllocationPriorityDefault creates a requestedToCapacity based
 // ResourceAllocationPriority using default resource scoring function shape.
 // The default function assigns 1.0 to resource when all capacity is available
 // and 0.0 when requested amount is equal to capacity.
 func RequestedToCapacityRatioResourceAllocationPriorityDefault() *ResourceAllocationPriority {
-	return RequestedToCapacityRatioResourceAllocationPriority(defaultFunctionShape)
+	return RequestedToCapacityRatioResourceAllocationPriority(defaultFunctionShape, DefaultRequestedRatioResources)
 }
 
 // RequestedToCapacityRatioResourceAllocationPriority creates a requestedToCapacity based
 // ResourceAllocationPriority using provided resource scoring function shape.
-func RequestedToCapacityRatioResourceAllocationPriority(scoringFunctionShape FunctionShape) *ResourceAllocationPriority {
-	return &ResourceAllocationPriority{"RequestedToCapacityRatioResourceAllocationPriority", buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape)}
+func RequestedToCapacityRatioResourceAllocationPriority(scoringFunctionShape FunctionShape, resourceToWeightMap ResourceToWeightMap) *ResourceAllocationPriority {
+	return &ResourceAllocationPriority{"RequestedToCapacityRatioResourceAllocationPriority", buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape, resourceToWeightMap), resourceToWeightMap}
 }
 
-func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape FunctionShape) func(*schedulernodeinfo.Resource, *schedulernodeinfo.Resource, bool, int, int) int64 {
+func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape FunctionShape, resourceToWeightMap ResourceToWeightMap) func(ResourceToValueMap, ResourceToValueMap, bool, int, int) int64 {
 	rawScoringFunction := buildBrokenLinearFunction(scoringFunctionShape)
-
+	err := validateResourceWeightMap(resourceToWeightMap)
+	if err != nil {
+		klog.Error(err)
+	}
 	resourceScoringFunction := func(requested, capacity int64) int64 {
 		if capacity == 0 || requested > capacity {
 			return rawScoringFunction(maxUtilization)
@@ -108,11 +125,19 @@ func buildRequestedToCapacityRatioScorerFunction(scoringFunctionShape FunctionSh
 
 		return rawScoringFunction(maxUtilization - (capacity-requested)*maxUtilization/capacity)
 	}
-
-	return func(requested, allocable *schedulernodeinfo.Resource, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
-		cpuScore := resourceScoringFunction(requested.MilliCPU, allocable.MilliCPU)
-		memoryScore := resourceScoringFunction(requested.Memory, allocable.Memory)
-		return (cpuScore + memoryScore) / 2
+	return func(requested, allocable ResourceToValueMap, includeVolumes bool, requestedVolumes int, allocatableVolumes int) int64 {
+		var nodeScore, weightSum int64
+		for resource, weight := range resourceToWeightMap {
+			resourceScore := resourceScoringFunction(requested[resource], allocable[resource])
+			if resourceScore > 0 {
+				nodeScore += resourceScore * weight
+				weightSum += weight
+			}
+		}
+		if weightSum == 0 {
+			return 0
+		}
+		return int64(math.Round(float64(nodeScore) / float64(weightSum)))
 	}
 }
 

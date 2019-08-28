@@ -25,16 +25,16 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2018-09-01/containerregistry"
+	"github.com/Azure/azure-sdk-for-go/services/containerregistry/mgmt/2019-05-01/containerregistry"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/spf13/pflag"
-	"k8s.io/klog"
-	"sigs.k8s.io/yaml"
 
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/legacy-cloud-providers/azure/auth"
+	"sigs.k8s.io/yaml"
 )
 
 var flagConfigFile = pflag.String("azure-container-registry-config", "",

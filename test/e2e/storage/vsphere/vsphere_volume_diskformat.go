@@ -108,7 +108,7 @@ func invokeTest(f *framework.Framework, client clientset.Interface, namespace st
 	scParameters["diskformat"] = diskFormat
 
 	ginkgo.By("Creating Storage Class With DiskFormat")
-	storageClassSpec := getVSphereStorageClassSpec("thinsc", scParameters, nil)
+	storageClassSpec := getVSphereStorageClassSpec("thinsc", scParameters, nil, "")
 	storageclass, err := client.StorageV1().StorageClasses().Create(storageClassSpec)
 	framework.ExpectNoError(err)
 

@@ -41,15 +41,16 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
-	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/typed/apiregistration/internalversion"
-	informers "k8s.io/kube-aggregator/pkg/client/informers/internalversion/apiregistration/internalversion"
+	apiregistrationclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/typed/apiregistration/v1"
+	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master/controller/crdregistration"
 )
 
@@ -109,10 +110,11 @@ func createAggregatorConfig(
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
-			ProxyClientCert: certBytes,
-			ProxyClientKey:  keyBytes,
-			ServiceResolver: serviceResolver,
-			ProxyTransport:  proxyTransport,
+			ProxyClientCert:                  certBytes,
+			ProxyClientKey:                   keyBytes,
+			ServiceResolver:                  serviceResolver,
+			ProxyTransport:                   proxyTransport,
+			EnableAggregatedDiscoveryTimeout: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.EnableAggregatedDiscoveryTimeout),
 		},
 	}
 
@@ -130,7 +132,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	if err != nil {
 		return nil, err
 	}
-	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(), apiRegistrationClient)
+	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().V1().APIServices(), apiRegistrationClient)
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
 	crdRegistrationController := crdregistration.NewCRDRegistrationController(
 		apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
@@ -153,11 +155,11 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		return nil, err
 	}
 
-	err = aggregatorServer.GenericAPIServer.AddHealthzChecks(
-		makeAPIServiceAvailableHealthzCheck(
+	err = aggregatorServer.GenericAPIServer.AddBootSequenceHealthChecks(
+		makeAPIServiceAvailableHealthCheck(
 			"autoregister-completion",
 			apiServices,
-			aggregatorServer.APIRegistrationInformers.Apiregistration().InternalVersion().APIServices(),
+			aggregatorServer.APIRegistrationInformers.Apiregistration().V1().APIServices(),
 		),
 	)
 	if err != nil {
@@ -167,7 +169,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	return aggregatorServer, nil
 }
 
-func makeAPIService(gv schema.GroupVersion) *apiregistration.APIService {
+func makeAPIService(gv schema.GroupVersion) *v1.APIService {
 	apiServicePriority, ok := apiVersionPriorities[gv]
 	if !ok {
 		// if we aren't found, then we shouldn't register ourselves because it could result in a CRD group version
@@ -175,9 +177,9 @@ func makeAPIService(gv schema.GroupVersion) *apiregistration.APIService {
 		klog.Infof("Skipping APIService creation for %v", gv)
 		return nil
 	}
-	return &apiregistration.APIService{
+	return &v1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: gv.Version + "." + gv.Group},
-		Spec: apiregistration.APIServiceSpec{
+		Spec: v1.APIServiceSpec{
 			Group:                gv.Group,
 			Version:              gv.Version,
 			GroupPriorityMinimum: apiServicePriority.group,
@@ -186,9 +188,9 @@ func makeAPIService(gv schema.GroupVersion) *apiregistration.APIService {
 	}
 }
 
-// makeAPIServiceAvailableHealthzCheck returns a healthz check that returns healthy
+// makeAPIServiceAvailableHealthCheck returns a healthz check that returns healthy
 // once all of the specified services have been observed to be available at least once.
-func makeAPIServiceAvailableHealthzCheck(name string, apiServices []*apiregistration.APIService, apiServiceInformer informers.APIServiceInformer) healthz.HealthzChecker {
+func makeAPIServiceAvailableHealthCheck(name string, apiServices []*v1.APIService, apiServiceInformer informers.APIServiceInformer) healthz.HealthChecker {
 	// Track the auto-registered API services that have not been observed to be available yet
 	pendingServiceNamesLock := &sync.RWMutex{}
 	pendingServiceNames := sets.NewString()
@@ -197,21 +199,21 @@ func makeAPIServiceAvailableHealthzCheck(name string, apiServices []*apiregistra
 	}
 
 	// When an APIService in the list is seen as available, remove it from the pending list
-	handleAPIServiceChange := func(service *apiregistration.APIService) {
+	handleAPIServiceChange := func(service *v1.APIService) {
 		pendingServiceNamesLock.Lock()
 		defer pendingServiceNamesLock.Unlock()
 		if !pendingServiceNames.Has(service.Name) {
 			return
 		}
-		if apiregistration.IsAPIServiceConditionTrue(service, apiregistration.Available) {
+		if v1helper.IsAPIServiceConditionTrue(service, v1.Available) {
 			pendingServiceNames.Delete(service.Name)
 		}
 	}
 
 	// Watch add/update events for APIServices
 	apiServiceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { handleAPIServiceChange(obj.(*apiregistration.APIService)) },
-		UpdateFunc: func(old, new interface{}) { handleAPIServiceChange(new.(*apiregistration.APIService)) },
+		AddFunc:    func(obj interface{}) { handleAPIServiceChange(obj.(*v1.APIService)) },
+		UpdateFunc: func(old, new interface{}) { handleAPIServiceChange(new.(*v1.APIService)) },
 	})
 
 	// Don't return healthy until the pending list is empty
@@ -269,6 +271,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "storage.k8s.io", Version: "v1"}:                    {group: 16800, version: 15},
 	{Group: "storage.k8s.io", Version: "v1beta1"}:               {group: 16800, version: 9},
 	{Group: "storage.k8s.io", Version: "v1alpha1"}:              {group: 16800, version: 1},
+	{Group: "apiextensions.k8s.io", Version: "v1"}:              {group: 16700, version: 15},
 	{Group: "apiextensions.k8s.io", Version: "v1beta1"}:         {group: 16700, version: 9},
 	{Group: "admissionregistration.k8s.io", Version: "v1"}:      {group: 16700, version: 15},
 	{Group: "admissionregistration.k8s.io", Version: "v1beta1"}: {group: 16700, version: 12},
@@ -280,13 +283,14 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "auditregistration.k8s.io", Version: "v1alpha1"}:    {group: 16400, version: 1},
 	{Group: "node.k8s.io", Version: "v1alpha1"}:                 {group: 16300, version: 1},
 	{Group: "node.k8s.io", Version: "v1beta1"}:                  {group: 16300, version: 9},
+	{Group: "discovery.k8s.io", Version: "v1alpha1"}:            {group: 16200, version: 9},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.
 	// Version can be set to 9 (to have space around) for a new group.
 }
 
-func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration) []*apiregistration.APIService {
-	apiServices := []*apiregistration.APIService{}
+func apiServicesToRegister(delegateAPIServer genericapiserver.DelegationTarget, registration autoregister.AutoAPIServiceRegistration) []*v1.APIService {
+	apiServices := []*v1.APIService{}
 
 	for _, curr := range delegateAPIServer.ListedPaths() {
 		if curr == "/api/v1" {

@@ -36,9 +36,8 @@ type HumanPrintFlags struct {
 	// get.go-specific values
 	NoHeaders bool
 
-	Kind               schema.GroupKind
-	AbsoluteTimestamps bool
-	WithNamespace      bool
+	Kind          schema.GroupKind
+	WithNamespace bool
 }
 
 // SetKind sets the Kind option
@@ -127,10 +126,9 @@ func NewHumanPrintFlags() *HumanPrintFlags {
 	columnLabels := []string{}
 
 	return &HumanPrintFlags{
-		NoHeaders:          false,
-		WithNamespace:      false,
-		AbsoluteTimestamps: false,
-		ColumnLabels:       &columnLabels,
+		NoHeaders:     false,
+		WithNamespace: false,
+		ColumnLabels:  &columnLabels,
 
 		Kind:       schema.GroupKind{},
 		ShowLabels: &showLabels,

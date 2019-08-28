@@ -458,7 +458,6 @@ func TestCreateCleanDefaultCluster(t *testing.T) {
 }
 
 func TestCreateMissingContextNoDefault(t *testing.T) {
-	const expectedErrorContains = "Context was not found for specified context"
 	config := createValidTestConfig()
 	clientBuilder := NewNonInteractiveClientConfig(*config, "not-present", &ConfigOverrides{}, nil)
 

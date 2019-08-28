@@ -17,6 +17,7 @@ limitations under the License.
 package noderestriction
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -825,19 +826,19 @@ func Test_nodePlugin_Admit(t *testing.T) {
 		{
 			name:       "allow create of my node pulling name from object",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mynodeObj, nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(mynodeObj, nil, nodeKind, mynodeObj.Namespace, "mynode", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "allow create of my node with taints",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(mynodeObjTaintA, nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(mynodeObjTaintA, nil, nodeKind, mynodeObj.Namespace, "mynode", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "",
 		},
 		{
 			name:       "allow create of my node with labels",
 			podsGetter: noExistingPods,
-			attributes: admission.NewAttributesRecord(setAllowedCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
+			attributes: admission.NewAttributesRecord(setAllowedCreateLabels(mynodeObj, ""), nil, nodeKind, mynodeObj.Namespace, "mynode", nodeResource, "", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "",
 		},
 		{
@@ -1210,7 +1211,7 @@ func Test_nodePlugin_Admit(t *testing.T) {
 				c.features = tt.features
 			}
 			c.podsGetter = tt.podsGetter
-			err := c.Admit(tt.attributes, nil)
+			err := c.Admit(context.TODO(), tt.attributes, nil)
 			if (err == nil) != (len(tt.err) == 0) {
 				t.Errorf("nodePlugin.Admit() error = %v, expected %v", err, tt.err)
 				return

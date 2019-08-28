@@ -395,7 +395,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		framework.ExpectNoError(err, "while waiting for pod to be running")
 
 		ginkgo.By("deleting the pod gracefully")
-		err = framework.DeletePodWithWait(f, f.ClientSet, pod)
+		err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
@@ -502,7 +502,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		framework.ExpectNoError(err, "while waiting for annotated pod to be running")
 
 		ginkgo.By("deleting the pod gracefully")
-		err = framework.DeletePodWithWait(f, f.ClientSet, pod)
+		err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 		framework.ExpectNoError(err, "failed to delete pod")
 	})
 
@@ -612,7 +612,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		podClient = f.PodClient()
 		pod = podClient.Create(pod)
 		defer func() {
-			framework.DeletePodWithWait(f, f.ClientSet, pod)
+			e2epod.DeletePodWithWait(f.ClientSet, pod)
 		}()
 		err := e2epod.WaitForPodRunningInNamespace(f.ClientSet, pod)
 		framework.ExpectNoError(err, "while waiting for pod to be running")
@@ -647,7 +647,7 @@ func testPodFailSubpath(f *framework.Framework, pod *v1.Pod) {
 	pod = podClient.Create(pod)
 
 	defer func() {
-		framework.DeletePodWithWait(f, f.ClientSet, pod)
+		e2epod.DeletePodWithWait(f.ClientSet, pod)
 	}()
 
 	err := e2epod.WaitTimeoutForPodRunningInNamespace(f.ClientSet, pod.Name, pod.Namespace, framework.PodStartShortTimeout)

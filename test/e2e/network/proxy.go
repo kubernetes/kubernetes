@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/endpoints"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -165,7 +164,7 @@ var _ = SIGDescribe("Proxy", func() {
 			framework.ExpectNoError(err)
 			defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, cfg.Name)
 
-			err = endpoints.WaitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)
+			err = waitForEndpoint(f.ClientSet, f.Namespace.Name, service.Name)
 			framework.ExpectNoError(err)
 
 			// table constructors
@@ -321,4 +320,24 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 	}
 	maxFailures := int(math.Floor(0.1 * float64(proxyAttempts)))
 	gomega.Expect(serviceUnavailableErrors).To(gomega.BeNumerically("<", maxFailures))
+}
+
+// waitForEndpoint waits for the specified endpoint to be ready.
+func waitForEndpoint(c clientset.Interface, ns, name string) error {
+	// registerTimeout is how long to wait for an endpoint to be registered.
+	registerTimeout := time.Minute
+	for t := time.Now(); time.Since(t) < registerTimeout; time.Sleep(framework.Poll) {
+		endpoint, err := c.CoreV1().Endpoints(ns).Get(name, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			e2elog.Logf("Endpoint %s/%s is not ready yet", ns, name)
+			continue
+		}
+		framework.ExpectNoError(err, "Failed to get endpoints for %s/%s", ns, name)
+		if len(endpoint.Subsets) == 0 || len(endpoint.Subsets[0].Addresses) == 0 {
+			e2elog.Logf("Endpoint %s/%s is not ready yet", ns, name)
+			continue
+		}
+		return nil
+	}
+	return fmt.Errorf("failed to get endpoints for %s/%s", ns, name)
 }

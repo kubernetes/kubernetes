@@ -174,11 +174,6 @@ func (in *Plugins) DeepCopyInto(out *Plugins) {
 		*out = new(PluginSet)
 		(*in).DeepCopyInto(*out)
 	}
-	if in.NormalizeScore != nil {
-		in, out := &in.NormalizeScore, &out.NormalizeScore
-		*out = new(PluginSet)
-		(*in).DeepCopyInto(*out)
-	}
 	if in.Reserve != nil {
 		in, out := &in.Reserve, &out.Reserve
 		*out = new(PluginSet)

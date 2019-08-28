@@ -27,15 +27,15 @@ import (
 // Scale represents a scaling request for a resource.
 type Scale struct {
 	metav1.TypeMeta
-	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata.
+	// Standard object metadata; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata.
 	// +optional
 	metav1.ObjectMeta
 
-	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+	// defines the behavior of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
 	// +optional
 	Spec ScaleSpec
 
-	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status. Read-only.
+	// current status of the scale. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status. Read-only.
 	// +optional
 	Status ScaleStatus
 }
@@ -62,7 +62,7 @@ type ScaleStatus struct {
 
 // CrossVersionObjectReference contains enough information to let you identify the referred resource.
 type CrossVersionObjectReference struct {
-	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds"
+	// Kind of the referent; More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
 	Kind string
 	// Name of the referent; More info: http://kubernetes.io/docs/user-guide/identifiers#names
 	Name string
@@ -76,8 +76,11 @@ type HorizontalPodAutoscalerSpec struct {
 	// ScaleTargetRef points to the target resource to scale, and is used to the pods for which metrics
 	// should be collected, as well as to actually change the replica count.
 	ScaleTargetRef CrossVersionObjectReference
-	// MinReplicas is the lower limit for the number of replicas to which the autoscaler can scale down.
-	// It defaults to 1 pod.
+	// minReplicas is the lower limit for the number of replicas to which the autoscaler
+	// can scale down.  It defaults to 1 pod.  minReplicas is allowed to be 0 if the
+	// alpha feature gate HPAScaleToZero is enabled and at least one Object or External
+	// metric is configured.  Scaling is active as long as at least one metric value is
+	// available.
 	// +optional
 	MinReplicas *int32
 	// MaxReplicas is the upper limit for the number of replicas to which the autoscaler can scale up.
@@ -391,12 +394,12 @@ type MetricValueStatus struct {
 type HorizontalPodAutoscaler struct {
 	metav1.TypeMeta
 	// Metadata is the standard object metadata.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
 	// +optional
 	metav1.ObjectMeta
 
 	// Spec is the specification for the behaviour of the autoscaler.
-	// More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status.
+	// More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status.
 	// +optional
 	Spec HorizontalPodAutoscalerSpec
 

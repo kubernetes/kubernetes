@@ -42,6 +42,7 @@ var csiTestDrivers = []func() testsuites.TestDriver{
 
 // List of testSuites to be executed in below loop
 var csiTestSuites = []func() testsuites.TestSuite{
+	testsuites.InitEphemeralTestSuite,
 	testsuites.InitVolumesTestSuite,
 	testsuites.InitVolumeIOTestSuite,
 	testsuites.InitVolumeModeTestSuite,
@@ -49,6 +50,9 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitProvisioningTestSuite,
 	testsuites.InitSnapshottableTestSuite,
 	testsuites.InitMultiVolumeTestSuite,
+	testsuites.InitDisruptiveTestSuite,
+	testsuites.InitVolumeExpandTestSuite,
+	testsuites.InitVolumeLimitsTestSuite,
 }
 
 // This executes testSuites for csi volumes.
@@ -119,8 +123,11 @@ func testTopologyPositive(cs clientset.Interface, suffix, namespace string, dela
 		addSingleCSIZoneAllowedTopologyToStorageClass(cs, class, topoZone)
 	}
 	test.Client = cs
-	test.Claim = newClaim(test, namespace, suffix)
-	test.Claim.Spec.StorageClassName = &class.Name
+	test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		ClaimSize:        test.ClaimSize,
+		StorageClassName: &(class.Name),
+		VolumeMode:       &test.VolumeMode,
+	}, namespace)
 	test.Class = class
 
 	if delayBinding {
@@ -150,15 +157,18 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 	test.Client = cs
 	test.Class = newStorageClass(test, namespace, suffix)
 	addSingleCSIZoneAllowedTopologyToStorageClass(cs, test.Class, pvZone)
-	test.Claim = newClaim(test, namespace, suffix)
-	test.Claim.Spec.StorageClassName = &test.Class.Name
+	test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		ClaimSize:        test.ClaimSize,
+		StorageClassName: &(test.Class.Name),
+		VolumeMode:       &test.VolumeMode,
+	}, namespace)
 	if delayBinding {
 		test.TestBindingWaitForFirstConsumer(nodeSelector, true /* expect unschedulable */)
 	} else {
 		test.PvCheck = func(claim *v1.PersistentVolumeClaim) {
 			// Ensure that a pod cannot be scheduled in an unsuitable zone.
 			pod := testsuites.StartInPodWithVolume(cs, namespace, claim.Name, "pvc-tester-unschedulable", "sleep 100000",
-				framework.NodeSelection{Selector: nodeSelector})
+				e2epod.NodeSelection{Selector: nodeSelector})
 			defer testsuites.StopPod(cs, pod)
 			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(cs, pod.Name, pod.Namespace), "pod should be unschedulable")
 		}

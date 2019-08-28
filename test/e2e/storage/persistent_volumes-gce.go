@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -48,7 +49,7 @@ func initializeGCETestSpec(c clientset.Interface, ns string, pvConfig framework.
 	framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
 	ginkgo.By("Creating the Client Pod")
-	clientPod, err := framework.CreateClientPod(c, ns, pvc)
+	clientPod, err := e2epod.CreateClientPod(c, ns, pvc)
 	framework.ExpectNoError(err)
 	return clientPod, pv, pvc
 }
@@ -107,7 +108,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 	ginkgo.AfterEach(func() {
 		e2elog.Logf("AfterEach: Cleaning up test resources")
 		if c != nil {
-			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod))
 			if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
 				e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
@@ -127,7 +128,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 		gomega.Expect(verifyGCEDiskAttached(diskName, node)).To(gomega.BeTrue())
 
 		ginkgo.By("Deleting the Pod")
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "Failed to delete pod ", clientPod.Name)
 
 		ginkgo.By("Verifying Persistent Disk detach")
 		framework.ExpectNoError(waitForPDDetach(diskName, node), "PD ", diskName, " did not detach")
@@ -142,7 +143,7 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 		gomega.Expect(verifyGCEDiskAttached(diskName, node)).To(gomega.BeTrue())
 
 		ginkgo.By("Deleting the client pod")
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "Failed to delete pod ", clientPod.Name)
 
 		ginkgo.By("Verifying Persistent Disk detaches")
 		framework.ExpectNoError(waitForPDDetach(diskName, node), "PD ", diskName, " did not detach")

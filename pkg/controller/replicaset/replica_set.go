@@ -182,7 +182,7 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting %v controller", controllerName)
 	defer klog.Infof("Shutting down %v controller", controllerName)
 
-	if !controller.WaitForCacheSync(rsc.Kind, stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
+	if !cache.WaitForNamedCacheSync(rsc.Kind, stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
 		return
 	}
 

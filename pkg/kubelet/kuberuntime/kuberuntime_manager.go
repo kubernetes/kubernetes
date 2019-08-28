@@ -30,6 +30,7 @@ import (
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
@@ -37,6 +38,7 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -66,7 +68,7 @@ const (
 
 var (
 	// ErrVersionNotSupported is returned when the api version of runtime interface is not supported
-	ErrVersionNotSupported = errors.New("Runtime api version is not supported")
+	ErrVersionNotSupported = errors.New("runtime api version is not supported")
 )
 
 // podStateProvider can determine if a pod is deleted ir terminated
@@ -375,7 +377,7 @@ type containerToKillInfo struct {
 
 // podActions keeps information what to do for a pod.
 type podActions struct {
-	// Stop all running (regular and init) containers and the sandbox for the pod.
+	// Stop all running (regular, init and ephemeral) containers and the sandbox for the pod.
 	KillPod bool
 	// Whether need to create a new sandbox. If needed to kill pod and create
 	// a new pod sandbox, all init containers need to be purged (i.e., removed).
@@ -395,6 +397,9 @@ type podActions struct {
 	// the key is the container ID of the container, while
 	// the value contains necessary information to kill a container.
 	ContainersToKill map[kubecontainer.ContainerID]containerToKillInfo
+	// EphemeralContainersToStart is a list of indexes for the ephemeral containers to start,
+	// where the index is the index of the specific container in pod.Spec.EphemeralContainers.
+	EphemeralContainersToStart []int
 }
 
 // podSandboxChanged checks whether the spec of the pod is changed and returns
@@ -498,6 +503,18 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 			changes.ContainersToStart = append(changes.ContainersToStart, idx)
 		}
 		return changes
+	}
+
+	// Ephemeral containers may be started even if initialization is not yet complete.
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		for i := range pod.Spec.EphemeralContainers {
+			c := (*v1.Container)(&pod.Spec.EphemeralContainers[i].EphemeralContainerCommon)
+
+			// Ephemeral Containers are never restarted
+			if podStatus.FindContainerStatusByName(c.Name) == nil {
+				changes.EphemeralContainersToStart = append(changes.EphemeralContainersToStart, i)
+			}
+		}
 	}
 
 	// Check initialization progress.
@@ -608,8 +625,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 //  2. Kill pod sandbox if necessary.
 //  3. Kill any containers that should not be running.
 //  4. Create sandbox if necessary.
-//  5. Create init containers.
-//  6. Create normal containers.
+//  5. Create ephemeral containers.
+//  6. Create init containers.
+//  7. Create normal containers.
 func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontainer.PodStatus, pullSecrets []v1.Secret, backOff *flowcontrol.Backoff) (result kubecontainer.PodSyncResult) {
 	// Step 1: Compute sandbox and container changes.
 	podContainerChanges := m.computePodActions(pod, podStatus)
@@ -739,22 +757,52 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		return
 	}
 
-	// Step 5: start the init container.
-	if container := podContainerChanges.NextInitContainerToStart; container != nil {
-		// Start the next init container.
+	// Helper containing boilerplate common to starting all types of containers.
+	// typeName is a label used to describe this type of container in log messages,
+	// currently: "container", "init container" or "ephemeral container"
+	start := func(typeName string, container *v1.Container) error {
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
 		result.AddSyncResult(startContainerResult)
+
 		isInBackOff, msg, err := m.doBackOff(pod, container, podStatus, backOff)
 		if isInBackOff {
 			startContainerResult.Fail(err, msg)
-			klog.V(4).Infof("Backing Off restarting init container %+v in pod %v", container, format.Pod(pod))
-			return
+			klog.V(4).Infof("Backing Off restarting %v %+v in pod %v", typeName, container, format.Pod(pod))
+			return err
 		}
 
-		klog.V(4).Infof("Creating init container %+v in pod %v", container, format.Pod(pod))
+		klog.V(4).Infof("Creating %v %+v in pod %v", typeName, container, format.Pod(pod))
 		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP); err != nil {
 			startContainerResult.Fail(err, msg)
-			utilruntime.HandleError(fmt.Errorf("init container start failed: %v: %s", err, msg))
+			// known errors that are logged in other places are logged at higher levels here to avoid
+			// repetitive log spam
+			switch {
+			case err == images.ErrImagePullBackOff:
+				klog.V(3).Infof("%v start failed: %v: %s", typeName, err, msg)
+			default:
+				utilruntime.HandleError(fmt.Errorf("%v start failed: %v: %s", typeName, err, msg))
+			}
+			return err
+		}
+
+		return nil
+	}
+
+	// Step 5: start ephemeral containers
+	// These are started "prior" to init containers to allow running ephemeral containers even when there
+	// are errors starting an init container. In practice init containers will start first since ephemeral
+	// containers cannot be specified on pod creation.
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		for _, idx := range podContainerChanges.EphemeralContainersToStart {
+			c := (*v1.Container)(&pod.Spec.EphemeralContainers[idx].EphemeralContainerCommon)
+			start("ephemeral container", c)
+		}
+	}
+
+	// Step 6: start the init container.
+	if container := podContainerChanges.NextInitContainerToStart; container != nil {
+		// Start the next init container.
+		if err := start("init container", container); err != nil {
 			return
 		}
 
@@ -762,32 +810,9 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		klog.V(4).Infof("Completed init container %q for pod %q", container.Name, format.Pod(pod))
 	}
 
-	// Step 6: start containers in podContainerChanges.ContainersToStart.
+	// Step 7: start containers in podContainerChanges.ContainersToStart.
 	for _, idx := range podContainerChanges.ContainersToStart {
-		container := &pod.Spec.Containers[idx]
-		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
-		result.AddSyncResult(startContainerResult)
-
-		isInBackOff, msg, err := m.doBackOff(pod, container, podStatus, backOff)
-		if isInBackOff {
-			startContainerResult.Fail(err, msg)
-			klog.V(4).Infof("Backing Off restarting container %+v in pod %v", container, format.Pod(pod))
-			continue
-		}
-
-		klog.V(4).Infof("Creating container %+v in pod %v", container, format.Pod(pod))
-		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP); err != nil {
-			startContainerResult.Fail(err, msg)
-			// known errors that are logged in other places are logged at higher levels here to avoid
-			// repetitive log spam
-			switch {
-			case err == images.ErrImagePullBackOff:
-				klog.V(3).Infof("container start failed: %v: %s", err, msg)
-			default:
-				utilruntime.HandleError(fmt.Errorf("container start failed: %v: %s", err, msg))
-			}
-			continue
-		}
+		start("container", &pod.Spec.Containers[idx])
 	}
 
 	return
@@ -817,7 +842,7 @@ func (m *kubeGenericRuntimeManager) doBackOff(pod *v1.Pod, container *v1.Contain
 		if ref, err := kubecontainer.GenerateContainerRef(pod, container); err == nil {
 			m.recorder.Eventf(ref, v1.EventTypeWarning, events.BackOffStartContainer, "Back-off restarting failed container")
 		}
-		err := fmt.Errorf("Back-off %s restarting failed container=%s pod=%s", backOff.Get(key), container.Name, format.Pod(pod))
+		err := fmt.Errorf("back-off %s restarting failed container=%s pod=%s", backOff.Get(key), container.Name, format.Pod(pod))
 		klog.V(3).Infof("%s", err.Error())
 		return true, err.Error(), kubecontainer.ErrCrashLoopBackOff
 	}

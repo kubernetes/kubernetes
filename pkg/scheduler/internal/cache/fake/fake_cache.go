@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // Cache is used for testing
@@ -85,7 +86,7 @@ func (c *Cache) UpdateCSINode(oldCSINode, newCSINode *storagev1beta1.CSINode) er
 func (c *Cache) RemoveCSINode(csiNode *storagev1beta1.CSINode) error { return nil }
 
 // UpdateNodeInfoSnapshot is a fake method for testing.
-func (c *Cache) UpdateNodeInfoSnapshot(nodeSnapshot *internalcache.NodeInfoSnapshot) error {
+func (c *Cache) UpdateNodeInfoSnapshot(nodeSnapshot *schedulernodeinfo.Snapshot) error {
 	return nil
 }
 
@@ -107,5 +108,15 @@ func (c *Cache) NodeTree() *internalcache.NodeTree { return nil }
 
 // GetNodeInfo is a fake method for testing.
 func (c *Cache) GetNodeInfo(nodeName string) (*v1.Node, error) {
+	return nil, nil
+}
+
+// ListNodes is a fake method for testing.
+func (c *Cache) ListNodes() []*v1.Node {
+	return nil
+}
+
+// GetCSINodeInfo is a fake method for testing.
+func (c *Cache) GetCSINodeInfo(nodeName string) (*storagev1beta1.CSINode, error) {
 	return nil, nil
 }

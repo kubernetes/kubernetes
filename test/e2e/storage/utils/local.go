@@ -101,7 +101,7 @@ func (l *ltrMgr) getTestDir() string {
 func (l *ltrMgr) setupLocalVolumeTmpfs(node *v1.Node, parameters map[string]string) *LocalTestResource {
 	hostDir := l.getTestDir()
 	ginkgo.By(fmt.Sprintf("Creating tmpfs mount point on node %q at path %q", node.Name, hostDir))
-	err := l.hostExec.IssueCommand(fmt.Sprintf("mkdir -p %q && sudo mount -t tmpfs -o size=10m tmpfs-%q %q", hostDir, hostDir, hostDir), node)
+	err := l.hostExec.IssueCommand(fmt.Sprintf("mkdir -p %q && mount -t tmpfs -o size=10m tmpfs-%q %q", hostDir, hostDir, hostDir), node)
 	framework.ExpectNoError(err)
 	return &LocalTestResource{
 		Node: node,
@@ -111,7 +111,7 @@ func (l *ltrMgr) setupLocalVolumeTmpfs(node *v1.Node, parameters map[string]stri
 
 func (l *ltrMgr) cleanupLocalVolumeTmpfs(ltr *LocalTestResource) {
 	ginkgo.By(fmt.Sprintf("Unmount tmpfs mount point on node %q at path %q", ltr.Node.Name, ltr.Path))
-	err := l.hostExec.IssueCommand(fmt.Sprintf("sudo umount %q", ltr.Path), ltr.Node)
+	err := l.hostExec.IssueCommand(fmt.Sprintf("umount %q", ltr.Path), ltr.Node)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Removing the test directory")
@@ -129,14 +129,14 @@ func (l *ltrMgr) createAndSetupLoopDevice(dir string, node *v1.Node, size int) {
 		count = 4096
 	}
 	ddCmd := fmt.Sprintf("dd if=/dev/zero of=%s/file bs=4096 count=%d", dir, count)
-	losetupCmd := fmt.Sprintf("sudo losetup -f %s/file", dir)
+	losetupCmd := fmt.Sprintf("losetup -f %s/file", dir)
 	err := l.hostExec.IssueCommand(fmt.Sprintf("%s && %s && %s", mkdirCmd, ddCmd, losetupCmd), node)
 	framework.ExpectNoError(err)
 }
 
 // findLoopDevice finds loop device path by its associated storage directory.
 func (l *ltrMgr) findLoopDevice(dir string, node *v1.Node) string {
-	cmd := fmt.Sprintf("E2E_LOOP_DEV=$(sudo losetup | grep %s/file | awk '{ print $1 }') 2>&1 > /dev/null && echo ${E2E_LOOP_DEV}", dir)
+	cmd := fmt.Sprintf("E2E_LOOP_DEV=$(losetup | grep %s/file | awk '{ print $1 }') 2>&1 > /dev/null && echo ${E2E_LOOP_DEV}", dir)
 	loopDevResult, err := l.hostExec.IssueCommandWithResult(cmd, node)
 	framework.ExpectNoError(err)
 	return strings.TrimSpace(loopDevResult)
@@ -157,7 +157,7 @@ func (l *ltrMgr) setupLocalVolumeBlock(node *v1.Node, parameters map[string]stri
 func (l *ltrMgr) teardownLoopDevice(dir string, node *v1.Node) {
 	loopDev := l.findLoopDevice(dir, node)
 	ginkgo.By(fmt.Sprintf("Tear down block device %q on node %q at path %s/file", loopDev, node.Name, dir))
-	losetupDeleteCmd := fmt.Sprintf("sudo losetup -d %s", loopDev)
+	losetupDeleteCmd := fmt.Sprintf("losetup -d %s", loopDev)
 	err := l.hostExec.IssueCommand(losetupDeleteCmd, node)
 	framework.ExpectNoError(err)
 	return
@@ -176,7 +176,7 @@ func (l *ltrMgr) setupLocalVolumeBlockFS(node *v1.Node, parameters map[string]st
 	loopDev := ltr.Path
 	loopDir := ltr.loopDir
 	// Format and mount at loopDir and give others rwx for read/write testing
-	cmd := fmt.Sprintf("sudo mkfs -t ext4 %s && sudo mount -t ext4 %s %s && sudo chmod o+rwx %s", loopDev, loopDev, loopDir, loopDir)
+	cmd := fmt.Sprintf("mkfs -t ext4 %s && mount -t ext4 %s %s && chmod o+rwx %s", loopDev, loopDev, loopDir, loopDir)
 	err := l.hostExec.IssueCommand(cmd, node)
 	framework.ExpectNoError(err)
 	return &LocalTestResource{
@@ -187,7 +187,7 @@ func (l *ltrMgr) setupLocalVolumeBlockFS(node *v1.Node, parameters map[string]st
 }
 
 func (l *ltrMgr) cleanupLocalVolumeBlockFS(ltr *LocalTestResource) {
-	umountCmd := fmt.Sprintf("sudo umount %s", ltr.Path)
+	umountCmd := fmt.Sprintf("umount %s", ltr.Path)
 	err := l.hostExec.IssueCommand(umountCmd, ltr.Node)
 	framework.ExpectNoError(err)
 	l.cleanupLocalVolumeBlock(ltr)
@@ -214,7 +214,7 @@ func (l *ltrMgr) cleanupLocalVolumeDirectory(ltr *LocalTestResource) {
 func (l *ltrMgr) setupLocalVolumeDirectoryLink(node *v1.Node, parameters map[string]string) *LocalTestResource {
 	hostDir := l.getTestDir()
 	hostDirBackend := hostDir + "-backend"
-	cmd := fmt.Sprintf("mkdir %s && sudo ln -s %s %s", hostDirBackend, hostDirBackend, hostDir)
+	cmd := fmt.Sprintf("mkdir %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDir)
 	err := l.hostExec.IssueCommand(cmd, node)
 	framework.ExpectNoError(err)
 	return &LocalTestResource{
@@ -227,14 +227,14 @@ func (l *ltrMgr) cleanupLocalVolumeDirectoryLink(ltr *LocalTestResource) {
 	ginkgo.By("Removing the test directory")
 	hostDir := ltr.Path
 	hostDirBackend := hostDir + "-backend"
-	removeCmd := fmt.Sprintf("sudo rm -r %s && rm -r %s", hostDir, hostDirBackend)
+	removeCmd := fmt.Sprintf("rm -r %s && rm -r %s", hostDir, hostDirBackend)
 	err := l.hostExec.IssueCommand(removeCmd, ltr.Node)
 	framework.ExpectNoError(err)
 }
 
 func (l *ltrMgr) setupLocalVolumeDirectoryBindMounted(node *v1.Node, parameters map[string]string) *LocalTestResource {
 	hostDir := l.getTestDir()
-	cmd := fmt.Sprintf("mkdir %s && sudo mount --bind %s %s", hostDir, hostDir, hostDir)
+	cmd := fmt.Sprintf("mkdir %s && mount --bind %s %s", hostDir, hostDir, hostDir)
 	err := l.hostExec.IssueCommand(cmd, node)
 	framework.ExpectNoError(err)
 	return &LocalTestResource{
@@ -246,7 +246,7 @@ func (l *ltrMgr) setupLocalVolumeDirectoryBindMounted(node *v1.Node, parameters 
 func (l *ltrMgr) cleanupLocalVolumeDirectoryBindMounted(ltr *LocalTestResource) {
 	ginkgo.By("Removing the test directory")
 	hostDir := ltr.Path
-	removeCmd := fmt.Sprintf("sudo umount %s && rm -r %s", hostDir, hostDir)
+	removeCmd := fmt.Sprintf("umount %s && rm -r %s", hostDir, hostDir)
 	err := l.hostExec.IssueCommand(removeCmd, ltr.Node)
 	framework.ExpectNoError(err)
 }
@@ -254,7 +254,7 @@ func (l *ltrMgr) cleanupLocalVolumeDirectoryBindMounted(ltr *LocalTestResource) 
 func (l *ltrMgr) setupLocalVolumeDirectoryLinkBindMounted(node *v1.Node, parameters map[string]string) *LocalTestResource {
 	hostDir := l.getTestDir()
 	hostDirBackend := hostDir + "-backend"
-	cmd := fmt.Sprintf("mkdir %s && sudo mount --bind %s %s && sudo ln -s %s %s", hostDirBackend, hostDirBackend, hostDirBackend, hostDirBackend, hostDir)
+	cmd := fmt.Sprintf("mkdir %s && mount --bind %s %s && ln -s %s %s", hostDirBackend, hostDirBackend, hostDirBackend, hostDirBackend, hostDir)
 	err := l.hostExec.IssueCommand(cmd, node)
 	framework.ExpectNoError(err)
 	return &LocalTestResource{
@@ -267,7 +267,7 @@ func (l *ltrMgr) cleanupLocalVolumeDirectoryLinkBindMounted(ltr *LocalTestResour
 	ginkgo.By("Removing the test directory")
 	hostDir := ltr.Path
 	hostDirBackend := hostDir + "-backend"
-	removeCmd := fmt.Sprintf("sudo rm %s && sudo umount %s && rm -r %s", hostDir, hostDirBackend, hostDirBackend)
+	removeCmd := fmt.Sprintf("rm %s && umount %s && rm -r %s", hostDir, hostDirBackend, hostDirBackend)
 	err := l.hostExec.IssueCommand(removeCmd, ltr.Node)
 	framework.ExpectNoError(err)
 }

@@ -17,6 +17,7 @@ limitations under the License.
 package kubemark
 
 import (
+	"fmt"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/emptydir"
 	"k8s.io/kubernetes/pkg/volume/projected"
 	"k8s.io/kubernetes/pkg/volume/secret"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/test/utils"
 
@@ -48,19 +50,13 @@ type HollowKubelet struct {
 }
 
 func NewHollowKubelet(
-	nodeName string,
+	flags *options.KubeletFlags,
+	config *kubeletconfig.KubeletConfiguration,
 	client *clientset.Clientset,
+	heartbeatClient *clientset.Clientset,
 	cadvisorInterface cadvisor.Interface,
 	dockerClientConfig *dockershim.ClientConfig,
-	kubeletPort, kubeletReadOnlyPort int,
-	containerManager cm.ContainerManager,
-	maxPods int, podsPerCore int,
-) *HollowKubelet {
-	// -----------------
-	// Static config
-	// -----------------
-	f, c := GetHollowKubeletConfig(nodeName, kubeletPort, kubeletReadOnlyPort, maxPods, podsPerCore)
-
+	containerManager cm.ContainerManager) *HollowKubelet {
 	// -----------------
 	// Injected objects
 	// -----------------
@@ -69,7 +65,7 @@ func NewHollowKubelet(
 	volumePlugins = append(volumePlugins, projected.ProbeVolumePlugins()...)
 	d := &kubelet.Dependencies{
 		KubeClient:         client,
-		HeartbeatClient:    client,
+		HeartbeatClient:    heartbeatClient,
 		DockerClientConfig: dockerClientConfig,
 		CAdvisorInterface:  cadvisorInterface,
 		Cloud:              nil,
@@ -80,12 +76,12 @@ func NewHollowKubelet(
 		OOMAdjuster:        oom.NewFakeOOMAdjuster(),
 		Mounter:            mount.New("" /* default mount path */),
 		Subpather:          &subpath.FakeSubpath{},
-		HostUtil:           &mount.FakeHostUtil{},
+		HostUtil:           hostutil.NewFakeHostUtil(nil),
 	}
 
 	return &HollowKubelet{
-		KubeletFlags:         f,
-		KubeletConfiguration: c,
+		KubeletFlags:         flags,
+		KubeletConfiguration: config,
 		KubeletDeps:          d,
 	}
 }
@@ -124,6 +120,7 @@ func GetHollowKubeletConfig(
 	f.MaxPerPodContainerCount = 2
 	f.RegisterNode = true
 	f.RegisterSchedulable = true
+	f.ProviderID = fmt.Sprintf("kubemark://%v", nodeName)
 
 	// Config struct
 	c, err := options.NewKubeletConfiguration()
@@ -139,6 +136,7 @@ func GetHollowKubeletConfig(
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
+	c.NodeStatusReportFrequency.Duration = time.Minute
 	c.SyncFrequency.Duration = 10 * time.Second
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
 	c.MaxPods = int32(maxPods)

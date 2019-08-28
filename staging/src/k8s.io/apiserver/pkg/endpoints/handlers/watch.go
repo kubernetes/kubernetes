@@ -165,7 +165,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	metrics.RegisteredWatchers.WithLabelValues(kind.Group, kind.Version, kind.Kind).Inc()
 	defer metrics.RegisteredWatchers.WithLabelValues(kind.Group, kind.Version, kind.Kind).Dec()
 
-	w = httplog.Unlogged(w)
+	w = httplog.Unlogged(req, w)
 
 	if wsstream.IsWebSocketRequest(req) {
 		w.Header().Set("Content-Type", s.MediaType)
@@ -238,6 +238,7 @@ func (s *WatchServer) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			// type
 			unknown.Raw = buf.Bytes()
 			event.Object = &unknown
+			metrics.WatchEventsSizes.WithLabelValues(kind.Group, kind.Version, kind.Kind).Observe(float64(len(unknown.Raw)))
 
 			*outEvent = metav1.WatchEvent{}
 

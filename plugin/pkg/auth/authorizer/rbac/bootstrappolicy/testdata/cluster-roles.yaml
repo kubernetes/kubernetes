@@ -236,11 +236,13 @@ items:
     - configmaps
     - endpoints
     - persistentvolumeclaims
+    - persistentvolumeclaims/status
     - pods
     - replicationcontrollers
     - replicationcontrollers/scale
     - serviceaccounts
     - services
+    - services/status
     verbs:
     - get
     - list
@@ -274,12 +276,16 @@ items:
     resources:
     - controllerrevisions
     - daemonsets
+    - daemonsets/status
     - deployments
     - deployments/scale
+    - deployments/status
     - replicasets
     - replicasets/scale
+    - replicasets/status
     - statefulsets
     - statefulsets/scale
+    - statefulsets/status
     verbs:
     - get
     - list
@@ -288,6 +294,7 @@ items:
     - autoscaling
     resources:
     - horizontalpodautoscalers
+    - horizontalpodautoscalers/status
     verbs:
     - get
     - list
@@ -296,7 +303,9 @@ items:
     - batch
     resources:
     - cronjobs
+    - cronjobs/status
     - jobs
+    - jobs/status
     verbs:
     - get
     - list
@@ -305,12 +314,16 @@ items:
     - extensions
     resources:
     - daemonsets
+    - daemonsets/status
     - deployments
     - deployments/scale
+    - deployments/status
     - ingresses
+    - ingresses/status
     - networkpolicies
     - replicasets
     - replicasets/scale
+    - replicasets/status
     - replicationcontrollers/scale
     verbs:
     - get
@@ -320,6 +333,7 @@ items:
     - policy
     resources:
     - poddisruptionbudgets
+    - poddisruptionbudgets/status
     verbs:
     - get
     - list
@@ -328,6 +342,7 @@ items:
     - networking.k8s.io
     resources:
     - ingresses
+    - ingresses/status
     - networkpolicies
     verbs:
     - get
@@ -533,6 +548,7 @@ items:
     - /apis
     - /apis/*
     - /healthz
+    - /livez
     - /openapi
     - /openapi/*
     - /readyz
@@ -600,6 +616,7 @@ items:
   rules:
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -693,6 +710,7 @@ items:
   rules:
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1064,6 +1082,7 @@ items:
     - patch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1096,6 +1115,7 @@ items:
     - get
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1147,6 +1167,7 @@ items:
     - watch
   - apiGroups:
     - ""
+    - events.k8s.io
     resources:
     - events
     verbs:
@@ -1165,6 +1186,7 @@ items:
   rules:
   - nonResourceURLs:
     - /healthz
+    - /livez
     - /readyz
     - /version
     - /version/

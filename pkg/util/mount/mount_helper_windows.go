@@ -19,7 +19,10 @@ limitations under the License.
 package mount
 
 import (
+	"fmt"
 	"os"
+	"strconv"
+	"strings"
 	"syscall"
 
 	"k8s.io/klog"
@@ -65,4 +68,31 @@ func IsCorruptedMnt(err error) bool {
 	}
 
 	return false
+}
+
+func NormalizeWindowsPath(path string) string {
+	normalizedPath := strings.Replace(path, "/", "\\", -1)
+	if strings.HasPrefix(normalizedPath, "\\") {
+		normalizedPath = "c:" + normalizedPath
+	}
+	return normalizedPath
+}
+
+// ValidateDiskNumber : disk number should be a number in [0, 99]
+func ValidateDiskNumber(disk string) error {
+	diskNum, err := strconv.Atoi(disk)
+	if err != nil {
+		return fmt.Errorf("wrong disk number format: %q, err:%v", disk, err)
+	}
+
+	if diskNum < 0 || diskNum > 99 {
+		return fmt.Errorf("disk number out of range: %q", disk)
+	}
+
+	return nil
+}
+
+// isMountPointMatch determines if the mountpoint matches the dir
+func isMountPointMatch(mp MountPoint, dir string) bool {
+	return mp.Path == dir
 }

@@ -41,7 +41,7 @@ func testPrintNamespace(obj *corev1.Namespace, options PrintOptions) ([]metav1be
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	row.Cells = append(row.Cells, obj.Name, obj.Status.Phase, "<unknow>")
+	row.Cells = append(row.Cells, obj.Name, obj.Status.Phase, "<unknown>")
 	return []metav1beta1.TableRow{row}, nil
 }
 
@@ -50,8 +50,9 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 
 	testCase := []struct {
 		name          string
-		h             *handlerEntry
+		h             *printHandler
 		opt           PrintOptions
+		eventType     string
 		obj           runtime.Object
 		includeHeader bool
 		expectOut     string
@@ -59,7 +60,7 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 	}{
 		{
 			name: "no tablecolumndefinition and includeheader flase",
-			h: &handlerEntry{
+			h: &printHandler{
 				columnDefinitions: []metav1beta1.TableColumnDefinition{},
 				printFunc:         printFunc,
 			},
@@ -68,11 +69,11 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			},
 			includeHeader: false,
-			expectOut:     "test\t\t<unknow>\n",
+			expectOut:     "test\t\t<unknown>\n",
 		},
 		{
 			name: "no tablecolumndefinition and includeheader true",
-			h: &handlerEntry{
+			h: &printHandler{
 				columnDefinitions: []metav1beta1.TableColumnDefinition{},
 				printFunc:         printFunc,
 			},
@@ -81,11 +82,11 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			},
 			includeHeader: true,
-			expectOut:     "\ntest\t\t<unknow>\n",
+			expectOut:     "\ntest\t\t<unknown>\n",
 		},
 		{
 			name: "have tablecolumndefinition and includeheader true",
-			h: &handlerEntry{
+			h: &printHandler{
 				columnDefinitions: testNamespaceColumnDefinitions,
 				printFunc:         printFunc,
 			},
@@ -94,11 +95,25 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "test"},
 			},
 			includeHeader: true,
-			expectOut:     "NAME\tSTATUS\tAGE\ntest\t\t<unknow>\n",
+			expectOut:     "NAME\tSTATUS\tAGE\ntest\t\t<unknown>\n",
+		},
+		{
+			name: "with event type",
+			h: &printHandler{
+				columnDefinitions: testNamespaceColumnDefinitions,
+				printFunc:         printFunc,
+			},
+			opt:       PrintOptions{},
+			eventType: "ADDED",
+			obj: &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{Name: "test"},
+			},
+			includeHeader: true,
+			expectOut:     "EVENT\tNAME\tSTATUS\tAGE\nADDED   \ttest\t\t<unknown>\n",
 		},
 		{
 			name: "print namespace and withnamespace true, should not print header",
-			h: &handlerEntry{
+			h: &printHandler{
 				columnDefinitions: testNamespaceColumnDefinitions,
 				printFunc:         printFunc,
 			},
@@ -116,7 +131,7 @@ func TestPrintRowsForHandlerEntry(t *testing.T) {
 	for _, test := range testCase {
 		t.Run(test.name, func(t *testing.T) {
 			buffer := &bytes.Buffer{}
-			err := printRowsForHandlerEntry(buffer, test.h, test.obj, test.opt, test.includeHeader)
+			err := printRowsForHandlerEntry(buffer, test.h, test.eventType, test.obj, test.opt, test.includeHeader)
 			if err != nil {
 				if err.Error() != test.expectErr {
 					t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", test.name, test.expectErr, err)

@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -39,18 +40,48 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
+	auditv1 "k8s.io/apiserver/pkg/apis/audit/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/framework"
+	"k8s.io/kubernetes/test/utils"
 )
 
 const (
 	testReinvocationClientUsername = "webhook-reinvocation-integration-client"
+	auditPolicy                    = `
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+  - level: Request
+    resources:
+      - group: "" # core
+        resources: ["pods"]
+`
 )
 
-// TestWebhookReinvocationPolicy ensures that the admission webhook reinvocation policy is applied correctly.
-func TestWebhookReinvocationPolicy(t *testing.T) {
+// TestWebhookReinvocationPolicyWithWatchCache ensures that the admission webhook reinvocation policy is applied correctly with the watch cache enabled.
+func TestWebhookReinvocationPolicyWithWatchCache(t *testing.T) {
+	testWebhookReinvocationPolicy(t, true)
+}
+
+// TestWebhookReinvocationPolicyWithoutWatchCache ensures that the admission webhook reinvocation policy is applied correctly without the watch cache enabled.
+func TestWebhookReinvocationPolicyWithoutWatchCache(t *testing.T) {
+	testWebhookReinvocationPolicy(t, false)
+}
+
+func mutationAnnotationValue(configuration, webhook string, mutated bool) string {
+	return fmt.Sprintf(`{"configuration":"%s","webhook":"%s","mutated":%t}`, configuration, webhook, mutated)
+}
+
+func patchAnnotationValue(configuration, webhook string, patch string) string {
+	return strings.Replace(fmt.Sprintf(`{"configuration": "%s", "webhook": "%s", "patch": %s, "patchType": "JSONPatch"}`, configuration, webhook, patch), " ", "", -1)
+}
+
+// testWebhookReinvocationPolicy ensures that the admission webhook reinvocation policy is applied correctly.
+func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 	reinvokeNever := registrationv1beta1.NeverReinvocationPolicy
 	reinvokeIfNeeded := registrationv1beta1.IfNeededReinvocationPolicy
 
@@ -61,13 +92,15 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                 string
-		initialPriorityClass string
-		webhooks             []testWebhook
-		expectLabels         map[string]string
-		expectInvocations    map[string]int
-		expectError          bool
-		errorContains        string
+		name                           string
+		initialPriorityClass           string
+		webhooks                       []testWebhook
+		expectLabels                   map[string]string
+		expectInvocations              map[string]int
+		expectError                    bool
+		errorContains                  string
+		expectAuditMutationAnnotations map[string]string
+		expectAuditPatchAnnotations    map[string]string
 	}{
 		{ // in-tree (mutation), webhook (no mutation), no reinvocation required
 			name:                 "no reinvocation for in-tree only mutation",
@@ -76,6 +109,9 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 				{path: "/noop", policy: &reinvokeIfNeeded},
 			},
 			expectInvocations: map[string]int{"/noop": 1},
+			expectAuditMutationAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue("admission.integration.test-0", "admission.integration.test.0.noop", false),
+			},
 		},
 		{ // in-tree (mutation), webhook (mutation), reinvoke in-tree (no-mutation), no webhook reinvocation required
 			name:                 "no webhook reinvocation for webhook when no in-tree reinvocation mutations",
@@ -84,6 +120,12 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 				{path: "/addlabel", policy: &reinvokeIfNeeded},
 			},
 			expectInvocations: map[string]int{"/addlabel": 1},
+			expectAuditPatchAnnotations: map[string]string{
+				"patch.webhook.admission.k8s.io/round_0_index_0": patchAnnotationValue("admission.integration.test-1", "admission.integration.test.0.addlabel", `[{"op": "add", "path": "/metadata/labels/a", "value": "true"}]`),
+			},
+			expectAuditMutationAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue("admission.integration.test-1", "admission.integration.test.0.addlabel", true),
+			},
 		},
 		{ // in-tree (mutation), webhook (mutation), reinvoke in-tree (mutation), webhook (no-mutation), both reinvoked
 			name:                 "webhook is reinvoked after in-tree reinvocation",
@@ -93,6 +135,13 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 				{path: "/setpriority", policy: &reinvokeIfNeeded}, // trigger in-tree reinvoke mutation
 			},
 			expectInvocations: map[string]int{"/setpriority": 2},
+			expectAuditPatchAnnotations: map[string]string{
+				"patch.webhook.admission.k8s.io/round_0_index_0": patchAnnotationValue("admission.integration.test-2", "admission.integration.test.0.setpriority", `[{"op": "add", "path": "/spec/priorityClassName", "value": "high-priority"},{"op": "remove", "path": "/spec/priority"}]`),
+			},
+			expectAuditMutationAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue("admission.integration.test-2", "admission.integration.test.0.setpriority", true),
+				"mutation.webhook.admission.k8s.io/round_1_index_0": mutationAnnotationValue("admission.integration.test-2", "admission.integration.test.0.setpriority", false),
+			},
 		},
 		{ // in-tree (mutation), webhook A (mutation), webhook B (mutation), reinvoke in-tree (no-mutation), reinvoke webhook A (no-mutation), no reinvocation of webhook B required
 			name:                 "no reinvocation of webhook B when in-tree or prior webhook mutations",
@@ -103,6 +152,15 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 			},
 			expectLabels:      map[string]string{"x": "true", "a": "true", "b": "true"},
 			expectInvocations: map[string]int{"/addlabel": 2, "/conditionaladdlabel": 1},
+			expectAuditPatchAnnotations: map[string]string{
+				"patch.webhook.admission.k8s.io/round_0_index_0": patchAnnotationValue("admission.integration.test-3", "admission.integration.test.0.addlabel", `[{"op": "add", "path": "/metadata/labels/a", "value": "true"}]`),
+				"patch.webhook.admission.k8s.io/round_0_index_1": patchAnnotationValue("admission.integration.test-3", "admission.integration.test.1.conditionaladdlabel", `[{"op": "add", "path": "/metadata/labels/b", "value": "true"}]`),
+			},
+			expectAuditMutationAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue("admission.integration.test-3", "admission.integration.test.0.addlabel", true),
+				"mutation.webhook.admission.k8s.io/round_0_index_1": mutationAnnotationValue("admission.integration.test-3", "admission.integration.test.1.conditionaladdlabel", true),
+				"mutation.webhook.admission.k8s.io/round_1_index_0": mutationAnnotationValue("admission.integration.test-3", "admission.integration.test.0.addlabel", false),
+			},
 		},
 		{ // in-tree (mutation), webhook A (mutation), webhook B (mutation), reinvoke in-tree (no-mutation), reinvoke webhook A (mutation), reinvoke webhook B (mutation), both webhooks reinvoked
 			name:                 "all webhooks reinvoked when any webhook reinvocation causes mutation",
@@ -113,6 +171,18 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 			},
 			expectLabels:      map[string]string{"x": "true", "fight": "false"},
 			expectInvocations: map[string]int{"/settrue": 2, "/setfalse": 2},
+			expectAuditPatchAnnotations: map[string]string{
+				"patch.webhook.admission.k8s.io/round_0_index_0": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.0.settrue", `[{"op": "replace", "path": "/metadata/labels/fight", "value": "true"}]`),
+				"patch.webhook.admission.k8s.io/round_0_index_1": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.1.setfalse", `[{"op": "replace", "path": "/metadata/labels/fight", "value": "false"}]`),
+				"patch.webhook.admission.k8s.io/round_1_index_0": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.0.settrue", `[{"op": "replace", "path": "/metadata/labels/fight", "value": "true"}]`),
+				"patch.webhook.admission.k8s.io/round_1_index_1": patchAnnotationValue("admission.integration.test-4", "admission.integration.test.1.setfalse", `[{"op": "replace", "path": "/metadata/labels/fight", "value": "false"}]`),
+			},
+			expectAuditMutationAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue("admission.integration.test-4", "admission.integration.test.0.settrue", true),
+				"mutation.webhook.admission.k8s.io/round_0_index_1": mutationAnnotationValue("admission.integration.test-4", "admission.integration.test.1.setfalse", true),
+				"mutation.webhook.admission.k8s.io/round_1_index_0": mutationAnnotationValue("admission.integration.test-4", "admission.integration.test.0.settrue", true),
+				"mutation.webhook.admission.k8s.io/round_1_index_1": mutationAnnotationValue("admission.integration.test-4", "admission.integration.test.1.setfalse", true),
+			},
 		},
 		{ // in-tree (mutation), webhook A is SKIPPED due to objectSelector not matching, webhook B (mutation), reinvoke in-tree (no-mutation), webhook A is SKIPPED even though the labels match now, because it's not called in the first round. No reinvocation of webhook B required
 			name:                 "no reinvocation of webhook B when in-tree or prior webhook mutations",
@@ -123,6 +193,12 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 			},
 			expectLabels:      map[string]string{"x": "true", "a": "true"},
 			expectInvocations: map[string]int{"/addlabel": 1, "/conditionaladdlabel": 0},
+			expectAuditPatchAnnotations: map[string]string{
+				"patch.webhook.admission.k8s.io/round_0_index_1": patchAnnotationValue("admission.integration.test-5", "admission.integration.test.1.addlabel", `[{"op": "add", "path": "/metadata/labels/a", "value": "true"}]`),
+			},
+			expectAuditMutationAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_1": mutationAnnotationValue("admission.integration.test-5", "admission.integration.test.1.addlabel", true),
+			},
 		},
 		{
 			name: "invalid priority class set by webhook should result in error from in-tree priority plugin",
@@ -142,6 +218,13 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 			},
 			expectLabels:      map[string]string{"x": "true", "a": "true"},
 			expectInvocations: map[string]int{"/conditionaladdlabel": 1, "/addlabel": 1},
+			expectAuditPatchAnnotations: map[string]string{
+				"patch.webhook.admission.k8s.io/round_0_index_1": patchAnnotationValue("admission.integration.test-7", "admission.integration.test.1.addlabel", `[{"op": "add", "path": "/metadata/labels/a", "value": "true"}]`),
+			},
+			expectAuditMutationAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue("admission.integration.test-7", "admission.integration.test.0.conditionaladdlabel", false),
+				"mutation.webhook.admission.k8s.io/round_0_index_1": mutationAnnotationValue("admission.integration.test-7", "admission.integration.test.1.addlabel", true),
+			},
 		},
 		{
 			name: "'reinvoke never' (by default) policy respected",
@@ -151,6 +234,13 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 			},
 			expectLabels:      map[string]string{"x": "true", "a": "true"},
 			expectInvocations: map[string]int{"/conditionaladdlabel": 1, "/addlabel": 1},
+			expectAuditPatchAnnotations: map[string]string{
+				"patch.webhook.admission.k8s.io/round_0_index_1": patchAnnotationValue("admission.integration.test-8", "admission.integration.test.1.addlabel", `[{"op": "add", "path": "/metadata/labels/a", "value": "true"}]`),
+			},
+			expectAuditMutationAnnotations: map[string]string{
+				"mutation.webhook.admission.k8s.io/round_0_index_0": mutationAnnotationValue("admission.integration.test-8", "admission.integration.test.0.conditionaladdlabel", false),
+				"mutation.webhook.admission.k8s.io/round_0_index_1": mutationAnnotationValue("admission.integration.test-8", "admission.integration.test.1.addlabel", true),
+			},
 		},
 	}
 
@@ -173,8 +263,33 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 	webhookServer.StartTLS()
 	defer webhookServer.Close()
 
+	// prepare audit policy file
+	policyFile, err := ioutil.TempFile("", "audit-policy.yaml")
+	if err != nil {
+		t.Fatalf("Failed to create audit policy file: %v", err)
+	}
+	defer os.Remove(policyFile.Name())
+	if _, err := policyFile.Write([]byte(auditPolicy)); err != nil {
+		t.Fatalf("Failed to write audit policy file: %v", err)
+	}
+	if err := policyFile.Close(); err != nil {
+		t.Fatalf("Failed to close audit policy file: %v", err)
+	}
+
+	// prepare audit log file
+	logFile, err := ioutil.TempFile("", "audit.log")
+	if err != nil {
+		t.Fatalf("Failed to create audit log file: %v", err)
+	}
+	defer os.Remove(logFile.Name())
+
 	s := kubeapiservertesting.StartTestServerOrDie(t, kubeapiservertesting.NewDefaultTestServerOptions(), []string{
 		"--disable-admission-plugins=ServiceAccount",
+		fmt.Sprintf("--watch-cache=%v", watchCache),
+		"--audit-policy-file", policyFile.Name(),
+		"--audit-log-version", "audit.k8s.io/v1",
+		"--audit-log-mode", "blocking",
+		"--audit-log-path", logFile.Name(),
 	}, framework.SharedEtcd())
 	defer s.TearDownFn()
 
@@ -309,6 +424,25 @@ func TestWebhookReinvocationPolicy(t *testing.T) {
 					}
 				}
 			}
+
+			stream, err := os.OpenFile(logFile.Name(), os.O_RDWR, 0600)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			defer stream.Close()
+			missing, err := utils.CheckAuditLines(stream, expectedAuditEvents(tt.expectAuditMutationAnnotations, tt.expectAuditPatchAnnotations, ns), auditv1.SchemeGroupVersion)
+			if err != nil {
+				t.Errorf("unexpected error checking audit lines: %v", err)
+			}
+			if len(missing.MissingEvents) > 0 {
+				t.Errorf("failed to get expected events -- missing: %s", missing)
+			}
+			if err := stream.Truncate(0); err != nil {
+				t.Errorf("unexpected error truncate file: %v", err)
+			}
+			if _, err := stream.Seek(0, 0); err != nil {
+				t.Errorf("unexpected error reset offset: %v", err)
+			}
 		})
 	}
 }
@@ -442,6 +576,28 @@ func newReinvokeWebhookHandler(recorder *invocationRecorder) http.Handler {
 			http.NotFound(w, r)
 		}
 	})
+}
+
+func expectedAuditEvents(webhookMutationAnnotations, webhookPatchAnnotations map[string]string, namespace string) []utils.AuditEvent {
+	return []utils.AuditEvent{
+		{
+			Level:                               auditinternal.LevelRequest,
+			Stage:                               auditinternal.StageResponseComplete,
+			RequestURI:                          fmt.Sprintf("/api/v1/namespaces/%s/pods", namespace),
+			Verb:                                "create",
+			Code:                                201,
+			User:                                "system:apiserver",
+			ImpersonatedUser:                    testReinvocationClientUsername,
+			ImpersonatedGroups:                  "system:authenticated,system:masters",
+			Resource:                            "pods",
+			Namespace:                           namespace,
+			AuthorizeDecision:                   "allow",
+			RequestObject:                       true,
+			ResponseObject:                      false,
+			AdmissionWebhookMutationAnnotations: webhookMutationAnnotations,
+			AdmissionWebhookPatchAnnotations:    webhookPatchAnnotations,
+		},
+	}
 }
 
 var reinvocationMarkerFixture = &corev1.Pod{

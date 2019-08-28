@@ -55,9 +55,12 @@ type Controller struct {
 	EventClient     corev1client.EventsGetter
 	healthClient    rest.Interface
 
-	ServiceClusterIPRegistry rangeallocation.RangeRegistry
+	ServiceClusterIPRegistry          rangeallocation.RangeRegistry
+	ServiceClusterIPRange             net.IPNet
+	SecondaryServiceClusterIPRegistry rangeallocation.RangeRegistry
+	SecondaryServiceClusterIPRange    net.IPNet
+
 	ServiceClusterIPInterval time.Duration
-	ServiceClusterIPRange    net.IPNet
 
 	ServiceNodePortRegistry rangeallocation.RangeRegistry
 	ServiceNodePortInterval time.Duration
@@ -106,8 +109,11 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 		SystemNamespaces:         systemNamespaces,
 		SystemNamespacesInterval: 1 * time.Minute,
 
-		ServiceClusterIPRegistry: legacyRESTStorage.ServiceClusterIPAllocator,
-		ServiceClusterIPRange:    c.ExtraConfig.ServiceIPRange,
+		ServiceClusterIPRegistry:          legacyRESTStorage.ServiceClusterIPAllocator,
+		ServiceClusterIPRange:             c.ExtraConfig.ServiceIPRange,
+		SecondaryServiceClusterIPRegistry: legacyRESTStorage.SecondaryServiceClusterIPAllocator,
+		SecondaryServiceClusterIPRange:    c.ExtraConfig.SecondaryServiceIPRange,
+
 		ServiceClusterIPInterval: 3 * time.Minute,
 
 		ServiceNodePortRegistry: legacyRESTStorage.ServiceNodePortAllocator,
@@ -148,7 +154,7 @@ func (c *Controller) Start() {
 		klog.Errorf("Unable to remove old endpoints from kubernetes service: %v", err)
 	}
 
-	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, c.EventClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry)
+	repairClusterIPs := servicecontroller.NewRepair(c.ServiceClusterIPInterval, c.ServiceClient, c.EventClient, &c.ServiceClusterIPRange, c.ServiceClusterIPRegistry, &c.SecondaryServiceClusterIPRange, c.SecondaryServiceClusterIPRegistry)
 	repairNodePorts := portallocatorcontroller.NewRepair(c.ServiceNodePortInterval, c.ServiceClient, c.EventClient, c.ServiceNodePortRange, c.ServiceNodePortRegistry)
 
 	// run all of the controllers once prior to returning from Start.

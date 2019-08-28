@@ -28,6 +28,3 @@ func dirExists(path string) bool {
 	}
 	return s.IsDir()
 }
-
-// empty is a placeholder type used to implement a set
-type empty struct{}

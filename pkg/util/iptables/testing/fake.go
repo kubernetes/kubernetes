@@ -48,10 +48,6 @@ func NewFake() *FakeIPTables {
 	return &FakeIPTables{}
 }
 
-func (*FakeIPTables) GetVersion() (string, error) {
-	return "0.0.0", nil
-}
-
 func (*FakeIPTables) EnsureChain(table iptables.Table, chain iptables.Chain) (bool, error) {
 	return true, nil
 }

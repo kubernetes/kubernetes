@@ -39,7 +39,10 @@ func newStorage(t *testing.T) (*JobStorage, *etcd3testing.EtcdTestServer) {
 		DeleteCollectionWorkers: 1,
 		ResourcePrefix:          "jobs",
 	}
-	jobStorage := NewStorage(restOptions)
+	jobStorage, err := NewStorage(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
 	return &jobStorage, server
 }
 

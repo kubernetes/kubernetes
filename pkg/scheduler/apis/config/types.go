@@ -138,10 +138,6 @@ type SchedulerPolicyConfigMapSource struct {
 // to include scheduler specific configuration.
 type KubeSchedulerLeaderElectionConfiguration struct {
 	componentbaseconfig.LeaderElectionConfiguration
-	// LockObjectNamespace defines the namespace of the lock object
-	LockObjectNamespace string
-	// LockObjectName defines the lock object name
-	LockObjectName string
 }
 
 // Plugins include multiple extension points. When specified, the list of plugins for
@@ -164,9 +160,6 @@ type Plugins struct {
 
 	// Score is a list of plugins that should be invoked when ranking nodes that have passed the filtering phase.
 	Score *PluginSet
-
-	// NormalizeScore is a list of plugins that should be invoked after the scoring phase to normalize scores.
-	NormalizeScore *PluginSet
 
 	// Reserve is a list of plugins invoked when reserving a node to run the pod.
 	Reserve *PluginSet

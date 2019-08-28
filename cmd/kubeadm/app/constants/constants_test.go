@@ -157,7 +157,7 @@ func TestEtcdSupportedVersion(t *testing.T) {
 		{
 			kubernetesVersion: "1.99.0",
 			expectedVersion:   nil,
-			expectedError:     errors.New("Unsupported or unknown Kubernetes version(1.99.0)"),
+			expectedError:     errors.New("unsupported or unknown Kubernetes version(1.99.0)"),
 		},
 		{
 			kubernetesVersion: MinimumControlPlaneVersion.WithPatch(1).String(),

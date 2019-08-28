@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -24,6 +26,7 @@ import (
 
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/stretchr/testify/assert"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 

@@ -14,9 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
-    fields:
-      "18":
-        "19": null
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -28,67 +26,67 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "16964250748386560239"
+  resourceVersion: "11042405498087606203"
   selfLink: "5"
-  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+  uid: "7"
 spec:
   allowPrivilegeEscalation: false
   allowedCSIDrivers:
-  - name: "30"
+  - name: "25"
   allowedCapabilities:
-  - SǡƏ
+  - ɑ
   allowedFlexVolumes:
-  - driver: "29"
+  - driver: "24"
   allowedHostPaths:
-  - pathPrefix: "28"
+  - pathPrefix: "23"
+    readOnly: true
   allowedProcMountTypes:
-  - ¬轚9Ȏ瀮昃
+  - ǣ偐圠=l畣潁
   allowedUnsafeSysctls:
-  - "31"
+  - "26"
   defaultAddCapabilities:
-  - ǸƢ6/
+  - qJ枊a8衍`Ĩ
   defaultAllowPrivilegeEscalation: false
   forbiddenSysctls:
-  - "32"
+  - "27"
   fsGroup:
     ranges:
-    - max: -2225037131652530471
-      min: -7003704988542234731
-    rule: 託仭
+    - max: 3058121789713366904
+      min: 8572633303645749270
+    rule: UɦOŖ
   hostIPC: true
   hostNetwork: true
-  hostPID: true
   hostPorts:
-  - max: -1487653240
-    min: -827642756
+  - max: 1575426699
+    min: -321835912
   privileged: true
   requiredDropCapabilities:
-  - VŚ(ĿȊ甞谐颋
+  - .蘯6ċV夸
   runAsGroup:
     ranges:
-    - max: 7506785378065797295
-      min: 4788190398976706073
-    rule: ē ƕP喂ƈ斎AO6ĴC浔Ű壝ž(-
+    - max: 2607109693095207331
+      min: -8679730194918865907
+    rule: ³;Ơ歿:狞夌碕ʂɭîcP
   runAsUser:
     ranges:
-    - max: -7606590868934742876
-      min: 6715860513467504728
-    rule: :狞夌碕ʂɭîcP$Iņɖ
+    - max: -90233536926144532
+      min: 8901768137137123048
+    rule: +½H牗洝尿彀亞螩
   runtimeClass:
     allowedRuntimeClassNames:
-    - "33"
-    defaultRuntimeClassName: "34"
+    - "28"
+    defaultRuntimeClassName: "29"
   seLinux:
-    rule: ""
+    rule: S
     seLinuxOptions:
-      level: "27"
-      role: "25"
-      type: "26"
-      user: "24"
+      level: "22"
+      role: "20"
+      type: "21"
+      user: "19"
   supplementalGroups:
     ranges:
-    - max: -8763960668058519584
-      min: -9190478501544852634
-    rule: ?øēƺ魋Ď儇击3ƆìQ
+    - max: -236027028483226507
+      min: -5498021643263379468
+    rule: ɖ橙9
   volumes:
-  - $+½H牗洝尿彀亞螩B峅
+  - ʤ脽ěĂ凗蓏Ŋ蛊ĉy緅縕>Ž

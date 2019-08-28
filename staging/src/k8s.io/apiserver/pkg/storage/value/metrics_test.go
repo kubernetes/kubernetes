@@ -44,12 +44,12 @@ func TestTotals(t *testing.T) {
 			},
 			error: errors.New("foo"),
 			want: `
-  # HELP apiserver_storage_transformation_failures_total (Deprecated) Total number of failed transformation operations.
+  # HELP apiserver_storage_transformation_failures_total [ALPHA] (Deprecated) Total number of failed transformation operations.
   # TYPE apiserver_storage_transformation_failures_total counter
   apiserver_storage_transformation_failures_total{transformation_type="encrypt"} 1
-	# HELP apiserver_storage_transformation_operations_total Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="encrypt"} 1
+  apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="encrypt",transformer_prefix="k8s:enc:kms:v1:"} 1
 `,
 		},
 		{
@@ -59,9 +59,9 @@ func TestTotals(t *testing.T) {
 				"apiserver_storage_transformation_failures_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="OK",transformation_type="encrypt"} 1
+  apiserver_storage_transformation_operations_total{status="OK",transformation_type="encrypt",transformer_prefix="k8s:enc:kms:v1:"} 1
 `,
 		},
 		{
@@ -72,12 +72,12 @@ func TestTotals(t *testing.T) {
 			},
 			error: status.Error(codes.FailedPrecondition, "foo"),
 			want: `
-  # HELP apiserver_storage_transformation_failures_total (Deprecated) Total number of failed transformation operations.
+  # HELP apiserver_storage_transformation_failures_total [ALPHA] (Deprecated) Total number of failed transformation operations.
   # TYPE apiserver_storage_transformation_failures_total counter
   apiserver_storage_transformation_failures_total{transformation_type="encrypt"} 1
-	# HELP apiserver_storage_transformation_operations_total Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
-  apiserver_storage_transformation_operations_total{status="FailedPrecondition",transformation_type="encrypt"} 1
+  apiserver_storage_transformation_operations_total{status="FailedPrecondition",transformation_type="encrypt",transformer_prefix="k8s:enc:kms:v1:"} 1
 `,
 		},
 	}
@@ -86,7 +86,7 @@ func TestTotals(t *testing.T) {
 
 	for _, tt := range testCases {
 		t.Run(tt.desc, func(t *testing.T) {
-			RecordTransformation("encrypt", time.Now(), tt.error)
+			RecordTransformation("encrypt", "k8s:enc:kms:v1:", time.Now(), tt.error)
 			defer transformerOperationsTotal.Reset()
 			defer deprecatedTransformerFailuresTotal.Reset()
 			if err := testutil.GatherAndCompare(prometheus.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {

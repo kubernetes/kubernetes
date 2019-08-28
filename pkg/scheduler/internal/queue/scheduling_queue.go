@@ -519,19 +519,31 @@ func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
 func (p *PriorityQueue) MoveAllToActiveQueue() {
 	p.lock.Lock()
 	defer p.lock.Unlock()
+
+	// There is a chance of errors when adding pods to other queues,
+	// we make a temporary slice to store the pods,
+	// since the probability is low, we set its len to 0
+	addErrorPods := make([]*framework.PodInfo, 0)
+
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
 		pod := pInfo.Pod
 		if p.isPodBackingOff(pod) {
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
 				klog.Errorf("Error adding pod %v to the backoff queue: %v", pod.Name, err)
+				addErrorPods = append(addErrorPods, pInfo)
 			}
 		} else {
 			if err := p.activeQ.Add(pInfo); err != nil {
 				klog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
+				addErrorPods = append(addErrorPods, pInfo)
 			}
 		}
 	}
 	p.unschedulableQ.clear()
+	// Adding pods that we could not move to Active queue or Backoff queue back to the Unschedulable queue
+	for _, podInfo := range addErrorPods {
+		p.unschedulableQ.addOrUpdate(podInfo)
+	}
 	p.moveRequestCycle = p.schedulingCycle
 	p.cond.Broadcast()
 }
@@ -543,13 +555,16 @@ func (p *PriorityQueue) movePodsToActiveQueue(podInfoList []*framework.PodInfo) 
 		if p.isPodBackingOff(pod) {
 			if err := p.podBackoffQ.Add(pInfo); err != nil {
 				klog.Errorf("Error adding pod %v to the backoff queue: %v", pod.Name, err)
+			} else {
+				p.unschedulableQ.delete(pod)
 			}
 		} else {
 			if err := p.activeQ.Add(pInfo); err != nil {
 				klog.Errorf("Error adding pod %v to the scheduling queue: %v", pod.Name, err)
+			} else {
+				p.unschedulableQ.delete(pod)
 			}
 		}
-		p.unschedulableQ.delete(pod)
 	}
 	p.moveRequestCycle = p.schedulingCycle
 	p.cond.Broadcast()

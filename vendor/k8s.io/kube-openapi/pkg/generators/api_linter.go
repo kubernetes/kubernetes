@@ -139,6 +139,7 @@ func newAPILinter() *apiLinter {
 		rules: []APIRule{
 			&rules.NamesMatch{},
 			&rules.OmitEmptyMatchCase{},
+			&rules.ListTypeMissing{},
 		},
 	}
 }

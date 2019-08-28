@@ -20,7 +20,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"net"
 	"net/url"
 	"os"
 	"sort"
@@ -28,12 +27,14 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/kustomize"
 )
 
 const (
@@ -42,9 +43,6 @@ const (
 
 	// kubeSchedulerAddressArg represents the address argument of the kube-scheduler configuration.
 	kubeSchedulerAddressArg = "address"
-
-	// etcdListenClientURLsArg represents the listen-client-urls argument of the etcd configuration.
-	etcdListenClientURLsArg = "listen-client-urls"
 )
 
 // ComponentPod returns a Pod object from the container and volume specifications
@@ -76,24 +74,6 @@ func ComponentResources(cpu string) v1.ResourceRequirements {
 		Requests: v1.ResourceList{
 			v1.ResourceName(v1.ResourceCPU): resource.MustParse(cpu),
 		},
-	}
-}
-
-// EtcdProbe is a helper function for building a shell-based, etcdctl v1.Probe object to healthcheck etcd
-func EtcdProbe(cfg *kubeadmapi.Etcd, port int, certsDir string, CACertName string, CertName string, KeyName string) *v1.Probe {
-	tlsFlags := fmt.Sprintf("--cacert=%[1]s/%[2]s --cert=%[1]s/%[3]s --key=%[1]s/%[4]s", certsDir, CACertName, CertName, KeyName)
-	// etcd pod is alive if a linearizable get succeeds.
-	cmd := fmt.Sprintf("ETCDCTL_API=3 etcdctl --endpoints=https://[%s]:%d %s get foo", GetEtcdProbeAddress(cfg), port, tlsFlags)
-
-	return &v1.Probe{
-		Handler: v1.Handler{
-			Exec: &v1.ExecAction{
-				Command: []string{"/bin/sh", "-ec", cmd},
-			},
-		},
-		InitialDelaySeconds: 15,
-		TimeoutSeconds:      15,
-		FailureThreshold:    8,
 	}
 }
 
@@ -165,6 +145,38 @@ func GetExtraParameters(overrides map[string]string, defaults map[string]string)
 	return command
 }
 
+// KustomizeStaticPod applies patches defined in kustomizeDir to a static Pod manifest
+func KustomizeStaticPod(pod *v1.Pod, kustomizeDir string) (*v1.Pod, error) {
+	// marshal the pod manifest into yaml
+	serialized, err := util.MarshalToYaml(pod, v1.SchemeGroupVersion)
+	if err != nil {
+		return pod, errors.Wrapf(err, "failed to marshal manifest to YAML")
+	}
+
+	km, err := kustomize.GetManager(kustomizeDir)
+	if err != nil {
+		return pod, errors.Wrapf(err, "failed to GetPatches from %q", kustomizeDir)
+	}
+
+	kustomized, err := km.Kustomize(serialized)
+	if err != nil {
+		return pod, errors.Wrap(err, "failed to kustomize static Pod manifest")
+	}
+
+	// unmarshal kustomized yaml back into a pod manifest
+	obj, err := util.UnmarshalFromYaml(kustomized, v1.SchemeGroupVersion)
+	if err != nil {
+		return pod, errors.Wrap(err, "failed to unmarshal kustomize manifest from YAML")
+	}
+
+	pod2, ok := obj.(*v1.Pod)
+	if !ok {
+		return pod, errors.Wrap(err, "kustomized manifest is not a valid Pod object")
+	}
+
+	return pod2, nil
+}
+
 // WriteStaticPodToDisk writes a static pod file to disk
 func WriteStaticPodToDisk(componentName, manifestDir string, pod v1.Pod) error {
 
@@ -205,6 +217,23 @@ func ReadStaticPodFromDisk(manifestPath string) (*v1.Pod, error) {
 	return pod, nil
 }
 
+// LivenessProbe creates a Probe object with a HTTPGet handler
+func LivenessProbe(host, path string, port int, scheme v1.URIScheme) *v1.Probe {
+	return &v1.Probe{
+		Handler: v1.Handler{
+			HTTPGet: &v1.HTTPGetAction{
+				Host:   host,
+				Path:   path,
+				Port:   intstr.FromInt(port),
+				Scheme: scheme,
+			},
+		},
+		InitialDelaySeconds: 15,
+		TimeoutSeconds:      15,
+		FailureThreshold:    8,
+	}
+}
+
 // GetAPIServerProbeAddress returns the probe address for the API server
 func GetAPIServerProbeAddress(endpoint *kubeadmapi.APIEndpoint) string {
 	// In the case of a self-hosted deployment, the initial host on which kubeadm --init is run,
@@ -237,51 +266,43 @@ func GetSchedulerProbeAddress(cfg *kubeadmapi.ClusterConfiguration) string {
 	return "127.0.0.1"
 }
 
-// GetEtcdProbeAddress returns the etcd probe address
-func GetEtcdProbeAddress(cfg *kubeadmapi.Etcd) string {
-	if cfg.Local != nil && cfg.Local.ExtraArgs != nil {
-		if arg, exists := cfg.Local.ExtraArgs[etcdListenClientURLsArg]; exists {
-			// Use the first url in the listen-client-urls if multiple url's are specified.
-			if strings.ContainsAny(arg, ",") {
-				arg = strings.Split(arg, ",")[0]
-			}
-			parsedURL, err := url.Parse(arg)
-			if err != nil || parsedURL.Hostname() == "" {
-				return "127.0.0.1"
-			}
-			// Return the IP if the URL contains an address instead of a name.
-			if ip := net.ParseIP(parsedURL.Hostname()); ip != nil {
-				// etcdctl doesn't support auto-converting zero addresses into loopback addresses
-				if ip.Equal(net.IPv4zero) {
-					return "127.0.0.1"
-				}
-				if ip.Equal(net.IPv6zero) {
-					return net.IPv6loopback.String()
-				}
-				return ip.String()
-			}
-			// Use the local resolver to try resolving the name within the URL.
-			// If the name can not be resolved, return an IPv4 loopback address.
-			// Otherwise, select the first valid IPv4 address.
-			// If the name does not resolve to an IPv4 address, select the first valid IPv6 address.
-			addrs, err := net.LookupIP(parsedURL.Hostname())
-			if err != nil {
-				return "127.0.0.1"
-			}
-			var ip net.IP
-			for _, addr := range addrs {
-				if addr.To4() != nil {
-					ip = addr
-					break
-				}
-				if addr.To16() != nil && ip == nil {
-					ip = addr
-				}
-			}
-			return ip.String()
-		}
+// GetEtcdProbeEndpoint takes a kubeadm Etcd configuration object and attempts to parse
+// the first URL in the listen-metrics-urls argument, returning an etcd probe hostname,
+// port and scheme
+func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd) (string, int, v1.URIScheme) {
+	localhost := "127.0.0.1"
+	if cfg.Local == nil || cfg.Local.ExtraArgs == nil {
+		return localhost, kubeadmconstants.EtcdMetricsPort, v1.URISchemeHTTP
 	}
-	return "127.0.0.1"
+	if arg, exists := cfg.Local.ExtraArgs["listen-metrics-urls"]; exists {
+		// Use the first url in the listen-metrics-urls if multiple URL's are specified.
+		arg = strings.Split(arg, ",")[0]
+		parsedURL, err := url.Parse(arg)
+		if err != nil {
+			return localhost, kubeadmconstants.EtcdMetricsPort, v1.URISchemeHTTP
+		}
+		// Parse scheme
+		scheme := v1.URISchemeHTTP
+		if parsedURL.Scheme == "https" {
+			scheme = v1.URISchemeHTTPS
+		}
+		// Parse hostname
+		hostname := parsedURL.Hostname()
+		if len(hostname) == 0 {
+			hostname = localhost
+		}
+		// Parse port
+		port := kubeadmconstants.EtcdMetricsPort
+		portStr := parsedURL.Port()
+		if len(portStr) != 0 {
+			p, err := util.ParsePort(portStr)
+			if err == nil {
+				port = p
+			}
+		}
+		return hostname, port, scheme
+	}
+	return localhost, kubeadmconstants.EtcdMetricsPort, v1.URISchemeHTTP
 }
 
 // ManifestFilesAreEqual compares 2 files. It returns true if their contents are equal, false otherwise

@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -85,22 +86,22 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 			var err error
 			switch scname {
 			case storageclass1:
-				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass1, nil, nil))
+				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass1, nil, nil, ""))
 			case storageclass2:
 				var scVSanParameters map[string]string
 				scVSanParameters = make(map[string]string)
 				scVSanParameters[Policy_HostFailuresToTolerate] = "1"
-				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass2, scVSanParameters, nil))
+				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass2, scVSanParameters, nil, ""))
 			case storageclass3:
 				var scSPBMPolicyParameters map[string]string
 				scSPBMPolicyParameters = make(map[string]string)
 				scSPBMPolicyParameters[SpbmStoragePolicy] = policyName
-				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters, nil))
+				sc, err = client.StorageV1().StorageClasses().Create(getVSphereStorageClassSpec(storageclass3, scSPBMPolicyParameters, nil, ""))
 			case storageclass4:
 				var scWithDSParameters map[string]string
 				scWithDSParameters = make(map[string]string)
 				scWithDSParameters[Datastore] = datastoreName
-				scWithDatastoreSpec := getVSphereStorageClassSpec(storageclass4, scWithDSParameters, nil)
+				scWithDatastoreSpec := getVSphereStorageClassSpec(storageclass4, scWithDSParameters, nil, "")
 				sc, err = client.StorageV1().StorageClasses().Create(scWithDatastoreSpec)
 			}
 			gomega.Expect(sc).NotTo(gomega.BeNil())
@@ -140,7 +141,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 
 		ginkgo.By(fmt.Sprintf("%v Creating Pod using the claim: %v", logPrefix, pvclaim.Name))
 		// Create pod to attach Volume to Node
-		pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
+		pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, "")
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("%v Waiting for the Pod: %v to be in the running state", logPrefix, pod.Name))
@@ -160,7 +161,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 
 		ginkgo.By(fmt.Sprintf("%v Deleting pod: %v", logPrefix, pod.Name))
-		err = framework.DeletePodWithWait(f, client, pod)
+		err = e2epod.DeletePodWithWait(client, pod)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("%v Waiting for volume: %v to be detached from the node: %v", logPrefix, persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName))

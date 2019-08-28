@@ -33,7 +33,6 @@ func TestDriverParameter(t *testing.T) {
 				"", // Default fsType
 			),
 		},
-		ShortName: "foo",
 		ClaimSize: "5Gi",
 	}
 	testcases := []struct {

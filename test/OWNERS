@@ -1,32 +1,14 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - bowei
-  - rramkumar1
-  - MrHohn
-  - deads2k
-  - enisoc
-  - janetkuo
-  - liggitt
-  - mikedanese
-  - msau42
-  - ncdc
-  - pwittrock # for test/e2e/kubectl.go
-  - saad-ali
-  - shyamjvs
-  - smarterclayton
-  - sig-testing-reviewers
-  - sttts
-  - timothysc
-  - zmerlynn
-  - vishh
   - xichengliudui
-  - andrewsykim
   - neolit123
   - stevesloka
   - johnSchnake
   - SataQiu
+  - draveness
 approvers:
+  - andrewsykim
   - bowei # for test/e2e/{dns*,network}.go
   - cblecker
   - rramkumar1

@@ -58,6 +58,8 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
+	_ "k8s.io/component-base/metrics/prometheus/workqueue" // for workqueue metric registration
+	"k8s.io/component-base/version"
 	"k8s.io/klog"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
 	aggregatorscheme "k8s.io/kube-aggregator/pkg/apiserver/scheme"
@@ -80,8 +82,6 @@ import (
 	rbacrest "k8s.io/kubernetes/pkg/registry/rbac/rest"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	_ "k8s.io/kubernetes/pkg/util/workqueue/prometheus" // for workqueue metric registration
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/kubernetes/plugin/pkg/auth/authenticator/token/bootstrap"
 )
@@ -153,11 +153,16 @@ func Run(completeOptions completedServerRunOptions, stopCh <-chan struct{}) erro
 		return err
 	}
 
-	return server.PrepareRun().Run(stopCh)
+	prepared, err := server.PrepareRun()
+	if err != nil {
+		return err
+	}
+
+	return prepared.Run(stopCh)
 }
 
 // CreateServerChain creates the apiservers connected via delegation.
-func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan struct{}) (*genericapiserver.GenericAPIServer, error) {
+func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan struct{}) (*aggregatorapiserver.APIAggregator, error) {
 	nodeTunneler, proxyTransport, err := CreateNodeDialer(completedOptions)
 	if err != nil {
 		return nil, err
@@ -184,13 +189,6 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 		return nil, err
 	}
 
-	// otherwise go down the normal path of standing the aggregator up in front of the API server
-	// this wires up openapi
-	kubeAPIServer.GenericAPIServer.PrepareRun()
-
-	// This will wire up openapi for extension api server
-	apiExtensionsServer.GenericAPIServer.PrepareRun()
-
 	// aggregator comes last in the chain
 	aggregatorConfig, err := createAggregatorConfig(*kubeAPIServerConfig.GenericConfig, completedOptions.ServerRunOptions, kubeAPIServerConfig.ExtraConfig.VersionedInformers, serviceResolver, proxyTransport, pluginInitializer)
 	if err != nil {
@@ -209,7 +207,7 @@ func CreateServerChain(completedOptions completedServerRunOptions, stopCh <-chan
 		}
 	}
 
-	return aggregatorServer.GenericAPIServer, nil
+	return aggregatorServer, nil
 }
 
 // CreateKubeAPIServer creates and wires a workable kube-apiserver
@@ -308,9 +306,19 @@ func CreateKubeAPIServerConfig(
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
-	serviceIPRange, apiServerServiceIP, lastErr := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
+	serviceIPRange, apiServerServiceIP, lastErr := master.DefaultServiceIPRange(s.PrimaryServiceClusterIPRange)
 	if lastErr != nil {
 		return
+	}
+
+	// defaults to empty range and ip
+	var secondaryServiceIPRange net.IPNet
+	// process secondary range only if provided by user
+	if s.SecondaryServiceClusterIPRange.IP != nil {
+		secondaryServiceIPRange, _, lastErr = master.DefaultServiceIPRange(s.SecondaryServiceClusterIPRange)
+		if lastErr != nil {
+			return
+		}
 	}
 
 	clientCA, lastErr := readCAorNil(s.Authentication.ClientCert.ClientCA)
@@ -343,8 +351,10 @@ func CreateKubeAPIServerConfig(
 
 			Tunneler: nodeTunneler,
 
-			ServiceIPRange:       serviceIPRange,
-			APIServerServiceIP:   apiServerServiceIP,
+			ServiceIPRange:          serviceIPRange,
+			APIServerServiceIP:      apiServerServiceIP,
+			SecondaryServiceIPRange: secondaryServiceIPRange,
+
 			APIServerServicePort: 443,
 
 			ServiceNodePortRange:      s.ServiceNodePortRange,
@@ -363,6 +373,10 @@ func CreateKubeAPIServerConfig(
 	if nodeTunneler != nil {
 		// Use the nodeTunneler's dialer to connect to the kubelet
 		config.ExtraConfig.KubeletClientConfig.Dial = nodeTunneler.Dial
+	}
+	if config.GenericConfig.EgressSelector != nil {
+		// Use the config.GenericConfig.EgressSelector lookup to find the dialer to connect to the kubelet
+		config.ExtraConfig.KubeletClientConfig.Lookup = config.GenericConfig.EgressSelector.Lookup
 	}
 
 	return
@@ -404,6 +418,9 @@ func buildGenericConfig(
 	if lastErr = s.APIEnablement.ApplyTo(genericConfig, master.DefaultAPIResourceConfigSource(), legacyscheme.Scheme); lastErr != nil {
 		return
 	}
+	if lastErr = s.EgressSelector.ApplyTo(genericConfig); lastErr != nil {
+		return
+	}
 
 	genericConfig.OpenAPIConfig = genericapiserver.DefaultOpenAPIConfig(generatedopenapi.GetOpenAPIDefinitions, openapinamer.NewDefinitionNamer(legacyscheme.Scheme, extensionsapiserver.Scheme, aggregatorscheme.Scheme))
 	genericConfig.OpenAPIConfig.Info.Title = "Kubernetes"
@@ -426,6 +443,9 @@ func buildGenericConfig(
 	if lastErr != nil {
 		return
 	}
+	if genericConfig.EgressSelector != nil {
+		storageFactory.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup
+	}
 	if lastErr = s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); lastErr != nil {
 		return
 	}
@@ -435,6 +455,9 @@ func buildGenericConfig(
 	// cannot default to it in generic apiserver and need to explicitly
 	// set it in kube-apiserver.
 	genericConfig.LoopbackClientConfig.ContentConfig.ContentType = "application/vnd.kubernetes.protobuf"
+	// Disable compression for self-communication, since we are going to be
+	// on a fast local network
+	genericConfig.LoopbackClientConfig.DisableCompression = true
 
 	kubeClientConfig := genericConfig.LoopbackClientConfig
 	clientgoExternalClient, err := clientgoclientset.NewForConfig(kubeClientConfig)
@@ -540,11 +563,49 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	if err := kubeoptions.DefaultAdvertiseAddress(s.GenericServerRunOptions, s.InsecureServing.DeprecatedInsecureServingOptions); err != nil {
 		return options, err
 	}
-	serviceIPRange, apiServerServiceIP, err := master.DefaultServiceIPRange(s.ServiceClusterIPRange)
-	if err != nil {
-		return options, fmt.Errorf("error determining service IP ranges: %v", err)
+
+	// process s.ServiceClusterIPRange from list to Primary and Secondary
+	// we process secondary only if provided by user
+
+	serviceClusterIPRangeList := strings.Split(s.ServiceClusterIPRanges, ",")
+
+	var apiServerServiceIP net.IP
+	var serviceIPRange net.IPNet
+	var err error
+	// nothing provided by user, use default range (only applies to the Primary)
+	if len(serviceClusterIPRangeList) == 0 {
+		var primaryServiceClusterCIDR net.IPNet
+		serviceIPRange, apiServerServiceIP, err = master.DefaultServiceIPRange(primaryServiceClusterCIDR)
+		if err != nil {
+			return options, fmt.Errorf("error determining service IP ranges: %v", err)
+		}
+		s.PrimaryServiceClusterIPRange = serviceIPRange
 	}
-	s.ServiceClusterIPRange = serviceIPRange
+
+	if len(serviceClusterIPRangeList) > 0 {
+		_, primaryServiceClusterCIDR, err := net.ParseCIDR(serviceClusterIPRangeList[0])
+		if err != nil {
+			return options, fmt.Errorf("service-cluster-ip-range[0] is not a valid cidr")
+		}
+
+		serviceIPRange, apiServerServiceIP, err = master.DefaultServiceIPRange(*(primaryServiceClusterCIDR))
+		if err != nil {
+			return options, fmt.Errorf("error determining service IP ranges for primary service cidr: %v", err)
+		}
+		s.PrimaryServiceClusterIPRange = serviceIPRange
+	}
+
+	// user provided at least two entries
+	if len(serviceClusterIPRangeList) > 1 {
+		_, secondaryServiceClusterCIDR, err := net.ParseCIDR(serviceClusterIPRangeList[1])
+		if err != nil {
+			return options, fmt.Errorf("service-cluster-ip-range[1] is not an ip net")
+		}
+
+		s.SecondaryServiceClusterIPRange = *(secondaryServiceClusterCIDR)
+	}
+	//note: validation asserts that the list is max of two dual stack entries
+
 	if err := s.SecureServing.MaybeDefaultWithSelfSignedCerts(s.GenericServerRunOptions.AdvertiseAddress.String(), []string{"kubernetes.default.svc", "kubernetes.default", "kubernetes"}, []net.IP{apiServerServiceIP}); err != nil {
 		return options, fmt.Errorf("error creating self-signed certificates: %v", err)
 	}
@@ -615,7 +676,6 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 		}
 	}
 
-	// TODO: remove when we stop supporting the legacy group version.
 	if s.APIEnablement.RuntimeConfig != nil {
 		for key, value := range s.APIEnablement.RuntimeConfig {
 			if key == "v1" || strings.HasPrefix(key, "v1/") ||

@@ -18,21 +18,25 @@ package conversion
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
+	internal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
-
-	internal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	utiltrace "k8s.io/utils/trace"
 )
 
 type webhookConverterFactory struct {
@@ -40,7 +44,11 @@ type webhookConverterFactory struct {
 }
 
 func newWebhookConverterFactory(serviceResolver webhook.ServiceResolver, authResolverWrapper webhook.AuthenticationInfoResolverWrapper) (*webhookConverterFactory, error) {
-	clientManager, err := webhook.NewClientManager(v1beta1.SchemeGroupVersion, v1beta1.AddToScheme)
+	clientManager, err := webhook.NewClientManager(
+		[]schema.GroupVersion{v1.SchemeGroupVersion, v1beta1.SchemeGroupVersion},
+		v1beta1.AddToScheme,
+		v1.AddToScheme,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +122,11 @@ func (c *webhookConverter) hasConversionReviewVersion(v string) bool {
 	return false
 }
 
-func createConversionReview(obj runtime.Object, apiVersion string) *v1beta1.ConversionReview {
+// getObjectsToConvert returns a list of objects requiring conversion.
+// if obj is a list, getObjectsToConvert returns a (potentially empty) list of the items that are not already in the desired version.
+// if obj is not a list, and is already in the desired version, getObjectsToConvert returns an empty list.
+// if obj is not a list, and is not already in the desired version, getObjectsToConvert returns a list containing only obj.
+func getObjectsToConvert(obj runtime.Object, apiVersion string) []runtime.RawExtension {
 	listObj, isList := obj.(*unstructured.UnstructuredList)
 	var objects []runtime.RawExtension
 	if isList {
@@ -129,14 +141,34 @@ func createConversionReview(obj runtime.Object, apiVersion string) *v1beta1.Conv
 			objects = []runtime.RawExtension{{Object: obj}}
 		}
 	}
-	return &v1beta1.ConversionReview{
-		Request: &v1beta1.ConversionRequest{
-			Objects:           objects,
-			DesiredAPIVersion: apiVersion,
-			UID:               uuid.NewUUID(),
-		},
-		Response: &v1beta1.ConversionResponse{},
+	return objects
+}
+
+// createConversionReviewObjects returns ConversionReview request and response objects for the first supported version found in conversionReviewVersions.
+func createConversionReviewObjects(conversionReviewVersions []string, objects []runtime.RawExtension, apiVersion string, requestUID types.UID) (request, response runtime.Object, err error) {
+	for _, version := range conversionReviewVersions {
+		switch version {
+		case v1beta1.SchemeGroupVersion.Version:
+			return &v1beta1.ConversionReview{
+				Request: &v1beta1.ConversionRequest{
+					Objects:           objects,
+					DesiredAPIVersion: apiVersion,
+					UID:               requestUID,
+				},
+				Response: &v1beta1.ConversionResponse{},
+			}, &v1beta1.ConversionReview{}, nil
+		case v1.SchemeGroupVersion.Version:
+			return &v1.ConversionReview{
+				Request: &v1.ConversionRequest{
+					Objects:           objects,
+					DesiredAPIVersion: apiVersion,
+					UID:               requestUID,
+				},
+				Response: &v1.ConversionResponse{},
+			}, &v1.ConversionReview{}, nil
+		}
 	}
+	return nil, nil, fmt.Errorf("no supported conversion review versions")
 }
 
 func getRawExtensionObject(rx runtime.RawExtension) (runtime.Object, error) {
@@ -151,6 +183,59 @@ func getRawExtensionObject(rx runtime.RawExtension) (runtime.Object, error) {
 	return &u, nil
 }
 
+// getConvertedObjectsFromResponse validates the response, and returns the converted objects.
+// if the response is malformed, an error is returned instead.
+// if the response does not indicate success, the error message is returned instead.
+func getConvertedObjectsFromResponse(expectedUID types.UID, response runtime.Object) (convertedObjects []runtime.RawExtension, err error) {
+	switch response := response.(type) {
+	case *v1.ConversionReview:
+		// Verify GVK to make sure we decoded what we intended to
+		v1GVK := v1.SchemeGroupVersion.WithKind("ConversionReview")
+		if response.GroupVersionKind() != v1GVK {
+			return nil, fmt.Errorf("expected webhook response of %v, got %v", v1GVK.String(), response.GroupVersionKind().String())
+		}
+
+		if response.Response == nil {
+			return nil, fmt.Errorf("no response provided")
+		}
+
+		// Verify UID to make sure this response was actually meant for the request we sent
+		if response.Response.UID != expectedUID {
+			return nil, fmt.Errorf("expected response.uid=%q, got %q", expectedUID, response.Response.UID)
+		}
+
+		if response.Response.Result.Status != metav1.StatusSuccess {
+			// TODO: Return a webhook specific error to be able to convert it to meta.Status
+			if len(response.Response.Result.Message) > 0 {
+				return nil, errors.New(response.Response.Result.Message)
+			}
+			return nil, fmt.Errorf("response.result.status was '%s', not 'Success'", response.Response.Result.Status)
+		}
+
+		return response.Response.ConvertedObjects, nil
+
+	case *v1beta1.ConversionReview:
+		// v1beta1 processing did not verify GVK or UID, so skip those for compatibility
+
+		if response.Response == nil {
+			return nil, fmt.Errorf("no response provided")
+		}
+
+		if response.Response.Result.Status != metav1.StatusSuccess {
+			// TODO: Return a webhook specific error to be able to convert it to meta.Status
+			if len(response.Response.Result.Message) > 0 {
+				return nil, errors.New(response.Response.Result.Message)
+			}
+			return nil, fmt.Errorf("response.result.status was '%s', not 'Success'", response.Response.Result.Status)
+		}
+
+		return response.Response.ConvertedObjects, nil
+
+	default:
+		return nil, fmt.Errorf("unrecognized response type: %T", response)
+	}
+}
+
 func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) (runtime.Object, error) {
 	// In general, the webhook should not do any defaulting or validation. A special case of that is an empty object
 	// conversion that must result an empty object and practically is the same as nopConverter.
@@ -163,41 +248,53 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 
 	listObj, isList := in.(*unstructured.UnstructuredList)
 
-	// Currently converter only supports `v1beta1` ConversionReview
-	// TODO: Make CRD webhooks caller capable of sending/receiving multiple ConversionReview versions
-	if !c.hasConversionReviewVersion(v1beta1.SchemeGroupVersion.Version) {
-		return nil, fmt.Errorf("webhook does not accept v1beta1 ConversionReview")
+	requestUID := uuid.NewUUID()
+	desiredAPIVersion := toGV.String()
+	objectsToConvert := getObjectsToConvert(in, desiredAPIVersion)
+	request, response, err := createConversionReviewObjects(c.conversionReviewVersions, objectsToConvert, desiredAPIVersion, requestUID)
+	if err != nil {
+		return nil, err
 	}
 
-	request := createConversionReview(in, toGV.String())
-	if len(request.Request.Objects) == 0 {
+	objCount := len(objectsToConvert)
+	if objCount == 0 {
+		// no objects needed conversion
 		if !isList {
+			// for a single item, return as-is
 			return in, nil
 		}
+		// for a list, set the version of the top-level list object (all individual objects are already in the correct version)
 		out := listObj.DeepCopy()
 		out.SetAPIVersion(toGV.String())
 		return out, nil
 	}
-	response := &v1beta1.ConversionReview{}
+
+	trace := utiltrace.New("Call conversion webhook",
+		utiltrace.Field{"custom-resource-definition", c.name},
+		utiltrace.Field{"desired-api-version", desiredAPIVersion},
+		utiltrace.Field{"object-count", objCount},
+		utiltrace.Field{"UID", requestUID})
+	// Only log conversion webhook traces that exceed a 8ms per object limit plus a 50ms request overhead allowance.
+	// The per object limit uses the SLO for conversion webhooks (~4ms per object) plus time to serialize/deserialize
+	// the conversion request on the apiserver side (~4ms per object).
+	defer trace.LogIfLong(time.Duration(50+8*objCount) * time.Millisecond)
+
 	// TODO: Figure out if adding one second timeout make sense here.
 	ctx := context.TODO()
 	r := c.restClient.Post().Context(ctx).Body(request).Do()
 	if err := r.Into(response); err != nil {
 		// TODO: Return a webhook specific error to be able to convert it to meta.Status
-		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind(), err)
+		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind().GroupVersionKind(), err)
+	}
+	trace.Step("Request completed")
+
+	convertedObjects, err := getConvertedObjectsFromResponse(requestUID, response)
+	if err != nil {
+		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind().GroupVersionKind(), err)
 	}
 
-	if response.Response == nil {
-		// TODO: Return a webhook specific error to be able to convert it to meta.Status
-		return nil, fmt.Errorf("conversion webhook for %v lacked response", in.GetObjectKind())
-	}
-
-	if response.Response.Result.Status != v1.StatusSuccess {
-		return nil, fmt.Errorf("conversion webhook for %v failed: %v", in.GetObjectKind(), response.Response.Result.Message)
-	}
-
-	if len(response.Response.ConvertedObjects) != len(request.Request.Objects) {
-		return nil, fmt.Errorf("conversion webhook for %v returned %d objects, expected %d", in.GetObjectKind(), len(response.Response.ConvertedObjects), len(request.Request.Objects))
+	if len(convertedObjects) != len(objectsToConvert) {
+		return nil, fmt.Errorf("conversion webhook for %v returned %d objects, expected %d", in.GetObjectKind().GroupVersionKind(), len(convertedObjects), len(objectsToConvert))
 	}
 
 	if isList {
@@ -212,27 +309,27 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 				// convertedList has the right item already.
 				continue
 			}
-			converted, err := getRawExtensionObject(response.Response.ConvertedObjects[convertedIndex])
+			converted, err := getRawExtensionObject(convertedObjects[convertedIndex])
 			if err != nil {
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: %v", in.GetObjectKind(), convertedIndex, err)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: %v", in.GetObjectKind().GroupVersionKind(), convertedIndex, err)
 			}
 			convertedIndex++
 			if expected, got := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); expected != got {
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid groupVersion, expected=%v, got=%v", in.GetObjectKind(), convertedIndex, expected, got)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid groupVersion (expected %v, received %v)", in.GetObjectKind().GroupVersionKind(), convertedIndex, expected, got)
 			}
 			if expected, got := original.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; expected != got {
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid kind, expected=%v, got=%v", in.GetObjectKind(), convertedIndex, expected, got)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid kind (expected %v, received %v)", in.GetObjectKind().GroupVersionKind(), convertedIndex, expected, got)
 			}
 			unstructConverted, ok := converted.(*unstructured.Unstructured)
 			if !ok {
 				// this should not happened
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid type, expected=Unstructured, got=%T", in.GetObjectKind(), convertedIndex, converted)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: invalid type, expected=Unstructured, got=%T", in.GetObjectKind().GroupVersionKind(), convertedIndex, converted)
 			}
 			if err := validateConvertedObject(original, unstructConverted); err != nil {
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: %v", in.GetObjectKind(), convertedIndex, err)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid converted object at index %v: %v", in.GetObjectKind().GroupVersionKind(), convertedIndex, err)
 			}
 			if err := restoreObjectMeta(original, unstructConverted); err != nil {
-				return nil, fmt.Errorf("conversion webhook for %v returned invalid metadata in object at index %v: %v", in.GetObjectKind(), convertedIndex, err)
+				return nil, fmt.Errorf("conversion webhook for %v returned invalid metadata in object at index %v: %v", in.GetObjectKind().GroupVersionKind(), convertedIndex, err)
 			}
 			convertedList.Items[i] = *unstructConverted
 		}
@@ -240,35 +337,35 @@ func (c *webhookConverter) Convert(in runtime.Object, toGV schema.GroupVersion) 
 		return convertedList, nil
 	}
 
-	if len(response.Response.ConvertedObjects) != 1 {
+	if len(convertedObjects) != 1 {
 		// This should not happened
-		return nil, fmt.Errorf("conversion webhook for %v failed", in.GetObjectKind())
+		return nil, fmt.Errorf("conversion webhook for %v failed, no objects returned", in.GetObjectKind())
 	}
-	converted, err := getRawExtensionObject(response.Response.ConvertedObjects[0])
+	converted, err := getRawExtensionObject(convertedObjects[0])
 	if err != nil {
 		return nil, err
 	}
 	if e, a := toGV, converted.GetObjectKind().GroupVersionKind().GroupVersion(); e != a {
-		return nil, fmt.Errorf("conversion webhook for %v returned invalid object: invalid groupVersion, e=%v, a=%v", in.GetObjectKind(), e, a)
+		return nil, fmt.Errorf("conversion webhook for %v returned invalid object at index 0: invalid groupVersion (expected %v, received %v)", in.GetObjectKind().GroupVersionKind(), e, a)
 	}
 	if e, a := in.GetObjectKind().GroupVersionKind().Kind, converted.GetObjectKind().GroupVersionKind().Kind; e != a {
-		return nil, fmt.Errorf("conversion webhook for %v returned invalid object: invalid kind, e=%v, a=%v", in.GetObjectKind(), e, a)
+		return nil, fmt.Errorf("conversion webhook for %v returned invalid object at index 0: invalid kind (expected %v, received %v)", in.GetObjectKind().GroupVersionKind(), e, a)
 	}
 	unstructConverted, ok := converted.(*unstructured.Unstructured)
 	if !ok {
 		// this should not happened
-		return nil, fmt.Errorf("conversion webhook for %v failed", in.GetObjectKind())
+		return nil, fmt.Errorf("conversion webhook for %v failed, unexpected type %T at index 0", in.GetObjectKind().GroupVersionKind(), converted)
 	}
 	unstructIn, ok := in.(*unstructured.Unstructured)
 	if !ok {
 		// this should not happened
-		return nil, fmt.Errorf("conversion webhook for %v failed", in.GetObjectKind())
+		return nil, fmt.Errorf("conversion webhook for %v failed unexpected input type %T", in.GetObjectKind().GroupVersionKind(), in)
 	}
 	if err := validateConvertedObject(unstructIn, unstructConverted); err != nil {
-		return nil, fmt.Errorf("conversion webhook for %v returned invalid object: %v", in.GetObjectKind(), err)
+		return nil, fmt.Errorf("conversion webhook for %v returned invalid object: %v", in.GetObjectKind().GroupVersionKind(), err)
 	}
 	if err := restoreObjectMeta(unstructIn, unstructConverted); err != nil {
-		return nil, fmt.Errorf("conversion webhook for %v returned invalid metadata: %v", in.GetObjectKind(), err)
+		return nil, fmt.Errorf("conversion webhook for %v returned invalid metadata: %v", in.GetObjectKind().GroupVersionKind(), err)
 	}
 	return converted, nil
 }

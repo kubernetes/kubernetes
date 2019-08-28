@@ -140,7 +140,7 @@ func (PodDisruptionBudgetStatus) SwaggerDoc() map[string]string {
 
 var map_PodSecurityPolicy = map[string]string{
 	"":         "PodSecurityPolicy governs the ability to make requests that affect the Security Context that will be applied to a pod and container.",
-	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "spec defines the policy enforced.",
 }
 
@@ -150,7 +150,7 @@ func (PodSecurityPolicy) SwaggerDoc() map[string]string {
 
 var map_PodSecurityPolicyList = map[string]string{
 	"":         "PodSecurityPolicyList is a list of PodSecurityPolicy objects.",
-	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "items is a list of schema objects.",
 }
 

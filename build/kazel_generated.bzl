@@ -27,6 +27,7 @@ kazel_configured_tags = ["openapi-gen"]
 # tags_values_pkgs is a dictionary mapping {k8s build tag: {tag value: [pkgs including that tag:value]}}
 tags_values_pkgs = {"openapi-gen": {
     "false": [
+        "staging/src/k8s.io/api/admission/v1",
         "staging/src/k8s.io/api/admission/v1beta1",
         "staging/src/k8s.io/api/core/v1",
         "staging/src/k8s.io/apimachinery/pkg/apis/testapigroup/v1",
@@ -39,6 +40,7 @@ tags_values_pkgs = {"openapi-gen": {
         "pkg/apis/abac/v1beta1",
         "pkg/apis/auditregistration",
         "pkg/version",
+        "staging/src/k8s.io/api/admissionregistration/v1",
         "staging/src/k8s.io/api/admissionregistration/v1beta1",
         "staging/src/k8s.io/api/apps/v1",
         "staging/src/k8s.io/api/apps/v1beta1",
@@ -58,6 +60,7 @@ tags_values_pkgs = {"openapi-gen": {
         "staging/src/k8s.io/api/coordination/v1",
         "staging/src/k8s.io/api/coordination/v1beta1",
         "staging/src/k8s.io/api/core/v1",
+        "staging/src/k8s.io/api/discovery/v1alpha1",
         "staging/src/k8s.io/api/events/v1beta1",
         "staging/src/k8s.io/api/extensions/v1beta1",
         "staging/src/k8s.io/api/imagepolicy/v1alpha1",
@@ -76,6 +79,7 @@ tags_values_pkgs = {"openapi-gen": {
         "staging/src/k8s.io/api/storage/v1",
         "staging/src/k8s.io/api/storage/v1alpha1",
         "staging/src/k8s.io/api/storage/v1beta1",
+        "staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1",
         "staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
         "staging/src/k8s.io/apimachinery/pkg/api/resource",
         "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1",
@@ -101,6 +105,8 @@ tags_values_pkgs = {"openapi-gen": {
         "staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1",
         "staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1",
         "staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1",
+        "staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1",
+        "staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1",
     ],
 }}
 
@@ -111,7 +117,9 @@ tags_pkgs_values = {"openapi-gen": {
     "pkg/apis/abac/v1beta1": ["true"],
     "pkg/apis/auditregistration": ["true"],
     "pkg/version": ["true"],
+    "staging/src/k8s.io/api/admission/v1": ["false"],
     "staging/src/k8s.io/api/admission/v1beta1": ["false"],
+    "staging/src/k8s.io/api/admissionregistration/v1": ["true"],
     "staging/src/k8s.io/api/admissionregistration/v1beta1": ["true"],
     "staging/src/k8s.io/api/apps/v1": ["true"],
     "staging/src/k8s.io/api/apps/v1beta1": ["true"],
@@ -134,6 +142,7 @@ tags_pkgs_values = {"openapi-gen": {
         "false",
         "true",
     ],
+    "staging/src/k8s.io/api/discovery/v1alpha1": ["true"],
     "staging/src/k8s.io/api/events/v1beta1": ["true"],
     "staging/src/k8s.io/api/extensions/v1beta1": ["true"],
     "staging/src/k8s.io/api/imagepolicy/v1alpha1": ["true"],
@@ -152,6 +161,7 @@ tags_pkgs_values = {"openapi-gen": {
     "staging/src/k8s.io/api/storage/v1": ["true"],
     "staging/src/k8s.io/api/storage/v1alpha1": ["true"],
     "staging/src/k8s.io/api/storage/v1beta1": ["true"],
+    "staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1": ["true"],
     "staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1": ["true"],
     "staging/src/k8s.io/apimachinery/pkg/api/resource": ["true"],
     "staging/src/k8s.io/apimachinery/pkg/apis/meta/v1": ["true"],
@@ -180,4 +190,6 @@ tags_pkgs_values = {"openapi-gen": {
     "staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1": ["true"],
     "staging/src/k8s.io/metrics/pkg/apis/metrics/v1beta1": ["true"],
     "staging/src/k8s.io/node-api/pkg/apis/node/v1alpha1": ["true"],
+    "staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1alpha1": ["true"],
+    "staging/src/k8s.io/sample-apiserver/pkg/apis/wardle/v1beta1": ["true"],
 }}

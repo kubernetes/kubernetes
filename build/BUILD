@@ -30,10 +30,6 @@ filegroup(
 # This list should roughly match kube::build::get_docker_wrapped_binaries()
 # in build/common.sh.
 DOCKERIZED_BINARIES = {
-    "cloud-controller-manager": {
-        "base": "@debian-base-{ARCH}//image",
-        "target": "//cmd/cloud-controller-manager:cloud-controller-manager",
-    },
     "kube-apiserver": {
         "base": "@debian-base-{ARCH}//image",
         "target": "//cmd/kube-apiserver:kube-apiserver",
@@ -52,14 +48,8 @@ DOCKERIZED_BINARIES = {
     },
 }
 
-# In the bash-based build (build/lib/release.sh), the images built for amd64 do not use
-# an arch in their name (but other arches do), and the GCE cluster scripts
-# (which sideload the images via tarfiles) expect there not to be an arch.
 # When pushing to gcr.io, we want to use an arch, since the archless name is now used for a
 # manifest list. Bazel doesn't support manifest lists (yet), so we can't do that either.
-# For now, we use the archless name for the image tars saved in the server tarball,
-# to satisfy GCE and other similar providers. (If one were to pull the images via the manifest
-# list, the arch wouldn't appear in the name either.)
 [multi_arch_container(
     name = binary,
     architectures = SERVER_PLATFORMS["linux"],
@@ -71,10 +61,8 @@ DOCKERIZED_BINARIES = {
     )),
     # Since the multi_arch_container macro replaces the {ARCH} format string,
     # we need to escape the stamping vars.
-    # Also see comment above about why the push tags use ARCH while the
-    # non-push tags do not.
     docker_push_tags = ["{{STABLE_DOCKER_PUSH_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
-    docker_tags = ["{{STABLE_DOCKER_REGISTRY}}/%s:{{STABLE_DOCKER_TAG}}" % binary],
+    docker_tags = ["{{STABLE_DOCKER_REGISTRY}}/%s-{ARCH}:{{STABLE_DOCKER_TAG}}" % binary],
     stamp = True,
     symlinks = {
         # Some cluster startup scripts expect to find the binaries in /usr/local/bin,
@@ -147,7 +135,6 @@ release_filegroup(
     name = "server-targets",
     conditioned_srcs = for_platforms(for_server = [
         "//cluster/gce/gci/mounter",
-        "//cmd/cloud-controller-manager",
         "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",

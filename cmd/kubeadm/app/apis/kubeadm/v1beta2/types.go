@@ -202,7 +202,7 @@ type NodeRegistrationOptions struct {
 
 	// Taints specifies the taints the Node API object should be registered with. If this field is unset, i.e. nil, in the `kubeadm init` process
 	// it will be defaulted to []v1.Taint{'node-role.kubernetes.io/master=""'}. If you don't want to taint your control-plane node, set this field to an
-	// empty slice, i.e. `taints: {}` in the YAML file. This field is solely used for Node registration.
+	// empty slice, i.e. `taints: []` in the YAML file. This field is solely used for Node registration.
 	Taints []v1.Taint `json:"taints"`
 
 	// KubeletExtraArgs passes through extra arguments to the kubelet. The arguments here are passed to the kubelet command line via the environment file

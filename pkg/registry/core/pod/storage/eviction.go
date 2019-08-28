@@ -67,7 +67,7 @@ type EvictionREST struct {
 	podDisruptionBudgetClient policyclient.PodDisruptionBudgetsGetter
 }
 
-var _ = rest.Creater(&EvictionREST{})
+var _ = rest.NamedCreater(&EvictionREST{})
 var _ = rest.GroupVersionKindProvider(&EvictionREST{})
 
 // GroupVersionKind specifies a particular GroupVersionKind to discovery
@@ -101,8 +101,15 @@ func propagateDryRun(eviction *policy.Eviction, options *metav1.CreateOptions) (
 }
 
 // Create attempts to create a new eviction.  That is, it tries to evict a pod.
-func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
-	eviction := obj.(*policy.Eviction)
+func (r *EvictionREST) Create(ctx context.Context, name string, obj runtime.Object, createValidation rest.ValidateObjectFunc, options *metav1.CreateOptions) (runtime.Object, error) {
+	eviction, ok := obj.(*policy.Eviction)
+	if !ok {
+		return nil, errors.NewBadRequest(fmt.Sprintf("not a Eviction object: %T", obj))
+	}
+
+	if name != eviction.Name {
+		return nil, errors.NewBadRequest("name in URL does not match name in Eviction object")
+	}
 
 	deletionOptions, err := propagateDryRun(eviction, options)
 	if err != nil {
@@ -116,7 +123,7 @@ func (r *EvictionREST) Create(ctx context.Context, obj runtime.Object, createVal
 	pod := obj.(*api.Pod)
 
 	if createValidation != nil {
-		if err := createValidation(eviction.DeepCopyObject()); err != nil {
+		if err := createValidation(ctx, eviction.DeepCopyObject()); err != nil {
 			return nil, err
 		}
 	}

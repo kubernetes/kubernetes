@@ -47,7 +47,7 @@ func completeTest(f *framework.Framework, c clientset.Interface, ns string, pv *
 	// 2. create the nfs writer pod, test if the write was successful,
 	//    then delete the pod and verify that it was deleted
 	ginkgo.By("Checking pod has write access to PersistentVolume")
-	framework.ExpectNoError(framework.CreateWaitAndDeletePod(f, c, ns, pvc))
+	framework.ExpectNoError(e2epod.CreateWaitAndDeletePod(c, ns, pvc, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')"))
 
 	// 3. delete the PVC, wait for PV to become "Released"
 	ginkgo.By("Deleting the PVC to invoke the reclaim policy.")
@@ -78,7 +78,7 @@ func completeMultiTest(f *framework.Framework, c clientset.Interface, ns string,
 			return fmt.Errorf("internal: pvols map is missing volume %q", pvc.Spec.VolumeName)
 		}
 		// TODO: currently a serialized test of each PV
-		if err = framework.CreateWaitAndDeletePod(f, c, pvcKey.Namespace, pvc); err != nil {
+		if err = e2epod.CreateWaitAndDeletePod(c, pvcKey.Namespace, pvc, "touch /mnt/volume1/SUCCESS && (id -G | grep -E '\\b777\\b')"); err != nil {
 			return err
 		}
 	}
@@ -145,7 +145,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			framework.ExpectNoError(framework.DeletePodWithWait(f, c, nfsServerPod), "AfterEach: Failed to delete pod ", nfsServerPod.Name)
+			framework.ExpectNoError(e2epod.DeletePodWithWait(c, nfsServerPod), "AfterEach: Failed to delete pod ", nfsServerPod.Name)
 			pv, pvc = nil, nil
 			pvConfig, pvcConfig = framework.PersistentVolumeConfig{}, framework.PersistentVolumeClaimConfig{}
 		})
@@ -286,7 +286,7 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
 
 				ginkgo.By("Deleting the claim")
-				framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 				framework.ExpectNoError(framework.DeletePVCandValidatePV(c, ns, pvc, pv, v1.VolumeAvailable))
 
 				ginkgo.By("Re-mounting the volume.")
@@ -298,11 +298,11 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				// If a file is detected in /mnt, fail the pod and do not restart it.
 				ginkgo.By("Verifying the mount has been cleaned.")
 				mount := pod.Spec.Containers[0].VolumeMounts[0].MountPath
-				pod = framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
+				pod = e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, fmt.Sprintf("[ $(ls -A %s | wc -l) -eq 0 ] && exit 0 || exit 1", mount))
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
-				framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 				e2elog.Logf("Pod exited without failure; the volume has been recycled.")
 			})
 		})

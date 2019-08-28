@@ -248,6 +248,17 @@ func TestSync(t *testing.T) {
 			},
 			noevents, noerrors, testSyncClaim,
 		},
+		{
+			// syncClaim that scheduled to a selected node
+			"1-18 - successful pre-bound PV to PVC provisioning",
+			newVolumeArray("volume1-18", "1Gi", "uid1-18", "claim1-18", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classWait),
+			newVolumeArray("volume1-18", "1Gi", "uid1-18", "claim1-18", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classWait),
+			claimWithAnnotation(pvutil.AnnSelectedNode, "node1",
+				newClaimArray("claim1-18", "uid1-18", "1Gi", "", v1.ClaimPending, &classWait)),
+			claimWithAnnotation(pvutil.AnnSelectedNode, "node1",
+				newClaimArray("claim1-18", "uid1-18", "1Gi", "volume1-18", v1.ClaimBound, &classWait, pvutil.AnnBoundByController, pvutil.AnnBindCompleted)),
+			noevents, noerrors, testSyncClaim,
+		},
 
 		// [Unit test set 2] User asked for a specific PV.
 		// Test the binding when pv.ClaimRef is already set by controller or

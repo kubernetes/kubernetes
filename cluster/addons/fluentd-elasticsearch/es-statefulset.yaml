@@ -51,7 +51,7 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: elasticsearch-logging
-    version: v6.6.1
+    version: v7.2.0
     addonmanager.kubernetes.io/mode: Reconcile
 spec:
   serviceName: elasticsearch-logging
@@ -59,17 +59,18 @@ spec:
   selector:
     matchLabels:
       k8s-app: elasticsearch-logging
-      version: v6.7.2
+      version: v7.2.0
   template:
     metadata:
       labels:
         k8s-app: elasticsearch-logging
-        version: v6.7.2
+        version: v7.2.0
     spec:
       serviceAccountName: elasticsearch-logging
       containers:
-      - image: gcr.io/fluentd-elasticsearch/elasticsearch:v6.6.1
+      - image: quay.io/fluentd_elasticsearch/elasticsearch:v7.2.0
         name: elasticsearch-logging
+        imagePullPolicy: Always
         resources:
           # need more cpu upon initialization, therefore burstable class
           limits:

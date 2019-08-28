@@ -18,7 +18,9 @@ package bootstrap
 
 import (
 	"context"
+	"crypto"
 	"crypto/sha512"
+	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/base64"
 	"errors"
@@ -235,32 +237,32 @@ func isClientConfigStillValid(kubeconfigPath string) (bool, error) {
 	}
 	bootstrapClientConfig, err := loadRESTClientConfig(kubeconfigPath)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to read existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to read existing bootstrap client config: %v", err))
 		return false, nil
 	}
 	transportConfig, err := bootstrapClientConfig.TransportConfig()
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to load transport configuration from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to load transport configuration from existing bootstrap client config: %v", err))
 		return false, nil
 	}
 	// has side effect of populating transport config data fields
 	if _, err := transport.TLSConfigFor(transportConfig); err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to load TLS configuration from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to load TLS configuration from existing bootstrap client config: %v", err))
 		return false, nil
 	}
 	certs, err := certutil.ParseCertsPEM(transportConfig.TLS.CertData)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Unable to load TLS certificates from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to load TLS certificates from existing bootstrap client config: %v", err))
 		return false, nil
 	}
 	if len(certs) == 0 {
-		utilruntime.HandleError(fmt.Errorf("Unable to read TLS certificates from existing bootstrap client config: %v", err))
+		utilruntime.HandleError(fmt.Errorf("unable to read TLS certificates from existing bootstrap client config: %v", err))
 		return false, nil
 	}
 	now := time.Now()
 	for _, cert := range certs {
 		if now.After(cert.NotAfter) {
-			utilruntime.HandleError(fmt.Errorf("Part of the existing bootstrap client certificate is expired: %s", cert.NotAfter))
+			utilruntime.HandleError(fmt.Errorf("part of the existing bootstrap client certificate is expired: %s", cert.NotAfter))
 			return false, nil
 		}
 	}
@@ -330,7 +332,18 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 		certificates.UsageKeyEncipherment,
 		certificates.UsageClientAuth,
 	}
-	name := digestedName(privateKeyData, subject, usages)
+
+	// The Signer interface contains the Public() method to get the public key.
+	signer, ok := privateKey.(crypto.Signer)
+	if !ok {
+		return nil, fmt.Errorf("private key does not implement crypto.Signer")
+	}
+
+	name, err := digestedName(signer.Public(), subject, usages)
+	if err != nil {
+		return nil, err
+	}
+
 	req, err := csr.RequestCertificate(client, csrData, name, usages, privateKey)
 	if err != nil {
 		return nil, err
@@ -347,7 +360,7 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 // regenerate every loop and we include usages which are not contained in the
 // CSR. This needs to be kept up to date as we add new fields to the node
 // certificates and with ensureCompatible.
-func digestedName(privateKeyData []byte, subject *pkix.Name, usages []certificates.KeyUsage) string {
+func digestedName(publicKey interface{}, subject *pkix.Name, usages []certificates.KeyUsage) (string, error) {
 	hash := sha512.New512_256()
 
 	// Here we make sure two different inputs can't write the same stream
@@ -362,7 +375,12 @@ func digestedName(privateKeyData []byte, subject *pkix.Name, usages []certificat
 		hash.Write([]byte{delimiter})
 	}
 
-	write(privateKeyData)
+	publicKeyData, err := x509.MarshalPKIXPublicKey(publicKey)
+	if err != nil {
+		return "", err
+	}
+	write(publicKeyData)
+
 	write([]byte(subject.CommonName))
 	for _, v := range subject.Organization {
 		write([]byte(v))
@@ -371,5 +389,5 @@ func digestedName(privateKeyData []byte, subject *pkix.Name, usages []certificat
 		write([]byte(v))
 	}
 
-	return "node-csr-" + encode(hash.Sum(nil))
+	return fmt.Sprintf("node-csr-%s", encode(hash.Sum(nil))), nil
 }

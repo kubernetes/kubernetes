@@ -10,10 +10,19 @@ information could retrieved through other means. To combat those differences,
 
 `agnhost` is an extendable CLI that behaves and outputs the same expected content,
 no matter the underlying OS. The name itself reflects this idea, being a portmanteau
-word of the words agnost and host.
+word of the words agnostic and host.
 
 The image was created for testing purposes, reducing the need for having different test
 cases for the same tested behaviour.
+
+
+## Developer notes
+
+We've introduced versioning into the `agnhost` binary for debugging purposes (e.g.: if the
+image and binary versions do not match, see [here](https://github.com/kubernetes/kubernetes/pull/79667#discussion_r304198370)).
+
+Whenever the image `VERSION` is bumped, the `Version` in `agnhost.go` will also have to be bumped.
+
 
 ## Usage
 
@@ -74,6 +83,29 @@ Usage:
 
 ```console
     kubectl exec test-agnhost -- /agnhost audit-proxy
+```
+
+
+### connect
+
+Tries to open a TCP connection to the given host and port. On error it
+prints an error message prefixed with a specific fixed string that
+test cases can check for:
+
+* `UNKNOWN` - Generic/unknown (non-network) error (eg, bad arguments)
+* `TIMEOUT` - The connection attempt timed out
+* `DNS` - An error in DNS resolution
+* `REFUSED` - Connection refused
+* `OTHER` - Other networking error (eg, "no route to host")
+
+(Theoretically it would be nicer for it to distinguish these by exit
+code, but it's much easier for test programs to compare strings in the
+output than to check the exit code.)
+
+Usage:
+
+```console
+    kubectl exec test-agnost -- /agnost connect [--timeout=<duration>] <host>:<port>
 ```
 
 
@@ -141,9 +173,14 @@ Usage:
 
 ### fake-gitserver
 
-Fakes a git server. When doing `git clone localhost:8000`, you will clone an empty git
-repo named `8000` on local. You can also use `git clone localhost:8000 my-repo-name` to
-rename that repo.
+Fakes a git server. When doing `git clone http://localhost:8000`, you will clone an empty git
+repo named `localhost` on local. You can also use `git clone http://localhost:8000 my-repo-name` to
+rename that repo. Access to the service with the backing pod will show you below information.
+
+```console
+curl -w "\n" http://localhost:8000
+I am a fake git server
+```
 
 Usage:
 
@@ -468,20 +505,18 @@ Usage:
     kubectl exec test-agnhost -- /agnhost serve-hostname [--tcp] [--udp] [--http] [--close] [--port <port>]
 ```
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/for-demos/serve_hostname/README.md
-?pixel)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/contrib/for-demos/serve_hostname/README.md?pixel)]()
 
-[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/serve_hostname/README.md?pixel
-)]()
+[![Analytics](https://kubernetes-site.appspot.com/UA-36037335-10/GitHub/test/images/serve_hostname/README.md?pixel)]()
 
 
 ### webhook (Kubernetes External Admission Webhook)
 
 The subcommand tests MutatingAdmissionWebhook and ValidatingAdmissionWebhook. After deploying
-it to kubernetes cluster, administrator needs to create a ValidatingWebhookConfiguration
-in kubernetes cluster to register remote webhook admission controllers.
+it to kubernetes cluster, administrator needs to create a MutatingWebhookConfiguration or
+ValidatingWebhookConfiguration in kubernetes cluster to register remote webhook admission controllers.
 
-TODO: add the reference when the document for admission webhook v1beta1 API is done.
+More details on the configuration can be found from here [Dynamic Admission Control](https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/).
 
 Check the [MutatingAdmissionWebhook](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.14/#mutatingwebhookconfiguration-v1beta1-admissionregistration-k8s-io) and [ValidatingAdmissionWebhook](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.14/#validatingwebhookconfiguration-v1beta1-admissionregistration-k8s-io) documentations for more information about them.
 

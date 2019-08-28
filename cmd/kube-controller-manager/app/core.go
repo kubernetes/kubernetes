@@ -29,12 +29,12 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/controller"
 	cloudcontroller "k8s.io/kubernetes/pkg/controller/cloud"
@@ -83,6 +83,7 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 }
 func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) {
 	var serviceCIDR *net.IPNet
+	var secondaryServiceCIDR *net.IPNet
 
 	// should we start nodeIPAM
 	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
@@ -118,12 +119,37 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		}
 	}
 
+	if len(strings.TrimSpace(ctx.ComponentConfig.NodeIPAMController.SecondaryServiceCIDR)) != 0 {
+		_, secondaryServiceCIDR, err = net.ParseCIDR(ctx.ComponentConfig.NodeIPAMController.SecondaryServiceCIDR)
+		if err != nil {
+			klog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.ComponentConfig.NodeIPAMController.SecondaryServiceCIDR, err)
+		}
+	}
+
+	// the following checks are triggered if both serviceCIDR and secondaryServiceCIDR are provided
+	if serviceCIDR != nil && secondaryServiceCIDR != nil {
+		// should have dual stack flag enabled
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
+			return nil, false, fmt.Errorf("secondary service cidr is provided and IPv6DualStack feature is not enabled")
+		}
+
+		// should be dual stack (from different IPFamilies)
+		dualstackServiceCIDR, err := netutils.IsDualStackCIDRs([]*net.IPNet{serviceCIDR, secondaryServiceCIDR})
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to perform dualstack check on serviceCIDR and secondaryServiceCIDR error:%v", err)
+		}
+		if !dualstackServiceCIDR {
+			return nil, false, fmt.Errorf("serviceCIDR and secondaryServiceCIDR are not dualstack (from different IPfamiles)")
+		}
+	}
+
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
 		clusterCIDRs,
 		serviceCIDR,
+		secondaryServiceCIDR,
 		int(ctx.ComponentConfig.NodeIPAMController.NodeCIDRMaskSize),
 		ipam.CIDRAllocatorType(ctx.ComponentConfig.KubeCloudShared.CIDRAllocatorType),
 	)
@@ -300,6 +326,7 @@ func startEndpointController(ctx ControllerContext) (http.Handler, bool, error) 
 		ctx.InformerFactory.Core().V1().Services(),
 		ctx.InformerFactory.Core().V1().Endpoints(),
 		ctx.ClientBuilder.ClientOrDie("endpoint-controller"),
+		ctx.ComponentConfig.EndpointController.EndpointUpdatesBatchPeriod.Duration,
 	).Run(int(ctx.ComponentConfig.EndpointController.ConcurrentEndpointSyncs), ctx.Stop)
 	return nil, true, nil
 }
@@ -333,7 +360,7 @@ func startResourceQuotaController(ctx ControllerContext) (http.Handler, bool, er
 		QuotaClient:               resourceQuotaControllerClient.CoreV1(),
 		ResourceQuotaInformer:     ctx.InformerFactory.Core().V1().ResourceQuotas(),
 		ResyncPeriod:              controller.StaticResyncPeriodFunc(ctx.ComponentConfig.ResourceQuotaController.ResourceQuotaSyncPeriod.Duration),
-		InformerFactory:           ctx.GenericInformerFactory,
+		InformerFactory:           ctx.ObjectOrMetadataInformerFactory,
 		ReplenishmentResyncPeriod: ctx.ResyncPeriod,
 		DiscoveryFunc:             discoveryFunc,
 		IgnoredResourcesFunc:      quotaConfiguration.IgnoredResources,
@@ -371,7 +398,7 @@ func startNamespaceController(ctx ControllerContext) (http.Handler, bool, error)
 
 func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient clientset.Interface, nsKubeconfig *restclient.Config) (http.Handler, bool, error) {
 
-	dynamicClient, err := dynamic.NewForConfig(nsKubeconfig)
+	metadataClient, err := metadata.NewForConfig(nsKubeconfig)
 	if err != nil {
 		return nil, true, err
 	}
@@ -380,7 +407,7 @@ func startModifiedNamespaceController(ctx ControllerContext, namespaceKubeClient
 
 	namespaceController := namespacecontroller.NewNamespaceController(
 		namespaceKubeClient,
-		dynamicClient,
+		metadataClient,
 		discoverResourcesFn,
 		ctx.InformerFactory.Core().V1().Namespaces(),
 		ctx.ComponentConfig.NamespaceController.NamespaceSyncPeriod.Duration,
@@ -422,7 +449,7 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 	discoveryClient := cacheddiscovery.NewMemCacheClient(gcClientset.Discovery())
 
 	config := ctx.ClientBuilder.ConfigOrDie("generic-garbage-collector")
-	dynamicClient, err := dynamic.NewForConfig(config)
+	metadataClient, err := metadata.NewForConfig(config)
 	if err != nil {
 		return nil, true, err
 	}
@@ -434,11 +461,11 @@ func startGarbageCollectorController(ctx ControllerContext) (http.Handler, bool,
 		ignoredResources[schema.GroupResource{Group: r.Group, Resource: r.Resource}] = struct{}{}
 	}
 	garbageCollector, err := garbagecollector.NewGarbageCollector(
-		dynamicClient,
+		metadataClient,
 		ctx.RESTMapper,
 		deletableResources,
 		ignoredResources,
-		ctx.GenericInformerFactory,
+		ctx.ObjectOrMetadataInformerFactory,
 		ctx.InformersStarted,
 	)
 	if err != nil {

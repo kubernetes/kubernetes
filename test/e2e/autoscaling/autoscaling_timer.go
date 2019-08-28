@@ -27,7 +27,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling", func() {
@@ -65,7 +64,7 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				// Make sure all nodes are schedulable, otherwise we are in some kind of a problem state.
 				nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 				schedulableCount := len(nodes.Items)
-				gomega.Expect(schedulableCount).To(gomega.Equal(nodeGroupSize), "not all nodes are schedulable")
+				framework.ExpectEqual(schedulableCount, nodeGroupSize, "not all nodes are schedulable")
 			})
 
 			ginkgo.AfterEach(func() {

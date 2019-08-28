@@ -54,3 +54,20 @@ func IsConnectionReset(err error) bool {
 	}
 	return false
 }
+
+// Returns if the given err is "connection refused" error
+func IsConnectionRefused(err error) bool {
+	if urlErr, ok := err.(*url.Error); ok {
+		err = urlErr.Err
+	}
+	if opErr, ok := err.(*net.OpError); ok {
+		err = opErr.Err
+	}
+	if osErr, ok := err.(*os.SyscallError); ok {
+		err = osErr.Err
+	}
+	if errno, ok := err.(syscall.Errno); ok && errno == syscall.ECONNREFUSED {
+		return true
+	}
+	return false
+}

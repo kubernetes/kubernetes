@@ -148,7 +148,7 @@ func DefaultOffAdmissionPlugins() sets.String {
 		defaultOnPlugins.Insert(nodetaint.PluginName) //TaintNodesByCondition
 	}
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.PodOverhead) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
 		defaultOnPlugins.Insert(runtimeclass.PluginName) //RuntimeClass
 	}
 

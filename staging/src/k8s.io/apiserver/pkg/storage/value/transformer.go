@@ -85,18 +85,12 @@ func (t *MutableTransformer) Set(transformer Transformer) {
 }
 
 func (t *MutableTransformer) TransformFromStorage(data []byte, context Context) (out []byte, stale bool, err error) {
-	defer func(start time.Time) {
-		RecordTransformation("from_storage", start, err)
-	}(time.Now())
 	t.lock.RLock()
 	transformer := t.transformer
 	t.lock.RUnlock()
 	return transformer.TransformFromStorage(data, context)
 }
 func (t *MutableTransformer) TransformToStorage(data []byte, context Context) (out []byte, err error) {
-	defer func(start time.Time) {
-		RecordTransformation("to_storage", start, err)
-	}(time.Now())
 	t.lock.RLock()
 	transformer := t.transformer
 	t.lock.RUnlock()
@@ -134,28 +128,37 @@ func NewPrefixTransformers(err error, transformers ...PrefixTransformer) Transfo
 // the result of transforming the value. It will always mark any transformation as stale that is not using
 // the first transformer.
 func (t *prefixTransformers) TransformFromStorage(data []byte, context Context) ([]byte, bool, error) {
+	start := time.Now()
 	for i, transformer := range t.transformers {
 		if bytes.HasPrefix(data, transformer.Prefix) {
 			result, stale, err := transformer.Transformer.TransformFromStorage(data[len(transformer.Prefix):], context)
 			// To migrate away from encryption, user can specify an identity transformer higher up
 			// (in the config file) than the encryption transformer. In that scenario, the identity transformer needs to
 			// identify (during reads from disk) whether the data being read is encrypted or not. If the data is encrypted,
-			// it shall throw an error, but that error should not prevent subsequent transformers from being tried.
+			// it shall throw an error, but that error should not prevent the next subsequent transformer from being tried.
 			if len(transformer.Prefix) == 0 && err != nil {
 				continue
+			}
+			if len(transformer.Prefix) == 0 {
+				RecordTransformation("from_storage", "identity", start, err)
+			} else {
+				RecordTransformation("from_storage", string(transformer.Prefix), start, err)
 			}
 			return result, stale || i != 0, err
 		}
 	}
+	RecordTransformation("from_storage", "unknown", start, t.err)
 	return nil, false, t.err
 }
 
 // TransformToStorage uses the first transformer and adds its prefix to the data.
 func (t *prefixTransformers) TransformToStorage(data []byte, context Context) ([]byte, error) {
+	start := time.Now()
 	transformer := t.transformers[0]
 	prefixedData := make([]byte, len(transformer.Prefix), len(data)+len(transformer.Prefix))
 	copy(prefixedData, transformer.Prefix)
 	result, err := transformer.Transformer.TransformToStorage(data, context)
+	RecordTransformation("to_storage", string(transformer.Prefix), start, err)
 	if err != nil {
 		return nil, err
 	}

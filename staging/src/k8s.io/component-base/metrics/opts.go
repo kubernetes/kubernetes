@@ -18,7 +18,6 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 	"sync"
 	"time"
@@ -36,7 +35,7 @@ type KubeOpts struct {
 	Name              string
 	Help              string
 	ConstLabels       prometheus.Labels
-	DeprecatedVersion *semver.Version
+	DeprecatedVersion string
 	deprecateOnce     sync.Once
 	annotateOnce      sync.Once
 	StabilityLevel    StabilityLevel
@@ -125,7 +124,7 @@ type HistogramOpts struct {
 	Help              string
 	ConstLabels       prometheus.Labels
 	Buckets           []float64
-	DeprecatedVersion *semver.Version
+	DeprecatedVersion string
 	deprecateOnce     sync.Once
 	annotateOnce      sync.Once
 	StabilityLevel    StabilityLevel
@@ -174,7 +173,7 @@ type SummaryOpts struct {
 	MaxAge            time.Duration
 	AgeBuckets        uint32
 	BufCap            uint32
-	DeprecatedVersion *semver.Version
+	DeprecatedVersion string
 	deprecateOnce     sync.Once
 	annotateOnce      sync.Once
 	StabilityLevel    StabilityLevel

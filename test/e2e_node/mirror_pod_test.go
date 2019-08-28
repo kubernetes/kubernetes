@@ -31,108 +31,108 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 var _ = framework.KubeDescribe("MirrorPod", func() {
 	f := framework.NewDefaultFramework("mirror-pod")
-	Context("when create a mirror pod ", func() {
+	ginkgo.Context("when create a mirror pod ", func() {
 		var ns, podPath, staticPodName, mirrorPodName string
-		BeforeEach(func() {
+		ginkgo.BeforeEach(func() {
 			ns = f.Namespace.Name
 			staticPodName = "static-pod-" + string(uuid.NewUUID())
 			mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 
 			podPath = framework.TestContext.KubeletConfig.StaticPodPath
 
-			By("create the static pod")
+			ginkgo.By("create the static pod")
 			err := createStaticPod(podPath, staticPodName, ns,
 				imageutils.GetE2EImage(imageutils.Nginx), v1.RestartPolicyAlways)
-			Expect(err).ShouldNot(HaveOccurred())
+			framework.ExpectNoError(err)
 
-			By("wait for the mirror pod to be running")
-			Eventually(func() error {
+			ginkgo.By("wait for the mirror pod to be running")
+			gomega.Eventually(func() error {
 				return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
-			}, 2*time.Minute, time.Second*4).Should(BeNil())
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 		/*
 			Release : v1.9
 			Testname: Mirror Pod, update
 			Description: Updating a static Pod MUST recreate an updated mirror Pod. Create a static pod, verify that a mirror pod is created. Update the static pod by changing the container image, the mirror pod MUST be re-created and updated with the new image.
 		*/
-		It("should be updated when static pod updated [NodeConformance]", func() {
-			By("get mirror pod uid")
+		ginkgo.It("should be updated when static pod updated [NodeConformance]", func() {
+			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
-			Expect(err).ShouldNot(HaveOccurred())
+			framework.ExpectNoError(err)
 			uid := pod.UID
 
-			By("update the static pod container image")
+			ginkgo.By("update the static pod container image")
 			image := imageutils.GetPauseImageName()
 			err = createStaticPod(podPath, staticPodName, ns, image, v1.RestartPolicyAlways)
-			Expect(err).ShouldNot(HaveOccurred())
+			framework.ExpectNoError(err)
 
-			By("wait for the mirror pod to be updated")
-			Eventually(func() error {
+			ginkgo.By("wait for the mirror pod to be updated")
+			gomega.Eventually(func() error {
 				return checkMirrorPodRecreatedAndRunning(f.ClientSet, mirrorPodName, ns, uid)
-			}, 2*time.Minute, time.Second*4).Should(BeNil())
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 
-			By("check the mirror pod container image is updated")
+			ginkgo.By("check the mirror pod container image is updated")
 			pod, err = f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
-			Expect(err).ShouldNot(HaveOccurred())
-			Expect(len(pod.Spec.Containers)).Should(Equal(1))
-			Expect(pod.Spec.Containers[0].Image).Should(Equal(image))
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(len(pod.Spec.Containers), 1)
+			framework.ExpectEqual(pod.Spec.Containers[0].Image, image)
 		})
 		/*
 			Release : v1.9
 			Testname: Mirror Pod, delete
 			Description:  When a mirror-Pod is deleted then the mirror pod MUST be re-created. Create a static pod, verify that a mirror pod is created. Delete the mirror pod, the mirror pod MUST be re-created and running.
 		*/
-		It("should be recreated when mirror pod gracefully deleted [NodeConformance]", func() {
-			By("get mirror pod uid")
+		ginkgo.It("should be recreated when mirror pod gracefully deleted [NodeConformance]", func() {
+			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
-			Expect(err).ShouldNot(HaveOccurred())
+			framework.ExpectNoError(err)
 			uid := pod.UID
 
-			By("delete the mirror pod with grace period 30s")
+			ginkgo.By("delete the mirror pod with grace period 30s")
 			err = f.ClientSet.CoreV1().Pods(ns).Delete(mirrorPodName, metav1.NewDeleteOptions(30))
-			Expect(err).ShouldNot(HaveOccurred())
+			framework.ExpectNoError(err)
 
-			By("wait for the mirror pod to be recreated")
-			Eventually(func() error {
+			ginkgo.By("wait for the mirror pod to be recreated")
+			gomega.Eventually(func() error {
 				return checkMirrorPodRecreatedAndRunning(f.ClientSet, mirrorPodName, ns, uid)
-			}, 2*time.Minute, time.Second*4).Should(BeNil())
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 		/*
 			Release : v1.9
 			Testname: Mirror Pod, force delete
 			Description: When a mirror-Pod is deleted, forcibly, then the mirror pod MUST be re-created. Create a static pod, verify that a mirror pod is created. Delete the mirror pod with delete wait time set to zero forcing immediate deletion, the mirror pod MUST be re-created and running.
 		*/
-		It("should be recreated when mirror pod forcibly deleted [NodeConformance]", func() {
-			By("get mirror pod uid")
+		ginkgo.It("should be recreated when mirror pod forcibly deleted [NodeConformance]", func() {
+			ginkgo.By("get mirror pod uid")
 			pod, err := f.ClientSet.CoreV1().Pods(ns).Get(mirrorPodName, metav1.GetOptions{})
-			Expect(err).ShouldNot(HaveOccurred())
+			framework.ExpectNoError(err)
 			uid := pod.UID
 
-			By("delete the mirror pod with grace period 0s")
+			ginkgo.By("delete the mirror pod with grace period 0s")
 			err = f.ClientSet.CoreV1().Pods(ns).Delete(mirrorPodName, metav1.NewDeleteOptions(0))
-			Expect(err).ShouldNot(HaveOccurred())
+			framework.ExpectNoError(err)
 
-			By("wait for the mirror pod to be recreated")
-			Eventually(func() error {
+			ginkgo.By("wait for the mirror pod to be recreated")
+			gomega.Eventually(func() error {
 				return checkMirrorPodRecreatedAndRunning(f.ClientSet, mirrorPodName, ns, uid)
-			}, 2*time.Minute, time.Second*4).Should(BeNil())
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
-		AfterEach(func() {
-			By("delete the static pod")
+		ginkgo.AfterEach(func() {
+			ginkgo.By("delete the static pod")
 			err := deleteStaticPod(podPath, staticPodName, ns)
-			Expect(err).ShouldNot(HaveOccurred())
+			framework.ExpectNoError(err)
 
-			By("wait for the mirror pod to disappear")
-			Eventually(func() error {
+			ginkgo.By("wait for the mirror pod to disappear")
+			gomega.Eventually(func() error {
 				return checkMirrorPodDisappear(f.ClientSet, mirrorPodName, ns)
-			}, 2*time.Minute, time.Second*4).Should(BeNil())
+			}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())
 		})
 	})
 })

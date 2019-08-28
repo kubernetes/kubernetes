@@ -149,7 +149,7 @@ func TestRecycleSync(t *testing.T) {
 			noevents, noerrors,
 			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Mark the volume as Available before the recycler starts
-				reactor.MarkVolumeAvaiable("volume6-7")
+				reactor.MarkVolumeAvailable("volume6-7")
 			}),
 		},
 		{
@@ -165,7 +165,7 @@ func TestRecycleSync(t *testing.T) {
 			noevents, noerrors,
 			wrapTestWithInjectedOperation(wrapTestWithReclaimCalls(operationRecycle, []error{}, testSyncVolume), func(ctrl *PersistentVolumeController, reactor *pvtesting.VolumeReactor) {
 				// Mark the volume as Available before the recycler starts
-				reactor.MarkVolumeAvaiable("volume6-8")
+				reactor.MarkVolumeAvailable("volume6-8")
 			}),
 		},
 		{

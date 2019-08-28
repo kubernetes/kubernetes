@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 )
 
@@ -92,7 +93,7 @@ func (p *esLogProvider) Init() error {
 	err = nil
 	var body []byte
 	for start := time.Now(); time.Since(start) < esRetryTimeout; time.Sleep(esRetryDelay) {
-		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
+		proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 		if errProxy != nil {
 			e2elog.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
 			continue
@@ -126,7 +127,7 @@ func (p *esLogProvider) Init() error {
 	e2elog.Logf("Checking health of Elasticsearch service.")
 	healthy := false
 	for start := time.Now(); time.Since(start) < esRetryTimeout; time.Sleep(esRetryDelay) {
-		proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
+		proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 		if errProxy != nil {
 			e2elog.Logf("After %v failed to get services proxy request: %v", time.Since(start), errProxy)
 			continue
@@ -174,7 +175,7 @@ func (p *esLogProvider) Cleanup() {
 func (p *esLogProvider) ReadEntries(name string) []utils.LogEntry {
 	f := p.Framework
 
-	proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
+	proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 	if errProxy != nil {
 		e2elog.Logf("Failed to get services proxy request: %v", errProxy)
 		return nil

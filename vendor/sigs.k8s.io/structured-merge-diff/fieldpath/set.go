@@ -17,6 +17,7 @@ limitations under the License.
 package fieldpath
 
 import (
+	"sort"
 	"strings"
 )
 
@@ -172,24 +173,33 @@ type setNode struct {
 
 // SetNodeMap is a map of PathElement to subset.
 type SetNodeMap struct {
-	members map[string]setNode
+	members sortedSetNode
 }
+
+type sortedSetNode []setNode
+
+// Implement the sort interface; this would permit bulk creation, which would
+// be faster than doing it one at a time via Insert.
+func (s sortedSetNode) Len() int           { return len(s) }
+func (s sortedSetNode) Less(i, j int) bool { return s[i].pathElement.Less(s[j].pathElement) }
+func (s sortedSetNode) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
 
 // Descend adds pe to the set if necessary, returning the associated subset.
 func (s *SetNodeMap) Descend(pe PathElement) *Set {
-	serialized := pe.String()
-	if s.members == nil {
-		s.members = map[string]setNode{}
+	loc := sort.Search(len(s.members), func(i int) bool {
+		return !s.members[i].pathElement.Less(pe)
+	})
+	if loc == len(s.members) {
+		s.members = append(s.members, setNode{pathElement: pe, set: &Set{}})
+		return s.members[loc].set
 	}
-	if n, ok := s.members[serialized]; ok {
-		return n.set
+	if s.members[loc].pathElement.Equals(pe) {
+		return s.members[loc].set
 	}
-	ss := &Set{}
-	s.members[serialized] = setNode{
-		pathElement: pe,
-		set:         ss,
-	}
-	return ss
+	s.members = append(s.members, setNode{})
+	copy(s.members[loc+1:], s.members[loc:])
+	s.members[loc] = setNode{pathElement: pe, set: &Set{}}
+	return s.members[loc].set
 }
 
 // Size returns the sum of the number of members of all subsets.
@@ -213,12 +223,14 @@ func (s *SetNodeMap) Empty() bool {
 
 // Get returns (the associated set, true) or (nil, false) if there is none.
 func (s *SetNodeMap) Get(pe PathElement) (*Set, bool) {
-	if s.members == nil {
+	loc := sort.Search(len(s.members), func(i int) bool {
+		return !s.members[i].pathElement.Less(pe)
+	})
+	if loc == len(s.members) {
 		return nil, false
 	}
-	serialized := pe.String()
-	if n, ok := s.members[serialized]; ok {
-		return n.set, true
+	if s.members[loc].pathElement.Equals(pe) {
+		return s.members[loc].set, true
 	}
 	return nil, false
 }
@@ -229,12 +241,11 @@ func (s *SetNodeMap) Equals(s2 *SetNodeMap) bool {
 	if len(s.members) != len(s2.members) {
 		return false
 	}
-	for k, v := range s.members {
-		v2, ok := s2.members[k]
-		if !ok {
+	for i := range s.members {
+		if !s.members[i].pathElement.Equals(s2.members[i].pathElement) {
 			return false
 		}
-		if !v.set.Equals(v2.set) {
+		if !s.members[i].set.Equals(s2.members[i].set) {
 			return false
 		}
 	}
@@ -244,21 +255,28 @@ func (s *SetNodeMap) Equals(s2 *SetNodeMap) bool {
 // Union returns a SetNodeMap with members that appear in either s or s2.
 func (s *SetNodeMap) Union(s2 *SetNodeMap) *SetNodeMap {
 	out := &SetNodeMap{}
-	for k, sn := range s.members {
-		pe := sn.pathElement
-		if sn2, ok := s2.members[k]; ok {
-			*out.Descend(pe) = *sn.set.Union(sn2.set)
+
+	i, j := 0, 0
+	for i < len(s.members) && j < len(s2.members) {
+		if s.members[i].pathElement.Less(s2.members[j].pathElement) {
+			out.members = append(out.members, s.members[i])
+			i++
 		} else {
-			*out.Descend(pe) = *sn.set
+			if !s2.members[j].pathElement.Less(s.members[i].pathElement) {
+				out.members = append(out.members, setNode{pathElement: s.members[i].pathElement, set: s.members[i].set.Union(s2.members[j].set)})
+				i++
+			} else {
+				out.members = append(out.members, s2.members[j])
+			}
+			j++
 		}
 	}
-	for k, sn2 := range s2.members {
-		pe := sn2.pathElement
-		if _, ok := s.members[k]; ok {
-			// already handled
-			continue
-		}
-		*out.Descend(pe) = *sn2.set
+
+	if i < len(s.members) {
+		out.members = append(out.members, s.members[i:]...)
+	}
+	if j < len(s2.members) {
+		out.members = append(out.members, s2.members[j:]...)
 	}
 	return out
 }
@@ -266,13 +284,20 @@ func (s *SetNodeMap) Union(s2 *SetNodeMap) *SetNodeMap {
 // Intersection returns a SetNodeMap with members that appear in both s and s2.
 func (s *SetNodeMap) Intersection(s2 *SetNodeMap) *SetNodeMap {
 	out := &SetNodeMap{}
-	for k, sn := range s.members {
-		pe := sn.pathElement
-		if sn2, ok := s2.members[k]; ok {
-			i := *sn.set.Intersection(sn2.set)
-			if !i.Empty() {
-				*out.Descend(pe) = i
+
+	i, j := 0, 0
+	for i < len(s.members) && j < len(s2.members) {
+		if s.members[i].pathElement.Less(s2.members[j].pathElement) {
+			i++
+		} else {
+			if !s2.members[j].pathElement.Less(s.members[i].pathElement) {
+				res := s.members[i].set.Intersection(s2.members[j].set)
+				if !res.Empty() {
+					out.members = append(out.members, setNode{pathElement: s.members[i].pathElement, set: res})
+				}
+				i++
 			}
+			j++
 		}
 	}
 	return out
@@ -281,17 +306,29 @@ func (s *SetNodeMap) Intersection(s2 *SetNodeMap) *SetNodeMap {
 // Difference returns a SetNodeMap with members that appear in s but not in s2.
 func (s *SetNodeMap) Difference(s2 *Set) *SetNodeMap {
 	out := &SetNodeMap{}
-	for k, sn := range s.members {
-		pe := sn.pathElement
-		if sn2, ok := s2.Children.members[k]; ok {
-			diff := *sn.set.Difference(sn2.set)
-			// We aren't permitted to add nodes with no elements.
-			if !diff.Empty() {
-				*out.Descend(pe) = diff
-			}
+
+	i, j := 0, 0
+	for i < len(s.members) && j < len(s2.Children.members) {
+		if s.members[i].pathElement.Less(s2.Children.members[j].pathElement) {
+			out.members = append(out.members, setNode{pathElement: s.members[i].pathElement, set: s.members[i].set})
+			i++
 		} else {
-			*out.Descend(pe) = *sn.set
+			if !s2.Children.members[j].pathElement.Less(s.members[i].pathElement) {
+
+				diff := s.members[i].set.Difference(s2.Children.members[j].set)
+				// We aren't permitted to add nodes with no elements.
+				if !diff.Empty() {
+					out.members = append(out.members, setNode{pathElement: s.members[i].pathElement, set: diff})
+				}
+
+				i++
+			}
+			j++
 		}
+	}
+
+	if i < len(s.members) {
+		out.members = append(out.members, s.members[i:]...)
 	}
 	return out
 }

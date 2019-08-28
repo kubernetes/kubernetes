@@ -31,7 +31,7 @@ func TestValidateKernelVersion(t *testing.T) {
 	// they may be different.
 	// This is fine, because the test mainly tests the kernel version validation logic,
 	// not the DefaultSysSpec. The DefaultSysSpec should be tested with node e2e.
-	testRegex := []string{`3\.[1-9][0-9].*`, `4\..*`}
+	testRegex := []string{`^3\.[1-9][0-9].*$`, `^([4-9]|[1-9][0-9]+)\.([0-9]+)\.([0-9]+).*$`}
 	for _, test := range []struct {
 		name    string
 		version string
@@ -53,9 +53,19 @@ func TestValidateKernelVersion(t *testing.T) {
 			err:     true,
 		},
 		{
-			name:    "5.0.0 no version regex matches",
+			name:    "5.0.0 one of version regexes matches",
 			version: "5.0.0",
-			err:     true,
+			err:     false,
+		},
+		{
+			name:    "10.21.1 one of version regexes matches",
+			version: "10.21.1",
+			err:     false,
+		},
+		{
+			name:    "99.12.12 one of version regexes matches",
+			version: "99.12.12",
+			err:     false,
 		},
 		{
 			name:    "3.9.0 no version regex matches",

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -20,27 +22,33 @@ import (
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var (
-	awsAPIMetric = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name: "cloudprovider_aws_api_request_duration_seconds",
-			Help: "Latency of AWS API calls",
+	awsAPIMetric = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Name:           "cloudprovider_aws_api_request_duration_seconds",
+			Help:           "Latency of AWS API calls",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"request"})
 
-	awsAPIErrorMetric = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "cloudprovider_aws_api_request_errors",
-			Help: "AWS API errors",
+	awsAPIErrorMetric = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "cloudprovider_aws_api_request_errors",
+			Help:           "AWS API errors",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"request"})
 
-	awsAPIThrottlesMetric = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "cloudprovider_aws_api_throttled_requests_total",
-			Help: "AWS API throttled requests",
+	awsAPIThrottlesMetric = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "cloudprovider_aws_api_throttled_requests_total",
+			Help:           "AWS API throttled requests",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_name"})
 )
@@ -61,8 +69,8 @@ var registerOnce sync.Once
 
 func registerMetrics() {
 	registerOnce.Do(func() {
-		prometheus.MustRegister(awsAPIMetric)
-		prometheus.MustRegister(awsAPIErrorMetric)
-		prometheus.MustRegister(awsAPIThrottlesMetric)
+		legacyregistry.MustRegister(awsAPIMetric)
+		legacyregistry.MustRegister(awsAPIErrorMetric)
+		legacyregistry.MustRegister(awsAPIThrottlesMetric)
 	})
 }

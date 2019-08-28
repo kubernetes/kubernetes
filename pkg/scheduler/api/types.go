@@ -19,7 +19,7 @@ package api
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -147,10 +147,11 @@ type LabelPreference struct {
 	Presence bool
 }
 
-// RequestedToCapacityRatioArguments holds arguments specific to RequestedToCapacityRatio priority function
+// RequestedToCapacityRatioArguments holds arguments specific to RequestedToCapacityRatio priority function.
 type RequestedToCapacityRatioArguments struct {
 	// Array of point defining priority function shape
 	UtilizationShape []UtilizationShapePoint
+	Resources        []ResourceSpec
 }
 
 // UtilizationShapePoint represents single point of priority function shape
@@ -159,6 +160,14 @@ type UtilizationShapePoint struct {
 	Utilization int
 	// Score assigned to given utilization (y axis). Valid values are 0 to 10.
 	Score int
+}
+
+// ResourceSpec represents single resource for bin packing of priority RequestedToCapacityRatioArguments.
+type ResourceSpec struct {
+	// Name of the resource to be managed by RequestedToCapacityRatio function.
+	Name v1.ResourceName
+	// Weight of the resource.
+	Weight int
 }
 
 // ExtenderManagedResource describes the arguments of extended resources

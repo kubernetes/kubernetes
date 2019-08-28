@@ -14,9 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
-    fields:
-      "18":
-        "19": null
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -28,24 +26,24 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "16964250748386560239"
+  resourceVersion: "11042405498087606203"
   selfLink: "5"
-  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+  uid: "7"
 spec:
   extra:
-    "27":
-    - "28"
+    "22":
+    - "23"
   groups:
-  - "26"
-  request: cQ==
-  uid: "25"
+  - "21"
+  request: OA==
+  uid: "20"
   usages:
-  - Ƣ6/ʕVŚ(ĿȊ甞
-  username: "24"
+  - J枊a
+  username: "19"
 status:
-  certificate: WQ==
+  certificate: 9Q==
   conditions:
-  - lastUpdateTime: "2050-07-09T05:54:12Z"
-    message: "30"
-    reason: "29"
-    type: 憍峕?狱³-Ǐ忄*
+  - lastUpdateTime: "2901-11-14T22:54:07Z"
+    message: "25"
+    reason: "24"
+    type: o,c鮽ort昍řČ扷5Ɨ

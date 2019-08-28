@@ -253,8 +253,8 @@ func convertToNodeNameToVictims(
 }
 
 // Filter based on extender implemented predicate functions. The filtered list is
-// expected to be a subset of the supplied list. failedNodesMap optionally contains
-// the list of failed nodes and failure reasons.
+// expected to be a subset of the supplied list; otherwise the function returns an error.
+// failedNodesMap optionally contains the list of failed nodes and failure reasons.
 func (h *HTTPExtender) Filter(
 	pod *v1.Pod,
 	nodes []*v1.Node, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
@@ -298,14 +298,20 @@ func (h *HTTPExtender) Filter(
 	}
 
 	if h.nodeCacheCapable && result.NodeNames != nil {
-		nodeResult = make([]*v1.Node, 0, len(*result.NodeNames))
-		for i := range *result.NodeNames {
-			nodeResult = append(nodeResult, nodeNameToInfo[(*result.NodeNames)[i]].Node())
+		nodeResult = make([]*v1.Node, len(*result.NodeNames))
+		for i, nodeName := range *result.NodeNames {
+			if node, ok := nodeNameToInfo[nodeName]; ok {
+				nodeResult[i] = node.Node()
+			} else {
+				return nil, nil, fmt.Errorf(
+					"extender %q claims a filtered node %q which is not found in nodeNameToInfo map",
+					h.extenderURL, nodeName)
+			}
 		}
 	} else if result.Nodes != nil {
-		nodeResult = make([]*v1.Node, 0, len(result.Nodes.Items))
+		nodeResult = make([]*v1.Node, len(result.Nodes.Items))
 		for i := range result.Nodes.Items {
-			nodeResult = append(nodeResult, &result.Nodes.Items[i])
+			nodeResult[i] = &result.Nodes.Items[i]
 		}
 	}
 

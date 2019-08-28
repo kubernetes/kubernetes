@@ -22,16 +22,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+
+	"k8s.io/component-base/metrics/legacyregistry"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 func TestRecordOperation(t *testing.T) {
-	prometheus.MustRegister(metrics.RuntimeOperations)
-	prometheus.MustRegister(metrics.RuntimeOperationsDuration)
-	prometheus.MustRegister(metrics.RuntimeOperationsErrors)
+	legacyregistry.MustRegister(metrics.RuntimeOperations)
+	legacyregistry.MustRegister(metrics.RuntimeOperationsDuration)
+	legacyregistry.MustRegister(metrics.RuntimeOperationsErrors)
 
 	temporalServer := "127.0.0.1:1234"
 	l, err := net.Listen("tcp", temporalServer)
@@ -40,7 +41,8 @@ func TestRecordOperation(t *testing.T) {
 
 	prometheusURL := "http://" + temporalServer + "/metrics"
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", prometheus.Handler())
+	//lint:ignore SA1019 ignore deprecated warning until we move off of global registries
+	mux.Handle("/metrics", legacyregistry.Handler())
 	server := &http.Server{
 		Addr:    temporalServer,
 		Handler: mux,

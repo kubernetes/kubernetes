@@ -21,7 +21,10 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog"
 	metricutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -56,8 +59,8 @@ type PVCLister interface {
 // Register all metrics for pv controller.
 func Register(pvLister PVLister, pvcLister PVCLister) {
 	registerMetrics.Do(func() {
-		prometheus.MustRegister(newPVAndPVCCountCollector(pvLister, pvcLister))
-		prometheus.MustRegister(volumeOperationErrorsMetric)
+		legacyregistry.RawMustRegister(newPVAndPVCCountCollector(pvLister, pvcLister))
+		legacyregistry.MustRegister(volumeOperationErrorsMetric)
 	})
 }
 
@@ -92,10 +95,11 @@ var (
 		"Gauge measuring number of persistent volume claim currently unbound",
 		[]string{namespaceLabel}, nil)
 
-	volumeOperationErrorsMetric = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "volume_operation_total_errors",
-			Help: "Total volume operation erros",
+	volumeOperationErrorsMetric = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "volume_operation_total_errors",
+			Help:           "Total volume operation erros",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin_name", "operation_name"})
 )

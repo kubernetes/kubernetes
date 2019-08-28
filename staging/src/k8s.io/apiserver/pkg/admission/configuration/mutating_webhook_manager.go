@@ -93,7 +93,7 @@ func mergeMutatingWebhookConfigurations(configurations []*v1beta1.MutatingWebhoo
 			n := c.Webhooks[i].Name
 			uid := fmt.Sprintf("%s/%s/%d", c.Name, n, names[n])
 			names[n]++
-			accessors = append(accessors, webhook.NewMutatingWebhookAccessor(uid, &c.Webhooks[i]))
+			accessors = append(accessors, webhook.NewMutatingWebhookAccessor(uid, c.Name, &c.Webhooks[i]))
 		}
 	}
 	return accessors

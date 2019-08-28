@@ -17,6 +17,7 @@ limitations under the License.
 package podtolerationrestriction
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -73,7 +74,7 @@ type Plugin struct {
 }
 
 // Admit checks the admission policy and triggers corresponding actions
-func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}
@@ -83,7 +84,7 @@ func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) err
 	}
 
 	pod := a.GetObject().(*api.Pod)
-	var finalTolerations []api.Toleration
+	var extraTolerations []api.Toleration
 	if a.GetOperation() == admission.Create {
 		ts, err := p.getNamespaceDefaultTolerations(a.GetNamespace())
 		if err != nil {
@@ -96,42 +97,25 @@ func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) err
 			ts = p.pluginConfig.Default
 		}
 
-		if len(ts) > 0 {
-			if len(pod.Spec.Tolerations) > 0 {
-				if tolerations.IsConflict(ts, pod.Spec.Tolerations) {
-					return fmt.Errorf("namespace tolerations and pod tolerations conflict")
-				}
-
-				// modified pod tolerations = namespace tolerations + current pod tolerations
-				finalTolerations = tolerations.MergeTolerations(ts, pod.Spec.Tolerations)
-			} else {
-				finalTolerations = ts
-
-			}
-		} else {
-			finalTolerations = pod.Spec.Tolerations
-		}
-	} else {
-		finalTolerations = pod.Spec.Tolerations
+		extraTolerations = ts
 	}
 
 	if qoshelper.GetPodQOS(pod) != api.PodQOSBestEffort {
-		finalTolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{
-			{
-				Key:      schedulerapi.TaintNodeMemoryPressure,
-				Operator: api.TolerationOpExists,
-				Effect:   api.TaintEffectNoSchedule,
-			},
+		extraTolerations = append(extraTolerations, api.Toleration{
+			Key:      schedulerapi.TaintNodeMemoryPressure,
+			Operator: api.TolerationOpExists,
+			Effect:   api.TaintEffectNoSchedule,
 		})
 	}
-	// Final merge of tolerations irrespective of pod type, if the user while creating pods gives
-	// conflicting tolerations(with same key+effect), the existing ones should be overwritten by latest one
-	pod.Spec.Tolerations = tolerations.MergeTolerations(finalTolerations, []api.Toleration{})
-	return p.Validate(a, o)
+	// Final merge of tolerations irrespective of pod type.
+	if len(extraTolerations) > 0 {
+		pod.Spec.Tolerations = tolerations.MergeTolerations(pod.Spec.Tolerations, extraTolerations)
+	}
+	return p.Validate(ctx, a, o)
 }
 
 // Validate we can obtain a whitelist of tolerations
-func (p *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if shouldIgnore(a) {
 		return nil
 	}

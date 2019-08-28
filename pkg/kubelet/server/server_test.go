@@ -43,7 +43,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -289,13 +288,11 @@ func (f *fakeAuth) Authorize(a authorizer.Attributes) (authorized authorizer.Dec
 }
 
 type serverTestFramework struct {
-	serverUnderTest         *Server
-	fakeKubelet             *fakeKubelet
-	fakeAuth                *fakeAuth
-	testHTTPServer          *httptest.Server
-	fakeRuntime             *fakeRuntime
-	testStreamingHTTPServer *httptest.Server
-	criHandler              *utiltesting.FakeHandler
+	serverUnderTest *Server
+	fakeKubelet     *fakeKubelet
+	fakeAuth        *fakeAuth
+	testHTTPServer  *httptest.Server
+	criHandler      *utiltesting.FakeHandler
 }
 
 func newServerTest() *serverTestFramework {
@@ -677,149 +674,90 @@ func assertHealthFails(t *testing.T, httpURL string, expectedErrorCode int) {
 	}
 }
 
-type authTestCase struct {
-	Method string
-	Path   string
+// Ensure all registered handlers & services have an associated testcase.
+func TestAuthzCoverage(t *testing.T) {
+	fw := newServerTest()
+	defer fw.testHTTPServer.Close()
+
+	// method:path -> has coverage
+	expectedCases := map[string]bool{}
+
+	// Test all the non-web-service handlers
+	for _, path := range fw.serverUnderTest.restfulCont.RegisteredHandlePaths() {
+		expectedCases["GET:"+path] = false
+		expectedCases["POST:"+path] = false
+	}
+
+	// Test all the generated web-service paths
+	for _, ws := range fw.serverUnderTest.restfulCont.RegisteredWebServices() {
+		for _, r := range ws.Routes() {
+			expectedCases[r.Method+":"+r.Path] = false
+		}
+	}
+
+	// This is a sanity check that the Handle->HandleWithFilter() delegation is working
+	// Ideally, these would move to registered web services and this list would get shorter
+	expectedPaths := []string{"/healthz", "/metrics", "/metrics/cadvisor"}
+	for _, expectedPath := range expectedPaths {
+		if _, expected := expectedCases["GET:"+expectedPath]; !expected {
+			t.Errorf("Expected registered handle path %s was missing", expectedPath)
+		}
+	}
+
+	for _, tc := range AuthzTestCases() {
+		expectedCases[tc.Method+":"+tc.Path] = true
+	}
+
+	for tc, found := range expectedCases {
+		if !found {
+			t.Errorf("Missing authz test case for %s", tc)
+		}
+	}
 }
 
 func TestAuthFilters(t *testing.T) {
 	fw := newServerTest()
 	defer fw.testHTTPServer.Close()
 
-	testcases := []authTestCase{}
+	attributesGetter := NewNodeAuthorizerAttributesGetter(authzTestNodeName)
 
-	// This is a sanity check that the Handle->HandleWithFilter() delegation is working
-	// Ideally, these would move to registered web services and this list would get shorter
-	expectedPaths := []string{"/healthz", "/metrics", "/metrics/cadvisor"}
-	paths := sets.NewString(fw.serverUnderTest.restfulCont.RegisteredHandlePaths()...)
-	for _, expectedPath := range expectedPaths {
-		if !paths.Has(expectedPath) {
-			t.Errorf("Expected registered handle path %s was missing", expectedPath)
-		}
-	}
+	for _, tc := range AuthzTestCases() {
+		t.Run(tc.Method+":"+tc.Path, func(t *testing.T) {
+			var (
+				expectedUser = AuthzTestUser()
 
-	// Test all the non-web-service handlers
-	for _, path := range fw.serverUnderTest.restfulCont.RegisteredHandlePaths() {
-		testcases = append(testcases, authTestCase{"GET", path})
-		testcases = append(testcases, authTestCase{"POST", path})
-		// Test subpaths for directory handlers
-		if strings.HasSuffix(path, "/") {
-			testcases = append(testcases, authTestCase{"GET", path + "foo"})
-			testcases = append(testcases, authTestCase{"POST", path + "foo"})
-		}
-	}
+				calledAuthenticate = false
+				calledAuthorize    = false
+				calledAttributes   = false
+			)
 
-	// Test all the generated web-service paths
-	for _, ws := range fw.serverUnderTest.restfulCont.RegisteredWebServices() {
-		for _, r := range ws.Routes() {
-			testcases = append(testcases, authTestCase{r.Method, r.Path})
-		}
-	}
-
-	methodToAPIVerb := map[string]string{"GET": "get", "POST": "create", "PUT": "update"}
-	pathToSubresource := func(path string) string {
-		switch {
-		// Cases for subpaths we expect specific subresources for
-		case isSubpath(path, statsPath):
-			return "stats"
-		case isSubpath(path, specPath):
-			return "spec"
-		case isSubpath(path, logsPath):
-			return "log"
-		case isSubpath(path, metricsPath):
-			return "metrics"
-
-		// Cases for subpaths we expect to map to the "proxy" subresource
-		case isSubpath(path, "/attach"),
-			isSubpath(path, "/configz"),
-			isSubpath(path, "/containerLogs"),
-			isSubpath(path, "/debug"),
-			isSubpath(path, "/exec"),
-			isSubpath(path, "/healthz"),
-			isSubpath(path, "/pods"),
-			isSubpath(path, "/portForward"),
-			isSubpath(path, "/run"),
-			isSubpath(path, "/runningpods"),
-			isSubpath(path, "/cri"):
-			return "proxy"
-
-		default:
-			panic(fmt.Errorf(`unexpected kubelet API path %s.
-The kubelet API has likely registered a handler for a new path.
-If the new path has a use case for partitioned authorization when requested from the kubelet API,
-add a specific subresource for it in auth.go#GetRequestAttributes() and in TestAuthFilters().
-Otherwise, add it to the expected list of paths that map to the "proxy" subresource in TestAuthFilters()`, path))
-		}
-	}
-	attributesGetter := NewNodeAuthorizerAttributesGetter(types.NodeName("test"))
-
-	for _, tc := range testcases {
-		var (
-			expectedUser       = &user.DefaultInfo{Name: "test"}
-			expectedAttributes = authorizer.AttributesRecord{
-				User:            expectedUser,
-				APIGroup:        "",
-				APIVersion:      "v1",
-				Verb:            methodToAPIVerb[tc.Method],
-				Resource:        "nodes",
-				Name:            "test",
-				Subresource:     pathToSubresource(tc.Path),
-				ResourceRequest: true,
-				Path:            tc.Path,
+			fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
+				calledAuthenticate = true
+				return &authenticator.Response{User: expectedUser}, true, nil
+			}
+			fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
+				calledAttributes = true
+				require.Equal(t, expectedUser, u)
+				return attributesGetter.GetRequestAttributes(u, req)
+			}
+			fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+				calledAuthorize = true
+				tc.AssertAttributes(t, a)
+				return authorizer.DecisionNoOpinion, "", nil
 			}
 
-			calledAuthenticate = false
-			calledAuthorize    = false
-			calledAttributes   = false
-		)
+			req, err := http.NewRequest(tc.Method, fw.testHTTPServer.URL+tc.Path, nil)
+			require.NoError(t, err)
 
-		fw.fakeAuth.authenticateFunc = func(req *http.Request) (*authenticator.Response, bool, error) {
-			calledAuthenticate = true
-			return &authenticator.Response{User: expectedUser}, true, nil
-		}
-		fw.fakeAuth.attributesFunc = func(u user.Info, req *http.Request) authorizer.Attributes {
-			calledAttributes = true
-			if u != expectedUser {
-				t.Fatalf("%s: expected user %v, got %v", tc.Path, expectedUser, u)
-			}
-			return attributesGetter.GetRequestAttributes(u, req)
-		}
-		fw.fakeAuth.authorizeFunc = func(a authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
-			calledAuthorize = true
-			if a != expectedAttributes {
-				t.Fatalf("%s: expected attributes\n\t%#v\ngot\n\t%#v", tc.Path, expectedAttributes, a)
-			}
-			return authorizer.DecisionNoOpinion, "", nil
-		}
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			defer resp.Body.Close()
 
-		req, err := http.NewRequest(tc.Method, fw.testHTTPServer.URL+tc.Path, nil)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.Path, err)
-			continue
-		}
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			t.Errorf("%s: unexpected error: %v", tc.Path, err)
-			continue
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusForbidden {
-			t.Errorf("%s: unexpected status code %d", tc.Path, resp.StatusCode)
-			continue
-		}
-
-		if !calledAuthenticate {
-			t.Errorf("%s: Authenticate was not called", tc.Path)
-			continue
-		}
-		if !calledAttributes {
-			t.Errorf("%s: Attributes were not called", tc.Path)
-			continue
-		}
-		if !calledAuthorize {
-			t.Errorf("%s: Authorize was not called", tc.Path)
-			continue
-		}
+			assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+			assert.True(t, calledAuthenticate, "Authenticate was not called")
+			assert.True(t, calledAttributes, "Attributes were not called")
+			assert.True(t, calledAuthorize, "Authorize was not called")
+		})
 	}
 }
 

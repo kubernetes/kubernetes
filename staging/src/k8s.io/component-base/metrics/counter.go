@@ -55,7 +55,7 @@ func (c *Counter) setPrometheusCounter(counter prometheus.Counter) {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (c *Counter) DeprecatedVersion() *semver.Version {
-	return c.CounterOpts.DeprecatedVersion
+	return parseSemver(c.CounterOpts.DeprecatedVersion)
 }
 
 // initializeMetric invocation creates the actual underlying Counter. Until this method is called
@@ -102,7 +102,8 @@ func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (v *CounterVec) DeprecatedVersion() *semver.Version {
-	return v.CounterOpts.DeprecatedVersion
+	return parseSemver(v.CounterOpts.DeprecatedVersion)
+
 }
 
 // initializeMetric invocation creates the actual underlying CounterVec. Until this method is called
@@ -147,4 +148,18 @@ func (v *CounterVec) With(labels prometheus.Labels) CounterMetric {
 		return noop // return no-op counter
 	}
 	return v.CounterVec.With(labels)
+}
+
+// Delete deletes the metric where the variable labels are the same as those
+// passed in as labels. It returns true if a metric was deleted.
+//
+// It is not an error if the number and names of the Labels are inconsistent
+// with those of the VariableLabels in Desc. However, such inconsistent Labels
+// can never match an actual metric, so the method will always return false in
+// that case.
+func (v *CounterVec) Delete(labels prometheus.Labels) bool {
+	if !v.IsCreated() {
+		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
+	}
+	return v.CounterVec.Delete(labels)
 }

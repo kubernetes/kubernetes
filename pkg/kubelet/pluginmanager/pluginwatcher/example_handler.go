@@ -39,8 +39,7 @@ type exampleHandler struct {
 
 	eventChans map[string]chan examplePluginEvent // map[pluginName]eventChan
 
-	m     sync.Mutex
-	count int
+	m sync.Mutex
 
 	permitDeprecatedDir bool
 }
@@ -95,7 +94,7 @@ func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string, versions []
 	// Verifies the grpcServer is ready to serve services.
 	_, conn, err := dial(endpoint, time.Second)
 	if err != nil {
-		return fmt.Errorf("Failed dialing endpoint (%s): %v", endpoint, err)
+		return fmt.Errorf("failed dialing endpoint (%s): %v", endpoint, err)
 	}
 	defer conn.Close()
 
@@ -106,13 +105,13 @@ func (p *exampleHandler) RegisterPlugin(pluginName, endpoint string, versions []
 	// Tests v1beta1 GetExampleInfo
 	_, err = v1beta1Client.GetExampleInfo(context.Background(), &v1beta1.ExampleRequest{})
 	if err != nil {
-		return fmt.Errorf("Failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
+		return fmt.Errorf("failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
 	}
 
 	// Tests v1beta1 GetExampleInfo
 	_, err = v1beta2Client.GetExampleInfo(context.Background(), &v1beta2.ExampleRequest{})
 	if err != nil {
-		return fmt.Errorf("Failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
+		return fmt.Errorf("failed GetExampleInfo for v1beta2Client(%s): %v", endpoint, err)
 	}
 
 	return nil

@@ -4,7 +4,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["fake_lister.go"],
+    srcs = [
+        "fake_lister.go",
+        "workload_prep.go",
+        "wrappers.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/testing",
     deps = [
         "//pkg/scheduler/algorithm:go_default_library",

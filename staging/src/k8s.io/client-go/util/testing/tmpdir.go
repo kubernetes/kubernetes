@@ -33,7 +33,7 @@ func MkTmpdir(prefix string) (string, error) {
 	return tmpDir, nil
 }
 
-// MkTmpdir does the same work as "MkTmpdir", except in case of
+// MkTmpdirOrDie does the same work as "MkTmpdir", except in case of
 // errors, it'll trigger a panic.
 func MkTmpdirOrDie(prefix string) string {
 	tmpDir, err := MkTmpdir(prefix)

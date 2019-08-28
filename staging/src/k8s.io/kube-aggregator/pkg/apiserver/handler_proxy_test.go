@@ -32,10 +32,12 @@ import (
 	"golang.org/x/net/websocket"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/proxy"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	apiregistration "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/utils/pointer"
 )
 
 type targetHTTPHandler struct {
@@ -118,7 +120,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{},
+					Service: &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
 					Group:   "foo",
 					Version: "v1",
 				},
@@ -140,7 +142,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:               &apiregistration.ServiceReference{},
+					Service:               &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
 					Group:                 "foo",
 					Version:               "v1",
 					InsecureSkipTLSVerify: true,
@@ -172,7 +174,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: 443},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
 					Group:    "foo",
 					Version:  "v1",
 					CABundle: testCACrt,
@@ -204,7 +206,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: 443},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
 					Group:    "foo",
 					Version:  "v1",
 					CABundle: testCACrt,
@@ -227,7 +229,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service:  &apiregistration.ServiceReference{Name: "bad-service", Namespace: "test-ns", Port: 443},
+					Service:  &apiregistration.ServiceReference{Name: "bad-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
 					Group:    "foo",
 					Version:  "v1",
 					CABundle: testCACrt,
@@ -249,7 +251,7 @@ func TestProxyHandler(t *testing.T) {
 			apiService: &apiregistration.APIService{
 				ObjectMeta: metav1.ObjectMeta{Name: "v1.foo"},
 				Spec: apiregistration.APIServiceSpec{
-					Service: &apiregistration.ServiceReference{},
+					Service: &apiregistration.ServiceReference{Port: pointer.Int32Ptr(443)},
 					Group:   "foo",
 					Version: "v1",
 				},
@@ -336,7 +338,7 @@ func TestProxyUpgrade(t *testing.T) {
 					CABundle: testCACrt,
 					Group:    "mygroup",
 					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: 443},
+					Service:  &apiregistration.ServiceReference{Name: "test-service", Namespace: "test-ns", Port: pointer.Int32Ptr(443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -353,7 +355,7 @@ func TestProxyUpgrade(t *testing.T) {
 					InsecureSkipTLSVerify: true,
 					Group:                 "mygroup",
 					Version:               "v1",
-					Service:               &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: 443},
+					Service:               &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: pointer.Int32Ptr(443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -370,7 +372,7 @@ func TestProxyUpgrade(t *testing.T) {
 					CABundle: testCACrt,
 					Group:    "mygroup",
 					Version:  "v1",
-					Service:  &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: 443},
+					Service:  &apiregistration.ServiceReference{Name: "invalid-service", Namespace: "invalid-ns", Port: pointer.Int32Ptr(443)},
 				},
 				Status: apiregistration.APIServiceStatus{
 					Conditions: []apiregistration.APIServiceCondition{
@@ -522,3 +524,45 @@ gR0TAoGACFOvhl8txfbkwLeuNeunyOPL7J4nIccthgd2ioFOr3HTou6wzN++vYTa
 a3OF9jH5Z7m6X1rrwn6J1+Gw9sBme38/GeGXHigsBI/8WaTvyuppyVIXOVPoTvVf
 VYsTwo5YgV1HzDkV+BNmBCw1GYcGXAElhJI+dCsgQuuU6TKzgl8=
 -----END RSA PRIVATE KEY-----`)
+
+func TestGetContextForNewRequest(t *testing.T) {
+	done := make(chan struct{})
+	server := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		<-done // never return so that we're certain to return base on timeout
+	}))
+	defer server.Close()
+	defer close(done)
+
+	proxyServer := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		location, err := url.Parse(server.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		location.Path = req.URL.Path
+
+		nestedReq := req.WithContext(genericapirequest.WithRequestInfo(req.Context(), &genericapirequest.RequestInfo{Path: req.URL.Path}))
+		newReq, cancelFn := newRequestForProxy(location, nestedReq, true)
+		defer cancelFn()
+
+		theproxy := proxy.NewUpgradeAwareHandler(location, server.Client().Transport, true, false, &responder{w: w})
+		theproxy.ServeHTTP(w, newReq)
+	}))
+	defer proxyServer.Close()
+
+	// normal clients will not be setting a timeout, don't set one here.  Our proxy logic should construct this for us
+	resp, err := proxyServer.Client().Get(proxyServer.URL + "/apis/group/version")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusServiceUnavailable {
+		t.Error(err)
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "Error trying to reach service: 'context deadline exceeded'") {
+		t.Error(string(body))
+	}
+
+}

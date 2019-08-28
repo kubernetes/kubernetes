@@ -187,11 +187,7 @@ func validateVolumeAttachmentSource(source *storage.VolumeAttachmentSource, fldP
 			allErrs = append(allErrs, field.Required(fldPath.Child("persistentVolumeName"), "must specify non empty persistentVolumeName"))
 		}
 	case source.InlineVolumeSpec != nil:
-		if utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
-			allErrs = append(allErrs, storagevalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"))...)
-		} else {
-			allErrs = append(allErrs, field.Forbidden(fldPath, "may not specify inlineVolumeSpec when CSIMigration feature is disabled"))
-		}
+		allErrs = append(allErrs, storagevalidation.ValidatePersistentVolumeSpec(source.InlineVolumeSpec, "", true, fldPath.Child("inlineVolumeSpec"))...)
 	}
 	return allErrs
 }
@@ -423,6 +419,7 @@ func validateCSIDriverSpec(
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, validateAttachRequired(spec.AttachRequired, fldPath.Child("attachedRequired"))...)
 	allErrs = append(allErrs, validatePodInfoOnMount(spec.PodInfoOnMount, fldPath.Child("podInfoOnMount"))...)
+	allErrs = append(allErrs, validateVolumeLifecycleModes(spec.VolumeLifecycleModes, fldPath.Child("volumeLifecycleModes"))...)
 	return allErrs
 }
 
@@ -441,6 +438,24 @@ func validatePodInfoOnMount(podInfoOnMount *bool, fldPath *field.Path) field.Err
 	allErrs := field.ErrorList{}
 	if podInfoOnMount == nil {
 		allErrs = append(allErrs, field.Required(fldPath, ""))
+	}
+
+	return allErrs
+}
+
+// validateVolumeLifecycleModes tests if mode has one of the allowed values.
+func validateVolumeLifecycleModes(modes []storage.VolumeLifecycleMode, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	for _, mode := range modes {
+		switch mode {
+		case storage.VolumeLifecyclePersistent, storage.VolumeLifecycleEphemeral:
+		default:
+			allErrs = append(allErrs, field.NotSupported(fldPath, mode,
+				[]string{
+					string(storage.VolumeLifecyclePersistent),
+					string(storage.VolumeLifecycleEphemeral),
+				}))
+		}
 	}
 
 	return allErrs

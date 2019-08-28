@@ -17,6 +17,7 @@ limitations under the License.
 package storageobjectinuseprotection
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -136,7 +137,7 @@ func TestAdmit(t *testing.T) {
 				nil,   // userInfo
 			)
 
-			err := ctrl.Admit(attrs, nil)
+			err := ctrl.Admit(context.TODO(), attrs, nil)
 			if err != nil {
 				t.Errorf("Test %q: got unexpected error: %v", test.name, err)
 			}

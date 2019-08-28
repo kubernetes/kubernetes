@@ -25,43 +25,43 @@ import (
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
-	"k8s.io/kube-aggregator/pkg/client/clientset_generated/internalclientset/fake"
-	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/internalversion"
+	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	"k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset/fake"
+	listers "k8s.io/kube-aggregator/pkg/client/listers/apiregistration/v1"
 )
 
-func newAutoRegisterManagedAPIService(name string) *apiregistration.APIService {
-	return &apiregistration.APIService{
+func newAutoRegisterManagedAPIService(name string) *apiregistrationv1.APIService {
+	return &apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{AutoRegisterManagedLabel: string("true")}},
 	}
 }
 
-func newAutoRegisterManagedOnStartAPIService(name string) *apiregistration.APIService {
-	return &apiregistration.APIService{
+func newAutoRegisterManagedOnStartAPIService(name string) *apiregistrationv1.APIService {
+	return &apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{AutoRegisterManagedLabel: string("onstart")}},
 	}
 }
 
-func newAutoRegisterManagedModifiedAPIService(name string) *apiregistration.APIService {
-	return &apiregistration.APIService{
+func newAutoRegisterManagedModifiedAPIService(name string) *apiregistrationv1.APIService {
+	return &apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{AutoRegisterManagedLabel: string("true")}},
-		Spec: apiregistration.APIServiceSpec{
+		Spec: apiregistrationv1.APIServiceSpec{
 			Group: "something",
 		},
 	}
 }
 
-func newAutoRegisterManagedOnStartModifiedAPIService(name string) *apiregistration.APIService {
-	return &apiregistration.APIService{
+func newAutoRegisterManagedOnStartModifiedAPIService(name string) *apiregistrationv1.APIService {
+	return &apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{AutoRegisterManagedLabel: string("onstart")}},
-		Spec: apiregistration.APIServiceSpec{
+		Spec: apiregistrationv1.APIServiceSpec{
 			Group: "something",
 		},
 	}
 }
 
-func newAPIService(name string) *apiregistration.APIService {
-	return &apiregistration.APIService{
+func newAPIService(name string) *apiregistrationv1.APIService {
+	return &apiregistrationv1.APIService{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 	}
 }
@@ -88,7 +88,7 @@ func checkForCreate(name string, client *fake.Clientset) error {
 	if !ok {
 		return fmt.Errorf("unexpected action: %v", client.Actions())
 	}
-	apiService := createAction.GetObject().(*apiregistration.APIService)
+	apiService := createAction.GetObject().(*apiregistrationv1.APIService)
 	if apiService.Name != name || apiService.Labels[AutoRegisterManagedLabel] != "true" {
 		return fmt.Errorf("bad name or label %v", createAction)
 	}
@@ -110,7 +110,7 @@ func checkForCreateOnStart(name string, client *fake.Clientset) error {
 	if !ok {
 		return fmt.Errorf("unexpected action: %v", client.Actions())
 	}
-	apiService := createAction.GetObject().(*apiregistration.APIService)
+	apiService := createAction.GetObject().(*apiregistrationv1.APIService)
 	if apiService.Name != name || apiService.Labels[AutoRegisterManagedLabel] != "onstart" {
 		return fmt.Errorf("bad name or label %v", createAction)
 	}
@@ -131,7 +131,7 @@ func checkForUpdate(name string, client *fake.Clientset) error {
 	if !ok {
 		return fmt.Errorf("unexpected action: %v", client.Actions())
 	}
-	apiService := updateAction.GetObject().(*apiregistration.APIService)
+	apiService := updateAction.GetObject().(*apiregistrationv1.APIService)
 	if apiService.Name != name || apiService.Labels[AutoRegisterManagedLabel] != "true" || apiService.Spec.Group != "" {
 		return fmt.Errorf("bad name, label, or group %v", updateAction)
 	}
@@ -161,10 +161,10 @@ func TestSync(t *testing.T) {
 	tests := []struct {
 		name                      string
 		apiServiceName            string
-		addAPIServices            []*apiregistration.APIService
-		updateAPIServices         []*apiregistration.APIService
-		addSyncAPIServices        []*apiregistration.APIService
-		addSyncOnStartAPIServices []*apiregistration.APIService
+		addAPIServices            []*apiregistrationv1.APIService
+		updateAPIServices         []*apiregistrationv1.APIService
+		addSyncAPIServices        []*apiregistrationv1.APIService
+		addSyncOnStartAPIServices []*apiregistrationv1.APIService
 		delSyncAPIServices        []string
 		alreadySynced             map[string]bool
 		presentAtStart            map[string]bool
@@ -173,63 +173,63 @@ func TestSync(t *testing.T) {
 		{
 			name:               "adding an API service which isn't auto-managed does nothing",
 			apiServiceName:     "foo",
-			addAPIServices:     []*apiregistration.APIService{newAPIService("foo")},
-			updateAPIServices:  []*apiregistration.APIService{},
-			addSyncAPIServices: []*apiregistration.APIService{},
+			addAPIServices:     []*apiregistrationv1.APIService{newAPIService("foo")},
+			updateAPIServices:  []*apiregistrationv1.APIService{},
+			addSyncAPIServices: []*apiregistrationv1.APIService{},
 			delSyncAPIServices: []string{},
 			expectedResults:    checkForNothing,
 		},
 		{
 			name:               "adding one to auto-register should create",
 			apiServiceName:     "foo",
-			addAPIServices:     []*apiregistration.APIService{},
-			updateAPIServices:  []*apiregistration.APIService{},
-			addSyncAPIServices: []*apiregistration.APIService{newAPIService("foo")},
+			addAPIServices:     []*apiregistrationv1.APIService{},
+			updateAPIServices:  []*apiregistrationv1.APIService{},
+			addSyncAPIServices: []*apiregistrationv1.APIService{newAPIService("foo")},
 			delSyncAPIServices: []string{},
 			expectedResults:    checkForCreate,
 		},
 		{
 			name:               "duplicate AddAPIServiceToSync don't panic",
 			apiServiceName:     "foo",
-			addAPIServices:     []*apiregistration.APIService{newAutoRegisterManagedAPIService("foo")},
-			updateAPIServices:  []*apiregistration.APIService{},
-			addSyncAPIServices: []*apiregistration.APIService{newAutoRegisterManagedAPIService("foo"), newAutoRegisterManagedAPIService("foo")},
+			addAPIServices:     []*apiregistrationv1.APIService{newAutoRegisterManagedAPIService("foo")},
+			updateAPIServices:  []*apiregistrationv1.APIService{},
+			addSyncAPIServices: []*apiregistrationv1.APIService{newAutoRegisterManagedAPIService("foo"), newAutoRegisterManagedAPIService("foo")},
 			delSyncAPIServices: []string{},
 			expectedResults:    checkForNothing,
 		},
 		{
 			name:               "duplicate RemoveAPIServiceToSync don't panic",
 			apiServiceName:     "foo",
-			addAPIServices:     []*apiregistration.APIService{newAutoRegisterManagedAPIService("foo")},
-			updateAPIServices:  []*apiregistration.APIService{},
-			addSyncAPIServices: []*apiregistration.APIService{},
+			addAPIServices:     []*apiregistrationv1.APIService{newAutoRegisterManagedAPIService("foo")},
+			updateAPIServices:  []*apiregistrationv1.APIService{},
+			addSyncAPIServices: []*apiregistrationv1.APIService{},
 			delSyncAPIServices: []string{"foo", "foo"},
 			expectedResults:    checkForDelete,
 		},
 		{
 			name:               "removing auto-managed then RemoveAPIService should not touch APIService",
 			apiServiceName:     "foo",
-			addAPIServices:     []*apiregistration.APIService{},
-			updateAPIServices:  []*apiregistration.APIService{newAPIService("foo")},
-			addSyncAPIServices: []*apiregistration.APIService{},
+			addAPIServices:     []*apiregistrationv1.APIService{},
+			updateAPIServices:  []*apiregistrationv1.APIService{newAPIService("foo")},
+			addSyncAPIServices: []*apiregistrationv1.APIService{},
 			delSyncAPIServices: []string{"foo"},
 			expectedResults:    checkForNothing,
 		},
 		{
 			name:               "create managed apiservice without a matching request",
 			apiServiceName:     "foo",
-			addAPIServices:     []*apiregistration.APIService{newAPIService("foo")},
-			updateAPIServices:  []*apiregistration.APIService{newAutoRegisterManagedAPIService("foo")},
-			addSyncAPIServices: []*apiregistration.APIService{},
+			addAPIServices:     []*apiregistrationv1.APIService{newAPIService("foo")},
+			updateAPIServices:  []*apiregistrationv1.APIService{newAutoRegisterManagedAPIService("foo")},
+			addSyncAPIServices: []*apiregistrationv1.APIService{},
 			delSyncAPIServices: []string{},
 			expectedResults:    checkForDelete,
 		},
 		{
 			name:               "modifying it should result in stomping",
 			apiServiceName:     "foo",
-			addAPIServices:     []*apiregistration.APIService{},
-			updateAPIServices:  []*apiregistration.APIService{newAutoRegisterManagedModifiedAPIService("foo")},
-			addSyncAPIServices: []*apiregistration.APIService{newAutoRegisterManagedAPIService("foo")},
+			addAPIServices:     []*apiregistrationv1.APIService{},
+			updateAPIServices:  []*apiregistrationv1.APIService{newAutoRegisterManagedModifiedAPIService("foo")},
+			addSyncAPIServices: []*apiregistrationv1.APIService{newAutoRegisterManagedAPIService("foo")},
 			delSyncAPIServices: []string{},
 			expectedResults:    checkForUpdate,
 		},
@@ -237,18 +237,18 @@ func TestSync(t *testing.T) {
 		{
 			name:                      "adding one to auto-register on start should create",
 			apiServiceName:            "foo",
-			addAPIServices:            []*apiregistration.APIService{},
-			updateAPIServices:         []*apiregistration.APIService{},
-			addSyncOnStartAPIServices: []*apiregistration.APIService{newAPIService("foo")},
+			addAPIServices:            []*apiregistrationv1.APIService{},
+			updateAPIServices:         []*apiregistrationv1.APIService{},
+			addSyncOnStartAPIServices: []*apiregistrationv1.APIService{newAPIService("foo")},
 			delSyncAPIServices:        []string{},
 			expectedResults:           checkForCreateOnStart,
 		},
 		{
 			name:                      "adding one to auto-register on start already synced should do nothing",
 			apiServiceName:            "foo",
-			addAPIServices:            []*apiregistration.APIService{},
-			updateAPIServices:         []*apiregistration.APIService{},
-			addSyncOnStartAPIServices: []*apiregistration.APIService{newAPIService("foo")},
+			addAPIServices:            []*apiregistrationv1.APIService{},
+			updateAPIServices:         []*apiregistrationv1.APIService{},
+			addSyncOnStartAPIServices: []*apiregistrationv1.APIService{newAPIService("foo")},
 			delSyncAPIServices:        []string{},
 			alreadySynced:             map[string]bool{"foo": true},
 			expectedResults:           checkForNothing,
@@ -256,9 +256,9 @@ func TestSync(t *testing.T) {
 		{
 			name:               "managed onstart apiservice present at start without a matching request should delete",
 			apiServiceName:     "foo",
-			addAPIServices:     []*apiregistration.APIService{newAPIService("foo")},
-			updateAPIServices:  []*apiregistration.APIService{newAutoRegisterManagedOnStartAPIService("foo")},
-			addSyncAPIServices: []*apiregistration.APIService{},
+			addAPIServices:     []*apiregistrationv1.APIService{newAPIService("foo")},
+			updateAPIServices:  []*apiregistrationv1.APIService{newAutoRegisterManagedOnStartAPIService("foo")},
+			addSyncAPIServices: []*apiregistrationv1.APIService{},
 			delSyncAPIServices: []string{},
 			presentAtStart:     map[string]bool{"foo": true},
 			alreadySynced:      map[string]bool{},
@@ -267,9 +267,9 @@ func TestSync(t *testing.T) {
 		{
 			name:               "managed onstart apiservice present at start without a matching request already synced once should no-op",
 			apiServiceName:     "foo",
-			addAPIServices:     []*apiregistration.APIService{newAPIService("foo")},
-			updateAPIServices:  []*apiregistration.APIService{newAutoRegisterManagedOnStartAPIService("foo")},
-			addSyncAPIServices: []*apiregistration.APIService{},
+			addAPIServices:     []*apiregistrationv1.APIService{newAPIService("foo")},
+			updateAPIServices:  []*apiregistrationv1.APIService{newAutoRegisterManagedOnStartAPIService("foo")},
+			addSyncAPIServices: []*apiregistrationv1.APIService{},
 			delSyncAPIServices: []string{},
 			presentAtStart:     map[string]bool{"foo": true},
 			alreadySynced:      map[string]bool{"foo": true},
@@ -278,9 +278,9 @@ func TestSync(t *testing.T) {
 		{
 			name:               "managed onstart apiservice not present at start without a matching request should no-op",
 			apiServiceName:     "foo",
-			addAPIServices:     []*apiregistration.APIService{newAPIService("foo")},
-			updateAPIServices:  []*apiregistration.APIService{newAutoRegisterManagedOnStartAPIService("foo")},
-			addSyncAPIServices: []*apiregistration.APIService{},
+			addAPIServices:     []*apiregistrationv1.APIService{newAPIService("foo")},
+			updateAPIServices:  []*apiregistrationv1.APIService{newAutoRegisterManagedOnStartAPIService("foo")},
+			addSyncAPIServices: []*apiregistrationv1.APIService{},
 			delSyncAPIServices: []string{},
 			presentAtStart:     map[string]bool{},
 			alreadySynced:      map[string]bool{},
@@ -289,18 +289,18 @@ func TestSync(t *testing.T) {
 		{
 			name:                      "modifying onstart it should result in stomping",
 			apiServiceName:            "foo",
-			addAPIServices:            []*apiregistration.APIService{},
-			updateAPIServices:         []*apiregistration.APIService{newAutoRegisterManagedModifiedAPIService("foo")},
-			addSyncOnStartAPIServices: []*apiregistration.APIService{newAutoRegisterManagedOnStartAPIService("foo")},
+			addAPIServices:            []*apiregistrationv1.APIService{},
+			updateAPIServices:         []*apiregistrationv1.APIService{newAutoRegisterManagedModifiedAPIService("foo")},
+			addSyncOnStartAPIServices: []*apiregistrationv1.APIService{newAutoRegisterManagedOnStartAPIService("foo")},
 			delSyncAPIServices:        []string{},
 			expectedResults:           checkForUpdate,
 		},
 		{
 			name:                      "modifying onstart already synced should no-op",
 			apiServiceName:            "foo",
-			addAPIServices:            []*apiregistration.APIService{},
-			updateAPIServices:         []*apiregistration.APIService{newAutoRegisterManagedModifiedAPIService("foo")},
-			addSyncOnStartAPIServices: []*apiregistration.APIService{newAutoRegisterManagedOnStartAPIService("foo")},
+			addAPIServices:            []*apiregistrationv1.APIService{},
+			updateAPIServices:         []*apiregistrationv1.APIService{newAutoRegisterManagedModifiedAPIService("foo")},
+			addSyncOnStartAPIServices: []*apiregistrationv1.APIService{newAutoRegisterManagedOnStartAPIService("foo")},
 			delSyncAPIServices:        []string{},
 			alreadySynced:             map[string]bool{"foo": true},
 			expectedResults:           checkForNothing,
@@ -322,9 +322,9 @@ func TestSync(t *testing.T) {
 		}
 
 		c := &autoRegisterController{
-			apiServiceClient:  fakeClient.Apiregistration(),
+			apiServiceClient:  fakeClient.ApiregistrationV1(),
 			apiServiceLister:  listers.NewAPIServiceLister(apiServiceIndexer),
-			apiServicesToSync: map[string]*apiregistration.APIService{},
+			apiServicesToSync: map[string]*apiregistrationv1.APIService{},
 			queue:             workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "autoregister"),
 
 			syncedSuccessfullyLock: &sync.RWMutex{},

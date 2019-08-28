@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "apiapproval_test.go",
         "apply_test.go",
         "basic_test.go",
         "change_test.go",
@@ -17,6 +18,7 @@ go_test(
         "objectmeta_test.go",
         "pruning_test.go",
         "registration_test.go",
+        "scope_test.go",
         "subresources_test.go",
         "table_test.go",
         "validation_test.go",
@@ -27,12 +29,14 @@ go_test(
     tags = ["integration"],
     deps = [
         "//staging/src/k8s.io/api/autoscaling/v1:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/scheme:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/cmd/server/options:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/test/integration/fixtures:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/test/integration/storage:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -57,6 +61,7 @@ go_test(
         "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
@@ -86,6 +91,7 @@ go_library(
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiextensions-apiserver/test/integration",
     importpath = "k8s.io/apiextensions-apiserver/test/integration",
     deps = [
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",

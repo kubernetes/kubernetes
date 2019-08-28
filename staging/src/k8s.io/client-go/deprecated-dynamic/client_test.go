@@ -511,7 +511,8 @@ func TestWatch(t *testing.T) {
 				t.Errorf("Watch(%q) got query %s. wanted %s", tc.name, r.URL.RawQuery, tc.query)
 			}
 
-			enc := restclientwatch.NewEncoder(streaming.NewEncoder(w, dynamicCodec{}), dynamicCodec{})
+			codec := unstructured.UnstructuredJSONScheme
+			enc := restclientwatch.NewEncoder(streaming.NewEncoder(w, codec), codec)
 			for _, e := range tc.events {
 				enc.Encode(&e)
 			}

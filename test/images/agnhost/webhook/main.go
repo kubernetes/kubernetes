@@ -24,8 +24,9 @@ import (
 
 	"github.com/spf13/cobra"
 
+	v1 "k8s.io/api/admission/v1"
 	"k8s.io/api/admission/v1beta1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/klog"
 	// TODO: try this library to see if it generates correct json patch
 	// https://github.com/mattbaird/jsonpatch
@@ -34,6 +35,7 @@ import (
 var (
 	certFile string
 	keyFile  string
+	port     int
 )
 
 // CmdWebhook is used by agnhost Cobra.
@@ -52,24 +54,40 @@ func init() {
 		"File containing the default x509 Certificate for HTTPS. (CA cert, if any, concatenated after server cert).")
 	CmdWebhook.Flags().StringVar(&keyFile, "tls-private-key-file", "",
 		"File containing the default x509 private key matching --tls-cert-file.")
+	CmdWebhook.Flags().IntVar(&port, "port", 443,
+		"Secure port that the webhook listens on")
 }
 
-// toAdmissionResponse is a helper function to create an AdmissionResponse
-// with an embedded error
-func toAdmissionResponse(err error) *v1beta1.AdmissionResponse {
-	return &v1beta1.AdmissionResponse{
-		Result: &metav1.Status{
-			Message: err.Error(),
-		},
+// admitv1beta1Func handles a v1beta1 admission
+type admitv1beta1Func func(v1beta1.AdmissionReview) *v1beta1.AdmissionResponse
+
+// admitv1beta1Func handles a v1 admission
+type admitv1Func func(v1.AdmissionReview) *v1.AdmissionResponse
+
+// admitHandler is a handler, for both validators and mutators, that supports multiple admission review versions
+type admitHandler struct {
+	v1beta1 admitv1beta1Func
+	v1      admitv1Func
+}
+
+func newDelegateToV1AdmitHandler(f admitv1Func) admitHandler {
+	return admitHandler{
+		v1beta1: delegateV1beta1AdmitToV1(f),
+		v1:      f,
 	}
 }
 
-// admitFunc is the type we use for all of our validators and mutators
-type admitFunc func(v1beta1.AdmissionReview) *v1beta1.AdmissionResponse
+func delegateV1beta1AdmitToV1(f admitv1Func) admitv1beta1Func {
+	return func(review v1beta1.AdmissionReview) *v1beta1.AdmissionResponse {
+		in := v1.AdmissionReview{Request: convertAdmissionRequestToV1(review.Request)}
+		out := f(in)
+		return convertAdmissionResponseToV1beta1(out)
+	}
+}
 
 // serve handles the http portion of a request prior to handing to an admit
 // function
-func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
+func serve(w http.ResponseWriter, r *http.Request, admit admitHandler) {
 	var body []byte
 	if r.Body != nil {
 		if data, err := ioutil.ReadAll(r.Body); err == nil {
@@ -86,77 +104,101 @@ func serve(w http.ResponseWriter, r *http.Request, admit admitFunc) {
 
 	klog.V(2).Info(fmt.Sprintf("handling request: %s", body))
 
-	// The AdmissionReview that was sent to the webhook
-	requestedAdmissionReview := v1beta1.AdmissionReview{}
-
-	// The AdmissionReview that will be returned
-	responseAdmissionReview := v1beta1.AdmissionReview{}
-
 	deserializer := codecs.UniversalDeserializer()
-	if _, _, err := deserializer.Decode(body, nil, &requestedAdmissionReview); err != nil {
-		klog.Error(err)
-		responseAdmissionReview.Response = toAdmissionResponse(err)
-	} else {
-		// pass to admitFunc
-		responseAdmissionReview.Response = admit(requestedAdmissionReview)
+	obj, gvk, err := deserializer.Decode(body, nil, nil)
+	if err != nil {
+		msg := fmt.Sprintf("Request could not be decoded: %v", err)
+		klog.Error(msg)
+		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
 
-	// Return the same UID
-	responseAdmissionReview.Response.UID = requestedAdmissionReview.Request.UID
+	var responseObj runtime.Object
+	switch *gvk {
+	case v1beta1.SchemeGroupVersion.WithKind("AdmissionReview"):
+		requestedAdmissionReview, ok := obj.(*v1beta1.AdmissionReview)
+		if !ok {
+			klog.Errorf("Expected v1beta1.AdmissionReview but got: %T", obj)
+			return
+		}
+		responseAdmissionReview := &v1beta1.AdmissionReview{}
+		responseAdmissionReview.SetGroupVersionKind(*gvk)
+		responseAdmissionReview.Response = admit.v1beta1(*requestedAdmissionReview)
+		responseAdmissionReview.Response.UID = requestedAdmissionReview.Request.UID
+		responseObj = responseAdmissionReview
+	case v1.SchemeGroupVersion.WithKind("AdmissionReview"):
+		requestedAdmissionReview, ok := obj.(*v1.AdmissionReview)
+		if !ok {
+			klog.Errorf("Expected v1.AdmissionReview but got: %T", obj)
+			return
+		}
+		responseAdmissionReview := &v1.AdmissionReview{}
+		responseAdmissionReview.SetGroupVersionKind(*gvk)
+		responseAdmissionReview.Response = admit.v1(*requestedAdmissionReview)
+		responseAdmissionReview.Response.UID = requestedAdmissionReview.Request.UID
+		responseObj = responseAdmissionReview
+	default:
+		msg := fmt.Sprintf("Unsupported group version kind: %v", gvk)
+		klog.Error(msg)
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
 
-	klog.V(2).Info(fmt.Sprintf("sending response: %v", responseAdmissionReview.Response))
-
-	respBytes, err := json.Marshal(responseAdmissionReview)
+	klog.V(2).Info(fmt.Sprintf("sending response: %v", responseObj))
+	respBytes, err := json.Marshal(responseObj)
 	if err != nil {
 		klog.Error(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "application/json")
 	if _, err := w.Write(respBytes); err != nil {
 		klog.Error(err)
 	}
 }
 
 func serveAlwaysAllowDelayFiveSeconds(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, alwaysAllowDelayFiveSeconds)
+	serve(w, r, newDelegateToV1AdmitHandler(alwaysAllowDelayFiveSeconds))
 }
 
 func serveAlwaysDeny(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, alwaysDeny)
+	serve(w, r, newDelegateToV1AdmitHandler(alwaysDeny))
 }
 
 func serveAddLabel(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, addLabel)
+	serve(w, r, newDelegateToV1AdmitHandler(addLabel))
 }
 
 func servePods(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, admitPods)
+	serve(w, r, newDelegateToV1AdmitHandler(admitPods))
 }
 
 func serveAttachingPods(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, denySpecificAttachment)
+	serve(w, r, newDelegateToV1AdmitHandler(denySpecificAttachment))
 }
 
 func serveMutatePods(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, mutatePods)
+	serve(w, r, newDelegateToV1AdmitHandler(mutatePods))
 }
 
 func serveConfigmaps(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, admitConfigMaps)
+	serve(w, r, newDelegateToV1AdmitHandler(admitConfigMaps))
 }
 
 func serveMutateConfigmaps(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, mutateConfigmaps)
+	serve(w, r, newDelegateToV1AdmitHandler(mutateConfigmaps))
 }
 
 func serveCustomResource(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, admitCustomResource)
+	serve(w, r, newDelegateToV1AdmitHandler(admitCustomResource))
 }
 
 func serveMutateCustomResource(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, mutateCustomResource)
+	serve(w, r, newDelegateToV1AdmitHandler(mutateCustomResource))
 }
 
 func serveCRD(w http.ResponseWriter, r *http.Request) {
-	serve(w, r, admitCRD)
+	serve(w, r, newDelegateToV1AdmitHandler(admitCRD))
 }
 
 func main(cmd *cobra.Command, args []string) {
@@ -176,9 +218,13 @@ func main(cmd *cobra.Command, args []string) {
 	http.HandleFunc("/custom-resource", serveCustomResource)
 	http.HandleFunc("/mutating-custom-resource", serveMutateCustomResource)
 	http.HandleFunc("/crd", serveCRD)
+	http.HandleFunc("/readyz", func(w http.ResponseWriter, req *http.Request) { w.Write([]byte("ok")) })
 	server := &http.Server{
-		Addr:      ":443",
+		Addr:      fmt.Sprintf(":%d", port),
 		TLSConfig: configTLS(config),
 	}
-	server.ListenAndServeTLS("", "")
+	err := server.ListenAndServeTLS("", "")
+	if err != nil {
+		panic(err)
+	}
 }

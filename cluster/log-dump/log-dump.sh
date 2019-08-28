@@ -204,7 +204,7 @@ function save-logs() {
 function export-windows-docker-event-log() {
     local -r node="${1}"
 
-    local -r powershell_cmd="powershell.exe -Command \$log=\$(Get-EventLog -LogName Application -Source Docker); Set-Content '${WINDOWS_LOGS_DIR}\\docker.log' \$log.Message"
+    local -r powershell_cmd="powershell.exe -Command \"\$logs=\$(Get-EventLog -LogName Application -Source Docker | Format-Table -Property TimeGenerated, EntryType, Message -Wrap); \$logs | Out-File -FilePath '${WINDOWS_LOGS_DIR}\\docker.log'\""
 
     # Retry up to 3 times to allow ssh keys to be properly propagated and
     # stored.

@@ -6,7 +6,17 @@ package grpc_prometheus
 import (
 	"strings"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+)
+
+type grpcType string
+
+const (
+	Unary        grpcType = "unary"
+	ClientStream grpcType = "client_stream"
+	ServerStream grpcType = "server_stream"
+	BidiStream   grpcType = "bidi_stream"
 )
 
 var (
@@ -24,4 +34,17 @@ func splitMethodName(fullMethodName string) (string, string) {
 		return fullMethodName[:i], fullMethodName[i+1:]
 	}
 	return "unknown", "unknown"
+}
+
+func typeFromMethodInfo(mInfo *grpc.MethodInfo) grpcType {
+	if !mInfo.IsClientStream && !mInfo.IsServerStream {
+		return Unary
+	}
+	if mInfo.IsClientStream && !mInfo.IsServerStream {
+		return ClientStream
+	}
+	if !mInfo.IsClientStream && mInfo.IsServerStream {
+		return ServerStream
+	}
+	return BidiStream
 }

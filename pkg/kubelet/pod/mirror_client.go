@@ -92,7 +92,6 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string, uid *types.UID)
 	}
 	klog.V(2).Infof("Deleting a mirror pod %q (uid %#v)", podFullName, uid)
 	var GracePeriodSeconds int64
-	GracePeriodSeconds = 0
 	if err := mc.apiserverClient.CoreV1().Pods(namespace).Delete(name, &metav1.DeleteOptions{GracePeriodSeconds: &GracePeriodSeconds, Preconditions: &metav1.Preconditions{UID: uid}}); err != nil {
 		// Unfortunately, there's no generic error for failing a precondition
 		if !(errors.IsNotFound(err) || errors.IsConflict(err)) {
@@ -105,13 +104,13 @@ func (mc *basicMirrorClient) DeleteMirrorPod(podFullName string, uid *types.UID)
 	return true, nil
 }
 
-// IsStaticPod returns true if the pod is a static pod.
+// IsStaticPod returns true if the passed Pod is static.
 func IsStaticPod(pod *v1.Pod) bool {
 	source, err := kubetypes.GetPodSource(pod)
 	return err == nil && source != kubetypes.ApiserverSource
 }
 
-// IsMirrorPod returns true if the pod is a mirror pod.
+// IsMirrorPod returns true if the passed Pod is a Mirror Pod.
 func IsMirrorPod(pod *v1.Pod) bool {
 	_, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return ok

@@ -65,30 +65,54 @@ type RESTStorageProvider struct {
 
 var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
 
-func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool) {
+func (p RESTStorageProvider) NewRESTStorage(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (genericapiserver.APIGroupInfo, bool, error) {
 	apiGroupInfo := genericapiserver.NewDefaultAPIGroupInfo(rbac.GroupName, legacyscheme.Scheme, legacyscheme.ParameterCodec, legacyscheme.Codecs)
 	// If you add a version here, be sure to add an entry in `k8s.io/kubernetes/cmd/kube-apiserver/app/aggregator.go with specific priorities.
 	// TODO refactor the plumbing to provide the information in the APIGroupInfo
 
 	if apiResourceConfigSource.VersionEnabled(rbacapiv1alpha1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1alpha1.SchemeGroupVersion.Version] = p.storage(rbacapiv1alpha1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter)
+		if storageMap, err := p.storage(rbacapiv1alpha1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter); err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		} else {
+			apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1alpha1.SchemeGroupVersion.Version] = storageMap
+		}
 	}
 	if apiResourceConfigSource.VersionEnabled(rbacapiv1beta1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1beta1.SchemeGroupVersion.Version] = p.storage(rbacapiv1beta1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter)
+		if stoageMap, err := p.storage(rbacapiv1beta1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter); err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		} else {
+			apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1beta1.SchemeGroupVersion.Version] = stoageMap
+		}
 	}
 	if apiResourceConfigSource.VersionEnabled(rbacapiv1.SchemeGroupVersion) {
-		apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1.SchemeGroupVersion.Version] = p.storage(rbacapiv1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter)
+		if storageMap, err := p.storage(rbacapiv1.SchemeGroupVersion, apiResourceConfigSource, restOptionsGetter); err != nil {
+			return genericapiserver.APIGroupInfo{}, false, err
+		} else {
+			apiGroupInfo.VersionedResourcesStorageMap[rbacapiv1.SchemeGroupVersion.Version] = storageMap
+		}
 	}
 
-	return apiGroupInfo, true
+	return apiGroupInfo, true, nil
 }
 
-func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) map[string]rest.Storage {
+func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter) (map[string]rest.Storage, error) {
 	storage := map[string]rest.Storage{}
-	rolesStorage := rolestore.NewREST(restOptionsGetter)
-	roleBindingsStorage := rolebindingstore.NewREST(restOptionsGetter)
-	clusterRolesStorage := clusterrolestore.NewREST(restOptionsGetter)
-	clusterRoleBindingsStorage := clusterrolebindingstore.NewREST(restOptionsGetter)
+	rolesStorage, err := rolestore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	roleBindingsStorage, err := rolebindingstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	clusterRolesStorage, err := clusterrolestore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
+	clusterRoleBindingsStorage, err := clusterrolebindingstore.NewREST(restOptionsGetter)
+	if err != nil {
+		return storage, err
+	}
 
 	authorizationRuleResolver := rbacregistryvalidation.NewDefaultRuleResolver(
 		role.AuthorizerAdapter{Registry: role.NewRegistry(rolesStorage)},
@@ -109,7 +133,7 @@ func (p RESTStorageProvider) storage(version schema.GroupVersion, apiResourceCon
 	// clusterrolebindings
 	storage["clusterrolebindings"] = clusterrolebindingpolicybased.NewStorage(clusterRoleBindingsStorage, p.Authorizer, authorizationRuleResolver)
 
-	return storage
+	return storage, nil
 }
 
 func (p RESTStorageProvider) PostStartHook() (string, genericapiserver.PostStartHookFunc, error) {

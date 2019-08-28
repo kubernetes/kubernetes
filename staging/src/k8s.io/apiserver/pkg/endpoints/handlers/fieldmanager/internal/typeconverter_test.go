@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"sigs.k8s.io/structured-merge-diff/typed"
 	"sigs.k8s.io/yaml"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -47,7 +48,7 @@ func TestTypeConverter(t *testing.T) {
 		t.Fatalf("Failed to build OpenAPI models: %v", err)
 	}
 
-	tc, err := internal.NewTypeConverter(m)
+	tc, err := internal.NewTypeConverter(m, false)
 	if err != nil {
 		t.Fatalf("Failed to build TypeConverter: %v", err)
 	}
@@ -174,4 +175,60 @@ Original object:
 Final object:
 %#v`, obj, newObj)
 	}
+}
+
+var result typed.TypedValue
+
+func BenchmarkYAMLToTyped(b *testing.B) {
+	y := `
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: nginx
+spec:
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.15.4
+`
+	obj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal([]byte(y), &obj.Object); err != nil {
+		b.Fatalf("Failed to parse yaml object: %v", err)
+	}
+
+	d, err := fakeSchema.OpenAPISchema()
+	if err != nil {
+		b.Fatalf("Failed to parse OpenAPI schema: %v", err)
+	}
+	m, err := proto.NewOpenAPIData(d)
+	if err != nil {
+		b.Fatalf("Failed to build OpenAPI models: %v", err)
+	}
+
+	tc, err := internal.NewTypeConverter(m, false)
+	if err != nil {
+		b.Fatalf("Failed to build TypeConverter: %v", err)
+	}
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	var r *typed.TypedValue
+	for i := 0; i < b.N; i++ {
+		var err error
+		r, err = tc.ObjectToTyped(obj)
+		if err != nil {
+			b.Fatalf("Failed to convert object to typed: %v", err)
+		}
+	}
+	result = *r
 }

@@ -41,7 +41,7 @@ func (sched *Scheduler) onPvAdd(obj interface{}) {
 	// provisioning and binding process, will not trigger events to schedule pod
 	// again. So we need to move pods to active queue on PV add for this
 	// scenario.
-	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) onPvUpdate(old, new interface{}) {
@@ -49,15 +49,15 @@ func (sched *Scheduler) onPvUpdate(old, new interface{}) {
 	// bindings due to conflicts if PVs are updated by PV controller or other
 	// parties, then scheduler will add pod back to unschedulable queue. We
 	// need to move pods to active queue on PV update for this scenario.
-	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) onPvcAdd(obj interface{}) {
-	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) onPvcUpdate(old, new interface{}) {
-	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
@@ -74,20 +74,20 @@ func (sched *Scheduler) onStorageClassAdd(obj interface{}) {
 	// We don't need to invalidate cached results because results will not be
 	// cached for pod that has unbound immediate PVCs.
 	if sc.VolumeBindingMode != nil && *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
-		sched.config.SchedulingQueue.MoveAllToActiveQueue()
+		sched.SchedulingQueue.MoveAllToActiveQueue()
 	}
 }
 
 func (sched *Scheduler) onServiceAdd(obj interface{}) {
-	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) onServiceUpdate(oldObj interface{}, newObj interface{}) {
-	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) onServiceDelete(obj interface{}) {
-	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) addNodeToCache(obj interface{}) {
@@ -97,11 +97,11 @@ func (sched *Scheduler) addNodeToCache(obj interface{}) {
 		return
 	}
 
-	if err := sched.config.SchedulerCache.AddNode(node); err != nil {
+	if err := sched.SchedulerCache.AddNode(node); err != nil {
 		klog.Errorf("scheduler cache AddNode failed: %v", err)
 	}
 
-	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
@@ -116,7 +116,7 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 		return
 	}
 
-	if err := sched.config.SchedulerCache.UpdateNode(oldNode, newNode); err != nil {
+	if err := sched.SchedulerCache.UpdateNode(oldNode, newNode); err != nil {
 		klog.Errorf("scheduler cache UpdateNode failed: %v", err)
 	}
 
@@ -125,8 +125,8 @@ func (sched *Scheduler) updateNodeInCache(oldObj, newObj interface{}) {
 	// to save processing cycles. We still trigger a move to active queue to cover the case
 	// that a pod being processed by the scheduler is determined unschedulable. We want this
 	// pod to be reevaluated when a change in the cluster happens.
-	if sched.config.SchedulingQueue.NumUnschedulablePods() == 0 || nodeSchedulingPropertiesChanged(newNode, oldNode) {
-		sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	if sched.SchedulingQueue.NumUnschedulablePods() == 0 || nodeSchedulingPropertiesChanged(newNode, oldNode) {
+		sched.SchedulingQueue.MoveAllToActiveQueue()
 	}
 }
 
@@ -151,7 +151,7 @@ func (sched *Scheduler) deleteNodeFromCache(obj interface{}) {
 	// invalidation and then snapshot the cache itself. If the cache is
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
-	if err := sched.config.SchedulerCache.RemoveNode(node); err != nil {
+	if err := sched.SchedulerCache.RemoveNode(node); err != nil {
 		klog.Errorf("scheduler cache RemoveNode failed: %v", err)
 	}
 }
@@ -163,11 +163,11 @@ func (sched *Scheduler) onCSINodeAdd(obj interface{}) {
 		return
 	}
 
-	if err := sched.config.SchedulerCache.AddCSINode(csiNode); err != nil {
+	if err := sched.SchedulerCache.AddCSINode(csiNode); err != nil {
 		klog.Errorf("scheduler cache AddCSINode failed: %v", err)
 	}
 
-	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) onCSINodeUpdate(oldObj, newObj interface{}) {
@@ -183,11 +183,11 @@ func (sched *Scheduler) onCSINodeUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	if err := sched.config.SchedulerCache.UpdateCSINode(oldCSINode, newCSINode); err != nil {
+	if err := sched.SchedulerCache.UpdateCSINode(oldCSINode, newCSINode); err != nil {
 		klog.Errorf("scheduler cache UpdateCSINode failed: %v", err)
 	}
 
-	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 func (sched *Scheduler) onCSINodeDelete(obj interface{}) {
@@ -207,13 +207,13 @@ func (sched *Scheduler) onCSINodeDelete(obj interface{}) {
 		return
 	}
 
-	if err := sched.config.SchedulerCache.RemoveCSINode(csiNode); err != nil {
+	if err := sched.SchedulerCache.RemoveCSINode(csiNode); err != nil {
 		klog.Errorf("scheduler cache RemoveCSINode failed: %v", err)
 	}
 }
 
 func (sched *Scheduler) addPodToSchedulingQueue(obj interface{}) {
-	if err := sched.config.SchedulingQueue.Add(obj.(*v1.Pod)); err != nil {
+	if err := sched.SchedulingQueue.Add(obj.(*v1.Pod)); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to queue %T: %v", obj, err))
 	}
 }
@@ -223,7 +223,7 @@ func (sched *Scheduler) updatePodInSchedulingQueue(oldObj, newObj interface{}) {
 	if sched.skipPodUpdate(pod) {
 		return
 	}
-	if err := sched.config.SchedulingQueue.Update(oldObj.(*v1.Pod), pod); err != nil {
+	if err := sched.SchedulingQueue.Update(oldObj.(*v1.Pod), pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to update %T: %v", newObj, err))
 	}
 }
@@ -244,12 +244,12 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		utilruntime.HandleError(fmt.Errorf("unable to handle object in %T: %T", sched, obj))
 		return
 	}
-	if err := sched.config.SchedulingQueue.Delete(pod); err != nil {
+	if err := sched.SchedulingQueue.Delete(pod); err != nil {
 		utilruntime.HandleError(fmt.Errorf("unable to dequeue %T: %v", obj, err))
 	}
-	if sched.config.VolumeBinder != nil {
+	if sched.VolumeBinder != nil {
 		// Volume binder only wants to keep unassigned pods
-		sched.config.VolumeBinder.DeletePodBindings(pod)
+		sched.VolumeBinder.DeletePodBindings(pod)
 	}
 }
 
@@ -260,11 +260,11 @@ func (sched *Scheduler) addPodToCache(obj interface{}) {
 		return
 	}
 
-	if err := sched.config.SchedulerCache.AddPod(pod); err != nil {
+	if err := sched.SchedulerCache.AddPod(pod); err != nil {
 		klog.Errorf("scheduler cache AddPod failed: %v", err)
 	}
 
-	sched.config.SchedulingQueue.AssignedPodAdded(pod)
+	sched.SchedulingQueue.AssignedPodAdded(pod)
 }
 
 func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
@@ -284,11 +284,11 @@ func (sched *Scheduler) updatePodInCache(oldObj, newObj interface{}) {
 	// invalidation and then snapshot the cache itself. If the cache is
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
-	if err := sched.config.SchedulerCache.UpdatePod(oldPod, newPod); err != nil {
+	if err := sched.SchedulerCache.UpdatePod(oldPod, newPod); err != nil {
 		klog.Errorf("scheduler cache UpdatePod failed: %v", err)
 	}
 
-	sched.config.SchedulingQueue.AssignedPodUpdated(newPod)
+	sched.SchedulingQueue.AssignedPodUpdated(newPod)
 }
 
 func (sched *Scheduler) deletePodFromCache(obj interface{}) {
@@ -312,11 +312,11 @@ func (sched *Scheduler) deletePodFromCache(obj interface{}) {
 	// invalidation and then snapshot the cache itself. If the cache is
 	// snapshotted before updates are written, we would update equivalence
 	// cache with stale information which is based on snapshot of old cache.
-	if err := sched.config.SchedulerCache.RemovePod(pod); err != nil {
+	if err := sched.SchedulerCache.RemovePod(pod); err != nil {
 		klog.Errorf("scheduler cache RemovePod failed: %v", err)
 	}
 
-	sched.config.SchedulingQueue.MoveAllToActiveQueue()
+	sched.SchedulingQueue.MoveAllToActiveQueue()
 }
 
 // assignedPod selects pods that are assigned (scheduled and running).
@@ -336,7 +336,7 @@ func responsibleForPod(pod *v1.Pod, schedulerName string) bool {
 //     updated.
 func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 	// Non-assumed pods should never be skipped.
-	isAssumed, err := sched.config.SchedulerCache.IsAssumedPod(pod)
+	isAssumed, err := sched.SchedulerCache.IsAssumedPod(pod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("failed to check whether pod %s/%s is assumed: %v", pod.Namespace, pod.Name, err))
 		return false
@@ -346,7 +346,7 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 	}
 
 	// Gets the assumed pod from the cache.
-	assumedPod, err := sched.config.SchedulerCache.GetPod(pod)
+	assumedPod, err := sched.SchedulerCache.GetPod(pod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("failed to get assumed pod %s/%s from cache: %v", pod.Namespace, pod.Name, err))
 		return false

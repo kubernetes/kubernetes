@@ -17,7 +17,7 @@ limitations under the License.
 package e2e_node
 
 import (
-	. "github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -36,8 +36,8 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 	f := framework.NewDefaultFramework("kubelet-container-log-path")
 	var podClient *framework.PodClient
 
-	Describe("Pod with a container", func() {
-		Context("printed log to stdout", func() {
+	ginkgo.Describe("Pod with a container", func() {
+		ginkgo.Context("printed log to stdout", func() {
 			makeLogPod := func(podName, log string) *v1.Pod {
 				return &v1.Pod{
 					ObjectMeta: metav1.ObjectMeta{
@@ -106,7 +106,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 			}
 
 			var logPodName string
-			BeforeEach(func() {
+			ginkgo.BeforeEach(func() {
 				if framework.TestContext.ContainerRuntime == "docker" {
 					// Container Log Path support requires JSON logging driver.
 					// It does not work when Docker daemon is logging to journald.
@@ -135,7 +135,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 				err := createAndWaitPod(makeLogPod(logPodName, logString))
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logPodName)
 			})
-			It("should print log to correct log path", func() {
+			ginkgo.It("should print log to correct log path", func() {
 
 				logDir := kubelet.ContainerLogsDir
 
@@ -152,7 +152,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 				framework.ExpectNoError(err, "Failed waiting for pod: %s to enter success state", logCheckPodName)
 			})
 
-			It("should print log to correct cri log path", func() {
+			ginkgo.It("should print log to correct cri log path", func() {
 
 				logCRIDir := "/var/log/pods"
 

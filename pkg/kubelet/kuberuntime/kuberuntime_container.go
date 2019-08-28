@@ -30,7 +30,7 @@ import (
 	"sync"
 	"time"
 
-	"google.golang.org/grpc"
+	grpcstatus "google.golang.org/grpc/status"
 
 	"github.com/armon/circbuf"
 	"k8s.io/klog"
@@ -94,7 +94,8 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	// Step 1: pull the image.
 	imageRef, msg, err := m.imagePuller.EnsureImageExists(pod, container, pullSecrets, podSandboxConfig)
 	if err != nil {
-		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
+		s, _ := grpcstatus.FromError(err)
+		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
 		return msg, err
 	}
 
@@ -117,19 +118,22 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 		defer cleanupAction()
 	}
 	if err != nil {
-		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
-		return grpc.ErrorDesc(err), ErrCreateContainerConfig
+		s, _ := grpcstatus.FromError(err)
+		m.recordContainerEvent(pod, container, "", v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
+		return s.Message(), ErrCreateContainerConfig
 	}
 
 	containerID, err := m.runtimeService.CreateContainer(podSandboxID, containerConfig, podSandboxConfig)
 	if err != nil {
-		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", grpc.ErrorDesc(err))
-		return grpc.ErrorDesc(err), ErrCreateContainer
+		s, _ := grpcstatus.FromError(err)
+		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToCreateContainer, "Error: %v", s.Message())
+		return s.Message(), ErrCreateContainer
 	}
 	err = m.internalLifecycle.PreStartContainer(pod, container, containerID)
 	if err != nil {
-		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", grpc.ErrorDesc(err))
-		return grpc.ErrorDesc(err), ErrPreStartHook
+		s, _ := grpcstatus.FromError(err)
+		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Internal PreStartContainer hook failed: %v", s.Message())
+		return s.Message(), ErrPreStartHook
 	}
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.CreatedContainer, fmt.Sprintf("Created container %s", container.Name))
 
@@ -143,8 +147,9 @@ func (m *kubeGenericRuntimeManager) startContainer(podSandboxID string, podSandb
 	// Step 3: start the container.
 	err = m.runtimeService.StartContainer(containerID)
 	if err != nil {
-		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Error: %v", grpc.ErrorDesc(err))
-		return grpc.ErrorDesc(err), kubecontainer.ErrRunContainer
+		s, _ := grpcstatus.FromError(err)
+		m.recordContainerEvent(pod, container, containerID, v1.EventTypeWarning, events.FailedToStartContainer, "Error: %v", s.Message())
+		return s.Message(), kubecontainer.ErrRunContainer
 	}
 	m.recordContainerEvent(pod, container, containerID, v1.EventTypeNormal, events.StartedContainer, fmt.Sprintf("Started container %s", container.Name))
 
@@ -633,7 +638,7 @@ func (m *kubeGenericRuntimeManager) pruneInitContainersBeforeStart(pod *v1.Pod, 
 	for name := range initContainerNames {
 		count := 0
 		for _, status := range podStatus.ContainerStatuses {
-			if status.Name != name || !initContainerNames.Has(status.Name) ||
+			if status.Name != name ||
 				(status.State != kubecontainer.ContainerStateExited &&
 					status.State != kubecontainer.ContainerStateUnknown) {
 				continue
@@ -674,7 +679,7 @@ func (m *kubeGenericRuntimeManager) purgeInitContainers(pod *v1.Pod, podStatus *
 	for name := range initContainerNames {
 		count := 0
 		for _, status := range podStatus.ContainerStatuses {
-			if status.Name != name || !initContainerNames.Has(status.Name) {
+			if status.Name != name {
 				continue
 			}
 			count++
@@ -744,7 +749,7 @@ func (m *kubeGenericRuntimeManager) GetContainerLogs(ctx context.Context, pod *v
 	status, err := m.runtimeService.ContainerStatus(containerID.ID)
 	if err != nil {
 		klog.V(4).Infof("failed to get container status for %v: %v", containerID.String(), err)
-		return fmt.Errorf("Unable to retrieve container logs for %v", containerID.String())
+		return fmt.Errorf("unable to retrieve container logs for %v", containerID.String())
 	}
 	return m.ReadLogs(ctx, status.GetLogPath(), containerID.ID, logOptions, stdout, stderr)
 }

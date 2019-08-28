@@ -25,9 +25,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/features"
+	v1resource "k8s.io/kubernetes/pkg/api/v1/resource"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
@@ -536,8 +535,8 @@ func exceedMemoryRequests(stats statsFunc) cmpFunc {
 
 		p1Memory := memoryUsage(p1Stats.Memory)
 		p2Memory := memoryUsage(p2Stats.Memory)
-		p1ExceedsRequests := p1Memory.Cmp(podRequest(p1, v1.ResourceMemory)) == 1
-		p2ExceedsRequests := p2Memory.Cmp(podRequest(p2, v1.ResourceMemory)) == 1
+		p1ExceedsRequests := p1Memory.Cmp(v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)) == 1
+		p2ExceedsRequests := p2Memory.Cmp(v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)) == 1
 		// prioritize evicting the pod which exceeds its requests
 		return cmpBool(p1ExceedsRequests, p2ExceedsRequests)
 	}
@@ -555,51 +554,16 @@ func memory(stats statsFunc) cmpFunc {
 
 		// adjust p1, p2 usage relative to the request (if any)
 		p1Memory := memoryUsage(p1Stats.Memory)
-		p1Request := podRequest(p1, v1.ResourceMemory)
+		p1Request := v1resource.GetResourceRequestQuantity(p1, v1.ResourceMemory)
 		p1Memory.Sub(p1Request)
 
 		p2Memory := memoryUsage(p2Stats.Memory)
-		p2Request := podRequest(p2, v1.ResourceMemory)
+		p2Request := v1resource.GetResourceRequestQuantity(p2, v1.ResourceMemory)
 		p2Memory.Sub(p2Request)
 
 		// prioritize evicting the pod which has the larger consumption of memory
 		return p2Memory.Cmp(*p1Memory)
 	}
-}
-
-// podRequest returns the total resource request of a pod which is the
-// max(max of init container requests, sum of container requests)
-func podRequest(pod *v1.Pod, resourceName v1.ResourceName) resource.Quantity {
-	containerValue := resource.Quantity{Format: resource.BinarySI}
-	if resourceName == v1.ResourceEphemeralStorage && !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		// if the local storage capacity isolation feature gate is disabled, pods request 0 disk
-		return containerValue
-	}
-	for i := range pod.Spec.Containers {
-		switch resourceName {
-		case v1.ResourceMemory:
-			containerValue.Add(*pod.Spec.Containers[i].Resources.Requests.Memory())
-		case v1.ResourceEphemeralStorage:
-			containerValue.Add(*pod.Spec.Containers[i].Resources.Requests.StorageEphemeral())
-		}
-	}
-	initValue := resource.Quantity{Format: resource.BinarySI}
-	for i := range pod.Spec.InitContainers {
-		switch resourceName {
-		case v1.ResourceMemory:
-			if initValue.Cmp(*pod.Spec.InitContainers[i].Resources.Requests.Memory()) < 0 {
-				initValue = *pod.Spec.InitContainers[i].Resources.Requests.Memory()
-			}
-		case v1.ResourceEphemeralStorage:
-			if initValue.Cmp(*pod.Spec.InitContainers[i].Resources.Requests.StorageEphemeral()) < 0 {
-				initValue = *pod.Spec.InitContainers[i].Resources.Requests.StorageEphemeral()
-			}
-		}
-	}
-	if containerValue.Cmp(initValue) > 0 {
-		return containerValue
-	}
-	return initValue
 }
 
 // exceedDiskRequests compares whether or not pods' disk usage exceeds their requests
@@ -621,8 +585,8 @@ func exceedDiskRequests(stats statsFunc, fsStatsToMeasure []fsStatsType, diskRes
 
 		p1Disk := p1Usage[diskResource]
 		p2Disk := p2Usage[diskResource]
-		p1ExceedsRequests := p1Disk.Cmp(podRequest(p1, diskResource)) == 1
-		p2ExceedsRequests := p2Disk.Cmp(podRequest(p2, diskResource)) == 1
+		p1ExceedsRequests := p1Disk.Cmp(v1resource.GetResourceRequestQuantity(p1, diskResource)) == 1
+		p2ExceedsRequests := p2Disk.Cmp(v1resource.GetResourceRequestQuantity(p2, diskResource)) == 1
 		// prioritize evicting the pod which exceeds its requests
 		return cmpBool(p1ExceedsRequests, p2ExceedsRequests)
 	}
@@ -647,9 +611,9 @@ func disk(stats statsFunc, fsStatsToMeasure []fsStatsType, diskResource v1.Resou
 		// adjust p1, p2 usage relative to the request (if any)
 		p1Disk := p1Usage[diskResource]
 		p2Disk := p2Usage[diskResource]
-		p1Request := podRequest(p1, v1.ResourceEphemeralStorage)
+		p1Request := v1resource.GetResourceRequestQuantity(p1, v1.ResourceEphemeralStorage)
 		p1Disk.Sub(p1Request)
-		p2Request := podRequest(p2, v1.ResourceEphemeralStorage)
+		p2Request := v1resource.GetResourceRequestQuantity(p2, v1.ResourceEphemeralStorage)
 		p2Disk.Sub(p2Request)
 		// prioritize evicting the pod which has the larger consumption of disk
 		return p2Disk.Cmp(p1Disk)

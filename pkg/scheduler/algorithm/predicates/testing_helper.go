@@ -19,8 +19,9 @@ package predicates
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 )
 
 // FakePersistentVolumeClaimInfo declares a []v1.PersistentVolumeClaim type for testing.
@@ -56,6 +57,15 @@ func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 		}
 	}
 	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
+}
+
+// FakeCSINodeInfo declares a storagev1beta1.CSINode type for testing.
+type FakeCSINodeInfo storagev1beta1.CSINode
+
+// GetCSINodeInfo returns a fake CSINode object.
+func (n FakeCSINodeInfo) GetCSINodeInfo(name string) (*storagev1beta1.CSINode, error) {
+	csiNode := storagev1beta1.CSINode(n)
+	return &csiNode, nil
 }
 
 // FakePersistentVolumeInfo declares a []v1.PersistentVolume type for testing.

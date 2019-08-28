@@ -194,7 +194,7 @@ function is_leader() {
     log INFO "Leader election disabled."
     return 0;
   fi
-  KUBE_CONTROLLER_MANAGER_LEADER=`${KUBECTL} -n kube-system get ep kube-controller-manager \
+  KUBE_CONTROLLER_MANAGER_LEADER=`${KUBECTL} ${KUBECTL_OPTS} -n kube-system get ep kube-controller-manager \
     -o go-template=$'{{index .metadata.annotations "control-plane.alpha.kubernetes.io/leader"}}' \
     | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/' | awk -F'_' '{print $1}'`
   # If there was any problem with getting the leader election results, var will

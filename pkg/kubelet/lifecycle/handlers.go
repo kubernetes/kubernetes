@@ -18,7 +18,6 @@ package lifecycle
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
@@ -31,6 +30,11 @@ import (
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/security/apparmor"
+	utilio "k8s.io/utils/io"
+)
+
+const (
+	maxRespBodyLength = 10 * 1 << 10 // 10KB
 )
 
 type HandlerRunner struct {
@@ -70,7 +74,7 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 		}
 		return msg, err
 	default:
-		err := fmt.Errorf("Invalid handler: %v", handler)
+		err := fmt.Errorf("invalid handler: %v", handler)
 		msg := fmt.Sprintf("Cannot run handler: %v", err)
 		klog.Errorf(msg)
 		return msg, err
@@ -133,7 +137,8 @@ func getHttpRespBody(resp *http.Response) string {
 		return ""
 	}
 	defer resp.Body.Close()
-	if bytes, err := ioutil.ReadAll(resp.Body); err == nil {
+	bytes, err := utilio.ReadAtMost(resp.Body, maxRespBodyLength)
+	if err == nil || err == utilio.ErrLimitReached {
 		return string(bytes)
 	}
 	return ""

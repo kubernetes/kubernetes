@@ -250,10 +250,14 @@ if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
 fi
 
 # Optional: set feature gates
-FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
+FEATURE_GATES="${KUBE_FEATURE_GATES:-}"
 
 if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    if [[ -z "${FEATURE_GATES:-}" ]]; then
+        FEATURE_GATES="DevicePlugins=true"
+    else
+        FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    fi
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
         NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
@@ -352,7 +356,7 @@ fi
 CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 
 # Admission Controllers to invoke prior to persisting objects in cluster
-ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection
+ADMISSION_CONTROL=NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,DefaultStorageClass,PersistentVolumeClaimResize,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,RuntimeClass
 
 if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
   ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
@@ -480,3 +484,6 @@ WINDOWS_NODE_TAINTS="${WINDOWS_NODE_TAINTS:-node.kubernetes.io/os=win1809:NoSche
 
 # Whether to set up a private GCE cluster, i.e. a cluster where nodes have only private IPs.
 GCE_PRIVATE_CLUSTER="${KUBE_GCE_PRIVATE_CLUSTER:-false}"
+
+# Optional: Create apiserver konnectivity server and agent.
+ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE="${KUBE_ENABLE_EGRESS_VIA_KONNECTIVITY_SERVICE:-false}"

@@ -27,40 +27,39 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // RealVersion turns a version constants into a version string deployable on
 // GKE.  See hack/get-build.sh for more information.
 func RealVersion(s string) (string, error) {
-	e2elog.Logf("Getting real version for %q", s)
+	framework.Logf("Getting real version for %q", s)
 	v, _, err := framework.RunCmd(path.Join(framework.TestContext.RepoRoot, "hack/get-build.sh"), "-v", s)
 	if err != nil {
 		return v, fmt.Errorf("error getting real version for %q: %v", s, err)
 	}
-	e2elog.Logf("Version for %q is %q", s, v)
+	framework.Logf("Version for %q is %q", s, v)
 	return strings.TrimPrefix(strings.TrimSpace(v), "v"), nil
 }
 
 func traceRouteToMaster() {
-	path, err := exec.LookPath("traceroute")
+	traceroute, err := exec.LookPath("traceroute")
 	if err != nil {
-		e2elog.Logf("Could not find traceroute program")
+		framework.Logf("Could not find traceroute program")
 		return
 	}
-	cmd := exec.Command(path, "-I", framework.GetMasterHost())
+	cmd := exec.Command(traceroute, "-I", framework.GetMasterHost())
 	out, err := cmd.Output()
 	if len(out) != 0 {
-		e2elog.Logf(string(out))
+		framework.Logf(string(out))
 	}
 	if exiterr, ok := err.(*exec.ExitError); err != nil && ok {
-		e2elog.Logf("Error while running traceroute: %s", exiterr.Stderr)
+		framework.Logf("Error while running traceroute: %s", exiterr.Stderr)
 	}
 }
 
 // CheckMasterVersion validates the master version
 func CheckMasterVersion(c clientset.Interface, want string) error {
-	e2elog.Logf("Checking master version")
+	framework.Logf("Checking master version")
 	var err error
 	var v *version.Info
 	waitErr := wait.PollImmediate(5*time.Second, 2*time.Minute, func() (bool, error) {
@@ -81,7 +80,7 @@ func CheckMasterVersion(c clientset.Interface, want string) error {
 	if !strings.HasPrefix(got, want) {
 		return fmt.Errorf("master had kube-apiserver version %s which does not start with %s", got, want)
 	}
-	e2elog.Logf("Master is at version %s", want)
+	framework.Logf("Master is at version %s", want)
 	return nil
 }
 

@@ -4,7 +4,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["providers.go"],
+    srcs = [
+        "doc.go",
+        "providers.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/cloudprovider/providers",
     visibility = [
         "//cmd/cloud-controller-manager:__pkg__",
@@ -13,10 +16,10 @@ go_library(
         "//cmd/kubelet/app:__pkg__",
     ],
     deps = [
-        "//pkg/cloudprovider/providers/openstack:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/aws:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/azure:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/gce:go_default_library",
+        "//staging/src/k8s.io/legacy-cloud-providers/openstack:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/vsphere:go_default_library",
     ],
 )
@@ -30,10 +33,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/cloudprovider/providers/openstack:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
 )
 

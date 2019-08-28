@@ -16,6 +16,7 @@ go_library(
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//pkg/volume/util/hostutil:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",
         "//pkg/volume/util/subpath:go_default_library",
         "//pkg/volume/util/volumepathhandler:go_default_library",

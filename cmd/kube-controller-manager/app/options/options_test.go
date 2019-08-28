@@ -35,6 +35,7 @@ import (
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
+	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
@@ -47,6 +48,7 @@ import (
 	resourcequotaconfig "k8s.io/kubernetes/pkg/controller/resourcequota/config"
 	serviceconfig "k8s.io/kubernetes/pkg/controller/service/config"
 	serviceaccountconfig "k8s.io/kubernetes/pkg/controller/serviceaccount/config"
+	statefulsetconfig "k8s.io/kubernetes/pkg/controller/statefulset/config"
 	ttlafterfinishedconfig "k8s.io/kubernetes/pkg/controller/ttlafterfinished/config"
 	attachdetachconfig "k8s.io/kubernetes/pkg/controller/volume/attachdetach/config"
 	persistentvolumeconfig "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/config"
@@ -71,7 +73,9 @@ func TestAddFlags(t *testing.T) {
 		"--cluster-signing-cert-file=/cluster-signing-cert",
 		"--cluster-signing-key-file=/cluster-signing-key",
 		"--concurrent-deployment-syncs=10",
+		"--concurrent-statefulset-syncs=15",
 		"--concurrent-endpoint-syncs=10",
+		"--concurrent-service-endpoint-syncs=10",
 		"--concurrent-gc-syncs=30",
 		"--concurrent-namespace-syncs=20",
 		"--concurrent-replicaset-syncs=10",
@@ -109,6 +113,7 @@ func TestAddFlags(t *testing.T) {
 		"--leader-elect-resource-lock=configmap",
 		"--leader-elect-retry-period=5s",
 		"--master=192.168.4.20",
+		"--max-endpoints-per-slice=200",
 		"--min-resync-period=8h",
 		"--namespace-sync-period=10m",
 		"--node-cidr-mask-size=48",
@@ -154,11 +159,13 @@ func TestAddFlags(t *testing.T) {
 				},
 				ControllerStartInterval: metav1.Duration{Duration: 2 * time.Minute},
 				LeaderElection: componentbaseconfig.LeaderElectionConfiguration{
-					ResourceLock:  "configmap",
-					LeaderElect:   false,
-					LeaseDuration: metav1.Duration{Duration: 30 * time.Second},
-					RenewDeadline: metav1.Duration{Duration: 15 * time.Second},
-					RetryPeriod:   metav1.Duration{Duration: 5 * time.Second},
+					ResourceLock:      "configmap",
+					LeaderElect:       false,
+					LeaseDuration:     metav1.Duration{Duration: 30 * time.Second},
+					RenewDeadline:     metav1.Duration{Duration: 15 * time.Second},
+					RetryPeriod:       metav1.Duration{Duration: 5 * time.Second},
+					ResourceName:      "kube-controller-manager",
+					ResourceNamespace: "kube-system",
 				},
 				Controllers: []string{"foo", "bar"},
 			},
@@ -216,6 +223,11 @@ func TestAddFlags(t *testing.T) {
 				DeploymentControllerSyncPeriod: metav1.Duration{Duration: 45 * time.Second},
 			},
 		},
+		StatefulSetController: &StatefulSetControllerOptions{
+			&statefulsetconfig.StatefulSetControllerConfiguration{
+				ConcurrentStatefulSetSyncs: 15,
+			},
+		},
 		DeprecatedFlags: &DeprecatedControllerOptions{
 			&kubectrlmgrconfig.DeprecatedControllerConfiguration{
 				DeletingPodsQPS:    0.1,
@@ -225,6 +237,12 @@ func TestAddFlags(t *testing.T) {
 		EndpointController: &EndpointControllerOptions{
 			&endpointconfig.EndpointControllerConfiguration{
 				ConcurrentEndpointSyncs: 10,
+			},
+		},
+		EndpointSliceController: &EndpointSliceControllerOptions{
+			&endpointsliceconfig.EndpointSliceControllerConfiguration{
+				ConcurrentServiceEndpointSyncs: 10,
+				MaxEndpointsPerSlice:           200,
 			},
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{

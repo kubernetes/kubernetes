@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -66,6 +68,7 @@ func (s *azureSvc) GetAzureCredentials(host volume.VolumeHost, nameSpace, secret
 	if accountName == "" || accountKey == "" {
 		return "", "", fmt.Errorf("Invalid %v/%v, couldn't extract azurestorageaccountname or azurestorageaccountkey", nameSpace, secretName)
 	}
+	accountName = strings.TrimSpace(accountName)
 	return accountName, accountKey, nil
 }
 

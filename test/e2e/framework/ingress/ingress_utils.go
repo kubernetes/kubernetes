@@ -49,8 +49,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -94,12 +94,6 @@ const (
 	// IngressReqTimeout is the timeout on a single http request.
 	IngressReqTimeout = 10 * time.Second
 
-	// healthz port used to verify glbc restarted correctly on the master.
-	glbcHealthzPort = 8086
-
-	// General cloud resource poll timeout (eg: create static ip, firewall etc)
-	cloudResourcePollTimeout = 5 * time.Minute
-
 	// NEGAnnotation is NEG annotation.
 	NEGAnnotation = "cloud.google.com/neg"
 
@@ -136,12 +130,12 @@ type E2ELogger struct{}
 
 // Infof outputs log.
 func (l *E2ELogger) Infof(format string, args ...interface{}) {
-	e2elog.Logf(format, args...)
+	framework.Logf(format, args...)
 }
 
 // Errorf outputs log.
 func (l *E2ELogger) Errorf(format string, args ...interface{}) {
-	e2elog.Logf(format, args...)
+	framework.Logf(format, args...)
 }
 
 // ConformanceTests contains a closure with an entry and exit log line.
@@ -215,7 +209,7 @@ func CreateIngressComformanceTests(jig *TestJig, ns string, annotations map[stri
 				})
 				ginkgo.By("Checking that " + pathToFail + " is not exposed by polling for failure")
 				route := fmt.Sprintf("http://%v%v", jig.Address, pathToFail)
-				framework.ExpectNoError(framework.PollURL(route, updateURLMapHost, framework.LoadBalancerCleanupTimeout, jig.PollInterval, &http.Client{Timeout: IngressReqTimeout}, true))
+				framework.ExpectNoError(framework.PollURL(route, updateURLMapHost, e2eservice.LoadBalancerCleanupTimeout, jig.PollInterval, &http.Client{Timeout: IngressReqTimeout}, true))
 			},
 			fmt.Sprintf("Waiting for path updates to reflect in L7"),
 		},
@@ -336,7 +330,7 @@ func BuildInsecureClient(timeout time.Duration) *http.Client {
 // Ingress, it's updated.
 func createTLSSecret(kubeClient clientset.Interface, namespace, secretName string, hosts ...string) (host string, rootCA, privKey []byte, err error) {
 	host = strings.Join(hosts, ",")
-	e2elog.Logf("Generating RSA cert for host %v", host)
+	framework.Logf("Generating RSA cert for host %v", host)
 	cert, key, err := GenerateRSACerts(host, true)
 	if err != nil {
 		return
@@ -353,11 +347,11 @@ func createTLSSecret(kubeClient clientset.Interface, namespace, secretName strin
 	var s *v1.Secret
 	if s, err = kubeClient.CoreV1().Secrets(namespace).Get(secretName, metav1.GetOptions{}); err == nil {
 		// TODO: Retry the update. We don't really expect anything to conflict though.
-		e2elog.Logf("Updating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
+		framework.Logf("Updating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
 		s.Data = secret.Data
 		_, err = kubeClient.CoreV1().Secrets(namespace).Update(s)
 	} else {
-		e2elog.Logf("Creating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
+		framework.Logf("Creating secret %v in ns %v with hosts %v", secret.Name, namespace, host)
 		_, err = kubeClient.CoreV1().Secrets(namespace).Create(secret)
 	}
 	return host, cert, key, err
@@ -385,7 +379,7 @@ func NewIngressTestJig(c clientset.Interface) *TestJig {
 	return &TestJig{
 		Client:       c,
 		RootCAs:      map[string][]byte{},
-		PollInterval: framework.LoadBalancerPollInterval,
+		PollInterval: e2eservice.LoadBalancerPollInterval,
 		Logger:       &E2ELogger{},
 	}
 }
@@ -398,10 +392,10 @@ func NewIngressTestJig(c clientset.Interface) *TestJig {
 func (j *TestJig) CreateIngress(manifestPath, ns string, ingAnnotations map[string]string, svcAnnotations map[string]string) {
 	var err error
 	read := func(file string) string {
-		return string(testfiles.ReadOrDie(filepath.Join(manifestPath, file), ginkgo.Fail))
+		return string(testfiles.ReadOrDie(filepath.Join(manifestPath, file)))
 	}
 	exists := func(file string) bool {
-		return testfiles.Exists(filepath.Join(manifestPath, file), ginkgo.Fail)
+		return testfiles.Exists(filepath.Join(manifestPath, file))
 	}
 
 	j.Logger.Infof("creating replication controller")
@@ -473,7 +467,7 @@ func (j *TestJig) Update(update func(ing *networkingv1beta1.Ingress)) {
 	for i := 0; i < 3; i++ {
 		j.Ingress, err = j.Client.NetworkingV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 		if err != nil {
-			e2elog.Failf("failed to get ingress %s/%s: %v", ns, name, err)
+			framework.Failf("failed to get ingress %s/%s: %v", ns, name, err)
 		}
 		update(j.Ingress)
 		j.Ingress, err = j.runUpdate(j.Ingress)
@@ -482,10 +476,10 @@ func (j *TestJig) Update(update func(ing *networkingv1beta1.Ingress)) {
 			return
 		}
 		if !apierrs.IsConflict(err) && !apierrs.IsServerTimeout(err) {
-			e2elog.Failf("failed to update ingress %s/%s: %v", ns, name, err)
+			framework.Failf("failed to update ingress %s/%s: %v", ns, name, err)
 		}
 	}
-	e2elog.Failf("too many retries updating ingress %s/%s", ns, name)
+	framework.Failf("too many retries updating ingress %s/%s", ns, name)
 }
 
 // AddHTTPS updates the ingress to add this secret for these hosts.
@@ -543,7 +537,7 @@ func (j *TestJig) GetRootCA(secretName string) (rootCA []byte) {
 	var ok bool
 	rootCA, ok = j.RootCAs[secretName]
 	if !ok {
-		e2elog.Failf("Failed to retrieve rootCAs, no recorded secret by name %v", secretName)
+		framework.Failf("Failed to retrieve rootCAs, no recorded secret by name %v", secretName)
 	}
 	return
 }
@@ -674,21 +668,21 @@ func (j *TestJig) pollIngressWithCert(ing *networkingv1beta1.Ingress, address st
 // WaitForIngress waits for the Ingress to get an address.
 // WaitForIngress returns when it gets the first 200 response
 func (j *TestJig) WaitForIngress(waitForNodePort bool) {
-	if err := j.WaitForGivenIngressWithTimeout(j.Ingress, waitForNodePort, framework.LoadBalancerPollTimeout); err != nil {
-		e2elog.Failf("error in waiting for ingress to get an address: %s", err)
+	if err := j.WaitForGivenIngressWithTimeout(j.Ingress, waitForNodePort, e2eservice.LoadBalancerPollTimeout); err != nil {
+		framework.Failf("error in waiting for ingress to get an address: %s", err)
 	}
 }
 
 // WaitForIngressToStable waits for the LB return 100 consecutive 200 responses.
 func (j *TestJig) WaitForIngressToStable() {
-	if err := wait.Poll(10*time.Second, framework.LoadBalancerCreateTimeoutDefault, func() (bool, error) {
+	if err := wait.Poll(10*time.Second, e2eservice.LoadBalancerCreateTimeoutDefault, func() (bool, error) {
 		_, err := j.GetDistinctResponseFromIngress()
 		if err != nil {
 			return false, nil
 		}
 		return true, nil
 	}); err != nil {
-		e2elog.Failf("error in waiting for ingress to stablize: %v", err)
+		framework.Failf("error in waiting for ingress to stablize: %v", err)
 	}
 }
 
@@ -720,12 +714,12 @@ func (j *TestJig) WaitForGivenIngressWithTimeout(ing *networkingv1beta1.Ingress,
 // Ingress. Hostnames and certificate need to be explicitly passed in.
 func (j *TestJig) WaitForIngressWithCert(waitForNodePort bool, knownHosts []string, cert []byte) error {
 	// Wait for the loadbalancer IP.
-	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, framework.LoadBalancerPollTimeout)
+	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, e2eservice.LoadBalancerPollTimeout)
 	if err != nil {
-		return fmt.Errorf("Ingress failed to acquire an IP address within %v", framework.LoadBalancerPollTimeout)
+		return fmt.Errorf("Ingress failed to acquire an IP address within %v", e2eservice.LoadBalancerPollTimeout)
 	}
 
-	return j.pollIngressWithCert(j.Ingress, address, knownHosts, cert, waitForNodePort, framework.LoadBalancerPollTimeout)
+	return j.pollIngressWithCert(j.Ingress, address, knownHosts, cert, waitForNodePort, e2eservice.LoadBalancerPollTimeout)
 }
 
 // VerifyURL polls for the given iterations, in intervals, and fails if the
@@ -734,7 +728,7 @@ func (j *TestJig) VerifyURL(route, host string, iterations int, interval time.Du
 	for i := 0; i < iterations; i++ {
 		b, err := framework.SimpleGET(httpClient, route, host)
 		if err != nil {
-			e2elog.Logf(b)
+			framework.Logf(b)
 			return err
 		}
 		j.Logger.Infof("Verified %v with host %v %d times, sleeping for %v", route, host, i, interval)
@@ -812,9 +806,9 @@ func (j *TestJig) ConstructFirewallForIngress(firewallRuleName string, nodeTags 
 // GetDistinctResponseFromIngress tries GET call to the ingress VIP and return all distinct responses.
 func (j *TestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 	// Wait for the loadbalancer IP.
-	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, framework.LoadBalancerPollTimeout)
+	address, err := j.WaitForIngressAddress(j.Client, j.Ingress.Namespace, j.Ingress.Name, e2eservice.LoadBalancerPollTimeout)
 	if err != nil {
-		e2elog.Failf("Ingress failed to acquire an IP address within %v", framework.LoadBalancerPollTimeout)
+		framework.Failf("Ingress failed to acquire an IP address within %v", e2eservice.LoadBalancerPollTimeout)
 	}
 	responses := sets.NewString()
 	timeoutClient := &http.Client{Timeout: IngressReqTimeout}
@@ -843,27 +837,27 @@ type NginxIngressController struct {
 // Init initializes the NginxIngressController
 func (cont *NginxIngressController) Init() {
 	read := func(file string) string {
-		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file), ginkgo.Fail))
+		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file)))
 	}
-	e2elog.Logf("initializing nginx ingress controller")
+	framework.Logf("initializing nginx ingress controller")
 	framework.RunKubectlOrDieInput(read("rc.yaml"), "create", "-f", "-", fmt.Sprintf("--namespace=%v", cont.Ns))
 
 	rc, err := cont.Client.CoreV1().ReplicationControllers(cont.Ns).Get("nginx-ingress-controller", metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	cont.rc = rc
 
-	e2elog.Logf("waiting for pods with label %v", rc.Spec.Selector)
+	framework.Logf("waiting for pods with label %v", rc.Spec.Selector)
 	sel := labels.SelectorFromSet(labels.Set(rc.Spec.Selector))
 	framework.ExpectNoError(testutils.WaitForPodsWithLabelRunning(cont.Client, cont.Ns, sel))
 	pods, err := cont.Client.CoreV1().Pods(cont.Ns).List(metav1.ListOptions{LabelSelector: sel.String()})
 	framework.ExpectNoError(err)
 	if len(pods.Items) == 0 {
-		e2elog.Failf("Failed to find nginx ingress controller pods with selector %v", sel)
+		framework.Failf("Failed to find nginx ingress controller pods with selector %v", sel)
 	}
 	cont.pod = &pods.Items[0]
 	cont.externalIP, err = framework.GetHostExternalAddress(cont.Client, cont.pod)
 	framework.ExpectNoError(err)
-	e2elog.Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
+	framework.Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
 }
 
 func generateBacksideHTTPSIngressSpec(ns string) *networkingv1beta1.Ingress {

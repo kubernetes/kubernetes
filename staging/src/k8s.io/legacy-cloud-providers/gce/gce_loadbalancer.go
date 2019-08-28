@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -150,7 +152,11 @@ func (g *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, svc 
 	default:
 		status, err = g.ensureExternalLoadBalancer(clusterName, clusterID, svc, existingFwdRule, nodes)
 	}
-	klog.V(4).Infof("EnsureLoadBalancer(%v, %v, %v, %v, %v): done ensuring loadbalancer. err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, err)
+	if err != nil {
+		klog.Errorf("Failed to EnsureLoadBalancer(%s, %s, %s, %s, %s), err: %v", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region, err)
+		return status, err
+	}
+	klog.V(4).Infof("EnsureLoadBalancer(%s, %s, %s, %s, %s): done ensuring loadbalancer.", clusterName, svc.Namespace, svc.Name, loadBalancerName, g.region)
 	return status, err
 }
 
@@ -197,7 +203,7 @@ func (g *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 }
 
 func getSvcScheme(svc *v1.Service) cloud.LbScheme {
-	if typ, ok := GetLoadBalancerAnnotationType(svc); ok && typ == LBTypeInternal {
+	if t := GetLoadBalancerAnnotationType(svc); t == LBTypeInternal {
 		return cloud.SchemeInternal
 	}
 	return cloud.SchemeExternal

@@ -196,7 +196,7 @@ func TestValidateKubeProxyConfiguration(t *testing.T) {
 					},
 				},
 			},
-			msg:       "must be a valid CIDR block (e.g. 10.100.0.0/16)",
+			msg:       "must be a valid CIDR block (e.g. 10.100.0.0/16 or FD02::0:0:0/96)",
 			expectErr: true,
 		},
 		{

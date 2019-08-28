@@ -25,6 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 const (
@@ -57,6 +58,10 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeInlineVolumeToCSI(vol
 	}
 	ebsSource := volume.AWSElasticBlockStore
 	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			// A.K.A InnerVolumeSpecName required to match for Unmount
+			Name: volume.Name,
+		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				CSI: &v1.CSIPersistentVolumeSource{
@@ -122,7 +127,7 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateCSIPVToInTree(pv *v1.Persis
 	if partition, ok := csiSource.VolumeAttributes["partition"]; ok {
 		partValue, err := strconv.Atoi(partition)
 		if err != nil {
-			return nil, fmt.Errorf("Failed to convert partition %v to integer: %v", partition, err)
+			return nil, fmt.Errorf("failed to convert partition %v to integer: %v", partition, err)
 		}
 		ebsSource.Partition = int32(partValue)
 	}

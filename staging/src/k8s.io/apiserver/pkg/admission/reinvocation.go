@@ -16,6 +16,8 @@ limitations under the License.
 
 package admission
 
+import "context"
+
 // newReinvocationHandler creates a handler that wraps the provided admission chain and reinvokes it
 // if needed according to re-invocation policy of the webhooks.
 func newReinvocationHandler(admissionChain Interface) Interface {
@@ -30,9 +32,9 @@ type reinvoker struct {
 // admission chain if needed according to the reinvocation policy.  Plugins are expected to check
 // the admission attributes' reinvocation context against their reinvocation policy to decide if
 // they should re-run, and to update the reinvocation context if they perform any mutations.
-func (r *reinvoker) Admit(a Attributes, o ObjectInterfaces) error {
+func (r *reinvoker) Admit(ctx context.Context, a Attributes, o ObjectInterfaces) error {
 	if mutator, ok := r.admissionChain.(MutationInterface); ok {
-		err := mutator.Admit(a, o)
+		err := mutator.Admit(ctx, a, o)
 		if err != nil {
 			return err
 		}
@@ -42,16 +44,16 @@ func (r *reinvoker) Admit(a Attributes, o ObjectInterfaces) error {
 			// Calling admit a second time will reinvoke all in-tree plugins
 			// as well as any webhook plugins that need to be reinvoked based on the
 			// reinvocation policy.
-			return mutator.Admit(a, o)
+			return mutator.Admit(ctx, a, o)
 		}
 	}
 	return nil
 }
 
 // Validate performs an admission control check using the wrapped admission chain, and returns immediately on first error.
-func (r *reinvoker) Validate(a Attributes, o ObjectInterfaces) error {
+func (r *reinvoker) Validate(ctx context.Context, a Attributes, o ObjectInterfaces) error {
 	if validator, ok := r.admissionChain.(ValidationInterface); ok {
-		return validator.Validate(a, o)
+		return validator.Validate(ctx, a, o)
 	}
 	return nil
 }

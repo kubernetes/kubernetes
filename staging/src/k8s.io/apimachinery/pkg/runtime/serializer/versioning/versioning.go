@@ -230,11 +230,3 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 	// Conversion is responsible for setting the proper group, version, and kind onto the outgoing object
 	return c.encoder.Encode(out, w)
 }
-
-// DirectEncoder was moved and renamed to runtime.WithVersionEncoder in 1.15.
-// TODO: remove in 1.16.
-type DirectEncoder = runtime.WithVersionEncoder
-
-// DirectDecoder was moved and renamed to runtime.WithoutVersionDecoder in 1.15.
-// TODO: remove in 1.16.
-type DirectDecoder = runtime.WithoutVersionDecoder

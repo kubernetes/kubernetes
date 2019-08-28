@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -22,19 +24,20 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2018-07-01/storage"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-04-01/storage"
 	"github.com/Azure/go-autorest/autorest"
 	"github.com/Azure/go-autorest/autorest/adal"
-	"k8s.io/klog"
 
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/klog"
 )
 
 const (
-	// The version number is taken from "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network".
-	azureNetworkAPIVersion = "2018-08-01"
+	// The version number is taken from "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network".
+	azureNetworkAPIVersion              = "2019-06-01"
+	virtualMachineScaleSetsDeallocating = "Deallocating"
 )
 
 // Helpers for rate limiting error/error channel creation
@@ -49,6 +52,7 @@ func createRateLimitErr(isWrite bool, opName string) error {
 // VirtualMachinesClient defines needed functions for azure compute.VirtualMachinesClient
 type VirtualMachinesClient interface {
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachine, source string) (resp *http.Response, err error)
+	Update(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachineUpdate, source string) (resp *http.Response, err error)
 	Get(ctx context.Context, resourceGroupName string, VMName string, expand compute.InstanceViewTypes) (result compute.VirtualMachine, err error)
 	List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachine, err error)
 }
@@ -73,6 +77,7 @@ type PublicIPAddressesClient interface {
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, publicIPAddressName string, parameters network.PublicIPAddress) (resp *http.Response, err error)
 	Delete(ctx context.Context, resourceGroupName string, publicIPAddressName string) (resp *http.Response, err error)
 	Get(ctx context.Context, resourceGroupName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
+	GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error)
 	List(ctx context.Context, resourceGroupName string) (result []network.PublicIPAddress, err error)
 }
 
@@ -96,6 +101,7 @@ type SecurityGroupsClient interface {
 type VirtualMachineScaleSetsClient interface {
 	Get(ctx context.Context, resourceGroupName string, VMScaleSetName string) (result compute.VirtualMachineScaleSet, err error)
 	List(ctx context.Context, resourceGroupName string) (result []compute.VirtualMachineScaleSet, err error)
+	CreateOrUpdate(ctx context.Context, resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) (resp *http.Response, err error)
 }
 
 // VirtualMachineScaleSetVMsClient defines needed functions for azure compute.VirtualMachineScaleSetVMsClient
@@ -197,6 +203,29 @@ func (az *azVirtualMachinesClient) CreateOrUpdate(ctx context.Context, resourceG
 
 	mc := newMetricContext("vm", "create_or_update", resourceGroupName, az.client.SubscriptionID, source)
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, VMName, parameters)
+	if err != nil {
+		return future.Response(), err
+	}
+
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
+	mc.Observe(err)
+	return future.Response(), err
+}
+
+func (az *azVirtualMachinesClient) Update(ctx context.Context, resourceGroupName string, VMName string, parameters compute.VirtualMachineUpdate, source string) (resp *http.Response, err error) {
+	// /* Write rate limiting */
+	if !az.rateLimiterWriter.TryAccept() {
+		err = createRateLimitErr(true, "VMUpdate")
+		return
+	}
+
+	klog.V(10).Infof("azVirtualMachinesClient.Update(%q, %q): start", resourceGroupName, VMName)
+	defer func() {
+		klog.V(10).Infof("azVirtualMachinesClient.Update(%q, %q): end", resourceGroupName, VMName)
+	}()
+
+	mc := newMetricContext("vm", "update", resourceGroupName, az.client.SubscriptionID, source)
+	future, err := az.client.Update(ctx, resourceGroupName, VMName, parameters)
 	if err != nil {
 		return future.Response(), err
 	}
@@ -568,6 +597,23 @@ func (az *azPublicIPAddressesClient) Get(ctx context.Context, resourceGroupName 
 	return
 }
 
+func (az *azPublicIPAddressesClient) GetVirtualMachineScaleSetPublicIPAddress(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, virtualmachineIndex string, networkInterfaceName string, IPConfigurationName string, publicIPAddressName string, expand string) (result network.PublicIPAddress, err error) {
+	if !az.rateLimiterReader.TryAccept() {
+		err = createRateLimitErr(false, "VMSSPublicIPGet")
+		return
+	}
+
+	klog.V(10).Infof("azPublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(%q,%q): start", resourceGroupName, publicIPAddressName)
+	defer func() {
+		klog.V(10).Infof("azPublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(%q,%q): end", resourceGroupName, publicIPAddressName)
+	}()
+
+	mc := newMetricContext("vmss_public_ip_addresses", "get", resourceGroupName, az.client.SubscriptionID, "")
+	result, err = az.client.GetVirtualMachineScaleSetPublicIPAddress(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName, expand)
+	mc.Observe(err)
+	return
+}
+
 func (az *azPublicIPAddressesClient) List(ctx context.Context, resourceGroupName string) ([]network.PublicIPAddress, error) {
 	if !az.rateLimiterReader.TryAccept() {
 		return nil, createRateLimitErr(false, "PublicIPList")
@@ -931,6 +977,28 @@ func (az *azVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGro
 	return result, nil
 }
 
+func (az *azVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, vmScaleSetName string, parameters compute.VirtualMachineScaleSet) (resp *http.Response, err error) {
+	/* Write rate limiting */
+	if !az.rateLimiterWriter.TryAccept() {
+		err = createRateLimitErr(true, "NiCreateOrUpdate")
+		return
+	}
+
+	klog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): start", resourceGroupName, vmScaleSetName)
+	defer func() {
+		klog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): end", resourceGroupName, vmScaleSetName)
+	}()
+
+	mc := newMetricContext("vmss", "create_or_update", resourceGroupName, az.client.SubscriptionID, "")
+	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, vmScaleSetName, parameters)
+	if err != nil {
+		return future.Response(), mc.Observe(err)
+	}
+
+	err = future.WaitForCompletionRef(ctx, az.client.Client)
+	return future.Response(), mc.Observe(err)
+}
+
 // azVirtualMachineScaleSetVMsClient implements VirtualMachineScaleSetVMsClient.
 type azVirtualMachineScaleSetVMsClient struct {
 	client            compute.VirtualMachineScaleSetVMsClient
@@ -1022,7 +1090,7 @@ func (az *azVirtualMachineScaleSetVMsClient) List(ctx context.Context, resourceG
 
 func (az *azVirtualMachineScaleSetVMsClient) Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM, source string) (resp *http.Response, err error) {
 	if !az.rateLimiterWriter.TryAccept() {
-		err = createRateLimitErr(true, "VMSSUpdate")
+		err = createRateLimitErr(true, "VMSSVMUpdate")
 		return
 	}
 
@@ -1351,7 +1419,7 @@ func (az *azStorageAccountClient) GetProperties(ctx context.Context, resourceGro
 	}()
 
 	mc := newMetricContext("storage_account", "get_properties", resourceGroupName, az.client.SubscriptionID, "")
-	result, err = az.client.GetProperties(ctx, resourceGroupName, accountName)
+	result, err = az.client.GetProperties(ctx, resourceGroupName, accountName, "")
 	mc.Observe(err)
 	return
 }

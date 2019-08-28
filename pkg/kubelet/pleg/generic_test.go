@@ -24,12 +24,14 @@ import (
 	"testing"
 	"time"
 
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/diff"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
+	"k8s.io/kubernetes/pkg/kubelet/metrics"
 )
 
 const (
@@ -642,4 +644,50 @@ func TestRelistIPChange(t *testing.T) {
 		assert.Nil(t, actualErr, tc.name)
 		assert.Exactly(t, []*PodLifecycleEvent{event}, actualEvents)
 	}
+}
+
+func TestRunningPodAndContainerCount(t *testing.T) {
+	fakeRuntime := &containertest.FakeRuntime{}
+	runtimeCache, _ := kubecontainer.NewRuntimeCache(fakeRuntime)
+	metrics.Register(runtimeCache)
+	testPleg := newTestGenericPLEG()
+	pleg, runtime := testPleg.pleg, testPleg.runtime
+
+	runtime.AllPodList = []*containertest.FakePod{
+		{Pod: &kubecontainer.Pod{
+			ID: "1234",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateRunning),
+				createTestContainer("c2", kubecontainer.ContainerStateUnknown),
+				createTestContainer("c3", kubecontainer.ContainerStateUnknown),
+			},
+		}},
+		{Pod: &kubecontainer.Pod{
+			ID: "4567",
+			Containers: []*kubecontainer.Container{
+				createTestContainer("c1", kubecontainer.ContainerStateExited),
+			},
+		}},
+	}
+
+	pleg.relist()
+
+	// assert for container count with label "running"
+	actualMetricRunningContainerCount := &dto.Metric{}
+	expectedMetricRunningContainerCount := float64(1)
+	metrics.RunningContainerCount.WithLabelValues(string(kubecontainer.ContainerStateRunning)).Write(actualMetricRunningContainerCount)
+	assert.Equal(t, expectedMetricRunningContainerCount, actualMetricRunningContainerCount.GetGauge().GetValue())
+
+	// assert for container count with label "unknown"
+	actualMetricUnknownContainerCount := &dto.Metric{}
+	expectedMetricUnknownContainerCount := float64(2)
+	metrics.RunningContainerCount.WithLabelValues(string(kubecontainer.ContainerStateUnknown)).Write(actualMetricUnknownContainerCount)
+	assert.Equal(t, expectedMetricUnknownContainerCount, actualMetricUnknownContainerCount.GetGauge().GetValue())
+
+	// assert for running pod count
+	actualMetricRunningPodCount := &dto.Metric{}
+	metrics.RunningPodCount.Write(actualMetricRunningPodCount)
+	expectedMetricRunningPodCount := float64(2)
+	assert.Equal(t, expectedMetricRunningPodCount, actualMetricRunningPodCount.GetGauge().GetValue())
+
 }

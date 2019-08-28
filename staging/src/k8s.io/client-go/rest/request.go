@@ -649,6 +649,9 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	if err != nil {
 		return nil, err
 	}
+	if r.body != nil {
+		req.Body = ioutil.NopCloser(r.body)
+	}
 	if r.ctx != nil {
 		req = req.WithContext(r.ctx)
 	}
@@ -868,13 +871,13 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			// 3. Apiserver closes connection.
 			// 4. client-go should catch this and return an error.
 			klog.V(2).Infof("Stream error %#v when reading response body, may be caused by closed connection.", err)
-			streamErr := fmt.Errorf("Stream error when reading response body, may be caused by closed connection. Please retry. Original error: %v", err)
+			streamErr := fmt.Errorf("stream error when reading response body, may be caused by closed connection. Please retry. Original error: %v", err)
 			return Result{
 				err: streamErr,
 			}
 		default:
 			klog.Errorf("Unexpected error when reading response body: %v", err)
-			unexpectedErr := fmt.Errorf("Unexpected error when reading response body. Please retry. Original error: %v", err)
+			unexpectedErr := fmt.Errorf("unexpected error when reading response body. Please retry. Original error: %v", err)
 			return Result{
 				err: unexpectedErr,
 			}

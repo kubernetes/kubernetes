@@ -311,7 +311,7 @@ type dockerService struct {
 	startLocalStreamingServer bool
 
 	// containerCleanupInfos maps container IDs to the `containerCleanupInfo` structs
-	// needed to clean up after containers have been started or removed.
+	// needed to clean up after containers have been removed.
 	// (see `applyPlatformSpecificDockerConfig` and `performPlatformSpecificContainerCleanup`
 	// methods for more info).
 	containerCleanupInfos map[string]*containerCleanupInfo
@@ -527,7 +527,7 @@ func (ds *dockerService) getDockerVersionFromCache() (*dockertypes.Version, erro
 	}
 	dv, ok := value.(*dockertypes.Version)
 	if !ok {
-		return nil, fmt.Errorf("Converted to *dockertype.Version error")
+		return nil, fmt.Errorf("converted to *dockertype.Version error")
 	}
 	return dv, nil
 }

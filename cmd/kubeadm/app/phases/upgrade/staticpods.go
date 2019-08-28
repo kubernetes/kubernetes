@@ -52,6 +52,8 @@ type StaticPodPathManager interface {
 	MoveFile(oldPath, newPath string) error
 	// KubernetesDir is the directory Kubernetes owns for storing various configuration files
 	KubernetesDir() string
+	// KustomizeDir should point to the folder where kustomize patches for static pod manifest are stored
+	KustomizeDir() string
 	// RealManifestPath gets the file path for the component in the "real" static pod manifest directory used by the kubelet
 	RealManifestPath(component string) string
 	// RealManifestDir should point to the static pod manifest directory used by the kubelet
@@ -73,6 +75,7 @@ type StaticPodPathManager interface {
 // KubeStaticPodPathManager is a real implementation of StaticPodPathManager that is used when upgrading a static pod cluster
 type KubeStaticPodPathManager struct {
 	kubernetesDir     string
+	kustomizeDir      string
 	realManifestDir   string
 	tempManifestDir   string
 	backupManifestDir string
@@ -83,9 +86,10 @@ type KubeStaticPodPathManager struct {
 }
 
 // NewKubeStaticPodPathManager creates a new instance of KubeStaticPodPathManager
-func NewKubeStaticPodPathManager(kubernetesDir, tempDir, backupDir, backupEtcdDir string, keepManifestDir, keepEtcdDir bool) StaticPodPathManager {
+func NewKubeStaticPodPathManager(kubernetesDir, kustomizeDir, tempDir, backupDir, backupEtcdDir string, keepManifestDir, keepEtcdDir bool) StaticPodPathManager {
 	return &KubeStaticPodPathManager{
 		kubernetesDir:     kubernetesDir,
+		kustomizeDir:      kustomizeDir,
 		realManifestDir:   filepath.Join(kubernetesDir, constants.ManifestsSubDirName),
 		tempManifestDir:   tempDir,
 		backupManifestDir: backupDir,
@@ -96,7 +100,7 @@ func NewKubeStaticPodPathManager(kubernetesDir, tempDir, backupDir, backupEtcdDi
 }
 
 // NewKubeStaticPodPathManagerUsingTempDirs creates a new instance of KubeStaticPodPathManager with temporary directories backing it
-func NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir string, saveManifestsDir, saveEtcdDir bool) (StaticPodPathManager, error) {
+func NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, kustomizeDir string, saveManifestsDir, saveEtcdDir bool) (StaticPodPathManager, error) {
 
 	upgradedManifestsDir, err := constants.CreateTempDirForKubeadm(kubernetesDir, "kubeadm-upgraded-manifests")
 	if err != nil {
@@ -111,7 +115,7 @@ func NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir string, saveManifest
 		return nil, err
 	}
 
-	return NewKubeStaticPodPathManager(kubernetesDir, upgradedManifestsDir, backupManifestsDir, backupEtcdDir, saveManifestsDir, saveEtcdDir), nil
+	return NewKubeStaticPodPathManager(kubernetesDir, kustomizeDir, upgradedManifestsDir, backupManifestsDir, backupEtcdDir, saveManifestsDir, saveEtcdDir), nil
 }
 
 // MoveFile should move a file from oldPath to newPath
@@ -122,6 +126,11 @@ func (spm *KubeStaticPodPathManager) MoveFile(oldPath, newPath string) error {
 // KubernetesDir should point to the directory Kubernetes owns for storing various configuration files
 func (spm *KubeStaticPodPathManager) KubernetesDir() string {
 	return spm.kubernetesDir
+}
+
+// KustomizeDir should point to the folder where kustomize patches for static pod manifest are stored
+func (spm *KubeStaticPodPathManager) KustomizeDir() string {
+	return spm.kustomizeDir
 }
 
 // RealManifestPath gets the file path for the component in the "real" static pod manifest directory used by the kubelet
@@ -184,7 +193,6 @@ func upgradeComponent(component string, certsRenewMgr *renewal.Manager, waiter a
 	// Special treatment is required for etcd case, when rollbackOldManifests should roll back etcd
 	// manifests only for the case when component is Etcd
 	recoverEtcd := false
-	waitForComponentRestart := true
 	if component == constants.Etcd {
 		recoverEtcd = true
 	}
@@ -232,27 +240,23 @@ func upgradeComponent(component string, certsRenewMgr *renewal.Manager, waiter a
 
 	fmt.Printf("[upgrade/staticpods] Moved new manifest to %q and backed up old manifest to %q\n", currentManifestPath, backupManifestPath)
 
-	if waitForComponentRestart {
-		fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
-		fmt.Printf("[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout %v)\n", UpgradeManifestTimeout)
+	fmt.Println("[upgrade/staticpods] Waiting for the kubelet to restart the component")
+	fmt.Printf("[upgrade/staticpods] This might take a minute or longer depending on the component/version gap (timeout %v)\n", UpgradeManifestTimeout)
 
-		// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
-		// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy
-		// If we don't do this, there is a case where we remove the Static Pod manifest, kubelet is slow to react, kubeadm checks the
-		// API endpoint below of the OLD Static Pod component and proceeds quickly enough, which might lead to unexpected results.
-		if err := waiter.WaitForStaticPodHashChange(cfg.NodeRegistration.Name, component, beforePodHash); err != nil {
-			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
-		}
-
-		// Wait for the static pod component to come up and register itself as a mirror pod
-		if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
-			return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
-		}
-
-		fmt.Printf("[upgrade/staticpods] Component %q upgraded successfully!\n", component)
-	} else {
-		fmt.Printf("[upgrade/staticpods] Not waiting for pod-hash change for component %q\n", component)
+	// Wait for the mirror Pod hash to change; otherwise we'll run into race conditions here when the kubelet hasn't had time to
+	// notice the removal of the Static Pod, leading to a false positive below where we check that the API endpoint is healthy
+	// If we don't do this, there is a case where we remove the Static Pod manifest, kubelet is slow to react, kubeadm checks the
+	// API endpoint below of the OLD Static Pod component and proceeds quickly enough, which might lead to unexpected results.
+	if err := waiter.WaitForStaticPodHashChange(cfg.NodeRegistration.Name, component, beforePodHash); err != nil {
+		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
 	}
+
+	// Wait for the static pod component to come up and register itself as a mirror pod
+	if err := waiter.WaitForPodsWithLabel("component=" + component); err != nil {
+		return rollbackOldManifests(recoverManifests, err, pathMgr, recoverEtcd)
+	}
+
+	fmt.Printf("[upgrade/staticpods] Component %q upgraded successfully!\n", component)
 
 	return nil
 }
@@ -314,7 +318,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 
 	// Write the updated etcd static Pod manifest into the temporary directory, at this point no etcd change
 	// has occurred in any aspects.
-	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
+	if err := etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.TempManifestDir(), pathMgr.KustomizeDir(), cfg.NodeRegistration.Name, &cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint); err != nil {
 		return true, errors.Wrap(err, "error creating local etcd static pod manifest file")
 	}
 
@@ -460,7 +464,7 @@ func StaticPodControlPlane(client clientset.Interface, waiter apiclient.Waiter, 
 
 	// Write the updated static Pod manifests into the temporary directory
 	fmt.Printf("[upgrade/staticpods] Writing new Static Pod manifests to %q\n", pathMgr.TempManifestDir())
-	err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), cfg)
+	err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.TempManifestDir(), pathMgr.KustomizeDir(), cfg)
 	if err != nil {
 		return errors.Wrap(err, "error creating init static pod manifest files")
 	}
@@ -587,14 +591,14 @@ func renewCertsByComponent(cfg *kubeadmapi.InitConfiguration, component string, 
 }
 
 // GetPathManagerForUpgrade returns a path manager properly configured for the given InitConfiguration.
-func GetPathManagerForUpgrade(kubernetesDir string, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) (StaticPodPathManager, error) {
+func GetPathManagerForUpgrade(kubernetesDir, kustomizeDir string, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade bool) (StaticPodPathManager, error) {
 	isHAEtcd := etcdutil.CheckConfigurationIsHA(&internalcfg.Etcd)
-	return NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, true, etcdUpgrade && !isHAEtcd)
+	return NewKubeStaticPodPathManagerUsingTempDirs(kubernetesDir, kustomizeDir, true, etcdUpgrade && !isHAEtcd)
 }
 
 // PerformStaticPodUpgrade performs the upgrade of the control plane components for a static pod hosted cluster
-func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade, renewCerts bool) error {
-	pathManager, err := GetPathManagerForUpgrade(constants.KubernetesDir, internalcfg, etcdUpgrade)
+func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter, internalcfg *kubeadmapi.InitConfiguration, etcdUpgrade, renewCerts bool, kustomizeDir string) error {
+	pathManager, err := GetPathManagerForUpgrade(constants.KubernetesDir, kustomizeDir, internalcfg, etcdUpgrade)
 	if err != nil {
 		return err
 	}
@@ -604,15 +608,14 @@ func PerformStaticPodUpgrade(client clientset.Interface, waiter apiclient.Waiter
 }
 
 // DryRunStaticPodUpgrade fakes an upgrade of the control plane
-func DryRunStaticPodUpgrade(internalcfg *kubeadmapi.InitConfiguration) error {
+func DryRunStaticPodUpgrade(kustomizeDir string, internalcfg *kubeadmapi.InitConfiguration) error {
 
 	dryRunManifestDir, err := constants.CreateTempDirForKubeadm("", "kubeadm-upgrade-dryrun")
 	if err != nil {
 		return err
 	}
 	defer os.RemoveAll(dryRunManifestDir)
-
-	if err := controlplane.CreateInitStaticPodManifestFiles(dryRunManifestDir, internalcfg); err != nil {
+	if err := controlplane.CreateInitStaticPodManifestFiles(dryRunManifestDir, kustomizeDir, internalcfg); err != nil {
 		return err
 	}
 

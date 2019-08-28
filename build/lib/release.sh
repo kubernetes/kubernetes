@@ -337,7 +337,7 @@ function kube::release::create_docker_images_for_server() {
     local images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
-    local -r docker_registry="k8s.gcr.io"
+    local -r docker_registry="${KUBE_DOCKER_REGISTRY}"
     # Docker tags cannot contain '+'
     local docker_tag="${KUBE_GIT_VERSION/+/_}"
     if [[ -z "${docker_tag}" ]]; then
@@ -357,17 +357,7 @@ function kube::release::create_docker_images_for_server() {
       local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
       local docker_file_path="${docker_build_path}/Dockerfile"
       local binary_file_path="${binary_dir}/${binary_name}"
-      local docker_image_tag="${docker_registry}"
-      if [[ ${arch} == "amd64" ]]; then
-        # If we are building a amd64 docker image, preserve the original
-        # image name
-        docker_image_tag+="/${binary_name}:${docker_tag}"
-      else
-        # If we are building a docker image for another architecture,
-        # append the arch in the image tag
-        docker_image_tag+="/${binary_name}-${arch}:${docker_tag}"
-      fi
-
+      local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
       (
@@ -395,9 +385,8 @@ EOF
         "${DOCKER[@]}" build "${docker_build_opts[@]}" -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
         # If we are building an official/alpha/beta release we want to keep
         # docker images and tag them appropriately.
-        local release_docker_image_tag=""
-        if [[ -n "${KUBE_DOCKER_IMAGE_TAG-}" && -n "${KUBE_DOCKER_REGISTRY-}" && $docker_registry != $KUBE_DOCKER_REGISTRY ]]; then
-          release_docker_image_tag="${KUBE_DOCKER_REGISTRY}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG}"
+        local -r release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
+        if [[ "${release_docker_image_tag}" != "${docker_image_tag}" ]]; then
           kube::log::status "Tagging docker image ${docker_image_tag} as ${release_docker_image_tag}"
           "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
           "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
@@ -407,11 +396,8 @@ EOF
         rm -rf "${docker_build_path}"
         ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
 
-        if [[ -z "${KUBE_DOCKER_IMAGE_TAG-}" || -z "${KUBE_DOCKER_REGISTRY-}" ]]; then
-          # not a release
-          kube::log::status "Deleting docker image ${docker_image_tag}"
-          "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
-        fi
+        kube::log::status "Deleting docker image ${docker_image_tag}"
+        "${DOCKER[@]}" rmi "${docker_image_tag}" &>/dev/null || true
       ) &
     done
 
@@ -446,6 +432,7 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/etcd.manifest" "${dst_dir}"
   cp "${src_dir}/kube-scheduler.manifest" "${dst_dir}"
   cp "${src_dir}/kube-apiserver.manifest" "${dst_dir}"
+  cp "${src_dir}/konnectivity-server.yaml" "${dst_dir}"
   cp "${src_dir}/abac-authz-policy.jsonl" "${dst_dir}"
   cp "${src_dir}/kube-controller-manager.manifest" "${dst_dir}"
   cp "${src_dir}/kube-addon-manager.yaml" "${dst_dir}"

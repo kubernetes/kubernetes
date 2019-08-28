@@ -41,6 +41,9 @@ type mergingWalker struct {
 
 	// internal housekeeping--don't set when constructing.
 	inLeaf bool // Set to true if we're in a "big leaf"--atomic map/list
+
+	// Allocate only as many walkers as needed for the depth by storing them here.
+	spareWalkers *[]*mergingWalker
 }
 
 // merge rules examine w.lhs and w.rhs (up to one of which may be nil) and
@@ -61,12 +64,26 @@ var (
 )
 
 // merge sets w.out.
-func (w *mergingWalker) merge() ValidationErrors {
+func (w *mergingWalker) merge() (errs ValidationErrors) {
 	if w.lhs == nil && w.rhs == nil {
 		// check this condidition here instead of everywhere below.
 		return w.errorf("at least one of lhs and rhs must be provided")
 	}
-	errs := resolveSchema(w.schema, w.typeRef, w)
+	a, ok := w.schema.Resolve(w.typeRef)
+	if !ok {
+		return w.errorf("schema error: no type found matching: %v", *w.typeRef.NamedType)
+	}
+
+	alhs := deduceAtom(a, w.lhs)
+	arhs := deduceAtom(a, w.rhs)
+	if alhs.Equals(arhs) {
+		errs = append(errs, handleAtom(arhs, w.typeRef, w)...)
+	} else {
+		w2 := *w
+		errs = append(errs, handleAtom(alhs, w.typeRef, &w2)...)
+		errs = append(errs, handleAtom(arhs, w.typeRef, w)...)
+	}
+
 	if !w.inLeaf && w.postItemHook != nil {
 		w.postItemHook(w)
 	}
@@ -101,106 +118,44 @@ func (w *mergingWalker) doScalar(t schema.Scalar) (errs ValidationErrors) {
 }
 
 func (w *mergingWalker) prepareDescent(pe fieldpath.PathElement, tr schema.TypeRef) *mergingWalker {
-	w2 := *w
+	if w.spareWalkers == nil {
+		// first descent.
+		w.spareWalkers = &[]*mergingWalker{}
+	}
+	var w2 *mergingWalker
+	if n := len(*w.spareWalkers); n > 0 {
+		w2, *w.spareWalkers = (*w.spareWalkers)[n-1], (*w.spareWalkers)[:n-1]
+	} else {
+		w2 = &mergingWalker{}
+	}
+	*w2 = *w
 	w2.typeRef = tr
 	w2.errorFormatter.descend(pe)
 	w2.lhs = nil
 	w2.rhs = nil
 	w2.out = nil
-	return &w2
+	return w2
 }
 
-func (w *mergingWalker) visitStructFields(t schema.Struct, lhs, rhs *value.Map) (errs ValidationErrors) {
-	out := &value.Map{}
-
-	valOrNil := func(m *value.Map, name string) *value.Value {
-		if m == nil {
-			return nil
-		}
-		val, ok := m.Get(name)
-		if ok {
-			return &val.Value
-		}
-		return nil
-	}
-
-	allowedNames := map[string]struct{}{}
-	for i := range t.Fields {
-		// I don't want to use the loop variable since a reference
-		// might outlive the loop iteration (in an error message).
-		f := t.Fields[i]
-		allowedNames[f.Name] = struct{}{}
-		w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &f.Name}, f.Type)
-		w2.lhs = valOrNil(lhs, f.Name)
-		w2.rhs = valOrNil(rhs, f.Name)
-		if w2.lhs == nil && w2.rhs == nil {
-			// All fields are optional
-			continue
-		}
-		if newErrs := w2.merge(); len(newErrs) > 0 {
-			errs = append(errs, newErrs...)
-		} else if w2.out != nil {
-			out.Set(f.Name, *w2.out)
-		}
-	}
-
-	// All fields may be optional, but unknown fields are not allowed.
-	errs = append(errs, w.rejectExtraStructFields(lhs, allowedNames, "lhs: ")...)
-	errs = append(errs, w.rejectExtraStructFields(rhs, allowedNames, "rhs: ")...)
-	if len(errs) > 0 {
-		return errs
-	}
-
-	if len(out.Items) > 0 {
-		w.out = &value.Value{MapValue: out}
-	}
-
-	return errs
+func (w *mergingWalker) finishDescent(w2 *mergingWalker) {
+	// if the descent caused a realloc, ensure that we reuse the buffer
+	// for the next sibling.
+	w.errorFormatter = w2.errorFormatter.parent()
+	*w.spareWalkers = append(*w.spareWalkers, w2)
 }
 
-func (w *mergingWalker) derefMapOrStruct(prefix, typeName string, v *value.Value, dest **value.Map) (errs ValidationErrors) {
+func (w *mergingWalker) derefMap(prefix string, v *value.Value, dest **value.Map) (errs ValidationErrors) {
 	// taking dest as input so that it can be called as a one-liner with
 	// append.
 	if v == nil {
 		return nil
 	}
-	m, err := mapOrStructValue(*v, typeName)
+	m, err := mapValue(*v)
 	if err != nil {
 		return w.prefixError(prefix, err)
 	}
 	*dest = m
 	return nil
-}
-
-func (w *mergingWalker) doStruct(t schema.Struct) (errs ValidationErrors) {
-	var lhs, rhs *value.Map
-	errs = append(errs, w.derefMapOrStruct("lhs: ", "struct", w.lhs, &lhs)...)
-	errs = append(errs, w.derefMapOrStruct("rhs: ", "struct", w.rhs, &rhs)...)
-	if len(errs) > 0 {
-		return errs
-	}
-
-	// If both lhs and rhs are empty/null, treat it as a
-	// leaf: this helps preserve the empty/null
-	// distinction.
-	emptyPromoteToLeaf := (lhs == nil || len(lhs.Items) == 0) &&
-		(rhs == nil || len(rhs.Items) == 0)
-
-	if t.ElementRelationship == schema.Atomic || emptyPromoteToLeaf {
-		w.doLeaf()
-		return nil
-	}
-
-	if lhs == nil && rhs == nil {
-		// nil is a valid map!
-		return nil
-	}
-
-	errs = w.visitStructFields(t, lhs, rhs)
-
-	// TODO: Check unions.
-
-	return errs
 }
 
 func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (errs ValidationErrors) {
@@ -261,6 +216,7 @@ func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (err
 			} else if w2.out != nil {
 				out.Items = append(out.Items, *w2.out)
 			}
+			w.finishDescent(w2)
 			// Keep track of children that have been handled
 			delete(observedRHS, keyStr)
 		}
@@ -275,6 +231,7 @@ func (w *mergingWalker) visitListItems(t schema.List, lhs, rhs *value.List) (err
 			} else if w2.out != nil {
 				out.Items = append(out.Items, *w2.out)
 			}
+			w.finishDescent(w2)
 		}
 	}
 
@@ -300,11 +257,8 @@ func (w *mergingWalker) derefList(prefix string, v *value.Value, dest **value.Li
 
 func (w *mergingWalker) doList(t schema.List) (errs ValidationErrors) {
 	var lhs, rhs *value.List
-	errs = append(errs, w.derefList("lhs: ", w.lhs, &lhs)...)
-	errs = append(errs, w.derefList("rhs: ", w.rhs, &rhs)...)
-	if len(errs) > 0 {
-		return errs
-	}
+	w.derefList("lhs: ", w.lhs, &lhs)
+	w.derefList("rhs: ", w.rhs, &rhs)
 
 	// If both lhs and rhs are empty/null, treat it as a
 	// leaf: this helps preserve the empty/null
@@ -329,10 +283,22 @@ func (w *mergingWalker) doList(t schema.List) (errs ValidationErrors) {
 func (w *mergingWalker) visitMapItems(t schema.Map, lhs, rhs *value.Map) (errs ValidationErrors) {
 	out := &value.Map{}
 
+	fieldTypes := map[string]schema.TypeRef{}
+	for i := range t.Fields {
+		// I don't want to use the loop variable since a reference
+		// might outlive the loop iteration (in an error message).
+		f := t.Fields[i]
+		fieldTypes[f.Name] = f.Type
+	}
+
 	if lhs != nil {
-		for _, litem := range lhs.Items {
-			name := litem.Name
-			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &name}, t.ElementType)
+		for i := range lhs.Items {
+			litem := &lhs.Items[i]
+			fieldType := t.ElementType
+			if ft, ok := fieldTypes[litem.Name]; ok {
+				fieldType = ft
+			}
+			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &litem.Name}, fieldType)
 			w2.lhs = &litem.Value
 			if rhs != nil {
 				if ritem, ok := rhs.Get(litem.Name); ok {
@@ -342,27 +308,33 @@ func (w *mergingWalker) visitMapItems(t schema.Map, lhs, rhs *value.Map) (errs V
 			if newErrs := w2.merge(); len(newErrs) > 0 {
 				errs = append(errs, newErrs...)
 			} else if w2.out != nil {
-				out.Set(name, *w2.out)
+				out.Items = append(out.Items, value.Field{litem.Name, *w2.out})
 			}
+			w.finishDescent(w2)
 		}
 	}
 
 	if rhs != nil {
-		for _, ritem := range rhs.Items {
+		for j := range rhs.Items {
+			ritem := &rhs.Items[j]
 			if lhs != nil {
 				if _, ok := lhs.Get(ritem.Name); ok {
 					continue
 				}
 			}
 
-			name := ritem.Name
-			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &name}, t.ElementType)
+			fieldType := t.ElementType
+			if ft, ok := fieldTypes[ritem.Name]; ok {
+				fieldType = ft
+			}
+			w2 := w.prepareDescent(fieldpath.PathElement{FieldName: &ritem.Name}, fieldType)
 			w2.rhs = &ritem.Value
 			if newErrs := w2.merge(); len(newErrs) > 0 {
 				errs = append(errs, newErrs...)
 			} else if w2.out != nil {
-				out.Set(name, *w2.out)
+				out.Items = append(out.Items, value.Field{ritem.Name, *w2.out})
 			}
+			w.finishDescent(w2)
 		}
 	}
 
@@ -374,11 +346,8 @@ func (w *mergingWalker) visitMapItems(t schema.Map, lhs, rhs *value.Map) (errs V
 
 func (w *mergingWalker) doMap(t schema.Map) (errs ValidationErrors) {
 	var lhs, rhs *value.Map
-	errs = append(errs, w.derefMapOrStruct("lhs: ", "map", w.lhs, &lhs)...)
-	errs = append(errs, w.derefMapOrStruct("rhs: ", "map", w.rhs, &rhs)...)
-	if len(errs) > 0 {
-		return errs
-	}
+	w.derefMap("lhs: ", w.lhs, &lhs)
+	w.derefMap("rhs: ", w.rhs, &rhs)
 
 	// If both lhs and rhs are empty/null, treat it as a
 	// leaf: this helps preserve the empty/null
@@ -395,16 +364,7 @@ func (w *mergingWalker) doMap(t schema.Map) (errs ValidationErrors) {
 		return nil
 	}
 
-	errs = w.visitMapItems(t, lhs, rhs)
+	errs = append(errs, w.visitMapItems(t, lhs, rhs)...)
 
 	return errs
-}
-
-func (w *mergingWalker) doUntyped(t schema.Untyped) (errs ValidationErrors) {
-	if t.ElementRelationship == "" || t.ElementRelationship == schema.Atomic {
-		// Untyped sections allow anything, and are considered leaf
-		// fields.
-		w.doLeaf()
-	}
-	return nil
 }

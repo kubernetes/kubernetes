@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -64,6 +65,8 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 	})
 
 	ginkgo.It("should not work when mount is in progress [Slow]", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		driver := "attachable-with-long-mount"
 		driverInstallAs := driver + "-" + suffix
 
@@ -96,7 +99,7 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 		time.Sleep(20 * time.Second)
 
 		ginkgo.By("Deleting the flexvolume pod")
-		err = framework.DeletePodWithWait(f, cs, pod)
+		err = e2epod.DeletePodWithWait(cs, pod)
 		framework.ExpectNoError(err, "in deleting the pod")
 
 		// Wait a bit for node to sync the volume status

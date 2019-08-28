@@ -86,6 +86,8 @@ const (
 
 	// EtcdListenClientPort defines the port etcd listen on for client traffic
 	EtcdListenClientPort = 2379
+	// EtcdMetricsPort is the port at which to obtain etcd metrics and health status
+	EtcdMetricsPort = 2381
 
 	// EtcdPeerCertAndKeyBaseName defines etcd's peer certificate and key base name
 	EtcdPeerCertAndKeyBaseName = "etcd/peer"
@@ -331,7 +333,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.3.1"
+	CoreDNSVersion = "1.6.2"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -366,6 +368,23 @@ const (
 	// May be overridden by a flag at startup.
 	// Deprecated: use the secure KubeControllerManagerPort instead.
 	InsecureKubeControllerManagerPort = 10252
+
+	// Mode* constants were copied from pkg/kubeapiserver/authorizer/modes
+	// to avoid kubeadm dependency on the internal module
+	// TODO: share Mode* constants in component config
+
+	// ModeAlwaysAllow is the mode to set all requests as authorized
+	ModeAlwaysAllow string = "AlwaysAllow"
+	// ModeAlwaysDeny is the mode to set no requests as authorized
+	ModeAlwaysDeny string = "AlwaysDeny"
+	// ModeABAC is the mode to use Attribute Based Access Control to authorize
+	ModeABAC string = "ABAC"
+	// ModeWebhook is the mode to make an external webhook call to authorize
+	ModeWebhook string = "Webhook"
+	// ModeRBAC is the mode to use Role Based Access Control to authorize
+	ModeRBAC string = "RBAC"
+	// ModeNode is an authorization mode that authorizes API requests made by kubelets.
+	ModeNode string = "Node"
 )
 
 var (
@@ -391,13 +410,13 @@ var (
 	ControlPlaneComponents = []string{KubeAPIServer, KubeControllerManager, KubeScheduler}
 
 	// MinimumControlPlaneVersion specifies the minimum control plane version kubeadm can deploy
-	MinimumControlPlaneVersion = version.MustParseSemantic("v1.13.0")
+	MinimumControlPlaneVersion = version.MustParseSemantic("v1.15.0")
 
 	// MinimumKubeletVersion specifies the minimum version of kubelet which kubeadm supports
-	MinimumKubeletVersion = version.MustParseSemantic("v1.13.0")
+	MinimumKubeletVersion = version.MustParseSemantic("v1.15.0")
 
 	// CurrentKubernetesVersion specifies current Kubernetes version supported by kubeadm
-	CurrentKubernetesVersion = version.MustParseSemantic("v1.14.0")
+	CurrentKubernetesVersion = version.MustParseSemantic("v1.16.0")
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
@@ -406,6 +425,7 @@ var (
 		14: "3.3.10",
 		15: "3.3.10",
 		16: "3.3.10",
+		17: "3.3.10",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
@@ -428,7 +448,7 @@ func EtcdSupportedVersion(versionString string) (*version.Version, error) {
 		}
 		return etcdVersion, nil
 	}
-	return nil, errors.Errorf("Unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
+	return nil, errors.Errorf("unsupported or unknown Kubernetes version(%v)", kubernetesVersion)
 }
 
 // GetStaticPodDirectory returns the location on the disk where the Static Pod should be present

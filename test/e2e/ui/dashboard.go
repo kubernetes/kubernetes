@@ -27,12 +27,13 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("Kubernetes Dashboard", func() {
+var _ = SIGDescribe("Kubernetes Dashboard [Feature:Dashboard]", func() {
 	ginkgo.BeforeEach(func() {
 		// TODO(kubernetes/kubernetes#61559): Enable dashboard here rather than skip the test.
 		framework.SkipIfProviderIs("gke")
@@ -62,7 +63,7 @@ var _ = SIGDescribe("Kubernetes Dashboard", func() {
 		ginkgo.By("Checking to make sure we get a response from the kubernetes-dashboard.")
 		err = wait.Poll(framework.Poll, serverStartTimeout, func() (bool, error) {
 			var status int
-			proxyRequest, errProxy := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
+			proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 			if errProxy != nil {
 				e2elog.Logf("Get services proxy request failed: %v", errProxy)
 			}

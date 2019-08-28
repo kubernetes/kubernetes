@@ -23,6 +23,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+
+	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/klog"
 )
 
 // New returns an http.RoundTripper that will provide the authentication
@@ -53,7 +56,7 @@ func New(config *Config) (http.RoundTripper, error) {
 // TLSConfigFor returns a tls.Config that will provide the transport level security defined
 // by the provided Config. Will return nil if no transport level security is requested.
 func TLSConfigFor(c *Config) (*tls.Config, error) {
-	if !(c.HasCA() || c.HasCertAuth() || c.HasCertCallback() || c.TLS.Insecure || len(c.TLS.ServerName) > 0) {
+	if !(c.HasCA() || c.HasCertAuth() || c.HasCertCallback() || c.TLS.Insecure || len(c.TLS.ServerName) > 0 || len(c.TLS.NextProtos) > 0) {
 		return nil, nil
 	}
 	if c.HasCA() && c.TLS.Insecure {
@@ -70,6 +73,7 @@ func TLSConfigFor(c *Config) (*tls.Config, error) {
 		MinVersion:         tls.VersionTLS12,
 		InsecureSkipVerify: c.TLS.Insecure,
 		ServerName:         c.TLS.ServerName,
+		NextProtos:         c.TLS.NextProtos,
 	}
 
 	if c.HasCA() {
@@ -223,5 +227,19 @@ func (b *contextCanceller) RoundTrip(req *http.Request) (*http.Response, error) 
 		return nil, b.err
 	default:
 		return b.rt.RoundTrip(req)
+	}
+}
+
+func tryCancelRequest(rt http.RoundTripper, req *http.Request) {
+	type canceler interface {
+		CancelRequest(*http.Request)
+	}
+	switch rt := rt.(type) {
+	case canceler:
+		rt.CancelRequest(req)
+	case utilnet.RoundTripperWrapper:
+		tryCancelRequest(rt.WrappedRoundTripper(), req)
+	default:
+		klog.Warningf("Unable to cancel request for %T", rt)
 	}
 }

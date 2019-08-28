@@ -28,7 +28,9 @@ import (
 )
 
 // PodRequestsAndLimits returns a dictionary of all defined resources summed up for all
-// containers of the pod.
+// containers of the pod. If pod overhead is non-nil, the pod overhead is added to the
+// total container resource requests and to the total container limits which have a
+// non-zero quantity.
 func PodRequestsAndLimits(pod *corev1.Pod) (reqs, limits corev1.ResourceList) {
 	reqs, limits = corev1.ResourceList{}, corev1.ResourceList{}
 	for _, container := range pod.Spec.Containers {
@@ -40,6 +42,18 @@ func PodRequestsAndLimits(pod *corev1.Pod) (reqs, limits corev1.ResourceList) {
 		maxResourceList(reqs, container.Resources.Requests)
 		maxResourceList(limits, container.Resources.Limits)
 	}
+
+	// Add overhead for running a pod to the sum of requests and to non-zero limits:
+	if pod.Spec.Overhead != nil {
+		addResourceList(reqs, pod.Spec.Overhead)
+
+		for name, quantity := range pod.Spec.Overhead {
+			if value, ok := limits[name]; ok && !value.IsZero() {
+				value.Add(quantity)
+				limits[name] = value
+			}
+		}
+	}
 	return
 }
 
@@ -47,7 +61,7 @@ func PodRequestsAndLimits(pod *corev1.Pod) (reqs, limits corev1.ResourceList) {
 func addResourceList(list, new corev1.ResourceList) {
 	for name, quantity := range new {
 		if value, ok := list[name]; !ok {
-			list[name] = *quantity.Copy()
+			list[name] = quantity.DeepCopy()
 		} else {
 			value.Add(quantity)
 			list[name] = value
@@ -60,11 +74,11 @@ func addResourceList(list, new corev1.ResourceList) {
 func maxResourceList(list, new corev1.ResourceList) {
 	for name, quantity := range new {
 		if value, ok := list[name]; !ok {
-			list[name] = *quantity.Copy()
+			list[name] = quantity.DeepCopy()
 			continue
 		} else {
 			if quantity.Cmp(value) > 0 {
-				list[name] = *quantity.Copy()
+				list[name] = quantity.DeepCopy()
 			}
 		}
 	}

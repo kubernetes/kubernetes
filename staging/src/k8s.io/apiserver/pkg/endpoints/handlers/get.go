@@ -48,7 +48,7 @@ type getterFunc func(ctx context.Context, name string, req *http.Request, trace 
 // passed-in getterFunc to perform the actual get.
 func getResourceHandler(scope *RequestScope, getter getterFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		trace := utiltrace.New("Get " + req.URL.Path)
+		trace := utiltrace.New("Get", utiltrace.Field{"url", req.URL.Path})
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		namespace, name, err := scope.Namer.Name(req)
@@ -165,7 +165,7 @@ func getRequestOptions(req *http.Request, scope *RequestScope, into runtime.Obje
 func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatch bool, minRequestTimeout time.Duration) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
-		trace := utiltrace.New("List " + req.URL.Path)
+		trace := utiltrace.New("List", utiltrace.Field{"url", req.URL.Path})
 
 		namespace, err := scope.Namer.Namespace(req)
 		if err != nil {
@@ -273,6 +273,6 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 		trace.Step("Listing from storage done")
 
 		transformResponseObject(ctx, scope, trace, req, w, http.StatusOK, outputMediaType, result)
-		trace.Step(fmt.Sprintf("Writing http response done (%d items)", meta.LenList(result)))
+		trace.Step("Writing http response done", utiltrace.Field{"count", meta.LenList(result)})
 	}
 }

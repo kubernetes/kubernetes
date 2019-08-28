@@ -75,6 +75,7 @@ func IndexFuncToKeyFuncAdapter(indexFunc IndexFunc) KeyFunc {
 }
 
 const (
+	// NamespaceIndex is the lookup name for the most comment index function, which is to index by the namespace field.
 	NamespaceIndex string = "namespace"
 )
 

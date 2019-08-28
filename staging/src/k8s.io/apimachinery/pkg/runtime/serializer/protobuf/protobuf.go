@@ -203,7 +203,7 @@ func (s *Serializer) Encode(obj runtime.Object, w io.Writer) error {
 	switch t := obj.(type) {
 	case bufferedMarshaller:
 		// this path performs a single allocation during write but requires the caller to implement
-		// the more efficient Size and MarshalTo methods
+		// the more efficient Size and MarshalToSizedBuffer methods
 		encodedSize := uint64(t.Size())
 		estimatedSize := prefixSize + estimateUnknownSize(&unk, encodedSize)
 		data := make([]byte, estimatedSize)
@@ -281,6 +281,12 @@ func copyKindDefaults(dst, src *schema.GroupVersionKind) {
 type bufferedMarshaller interface {
 	proto.Sizer
 	runtime.ProtobufMarshaller
+}
+
+// Like bufferedMarshaller, but is able to marshal backwards, which is more efficient since it doesn't call Size() as frequently.
+type bufferedReverseMarshaller interface {
+	proto.Sizer
+	runtime.ProtobufReverseMarshaller
 }
 
 // estimateUnknownSize returns the expected bytes consumed by a given runtime.Unknown
@@ -414,6 +420,19 @@ func unmarshalToObject(typer runtime.ObjectTyper, creater runtime.ObjectCreater,
 // Encode serializes the provided object to the given writer. Overrides is ignored.
 func (s *RawSerializer) Encode(obj runtime.Object, w io.Writer) error {
 	switch t := obj.(type) {
+	case bufferedReverseMarshaller:
+		// this path performs a single allocation during write but requires the caller to implement
+		// the more efficient Size and MarshalToSizedBuffer methods
+		encodedSize := uint64(t.Size())
+		data := make([]byte, encodedSize)
+
+		n, err := t.MarshalToSizedBuffer(data)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(data[:n])
+		return err
+
 	case bufferedMarshaller:
 		// this path performs a single allocation during write but requires the caller to implement
 		// the more efficient Size and MarshalTo methods

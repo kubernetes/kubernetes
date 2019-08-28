@@ -60,7 +60,7 @@ func (EtcdUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 }
 
 func kubectlCreate(ns, file string) {
-	input := string(testfiles.ReadOrDie(filepath.Join(manifestPath, file), ginkgo.Fail))
+	input := string(testfiles.ReadOrDie(filepath.Join(manifestPath, file)))
 	framework.RunKubectlOrDieInput(input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
 }
 

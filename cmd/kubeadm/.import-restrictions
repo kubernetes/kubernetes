@@ -63,7 +63,6 @@
 				"k8s.io/kubernetes/pkg/controller",
 				"k8s.io/kubernetes/pkg/features",
 				"k8s.io/kubernetes/pkg/fieldpath",
-				"k8s.io/kubernetes/pkg/kubeapiserver/authorizer/modes",
 				"k8s.io/kubernetes/pkg/kubelet/apis",
 				"k8s.io/kubernetes/pkg/kubelet/qos",
 				"k8s.io/kubernetes/pkg/kubelet/types",
@@ -78,13 +77,9 @@
 				"k8s.io/kubernetes/pkg/util/conntrack",
 				"k8s.io/kubernetes/pkg/util/dbus",
 				"k8s.io/kubernetes/pkg/util/hash",
-				"k8s.io/kubernetes/pkg/util/ipset",
 				"k8s.io/kubernetes/pkg/util/iptables",
-				"k8s.io/kubernetes/pkg/util/ipvs",
 				"k8s.io/kubernetes/pkg/util/metrics",
-				"k8s.io/kubernetes/pkg/util/node",
 				"k8s.io/kubernetes/pkg/util/parsers",
-				"k8s.io/kubernetes/pkg/util/procfs",
 				"k8s.io/kubernetes/pkg/util/sysctl",
 				"k8s.io/kubernetes/pkg/util/taints"
 			],
@@ -104,6 +99,7 @@
 			"AllowedPrefixes": [
 				"github.com/beorn7/perks/quantile",
 				"github.com/blang/semver",
+				"github.com/coredns/corefile-migration/migration",
 				"github.com/coreos/etcd/auth/authpb",
 				"github.com/coreos/etcd/clientv3",
 				"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes",
@@ -113,7 +109,6 @@
 				"github.com/coreos/etcd/pkg/transport",
 				"github.com/davecgh/go-spew/spew",
 				"github.com/docker/distribution/reference",
-				"github.com/docker/libnetwork/ipvs",
 				"github.com/godbus/dbus",
 				"github.com/gogo/protobuf/proto",
 				"github.com/gogo/protobuf/sortkeys",
@@ -131,7 +126,7 @@
 				"github.com/json-iterator/go",
 				"github.com/MakeNowJust/heredoc",
 				"github.com/matttproud/golang_protobuf_extensions/pbutil",
-				"github.com/mholt/caddy/caddyfile",
+				"github.com/caddyserver/caddy/caddyfile",
 				"github.com/modern-go/concurrent",
 				"github.com/modern-go/reflect2",
 				"github.com/opencontainers/go-digest",
@@ -179,13 +174,7 @@
 				"golang.org/x/text/unicode/bidi",
 				"golang.org/x/text/unicode/norm",
 				"golang.org/x/text/width",
-				"golang.org/x/time/rate"
-			]
-		},
-		{
-			"SelectorRegexp": "google[.]golang[.]org",
-			"AllowedPrefixes": [
-				"google.golang.org/genproto/googleapis/rpc/status",
+				"golang.org/x/time/rate",
 				"google.golang.org/grpc"
 			]
 		},

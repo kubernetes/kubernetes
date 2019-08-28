@@ -21,13 +21,13 @@ import (
 	"regexp"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/pkg/util/system"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/system"
 	testutils "k8s.io/kubernetes/test/utils"
 )
 
@@ -83,7 +83,7 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 		}
 		missingPodsPerNode = make(map[string][]string)
 		for _, node := range nodes.Items {
-			if !system.IsMasterNode(node.Name) {
+			if !system.DeprecatedMightBeMasterNode(node.Name) {
 				for _, requiredPod := range requiredPerNodePods {
 					foundRequired := false
 					for _, presentPod := range systemPodsPerNode[node.Name] {
@@ -194,6 +194,15 @@ func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
 		return true, nil
 	}) != nil {
 		return nodes, err
+	}
+	return nodes, nil
+}
+
+// checkWaitListSchedulableNodes is a wrapper around listing nodes supporting retries.
+func checkWaitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
+	nodes, err := waitListSchedulableNodes(c)
+	if err != nil {
+		return nil, fmt.Errorf("error: %s. Non-retryable failure or timed out while listing nodes for e2e cluster", err)
 	}
 	return nodes, nil
 }

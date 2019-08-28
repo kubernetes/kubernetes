@@ -19,7 +19,9 @@ package crd
 import (
 	"fmt"
 
-	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	"k8s.io/utils/pointer"
+
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	crdclientset "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,13 +37,13 @@ type CleanCrdFn func() error
 // TestCrd holds all the pieces needed to test with the CRD
 type TestCrd struct {
 	APIExtensionClient *crdclientset.Clientset
-	Crd                *apiextensionsv1beta1.CustomResourceDefinition
+	Crd                *apiextensionsv1.CustomResourceDefinition
 	DynamicClients     map[string]dynamic.ResourceInterface
 	CleanUp            CleanCrdFn
 }
 
 // Option is a modifier for a CRD object used to customize CreateMultiVersionTestCRD and CreateTestCRD.
-type Option func(crd *apiextensionsv1beta1.CustomResourceDefinition)
+type Option func(crd *apiextensionsv1.CustomResourceDefinition)
 
 // CreateMultiVersionTestCRD creates a new CRD specifically for the calling test.
 func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Option) (*TestCrd, error) {
@@ -67,28 +69,38 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 		return nil, err
 	}
 
-	crd := &apiextensionsv1beta1.CustomResourceDefinition{
+	crd := &apiextensionsv1.CustomResourceDefinition{
 		ObjectMeta: metav1.ObjectMeta{Name: name + "s." + group},
-		Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
+		Spec: apiextensionsv1.CustomResourceDefinitionSpec{
 			Group: group,
-			Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+			Names: apiextensionsv1.CustomResourceDefinitionNames{
 				Plural:   name + "s",
 				Singular: name,
 				Kind:     kind,
 				ListKind: kind + "List",
 			},
-			Scope: apiextensionsv1beta1.NamespaceScoped,
+			Scope: apiextensionsv1.NamespaceScoped,
 		},
 	}
 	for _, opt := range opts {
 		opt(crd)
 	}
-	if len(crd.Spec.Versions) == 0 && len(crd.Spec.Version) == 0 {
-		crd.Spec.Version = "v1"
+	if len(crd.Spec.Versions) == 0 {
+		crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{{
+			Served:  true,
+			Storage: true,
+			Name:    "v1",
+			Schema: &apiextensionsv1.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+					XPreserveUnknownFields: pointer.BoolPtr(true),
+					Type:                   "object",
+				},
+			},
+		}}
 	}
 
 	//create CRD and waits for the resource to be recognized and available.
-	crd, err = fixtures.CreateNewCustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
+	crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 	if err != nil {
 		e2elog.Failf("failed to create CustomResourceDefinition: %v", err)
 		return nil, err
@@ -106,7 +118,7 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 	testcrd.Crd = crd
 	testcrd.DynamicClients = resourceClients
 	testcrd.CleanUp = func() error {
-		err := fixtures.DeleteCustomResourceDefinition(crd, apiExtensionClient)
+		err := fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
 		if err != nil {
 			e2elog.Failf("failed to delete CustomResourceDefinition(%s): %v", name, err)
 		}
@@ -117,13 +129,19 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 
 // CreateTestCRD creates a new CRD specifically for the calling test.
 func CreateTestCRD(f *framework.Framework, opts ...Option) (*TestCrd, error) {
-	group := fmt.Sprintf("%s-crd-test.k8s.io", f.BaseName)
-	return CreateMultiVersionTestCRD(f, group, append([]Option{func(crd *apiextensionsv1beta1.CustomResourceDefinition) {
-		crd.Spec.Versions = []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+	group := fmt.Sprintf("%s.example.com", f.BaseName)
+	return CreateMultiVersionTestCRD(f, group, append([]Option{func(crd *apiextensionsv1.CustomResourceDefinition) {
+		crd.Spec.Versions = []apiextensionsv1.CustomResourceDefinitionVersion{
 			{
 				Name:    "v1",
 				Served:  true,
 				Storage: true,
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+						XPreserveUnknownFields: pointer.BoolPtr(true),
+						Type:                   "object",
+					},
+				},
 			},
 		}
 	}}, opts...)...)

@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,7 +42,6 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 const region = "us-central"
@@ -308,7 +307,7 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ServiceLoadBalancerFinalizer, tc.enableFeatureGate)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, serviceLoadBalancerFinalizerFeature, tc.enableFeatureGate)()
 
 			controller, cloud, client := newController()
 			cloud.Exists = tc.lbExists
@@ -618,10 +617,10 @@ func TestProcessServiceCreateOrUpdate(t *testing.T) {
 }
 
 // TestProcessServiceCreateOrUpdateK8sError tests processServiceCreateOrUpdate
-// with various kubernetes errors.
+// with various kubernetes errors when patching status.
 func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 	svcName := "svc-k8s-err"
-	conflictErr := apierrors.NewConflict(schema.GroupResource{}, svcName, errors.New("Object conflict"))
+	conflictErr := apierrors.NewConflict(schema.GroupResource{}, svcName, errors.New("object conflict"))
 	notFoundErr := apierrors.NewNotFound(schema.GroupResource{}, svcName)
 
 	testCases := []struct {
@@ -644,6 +643,8 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			svc := newService(svcName, types.UID("123"), v1.ServiceTypeLoadBalancer)
+			// Preset finalizer so k8s error only happens when patching status.
+			svc.Finalizers = []string{servicehelper.LoadBalancerCleanupFinalizer}
 			controller, _, client := newController()
 			client.PrependReactor("patch", "services", func(action core.Action) (bool, runtime.Object, error) {
 				return true, nil, tc.k8sErr
@@ -710,7 +711,7 @@ func TestSyncService(t *testing.T) {
 				srv := controller.cache.getOrCreate("external-balancer")
 				srv.state = defaultExternalService()
 			},
-			expectedErr: fmt.Errorf("Service somethingelse not in cache even though the watcher thought it was. Ignoring the deletion."),
+			expectedErr: fmt.Errorf("service somethingelse not in cache even though the watcher thought it was. Ignoring the deletion."),
 		},
 		*/
 
@@ -780,12 +781,12 @@ func TestProcessServiceDeletion(t *testing.T) {
 
 				svc := controller.cache.getOrCreate(svcKey)
 				svc.state = defaultExternalService()
-				cloud.Err = fmt.Errorf("Error Deleting the Loadbalancer")
+				cloud.Err = fmt.Errorf("error Deleting the Loadbalancer")
 
 			},
 			expectedFn: func(svcErr error) error {
 
-				expectedError := "Error Deleting the Loadbalancer"
+				expectedError := "error Deleting the Loadbalancer"
 
 				if svcErr == nil || svcErr.Error() != expectedError {
 					return fmt.Errorf("Expected=%v Obtained=%v", expectedError, svcErr)
@@ -1110,7 +1111,7 @@ func TestServiceCache(t *testing.T) {
 					return fmt.Errorf("is Available Expected=true Obtained=%v", bool)
 				}
 				if Cs == nil {
-					return fmt.Errorf("CachedService expected:non-nil Obtained=nil")
+					return fmt.Errorf("cachedService expected:non-nil Obtained=nil")
 				}
 				return nil
 			},
@@ -1125,7 +1126,7 @@ func TestServiceCache(t *testing.T) {
 				//It should have two elements
 				keys := sc.ListKeys()
 				if len(keys) != 2 {
-					return fmt.Errorf("Elementes Expected=2 Obtained=%v", len(keys))
+					return fmt.Errorf("elements Expected=2 Obtained=%v", len(keys))
 				}
 				return nil
 			},
@@ -1391,6 +1392,40 @@ func TestPatchStatus(t *testing.T) {
 			}
 			if patchActionFound != tc.expectPatch {
 				t.Errorf("Got patchActionFound = %t, want %t", patchActionFound, tc.expectPatch)
+			}
+		})
+	}
+}
+
+func Test_getNodeConditionPredicate(t *testing.T) {
+	validNodeStatus := v1.NodeStatus{Conditions: []v1.NodeCondition{{Type: "Test"}}}
+	tests := []struct {
+		name string
+
+		enableExclusion bool
+		enableLegacy    bool
+		input           *v1.Node
+		want            bool
+	}{
+		{want: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{}}}},
+		{want: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleMaster: ""}}}},
+		{want: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleExcludeBalancer: ""}}}},
+		{want: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelAlphaNodeRoleExcludeBalancer: ""}}}},
+
+		{want: true, enableExclusion: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleMaster: ""}}}},
+		{want: true, enableLegacy: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleExcludeBalancer: ""}}}},
+
+		{want: false, enableLegacy: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleMaster: ""}}}},
+		{want: false, enableExclusion: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelAlphaNodeRoleExcludeBalancer: ""}}}},
+		{want: false, enableExclusion: true, input: &v1.Node{Status: validNodeStatus, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{labelNodeRoleExcludeBalancer: ""}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, serviceNodeExclusionFeature, tt.enableExclusion)()
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, legacyNodeRoleBehaviorFeature, tt.enableLegacy)()
+
+			if result := getNodeConditionPredicate()(tt.input); result != tt.want {
+				t.Errorf("getNodeConditionPredicate() = %v, want %v", result, tt.want)
 			}
 		})
 	}

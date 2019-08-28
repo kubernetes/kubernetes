@@ -113,8 +113,7 @@ func SpreadServiceOrFail(f *framework.Framework, replicaCount int, image string)
 	// Now make sure they're spread across zones
 	zoneNames, err := framework.GetClusterZones(f.ClientSet)
 	framework.ExpectNoError(err)
-	ret, _ := checkZoneSpreading(f.ClientSet, pods, zoneNames.List())
-	framework.ExpectEqual(ret, true)
+	checkZoneSpreading(f.ClientSet, pods, zoneNames.List())
 }
 
 // Find the name of the zone in which a Node is running
@@ -147,7 +146,7 @@ func getZoneNameForPod(c clientset.Interface, pod v1.Pod) (string, error) {
 
 // Determine whether a set of pods are approximately evenly spread
 // across a given set of zones
-func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []string) (bool, error) {
+func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []string) {
 	podsPerZone := make(map[string]int)
 	for _, zoneName := range zoneNames {
 		podsPerZone[zoneName] = 0
@@ -173,7 +172,6 @@ func checkZoneSpreading(c clientset.Interface, pods *v1.PodList, zoneNames []str
 	gomega.Expect(minPodsPerZone).To(gomega.BeNumerically("~", maxPodsPerZone, 1),
 		"Pods were not evenly spread across zones.  %d in one zone and %d in another zone",
 		minPodsPerZone, maxPodsPerZone)
-	return true, nil
 }
 
 // SpreadRCOrFail Check that the pods comprising a replication
@@ -229,6 +227,5 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string, ar
 	// Now make sure they're spread across zones
 	zoneNames, err := framework.GetClusterZones(f.ClientSet)
 	framework.ExpectNoError(err)
-	ret, _ := checkZoneSpreading(f.ClientSet, pods, zoneNames.List())
-	framework.ExpectEqual(ret, true)
+	checkZoneSpreading(f.ClientSet, pods, zoneNames.List())
 }

@@ -41,8 +41,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/dynamic"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/utils/pointer"
 
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/pkg/cmd/server/options"
@@ -71,39 +71,94 @@ func TestWebhookConverterWithDefaulting(t *testing.T) {
 
 func testWebhookConverter(t *testing.T, defaulting, watchCache bool) {
 	tests := []struct {
-		group   string
-		handler http.Handler
-		checks  []Checker
+		group          string
+		handler        http.Handler
+		reviewVersions []string
+		checks         []Checker
 	}{
 		{
-			group:   "noop-converter",
-			handler: NewObjectConverterWebhookHandler(t, noopConverter),
-			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1")), // no v1beta2 as the schema differs
+			group:          "noop-converter-v1",
+			handler:        NewObjectConverterWebhookHandler(t, noopConverter),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1")), // no v1beta2 as the schema differs
 		},
 		{
-			group:   "nontrivial-converter",
-			handler: NewObjectConverterWebhookHandler(t, nontrivialConverter),
-			checks:  checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning, validateDefaulting),
+			group:          "noop-converter-v1beta1",
+			handler:        NewObjectConverterWebhookHandler(t, noopConverter),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1")), // no v1beta2 as the schema differs
 		},
 		{
-			group:   "metadata-mutating-converter",
-			handler: NewObjectConverterWebhookHandler(t, metadataMutatingConverter),
-			checks:  checks(validateObjectMetaMutation),
+			group:          "nontrivial-converter-v1",
+			handler:        NewObjectConverterWebhookHandler(t, nontrivialConverter),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning, validateDefaulting),
 		},
 		{
-			group:   "metadata-uid-mutating-converter",
-			handler: NewObjectConverterWebhookHandler(t, uidMutatingConverter),
-			checks:  checks(validateUIDMutation),
+			group:          "nontrivial-converter-v1beta1",
+			handler:        NewObjectConverterWebhookHandler(t, nontrivialConverter),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(validateStorageVersion, validateServed, validateMixedStorageVersions("v1alpha1", "v1beta1", "v1beta2"), validateNonTrivialConverted, validateNonTrivialConvertedList, validateStoragePruning, validateDefaulting),
 		},
 		{
-			group:   "empty-response",
-			handler: NewReviewWebhookHandler(t, emptyResponseConverter),
-			checks:  checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1")),
+			group:          "metadata-mutating-v1",
+			handler:        NewObjectConverterWebhookHandler(t, metadataMutatingConverter),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(validateObjectMetaMutation),
 		},
 		{
-			group:   "failure-message",
-			handler: NewReviewWebhookHandler(t, failureResponseConverter("custom webhook conversion error")),
-			checks:  checks(expectConversionFailureMessage("failure-message", "custom webhook conversion error")),
+			group:          "metadata-mutating-v1beta1",
+			handler:        NewObjectConverterWebhookHandler(t, metadataMutatingConverter),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(validateObjectMetaMutation),
+		},
+		{
+			group:          "metadata-uid-mutating-v1",
+			handler:        NewObjectConverterWebhookHandler(t, uidMutatingConverter),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(validateUIDMutation),
+		},
+		{
+			group:          "metadata-uid-mutating-v1beta1",
+			handler:        NewObjectConverterWebhookHandler(t, uidMutatingConverter),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(validateUIDMutation),
+		},
+		{
+			group:          "empty-response-v1",
+			handler:        NewReviewWebhookHandler(t, nil, emptyV1ResponseConverter),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1")),
+		},
+		{
+			group:          "empty-response-v1beta1",
+			handler:        NewReviewWebhookHandler(t, emptyV1Beta1ResponseConverter, nil),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(expectConversionFailureMessage("empty-response", "returned 0 objects, expected 1")),
+		},
+		{
+			group:          "failure-message-v1",
+			handler:        NewReviewWebhookHandler(t, nil, failureV1ResponseConverter("custom webhook conversion error")),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(expectConversionFailureMessage("failure-message", "custom webhook conversion error")),
+		},
+		{
+			group:          "failure-message-v1beta1",
+			handler:        NewReviewWebhookHandler(t, failureV1Beta1ResponseConverter("custom webhook conversion error"), nil),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(expectConversionFailureMessage("failure-message", "custom webhook conversion error")),
+		},
+		{
+			group:          "unhandled-v1",
+			handler:        NewReviewWebhookHandler(t, nil, nil),
+			reviewVersions: []string{"v1", "v1beta1"},
+			checks:         checks(expectConversionFailureMessage("server-error", "the server rejected our request")),
+		},
+		{
+			group:          "unhandled-v1beta1",
+			handler:        NewReviewWebhookHandler(t, nil, nil),
+			reviewVersions: []string{"v1beta1", "v1"},
+			checks:         checks(expectConversionFailureMessage("server-error", "the server rejected our request")),
 		},
 	}
 
@@ -174,7 +229,7 @@ func testWebhookConverter(t *testing.T, defaulting, watchCache bool) {
 			}
 			defer tearDown()
 
-			ctc.setConversionWebhook(t, webhookClientConfig)
+			ctc.setConversionWebhook(t, webhookClientConfig, test.reviewVersions)
 			defer ctc.removeConversionWebhook(t)
 
 			// wait until new webhook is called the first time
@@ -711,7 +766,15 @@ func noopConverter(desiredAPIVersion string, obj runtime.RawExtension) (runtime.
 	return runtime.RawExtension{Raw: raw}, nil
 }
 
-func emptyResponseConverter(review apiextensionsv1beta1.ConversionReview) (apiextensionsv1beta1.ConversionReview, error) {
+func emptyV1ResponseConverter(review *apiextensionsv1.ConversionReview) (*apiextensionsv1.ConversionReview, error) {
+	review.Response = &apiextensionsv1.ConversionResponse{
+		UID:              review.Request.UID,
+		ConvertedObjects: []runtime.RawExtension{},
+		Result:           metav1.Status{Status: "Success"},
+	}
+	return review, nil
+}
+func emptyV1Beta1ResponseConverter(review *apiextensionsv1beta1.ConversionReview) (*apiextensionsv1beta1.ConversionReview, error) {
 	review.Response = &apiextensionsv1beta1.ConversionResponse{
 		UID:              review.Request.UID,
 		ConvertedObjects: []runtime.RawExtension{},
@@ -720,8 +783,19 @@ func emptyResponseConverter(review apiextensionsv1beta1.ConversionReview) (apiex
 	return review, nil
 }
 
-func failureResponseConverter(message string) func(review apiextensionsv1beta1.ConversionReview) (apiextensionsv1beta1.ConversionReview, error) {
-	return func(review apiextensionsv1beta1.ConversionReview) (apiextensionsv1beta1.ConversionReview, error) {
+func failureV1ResponseConverter(message string) func(review *apiextensionsv1.ConversionReview) (*apiextensionsv1.ConversionReview, error) {
+	return func(review *apiextensionsv1.ConversionReview) (*apiextensionsv1.ConversionReview, error) {
+		review.Response = &apiextensionsv1.ConversionResponse{
+			UID:              review.Request.UID,
+			ConvertedObjects: []runtime.RawExtension{},
+			Result:           metav1.Status{Message: message, Status: "Failure"},
+		}
+		return review, nil
+	}
+}
+
+func failureV1Beta1ResponseConverter(message string) func(review *apiextensionsv1beta1.ConversionReview) (*apiextensionsv1beta1.ConversionReview, error) {
+	return func(review *apiextensionsv1beta1.ConversionReview) (*apiextensionsv1beta1.ConversionReview, error) {
 		review.Response = &apiextensionsv1beta1.ConversionResponse{
 			UID:              review.Request.UID,
 			ConvertedObjects: []runtime.RawExtension{},
@@ -845,8 +919,12 @@ func uidMutatingConverter(desiredAPIVersion string, obj runtime.RawExtension) (r
 	return runtime.RawExtension{Raw: raw}, nil
 }
 
-func newConversionTestContext(t *testing.T, apiExtensionsClient clientset.Interface, dynamicClient dynamic.Interface, etcdObjectReader *storage.EtcdObjectReader, crd *apiextensionsv1beta1.CustomResourceDefinition) (func(), *conversionTestContext) {
-	crd, err := fixtures.CreateNewCustomResourceDefinition(crd, apiExtensionsClient, dynamicClient)
+func newConversionTestContext(t *testing.T, apiExtensionsClient clientset.Interface, dynamicClient dynamic.Interface, etcdObjectReader *storage.EtcdObjectReader, v1CRD *apiextensionsv1.CustomResourceDefinition) (func(), *conversionTestContext) {
+	v1CRD, err := fixtures.CreateNewV1CustomResourceDefinition(v1CRD, apiExtensionsClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	crd, err := apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(v1CRD.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -885,14 +963,15 @@ func (c *conversionTestContext) versionedClients(ns string) map[string]dynamic.R
 	return ret
 }
 
-func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClientConfig *apiextensionsv1beta1.WebhookClientConfig) {
+func (c *conversionTestContext) setConversionWebhook(t *testing.T, webhookClientConfig *apiextensionsv1beta1.WebhookClientConfig, reviewVersions []string) {
 	crd, err := c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Get(c.crd.Name, metav1.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	crd.Spec.Conversion = &apiextensionsv1beta1.CustomResourceConversion{
-		Strategy:            apiextensionsv1beta1.WebhookConverter,
-		WebhookClientConfig: webhookClientConfig,
+		Strategy:                 apiextensionsv1beta1.WebhookConverter,
+		WebhookClientConfig:      webhookClientConfig,
+		ConversionReviewVersions: reviewVersions,
 	}
 	crd, err = c.apiExtensionsClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
 	if err != nil {
@@ -1000,12 +1079,11 @@ func (c *conversionTestContext) waitForServed(t *testing.T, version string, serv
 	}
 }
 
-var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
+var multiVersionFixture = &apiextensionsv1.CustomResourceDefinition{
 	ObjectMeta: metav1.ObjectMeta{Name: "multiversion.stable.example.com"},
-	Spec: apiextensionsv1beta1.CustomResourceDefinitionSpec{
-		Group:   "stable.example.com",
-		Version: "v1beta1",
-		Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
+	Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+		Group: "stable.example.com",
+		Names: apiextensionsv1.CustomResourceDefinitionNames{
 			Plural:     "multiversion",
 			Singular:   "multiversion",
 			Kind:       "MultiVersion",
@@ -1013,34 +1091,41 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 			ListKind:   "MultiVersionList",
 			Categories: []string{"all"},
 		},
-		Scope:                 apiextensionsv1beta1.NamespaceScoped,
-		PreserveUnknownFields: pointer.BoolPtr(false),
-		Versions: []apiextensionsv1beta1.CustomResourceDefinitionVersion{
+		Scope:                 apiextensionsv1.NamespaceScoped,
+		PreserveUnknownFields: false,
+		Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 			{
 				// storage version, same schema as v1alpha1
 				Name:    "v1beta1",
 				Served:  true,
 				Storage: true,
-				Schema: &apiextensionsv1beta1.CustomResourceValidation{
-					OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+						SpecReplicasPath:   ".spec.num.num1",
+						StatusReplicasPath: ".status.num.num2",
+					},
+				},
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
 						Type: "object",
-						Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
 							"content": {
 								Type: "object",
-								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"key": {Type: "string"},
 								},
 							},
 							"num": {
 								Type: "object",
-								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"num1": {Type: "integer"},
 									"num2": {Type: "integer"},
 								},
 							},
 							"defaults": {
 								Type: "object",
-								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"v1alpha1": {Type: "boolean"},
 									"v1beta1":  {Type: "boolean", Default: jsonPtr(true)},
 									"v1beta2":  {Type: "boolean"},
@@ -1055,26 +1140,33 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 				Name:    "v1alpha1",
 				Served:  true,
 				Storage: false,
-				Schema: &apiextensionsv1beta1.CustomResourceValidation{
-					OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+						SpecReplicasPath:   ".spec.num.num1",
+						StatusReplicasPath: ".status.num.num2",
+					},
+				},
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
 						Type: "object",
-						Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
 							"content": {
 								Type: "object",
-								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"key": {Type: "string"},
 								},
 							},
 							"num": {
 								Type: "object",
-								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"num1": {Type: "integer"},
 									"num2": {Type: "integer"},
 								},
 							},
 							"defaults": {
 								Type: "object",
-								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"v1alpha1": {Type: "boolean", Default: jsonPtr(true)},
 									"v1beta1":  {Type: "boolean"},
 									"v1beta2":  {Type: "boolean"},
@@ -1089,26 +1181,33 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 				Name:    "v1beta2",
 				Served:  true,
 				Storage: false,
-				Schema: &apiextensionsv1beta1.CustomResourceValidation{
-					OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
+				Subresources: &apiextensionsv1.CustomResourceSubresources{
+					Status: &apiextensionsv1.CustomResourceSubresourceStatus{},
+					Scale: &apiextensionsv1.CustomResourceSubresourceScale{
+						SpecReplicasPath:   ".spec.num.num1",
+						StatusReplicasPath: ".status.num.num2",
+					},
+				},
+				Schema: &apiextensionsv1.CustomResourceValidation{
+					OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
 						Type: "object",
-						Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+						Properties: map[string]apiextensionsv1.JSONSchemaProps{
 							"contentv2": {
 								Type: "object",
-								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"key": {Type: "string"},
 								},
 							},
 							"numv2": {
 								Type: "object",
-								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"num1": {Type: "integer"},
 									"num2": {Type: "integer"},
 								},
 							},
 							"defaults": {
 								Type: "object",
-								Properties: map[string]apiextensionsv1beta1.JSONSchemaProps{
+								Properties: map[string]apiextensionsv1.JSONSchemaProps{
 									"v1alpha1": {Type: "boolean"},
 									"v1beta1":  {Type: "boolean"},
 									"v1beta2":  {Type: "boolean", Default: jsonPtr(true)},
@@ -1117,13 +1216,6 @@ var multiVersionFixture = &apiextensionsv1beta1.CustomResourceDefinition{
 						},
 					},
 				},
-			},
-		},
-		Subresources: &apiextensionsv1beta1.CustomResourceSubresources{
-			Status: &apiextensionsv1beta1.CustomResourceSubresourceStatus{},
-			Scale: &apiextensionsv1beta1.CustomResourceSubresourceScale{
-				SpecReplicasPath:   ".spec.num.num1",
-				StatusReplicasPath: ".status.num.num2",
 			},
 		},
 	},
@@ -1234,11 +1326,11 @@ func closeOnCall(h http.Handler) (chan struct{}, http.Handler) {
 	})
 }
 
-func jsonPtr(x interface{}) *apiextensionsv1beta1.JSON {
+func jsonPtr(x interface{}) *apiextensionsv1.JSON {
 	bs, err := json.Marshal(x)
 	if err != nil {
 		panic(err)
 	}
-	ret := apiextensionsv1beta1.JSON{Raw: bs}
+	ret := apiextensionsv1.JSON{Raw: bs}
 	return &ret
 }

@@ -52,6 +52,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -425,7 +427,7 @@ var _ = SIGDescribe("Density", func() {
 	missingMeasurements := 0
 	var testPhaseDurations *timer.TestPhaseTimer
 	var profileGathererStopCh chan struct{}
-	var etcdMetricsCollector *framework.EtcdMetricsCollector
+	var etcdMetricsCollector *e2emetrics.EtcdMetricsCollector
 
 	// Gathers data prior to framework namespace teardown
 	ginkgo.AfterEach(func() {
@@ -447,18 +449,18 @@ var _ = SIGDescribe("Density", func() {
 			NumberOfPods:   totalPods,
 			Throughput:     float32(totalPods) / float32(e2eStartupTime/time.Second),
 		}
-		e2elog.Logf("Cluster saturation time: %s", framework.PrettyPrintJSON(saturationData))
+		e2elog.Logf("Cluster saturation time: %s", e2emetrics.PrettyPrintJSON(saturationData))
 
 		summaries := make([]framework.TestDataSummary, 0, 2)
 		// Verify latency metrics.
-		highLatencyRequests, metrics, err := framework.HighLatencyRequests(c, nodeCount)
+		highLatencyRequests, metrics, err := e2emetrics.HighLatencyRequests(c, nodeCount)
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries = append(summaries, metrics)
 		}
 
 		// Summarize scheduler metrics.
-		latency, err := framework.VerifySchedulerLatency(c)
+		latency, err := e2emetrics.VerifySchedulerLatency(c, framework.TestContext.Provider, framework.TestContext.CloudConfig.MasterName, framework.GetMasterHost())
 		framework.ExpectNoError(err)
 		if err == nil {
 			// Compute avg and quantiles of throughput (excluding last element, that's usually an outlier).
@@ -475,7 +477,7 @@ var _ = SIGDescribe("Density", func() {
 		}
 
 		// Summarize etcd metrics.
-		err = etcdMetricsCollector.StopAndSummarize()
+		err = etcdMetricsCollector.StopAndSummarize(framework.TestContext.Provider, framework.GetMasterHost())
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries = append(summaries, etcdMetricsCollector.GetMetrics())
@@ -501,6 +503,10 @@ var _ = SIGDescribe("Density", func() {
 	f.NamespaceDeletionTimeout = time.Hour
 
 	ginkgo.BeforeEach(func() {
+		// Gathering the metrics currently uses a path which uses SSH.
+		framework.SkipUnlessSSHKeyPresent()
+
+		var err error
 		c = f.ClientSet
 		ns = f.Namespace.Name
 		testPhaseDurations = timer.NewTestPhaseTimer()
@@ -517,7 +523,12 @@ var _ = SIGDescribe("Density", func() {
 			},
 		})
 
-		_, nodes = framework.GetMasterAndWorkerNodesOrDie(c)
+		_, nodes, err = e2enode.GetMasterAndWorkerNodes(c)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 		nodeCount = len(nodes.Items)
 		gomega.Expect(nodeCount).NotTo(gomega.BeZero())
 
@@ -528,13 +539,13 @@ var _ = SIGDescribe("Density", func() {
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err := framework.CheckTestingNSDeletedExcept(c, ns)
+		err = framework.CheckTestingNSDeletedExcept(c, ns)
 		framework.ExpectNoError(err)
 
 		uuid = string(utiluuid.NewUUID())
 
-		framework.ExpectNoError(framework.ResetSchedulerMetrics(c))
-		framework.ExpectNoError(framework.ResetMetrics(c))
+		framework.ExpectNoError(e2emetrics.ResetSchedulerMetrics(c, framework.TestContext.Provider, framework.TestContext.CloudConfig.MasterName, framework.GetMasterHost()))
+		framework.ExpectNoError(e2emetrics.ResetMetrics(c))
 		framework.ExpectNoError(os.Mkdir(fmt.Sprintf(framework.TestContext.OutputDir+"/%s", uuid), 0777))
 
 		e2elog.Logf("Listing nodes for easy debugging:\n")
@@ -556,8 +567,8 @@ var _ = SIGDescribe("Density", func() {
 		profileGathererStopCh = framework.StartCPUProfileGatherer("kube-apiserver", "density", profileGatheringDelay)
 
 		// Start etcs metrics collection.
-		etcdMetricsCollector = framework.NewEtcdMetricsCollector()
-		etcdMetricsCollector.StartCollecting(time.Minute)
+		etcdMetricsCollector = e2emetrics.NewEtcdMetricsCollector()
+		etcdMetricsCollector.StartCollecting(time.Minute, framework.TestContext.Provider, framework.GetMasterHost())
 	})
 
 	type Density struct {
@@ -941,11 +952,11 @@ var _ = SIGDescribe("Density", func() {
 					}
 				}
 
-				scheduleLag := make([]framework.PodLatencyData, 0)
-				startupLag := make([]framework.PodLatencyData, 0)
-				watchLag := make([]framework.PodLatencyData, 0)
-				schedToWatchLag := make([]framework.PodLatencyData, 0)
-				e2eLag := make([]framework.PodLatencyData, 0)
+				scheduleLag := make([]e2emetrics.PodLatencyData, 0)
+				startupLag := make([]e2emetrics.PodLatencyData, 0)
+				watchLag := make([]e2emetrics.PodLatencyData, 0)
+				schedToWatchLag := make([]e2emetrics.PodLatencyData, 0)
+				e2eLag := make([]e2emetrics.PodLatencyData, 0)
 
 				for name, create := range createTimes {
 					sched, ok := scheduleTimes[name]
@@ -969,44 +980,44 @@ var _ = SIGDescribe("Density", func() {
 						missingMeasurements++
 					}
 
-					scheduleLag = append(scheduleLag, framework.PodLatencyData{Name: name, Node: node, Latency: sched.Time.Sub(create.Time)})
-					startupLag = append(startupLag, framework.PodLatencyData{Name: name, Node: node, Latency: run.Time.Sub(sched.Time)})
-					watchLag = append(watchLag, framework.PodLatencyData{Name: name, Node: node, Latency: watch.Time.Sub(run.Time)})
-					schedToWatchLag = append(schedToWatchLag, framework.PodLatencyData{Name: name, Node: node, Latency: watch.Time.Sub(sched.Time)})
-					e2eLag = append(e2eLag, framework.PodLatencyData{Name: name, Node: node, Latency: watch.Time.Sub(create.Time)})
+					scheduleLag = append(scheduleLag, e2emetrics.PodLatencyData{Name: name, Node: node, Latency: sched.Time.Sub(create.Time)})
+					startupLag = append(startupLag, e2emetrics.PodLatencyData{Name: name, Node: node, Latency: run.Time.Sub(sched.Time)})
+					watchLag = append(watchLag, e2emetrics.PodLatencyData{Name: name, Node: node, Latency: watch.Time.Sub(run.Time)})
+					schedToWatchLag = append(schedToWatchLag, e2emetrics.PodLatencyData{Name: name, Node: node, Latency: watch.Time.Sub(sched.Time)})
+					e2eLag = append(e2eLag, e2emetrics.PodLatencyData{Name: name, Node: node, Latency: watch.Time.Sub(create.Time)})
 				}
 
-				sort.Sort(framework.LatencySlice(scheduleLag))
-				sort.Sort(framework.LatencySlice(startupLag))
-				sort.Sort(framework.LatencySlice(watchLag))
-				sort.Sort(framework.LatencySlice(schedToWatchLag))
-				sort.Sort(framework.LatencySlice(e2eLag))
+				sort.Sort(e2emetrics.LatencySlice(scheduleLag))
+				sort.Sort(e2emetrics.LatencySlice(startupLag))
+				sort.Sort(e2emetrics.LatencySlice(watchLag))
+				sort.Sort(e2emetrics.LatencySlice(schedToWatchLag))
+				sort.Sort(e2emetrics.LatencySlice(e2eLag))
 
-				framework.PrintLatencies(scheduleLag, "worst create-to-schedule latencies")
-				framework.PrintLatencies(startupLag, "worst schedule-to-run latencies")
-				framework.PrintLatencies(watchLag, "worst run-to-watch latencies")
-				framework.PrintLatencies(schedToWatchLag, "worst schedule-to-watch latencies")
-				framework.PrintLatencies(e2eLag, "worst e2e latencies")
+				e2emetrics.PrintLatencies(scheduleLag, "worst create-to-schedule latencies")
+				e2emetrics.PrintLatencies(startupLag, "worst schedule-to-run latencies")
+				e2emetrics.PrintLatencies(watchLag, "worst run-to-watch latencies")
+				e2emetrics.PrintLatencies(schedToWatchLag, "worst schedule-to-watch latencies")
+				e2emetrics.PrintLatencies(e2eLag, "worst e2e latencies")
 
 				// Capture latency metrics related to pod-startup.
-				podStartupLatency := &framework.PodStartupLatency{
-					CreateToScheduleLatency: framework.ExtractLatencyMetrics(scheduleLag),
-					ScheduleToRunLatency:    framework.ExtractLatencyMetrics(startupLag),
-					RunToWatchLatency:       framework.ExtractLatencyMetrics(watchLag),
-					ScheduleToWatchLatency:  framework.ExtractLatencyMetrics(schedToWatchLag),
-					E2ELatency:              framework.ExtractLatencyMetrics(e2eLag),
+				podStartupLatency := &e2emetrics.PodStartupLatency{
+					CreateToScheduleLatency: e2emetrics.ExtractLatencyMetrics(scheduleLag),
+					ScheduleToRunLatency:    e2emetrics.ExtractLatencyMetrics(startupLag),
+					RunToWatchLatency:       e2emetrics.ExtractLatencyMetrics(watchLag),
+					ScheduleToWatchLatency:  e2emetrics.ExtractLatencyMetrics(schedToWatchLag),
+					E2ELatency:              e2emetrics.ExtractLatencyMetrics(e2eLag),
 				}
 				f.TestSummaries = append(f.TestSummaries, podStartupLatency)
 
 				// Test whether e2e pod startup time is acceptable.
-				podStartupLatencyThreshold := framework.LatencyMetric{
+				podStartupLatencyThreshold := e2emetrics.LatencyMetric{
 					Perc50: PodStartupLatencyThreshold,
 					Perc90: PodStartupLatencyThreshold,
 					Perc99: PodStartupLatencyThreshold,
 				}
-				framework.ExpectNoError(framework.VerifyLatencyWithinThreshold(podStartupLatencyThreshold, podStartupLatency.E2ELatency, "pod startup"))
+				framework.ExpectNoError(e2emetrics.VerifyLatencyWithinThreshold(podStartupLatencyThreshold, podStartupLatency.E2ELatency, "pod startup"))
 
-				framework.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
+				e2emetrics.LogSuspiciousLatency(startupLag, e2eLag, nodeCount, c)
 			}
 		})
 	}

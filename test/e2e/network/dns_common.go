@@ -447,14 +447,18 @@ func createDNSPod(namespace, wheezyProbeCmd, jessieProbeCmd, podHostName, servic
 	return dnsPod
 }
 
-func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookupIP string, fileNamePrefix, namespace, dnsDomain string) (string, []string) {
+func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookupIP string, fileNamePrefix, namespace, dnsDomain string, isIPv6 bool) (string, []string) {
 	fileNames := make([]string, 0, len(namesToResolve)*2)
 	probeCmd := "for i in `seq 1 600`; do "
+	dnsRecord := "A"
+	if isIPv6 {
+		dnsRecord = "AAAA"
+	}
 	for _, name := range namesToResolve {
 		// Resolve by TCP and UDP DNS.  Use $$(...) because $(...) is
 		// expanded by kubernetes (though this won't expand so should
 		// remain a literal, safe > sorry).
-		lookup := fmt.Sprintf("%s A %s AAAA", name, name)
+		lookup := fmt.Sprintf("%s %s", name, dnsRecord)
 		if strings.HasPrefix(name, "_") {
 			lookup = fmt.Sprintf("%s SRV", name)
 		}
@@ -474,9 +478,17 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 
 	podARecByUDPFileName := fmt.Sprintf("%s_udp@PodARecord", fileNamePrefix)
 	podARecByTCPFileName := fmt.Sprintf("%s_tcp@PodARecord", fileNamePrefix)
-	probeCmd += fmt.Sprintf(`podARec=$$(getent hosts $$(hostname | awk '{print $1}') | tr ":." "-" | awk '{print $$1".%s.pod.%s"}');`, namespace, dnsDomain)
-	probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search $${podARec} A $${podARec} AAAA)" && test -n "$$check" && echo OK > /results/%s;`, podARecByUDPFileName)
-	probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search $${podARec} A $${podARec} AAAA)" && test -n "$$check" && echo OK > /results/%s;`, podARecByTCPFileName)
+
+	// getent doesn't work properly on Windows hosts and hostname -i doesn't return an IPv6 address
+	// so we  have to use a different command per IP family
+	if isIPv6 {
+		probeCmd += fmt.Sprintf(`podARec=$$(getent hosts $$(hostname -s) | tr ":." "-" | awk '{print $$1".%s.pod.%s"}');`, namespace, dnsDomain)
+	} else {
+		probeCmd += fmt.Sprintf(`podARec=$$(hostname -i| awk -F. '{print $$1"-"$$2"-"$$3"-"$$4".%s.pod.%s"}');`, namespace, dnsDomain)
+	}
+
+	probeCmd += fmt.Sprintf(`check="$$(dig +notcp +noall +answer +search $${podARec} %s)" && test -n "$$check" && echo OK > /results/%s;`, dnsRecord, podARecByUDPFileName)
+	probeCmd += fmt.Sprintf(`check="$$(dig +tcp +noall +answer +search $${podARec} %s)" && test -n "$$check" && echo OK > /results/%s;`, dnsRecord, podARecByTCPFileName)
 	fileNames = append(fileNames, podARecByUDPFileName)
 	fileNames = append(fileNames, podARecByTCPFileName)
 
@@ -501,9 +513,6 @@ func createProbeCommand(namesToResolve []string, hostEntries []string, ptrLookup
 func createTargetedProbeCommand(nameToResolve string, lookup string, fileNamePrefix string) (string, string) {
 	fileName := fmt.Sprintf("%s_udp@%s", fileNamePrefix, nameToResolve)
 	nameLookup := fmt.Sprintf("%s %s", nameToResolve, lookup)
-	if lookup == "A" {
-		nameLookup = fmt.Sprintf("%s A %s AAAA", nameToResolve, nameToResolve)
-	}
 	probeCmd := fmt.Sprintf("for i in `seq 1 30`; do dig +short %s > /results/%s; sleep 1; done", nameLookup, fileName)
 	return probeCmd, fileName
 }

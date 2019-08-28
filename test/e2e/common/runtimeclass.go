@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -33,6 +34,7 @@ import (
 	utilpointer "k8s.io/utils/pointer"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -49,14 +51,13 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 
 	ginkgo.It("should reject a Pod requesting a non-existent RuntimeClass", func() {
 		rcName := f.Namespace.Name + "-nonexistent"
-		pod := createRuntimeClassPod(f, rcName)
-		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", rcName))
+		expectPodRejection(f, newRuntimeClassPod(rcName))
 	})
 
 	ginkgo.It("should reject a Pod requesting a RuntimeClass with an unconfigured handler", func() {
 		handler := f.Namespace.Name + "-handler"
 		rcName := createRuntimeClass(f, "unconfigured-handler", handler)
-		pod := createRuntimeClassPod(f, rcName)
+		pod := f.PodClient().Create(newRuntimeClassPod(rcName))
 		expectSandboxFailureEvent(f, pod, handler)
 	})
 
@@ -69,7 +70,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		}
 
 		rcName := createRuntimeClass(f, "preconfigured-handler", handler)
-		pod := createRuntimeClassPod(f, rcName)
+		pod := f.PodClient().Create(newRuntimeClassPod(rcName))
 		expectPodSuccess(f, pod)
 	})
 
@@ -94,8 +95,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 			}))
 		})
 
-		pod := createRuntimeClassPod(f, rcName)
-		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", rcName))
+		expectPodRejection(f, newRuntimeClassPod(rcName))
 	})
 })
 
@@ -109,9 +109,9 @@ func createRuntimeClass(f *framework.Framework, name, handler string) string {
 	return rc.GetName()
 }
 
-// createRuntimeClass creates a test pod with the given runtimeClassName.
-func createRuntimeClassPod(f *framework.Framework, runtimeClassName string) *v1.Pod {
-	pod := &v1.Pod{
+// newRuntimeClassPod generates a test pod with the given runtimeClassName.
+func newRuntimeClassPod(runtimeClassName string) *v1.Pod {
+	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: fmt.Sprintf("test-runtimeclass-%s-", runtimeClassName),
 		},
@@ -126,7 +126,19 @@ func createRuntimeClassPod(f *framework.Framework, runtimeClassName string) *v1.
 			AutomountServiceAccountToken: utilpointer.BoolPtr(false),
 		},
 	}
-	return f.PodClient().Create(pod)
+}
+
+func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
+	// The Node E2E doesn't run the RuntimeClass admission controller, so we expect the rejection to
+	// happen by the Kubelet.
+	if framework.TestContext.NodeE2E {
+		pod = f.PodClient().Create(pod)
+		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", *pod.Spec.RuntimeClassName))
+	} else {
+		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+		framework.ExpectError(err, "should be forbidden")
+		gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
+	}
 }
 
 // expectPodSuccess waits for the given pod to terminate successfully.
@@ -144,6 +156,6 @@ func expectSandboxFailureEvent(f *framework.Framework, pod *v1.Pod, msg string) 
 		"involvedObject.namespace": f.Namespace.Name,
 		"reason":                   events.FailedCreatePodSandBox,
 	}.AsSelector().String()
-	framework.ExpectNoError(e2epod.WaitTimeoutForPodEvent(
-		f.ClientSet, pod.Name, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
+	framework.ExpectNoError(WaitTimeoutForEvent(
+		f.ClientSet, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
 }

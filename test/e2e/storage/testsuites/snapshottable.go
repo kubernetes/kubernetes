@@ -66,6 +66,9 @@ func (s *snapshottableTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
 
+func (s *snapshottableTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+}
+
 func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	var (
 		sDriver SnapshottableTestDriver
@@ -78,7 +81,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		dInfo := driver.GetDriverInfo()
 		ok := false
 		sDriver, ok = driver.(SnapshottableTestDriver)
-		if !dInfo.Capabilities[CapDataSource] || !ok {
+		if !dInfo.Capabilities[CapSnapshotDataSource] || !ok {
 			framework.Skipf("Driver %q does not support snapshots - skipping", dInfo.Name)
 		}
 		dDriver, ok = driver.(DynamicPVTestDriver)
@@ -107,9 +110,11 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 		}
 
-		claimSize := dDriver.GetClaimSize()
-		pvc := getClaim(claimSize, config.Framework.Namespace.Name)
-		pvc.Spec.StorageClassName = &class.Name
+		pvc := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			ClaimSize:        dDriver.GetClaimSize(),
+			StorageClassName: &(class.Name),
+		}, config.Framework.Namespace.Name)
+
 		e2elog.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
 
 		ginkgo.By("creating a StorageClass " + class.Name)

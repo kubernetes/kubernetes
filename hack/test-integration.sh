@@ -20,8 +20,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-KUBE_ROOT=$(dirname "${BASH_SOURCE}")/..
-
 echo "$0 has been replaced by 'make test-integration'"
 echo
 echo "The following invocation will run all integration tests: "

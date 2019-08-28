@@ -100,7 +100,6 @@ try {
   Dump-DebugInfoToConsole
   Set-PrerequisiteOptions
   $kube_env = Fetch-KubeEnv
-  Disable-WindowsDefender
 
   if (Test-IsTestCluster $kube_env) {
     Log-Output 'Test cluster detected, installing OpenSSH.'

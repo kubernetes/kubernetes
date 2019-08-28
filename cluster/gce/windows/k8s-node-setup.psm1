@@ -244,22 +244,6 @@ function Set-PrerequisiteOptions {
   Install-Module -Name powershell-yaml -Force
 }
 
-# Disables Windows Defender realtime scanning.
-# TODO: remove this workaround once the fix is rolled out the Windows image
-# https://github.com/kubernetes/kubernetes/issues/75148
-function Disable-WindowsDefender {
-  # Windows Defender periodically consumes 100% of the CPU, so disable realtime
-  # scanning. Uninstalling the Windows Feature will prevent the service from
-  # starting after a reboot.
-  # TODO(pjh): move this step to image preparation, since we don't want to do a
-  # full reboot here.
-  if ((Get-WindowsFeature -Name 'Windows-Defender').Installed) {
-    Log-Output "Disabling Windows Defender service"
-    Set-MpPreference -DisableRealtimeMonitoring $true
-    Uninstall-WindowsFeature -Name 'Windows-Defender'
-  }
-}
-
 # Creates directories where other functions in this module will read and write
 # data.
 # Note: C:\tmp is required for running certain kubernetes tests.
@@ -973,7 +957,6 @@ function Start-WorkerServices {
   #   kube-proxy --master=https://35.239.84.171
   #   --kubeconfig=/var/lib/kube-proxy/kubeconfig --cluster-cidr=10.64.0.0/14
   #   --oom-score-adj=-998 --v=2
-  #   --feature-gates=ExperimentalCriticalPodAnnotation=true
   #   --iptables-sync-period=1m --iptables-min-sync-period=10s
   #   --ipvs-sync-period=1m --ipvs-min-sync-period=10s
   # And also with various volumeMounts and "securityContext: privileged: true".
@@ -1113,13 +1096,39 @@ $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 # sometimes is unstoppable, so we work around it by killing the processes.
 function Restart-StackdriverLoggingAgent {
   Stop-Service -NoWait -ErrorAction Ignore StackdriverLogging
-  # TODO: check periodically to lower the wait time
-  Start-Sleep 10
+ 
+  # Wait (if necessary) for service to stop.
+  $timeout = 10
+  $stopped = (Get-service StackdriverLogging).Status -eq 'Stopped'
+  for ($i = 0; $i -lt $timeout -and !($stopped); $i++) {
+      Start-Sleep 1
+      $stopped = (Get-service StackdriverLogging).Status -eq 'Stopped'
+  }
+
   if ((Get-service StackdriverLogging).Status -ne 'Stopped') {
     # Force kill the processes.
     Stop-Process -Force -PassThru -Id (Get-WmiObject win32_process |
       Where CommandLine -Like '*Stackdriver/logging*').ProcessId
+
+    # Wait until process has stopped.
+    $waited = 0
+    $log_period = 10
+    $timeout = 60
+    while ((Get-service StackdriverLogging).Status -ne 'Stopped' -and $waited -lt $timeout) {
+      Start-Sleep 1
+      $waited++
+
+      if ($waited % $log_period -eq 0) {
+        Log-Output "Waiting for StackdriverLogging service to stop"
+      }
+    }
+
+    # Timeout occurred
+    if ($waited -ge $timeout) {
+      Throw ("Timeout while waiting for StackdriverLogging service to stop")
+    }
   }
+  
   Start-Service StackdriverLogging
 }
 

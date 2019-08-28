@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 
@@ -93,7 +94,7 @@ func (t *VolumeModeDowngradeTest) Setup(f *framework.Framework) {
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Consuming the PVC before downgrade")
-	t.pod, err = framework.CreateSecPod(cs, ns, []*v1.PersistentVolumeClaim{t.pvc}, false, "", false, false, framework.SELinuxLabel, nil, framework.PodStartTimeout)
+	t.pod, err = e2epod.CreateSecPod(cs, ns, []*v1.PersistentVolumeClaim{t.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil, framework.PodStartTimeout)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Checking if PV exists as expected volume mode")
@@ -116,7 +117,7 @@ func (t *VolumeModeDowngradeTest) Test(f *framework.Framework, done <-chan struc
 // Teardown cleans up any remaining resources.
 func (t *VolumeModeDowngradeTest) Teardown(f *framework.Framework) {
 	ginkgo.By("Deleting the pod")
-	framework.ExpectNoError(framework.DeletePodWithWait(f, f.ClientSet, t.pod))
+	framework.ExpectNoError(e2epod.DeletePodWithWait(f.ClientSet, t.pod))
 
 	ginkgo.By("Deleting the PVC")
 	framework.ExpectNoError(f.ClientSet.CoreV1().PersistentVolumeClaims(t.pvc.Namespace).Delete(t.pvc.Name, nil))

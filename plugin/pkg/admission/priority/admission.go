@@ -17,6 +17,7 @@ limitations under the License.
 package priority
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -35,7 +36,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
-	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 const (
@@ -99,7 +99,7 @@ var (
 
 // Admit checks Pods and admits or rejects them. It also resolves the priority of pods based on their PriorityClass.
 // Note that pod validation mechanism prevents update of a pod priority.
-func (p *priorityPlugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *priorityPlugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
 	if len(a.GetSubresource()) != 0 {
@@ -119,7 +119,7 @@ func (p *priorityPlugin) Admit(a admission.Attributes, o admission.ObjectInterfa
 }
 
 // Validate checks PriorityClasses and admits or rejects them.
-func (p *priorityPlugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *priorityPlugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	operation := a.GetOperation()
 	// Ignore all calls to subresources
 	if len(a.GetSubresource()) != 0 {
@@ -178,13 +178,6 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 	if operation == admission.Create {
 		var priority int32
 		var preemptionPolicy *apiv1.PreemptionPolicy
-		// TODO: @ravig - This is for backwards compatibility to ensure that critical pods with annotations just work fine.
-		// Remove when no longer needed.
-		if len(pod.Spec.PriorityClassName) == 0 &&
-			utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalCriticalPodAnnotation) &&
-			kubelettypes.IsCritical(a.GetNamespace(), pod.Annotations) {
-			pod.Spec.PriorityClassName = scheduling.SystemClusterCritical
-		}
 		if len(pod.Spec.PriorityClassName) == 0 {
 			var err error
 			var pcName string

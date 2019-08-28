@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -20,12 +22,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 type apiCallMetrics struct {
-	latency *prometheus.HistogramVec
-	errors  *prometheus.CounterVec
+	latency *metrics.HistogramVec
+	errors  *metrics.CounterVec
 }
 
 var (
@@ -63,24 +66,26 @@ func (mc *metricContext) Observe(err error) error {
 
 func registerAPIMetrics(attributes ...string) *apiCallMetrics {
 	metrics := &apiCallMetrics{
-		latency: prometheus.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Name: "cloudprovider_azure_api_request_duration_seconds",
-				Help: "Latency of an Azure API call",
+		latency: metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Name:           "cloudprovider_azure_api_request_duration_seconds",
+				Help:           "Latency of an Azure API call",
+				StabilityLevel: metrics.ALPHA,
 			},
 			attributes,
 		),
-		errors: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "cloudprovider_azure_api_request_errors",
-				Help: "Number of errors for an Azure API call",
+		errors: metrics.NewCounterVec(
+			&metrics.CounterOpts{
+				Name:           "cloudprovider_azure_api_request_errors",
+				Help:           "Number of errors for an Azure API call",
+				StabilityLevel: metrics.ALPHA,
 			},
 			attributes,
 		),
 	}
 
-	prometheus.MustRegister(metrics.latency)
-	prometheus.MustRegister(metrics.errors)
+	legacyregistry.MustRegister(metrics.latency)
+	legacyregistry.MustRegister(metrics.errors)
 
 	return metrics
 }

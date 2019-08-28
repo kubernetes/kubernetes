@@ -333,7 +333,7 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting disruption controller")
 	defer klog.Infof("Shutting down disruption controller")
 
-	if !controller.WaitForCacheSync("disruption", stopCh, dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
+	if !cache.WaitForNamedCacheSync("disruption", stopCh, dc.podListerSynced, dc.pdbListerSynced, dc.rcListerSynced, dc.rsListerSynced, dc.dListerSynced, dc.ssListerSynced) {
 		return
 	}
 

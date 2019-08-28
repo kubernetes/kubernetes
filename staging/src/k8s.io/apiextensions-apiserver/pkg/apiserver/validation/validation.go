@@ -17,11 +17,16 @@ limitations under the License.
 package validation
 
 import (
+	"encoding/json"
+	"strings"
+
+	openapierrors "github.com/go-openapi/errors"
 	"github.com/go-openapi/spec"
 	"github.com/go-openapi/strfmt"
 	"github.com/go-openapi/validate"
 
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 // NewSchemaValidator creates an openapi schema validator for the given CRD validation.
@@ -29,7 +34,7 @@ func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceVa
 	// Convert CRD schema to openapi schema
 	openapiSchema := &spec.Schema{}
 	if customResourceValidation != nil {
-		// WARNING: do not replace this with Structural.ToGoOpenAPI until it supports nullable.
+		// TODO: replace with NewStructural(...).ToGoOpenAPI
 		if err := ConvertJSONSchemaProps(customResourceValidation.OpenAPIV3Schema, openapiSchema); err != nil {
 			return nil, nil, err
 		}
@@ -39,16 +44,54 @@ func NewSchemaValidator(customResourceValidation *apiextensions.CustomResourceVa
 
 // ValidateCustomResource validates the Custom Resource against the schema in the CustomResourceDefinition.
 // CustomResource is a JSON data structure.
-func ValidateCustomResource(customResource interface{}, validator *validate.SchemaValidator) error {
+func ValidateCustomResource(fldPath *field.Path, customResource interface{}, validator *validate.SchemaValidator) field.ErrorList {
 	if validator == nil {
 		return nil
 	}
 
 	result := validator.Validate(customResource)
-	if result.AsError() != nil {
-		return result.AsError()
+	if result.IsValid() {
+		return nil
 	}
-	return nil
+	var allErrs field.ErrorList
+	for _, err := range result.Errors {
+		switch err := err.(type) {
+
+		case *openapierrors.Validation:
+			errPath := fldPath
+			if len(err.Name) > 0 && err.Name != "." {
+				errPath = errPath.Child(strings.TrimPrefix(err.Name, "."))
+			}
+
+			switch err.Code() {
+			case openapierrors.RequiredFailCode:
+				allErrs = append(allErrs, field.Required(errPath, ""))
+
+			case openapierrors.EnumFailCode:
+				values := []string{}
+				for _, allowedValue := range err.Values {
+					if s, ok := allowedValue.(string); ok {
+						values = append(values, s)
+					} else {
+						allowedJSON, _ := json.Marshal(allowedValue)
+						values = append(values, string(allowedJSON))
+					}
+				}
+				allErrs = append(allErrs, field.NotSupported(errPath, err.Value, values))
+
+			default:
+				value := interface{}("")
+				if err.Value != nil {
+					value = err.Value
+				}
+				allErrs = append(allErrs, field.Invalid(errPath, value, err.Error()))
+			}
+
+		default:
+			allErrs = append(allErrs, field.Invalid(fldPath, "", err.Error()))
+		}
+	}
+	return allErrs
 }
 
 // ConvertJSONSchemaProps converts the schema from apiextensions.JSONSchemaPropos to go-openapi/spec.Schema.
@@ -76,9 +119,7 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		out.VendorExtensible.AddExtension("x-kubernetes-int-or-string", true)
 		out.Type = spec.StringOrArray{"integer", "string"}
 	}
-	if out.Type != nil && in.Nullable {
-		out.Type = append(out.Type, "null")
-	}
+	out.Nullable = in.Nullable
 	out.Format = in.Format
 	out.Title = in.Title
 	out.Maximum = in.Maximum
@@ -204,6 +245,12 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	}
 	if in.XEmbeddedResource {
 		out.VendorExtensible.AddExtension("x-kubernetes-embedded-resource", true)
+	}
+	if len(in.XListMapKeys) != 0 {
+		out.VendorExtensible.AddExtension("x-kubernetes-list-map-keys", in.XListMapKeys)
+	}
+	if in.XListType != nil {
+		out.VendorExtensible.AddExtension("x-kubernetes-list-type", *in.XListType)
 	}
 
 	return nil

@@ -19,6 +19,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
+        "//pkg/api/v1/pod:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//pkg/volume:go_default_library",
@@ -29,6 +31,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
@@ -43,6 +46,7 @@ go_test(
     name = "go_default_test",
     srcs = [
         "cache_test.go",
+        "container_hash_test.go",
         "helpers_test.go",
         "ref_test.go",
         "runtime_cache_test.go",
@@ -51,10 +55,14 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/apis/core/install:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

@@ -68,5 +68,5 @@ func aggregatePods(pods []*v1.Pod, handler podHandler) string {
 	for _, pod := range pods {
 		podStrings = append(podStrings, handler(pod))
 	}
-	return fmt.Sprintf(strings.Join(podStrings, ", "))
+	return strings.Join(podStrings, ", ")
 }

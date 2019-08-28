@@ -33,6 +33,7 @@ go_library(
         "init_others.go",
         "init_windows.go",
         "plugins.go",
+        "plugins_providers.go",
         "server.go",
         "server_linux.go",
         "server_unsupported.go",
@@ -106,7 +107,7 @@ go_library(
         "//pkg/volume/scaleio:go_default_library",
         "//pkg/volume/secret:go_default_library",
         "//pkg/volume/storageos:go_default_library",
-        "//pkg/volume/util/nsenter:go_default_library",
+        "//pkg/volume/util/hostutil:go_default_library",
         "//pkg/volume/util/subpath:go_default_library",
         "//pkg/volume/vsphere_volume:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -144,10 +145,9 @@ go_library(
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
-        "//vendor/k8s.io/utils/nsenter:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
-            "//vendor/github.com/sigma/go-inotify:go_default_library",
+            "//vendor/k8s.io/utils/inotify:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/windows/service:go_default_library",

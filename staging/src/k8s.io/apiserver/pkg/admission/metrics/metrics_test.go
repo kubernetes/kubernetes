@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -36,8 +37,8 @@ var (
 func TestObserveAdmissionStep(t *testing.T) {
 	Metrics.reset()
 	handler := WithStepMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true})
-	handler.(admission.MutationInterface).Admit(attr, nil)
-	handler.(admission.ValidationInterface).Validate(attr, nil)
+	handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil)
+	handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil)
 	wantLabels := map[string]string{
 		"operation": string(admission.Create),
 		"type":      "admit",
@@ -54,8 +55,8 @@ func TestObserveAdmissionStep(t *testing.T) {
 func TestObserveAdmissionController(t *testing.T) {
 	Metrics.reset()
 	handler := WithControllerMetrics(&mutatingAndValidatingFakeHandler{admission.NewHandler(admission.Create), true, true}, "a")
-	handler.(admission.MutationInterface).Admit(attr, nil)
-	handler.(admission.ValidationInterface).Validate(attr, nil)
+	handler.(admission.MutationInterface).Admit(context.TODO(), attr, nil)
+	handler.(admission.ValidationInterface).Validate(context.TODO(), attr, nil)
 	wantLabels := map[string]string{
 		"name":      "a",
 		"operation": string(admission.Create),
@@ -78,6 +79,37 @@ func TestObserveWebhook(t *testing.T) {
 		"rejected":  "false",
 	}
 	expectHistogramCountTotal(t, "apiserver_admission_webhook_admission_duration_seconds", wantLabels, 1)
+}
+
+func TestObserveWebhookRejection(t *testing.T) {
+	Metrics.reset()
+	Metrics.ObserveWebhookRejection("x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 500)
+	Metrics.ObserveWebhookRejection("x", stepAdmit, string(admission.Create), WebhookRejectionNoError, 654)
+	Metrics.ObserveWebhookRejection("x", stepValidate, string(admission.Update), WebhookRejectionCallingWebhookError, 0)
+	wantLabels := map[string]string{
+		"name":           "x",
+		"operation":      string(admission.Create),
+		"type":           "admit",
+		"error_type":     "no_error",
+		"rejection_code": "500",
+	}
+	wantLabels600 := map[string]string{
+		"name":           "x",
+		"operation":      string(admission.Create),
+		"type":           "admit",
+		"error_type":     "no_error",
+		"rejection_code": "600",
+	}
+	wantLabelsCallingWebhookError := map[string]string{
+		"name":           "x",
+		"operation":      string(admission.Update),
+		"type":           "validate",
+		"error_type":     "calling_webhook_error",
+		"rejection_code": "0",
+	}
+	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabels600, 1)
+	expectCounterValue(t, "apiserver_admission_webhook_rejection_count", wantLabelsCallingWebhookError, 1)
 }
 
 func TestWithMetrics(t *testing.T) {
@@ -154,7 +186,7 @@ func TestWithMetrics(t *testing.T) {
 		h := WithMetrics(test.handler, Metrics.ObserveAdmissionController, test.name)
 
 		// test mutation
-		err := h.(admission.MutationInterface).Admit(admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
+		err := h.(admission.MutationInterface).Admit(context.TODO(), admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		if test.admit && err != nil {
 			t.Errorf("expected admit to succeed, but failed: %v", err)
 			continue
@@ -179,7 +211,7 @@ func TestWithMetrics(t *testing.T) {
 		}
 
 		// test validation
-		err = h.(admission.ValidationInterface).Validate(admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
+		err = h.(admission.ValidationInterface).Validate(context.TODO(), admission.NewAttributesRecord(nil, nil, schema.GroupVersionKind{}, test.ns, "", schema.GroupVersionResource{}, "", test.operation, test.options, false, nil), nil)
 		if test.validate && err != nil {
 			t.Errorf("expected admit to succeed, but failed: %v", err)
 			continue
@@ -206,14 +238,14 @@ type mutatingAndValidatingFakeHandler struct {
 	validate bool
 }
 
-func (h *mutatingAndValidatingFakeHandler) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (h *mutatingAndValidatingFakeHandler) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if h.admit {
 		return nil
 	}
 	return fmt.Errorf("don't admit")
 }
 
-func (h *mutatingAndValidatingFakeHandler) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (h *mutatingAndValidatingFakeHandler) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if h.validate {
 		return nil
 	}
@@ -225,7 +257,7 @@ type validatingFakeHandler struct {
 	validate bool
 }
 
-func (h *validatingFakeHandler) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (h *validatingFakeHandler) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if h.validate {
 		return nil
 	}
@@ -237,7 +269,7 @@ type mutatingFakeHandler struct {
 	admit bool
 }
 
-func (h *mutatingFakeHandler) Admit(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (h *mutatingFakeHandler) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	if h.admit {
 		return nil
 	}

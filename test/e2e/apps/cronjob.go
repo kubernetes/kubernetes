@@ -35,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -51,6 +50,7 @@ var _ = SIGDescribe("CronJob", func() {
 
 	// Pod will complete instantly
 	successCommand := []string{"/bin/true"}
+	failureCommand := []string{"/bin/false"}
 
 	ginkgo.BeforeEach(func() {
 		framework.SkipIfMissingResource(f.DynamicClient, CronJobGroupVersionResourceBeta, f.Namespace.Name)
@@ -60,7 +60,7 @@ var _ = SIGDescribe("CronJob", func() {
 	ginkgo.It("should schedule multiple jobs concurrently", func() {
 		ginkgo.By("Creating a cronjob")
 		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
-			sleepCommand, nil)
+			sleepCommand, nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
@@ -83,7 +83,7 @@ var _ = SIGDescribe("CronJob", func() {
 	ginkgo.It("should not schedule jobs when suspended [Slow]", func() {
 		ginkgo.By("Creating a suspended cronjob")
 		cronJob := newTestCronJob("suspended", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
-			sleepCommand, nil)
+			sleepCommand, nil, nil)
 		t := true
 		cronJob.Spec.Suspend = &t
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
@@ -107,7 +107,7 @@ var _ = SIGDescribe("CronJob", func() {
 	ginkgo.It("should not schedule new jobs when ForbidConcurrent [Slow]", func() {
 		ginkgo.By("Creating a ForbidConcurrent cronjob")
 		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batchv1beta1.ForbidConcurrent,
-			sleepCommand, nil)
+			sleepCommand, nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
@@ -139,7 +139,7 @@ var _ = SIGDescribe("CronJob", func() {
 	ginkgo.It("should replace jobs when ReplaceConcurrent", func() {
 		ginkgo.By("Creating a ReplaceConcurrent cronjob")
 		cronJob := newTestCronJob("replace", "*/1 * * * ?", batchv1beta1.ReplaceConcurrent,
-			sleepCommand, nil)
+			sleepCommand, nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
@@ -171,7 +171,7 @@ var _ = SIGDescribe("CronJob", func() {
 	ginkgo.It("should not emit unexpected warnings", func() {
 		ginkgo.By("Creating a cronjob")
 		cronJob := newTestCronJob("concurrent", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
-			nil, nil)
+			nil, nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
@@ -194,7 +194,7 @@ var _ = SIGDescribe("CronJob", func() {
 	ginkgo.It("should remove from active list jobs that have been deleted", func() {
 		ginkgo.By("Creating a ForbidConcurrent cronjob")
 		cronJob := newTestCronJob("forbid", "*/1 * * * ?", batchv1beta1.ForbidConcurrent,
-			sleepCommand, nil)
+			sleepCommand, nil, nil)
 		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
 		framework.ExpectNoError(err, "Failed to create CronJob in namespace %s", f.Namespace.Name)
 
@@ -229,52 +229,75 @@ var _ = SIGDescribe("CronJob", func() {
 		framework.ExpectNoError(err, "Failed to remove %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
 	})
 
-	// cleanup of successful finished jobs, with limit of one successful job
-	ginkgo.It("should delete successful finished jobs with limit of one successful job", func() {
-		ginkgo.By("Creating a AllowConcurrent cronjob with custom history limits")
-		successLimit := int32(1)
-		cronJob := newTestCronJob("concurrent-limit", "*/1 * * * ?", batchv1beta1.AllowConcurrent,
-			successCommand, &successLimit)
-		cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
-		framework.ExpectNoError(err, "Failed to create allowconcurrent cronjob with custom history limits in namespace %s", f.Namespace.Name)
+	// cleanup of successful/failed finished jobs, with successfulJobsHistoryLimit and failedJobsHistoryLimit
+	ginkgo.It("should delete successful/failed finished jobs with limit of one job", func() {
 
-		// Job is going to complete instantly: do not check for an active job
-		// as we are most likely to miss it
+		testCases := []struct {
+			description  string
+			command      []string
+			successLimit int32
+			failedLimit  int32
+		}{
+			{
+				description:  "successful-jobs-history-limit",
+				command:      successCommand,
+				successLimit: 1, // keep one successful job
+				failedLimit:  0, // keep none failed job
+			},
+			{
+				description:  "failed-jobs-history-limit",
+				command:      failureCommand,
+				successLimit: 0, // keep none succcessful job
+				failedLimit:  1, // keep one failed job
+			},
+		}
 
-		ginkgo.By("Ensuring a finished job exists")
-		err = waitForAnyFinishedJob(f.ClientSet, f.Namespace.Name)
-		framework.ExpectNoError(err, "Failed to ensure a finished cronjob exists in namespace %s", f.Namespace.Name)
+		for _, t := range testCases {
+			ginkgo.By(fmt.Sprintf("Creating a AllowConcurrent cronjob with custom %s", t.description))
+			cronJob := newTestCronJob(t.description, "*/1 * * * ?", batchv1beta1.AllowConcurrent,
+				t.command, &t.successLimit, &t.failedLimit)
+			cronJob, err := createCronJob(f.ClientSet, f.Namespace.Name, cronJob)
+			framework.ExpectNoError(err, "Failed to create allowconcurrent cronjob with custom history limits in namespace %s", f.Namespace.Name)
 
-		ginkgo.By("Ensuring a finished job exists by listing jobs explicitly")
-		jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		framework.ExpectNoError(err, "Failed to ensure a finished cronjob exists by listing jobs explicitly in namespace %s", f.Namespace.Name)
-		_, finishedJobs := filterActiveJobs(jobs)
-		framework.ExpectEqual(len(finishedJobs), 1)
+			// Job is going to complete instantly: do not check for an active job
+			// as we are most likely to miss it
 
-		// Job should get deleted when the next job finishes the next minute
-		ginkgo.By("Ensuring this job and its pods does not exist anymore")
-		err = waitForJobToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
-		framework.ExpectNoError(err, "Failed to ensure that job does not exists anymore in namespace %s", f.Namespace.Name)
-		err = waitForJobsPodToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
-		framework.ExpectNoError(err, "Failed to ensure that pods for job does not exists anymore in namespace %s", f.Namespace.Name)
+			ginkgo.By("Ensuring a finished job exists")
+			err = waitForAnyFinishedJob(f.ClientSet, f.Namespace.Name)
+			framework.ExpectNoError(err, "Failed to ensure a finished cronjob exists in namespace %s", f.Namespace.Name)
 
-		ginkgo.By("Ensuring there is 1 finished job by listing jobs explicitly")
-		jobs, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
-		framework.ExpectNoError(err, "Failed to ensure there is one finished job by listing job explicitly in namespace %s", f.Namespace.Name)
-		_, finishedJobs = filterActiveJobs(jobs)
-		framework.ExpectEqual(len(finishedJobs), 1)
+			ginkgo.By("Ensuring a finished job exists by listing jobs explicitly")
+			jobs, err := f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+			framework.ExpectNoError(err, "Failed to ensure a finished cronjob exists by listing jobs explicitly in namespace %s", f.Namespace.Name)
+			_, finishedJobs := filterActiveJobs(jobs)
+			framework.ExpectEqual(len(finishedJobs), 1)
 
-		ginkgo.By("Removing cronjob")
-		err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
-		framework.ExpectNoError(err, "Failed to remove the %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
+			// Job should get deleted when the next job finishes the next minute
+			ginkgo.By("Ensuring this job and its pods does not exist anymore")
+			err = waitForJobToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
+			framework.ExpectNoError(err, "Failed to ensure that job does not exists anymore in namespace %s", f.Namespace.Name)
+			err = waitForJobsPodToDisappear(f.ClientSet, f.Namespace.Name, finishedJobs[0])
+			framework.ExpectNoError(err, "Failed to ensure that pods for job does not exists anymore in namespace %s", f.Namespace.Name)
+
+			ginkgo.By("Ensuring there is 1 finished job by listing jobs explicitly")
+			jobs, err = f.ClientSet.BatchV1().Jobs(f.Namespace.Name).List(metav1.ListOptions{})
+			framework.ExpectNoError(err, "Failed to ensure there is one finished job by listing job explicitly in namespace %s", f.Namespace.Name)
+			_, finishedJobs = filterActiveJobs(jobs)
+			framework.ExpectEqual(len(finishedJobs), 1)
+
+			ginkgo.By("Removing cronjob")
+			err = deleteCronJob(f.ClientSet, f.Namespace.Name, cronJob.Name)
+			framework.ExpectNoError(err, "Failed to remove the %s cronjob in namespace %s", cronJob.Name, f.Namespace.Name)
+		}
 	})
 })
 
 // newTestCronJob returns a cronjob which does one of several testing behaviors.
 func newTestCronJob(name, schedule string, concurrencyPolicy batchv1beta1.ConcurrencyPolicy,
-	command []string, successfulJobsHistoryLimit *int32) *batchv1beta1.CronJob {
+	command []string, successfulJobsHistoryLimit *int32, failedJobsHistoryLimit *int32) *batchv1beta1.CronJob {
 	parallelism := int32(1)
 	completions := int32(1)
+	backofflimit := int32(1)
 	sj := &batchv1beta1.CronJob{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -287,8 +310,9 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batchv1beta1.Concur
 			ConcurrencyPolicy: concurrencyPolicy,
 			JobTemplate: batchv1beta1.JobTemplateSpec{
 				Spec: batchv1.JobSpec{
-					Parallelism: &parallelism,
-					Completions: &completions,
+					Parallelism:  &parallelism,
+					Completions:  &completions,
+					BackoffLimit: &backofflimit,
 					Template: v1.PodTemplateSpec{
 						Spec: v1.PodSpec{
 							RestartPolicy: v1.RestartPolicyOnFailure,
@@ -319,6 +343,7 @@ func newTestCronJob(name, schedule string, concurrencyPolicy batchv1beta1.Concur
 		},
 	}
 	sj.Spec.SuccessfulJobsHistoryLimit = successfulJobsHistoryLimit
+	sj.Spec.FailedJobsHistoryLimit = failedJobsHistoryLimit
 	if command != nil {
 		sj.Spec.JobTemplate.Spec.Template.Spec.Containers[0].Command = command
 	}
@@ -334,7 +359,8 @@ func getCronJob(c clientset.Interface, ns, name string) (*batchv1beta1.CronJob, 
 }
 
 func deleteCronJob(c clientset.Interface, ns, name string) error {
-	return c.BatchV1beta1().CronJobs(ns).Delete(name, nil)
+	propagationPolicy := metav1.DeletePropagationBackground // Also delete jobs and pods related to cronjob
+	return c.BatchV1beta1().CronJobs(ns).Delete(name, &metav1.DeleteOptions{PropagationPolicy: &propagationPolicy})
 }
 
 // Wait for at least given amount of active jobs.
@@ -424,7 +450,7 @@ func waitForJobReplaced(c clientset.Interface, ns, previousJobName string) error
 		if len(aliveJobs) > 1 {
 			return false, fmt.Errorf("More than one job is running %+v", jobs.Items)
 		} else if len(aliveJobs) == 0 {
-			e2elog.Logf("Warning: Found 0 jobs in namespace %v", ns)
+			framework.Logf("Warning: Found 0 jobs in namespace %v", ns)
 			return false, nil
 		}
 		return aliveJobs[0].Name != previousJobName, nil
