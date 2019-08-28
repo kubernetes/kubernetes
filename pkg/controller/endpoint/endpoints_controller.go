@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
@@ -55,8 +56,8 @@ const (
 	// 5ms, 10ms, 20ms, 40ms, 80ms, 160ms, 320ms, 640ms, 1.3s, 2.6s, 5.1s, 10.2s, 20.4s, 41s, 82s
 	maxRetries = 15
 
-	// An annotation on the Service denoting if the endpoints controller should
-	// go ahead and create endpoints for unready pods. This annotation is
+	// TolerateUnreadyEndpointsAnnotation is an annotation on the Service denoting if the endpoints
+	// controller should go ahead and create endpoints for unready pods. This annotation is
 	// currently only used by StatefulSets, where we need the pod to be DNS
 	// resolvable during initialization and termination. In this situation we
 	// create a headless Service just for the StatefulSet, and clients shouldn't
@@ -543,6 +544,16 @@ func (e *EndpointController) syncService(key string) error {
 			endpointsLastChangeTriggerTime.Format(time.RFC3339Nano)
 	} else { // No new trigger time, clear the annotation.
 		delete(newEndpoints.Annotations, v1.EndpointsLastChangeTriggerTime)
+	}
+
+	if newEndpoints.Labels == nil {
+		newEndpoints.Labels = make(map[string]string)
+	}
+
+	if !helper.IsServiceIPSet(service) {
+		newEndpoints.Labels[v1.IsHeadlessService] = ""
+	} else {
+		delete(newEndpoints.Labels, v1.IsHeadlessService)
 	}
 
 	klog.V(4).Infof("Update endpoints for %v/%v, ready: %d not ready: %d", service.Namespace, service.Name, totalReadyEps, totalNotReadyEps)
