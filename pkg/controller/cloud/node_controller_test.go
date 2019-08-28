@@ -18,7 +18,6 @@ package cloud
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -52,7 +51,6 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 		existsByProviderID bool
 		nodeNameErr        error
 		providerIDErr      error
-		errInstanceID      error
 	}{
 		{
 			testName:           "node exists by provider id",
@@ -106,9 +104,8 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 			testName:           "does not exist by no instance id",
 			existsByProviderID: true,
 			providerIDErr:      nil,
-			errInstanceID:      cloudprovider.InstanceNotFound,
 			hasInstanceID:      false,
-			nodeNameErr:        fmt.Errorf("failed to get instance ID from cloud provider: %v", cloudprovider.InstanceNotFound),
+			nodeNameErr:        cloudprovider.InstanceNotFound,
 			expectedCalls:      []string{"instance-id"},
 			expectedNodeExists: false,
 			node: &v1.Node{
@@ -140,31 +137,19 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 		t.Run(tc.testName, func(t *testing.T) {
 			fc := &fakecloud.Cloud{
 				ExistsByProviderID: tc.existsByProviderID,
+				Err:                tc.nodeNameErr,
 				ErrByProviderID:    tc.providerIDErr,
-				ErrInstanceID:      tc.errInstanceID,
 			}
 
 			if tc.hasInstanceID {
 				fc.ExtID = map[types.NodeName]string{
-					types.NodeName(tc.node.Name): "a",
+					types.NodeName(tc.node.Name): "provider-id://a",
 				}
 			}
 
 			instances, _ := fc.Instances()
-			exists, err := ensureNodeExistsByProviderID(instances, tc.node, fc)
-
-			isInstanceExistsByProviderIDCalled := false
-			for _, called := range fc.Calls {
-				if called == "instance-exists-by-provider-id" {
-					isInstanceExistsByProviderIDCalled = true
-				}
-			}
-
-			if isInstanceExistsByProviderIDCalled {
-				assert.Equal(t, err, tc.providerIDErr)
-			} else {
-				assert.Equal(t, err, tc.nodeNameErr)
-			}
+			exists, err := ensureNodeExistsByProviderID(instances, tc.node)
+			assert.Equal(t, err, tc.providerIDErr)
 
 			assert.EqualValues(t, tc.expectedCalls, fc.Calls,
 				"expected cloud provider methods `%v` to be called but `%v` was called ",

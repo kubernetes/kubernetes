@@ -134,7 +134,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 		return
 	}
 	// Node that isn't present according to the cloud provider shouldn't have its address updated
-	exists, err := ensureNodeExistsByProviderID(instances, node, cnc.cloud)
+	exists, err := ensureNodeExistsByProviderID(instances, node)
 	if err != nil {
 		// Continue to update node address when not sure the node is not exists
 		klog.Errorf("%v", err)
@@ -343,11 +343,11 @@ func excludeCloudTaint(taints []v1.Taint) []v1.Taint {
 
 // ensureNodeExistsByProviderID checks if the instance exists by the provider id,
 // If provider id in spec is empty it calls instanceId with node name to get provider id
-func ensureNodeExistsByProviderID(instances cloudprovider.Instances, node *v1.Node, cloud cloudprovider.Interface) (bool, error) {
+func ensureNodeExistsByProviderID(instances cloudprovider.Instances, node *v1.Node) (bool, error) {
 	providerID := node.Spec.ProviderID
 	if providerID == "" {
 		var err error
-		providerID, err := cloudprovider.GetInstanceProviderID(context.TODO(), cloud, types.NodeName(node.Name))
+		providerID, err = instances.InstanceID(context.TODO(), types.NodeName(node.Name))
 		if err != nil {
 			if err == cloudprovider.InstanceNotFound {
 				return false, nil
