@@ -26,8 +26,8 @@ type JSONSchemaProps struct {
 	Format      string        `json:"format,omitempty" protobuf:"bytes,6,opt,name=format"`
 	Title       string        `json:"title,omitempty" protobuf:"bytes,7,opt,name=title"`
 	// default is a default value for undefined object fields.
-	// Defaulting is an alpha feature under the CustomResourceDefaulting feature gate.
-	// Defaulting requires spec.preserveUnknownFields to be false.
+	// Defaulting is a beta feature under the CustomResourceDefaulting feature gate.
+	// CustomResourceDefinitions with defaults must be created using the v1 (or newer) CustomResourceDefinition API.
 	Default              *JSON                      `json:"default,omitempty" protobuf:"bytes,8,opt,name=default"`
 	Maximum              *float64                   `json:"maximum,omitempty" protobuf:"bytes,9,opt,name=maximum"`
 	ExclusiveMaximum     bool                       `json:"exclusiveMaximum,omitempty" protobuf:"bytes,10,opt,name=exclusiveMaximum"`
