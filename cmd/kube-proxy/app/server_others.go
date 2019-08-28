@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,6 +49,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	"k8s.io/utils/exec"
+	utilsnet "k8s.io/utils/net"
 
 	"k8s.io/klog"
 )
@@ -174,8 +176,6 @@ func newProxyServer(
 		klog.V(0).Info("Using ipvs Proxier.")
 		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 			klog.V(0).Info("IPv6DualStack; Creating DualStackProxier for ipvs.")
-			// TODO: Temporary create dual-stack params as they will look
-			// when other dual-stack PR's have been merged.
 			proxier, err = ipvs.NewDualStackProxier(
 				iptInterface,
 				ipvsInterface,
@@ -188,9 +188,9 @@ func newProxyServer(
 				config.IPVS.StrictARP,
 				config.IPTables.MasqueradeAll,
 				int(*config.IPTables.MasqueradeBit),
-				config.ClusterCIDR,
+				cidrTuple(config.ClusterCIDR),
 				hostname,
-				nodeIP,
+				nodeIPTuple(config.BindAddress),
 				recorder,
 				healthzServer,
 				config.IPVS.Scheduler,
@@ -264,6 +264,46 @@ func newProxyServer(
 		ConfigSyncPeriod:       config.ConfigSyncPeriod.Duration,
 		HealthzServer:          healthzServer,
 	}, nil
+}
+
+// cidrTuple takes a comma separated list of CIDRs and return a tuple (ipv4cidr,ipv6cidr)
+// The returned tuple is guaranteed to have the order (ipv4,ipv6) and if no cidr from a family is found an
+// empty string "" is inserted.
+func cidrTuple(cidrList string) [2]string {
+	cidrs := [2]string{"", ""}
+	foundIPv4 := false
+	foundIPv6 := false
+
+	for _, cidr := range strings.Split(cidrList, ",") {
+		if utilsnet.IsIPv6CIDRString(cidr) && !foundIPv6 {
+			cidrs[1] = cidr
+			foundIPv6 = true
+		} else if !foundIPv4 {
+			cidrs[0] = cidr
+			foundIPv4 = true
+		}
+		if foundIPv6 && foundIPv4 {
+			break
+		}
+	}
+
+	return cidrs
+}
+
+// nodeIPTuple takes an addresses and return a tuple (ipv4,ipv6)
+// The returned tuple is guaranteed to have the order (ipv4,ipv6). The address NOT of the passed address
+// will have "any" address (0.0.0.0 or ::) inserted.
+func nodeIPTuple(bindAddress string) [2]net.IP {
+	nodes := [2]net.IP{net.IPv4zero, net.IPv6zero}
+
+	adr := net.ParseIP(bindAddress)
+	if utilsnet.IsIPv6(adr) {
+		nodes[1] = adr
+	} else {
+		nodes[0] = adr
+	}
+
+	return nodes
 }
 
 func getProxyMode(proxyMode string, khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {

@@ -466,9 +466,9 @@ func NewDualStackProxier(
 	strictARP bool,
 	masqueradeAll bool,
 	masqueradeBit int,
-	clusterCIDR string,
+	clusterCIDR [2]string,
 	hostname string,
-	nodeIP net.IP,
+	nodeIP [2]net.IP,
 	recorder record.EventRecorder,
 	healthzServer healthcheck.HealthzUpdater,
 	scheduler string,
@@ -480,27 +480,19 @@ func NewDualStackProxier(
 	// Create an ipv4 instance of the single-stack proxier
 	ipv4Proxier, err := NewProxier(ipt, ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, excludeCIDRs, strictARP,
-		masqueradeAll, masqueradeBit, clusterCIDR, hostname, nodeIP,
+		masqueradeAll, masqueradeBit, clusterCIDR[0], hostname, nodeIP[0],
 		recorder, healthzServer, scheduler, nodePortAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
 	// Create an ipv6 instance of the single-stack proxier
-
-	// TODO: Remove hard-coded values
-	nodeIP = net.ParseIP("::1")
-	clusterCIDR = os.Getenv("CLUSTER_IPV6_CIDR")
-	if clusterCIDR == "" {
-		clusterCIDR = "1100::/16"
-	}
-
 	dbus := utildbus.New()
 	ipt = utiliptables.New(exec, dbus, utiliptables.ProtocolIpv6)
 
 	ipv6Proxier, err := NewProxier(ipt, ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, excludeCIDRs, strictARP,
-		masqueradeAll, masqueradeBit, clusterCIDR, hostname, nodeIP,
+		masqueradeAll, masqueradeBit, clusterCIDR[1], hostname, nodeIP[1],
 		nil, nil, scheduler, nodePortAddresses)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
