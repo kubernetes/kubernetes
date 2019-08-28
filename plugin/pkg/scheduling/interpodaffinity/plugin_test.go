@@ -28,6 +28,27 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
+var (
+	plugins = &config.Plugins{
+		PostFilter: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{
+					Name: Name,
+				},
+			},
+		},
+		Score: &config.PluginSet{
+			Enabled: []config.Plugin{
+				{
+					Name:   Name,
+					Weight: 1,
+				},
+			},
+		},
+	}
+	args = []config.PluginConfig{}
+)
+
 func TestInterPodAffinity(t *testing.T) {
 	labelRgChina := map[string]string{
 		"region": "China",
@@ -252,35 +273,6 @@ func TestInterPodAffinity(t *testing.T) {
 		},
 	}
 
-	registry := framework.Registry{
-		Name: New,
-	}
-	plugins := &config.Plugins{
-		PostFilter: &config.PluginSet{
-			Enabled: []config.Plugin{
-				{
-					Name: Name,
-				},
-			},
-		},
-		Score: &config.PluginSet{
-			Enabled: []config.Plugin{
-				{
-					Name:   Name,
-					Weight: 1,
-				},
-			},
-		},
-	}
-	args := []config.PluginConfig{}
-
-	f, err := framework.NewFramework(registry, plugins, args)
-	if err != nil {
-		t.Fatalf("new framework error, err: %v", err)
-	}
-
-	pluginContext := &framework.PluginContext{}
-
 	tests := []struct {
 		name               string
 		pod                *v1.Pod
@@ -465,7 +457,7 @@ func TestInterPodAffinity(t *testing.T) {
 			expectedNodeScores: framework.NodeScoreList{{Name: "machine1", Score: 0}, {Name: "machine2", Score: schedulerapi.MaxPriority}},
 			name:               "Anti Affinity symmetry: the existing pods in node which has anti affinity match will get high score",
 		},
-		// Test both  affinity and anti-affinity
+		// Test both affinity and anti-affinity
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: "", Affinity: stayWithS1InRegionAwayFromS2InAz}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
 			pods: []*v1.Pod{
@@ -531,6 +523,116 @@ func TestInterPodAffinity(t *testing.T) {
 	for i := range tests {
 		test := tests[i]
 		t.Run(test.name, func(t *testing.T) {
+			f, err := framework.NewFramework(framework.Registry{
+				Name: New(v1.DefaultHardPodAffinitySymmetricWeight),
+			}, plugins, args)
+			if err != nil {
+				t.Fatalf("new framework error, err: %v", err)
+			}
+
+			pluginContext := &framework.PluginContext{}
+
+			nodeNameToInfo := nodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			f.NodeInfoSnapshot().NodeInfoMap = nodeNameToInfo
+
+			postFilterStatus := f.RunPostFilterPlugins(pluginContext, test.pod, test.nodes, nil)
+			if !postFilterStatus.IsSuccess() {
+				t.Errorf("run post-filter plugins error: %v", postFilterStatus.AsError())
+			}
+
+			pluginToNodeScores, scoreStatus := f.RunScorePlugins(pluginContext, test.pod, test.nodes)
+			if !scoreStatus.IsSuccess() {
+				t.Errorf("run score plugins error: %v", scoreStatus.AsError())
+			}
+
+			if !reflect.DeepEqual(test.expectedNodeScores, pluginToNodeScores[Name]) {
+				t.Errorf("expected \n\t%#v, \ngot \n\t%#v\n", test.expectedNodeScores, pluginToNodeScores[Name])
+			}
+		})
+	}
+}
+
+func TestHardPodAffinitySymmetricWeight(t *testing.T) {
+	podLabelServiceS1 := map[string]string{
+		"service": "S1",
+	}
+	labelRgChina := map[string]string{
+		"region": "China",
+	}
+	labelRgIndia := map[string]string{
+		"region": "India",
+	}
+	labelAzAz1 := map[string]string{
+		"az": "az1",
+	}
+	hardPodAffinity := &v1.Affinity{
+		PodAffinity: &v1.PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "service",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{"S1"},
+							},
+						},
+					},
+					TopologyKey: "region",
+				},
+			},
+		},
+	}
+	tests := []struct {
+		pod                            *v1.Pod
+		pods                           []*v1.Pod
+		nodes                          []*v1.Node
+		hardPodAffinitySymmetricWeight int32
+		expectedNodeScores             framework.NodeScoreList
+		name                           string
+	}{
+		{
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelServiceS1}},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "machine1", Affinity: hardPodAffinity}},
+				{Spec: v1.PodSpec{NodeName: "machine2", Affinity: hardPodAffinity}},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
+			},
+			hardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+			expectedNodeScores:             framework.NodeScoreList{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: schedulerapi.MaxPriority}, {Name: "machine3", Score: 0}},
+			name:                           "Hard Pod Affinity symmetry: hard pod affinity symmetry weights 1 by default, then nodes that match the hard pod affinity symmetry rules, get a high score",
+		},
+		{
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelServiceS1}},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "machine1", Affinity: hardPodAffinity}},
+				{Spec: v1.PodSpec{NodeName: "machine2", Affinity: hardPodAffinity}},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
+			},
+			hardPodAffinitySymmetricWeight: 0,
+			expectedNodeScores:             framework.NodeScoreList{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			name:                           "Hard Pod Affinity symmetry: hard pod affinity symmetry is closed(weights 0), then nodes that match the hard pod affinity symmetry rules, get same score with those not match",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			f, err := framework.NewFramework(framework.Registry{
+				Name: New(test.hardPodAffinitySymmetricWeight),
+			}, plugins, args)
+			if err != nil {
+				t.Fatalf("new framework error, err: %v", err)
+			}
+
+			pluginContext := &framework.PluginContext{}
+
 			nodeNameToInfo := nodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
 			f.NodeInfoSnapshot().NodeInfoMap = nodeNameToInfo
 

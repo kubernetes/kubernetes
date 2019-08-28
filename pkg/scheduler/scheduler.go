@@ -45,6 +45,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
+	"k8s.io/kubernetes/plugin/pkg/scheduling/interpodaffinity"
 )
 
 const (
@@ -187,6 +188,9 @@ func New(client clientset.Interface,
 	for _, opt := range opts {
 		opt(&options)
 	}
+
+	registry.Register(interpodaffinity.Name, interpodaffinity.New(options.hardPodAffinitySymmetricWeight))
+
 	// Set up the configurator which can create schedulers from configs.
 	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		Client:                         client,

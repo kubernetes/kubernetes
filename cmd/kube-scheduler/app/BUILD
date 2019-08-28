@@ -22,7 +22,6 @@ go_library(
         "//pkg/util/flag:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/version/verflag:go_default_library",
-        "//plugin/pkg/scheduling/interpodaffinity:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",

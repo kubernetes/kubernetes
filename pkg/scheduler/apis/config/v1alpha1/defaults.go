@@ -28,7 +28,6 @@ import (
 	// this package shouldn't really depend on other k8s.io/kubernetes code
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/plugin/pkg/scheduling/interpodaffinity"
 )
 
 // When the --failure-domains scheduler flag is not specified,
@@ -110,14 +109,14 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 			PostFilter: &kubeschedulerconfigv1alpha1.PluginSet{
 				Enabled: []kubeschedulerconfigv1alpha1.Plugin{
 					{
-						Name: interpodaffinity.Name,
+						Name: "interpod-affinity-plugin",
 					},
 				},
 			},
 			Score: &kubeschedulerconfigv1alpha1.PluginSet{
 				Enabled: []kubeschedulerconfigv1alpha1.Plugin{
 					{
-						Name: interpodaffinity.Name,
+						Name: "interpod-affinity-plugin",
 					},
 				},
 			},

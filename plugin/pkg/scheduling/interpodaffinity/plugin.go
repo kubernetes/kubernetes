@@ -29,10 +29,20 @@ import (
 
 // InterPodAffinity is a plugin implements scoring extension point.
 type InterPodAffinity struct {
-	nodeInfoSnapshot      *nodeinfo.Snapshot
-	hardPodAffinityWeight int32
+	nodeInfoSnapshot               *nodeinfo.Snapshot
+	hardPodAffinitySymmetricWeight int32
 
 	currentPodAffinityPriorityMap *podAffinityPriorityMap
+}
+
+// New returns a new interpod affinity plugin.
+func New(hardPodAffinitySymmetricWeight int32) framework.PluginFactory {
+	return func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+		return &InterPodAffinity{
+			nodeInfoSnapshot:               fh.NodeInfoSnapshot(),
+			hardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
+		}, nil
+	}
 }
 
 var _ framework.PostFilterPlugin = &InterPodAffinity{}
@@ -107,15 +117,15 @@ func (ipa *InterPodAffinity) Score(pc *framework.PluginContext, pod *v1.Pod, nod
 		if existingHasAffinityConstraints {
 			// For every hard pod affinity term of <existingPod>, if <pod> matches the term,
 			// increment <pm.counts> for every node in the cluster with the same <term.TopologyKey>
-			// value as that of <existingPod>'s node by the constant <ipa.hardPodAffinityWeight>
-			if ipa.hardPodAffinityWeight > 0 {
+			// value as that of <existingPod>'s node by the constant <ipa.hardPodAffinitySymmetricWeight>
+			if ipa.hardPodAffinitySymmetricWeight > 0 {
 				terms := existingPodAffinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution
 				// TODO: Uncomment this block when implement RequiredDuringSchedulingRequiredDuringExecution.
 				//if len(existingPodAffinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution) != 0 {
 				//	terms = append(terms, existingPodAffinity.PodAffinity.RequiredDuringSchedulingRequiredDuringExecution...)
 				//}
 				for _, term := range terms {
-					if err := pm.processTerm(&term, existingPod, pod, existingPodNode, nodes, int64(ipa.hardPodAffinityWeight)); err != nil {
+					if err := pm.processTerm(&term, existingPod, pod, existingPodNode, nodes, int64(ipa.hardPodAffinitySymmetricWeight)); err != nil {
 						return err
 					}
 				}
@@ -198,13 +208,4 @@ func (ipa *InterPodAffinity) NormalizeScore(pc *framework.PluginContext, pod *v1
 	}
 
 	return nil
-}
-
-// New returns a new interpod affinity plugin.
-func New(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
-	return &InterPodAffinity{
-		nodeInfoSnapshot: fh.NodeInfoSnapshot(),
-		// TODO(draveness): update hard pod affinity weight with runtime arguments.
-		hardPodAffinityWeight: 1,
-	}, nil
 }
