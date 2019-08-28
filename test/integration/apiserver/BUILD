@@ -33,6 +33,7 @@ go_test(
         "//staging/src/k8s.io/api/auditregistration/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/batch/v2alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/node/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1alpha1:go_default_library",
