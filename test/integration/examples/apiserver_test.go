@@ -118,7 +118,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		kubeAPIServerConfig, _, _, _, admissionPostStartHook, err := app.CreateKubeAPIServerConfig(completedOptions, tunneler, proxyTransport)
+		kubeAPIServerConfig, _, _, _, err := app.CreateKubeAPIServerConfig(completedOptions, tunneler, proxyTransport)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -129,7 +129,7 @@ func TestAggregatedAPIServer(t *testing.T) {
 		kubeAPIServerClientConfig.ServerName = ""
 		kubeClientConfigValue.Store(kubeAPIServerClientConfig)
 
-		kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.NewEmptyDelegate(), admissionPostStartHook)
+		kubeAPIServer, err := app.CreateKubeAPIServer(kubeAPIServerConfig, genericapiserver.NewEmptyDelegate())
 		if err != nil {
 			t.Fatal(err)
 		}

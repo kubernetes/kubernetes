@@ -48,6 +48,8 @@ func createAPIExtensionsConfig(
 	// make a shallow copy to let us twiddle a few things
 	// most of the config actually remains the same.  We only need to mess with a couple items related to the particulars of the apiextensions
 	genericConfig := kubeAPIServerConfig
+	genericConfig.PostStartHooks = map[string]genericapiserver.PostStartHookConfigEntry{}
+	genericConfig.RESTOptionsGetter = nil
 
 	// override genericConfig.AdmissionControl with apiextensions' scheme,
 	// because apiextentions apiserver should use its own scheme to convert resources.
