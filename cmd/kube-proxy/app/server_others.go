@@ -176,8 +176,19 @@ func newProxyServer(
 		klog.V(0).Info("Using ipvs Proxier.")
 		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
 			klog.V(0).Info("IPv6DualStack; Creating DualStackProxier for ipvs.")
+
+			// Create iptables handlers for both families, one is already created
+			var ipt [2]utiliptables.Interface
+			if iptInterface.IsIpv6() {
+				ipt[1] = iptInterface
+				ipt[0] = utiliptables.New(execer, dbus, utiliptables.ProtocolIpv4)
+			} else {
+				ipt[0] = iptInterface
+				ipt[1] = utiliptables.New(execer, dbus, utiliptables.ProtocolIpv6)
+			}
+
 			proxier, err = ipvs.NewDualStackProxier(
-				iptInterface,
+				ipt,
 				ipvsInterface,
 				ipsetInterface,
 				utilsysctl.New(),

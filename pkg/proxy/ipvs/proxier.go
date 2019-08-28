@@ -43,7 +43,6 @@ import (
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
-	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
@@ -455,7 +454,7 @@ func NewProxier(ipt utiliptables.Interface,
 }
 
 func NewDualStackProxier(
-	ipt utiliptables.Interface,
+	ipt [2]utiliptables.Interface,
 	ipvs utilipvs.Interface,
 	ipset utilipset.Interface,
 	sysctl utilsysctl.Interface,
@@ -478,7 +477,7 @@ func NewDualStackProxier(
 	safeIpset := newSafeIpset(ipset)
 
 	// Create an ipv4 instance of the single-stack proxier
-	ipv4Proxier, err := NewProxier(ipt, ipvs, safeIpset, sysctl,
+	ipv4Proxier, err := NewProxier(ipt[0], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		masqueradeAll, masqueradeBit, clusterCIDR[0], hostname, nodeIP[0],
 		recorder, healthzServer, scheduler, nodePortAddresses)
@@ -486,11 +485,7 @@ func NewDualStackProxier(
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
 
-	// Create an ipv6 instance of the single-stack proxier
-	dbus := utildbus.New()
-	ipt = utiliptables.New(exec, dbus, utiliptables.ProtocolIpv6)
-
-	ipv6Proxier, err := NewProxier(ipt, ipvs, safeIpset, sysctl,
+	ipv6Proxier, err := NewProxier(ipt[1], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		masqueradeAll, masqueradeBit, clusterCIDR[1], hostname, nodeIP[1],
 		nil, nil, scheduler, nodePortAddresses)
