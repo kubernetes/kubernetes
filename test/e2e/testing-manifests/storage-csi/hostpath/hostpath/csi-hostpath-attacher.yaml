@@ -27,20 +27,27 @@ spec:
       labels:
         app: csi-hostpath-attacher
     spec:
+      affinity:
+        podAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app
+                operator: In
+                values:
+                - csi-hostpathplugin
+            topologyKey: kubernetes.io/hostname
       serviceAccountName: csi-attacher
       containers:
         - name: csi-attacher
           image: quay.io/k8scsi/csi-attacher:v1.2.0
           args:
             - --v=5
-            - --csi-address=$(ADDRESS)
-          env:
-            - name: ADDRESS
-              value: /csi/csi.sock
-          imagePullPolicy: Always
+            - --csi-address=/csi/csi.sock
           volumeMounts:
           - mountPath: /csi
             name: socket-dir
+
       volumes:
         - hostPath:
             path: /var/lib/kubelet/plugins/csi-hostpath

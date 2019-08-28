@@ -131,7 +131,9 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 		if o.CanAttach != nil {
 			object.Spec.AttachRequired = o.CanAttach
 		}
-		object.Spec.VolumeLifecycleModes = o.VolumeLifecycleModes
+		if o.VolumeLifecycleModes != nil {
+			object.Spec.VolumeLifecycleModes = *o.VolumeLifecycleModes
+		}
 	}
 
 	return nil
@@ -171,8 +173,8 @@ type PatchCSIOptions struct {
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.
 	CanAttach *bool
-	// The value to use for the CSIDriver.Spec.VolumeLifecycleModes
+	// If not nil, the value to use for the CSIDriver.Spec.VolumeLifecycleModes
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.
-	VolumeLifecycleModes []storagev1beta1.VolumeLifecycleMode
+	VolumeLifecycleModes *[]storagev1beta1.VolumeLifecycleMode
 }
