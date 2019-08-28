@@ -84,7 +84,7 @@ func TestFailureOutput(t *testing.T) {
 			output:  "INFO: before\nFAIL: hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n",
 			failure: "hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred",
 			// TODO: should start with k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()
-			stack: "\tutil.go:1362\nk8s.io/kubernetes/test/e2e/framework.ExpectNoError()\n\tutil.go:1356\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()\n\tlogger_test.go:49\nk8s.io/kubernetes/vendor/github.com/onsi/ginkgo/internal/leafnodes.(*runner).runSync()\n\tlogger_test.go:65\n",
+			stack: "\tutil.go:1369\nk8s.io/kubernetes/test/e2e/framework.ExpectNoError()\n\tutil.go:1363\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()\n\tlogger_test.go:49\nk8s.io/kubernetes/vendor/github.com/onsi/ginkgo/internal/leafnodes.(*runner).runSync()\n\tlogger_test.go:65\n",
 		},
 		testResult{
 			name:    "[Top Level] log fails",
