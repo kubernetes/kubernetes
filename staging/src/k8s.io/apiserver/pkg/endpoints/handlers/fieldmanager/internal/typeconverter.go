@@ -78,8 +78,8 @@ var _ TypeConverter = &typeConverter{}
 // NewTypeConverter builds a TypeConverter from a proto.Models. This
 // will automatically find the proper version of the object, and the
 // corresponding schema information.
-func NewTypeConverter(models proto.Models) (TypeConverter, error) {
-	parser, err := newGVKParser(models)
+func NewTypeConverter(models proto.Models, preserveUnknownFields bool) (TypeConverter, error) {
+	parser, err := newGVKParser(models, preserveUnknownFields)
 	if err != nil {
 		return nil, err
 	}

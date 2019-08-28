@@ -48,7 +48,7 @@ type FieldManager struct {
 // NewFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
 func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (*FieldManager, error) {
-	typeConverter, err := internal.NewTypeConverter(models)
+	typeConverter, err := internal.NewTypeConverter(models, false)
 	if err != nil {
 		return nil, err
 	}
@@ -66,19 +66,26 @@ func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectC
 }
 
 // NewCRDFieldManager creates a new FieldManager specifically for
-// CRDs. This doesn't use openapi models (and it doesn't support the
-// validation field right now).
-func NewCRDFieldManager(objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) *FieldManager {
+// CRDs. This allows for the possibility of fields which are not defined
+// in models, as well as having no models defined at all.
+func NewCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preserveUnknownFields bool) (_ *FieldManager, err error) {
+	var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
+	if models != nil {
+		typeConverter, err = internal.NewTypeConverter(models, preserveUnknownFields)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return &FieldManager{
-		typeConverter:   internal.DeducedTypeConverter{},
+		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
 		objectDefaulter: objectDefaulter,
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
-			Converter: internal.NewCRDVersionConverter(internal.DeducedTypeConverter{}, objectConverter, hub),
+			Converter: internal.NewCRDVersionConverter(typeConverter, objectConverter, hub),
 		},
-	}
+	}, nil
 }
 
 // Update is used when the object has already been merged (non-apply
