@@ -120,11 +120,7 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 		var ok bool
 		zoneFromNode, ok = node.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 		if !ok {
-			zoneFromNode, ok = node.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable]
-		}
-
-		if !ok {
-			return nil, fmt.Errorf("Label %q or %q for node is missing", v1.LabelZoneFailureDomain, v1.LabelZoneFailureDomainStable)
+			return nil, fmt.Errorf("%s Label for node missing", v1.LabelZoneFailureDomain)
 		}
 		// if single replica volume and node with zone found, return immediately
 		if numReplicas == 1 {
@@ -139,8 +135,7 @@ func SelectZonesForVolume(zoneParameterPresent, zonesParameterPresent bool, zone
 	}
 
 	if (len(allowedTopologies) > 0) && (allowedZones.Len() == 0) {
-		return nil, fmt.Errorf("no matchLabelExpressions with keys %q,%q found in allowedTopologies. Please specify matchLabelExpressions with keys: %q,%q",
-			v1.LabelZoneFailureDomain, v1.LabelZoneFailureDomainStable, v1.LabelZoneFailureDomain, v1.LabelZoneFailureDomainStable)
+		return nil, fmt.Errorf("no matchLabelExpressions with %s key found in allowedTopologies. Please specify matchLabelExpressions with %s key", v1.LabelZoneFailureDomain, v1.LabelZoneFailureDomain)
 	}
 
 	if allowedZones.Len() > 0 {
@@ -190,7 +185,7 @@ func ZonesFromAllowedTopologies(allowedTopologies []v1.TopologySelectorTerm) (se
 	zones := make(sets.String)
 	for _, term := range allowedTopologies {
 		for _, exp := range term.MatchLabelExpressions {
-			if exp.Key == v1.LabelZoneFailureDomain || exp.Key == v1.LabelZoneFailureDomainStable {
+			if exp.Key == v1.LabelZoneFailureDomain {
 				for _, value := range exp.Values {
 					zones.Insert(value)
 				}
@@ -312,104 +307,4 @@ func getPVCNameHashAndIndexOffset(pvcName string) (hash uint32, index uint32) {
 	}
 
 	return hash, index
-}
-
-// TranslateZoneRegionLabelsToNodeSelectorTerms translates the set of provided labels as []v1.NodeSelectorTerms.
-// For zone/region topologies, a node can have either only the beta label (failure-domain.beta.kubernetes.io/{zone,region})
-// or both the beta and GA label (topology.kubernetes.io/{zone,region}). We have to put each topology label into
-// separate node selector terms so PVs can be scheduled on nodes with either one or both labels
-func TranslateZoneRegionLabelsToNodeSelectorTerms(labels map[string]string) []v1.NodeSelectorTerm {
-	nodeSelectorTerms := make([]v1.NodeSelectorTerm, 0)
-	deprecatedTopologyReqs := make([]v1.NodeSelectorRequirement, 0)
-	topologyReqs := make([]v1.NodeSelectorRequirement, 0)
-
-	if len(labels) == 0 {
-		return nodeSelectorTerms
-	}
-
-	for k, v := range labels {
-		if k == v1.LabelZoneFailureDomain || k == v1.LabelZoneRegion {
-			deprecatedTopologyReqs = append(deprecatedTopologyReqs, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
-			continue
-		}
-
-		if k == v1.LabelZoneFailureDomainStable || k == v1.LabelZoneRegionStable {
-			topologyReqs = append(topologyReqs, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
-			continue
-		}
-
-		// remaining labels outside known topology labels get added to both beta and GA node selectors
-		deprecatedTopologyReqs = append(deprecatedTopologyReqs, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
-		topologyReqs = append(topologyReqs, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
-	}
-
-	if len(deprecatedTopologyReqs) > 0 {
-		nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
-			MatchExpressions: deprecatedTopologyReqs,
-		})
-	}
-
-	if len(topologyReqs) > 0 {
-		nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
-			MatchExpressions: topologyReqs,
-		})
-	}
-
-	return nodeSelectorTerms
-}
-
-// TranslateZoneLabelsToNodeSelectorTerms translates the set of provided labels as []v1.NodeSelectorTerms.
-// For zone topologies, a node can have either only the beta label (failure-domain.beta.kubernetes.io/zone)
-// or both the beta and GA label (topology.kubernetes.io/zone). We have to put each topology label into
-// separate node selector terms so PVs can be scheduled on nodes with either one or both labels
-func TranslateZoneLabelsToNodeSelectorTerms(labels map[string]string) ([]v1.NodeSelectorTerm, error) {
-	nodeSelectorTerms := make([]v1.NodeSelectorTerm, 0)
-	deprecatedTopologyReqs := make([]v1.NodeSelectorRequirement, 0)
-	topologyReqs := make([]v1.NodeSelectorRequirement, 0)
-
-	if len(labels) == 0 {
-		return nodeSelectorTerms, nil
-	}
-
-	for k, v := range labels {
-		var values []string
-		if k == v1.LabelZoneFailureDomain {
-			values, err := LabelZonesToList(v)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert label string for Zone: %s to a List: %v", v, err)
-			}
-
-			deprecatedTopologyReqs = append(deprecatedTopologyReqs, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: values})
-			continue
-		}
-
-		if k == v1.LabelZoneFailureDomainStable {
-			values, err := LabelZonesToList(v)
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert label string for Zone: %s to a List: %v", v, err)
-			}
-
-			topologyReqs = append(topologyReqs, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: values})
-			continue
-		}
-
-		// remaining labels outside known topology labels get added to both beta and GA node selectors
-		values = []string{v}
-		deprecatedTopologyReqs = append(deprecatedTopologyReqs, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: values})
-		topologyReqs = append(topologyReqs, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: values})
-	}
-
-	if len(deprecatedTopologyReqs) > 0 {
-		nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
-			MatchExpressions: deprecatedTopologyReqs,
-		})
-	}
-
-	if len(topologyReqs) > 0 {
-		nodeSelectorTerms = append(nodeSelectorTerms, v1.NodeSelectorTerm{
-			MatchExpressions: topologyReqs,
-		})
-	}
-
-	return nodeSelectorTerms, nil
 }

@@ -694,9 +694,7 @@ func (g *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 			prevNode := prev.(*v1.Node)
 			newNode := obj.(*v1.Node)
 			if newNode.Labels[v1.LabelZoneFailureDomain] ==
-				prevNode.Labels[v1.LabelZoneFailureDomain] &&
-				newNode.Labels[v1.LabelZoneFailureDomainStable] ==
-					prevNode.Labels[v1.LabelZoneFailureDomainStable] {
+				prevNode.Labels[v1.LabelZoneFailureDomain] {
 				return
 			}
 			g.updateNodeZones(prevNode, newNode)
@@ -728,10 +726,6 @@ func (g *Cloud) updateNodeZones(prevNode, newNode *v1.Node) {
 	defer g.nodeZonesLock.Unlock()
 	if prevNode != nil {
 		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
-		if !ok {
-			prevZone, ok = prevNode.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable]
-		}
-
 		if ok {
 			g.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
 			if g.nodeZones[prevZone].Len() == 0 {
@@ -741,10 +735,6 @@ func (g *Cloud) updateNodeZones(prevNode, newNode *v1.Node) {
 	}
 	if newNode != nil {
 		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
-		if !ok {
-			newZone, ok = newNode.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable]
-		}
-
 		if ok {
 			if g.nodeZones[newZone] == nil {
 				g.nodeZones[newZone] = sets.NewString()

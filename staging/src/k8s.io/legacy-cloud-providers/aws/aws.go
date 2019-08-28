@@ -2639,15 +2639,11 @@ func (c *Cloud) GetVolumeLabels(volumeName KubernetesVolumeID) (map[string]strin
 	}
 
 	labels[v1.LabelZoneFailureDomain] = az
-	labels[v1.LabelZoneFailureDomainStable] = az
-
 	region, err := azToRegion(az)
 	if err != nil {
 		return nil, err
 	}
-
 	labels[v1.LabelZoneRegion] = region
-	labels[v1.LabelZoneRegionStable] = region
 
 	return labels, nil
 }

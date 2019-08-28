@@ -499,10 +499,7 @@ func (g *Cloud) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVolume)
 	}
 
 	// If the zone is already labeled, honor the hint
-	zone, ok := pv.Labels[v1.LabelZoneFailureDomain]
-	if !ok {
-		zone = pv.Labels[v1.LabelZoneFailureDomainStable]
-	}
+	zone := pv.Labels[v1.LabelZoneFailureDomain]
 
 	labels, err := g.GetAutoLabelsForPD(pv.Spec.GCEPersistentDisk.PDName, zone)
 	if err != nil {
@@ -859,8 +856,6 @@ func (g *Cloud) GetAutoLabelsForPD(name string, zone string) (map[string]string,
 		}
 		labels[v1.LabelZoneFailureDomain] = zoneInfo.zone
 		labels[v1.LabelZoneRegion] = disk.Region
-		labels[v1.LabelZoneFailureDomainStable] = zoneInfo.zone
-		labels[v1.LabelZoneRegionStable] = disk.Region
 	case multiZone:
 		if zoneInfo.replicaZones == nil || zoneInfo.replicaZones.Len() <= 0 {
 			// Unexpected, but sanity-check
@@ -869,9 +864,6 @@ func (g *Cloud) GetAutoLabelsForPD(name string, zone string) (map[string]string,
 		labels[v1.LabelZoneFailureDomain] =
 			volumehelpers.ZonesSetToLabelValue(zoneInfo.replicaZones)
 		labels[v1.LabelZoneRegion] = disk.Region
-		labels[v1.LabelZoneFailureDomainStable] =
-			volumehelpers.ZonesSetToLabelValue(zoneInfo.replicaZones)
-		labels[v1.LabelZoneRegionStable] = disk.Region
 	case nil:
 		// Unexpected, but sanity-check
 		return nil, fmt.Errorf("PD did not have ZoneInfo: %v", disk)

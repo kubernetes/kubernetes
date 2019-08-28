@@ -123,7 +123,6 @@ func (fake *fakePDManager) DetachDisk(c *cinderVolumeUnmounter) error {
 func (fake *fakePDManager) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, allowedTopologies []v1.TopologySelectorTerm) (volumeID string, volumeSizeGB int, labels map[string]string, fstype string, err error) {
 	labels = make(map[string]string)
 	labels[v1.LabelZoneFailureDomain] = "nova"
-	labels[v1.LabelZoneFailureDomainStable] = "nova"
 	return "test-volume-name", 1, labels, "", nil
 }
 
@@ -230,7 +229,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	n := len(persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms)
-	if n != 2 {
+	if n != 1 {
 		t.Errorf("Provision() returned unexpected number of NodeSelectorTerms %d. Expected %d", n, 1)
 	}
 
@@ -242,25 +241,6 @@ func TestPlugin(t *testing.T) {
 	req := persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0]
 
 	if req.Key != v1.LabelZoneFailureDomain {
-		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
-	}
-
-	if req.Operator != v1.NodeSelectorOpIn {
-		t.Errorf("Provision() returned unexpected requirement operator in NodeAffinity %v", req.Operator)
-	}
-
-	if len(req.Values) != 1 || req.Values[0] != "nova" {
-		t.Errorf("Provision() returned unexpected requirement value in NodeAffinity %v", req.Values)
-	}
-
-	n = len(persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[1].MatchExpressions)
-	if n != 1 {
-		t.Errorf("Provision() returned unexpected number of MatchExpressions %d. Expected %d", n, 1)
-	}
-
-	req = persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[1].MatchExpressions[0]
-
-	if req.Key != v1.LabelZoneFailureDomainStable {
 		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
 	}
 

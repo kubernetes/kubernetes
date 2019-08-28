@@ -17,10 +17,7 @@ limitations under the License.
 package helpers
 
 import (
-	"fmt"
 	"hash/fnv"
-	"reflect"
-	"sort"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -420,7 +417,7 @@ func TestChooseZonesForVolume(t *testing.T) {
 func TestSelectZoneForVolume(t *testing.T) {
 
 	nodeWithZoneLabels := &v1.Node{}
-	nodeWithZoneLabels.Labels = map[string]string{v1.LabelZoneFailureDomain: "zoneX", v1.LabelZoneFailureDomainStable: "zoneX"}
+	nodeWithZoneLabels.Labels = map[string]string{v1.LabelZoneFailureDomain: "zoneX"}
 
 	nodeWithNoLabels := &v1.Node{}
 
@@ -661,10 +658,6 @@ func TestSelectZoneForVolume(t *testing.T) {
 							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneX", "zoneY"},
 						},
-						{
-							Key:    v1.LabelZoneFailureDomainStable,
-							Values: []string{"zoneX", "zoneY"},
-						},
 					},
 				},
 			},
@@ -692,22 +685,6 @@ func TestSelectZoneForVolume(t *testing.T) {
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
 							Key:    v1.LabelZoneFailureDomain,
-							Values: []string{"zoneY"},
-						},
-					},
-				},
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    v1.LabelZoneFailureDomainStable,
-							Values: []string{"zoneX"},
-						},
-					},
-				},
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    v1.LabelZoneFailureDomainStable,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1133,7 +1110,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 		// Select zones from node label and AllowedTopologies [Pass]
 		// [1] Node with zone labels
 		// [2] no Zone/Zones parameters
-		// [3] AllowedTopologies with single term with multiple values specified, both beta and GA zone labels
+		// [3] AllowedTopologies with single term with multiple values specified
 		// [4] ReplicaCount specified
 		// [5] ZonesWithNodes irrelevant
 		// Note: the test Name suffix is used as the pvcname and it's suffix is important to influence ChooseZonesForVolume
@@ -1149,10 +1126,6 @@ func TestSelectZonesForVolume(t *testing.T) {
 							Key:    v1.LabelZoneFailureDomain,
 							Values: []string{"zoneV", "zoneW", "zoneX", "zoneY", "zoneZ"},
 						},
-						{
-							Key:    v1.LabelZoneFailureDomainStable,
-							Values: []string{"zoneV", "zoneW", "zoneX", "zoneY", "zoneZ"},
-						},
 					},
 				},
 			},
@@ -1165,35 +1138,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 		// Select zones from node label and AllowedTopologies [Pass]
 		// [1] Node with zone labels
 		// [2] no Zone/Zones parameters
-		// [3] AllowedTopologies with single term with multiple values specified, only GA zone labels
-		// [4] ReplicaCount specified
-		// [5] ZonesWithNodes irrelevant
-		// Note: the test Name suffix is used as the pvcname and it's suffix is important to influence ChooseZonesForVolume
-		// to NOT pick zoneX from AllowedTopologies if zoneFromNode is incorrectly set or not set at all.
-		{
-			Name:         "Node_with_Zone_labels_and_Multiple_Allowed_Topology_values_Superset-1",
-			Node:         nodeWithZoneLabels,
-			ReplicaCount: 2,
-			AllowedTopologies: []v1.TopologySelectorTerm{
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    v1.LabelZoneFailureDomainStable,
-							Values: []string{"zoneV", "zoneW", "zoneX", "zoneY", "zoneZ"},
-						},
-					},
-				},
-			},
-			Reject:             false,
-			ExpectSpecificZone: true,
-			ExpectedZone:       "zoneX",
-			ExpectedZones:      "zoneV,zoneW,zoneX,zoneY,zoneZ",
-		},
-
-		// Select zones from node label and AllowedTopologies [Pass]
-		// [1] Node with zone labels
-		// [2] no Zone/Zones parameters
-		// [3] AllowedTopologies with single term with multiple values specified, has both beta/GA zone labels
+		// [3] AllowedTopologies with single term with multiple values specified
 		// [4] ReplicaCount specified
 		// [5] ZonesWithNodes irrelevant
 		{
@@ -1205,10 +1150,6 @@ func TestSelectZonesForVolume(t *testing.T) {
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
 							Key:    v1.LabelZoneFailureDomain,
-							Values: []string{"zoneX", "zoneY"},
-						},
-						{
-							Key:    v1.LabelZoneFailureDomainStable,
 							Values: []string{"zoneX", "zoneY"},
 						},
 					},
@@ -1334,7 +1275,7 @@ func TestSelectZonesForVolume(t *testing.T) {
 		// Select zones from node label and AllowedTopologies [Pass]
 		// [1] Node with zone labels
 		// [2] no Zone/Zones parametes specified
-		// [3] AllowedTopologies with multiple terms specified, has both beta/GA zone labels
+		// [3] AllowedTopologies with multiple terms specified
 		// [4] ReplicaCount specified
 		// [5] ZonesWithNodes irrelevant
 		{
@@ -1354,22 +1295,6 @@ func TestSelectZonesForVolume(t *testing.T) {
 					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
 						{
 							Key:    v1.LabelZoneFailureDomain,
-							Values: []string{"zoneY"},
-						},
-					},
-				},
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    v1.LabelZoneFailureDomainStable,
-							Values: []string{"zoneX"},
-						},
-					},
-				},
-				{
-					MatchLabelExpressions: []v1.TopologySelectorLabelRequirement{
-						{
-							Key:    v1.LabelZoneFailureDomainStable,
 							Values: []string{"zoneY"},
 						},
 					},
@@ -1710,398 +1635,5 @@ func checkFnv32(t *testing.T, s string, expected uint32) {
 
 	if h.Sum32() != expected {
 		t.Fatalf("hash of %q was %v, expected %v", s, h.Sum32(), expected)
-	}
-}
-
-func Test_TranslateZoneRegionLabelsToNodeSelectorTerms(t *testing.T) {
-	testcases := []struct {
-		name             string
-		labels           map[string]string
-		nodeSelectorTerm []v1.NodeSelectorTerm
-	}{
-		{
-			name:             "empty label set",
-			labels:           map[string]string{},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{},
-		},
-		{
-			name:             "nil label set",
-			labels:           nil,
-			nodeSelectorTerm: []v1.NodeSelectorTerm{},
-		},
-		{
-			name: "with beta zone labels",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain: "zone1",
-			},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomain,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "with beta and stable zone labels",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain:       "zone1",
-				v1.LabelZoneFailureDomainStable: "zone1",
-			},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomain,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-					},
-				},
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomainStable,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "with beta zone and region labels",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain: "zone1",
-				v1.LabelZoneRegion:        "region1",
-			},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomain,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-						{
-							Key:      v1.LabelZoneRegion,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"region1"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "with stable zone and region labels",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain: "zone1",
-				v1.LabelZoneRegion:        "region1",
-			},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomain,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-						{
-							Key:      v1.LabelZoneRegion,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"region1"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "with beta/stable and zone/region labels",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain:       "zone1",
-				v1.LabelZoneFailureDomainStable: "zone1",
-				v1.LabelZoneRegion:              "region1",
-				v1.LabelZoneRegionStable:        "region1",
-			},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomain,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-						{
-							Key:      v1.LabelZoneRegion,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"region1"},
-						},
-					},
-				},
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomainStable,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-						{
-							Key:      v1.LabelZoneRegionStable,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"region1"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "with beta/stable and zone/region and other labels",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain:       "zone1",
-				v1.LabelZoneFailureDomainStable: "zone1",
-				v1.LabelZoneRegion:              "region1",
-				v1.LabelZoneRegionStable:        "region1",
-				"hello":                         "world",
-			},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomain,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-						{
-							Key:      v1.LabelZoneRegion,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"region1"},
-						},
-						{
-							Key:      "hello",
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"world"},
-						},
-					},
-				},
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomainStable,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-						{
-							Key:      v1.LabelZoneRegionStable,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"region1"},
-						},
-						{
-							Key:      "hello",
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"world"},
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for _, testcase := range testcases {
-		t.Run(testcase.name, func(t *testing.T) {
-			nodeSelectorTerm := TranslateZoneRegionLabelsToNodeSelectorTerms(testcase.labels)
-			sortNodeSelectorTerm(nodeSelectorTerm)
-			sortNodeSelectorTerm(testcase.nodeSelectorTerm)
-
-			if !reflect.DeepEqual(nodeSelectorTerm, testcase.nodeSelectorTerm) {
-				t.Logf("actual node selector term: %v", nodeSelectorTerm)
-				t.Logf("expected node selector term: %v", testcase.nodeSelectorTerm)
-				t.Error("unexpected node selector term")
-			}
-		})
-	}
-}
-
-func Test_TranslateZoneLabelsToNodeSelectorTerms(t *testing.T) {
-	testcases := []struct {
-		name             string
-		labels           map[string]string
-		nodeSelectorTerm []v1.NodeSelectorTerm
-		expectedErr      error
-	}{
-		{
-			name:             "empty label set",
-			labels:           map[string]string{},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{},
-		},
-		{
-			name:             "nil label set",
-			labels:           nil,
-			nodeSelectorTerm: []v1.NodeSelectorTerm{},
-		},
-		{
-			name: "with beta zone labels",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain: "zone1",
-			},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomain,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "with beta multi-zone labels",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain: "zone1__zone2",
-			},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomain,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1", "zone2"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "with beta and stable zone labels",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain:       "zone1",
-				v1.LabelZoneFailureDomainStable: "zone1",
-			},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomain,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-					},
-				},
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomainStable,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "with beta and stable multi-zone labels",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain:       "zone1__zone2",
-				v1.LabelZoneFailureDomainStable: "zone1__zone2",
-			},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomain,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1", "zone2"},
-						},
-					},
-				},
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomainStable,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1", "zone2"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "with beta/stable zones and others",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain:       "zone1__zone2",
-				v1.LabelZoneFailureDomainStable: "zone1__zone2",
-				"hello":                         "world",
-			},
-			nodeSelectorTerm: []v1.NodeSelectorTerm{
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomain,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1", "zone2"},
-						},
-						{
-							Key:      "hello",
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"world"},
-						},
-					},
-				},
-				{
-					MatchExpressions: []v1.NodeSelectorRequirement{
-						{
-							Key:      v1.LabelZoneFailureDomainStable,
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"zone1", "zone2"},
-						},
-						{
-							Key:      "hello",
-							Operator: v1.NodeSelectorOpIn,
-							Values:   []string{"world"},
-						},
-					},
-				},
-			},
-		},
-		{
-			name: "with invalid zone value",
-			labels: map[string]string{
-				v1.LabelZoneFailureDomain: "zone1__",
-			},
-			expectedErr: fmt.Errorf("failed to convert label string for Zone: zone1__ to a List: %q separated list (%q) must not contain an empty string", "__", "zone1__"),
-		},
-	}
-
-	for _, testcase := range testcases {
-		t.Run(testcase.name, func(t *testing.T) {
-			nodeSelectorTerm, err := TranslateZoneLabelsToNodeSelectorTerms(testcase.labels)
-			if !reflect.DeepEqual(err, testcase.expectedErr) {
-				t.Logf("actual err: %v", err)
-				t.Logf("expected err: %v", testcase.expectedErr)
-				t.Fatal("unexpected error")
-			}
-
-			sortNodeSelectorTerm(nodeSelectorTerm)
-			sortNodeSelectorTerm(testcase.nodeSelectorTerm)
-
-			if !reflect.DeepEqual(nodeSelectorTerm, testcase.nodeSelectorTerm) {
-				t.Logf("actual node selector term: %v", nodeSelectorTerm)
-				t.Logf("expected node selector term: %v", testcase.nodeSelectorTerm)
-				t.Error("unexpected node selector term")
-			}
-		})
-	}
-}
-
-func sortNodeSelectorTerm(nodeSelectorTerms []v1.NodeSelectorTerm) {
-	for _, nodeSelectorTerm := range nodeSelectorTerms {
-		sort.Slice(nodeSelectorTerm.MatchExpressions, func(i, j int) bool {
-			return nodeSelectorTerm.MatchExpressions[i].Key < nodeSelectorTerm.MatchExpressions[j].Key
-		})
 	}
 }

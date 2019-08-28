@@ -207,7 +207,7 @@ func TestPlugin(t *testing.T) {
 	}
 
 	n := len(persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms)
-	if n != 2 {
+	if n != 1 {
 		t.Errorf("Provision() returned unexpected number of NodeSelectorTerms %d. Expected %d", n, 1)
 	}
 
@@ -228,25 +228,6 @@ func TestPlugin(t *testing.T) {
 	if len(req.Values) != 1 || req.Values[0] != "yes" {
 		t.Errorf("Provision() returned unexpected requirement value in NodeAffinity %v", req.Values)
 	}
-
-	n = len(persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[1].MatchExpressions)
-	if n != 1 {
-		t.Errorf("Provision() returned unexpected number of MatchExpressions %d. Expected %d", n, 1)
-	}
-
-	req = persistentSpec.Spec.NodeAffinity.Required.NodeSelectorTerms[1].MatchExpressions[0]
-	if req.Key != "fakepdmanager" {
-		t.Errorf("Provision() returned unexpected requirement key in NodeAffinity %v", req.Key)
-	}
-
-	if req.Operator != v1.NodeSelectorOpIn {
-		t.Errorf("Provision() returned unexpected requirement operator in NodeAffinity %v", req.Operator)
-	}
-
-	if len(req.Values) != 1 || req.Values[0] != "yes" {
-		t.Errorf("Provision() returned unexpected requirement value in NodeAffinity %v", req.Values)
-	}
-
 	// Test Deleter
 	volSpec := &volume.Spec{
 		PersistentVolume: persistentSpec,

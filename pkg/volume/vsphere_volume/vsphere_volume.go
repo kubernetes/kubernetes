@@ -403,7 +403,7 @@ func (v *vsphereVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopol
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   v.options.PVName,
-			Labels: volSpec.Labels,
+			Labels: map[string]string{},
 			Annotations: map[string]string{
 				util.VolumeDynamicallyCreatedByKey: "vsphere-volume-dynamic-provisioner",
 			},
@@ -430,15 +430,33 @@ func (v *vsphereVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopol
 		pv.Spec.AccessModes = v.plugin.GetAccessModes()
 	}
 
-	pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
-	pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
-
-	nodeSelectorTerms, err := volumehelpers.TranslateZoneLabelsToNodeSelectorTerms(volSpec.Labels)
-	if err != nil {
-		return nil, err
+	labels := volSpec.Labels
+	requirements := make([]v1.NodeSelectorRequirement, 0)
+	if len(labels) != 0 {
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		}
+		for k, v := range labels {
+			pv.Labels[k] = v
+			var values []string
+			if k == v1.LabelZoneFailureDomain {
+				values, err = volumehelpers.LabelZonesToList(v)
+				if err != nil {
+					return nil, fmt.Errorf("failed to convert label string for Zone: %s to a List: %v", v, err)
+				}
+			} else {
+				values = []string{v}
+			}
+			requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: values})
+		}
 	}
 
-	pv.Spec.NodeAffinity.Required.NodeSelectorTerms = nodeSelectorTerms
+	if len(requirements) > 0 {
+		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
+	}
 
 	return pv, nil
 }

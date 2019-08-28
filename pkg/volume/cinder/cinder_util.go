@@ -157,12 +157,6 @@ func getZonesFromNodes(kubeClient clientset.Interface) (sets.String, error) {
 	for _, node := range nodes.Items {
 		if zone, ok := node.Labels[v1.LabelZoneFailureDomain]; ok {
 			zones.Insert(zone)
-			// don't need to check GA label if beta label already exists
-			continue
-		}
-
-		if zone, ok := node.Labels[v1.LabelZoneFailureDomainStable]; ok {
-			zones.Insert(zone)
 		}
 	}
 	klog.V(4).Infof("zones found: %v", zones)
@@ -235,12 +229,9 @@ func (util *DiskUtil) CreateVolume(c *cinderVolumeProvisioner, node *v1.Node, al
 	if IgnoreVolumeAZ == false {
 		if volumeAZ != "" {
 			volumeLabels[v1.LabelZoneFailureDomain] = volumeAZ
-			volumeLabels[v1.LabelZoneFailureDomainStable] = volumeAZ
 		}
-
 		if volumeRegion != "" {
 			volumeLabels[v1.LabelZoneRegion] = volumeRegion
-			volumeLabels[v1.LabelZoneRegionStable] = volumeRegion
 		}
 	}
 	return volumeID, volSizeGiB, volumeLabels, fstype, nil

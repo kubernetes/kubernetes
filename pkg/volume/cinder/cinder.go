@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cloudprovider "k8s.io/cloud-provider"
-	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -619,9 +618,18 @@ func (c *cinderVolumeProvisioner) Provision(selectedNode *v1.Node, allowedTopolo
 		pv.Spec.AccessModes = c.plugin.GetAccessModes()
 	}
 
-	pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
-	pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
-	pv.Spec.NodeAffinity.Required.NodeSelectorTerms = volumehelpers.TranslateZoneRegionLabelsToNodeSelectorTerms(labels)
+	requirements := make([]v1.NodeSelectorRequirement, 0)
+	for k, v := range labels {
+		if v != "" {
+			requirements = append(requirements, v1.NodeSelectorRequirement{Key: k, Operator: v1.NodeSelectorOpIn, Values: []string{v}})
+		}
+	}
+	if len(requirements) > 0 {
+		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = requirements
+	}
 
 	return pv, nil
 }

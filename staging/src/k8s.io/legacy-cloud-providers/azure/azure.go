@@ -636,9 +636,7 @@ func (az *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
 			prevNode := prev.(*v1.Node)
 			newNode := obj.(*v1.Node)
 			if newNode.Labels[v1.LabelZoneFailureDomain] ==
-				prevNode.Labels[v1.LabelZoneFailureDomain] &&
-				newNode.Labels[v1.LabelZoneFailureDomainStable] ==
-					prevNode.Labels[v1.LabelZoneFailureDomainStable] {
+				prevNode.Labels[v1.LabelZoneFailureDomain] {
 				return
 			}
 			az.updateNodeCaches(prevNode, newNode)
@@ -673,10 +671,6 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 	if prevNode != nil {
 		// Remove from nodeZones cache.
 		prevZone, ok := prevNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
-		if !ok {
-			prevZone, ok = prevNode.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable]
-		}
-
 		if ok && az.isAvailabilityZone(prevZone) {
 			az.nodeZones[prevZone].Delete(prevNode.ObjectMeta.Name)
 			if az.nodeZones[prevZone].Len() == 0 {
@@ -700,10 +694,6 @@ func (az *Cloud) updateNodeCaches(prevNode, newNode *v1.Node) {
 	if newNode != nil {
 		// Add to nodeZones cache.
 		newZone, ok := newNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
-		if !ok {
-			newZone, ok = newNode.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable]
-		}
-
 		if ok && az.isAvailabilityZone(newZone) {
 			if az.nodeZones[newZone] == nil {
 				az.nodeZones[newZone] = sets.NewString()

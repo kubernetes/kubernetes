@@ -72,13 +72,8 @@ func TestTranslatePDInTreeStorageClassToCSI(t *testing.T) {
 			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(GCEPDTopologyKey, []string{"foo"})),
 		},
 		{
-			name:       "some translated topology using deprecated zone label",
-			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(v1.LabelZoneFailureDomain, []string{"foo"})),
-			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(GCEPDTopologyKey, []string{"foo"})),
-		},
-		{
 			name:       "some translated topology",
-			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(v1.LabelZoneFailureDomainStable, []string{"foo"})),
+			options:    NewStorageClass(map[string]string{}, generateToplogySelectors(v1.LabelZoneFailureDomain, []string{"foo"})),
 			expOptions: NewStorageClass(map[string]string{}, generateToplogySelectors(GCEPDTopologyKey, []string{"foo"})),
 		},
 		{
