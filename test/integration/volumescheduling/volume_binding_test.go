@@ -891,10 +891,10 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	if err != nil {
 		t.Fatalf("Failed to create PV controller: %v", err)
 	}
-	go ctrl.Run(context.stopCh)
+	go ctrl.Run(context.ctx.Done())
 	// Start informer factory after all controllers are configured and running.
-	informerFactory.Start(context.stopCh)
-	informerFactory.WaitForCacheSync(context.stopCh)
+	informerFactory.Start(context.ctx.Done())
+	informerFactory.WaitForCacheSync(context.ctx.Done())
 
 	// Create shared objects
 	// Create nodes
@@ -915,7 +915,7 @@ func setupCluster(t *testing.T, nsName string, numberOfNodes int, resyncPeriod t
 	return &testConfig{
 		client: clientset,
 		ns:     ns,
-		stop:   context.stopCh,
+		stop:   context.ctx.Done(),
 		teardown: func() {
 			klog.Infof("test cluster %q start to tear down", ns)
 			deleteTestObjects(clientset, ns, nil)

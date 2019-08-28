@@ -17,6 +17,7 @@ limitations under the License.
 package tainttoleration
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -45,14 +46,14 @@ func (pl *TaintToleration) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *TaintToleration) Filter(state *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	// Note that PodToleratesNodeTaints doesn't use predicate metadata, hence passing nil here.
 	_, reasons, err := predicates.PodToleratesNodeTaints(pod, nil, nodeInfo)
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
 }
 
 // Score invoked at the Score extension point.
-func (pl *TaintToleration) Score(state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (pl *TaintToleration) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, exist := pl.handle.NodeInfoSnapshot().NodeInfoMap[nodeName]
 	if !exist {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("node %q does not exist in NodeInfoSnapshot", nodeName))
@@ -63,7 +64,7 @@ func (pl *TaintToleration) Score(state *framework.CycleState, pod *v1.Pod, nodeN
 }
 
 // NormalizeScore invoked after scoring all nodes.
-func (pl *TaintToleration) NormalizeScore(_ *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+func (pl *TaintToleration) NormalizeScore(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
 	// Note that ComputeTaintTolerationPriorityReduce doesn't use priority metadata, hence passing nil here.
 	err := priorities.ComputeTaintTolerationPriorityReduce(pod, nil, pl.handle.NodeInfoSnapshot().NodeInfoMap, scores)
 	return migration.ErrorToFrameworkStatus(err)

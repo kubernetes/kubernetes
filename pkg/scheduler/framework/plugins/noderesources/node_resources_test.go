@@ -17,10 +17,11 @@ limitations under the License.
 package noderesources
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -350,7 +351,7 @@ func TestNodeResources(t *testing.T) {
 			test.nodeInfo.SetNode(&node)
 
 			p, _ := New(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(state, test.pod, test.nodeInfo)
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -403,7 +404,7 @@ func TestNodeResources(t *testing.T) {
 			test.nodeInfo.SetNode(&node)
 
 			p, _ := New(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(state, test.pod, test.nodeInfo)
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -454,7 +455,7 @@ func TestNodeResources(t *testing.T) {
 			test.nodeInfo.SetNode(&node)
 
 			p, _ := New(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(state, test.pod, test.nodeInfo)
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, test.nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}

@@ -17,6 +17,7 @@ limitations under the License.
 package imagelocality
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -207,7 +208,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			var gotList framework.NodeScoreList
 			for _, n := range test.nodes {
 				nodeName := n.ObjectMeta.Name
-				score, status := p.(framework.ScorePlugin).Score(state, test.pod, nodeName)
+				score, status := p.(framework.ScorePlugin).Score(context.Background(), state, test.pod, nodeName)
 				if !status.IsSuccess() {
 					t.Errorf("unexpected error: %v", status)
 				}

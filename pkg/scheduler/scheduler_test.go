@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -150,7 +151,7 @@ type mockScheduler struct {
 	err    error
 }
 
-func (es mockScheduler) Schedule(state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
+func (es mockScheduler) Schedule(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
 
@@ -164,7 +165,7 @@ func (es mockScheduler) Extenders() []algorithm.SchedulerExtender {
 	return nil
 }
 
-func (es mockScheduler) Preempt(state *framework.CycleState, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
+func (es mockScheduler) Preempt(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	return nil, nil, nil, nil
 }
 
@@ -301,7 +302,7 @@ func TestScheduler(t *testing.T) {
 				}
 				close(called)
 			})
-			s.scheduleOne()
+			s.scheduleOne(context.Background())
 			<-called
 			if e, a := item.expectAssumedPod, gotAssumedPod; !reflect.DeepEqual(e, a) {
 				t.Errorf("assumed pod: wanted %v, got %v", e, a)
@@ -371,7 +372,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 	// We use conflicted pod ports to incur fit predicate failure if first pod not removed.
 	secondPod := podWithPort("bar", "", 8080)
 	queuedPodStore.Add(secondPod)
-	scheduler.scheduleOne()
+	scheduler.scheduleOne(context.Background())
 	select {
 	case b := <-bindingChan:
 		expectBinding := &v1.Binding{
@@ -405,7 +406,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	// queuedPodStore: [bar:8080]
 	// cache: [(assumed)foo:8080]
 
-	scheduler.scheduleOne()
+	scheduler.scheduleOne(context.Background())
 	select {
 	case err := <-errChan:
 		expectErr := &core.FitError{
@@ -436,7 +437,7 @@ func TestSchedulerNoPhantomPodAfterDelete(t *testing.T) {
 	}
 
 	queuedPodStore.Add(secondPod)
-	scheduler.scheduleOne()
+	scheduler.scheduleOne(context.Background())
 	select {
 	case b := <-bindingChan:
 		expectBinding := &v1.Binding{
@@ -496,7 +497,7 @@ func TestSchedulerErrorWithLongBinding(t *testing.T) {
 			informerFactory.Start(stop)
 			informerFactory.WaitForCacheSync(stop)
 
-			scheduler.Run()
+			go scheduler.Run(context.Background())
 			queuedPodStore.Add(firstPod)
 			queuedPodStore.Add(conflictPod)
 
@@ -534,7 +535,7 @@ func setupTestSchedulerWithOnePodOnNode(t *testing.T, queuedPodStore *clientcach
 	// queuedPodStore: [foo:8080]
 	// cache: []
 
-	scheduler.scheduleOne()
+	scheduler.scheduleOne(context.Background())
 	// queuedPodStore: []
 	// cache: [(assumed)foo:8080]
 
@@ -613,7 +614,7 @@ func TestSchedulerFailedSchedulingReasons(t *testing.T) {
 	informerFactory.WaitForCacheSync(stop)
 
 	queuedPodStore.Add(podWithTooBigResourceRequests)
-	scheduler.scheduleOne()
+	scheduler.scheduleOne(context.Background())
 	select {
 	case err := <-errChan:
 		expectErr := &core.FitError{
@@ -890,7 +891,7 @@ func TestSchedulerWithVolumeBinding(t *testing.T) {
 				}
 				close(eventChan)
 			})
-			s.scheduleOne()
+			s.scheduleOne(context.Background())
 			// Wait for pod to succeed or fail scheduling
 			select {
 			case <-eventChan:

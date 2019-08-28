@@ -17,9 +17,10 @@ limitations under the License.
 package noderesources
 
 import (
+	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
@@ -41,7 +42,7 @@ func (pl *NodeResources) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodeResources) Filter(cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *NodeResources) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	meta, ok := migration.PredicateMetadata(cycleState).(predicates.PredicateMetadata)
 	if !ok {
 		return migration.ErrorToFrameworkStatus(fmt.Errorf("%+v convert to predicates.PredicateMetadata error", cycleState))

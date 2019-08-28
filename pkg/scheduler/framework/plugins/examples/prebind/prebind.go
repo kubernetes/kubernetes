@@ -17,6 +17,7 @@ limitations under the License.
 package prebind
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -39,7 +40,7 @@ func (sr StatelessPreBindExample) Name() string {
 }
 
 // PreBind is the functions invoked by the framework at "prebind" extension point.
-func (sr StatelessPreBindExample) PreBind(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
+func (sr StatelessPreBindExample) PreBind(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, fmt.Sprintf("pod cannot be nil"))
 	}
