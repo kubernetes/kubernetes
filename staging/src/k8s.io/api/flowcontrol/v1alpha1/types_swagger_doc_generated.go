@@ -72,7 +72,7 @@ func (FlowSchemaList) SwaggerDoc() map[string]string {
 
 var map_FlowSchemaSpec = map[string]string{
 	"":                           "FlowSchemaSpec describes how the flow-schema's specification looks like.",
-	"priorityLevelConfiguration": "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the flow-schema will ignored and marked as invalid in its status. Required.",
+	"priorityLevelConfiguration": "`priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot be resolved, the flow-schema will be ignored and marked as invalid in its status. Required.",
 	"matchingPrecedence":         "`matchingPrecedence` is used to choose among the FlowSchemas that match a given request.  The chosen FlowSchema is among those with the numerically lowest (which we take to be logically highest) MatchingPrecedence.  Each MatchingPrecedence value must be non-negative.",
 	"distinguisherMethod":        "`distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema. `nil` specifies that the distinguisher is disabled and thus will always be the empty string.",
 	"rules":                      "`rules` describes which requests will match this flow schema. The flow-schema applies if any rule matches.",
