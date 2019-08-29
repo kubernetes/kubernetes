@@ -476,6 +476,12 @@ const (
 	// Enables ipv6 dual stack
 	IPv6DualStack featuregate.Feature = "IPv6DualStack"
 
+	// owner: @robscott @freehan
+	// alpha: v1.16
+	//
+	// Enable Endpoint Slices for more scalable Service endpoints.
+	EndpointSlice featuregate.Feature = "EndpointSlice"
+
 	// owner: @Huang-Wei
 	// alpha: v1.16
 	//
@@ -559,6 +565,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumePVCDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
 	PodOverhead:                                    {Default: false, PreRelease: featuregate.Alpha},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
+	EndpointSlice:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EvenPodsSpread:                                 {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
