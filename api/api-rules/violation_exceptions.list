@@ -147,6 +147,7 @@ API rule violation: list_type_missing,k8s.io/api/core/v1,List,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,LoadBalancerStatus,Ingress
 API rule violation: list_type_missing,k8s.io/api/core/v1,NamespaceList,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,NamespaceSpec,Finalizers
+API rule violation: list_type_missing,k8s.io/api/core/v1,NamespaceStatus,Conditions
 API rule violation: list_type_missing,k8s.io/api/core/v1,NodeAffinity,PreferredDuringSchedulingIgnoredDuringExecution
 API rule violation: list_type_missing,k8s.io/api/core/v1,NodeList,Items
 API rule violation: list_type_missing,k8s.io/api/core/v1,NodeSelector,NodeSelectorTerms

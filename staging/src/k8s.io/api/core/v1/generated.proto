@@ -2018,6 +2018,24 @@ message Namespace {
   optional NamespaceStatus status = 3;
 }
 
+// NamespaceCondition contains details about state of namespace.
+message NamespaceCondition {
+  // Type of namespace controller condition.
+  optional string type = 1;
+
+  // Status of the condition, one of True, False, Unknown.
+  optional string status = 2;
+
+  // +optional
+  optional k8s.io.apimachinery.pkg.apis.meta.v1.Time lastTransitionTime = 4;
+
+  // +optional
+  optional string reason = 5;
+
+  // +optional
+  optional string message = 6;
+}
+
 // NamespaceList is a list of Namespaces.
 message NamespaceList {
   // Standard list metadata.
@@ -2044,6 +2062,12 @@ message NamespaceStatus {
   // More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/
   // +optional
   optional string phase = 1;
+
+  // Represents the latest available observations of a namespace's current state.
+  // +optional
+  // +patchMergeKey=type
+  // +patchStrategy=merge
+  repeated NamespaceCondition conditions = 2;
 }
 
 // Node is a worker node in Kubernetes.
