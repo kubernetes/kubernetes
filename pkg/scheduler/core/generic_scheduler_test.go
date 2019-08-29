@@ -652,7 +652,7 @@ func TestGenericScheduler(t *testing.T) {
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)
-			result, err := scheduler.Schedule(test.pod, framework.NewPluginContext())
+			result, err := scheduler.Schedule(framework.NewPluginContext(), test.pod)
 			if !reflect.DeepEqual(err, test.wErr) {
 				t.Errorf("Unexpected error: %v, expected: %v", err.Error(), test.wErr)
 			}
