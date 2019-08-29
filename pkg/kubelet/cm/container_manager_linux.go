@@ -289,6 +289,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
 		cm.topologyManager, err = topologymanager.NewManager(
+			numaNodeInfo,
 			nodeConfig.ExperimentalTopologyManagerPolicy,
 		)
 
