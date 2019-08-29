@@ -51,11 +51,6 @@ const (
 	// timeFormat is the time format used in the log.
 	timeFormat = time.RFC3339Nano
 
-	// stateCheckPeriod is the period to check container state while following
-	// the container log. Kubelet should not keep following the log when the
-	// container is not running.
-	stateCheckPeriod = 5 * time.Second
-
 	// logForceCheckPeriod is the period to check for a new read
 	logForceCheckPeriod = 1 * time.Second
 )
@@ -447,10 +442,6 @@ func waitLogs(ctx context.Context, id string, w *fsnotify.Watcher, runtimeServic
 			errRetry--
 		case <-time.After(logForceCheckPeriod):
 			return true, false, nil
-		case <-time.After(stateCheckPeriod):
-			if running, err := isContainerRunning(id, runtimeService); !running {
-				return false, false, err
-			}
 		}
 	}
 }
