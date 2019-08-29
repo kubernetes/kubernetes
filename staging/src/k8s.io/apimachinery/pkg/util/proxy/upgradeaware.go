@@ -19,7 +19,6 @@ package proxy
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -222,15 +221,8 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 		h.Transport = h.defaultProxyTransport(req.URL, h.Transport)
 	}
 
-	// WithContext creates a shallow clone of the request with the new context.
-	ctx := context.Background()
-	// if the original request has a deadline, we should honor that deadline for our proxied request
-	if deadline, ok := req.Context().Deadline(); ok {
-		var cancelFn context.CancelFunc
-		ctx, cancelFn = context.WithDeadline(ctx, deadline)
-		defer cancelFn()
-	}
-	newReq := req.WithContext(ctx)
+	// WithContext creates a shallow clone of the request with the same context.
+	newReq := req.WithContext(req.Context())
 	newReq.Header = utilnet.CloneHeader(req.Header)
 	if !h.UseRequestLocation {
 		newReq.URL = &loc

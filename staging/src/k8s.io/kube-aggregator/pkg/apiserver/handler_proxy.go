@@ -178,23 +178,19 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 // newRequestForProxy returns a shallow copy of the original request with a context that may include a timeout for discovery requests
 func newRequestForProxy(location *url.URL, req *http.Request, enableAggregatedDiscoveryTimeout bool) (*http.Request, context.CancelFunc) {
-	newCtx := context.Background()
+	newCtx := req.Context()
 	cancelFn := func() {}
 
-	// if the original request has a deadline, we should honor that deadline for our proxied request
-	if deadline, ok := req.Context().Deadline(); ok {
-		newCtx, cancelFn = context.WithDeadline(newCtx, deadline)
-
-		// trim leading and trailing slashes. Then "/apis/group/version" requests are for discovery, so if we have exactly three
-		// segments that we are going to proxy, we have a discovery request.
-	} else if enableAggregatedDiscoveryTimeout && len(strings.Split(strings.Trim(req.URL.Path, "/"), "/")) == 3 {
+	// trim leading and trailing slashes. Then "/apis/group/version" requests are for discovery, so if we have exactly three
+	// segments that we are going to proxy, we have a discovery request.
+	if enableAggregatedDiscoveryTimeout && len(strings.Split(strings.Trim(req.URL.Path, "/"), "/")) == 3 {
 		// discovery requests are used by kubectl and others to determine which resources a server has.  This is a cheap call that
 		// should be fast for every aggregated apiserver.  Latency for aggregation is expected to be low (as for all extensions)
 		// so forcing a short timeout here helps responsiveness of all clients.
 		newCtx, cancelFn = context.WithTimeout(newCtx, aggregatedDiscoveryTimeout)
 	}
 
-	// WithContext creates a shallow clone of the request with the new context.
+	// WithContext creates a shallow clone of the request with the same context.
 	newReq := req.WithContext(newCtx)
 	newReq.Header = utilnet.CloneHeader(req.Header)
 	newReq.URL = location
