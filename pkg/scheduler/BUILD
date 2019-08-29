@@ -99,6 +99,7 @@ filegroup(
         "//pkg/scheduler/factory:all-srcs",
         "//pkg/scheduler/framework:all-srcs",
         "//pkg/scheduler/internal/cache:all-srcs",
+        "//pkg/scheduler/internal/podinfo:all-srcs",
         "//pkg/scheduler/internal/queue:all-srcs",
         "//pkg/scheduler/metrics:all-srcs",
         "//pkg/scheduler/nodeinfo:all-srcs",

@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+	podinfo "k8s.io/kubernetes/pkg/api/pod"
 )
 
 var negPriority, lowPriority, midPriority, highPriority, veryHighPriority = int32(-100), int32(0), int32(100), int32(1000), int32(10000)
@@ -157,8 +158,8 @@ type fakeFramework struct{}
 
 func (*fakeFramework) QueueSortFunc() framework.LessFunc {
 	return func(podInfo1, podInfo2 *framework.PodInfo) bool {
-		prio1 := util.GetPodPriority(podInfo1.Pod)
-		prio2 := util.GetPodPriority(podInfo2.Pod)
+		prio1 := podinfo.GetPodPriority(podInfo1.Pod)
+		prio2 := podinfo.GetPodPriority(podInfo2.Pod)
 		return prio1 < prio2
 	}
 }

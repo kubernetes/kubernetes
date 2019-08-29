@@ -46,9 +46,10 @@ import (
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	podinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
+
 )
 
 const (
@@ -1156,7 +1157,7 @@ func PodFitsHostPorts(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulerno
 		wantPorts = predicateMeta.podPorts
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
-		wantPorts = schedutil.GetContainerPorts(pod)
+		wantPorts = podinfo.GetContainerPorts(pod)
 	}
 	if len(wantPorts) == 0 {
 		return true, nil, nil

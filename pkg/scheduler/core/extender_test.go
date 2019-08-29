@@ -37,6 +37,7 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
+	podinfo "k8s.io/kubernetes/pkg/api/pod"
 )
 
 type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
@@ -210,9 +211,9 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 	}
 	// As the first step, remove all the lower priority pods from the node and
 	// check if the given pod can be scheduled.
-	podPriority := util.GetPodPriority(pod)
+	podPriority := podinfo.GetPodPriority(pod)
 	for _, p := range nodeInfoCopy.Pods() {
-		if util.GetPodPriority(p) < podPriority {
+		if podinfo.GetPodPriority(p) < podPriority {
 			potentialVictims.Items = append(potentialVictims.Items, p)
 			removePod(p)
 		}

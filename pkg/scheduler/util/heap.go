@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
+	podinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 )
 
 // KeyFunc is a function type to get the key from an object.
@@ -56,7 +57,7 @@ type heapData struct {
 	// should be deterministic.
 	keyFunc KeyFunc
 	// lessFunc is used to compare two objects in the heap.
-	lessFunc LessFunc
+	lessFunc podinfo.LessFunc
 }
 
 var (
@@ -240,12 +241,12 @@ func (h *Heap) Len() int {
 }
 
 // NewHeap returns a Heap which can be used to queue up items to process.
-func NewHeap(keyFn KeyFunc, lessFn LessFunc) *Heap {
+func NewHeap(keyFn KeyFunc, lessFn podinfo.LessFunc) *Heap {
 	return NewHeapWithRecorder(keyFn, lessFn, nil)
 }
 
 // NewHeapWithRecorder wraps an optional metricRecorder to compose a Heap object.
-func NewHeapWithRecorder(keyFn KeyFunc, lessFn LessFunc, metricRecorder metrics.MetricRecorder) *Heap {
+func NewHeapWithRecorder(keyFn KeyFunc, lessFn podinfo.LessFunc, metricRecorder metrics.MetricRecorder) *Heap {
 	return &Heap{
 		data: &heapData{
 			items:    map[string]*heapItem{},

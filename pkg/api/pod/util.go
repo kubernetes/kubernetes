@@ -19,9 +19,11 @@ package pod
 import (
 	"strings"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 )
@@ -841,4 +843,15 @@ func multiplePodIPsInUse(podStatus *api.PodStatus) bool {
 		return true
 	}
 	return false
+}
+
+// GetPodPriority returns priority of the given pod.
+func GetPodPriority(pod *v1.Pod) int32 {
+	if pod.Spec.Priority != nil {
+		return *pod.Spec.Priority
+	}
+	// When priority of a running pod is nil, it means it was created at a time
+	// that there was no global default priority class and the priority class
+	// name of the pod was empty. So, we resolve to the static default priority.
+	return scheduling.DefaultPriorityWhenNoDefaultClassExists
 }

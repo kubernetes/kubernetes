@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/workqueue"
+	podinfo "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
@@ -427,9 +428,9 @@ func (g *genericScheduler) getLowerPriorityNominatedPods(pod *v1.Pod, nodeName s
 	}
 
 	var lowerPriorityPods []*v1.Pod
-	podPriority := util.GetPodPriority(pod)
+	podPriority := podinfo.GetPodPriority(pod)
 	for _, p := range pods {
-		if util.GetPodPriority(p) < podPriority {
+		if podinfo.GetPodPriority(p) < podPriority {
 			lowerPriorityPods = append(lowerPriorityPods, p)
 		}
 	}
@@ -592,7 +593,7 @@ func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
 	nodeInfoOut := nodeInfo.Clone()
 	podsAdded := false
 	for _, p := range nominatedPods {
-		if util.GetPodPriority(p) >= util.GetPodPriority(pod) && p.UID != pod.UID {
+		if podinfo.GetPodPriority(p) >= podinfo.GetPodPriority(pod) && p.UID != pod.UID {
 			nodeInfoOut.AddPod(p)
 			if metaOut != nil {
 				metaOut.AddPod(p, nodeInfoOut)
@@ -902,7 +903,7 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 		node := minNodes1[i]
 		victims := nodesToVictims[node]
 		// highestPodPriority is the highest priority among the victims on this node.
-		highestPodPriority := util.GetPodPriority(victims.Pods[0])
+		highestPodPriority := podinfo.GetPodPriority(victims.Pods[0])
 		if highestPodPriority < minHighestPriority {
 			minHighestPriority = highestPodPriority
 			lenNodes2 = 0
@@ -928,7 +929,7 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 			// needed so that a node with a few pods with negative priority is not
 			// picked over a node with a smaller number of pods with the same negative
 			// priority (and similar scenarios).
-			sumPriorities += int64(util.GetPodPriority(pod)) + int64(math.MaxInt32+1)
+			sumPriorities += int64(podinfo.GetPodPriority(pod)) + int64(math.MaxInt32+1)
 		}
 		if sumPriorities < minSumPriorities {
 			minSumPriorities = sumPriorities
@@ -1108,9 +1109,9 @@ func selectVictimsOnNode(
 	}
 	// As the first step, remove all the lower priority pods from the node and
 	// check if the given pod can be scheduled.
-	podPriority := util.GetPodPriority(pod)
+	podPriority := podinfo.GetPodPriority(pod)
 	for _, p := range nodeInfoCopy.Pods() {
-		if util.GetPodPriority(p) < podPriority {
+		if podinfo.GetPodPriority(p) < podPriority {
 			potentialVictims.Items = append(potentialVictims.Items, p)
 			removePod(p)
 		}
@@ -1199,9 +1200,9 @@ func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedule
 	nomNodeName := pod.Status.NominatedNodeName
 	if len(nomNodeName) > 0 {
 		if nodeInfo, found := nodeNameToInfo[nomNodeName]; found {
-			podPriority := util.GetPodPriority(pod)
+			podPriority := podinfo.GetPodPriority(pod)
 			for _, p := range nodeInfo.Pods() {
-				if p.DeletionTimestamp != nil && util.GetPodPriority(p) < podPriority {
+				if p.DeletionTimestamp != nil && podinfo.GetPodPriority(p) < podPriority {
 					// There is a terminating pod on the nominated node.
 					return false
 				}
