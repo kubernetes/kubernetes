@@ -20,7 +20,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/volume"
 )
 
@@ -29,36 +30,48 @@ const (
 	statusFailUnknown = "fail-unknown"
 )
 
-var storageOperationMetric = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name:    "storage_operation_duration_seconds",
-		Help:    "Storage operation duration",
-		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
+/*
+ * By default, all the following metrics are defined as falling under
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ *
+ * Promoting the stability level of the metric is a responsibility of the component owner, since it
+ * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
+ * the metric stability policy.
+ */
+var storageOperationMetric = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
+		Name:           "storage_operation_duration_seconds",
+		Help:           "Storage operation duration",
+		Buckets:        []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"volume_plugin", "operation_name"},
 )
 
-var storageOperationErrorMetric = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "storage_operation_errors_total",
-		Help: "Storage operation errors",
+var storageOperationErrorMetric = metrics.NewCounterVec(
+	&metrics.CounterOpts{
+		Name:           "storage_operation_errors_total",
+		Help:           "Storage operation errors",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"volume_plugin", "operation_name"},
 )
 
-var storageOperationStatusMetric = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "storage_operation_status_count",
-		Help: "Storage operation return statuses count",
+var storageOperationStatusMetric = metrics.NewCounterVec(
+	&metrics.CounterOpts{
+		Name:           "storage_operation_status_count",
+		Help:           "Storage operation return statuses count",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"volume_plugin", "operation_name", "status"},
 )
 
-var storageOperationEndToEndLatencyMetric = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name:    "volume_operation_total_seconds",
-		Help:    "Storage operation end to end duration in seconds",
-		Buckets: []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
+var storageOperationEndToEndLatencyMetric = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
+		Name:           "volume_operation_total_seconds",
+		Help:           "Storage operation end to end duration in seconds",
+		Buckets:        []float64{.1, .25, .5, 1, 2.5, 5, 10, 15, 25, 50, 120, 300, 600},
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"plugin_name", "operation_name"},
 )
@@ -68,10 +81,12 @@ func init() {
 }
 
 func registerMetrics() {
-	prometheus.MustRegister(storageOperationMetric)
-	prometheus.MustRegister(storageOperationErrorMetric)
-	prometheus.MustRegister(storageOperationStatusMetric)
-	prometheus.MustRegister(storageOperationEndToEndLatencyMetric)
+	// legacyregistry is the internal k8s wrapper around the prometheus
+	// global registry, used specifically for metric stability enforcement
+	legacyregistry.MustRegister(storageOperationMetric)
+	legacyregistry.MustRegister(storageOperationErrorMetric)
+	legacyregistry.MustRegister(storageOperationStatusMetric)
+	legacyregistry.MustRegister(storageOperationEndToEndLatencyMetric)
 }
 
 // OperationCompleteHook returns a hook to call when an operation is completed
