@@ -35,6 +35,9 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -536,6 +539,23 @@ func (az *Cloud) ensurePublicIPExists(service *v1.Service, pipName string, domai
 		}
 	}
 
+	if utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+		// TODO: (khenidak) if we ever enable IPv6 single stack, then we should
+		// not wrap the following in a feature gate
+		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+		if ipv6 {
+			pip.PublicIPAddressVersion = network.IPv6
+			klog.V(2).Infof("service(%s): pip(%s) - creating as ipv6 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
+			// static allocation on IPv6 on Azure is not allowed
+			pip.PublicIPAddressPropertiesFormat.PublicIPAllocationMethod = network.Dynamic
+		} else {
+			pip.PublicIPAddressVersion = network.IPv4
+			klog.V(2).Infof("service(%s): pip(%s) - creating as ipv4 for clusterIP:%v", serviceName, *pip.Name, service.Spec.ClusterIP)
+		}
+	}
+
+	klog.V(2).Infof("ensurePublicIPExists for service(%s): pip(%s) - creating", serviceName, *pip.Name)
+
 	klog.V(10).Infof("CreateOrUpdatePIP(%s, %q): start", pipResourceGroup, *pip.Name)
 	err = az.CreateOrUpdatePIP(service, pipResourceGroup, pip)
 	if err != nil {
@@ -649,7 +669,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 	klog.V(2).Infof("reconcileLoadBalancer for service(%s): lb(%s) wantLb(%t) resolved load balancer name", serviceName, lbName, wantLb)
 	lbFrontendIPConfigName := az.getFrontendIPConfigName(service, subnet(service))
 	lbFrontendIPConfigID := az.getFrontendIPConfigID(lbName, lbFrontendIPConfigName)
-	lbBackendPoolName := getBackendPoolName(clusterName)
+	lbBackendPoolName := getBackendPoolName(clusterName, service)
 	lbBackendPoolID := az.getBackendPoolID(lbName, lbBackendPoolName)
 
 	lbIdleTimeout, err := getIdleTimeout(service)
@@ -727,6 +747,13 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 			// construct FrontendIPConfigurationPropertiesFormat
 			var fipConfigurationProperties *network.FrontendIPConfigurationPropertiesFormat
 			if isInternal {
+				// azure does not support ILB for IPv6 yet.
+				// TODO: remove this check when ILB supports IPv6 *and* the SDK
+				// have been rev'ed to 2019* version
+				if utilnet.IsIPv6String(service.Spec.ClusterIP) {
+					return nil, fmt.Errorf("ensure(%s): lb(%s) - internal load balancers does not support IPv6", serviceName, lbName)
+				}
+
 				subnetName := subnet(service)
 				if subnetName == nil {
 					subnetName = &az.SubnetName
@@ -1025,11 +1052,18 @@ func (az *Cloud) reconcileLoadBalancerRule(
 					LoadDistribution:    loadDistribution,
 					FrontendPort:        to.Int32Ptr(port.Port),
 					BackendPort:         to.Int32Ptr(port.Port),
-					EnableFloatingIP:    to.BoolPtr(true),
 					DisableOutboundSnat: to.BoolPtr(az.disableLoadBalancerOutboundSNAT()),
 					EnableTCPReset:      enableTCPReset,
 				},
 			}
+			// LB does not support floating IPs for IPV6 rules
+			if utilnet.IsIPv6String(service.Spec.ClusterIP) {
+				expectedRule.BackendPort = to.Int32Ptr(port.NodePort)
+				expectedRule.EnableFloatingIP = to.BoolPtr(false)
+			} else {
+				expectedRule.EnableFloatingIP = to.BoolPtr(true)
+			}
+
 			if protocol == v1.ProtocolTCP {
 				expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
 			}
