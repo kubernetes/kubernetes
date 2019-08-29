@@ -20,6 +20,8 @@ import (
 	"context"
 	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -29,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -46,6 +49,19 @@ const (
 
 	aggregatedDiscoveryTimeout = 5 * time.Second
 )
+
+var (
+	// TODO this should be unconditionally true once we remove the env var override
+	enableAggregatedDiscoveryTimeout = true
+)
+
+func init() {
+	disableAggregatedDiscoveryTimeout, err := strconv.ParseBool(os.Getenv("DEPRECATED_DISABLE_AGGREGATOR_DISCOVERY_TIMEOUT"))
+	if err != nil {
+		utilruntime.HandleError(err)
+	}
+	enableAggregatedDiscoveryTimeout = !disableAggregatedDiscoveryTimeout
+}
 
 // proxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
@@ -185,7 +201,7 @@ func newRequestForProxy(location *url.URL, req *http.Request) (*http.Request, co
 
 		// trim leading and trailing slashes. Then "/apis/group/version" requests are for discovery, so if we have exactly three
 		// segments that we are going to proxy, we have a discovery request.
-	} else if len(strings.Split(strings.Trim(req.URL.Path, "/"), "/")) == 3 {
+	} else if enableAggregatedDiscoveryTimeout && len(strings.Split(strings.Trim(req.URL.Path, "/"), "/")) == 3 {
 		// discovery requests are used by kubectl and others to determine which resources a server has.  This is a cheap call that
 		// should be fast for every aggregated apiserver.  Latency for aggregation is expected to be low (as for all extensions)
 		// so forcing a short timeout here helps responsiveness of all clients.
