@@ -1618,7 +1618,7 @@ func (proxier *Proxier) createAndLinkeKubeChain() {
 			if chain, ok := existingNATChains[ch.chain]; ok {
 				writeBytesLine(proxier.natChains, chain)
 			} else {
-				writeLine(proxier.natChains, utiliptables.MakeChainLine(kubePostroutingChain))
+				writeLine(proxier.natChains, utiliptables.MakeChainLine(ch.chain))
 			}
 		} else {
 			if chain, ok := existingFilterChains[KubeForwardChain]; ok {
