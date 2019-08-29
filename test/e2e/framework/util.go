@@ -151,20 +151,8 @@ const (
 	// Use it case by case when we are sure this timeout is enough.
 	ClaimProvisionShortTimeout = 1 * time.Minute
 
-	// ClaimBindingTimeout is how long claims have to become bound.
-	ClaimBindingTimeout = 3 * time.Minute
-
 	// ClaimDeletingTimeout is How long claims have to become deleted.
 	ClaimDeletingTimeout = 3 * time.Minute
-
-	// PVReclaimingTimeout is how long PVs have to beome reclaimed.
-	PVReclaimingTimeout = 3 * time.Minute
-
-	// PVBindingTimeout is how long PVs have to become bound.
-	PVBindingTimeout = 3 * time.Minute
-
-	// PVDeletingTimeout is how long PVs have to become deleted.
-	PVDeletingTimeout = 3 * time.Minute
 
 	// RecreateNodeReadyAgainTimeout is how long a node is allowed to become "Ready" after it is recreated before
 	// the test is considered failed.
@@ -665,24 +653,6 @@ func WaitForDefaultServiceAccountInNamespace(c clientset.Interface, namespace st
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
 }
 
-// WaitForPersistentVolumePhase waits for a PersistentVolume to be in a specific phase or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumePhase(phase v1.PersistentVolumePhase, c clientset.Interface, pvName string, Poll, timeout time.Duration) error {
-	e2elog.Logf("Waiting up to %v for PersistentVolume %s to have phase %s", timeout, pvName, phase)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		pv, err := c.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
-		if err != nil {
-			e2elog.Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
-			continue
-		}
-		if pv.Status.Phase == phase {
-			e2elog.Logf("PersistentVolume %s found and phase=%s (%v)", pvName, phase, time.Since(start))
-			return nil
-		}
-		e2elog.Logf("PersistentVolume %s found but phase is %s instead of %s.", pvName, pv.Status.Phase, phase)
-	}
-	return fmt.Errorf("PersistentVolume %s not in phase %s within %v", pvName, phase, timeout)
-}
-
 // WaitForStatefulSetReplicasReady waits for all replicas of a StatefulSet to become ready or until timeout occurs, whichever comes first.
 func WaitForStatefulSetReplicasReady(statefulSetName, ns string, c clientset.Interface, Poll, timeout time.Duration) error {
 	e2elog.Logf("Waiting up to %v for StatefulSet %s to have all replicas ready", timeout, statefulSetName)
@@ -717,43 +687,6 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, 
 		e2elog.Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
 	}
 	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
-}
-
-// WaitForPersistentVolumeClaimPhase waits for a PersistentVolumeClaim to be in a specific phase or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeClaimPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
-	return WaitForPersistentVolumeClaimsPhase(phase, c, ns, []string{pvcName}, Poll, timeout, true)
-}
-
-// WaitForPersistentVolumeClaimsPhase waits for any (if matchAny is true) or all (if matchAny is false) PersistentVolumeClaims
-// to be in a specific phase or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcNames []string, Poll, timeout time.Duration, matchAny bool) error {
-	if len(pvcNames) == 0 {
-		return fmt.Errorf("Incorrect parameter: Need at least one PVC to track. Found 0")
-	}
-	e2elog.Logf("Waiting up to %v for PersistentVolumeClaims %v to have phase %s", timeout, pvcNames, phase)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		phaseFoundInAllClaims := true
-		for _, pvcName := range pvcNames {
-			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
-			if err != nil {
-				e2elog.Logf("Failed to get claim %q, retrying in %v. Error: %v", pvcName, Poll, err)
-				continue
-			}
-			if pvc.Status.Phase == phase {
-				e2elog.Logf("PersistentVolumeClaim %s found and phase=%s (%v)", pvcName, phase, time.Since(start))
-				if matchAny {
-					return nil
-				}
-			} else {
-				e2elog.Logf("PersistentVolumeClaim %s found but phase is %s instead of %s.", pvcName, pvc.Status.Phase, phase)
-				phaseFoundInAllClaims = false
-			}
-		}
-		if phaseFoundInAllClaims {
-			return nil
-		}
-	}
-	return fmt.Errorf("PersistentVolumeClaims %v not all in phase %s within %v", pvcNames, phase, timeout)
 }
 
 // findAvailableNamespaceName random namespace name starting with baseName.

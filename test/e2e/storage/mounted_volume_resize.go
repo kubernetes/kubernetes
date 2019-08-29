@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -85,7 +86,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		framework.ExpectNoError(err, "Error creating resizable storage class")
 		gomega.Expect(*resizableSc.AllowVolumeExpansion).To(gomega.BeTrue())
 
-		pvc = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        test.ClaimSize,
 			StorageClassName: &(resizableSc.Name),
 			VolumeMode:       &test.VolumeMode,
@@ -104,7 +105,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		framework.Logf("AfterEach: Cleaning up resources for mounted volume resize")
 
 		if c != nil {
-			if errs := framework.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {
+			if errs := e2epv.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {
 				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pvc, nodeName, isNodeLabeled, nodeLabelValue = nil, "", false, ""
@@ -125,7 +126,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 
 		// PVC should be bound at this point
 		ginkgo.By("Checking for bound PVC")
-		pvs, err := framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+		pvs, err := e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 		framework.ExpectEqual(len(pvs), 1)
 

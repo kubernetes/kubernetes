@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -466,14 +467,14 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		volumeLabels := labels.Set{
-			framework.VolumeSelectorKey: f.Namespace.Name,
+			e2epv.VolumeSelectorKey: f.Namespace.Name,
 		}
 		selector := metav1.SetAsLabelSelector(volumeLabels)
 
 		ginkgo.By("creating volume & pvc")
-		diskName, err := framework.CreatePDWithRetry()
+		diskName, err := e2epv.CreatePDWithRetry()
 		framework.ExpectNoError(err)
-		pvConfig := framework.PersistentVolumeConfig{
+		pvConfig := e2epv.PersistentVolumeConfig{
 			NamePrefix: "gce-",
 			Labels:     volumeLabels,
 			PVSource: v1.PersistentVolumeSource{
@@ -486,23 +487,23 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			Prebind: nil,
 		}
 		emptyStorageClass := ""
-		pvcConfig := framework.PersistentVolumeClaimConfig{
+		pvcConfig := e2epv.PersistentVolumeClaimConfig{
 			Selector:         selector,
 			StorageClassName: &emptyStorageClass,
 		}
 
-		pv, pvc, err := framework.CreatePVPVC(c, pvConfig, pvcConfig, f.Namespace.Name, false)
+		pv, pvc, err := e2epv.CreatePVPVC(c, pvConfig, pvcConfig, f.Namespace.Name, false)
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(framework.WaitOnPVandPVC(c, f.Namespace.Name, pv, pvc))
+		framework.ExpectNoError(e2epv.WaitOnPVandPVC(c, f.Namespace.Name, pv, pvc))
 
 		defer func() {
-			errs := framework.PVPVCCleanup(c, f.Namespace.Name, pv, pvc)
+			errs := e2epv.PVPVCCleanup(c, f.Namespace.Name, pv, pvc)
 			if len(errs) > 0 {
 				e2elog.Failf("failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pv, pvc = nil, nil
 			if diskName != "" {
-				framework.ExpectNoError(framework.DeletePDWithRetry(diskName))
+				framework.ExpectNoError(e2epv.DeletePDWithRetry(diskName))
 			}
 		}()
 

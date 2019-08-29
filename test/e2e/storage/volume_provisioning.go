@@ -48,6 +48,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -224,7 +225,7 @@ func testZonalDelayedBinding(c clientset.Interface, ns string, specifyAllowedTop
 		ginkgo.By(action)
 		var claims []*v1.PersistentVolumeClaim
 		for i := 0; i < pvcCount; i++ {
-			claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        test.ClaimSize,
 				StorageClassName: &test.Class.Name,
 				VolumeMode:       &test.VolumeMode,
@@ -460,7 +461,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				suffix := fmt.Sprintf("%d", i)
 				test.Client = c
 				test.Class = newStorageClass(test, ns, suffix)
-				test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 					ClaimSize:        test.ClaimSize,
 					StorageClassName: &test.Class.Name,
 					VolumeMode:       &test.VolumeMode,
@@ -479,7 +480,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 				betaTest.Client = c
 				betaTest.Class = nil
-				betaTest.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				betaTest.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 					ClaimSize:        betaTest.ClaimSize,
 					StorageClassName: &class.Name,
 					VolumeMode:       &betaTest.VolumeMode,
@@ -513,7 +514,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			test.Class = newStorageClass(test, ns, "reclaimpolicy")
 			retain := v1.PersistentVolumeReclaimRetain
 			test.Class.ReclaimPolicy = &retain
-			test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        test.ClaimSize,
 				StorageClassName: &test.Class.Name,
 				VolumeMode:       &test.VolumeMode,
@@ -521,13 +522,13 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			pv := test.TestDynamicProvisioning()
 
 			ginkgo.By(fmt.Sprintf("waiting for the provisioned PV %q to enter phase %s", pv.Name, v1.VolumeReleased))
-			framework.ExpectNoError(framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 1*time.Second, 30*time.Second))
+			framework.ExpectNoError(e2epv.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 1*time.Second, 30*time.Second))
 
 			ginkgo.By(fmt.Sprintf("deleting the storage asset backing the PV %q", pv.Name))
-			framework.ExpectNoError(framework.DeletePDWithRetry(pv.Spec.GCEPersistentDisk.PDName))
+			framework.ExpectNoError(e2epv.DeletePDWithRetry(pv.Spec.GCEPersistentDisk.PDName))
 
 			ginkgo.By(fmt.Sprintf("deleting the PV %q", pv.Name))
-			framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
+			framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)
 			framework.ExpectNoError(framework.WaitForPersistentVolumeDeleted(c, pv.Name, 1*time.Second, 30*time.Second))
 		})
 
@@ -575,7 +576,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			defer deleteStorageClass(c, sc.Name)
 
 			ginkgo.By("Creating a claim and expecting it to timeout")
-			pvc := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        test.ClaimSize,
 				StorageClassName: &sc.Name,
 				VolumeMode:       &test.VolumeMode,
@@ -583,11 +584,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			pvc, err = c.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
 			framework.ExpectNoError(err)
 			defer func() {
-				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
+				framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, pvc.Name, ns), "Failed to delete PVC ", pvc.Name)
 			}()
 
 			// The claim should timeout phase:Pending
-			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			framework.ExpectError(err)
 			framework.Logf(err.Error())
 		})
@@ -617,15 +618,15 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// To increase chance of detection, attempt multiple iterations
 			for i := 0; i < raceAttempts; i++ {
 				prefix := fmt.Sprintf("race-%d", i)
-				claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 					NamePrefix:       prefix,
 					ClaimSize:        test.ClaimSize,
 					StorageClassName: &class.Name,
 					VolumeMode:       &test.VolumeMode,
 				}, ns)
-				tmpClaim, err := framework.CreatePVC(c, ns, claim)
+				tmpClaim, err := e2epv.CreatePVC(c, ns, claim)
 				framework.ExpectNoError(err)
-				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, tmpClaim.Name, ns))
+				framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, tmpClaim.Name, ns))
 			}
 
 			ginkgo.By(fmt.Sprintf("Checking for residual PersistentVolumes associated with StorageClass %s", class.Name))
@@ -653,11 +654,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// is already deleted.
 			framework.SkipUnlessProviderIs("gce", "gke", "aws")
 			ginkgo.By("creating PD")
-			diskName, err := framework.CreatePDWithRetry()
+			diskName, err := e2epv.CreatePDWithRetry()
 			framework.ExpectNoError(err)
 
 			ginkgo.By("creating PV")
-			pv := framework.MakePersistentVolume(framework.PersistentVolumeConfig{
+			pv := e2epv.MakePersistentVolume(e2epv.PersistentVolumeConfig{
 				NamePrefix: "volume-idempotent-delete-",
 				// Use Retain to keep the PV, the test will change it to Delete
 				// when the time comes.
@@ -694,11 +695,11 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("waiting for the PV to get Released")
-			err = framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 2*time.Second, framework.PVReclaimingTimeout)
+			err = e2epv.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 2*time.Second, e2epv.PVReclaimingTimeout)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("deleting the PD")
-			err = framework.DeletePVSource(&pv.Spec.PersistentVolumeSource)
+			err = e2epv.DeletePVSource(&pv.Spec.PersistentVolumeSource)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("changing the PV reclaim policy")
@@ -709,7 +710,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("waiting for the PV to get deleted")
-			err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, framework.PVDeletingTimeout)
+			err = framework.WaitForPersistentVolumeDeleted(c, pv.Name, 5*time.Second, e2epv.PVDeletingTimeout)
 			framework.ExpectNoError(err)
 		})
 	})
@@ -762,7 +763,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				ExpectedSize: "1500Mi",
 			}
 			test.Class = newStorageClass(test, ns, "external")
-			test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        test.ClaimSize,
 				StorageClassName: &test.Class.Name,
 				VolumeMode:       &test.VolumeMode,
@@ -785,7 +786,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				ExpectedSize: "2Gi",
 			}
 
-			test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:  test.ClaimSize,
 				VolumeMode: &test.VolumeMode,
 			}, ns)
@@ -795,7 +796,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		ginkgo.It("should be disabled by changing the default annotation [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
-			scName, scErr := framework.GetDefaultStorageClassName(c)
+			scName, scErr := e2epv.GetDefaultStorageClassName(c)
 			if scErr != nil {
 				framework.Failf(scErr.Error())
 			}
@@ -810,18 +811,18 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			updateDefaultStorageClass(c, scName, "false")
 
 			ginkgo.By("creating a claim with default storageclass and expecting it to timeout")
-			claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:  test.ClaimSize,
 				VolumeMode: &test.VolumeMode,
 			}, ns)
 			claim, err := c.CoreV1().PersistentVolumeClaims(ns).Create(claim)
 			framework.ExpectNoError(err)
 			defer func() {
-				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, claim.Name, ns))
+				framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, claim.Name, ns))
 			}()
 
 			// The claim should timeout phase:Pending
-			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			framework.ExpectError(err)
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
@@ -832,7 +833,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 		// Modifying the default storage class can be disruptive to other tests that depend on it
 		ginkgo.It("should be disabled by removing the default annotation [Serial] [Disruptive]", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
-			scName, scErr := framework.GetDefaultStorageClassName(c)
+			scName, scErr := e2epv.GetDefaultStorageClassName(c)
 			if scErr != nil {
 				framework.Failf(scErr.Error())
 			}
@@ -847,18 +848,18 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			updateDefaultStorageClass(c, scName, "")
 
 			ginkgo.By("creating a claim with default storageclass and expecting it to timeout")
-			claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:  test.ClaimSize,
 				VolumeMode: &test.VolumeMode,
 			}, ns)
 			claim, err := c.CoreV1().PersistentVolumeClaims(ns).Create(claim)
 			framework.ExpectNoError(err)
 			defer func() {
-				framework.ExpectNoError(framework.DeletePersistentVolumeClaim(c, claim.Name, ns))
+				framework.ExpectNoError(e2epv.DeletePersistentVolumeClaim(c, claim.Name, ns))
 			}()
 
 			// The claim should timeout phase:Pending
-			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
+			err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			framework.ExpectError(err)
 			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
@@ -886,7 +887,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			test.Class = newStorageClass(test, ns, suffix)
 
 			ginkgo.By("creating a claim object with a suffix for gluster dynamic provisioner")
-			test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        test.ClaimSize,
 				StorageClassName: &test.Class.Name,
 				VolumeMode:       &test.VolumeMode,
@@ -917,7 +918,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}()
 
 			ginkgo.By("creating a claim object with a suffix for gluster dynamic provisioner")
-			claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        test.ClaimSize,
 				StorageClassName: &class.Name,
 				VolumeMode:       &test.VolumeMode,
@@ -998,7 +999,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				test.Class = newStorageClass(test, ns, suffix)
 				zone := getRandomClusterZone(c)
 				addSingleZoneAllowedTopologyToStorageClass(c, test.Class, zone)
-				test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+				test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 					ClaimSize:        test.ClaimSize,
 					StorageClassName: &test.Class.Name,
 					VolumeMode:       &test.VolumeMode,
@@ -1227,8 +1228,8 @@ func deleteStorageClass(c clientset.Interface, className string) {
 // deleteProvisionedVolumes [gce||gke only]  iteratively deletes persistent volumes and attached GCE PDs.
 func deleteProvisionedVolumesAndDisks(c clientset.Interface, pvs []*v1.PersistentVolume) {
 	for _, pv := range pvs {
-		framework.ExpectNoError(framework.DeletePDWithRetry(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName))
-		framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name))
+		framework.ExpectNoError(e2epv.DeletePDWithRetry(pv.Spec.PersistentVolumeSource.GCEPersistentDisk.PDName))
+		framework.ExpectNoError(e2epv.DeletePersistentVolume(c, pv.Name))
 	}
 }
 

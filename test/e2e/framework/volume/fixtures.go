@@ -53,6 +53,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -594,7 +595,7 @@ func InjectContent(client clientset.Interface, config TestConfig, fsGroup *int64
 
 // CreateGCEVolume creates PersistentVolumeSource for GCEVolume.
 func CreateGCEVolume() (*v1.PersistentVolumeSource, string) {
-	diskName, err := framework.CreatePDWithRetry()
+	diskName, err := e2epv.CreatePDWithRetry()
 	framework.ExpectNoError(err)
 	return &v1.PersistentVolumeSource{
 		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{

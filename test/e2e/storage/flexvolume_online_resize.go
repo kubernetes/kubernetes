@@ -29,6 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -88,7 +89,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 		framework.ExpectNoError(err, "Error creating resizable storage class: %v", err)
 		gomega.Expect(*resizableSc.AllowVolumeExpansion).To(gomega.BeTrue())
 
-		pvc = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			StorageClassName: &(resizableSc.Name),
 			ClaimSize:        "2Gi",
 		}, ns)
@@ -107,7 +108,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 		framework.Logf("AfterEach: Cleaning up resources for mounted volume resize")
 
 		if c != nil {
-			if errs := framework.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {
+			if errs := e2epv.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {
 				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pvc, nodeName, isNodeLabeled, nodeLabelValue = nil, "", false, ""
@@ -126,7 +127,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on (master) node %s as %s", path.Join(driverDir, driver), node.Name, driver))
 		installFlex(c, nil, "k8s", driver, path.Join(driverDir, driver))
 
-		pv := framework.MakePersistentVolume(framework.PersistentVolumeConfig{
+		pv := e2epv.MakePersistentVolume(e2epv.PersistentVolumeConfig{
 			PVSource: v1.PersistentVolumeSource{
 				FlexVolume: &v1.FlexPersistentVolumeSource{
 					Driver: "k8s/" + driver,
@@ -136,14 +137,14 @@ var _ = utils.SIGDescribe("Mounted flexvolume volume expand [Slow] [Feature:Expa
 			VolumeMode:       pvc.Spec.VolumeMode,
 		})
 
-		pv, err = framework.CreatePV(c, pv)
+		pv, err = e2epv.CreatePV(c, pv)
 		framework.ExpectNoError(err, "Error creating pv %v", err)
 
 		ginkgo.By("Waiting for PVC to be in bound phase")
 		pvcClaims := []*v1.PersistentVolumeClaim{pvc}
 		var pvs []*v1.PersistentVolume
 
-		pvs, err = framework.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
+		pvs, err = e2epv.WaitForPVClaimBoundPhase(c, pvcClaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 		framework.ExpectEqual(len(pvs), 1)
 

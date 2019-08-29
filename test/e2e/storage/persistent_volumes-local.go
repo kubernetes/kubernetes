@@ -40,6 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -452,7 +453,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			for _, localVolumes := range allLocalVolumes {
 				for _, localVolume := range localVolumes {
 					pvConfig := makeLocalPVConfig(config, localVolume)
-					localVolume.pv, err = framework.CreatePV(config.client, framework.MakePersistentVolume(pvConfig))
+					localVolume.pv, err = e2epv.CreatePV(config.client, e2epv.MakePersistentVolume(pvConfig))
 					framework.ExpectNoError(err)
 				}
 			}
@@ -493,7 +494,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 								err = config.client.CoreV1().PersistentVolumes().Delete(pv.Name, &metav1.DeleteOptions{})
 								framework.ExpectNoError(err)
 								pvConfig := makeLocalPVConfig(config, localVolume)
-								localVolume.pv, err = framework.CreatePV(config.client, framework.MakePersistentVolume(pvConfig))
+								localVolume.pv, err = e2epv.CreatePV(config.client, e2epv.MakePersistentVolume(pvConfig))
 								framework.ExpectNoError(err)
 							}
 						}
@@ -548,8 +549,8 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				for i := 0; i < numConcurrentPods; i++ {
 					pvcs := []*v1.PersistentVolumeClaim{}
 					for j := 0; j < volsPerPod; j++ {
-						pvc := framework.MakePersistentVolumeClaim(makeLocalPVCConfig(config, volType), config.ns)
-						pvc, err := framework.CreatePVC(config.client, config.ns, pvc)
+						pvc := e2epv.MakePersistentVolumeClaim(makeLocalPVCConfig(config, volType), config.ns)
+						pvc, err := e2epv.CreatePVC(config.client, config.ns, pvc)
 						framework.ExpectNoError(err)
 						pvcs = append(pvcs, pvc)
 					}
@@ -621,7 +622,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			}
 			pvConfig := makeLocalPVConfig(config, localVolume)
 			var err error
-			pv, err = framework.CreatePV(config.client, framework.MakePersistentVolume(pvConfig))
+			pv, err = e2epv.CreatePV(config.client, e2epv.MakePersistentVolume(pvConfig))
 			framework.ExpectNoError(err)
 		})
 
@@ -641,9 +642,9 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 				count = 50
 				err   error
 			)
-			pvc = framework.MakePersistentVolumeClaim(makeLocalPVCConfig(config, DirectoryLocalVolumeType), config.ns)
+			pvc = e2epv.MakePersistentVolumeClaim(makeLocalPVCConfig(config, DirectoryLocalVolumeType), config.ns)
 			ginkgo.By(fmt.Sprintf("Create a PVC %s", pvc.Name))
-			pvc, err = framework.CreatePVC(config.client, config.ns, pvc)
+			pvc, err = e2epv.CreatePVC(config.client, config.ns, pvc)
 			framework.ExpectNoError(err)
 			ginkgo.By(fmt.Sprintf("Create %d pods to use this PVC", count))
 			for i := 0; i < count; i++ {
@@ -682,7 +683,7 @@ func deletePodAndPVCs(config *localTestConfig, pod *v1.Pod) error {
 	for _, vol := range pod.Spec.Volumes {
 		pvcSource := vol.VolumeSource.PersistentVolumeClaim
 		if pvcSource != nil {
-			if err := framework.DeletePersistentVolumeClaim(config.client, pvcSource.ClaimName, config.ns); err != nil {
+			if err := e2epv.DeletePersistentVolumeClaim(config.client, pvcSource.ClaimName, config.ns); err != nil {
 				return err
 			}
 		}
@@ -824,7 +825,7 @@ func setupLocalVolumes(config *localTestConfig, localVolumeType localVolumeType,
 func cleanupLocalPVCsPVs(config *localTestConfig, volumes []*localTestVolume) {
 	for _, volume := range volumes {
 		ginkgo.By("Cleaning up PVC and PV")
-		errs := framework.PVPVCCleanup(config.client, config.ns, volume.pv, volume.pvc)
+		errs := e2epv.PVPVCCleanup(config.client, config.ns, volume.pv, volume.pvc)
 		if len(errs) > 0 {
 			framework.Failf("Failed to delete PV and/or PVC: %v", utilerrors.NewAggregate(errs))
 		}
@@ -841,7 +842,7 @@ func cleanupLocalVolumes(config *localTestConfig, volumes []*localTestVolume) {
 }
 
 func verifyLocalVolume(config *localTestConfig, volume *localTestVolume) {
-	framework.ExpectNoError(framework.WaitOnPVandPVC(config.client, config.ns, volume.pv, volume.pvc))
+	framework.ExpectNoError(e2epv.WaitOnPVandPVC(config.client, config.ns, volume.pv, volume.pvc))
 }
 
 func verifyLocalPod(config *localTestConfig, volume *localTestVolume, pod *v1.Pod, expectedNodeName string) {
@@ -851,8 +852,8 @@ func verifyLocalPod(config *localTestConfig, volume *localTestVolume, pod *v1.Po
 	framework.ExpectEqual(podNodeName, expectedNodeName)
 }
 
-func makeLocalPVCConfig(config *localTestConfig, volumeType localVolumeType) framework.PersistentVolumeClaimConfig {
-	pvcConfig := framework.PersistentVolumeClaimConfig{
+func makeLocalPVCConfig(config *localTestConfig, volumeType localVolumeType) e2epv.PersistentVolumeClaimConfig {
+	pvcConfig := e2epv.PersistentVolumeClaimConfig{
 		AccessModes:      []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 		StorageClassName: &config.scName,
 	}
@@ -863,7 +864,7 @@ func makeLocalPVCConfig(config *localTestConfig, volumeType localVolumeType) fra
 	return pvcConfig
 }
 
-func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) framework.PersistentVolumeConfig {
+func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) e2epv.PersistentVolumeConfig {
 	// TODO: hostname may not be the best option
 	nodeKey := "kubernetes.io/hostname"
 	if volume.ltr.Node.Labels == nil {
@@ -874,7 +875,7 @@ func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) framewo
 		framework.Failf("Node does not have required label %q", nodeKey)
 	}
 
-	pvConfig := framework.PersistentVolumeConfig{
+	pvConfig := e2epv.PersistentVolumeConfig{
 		PVSource: v1.PersistentVolumeSource{
 			Local: &v1.LocalVolumeSource{
 				Path: volume.ltr.Path,
@@ -914,7 +915,7 @@ func createLocalPVCsPVs(config *localTestConfig, volumes []*localTestVolume, mod
 		pvcConfig := makeLocalPVCConfig(config, volume.localVolumeType)
 		pvConfig := makeLocalPVConfig(config, volume)
 
-		volume.pv, volume.pvc, err = framework.CreatePVPVC(config.client, pvConfig, pvcConfig, config.ns, false)
+		volume.pv, volume.pvc, err = e2epv.CreatePVPVC(config.client, pvConfig, pvcConfig, config.ns, false)
 		framework.ExpectNoError(err)
 	}
 
@@ -1175,7 +1176,7 @@ func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti b
 		for _, volume := range pod.Spec.Volumes {
 			pvcSource := volume.VolumeSource.PersistentVolumeClaim
 			if pvcSource != nil {
-				err := framework.WaitForPersistentVolumeClaimPhase(
+				err := e2epv.WaitForPersistentVolumeClaimPhase(
 					v1.ClaimBound, config.client, config.ns, pvcSource.ClaimName, framework.Poll, time.Second)
 				framework.ExpectNoError(err)
 			}
