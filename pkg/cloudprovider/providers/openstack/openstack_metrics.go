@@ -21,7 +21,8 @@ package openstack
 import (
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const (
@@ -31,20 +32,22 @@ const (
 )
 
 var (
-	openstackOperationsLatency = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Subsystem: openstackSubsystem,
-			Name:      openstackOperationKey,
-			Help:      "Latency of openstack api call",
+	openstackOperationsLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      openstackSubsystem,
+			Name:           openstackOperationKey,
+			Help:           "Latency of openstack api call",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"request"},
 	)
 
-	openstackAPIRequestErrors = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Subsystem: openstackSubsystem,
-			Name:      openstackOperationErrorKey,
-			Help:      "Cumulative number of openstack Api call errors",
+	openstackAPIRequestErrors = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      openstackSubsystem,
+			Name:           openstackOperationErrorKey,
+			Help:           "Cumulative number of openstack Api call errors",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"request"},
 	)
@@ -54,7 +57,7 @@ var registerOnce sync.Once
 
 func registerMetrics() {
 	registerOnce.Do(func() {
-		prometheus.MustRegister(openstackOperationsLatency)
-		prometheus.MustRegister(openstackAPIRequestErrors)
+		legacyregistry.MustRegister(openstackOperationsLatency)
+		legacyregistry.MustRegister(openstackAPIRequestErrors)
 	})
 }
