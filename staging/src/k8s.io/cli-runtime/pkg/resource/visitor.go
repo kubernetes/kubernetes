@@ -375,7 +375,6 @@ func (v ContinueOnErrorVisitor) Visit(fn VisitorFunc) error {
 // that interface - into multiple Infos. Returns nil in the case of no errors.
 // When an error is hit on sub items (for instance, if a List contains an object that does
 // not have a registered client or resource), returns an aggregate error.
-
 type FlattenListVisitor struct {
 	visitor Visitor
 	typer   runtime.ObjectTyper
@@ -428,7 +427,6 @@ func (v FlattenListVisitor) Visit(fn VisitorFunc) error {
 		errs := []error{}
 		for i := range items {
 			item, err := v.mapper.infoForObject(items[i], v.typer, preferredGVKs)
-
 			if err != nil {
 				errs = append(errs, err)
 				continue
