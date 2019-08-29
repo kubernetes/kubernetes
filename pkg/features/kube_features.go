@@ -599,6 +599,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
-	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
+	HPAScaleToZero:         {Default: false, PreRelease: featuregate.Alpha},
 	LegacyNodeRoleBehavior: {Default: true, PreRelease: featuregate.Alpha},
 }

@@ -115,6 +115,7 @@ go_test(
         "restart_test.go",
         "runtime_conformance_test.go",
         "security_context_test.go",
+        "startup_probe_test.go",
         "summary_test.go",
         "system_node_critical_test.go",
         "volume_manager_test.go",
