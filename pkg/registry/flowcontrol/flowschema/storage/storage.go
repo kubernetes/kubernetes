@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -30,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/flowcontrol/flowschema"
 )
 
-// Container includes dummy storage for RC pods and experimental storage for Scale.
+// FlowSchemaStorage implements storage for flow schema.
 type FlowSchemaStorage struct {
 	FlowSchema *REST
 	Status     *StatusREST
@@ -45,12 +46,12 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) FlowSchemaStorage {
 	}
 }
 
-// REST implements a RESTStorage for jobs against etcd
+// REST implements a RESTStorage for flow schema against etcd
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against Jobs.
+// NewREST returns a RESTStorage object that will work against flow schemas.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &flowcontrol.FlowSchema{} },
@@ -81,12 +82,12 @@ func (r *REST) ShortNames() []string {
 	return []string{"fs"}
 }
 
-// StatusREST implements the REST endpoint for changing the status of a resourcequota.
+// StatusREST implements the REST endpoint for changing the status of a flow schema.
 type StatusREST struct {
 	store *genericregistry.Store
 }
 
-// New creates a new Job object.
+// New creates a new flow schema object.
 func (r *StatusREST) New() runtime.Object {
 	return &flowcontrol.FlowSchema{}
 }
