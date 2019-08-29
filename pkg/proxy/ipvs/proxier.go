@@ -1527,7 +1527,7 @@ func (proxier *Proxier) writeIptablesRules() {
 	)
 	writeLine(proxier.natRules, append(args, "-j", string(KubeNodePortChain))...)
 
-	// mark drop for KUBE-LOAD-BALANCER
+	// mark masq for KUBE-LOAD-BALANCER
 	writeLine(proxier.natRules, []string{
 		"-A", string(KubeLoadBalancerChain),
 		"-j", string(KubeMarkMasqChain),
