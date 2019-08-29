@@ -19,6 +19,7 @@ package ipvs
 import (
 	"bytes"
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet"
 	"net"
 	"reflect"
 	"sort"
@@ -1511,7 +1512,7 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 		string(KubeFireWallChain): {{
 			JumpChain: "RETURN", MatchSet: kubeLoadBalancerSourceCIDRSet,
 		}, {
-			JumpChain: string(KubeMarkDropChain), MatchSet: "",
+			JumpChain: string(kubelet.KubeMarkDropChain), MatchSet: "",
 		}},
 	}
 	checkIptables(t, ipt, epIpt)

@@ -68,9 +68,6 @@ const (
 	// KubeNodePortChain is the kubernetes node port chain
 	KubeNodePortChain utiliptables.Chain = "KUBE-NODE-PORT"
 
-	// KubeMarkDropChain is the mark-for-drop chain
-	KubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
-
 	// KubeForwardChain is the kubernetes forward chain
 	KubeForwardChain utiliptables.Chain = "KUBE-FORWARD"
 
@@ -1534,7 +1531,7 @@ func (proxier *Proxier) writeIptablesRules() {
 	// mark drop for KUBE-FIRE-WALL
 	writeLine(proxier.natRules, []string{
 		"-A", string(KubeFireWallChain),
-		"-j", string(KubeMarkDropChain),
+		"-j", string(kubelet.KubeMarkDropChain),
 	}...)
 
 	// Accept all traffic with destination of ipvs virtual service, in case other iptables rules

@@ -63,9 +63,6 @@ const (
 	// the nodeports chain
 	kubeNodePortsChain utiliptables.Chain = "KUBE-NODEPORTS"
 
-	// KubeMarkDropChain is the mark-for-drop chain
-	KubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
-
 	// the kubernetes forward chain
 	kubeForwardChain utiliptables.Chain = "KUBE-FORWARD"
 )
@@ -1000,7 +997,7 @@ func (proxier *Proxier) syncProxyRules() {
 
 					// If the packet was able to reach the end of firewall chain, then it did not get DNATed.
 					// It means the packet cannot go thru the firewall, then mark it for DROP
-					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkDropChain))...)
+					writeLine(proxier.natRules, append(args, "-j", string(kubelet.KubeMarkDropChain))...)
 				} else {
 					// No endpoints.
 					writeLine(proxier.filterRules,
@@ -1237,7 +1234,7 @@ func (proxier *Proxier) syncProxyRules() {
 				"-m", "comment", "--comment",
 				fmt.Sprintf(`"%s has no local endpoints"`, svcNameString),
 				"-j",
-				string(KubeMarkDropChain),
+				string(kubelet.KubeMarkDropChain),
 			)
 			writeLine(proxier.natRules, args...)
 		} else {
