@@ -110,19 +110,6 @@ var iptablesChains = []struct {
 	{utiliptables.TableNAT, KubeFireWallChain},
 	{utiliptables.TableNAT, KubeNodePortChain},
 	{utiliptables.TableNAT, KubeLoadBalancerChain},
-	{utiliptables.TableNAT, KubeMarkMasqChain},
-	{utiliptables.TableFilter, KubeForwardChain},
-}
-
-var iptablesCleanupChains = []struct {
-	table utiliptables.Table
-	chain utiliptables.Chain
-}{
-	{utiliptables.TableNAT, kubeServicesChain},
-	{utiliptables.TableNAT, kubePostroutingChain},
-	{utiliptables.TableNAT, KubeFireWallChain},
-	{utiliptables.TableNAT, KubeNodePortChain},
-	{utiliptables.TableNAT, KubeLoadBalancerChain},
 	{utiliptables.TableFilter, KubeForwardChain},
 }
 
@@ -657,7 +644,7 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 	}
 
 	// Flush and remove all of our chains. Flushing all chains before removing them also removes all links between chains first.
-	for _, ch := range iptablesCleanupChains {
+	for _, ch := range iptablesChains {
 		if err := ipt.FlushChain(ch.table, ch.chain); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				klog.Errorf("Error removing iptables rules in ipvs proxier: %v", err)
@@ -667,7 +654,7 @@ func cleanupIptablesLeftovers(ipt utiliptables.Interface) (encounteredError bool
 	}
 
 	// Remove all of our chains.
-	for _, ch := range iptablesCleanupChains {
+	for _, ch := range iptablesChains {
 		if err := ipt.DeleteChain(ch.table, ch.chain); err != nil {
 			if !utiliptables.IsNotFoundError(err) {
 				klog.Errorf("Error removing iptables rules in ipvs proxier: %v", err)
@@ -1650,24 +1637,6 @@ func (proxier *Proxier) createAndLinkeKubeChain() {
 			klog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", jc.table, jc.from, jc.to, err)
 		}
 	}
-
-	// Install the kubernetes-specific postrouting rules. We use a whole chain for
-	// this so that it is easier to flush and change, for example if the mark
-	// value should ever change.
-	writeLine(proxier.natRules, []string{
-		"-A", string(kubePostroutingChain),
-		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
-		"-m", "mark", "--mark", proxier.masqueradeMark,
-		"-j", "MASQUERADE",
-	}...)
-
-	// Install the kubernetes-specific masquerade mark rule. We use a whole chain for
-	// this so that it is easier to flush and change, for example if the mark
-	// value should ever change.
-	writeLine(proxier.natRules, []string{
-		"-A", string(KubeMarkMasqChain),
-		"-j", "MARK", "--set-xmark", proxier.masqueradeMark,
-	}...)
 }
 
 // getExistingChains get iptables-save output so we can check for existing chains and rules.

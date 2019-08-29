@@ -27,7 +27,6 @@ import (
 
 const (
 	// KubeMarkMasqChain is the mark-for-masquerade chain
-	// TODO: clean up this logic in kube-proxy
 	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
 
 	// KubeMarkDropChain is the mark-for-drop chain
