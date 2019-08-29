@@ -76,7 +76,7 @@ const (
 	addedLabelValue           = "yes"
 )
 
-var _ = SIGDescribe("AdmissionWebhook", func() {
+var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 	var context *certContext
 	f := framework.NewDefaultFramework("webhook")
 	servicePort := int32(8443)
@@ -104,7 +104,15 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		cleanWebhookTest(client, namespaceName)
 	})
 
-	ginkgo.It("should include webhook resources in discovery documents", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, discovery document
+		Description: The admissionregistration.k8s.io API group MUST exists in the /apis discovery document.
+		The admissionregistration.k8s.io/v1 API group/version MUST exists in the /apis discovery document.
+		The mutatingwebhookconfigurations and validatingwebhookconfigurations resources MUST exist in the
+		/apis/admissionregistration.k8s.io/v1 discovery document.
+	*/
+	framework.ConformanceIt("should include webhook resources in discovery documents", func() {
 		{
 			ginkgo.By("fetching the /apis discovery document")
 			apiGroupList := &metav1.APIGroupList{}
@@ -175,19 +183,40 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		}
 	})
 
-	ginkgo.It("Should be able to deny pod and configmap creation", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, deny create
+		Description: Register an admission webhook configuration that admits pod and configmap. Attempts to create
+		non-compliant pods and configmaps, or update/patch compliant pods and configmaps to be non-compliant MUST
+		be denied. An attempt to create a pod that causes a webhook to hang MUST result in a webhook timeout error,
+		and the pod creation MUST be denied. An attempt to create a non-compliant configmap in a whitelisted
+		namespace based on the webhook namespace selector MUST be allowed.
+	*/
+	framework.ConformanceIt("should be able to deny pod and configmap creation", func() {
 		webhookCleanup := registerWebhook(f, f.UniqueName, context, servicePort)
 		defer webhookCleanup()
 		testWebhook(f)
 	})
 
-	ginkgo.It("Should be able to deny attaching pod", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, deny attach
+		Description: Register an admission webhook configuration that denies connecting to a pod's attach sub-resource.
+		Attempts to attach MUST be denied.
+	*/
+	framework.ConformanceIt("should be able to deny attaching pod", func() {
 		webhookCleanup := registerWebhookForAttachingPod(f, f.UniqueName, context, servicePort)
 		defer webhookCleanup()
 		testAttachingPodWebhook(f)
 	})
 
-	ginkgo.It("Should be able to deny custom resource creation and deletion", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, deny custom resource create and delete
+		Description: Register an admission webhook configuration that denies creation, update and deletion of
+		custom resources. Attempts to create, update and delete custom resources MUST be denied.
+	*/
+	framework.ConformanceIt("should be able to deny custom resource creation, update and deletion", func() {
 		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
@@ -199,25 +228,51 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testBlockingCustomResourceUpdateDeletion(f, testcrd.Crd, testcrd.DynamicClients["v1"])
 	})
 
-	ginkgo.It("Should unconditionally reject operations on fail closed webhook", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, fail closed
+		Description: Register a webhook with a fail closed policy and without CA bundle so that it cannot be called.
+		Attempt operations that require the admission webhook; all MUST be denied.
+	*/
+	framework.ConformanceIt("should unconditionally reject operations on fail closed webhook", func() {
 		webhookCleanup := registerFailClosedWebhook(f, f.UniqueName, context, servicePort)
 		defer webhookCleanup()
 		testFailClosedWebhook(f)
 	})
 
-	ginkgo.It("Should mutate configmap", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, ordered mutation
+		Description: Register a mutating webhook configuration with two webhooks that admit configmaps, one that
+		adds a data key if the configmap already has a specific key, and another that adds a key if the key added by
+		the first webhook is present. Attempt to create a config map; both keys MUST be added to the config map.
+	*/
+	framework.ConformanceIt("should mutate configmap", func() {
 		webhookCleanup := registerMutatingWebhookForConfigMap(f, f.UniqueName, context, servicePort)
 		defer webhookCleanup()
 		testMutatingConfigMapWebhook(f)
 	})
 
-	ginkgo.It("Should mutate pod and apply defaults after mutation", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, mutation with defaulting
+		Description: Register a mutating webhook that adds an InitContainer to pods. Attempt to create a pod;
+		the InitContainer MUST be added the TerminationMessagePolicy MUST be defaulted.
+	*/
+	framework.ConformanceIt("should mutate pod and apply defaults after mutation", func() {
 		webhookCleanup := registerMutatingWebhookForPod(f, f.UniqueName, context, servicePort)
 		defer webhookCleanup()
 		testMutatingPodWebhook(f)
 	})
 
-	ginkgo.It("Should not be able to mutate or prevent deletion of webhook configuration objects", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, admission control not allowed on webhook configuration objects
+		Description: Register webhooks that mutate and deny deletion of webhook configuration objects. Attempt to create
+		and delete a webhook configuration object; both operations MUST be allowed and the webhook configuration object
+		MUST NOT be mutated the the webhooks.
+	*/
+	framework.ConformanceIt("should not be able to mutate or prevent deletion of webhook configuration objects", func() {
 		validatingWebhookCleanup := registerValidatingWebhookForWebhookConfigurations(f, f.UniqueName+"blocking", context, servicePort)
 		defer validatingWebhookCleanup()
 		mutatingWebhookCleanup := registerMutatingWebhookForWebhookConfigurations(f, f.UniqueName+"blocking", context, servicePort)
@@ -225,7 +280,13 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testWebhooksForWebhookConfigurations(f, f.UniqueName, context, servicePort)
 	})
 
-	ginkgo.It("Should mutate custom resource", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, mutate custom resource
+		Description: Register a webhook that mutates a custom resource. Attempt to create custom resource object;
+		the custom resource MUST be mutated.
+	*/
+	framework.ConformanceIt("should mutate custom resource", func() {
 		testcrd, err := crd.CreateTestCRD(f)
 		if err != nil {
 			return
@@ -236,14 +297,28 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"], false)
 	})
 
-	ginkgo.It("Should deny crd creation", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, deny custom resource definition
+		Description: Register a webhook that denies custom resource definition create. Attempt to create a
+		custom resource definition; the create request MUST be denied.
+	*/
+	framework.ConformanceIt("should deny crd creation", func() {
 		crdWebhookCleanup := registerValidatingWebhookForCRD(f, f.UniqueName, context, servicePort)
 		defer crdWebhookCleanup()
 
 		testCRDDenyWebhook(f)
 	})
 
-	ginkgo.It("Should mutate custom resource with different stored version", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, mutate custom resource with different stored version
+		Description: Register a webhook that mutates custom resources on create and update. Register a custom resource
+		definition using v1 as stored version. Create a custom resource. Patch the custom resource definition to use v2 as
+		the stored version. Attempt to patch the custom resource with a new field and value; the patch MUST be applied
+		successfully.
+	*/
+	framework.ConformanceIt("should mutate custom resource with different stored version", func() {
 		testcrd, err := createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f)
 		if err != nil {
 			return
@@ -254,7 +329,14 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testMultiVersionCustomResourceWebhook(f, testcrd)
 	})
 
-	ginkgo.It("Should mutate custom resource with pruning", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, mutate custom resource with pruning
+		Description: Register mutating webhooks that adds fields to custom objects. Register a custom resource definition
+		with a schema that includes only one of the data keys added by the webhooks. Attempt to a custom resource;
+		the fields included in the schema MUST be present and field not included in the schema MUST NOT be present.
+	*/
+	framework.ConformanceIt("should mutate custom resource with pruning", func() {
 		const prune = true
 		testcrd, err := createAdmissionWebhookMultiVersionTestCRDWithV1Storage(f, func(crd *apiextensionsv1.CustomResourceDefinition) {
 			crd.Spec.PreserveUnknownFields = false
@@ -285,7 +367,16 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		testMutatingCustomResourceWebhook(f, testcrd.Crd, testcrd.DynamicClients["v1"], prune)
 	})
 
-	ginkgo.It("Should honor timeout", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, honor timeout
+		Description: Using a webhook that waits 5 seconds before admitting objects, configure the webhook with combinations
+		of timeouts and failure policy values. Attempt to create a config map with each combination. Requests MUST
+		timeout if the configured webhook timeout is less than 5 seconds and failure policy is fail. Requests must not timeout if
+		the failure policy is ignore. Requests MUST NOT timeout if configured webhook timeout is 10 seconds (much longer
+		than the webhook wait duration).
+	*/
+	framework.ConformanceIt("should honor timeout", func() {
 		policyFail := admissionregistrationv1.Fail
 		policyIgnore := admissionregistrationv1.Ignore
 
@@ -310,7 +401,14 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		slowWebhookCleanup()
 	})
 
-	ginkgo.It("patching/updating a validating webhook should work", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, update validating webhook
+		Description: Register a validating admission webhook configuration. Update the webhook to not apply to the create
+		operation and attempt to create an object; the webhook MUST NOT deny the create. Patch the webhook to apply to the
+		create operation again and attempt to create an object; the webhook MUST deny the create.
+	*/
+	framework.ConformanceIt("patching/updating a validating webhook should work", func() {
 		client := f.ClientSet
 		admissionClient := client.AdmissionregistrationV1()
 
@@ -393,7 +491,14 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be denied creation by validating webhook", f.Namespace.Name)
 	})
 
-	ginkgo.It("patching/updating a mutating webhook should work", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, update mutating webhook
+		Description: Register a mutating admission webhook configuration. Update the webhook to not apply to the create
+		operation and attempt to create an object; the webhook MUST NOT mutate the object. Patch the webhook to apply to the
+		create operation again and attempt to create an object; the webhook MUST mutate the object.
+	*/
+	framework.ConformanceIt("patching/updating a mutating webhook should work", func() {
 		client := f.ClientSet
 		admissionClient := client.AdmissionregistrationV1()
 
@@ -455,7 +560,15 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be mutated", f.Namespace.Name)
 	})
 
-	ginkgo.It("listing validating webhooks should work", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, list validating webhooks
+		Description: Create 10 validating webhook configurations, all with a label. Attempt to list the webhook
+		configurations matching the label; all the created webhook configurations MUST be present. Attempt to create an
+		object; the create MUST be denied. Attempt to remove the webhook configurations matching the label with deletecollection;
+		all webhook configurations MUST be deleted. Attempt to create an object; the create MUST NOT be denied.
+	*/
+	framework.ConformanceIt("listing validating webhooks should work", func() {
 		testListSize := 10
 		testUUID := string(uuid.NewUUID())
 
@@ -516,7 +629,15 @@ var _ = SIGDescribe("AdmissionWebhook", func() {
 		framework.ExpectNoError(err, "Waiting for configMap in namespace %s to be allowed creation since there are no webhooks", f.Namespace.Name)
 	})
 
-	ginkgo.It("listing mutating webhooks should work", func() {
+	/*
+		Release : v1.16
+		Testname: Admission webhook, list mutating webhooks
+		Description: Create 10 mutating webhook configurations, all with a label. Attempt to list the webhook
+		configurations matching the label; all the created webhook configurations MUST be present. Attempt to create an
+		object; the object MUST be mutated. Attempt to remove the webhook configurations matching the label with deletecollection;
+		all webhook configurations MUST be deleted. Attempt to create an object; the object MUST NOT be mutated.
+	*/
+	framework.ConformanceIt("listing mutating webhooks should work", func() {
 		testListSize := 10
 		testUUID := string(uuid.NewUUID())
 
