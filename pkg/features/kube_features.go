@@ -417,6 +417,7 @@ const (
 
 	// owner: @wk8
 	// alpha: v1.14
+	// beta: v1.16
 	//
 	// Enables GMSA support for Windows workloads.
 	WindowsGMSA featuregate.Feature = "WindowsGMSA"
@@ -551,7 +552,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ProcMountType:                       {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                    {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                 {Default: true, PreRelease: featuregate.Beta},
-	WindowsGMSA:                         {Default: false, PreRelease: featuregate.Alpha},
+	WindowsGMSA:                         {Default: true, PreRelease: featuregate.Beta},
 	WindowsRunAsUserName:                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLoadBalancerFinalizer:        {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
