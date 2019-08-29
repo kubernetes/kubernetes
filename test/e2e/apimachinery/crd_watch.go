@@ -35,17 +35,18 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
+var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", func() {
 
 	f := framework.NewDefaultFramework("crd-watch")
 
 	ginkgo.Context("CustomResourceDefinition Watch", func() {
 		/*
-			   	   Testname: crd-watch
-			   	   Description: Create a Custom Resource Definition and make sure
-				   watches observe events on create/delete.
+			Release: v1.16
+			Testname: Custom Resource Definition, watch
+			Description: Create a Custom Resource Definition. Attempt to watch it; the watch MUST observe create,
+			modify and delete events.
 		*/
-		ginkgo.It("watch on custom resource definition objects", func() {
+		framework.ConformanceIt("watch on custom resource definition objects", func() {
 
 			const (
 				watchCRNameA = "name1"

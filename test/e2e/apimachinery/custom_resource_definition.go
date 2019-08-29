@@ -35,7 +35,7 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
-var _ = SIGDescribe("CustomResourceDefinition resources", func() {
+var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin]", func() {
 
 	framework.NewDefaultFramework("custom-resource-definition")
 
@@ -43,7 +43,9 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 		/*
 			Release : v1.9
 			Testname: Custom Resource Definition, create
-			Description: Create a API extension client, define a random custom resource definition, create the custom resource. API server MUST be able to create the custom resource.
+			Description: Create a API extension client and define a random custom resource definition.
+			Create the custom resource definition and then delete it. The creation and deletion MUST
+			be successful.
 		*/
 		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
 
@@ -67,9 +69,12 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 		/*
 			Release : v1.16
 			Testname: Custom Resource Definition, list
-			Description: Create a API extension client, define 10 random custom resource definitions and list them using a label selector. API server MUST be able to list the custom resource definitions and delete them via delete collection.
+			Description: Create a API extension client, define 10 labeled custom resource definitions and list them using
+			a label selector; the list result MUST contain only the labeled custom resource definitions. Delete the labeled
+			custom resource definitions via delete collection; the delete MUST be successful and MUST delete only the
+			labeled custom resource definitions.
 		*/
-		ginkgo.It("listing custom resource definition objects works ", func() {
+		framework.ConformanceIt("listing custom resource definition objects works ", func() {
 			testListSize := 10
 			config, err := framework.LoadConfig()
 			framework.ExpectNoError(err, "loading config")
@@ -126,9 +131,10 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 		/*
 			Release : v1.16
 			Testname: Custom Resource Definition, status sub-resource
-			Description: Create a API extension client, create a custom resource definition and then read, update and patch its status sub-resource. API server MUST be able to perform the operations against the status sub-resource.
+			Description: Create a custom resource definition. Attempt to read, update and patch its status sub-resource;
+			all mutating sub-resource operations MUST be visible to subsequent reads.
 		*/
-		ginkgo.It("getting/updating/patching custom resource definition status sub-resource works ", func() {
+		framework.ConformanceIt("getting/updating/patching custom resource definition status sub-resource works ", func() {
 			config, err := framework.LoadConfig()
 			framework.ExpectNoError(err, "loading config")
 			apiExtensionClient, err := clientset.NewForConfig(config)
