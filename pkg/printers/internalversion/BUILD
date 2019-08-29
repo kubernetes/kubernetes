@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "additional_printers_test.go",
         "printers_test.go",
         "sorted_resource_name_list_test.go",
     ],
@@ -19,12 +20,14 @@ go_test(
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/coordination:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/discovery:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/node:go_default_library",
         "//pkg/apis/policy:go_default_library",
+        "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/printers:go_default_library",
