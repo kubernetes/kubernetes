@@ -25,6 +25,7 @@ import (
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -255,10 +256,21 @@ spec:
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
+		SetHeader("Accept", "application/json").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
 		t.Fatalf("failed to apply same config after adding a finalizer: %v:\n%v", err, string(result))
+	}
+
+	// Test that the finalizers were not overwritten
+	obj := unstructured.Unstructured{}
+	err = obj.UnmarshalJSON(result)
+	if err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if actual, expected := len(obj.GetFinalizers()), 2; actual != expected {
+		t.Fatalf("expected %v finalizers after re-applying but got %v:\n%v", expected, actual, string(result))
 	}
 
 	// Patch object to change the number of replicas
@@ -343,9 +355,36 @@ spec:
   - name: "y"
     containerPort: 8080
     protocol: TCP`, apiVersion, kind, name))).
+		SetHeader("Accept", "application/json").
 		DoRaw()
 	if err != nil {
 		t.Fatalf("failed to add a new list item to the object as a different applier: %v:\n%v", err, string(result))
+	}
+
+	// Test that the ports were not overwritten
+	obj = unstructured.Unstructured{}
+	err = obj.UnmarshalJSON(result)
+	if err != nil {
+		t.Fatalf("failed to find ports list in response: %v:\n%v", err, string(result))
+	}
+	spec, ok := obj.Object["spec"]
+	if !ok {
+		t.Fatalf("failed to find ports list in response: %v:\n%v", err, string(result))
+	}
+	specMap, ok := spec.(map[string]interface{})
+	if !ok {
+		t.Fatalf("failed to find ports list in response: %v:\n%v", err, string(result))
+	}
+	ports, ok := specMap["ports"]
+	if !ok {
+		t.Fatalf("failed to find ports list in response: %v:\n%v", err, string(result))
+	}
+	portsList, ok := ports.([]interface{})
+	if !ok {
+		t.Fatalf("failed to find ports list in response: %v:\n%v", err, string(result))
+	}
+	if actual, expected := len(portsList), 2; actual != expected {
+		t.Fatalf("expected %v ports after re-applying but got %v:\n%v", expected, actual, string(result))
 	}
 }
 
@@ -446,10 +485,21 @@ spec:
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
+		SetHeader("Accept", "application/json").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
 		t.Fatalf("failed to apply same config after adding a finalizer: %v:\n%v", err, string(result))
+	}
+
+	// Test that the finalizers were not overwritten
+	obj := unstructured.Unstructured{}
+	err = obj.UnmarshalJSON(result)
+	if err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if actual, expected := len(obj.GetFinalizers()), 2; actual != expected {
+		t.Fatalf("expected %v finalizers after re-applying but got %v:\n%v", expected, actual, string(result))
 	}
 
 	// Patch object to change the number of replicas

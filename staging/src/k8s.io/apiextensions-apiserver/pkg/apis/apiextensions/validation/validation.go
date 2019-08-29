@@ -796,8 +796,12 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 	}
 
+	if schema.XListType == nil && schema.Type == "array" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-list-type"), "must be set if type is array"))
+	}
+
 	if schema.XListType != nil && *schema.XListType != "atomic" && *schema.XListType != "set" && *schema.XListType != "map" {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-list-type"), *schema.XListType, "must be one of 'atomic', 'set', 'map', or unset"))
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("x-kubernetes-list-type"), *schema.XListType, []string{"atomic", "set", "map"}))
 	}
 
 	if len(schema.XListMapKeys) > 0 && (schema.XListType == nil || *schema.XListType != "map") {
@@ -805,6 +809,35 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-list-type"), "must be map if x-kubernetes-list-map-keys is non-empty"))
 		} else {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-list-type"), *schema.XListType, "must be map if x-kubernetes-list-map-keys is non-empty"))
+		}
+	}
+
+	if len(schema.XListMapKeys) == 0 && schema.XListType != nil && *schema.XListType == "map" {
+		allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-list-map-keys"), "must not be empty if x-kubernetes-list-type is map"))
+	}
+
+	if schema.Items != nil && schema.Items.Schema == nil && schema.XListType != nil && *schema.XListType == "map" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("items"), schema.Items, "must only have a single schema if x-kubernetes-list-type is map"))
+	}
+
+	if schema.Items != nil && schema.Items.Schema != nil && schema.Items.Schema.Type != "object" && schema.XListType != nil && *schema.XListType == "map" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("items").Child("type"), schema.Items.Schema.Type, "must be object if parent array's x-kubernetes-list-type is map"))
+	}
+
+	if schema.Items != nil && schema.Items.Schema != nil && schema.Items.Schema.Type == "object" && schema.XListType != nil && *schema.XListType == "map" {
+		keys := map[string]struct{}{}
+		for _, k := range schema.XListMapKeys {
+			if s, ok := schema.Items.Schema.Properties[k]; ok {
+				if s.Type == "array" || s.Type == "object" {
+					allErrs = append(allErrs, field.Invalid(fldPath.Child("items").Child("properties").Child(k).Child("type"), schema.Items.Schema.Type, "must be a scalar type if parent array's x-kubernetes-list-type is map"))
+				}
+			} else {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-list-map-keys"), schema.XListMapKeys, "entries must all be names of item properties"))
+			}
+			if _, ok := keys[k]; ok {
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-list-map-keys"), schema.XListMapKeys, "must not contain duplicate entries"))
+			}
+			keys[k] = struct{}{}
 		}
 	}
 
