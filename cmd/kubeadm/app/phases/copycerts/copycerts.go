@@ -90,6 +90,18 @@ func UploadCerts(client clientset.Interface, cfg *kubeadmapi.InitConfiguration, 
 	if err != nil {
 		return errors.Wrap(err, "error decoding certificate key")
 	}
+	keySecretData := getCertsKey(key)
+	err = apiclient.CreateOrUpdateSecret(client, &v1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:            kubeadmconstants.KubeadmCertsKeySecret,
+			Namespace:       metav1.NamespaceSystem,
+		},
+		StringData: keySecretData,
+	})
+	if err != nil {
+		return err
+	}
+
 	tokenID, err := createShortLivedBootstrapToken(client)
 	if err != nil {
 		return err
@@ -211,6 +223,12 @@ func getDataFromDisk(cfg *kubeadmapi.InitConfiguration, key []byte) (map[string]
 		}
 	}
 	return secretData, nil
+}
+
+func getCertsKey(key string) map[string]string{
+	keySecretData := map[string]string{}
+	keySecretData[certOrKeyNameToSecretName(kubeadmconstants.CertificateKeyValue)] = key
+	return keySecretData
 }
 
 // DownloadCerts downloads the certificates needed to join a new control plane.
