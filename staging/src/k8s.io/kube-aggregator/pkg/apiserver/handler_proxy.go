@@ -181,13 +181,15 @@ func newRequestForProxy(location *url.URL, req *http.Request, enableAggregatedDi
 	newCtx := req.Context()
 	cancelFn := func() {}
 
-	// trim leading and trailing slashes. Then "/apis/group/version" requests are for discovery, so if we have exactly three
-	// segments that we are going to proxy, we have a discovery request.
-	if enableAggregatedDiscoveryTimeout && len(strings.Split(strings.Trim(req.URL.Path, "/"), "/")) == 3 {
-		// discovery requests are used by kubectl and others to determine which resources a server has.  This is a cheap call that
-		// should be fast for every aggregated apiserver.  Latency for aggregation is expected to be low (as for all extensions)
-		// so forcing a short timeout here helps responsiveness of all clients.
-		newCtx, cancelFn = context.WithTimeout(newCtx, aggregatedDiscoveryTimeout)
+	if requestInfo, ok := genericapirequest.RequestInfoFrom(req.Context()); ok {
+		// trim leading and trailing slashes. Then "/apis/group/version" requests are for discovery, so if we have exactly three
+		// segments that we are going to proxy, we have a discovery request.
+		if enableAggregatedDiscoveryTimeout && !requestInfo.IsResourceRequest && len(strings.Split(strings.Trim(requestInfo.Path, "/"), "/")) == 3 {
+			// discovery requests are used by kubectl and others to determine which resources a server has.  This is a cheap call that
+			// should be fast for every aggregated apiserver.  Latency for aggregation is expected to be low (as for all extensions)
+			// so forcing a short timeout here helps responsiveness of all clients.
+			newCtx, cancelFn = context.WithTimeout(newCtx, aggregatedDiscoveryTimeout)
+		}
 	}
 
 	// WithContext creates a shallow clone of the request with the same context.
