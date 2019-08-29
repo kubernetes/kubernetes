@@ -34,7 +34,7 @@ type flowSchemaStrategy struct {
 	names.NameGenerator
 }
 
-// Strategy is the default logic that applies when creating and updating Replication Controller objects.
+// Strategy is the default logic that applies when creating and updating flow schema objects.
 var Strategy = flowSchemaStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns false because all PriorityClasses are global.
