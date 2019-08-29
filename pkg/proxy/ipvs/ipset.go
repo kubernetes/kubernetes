@@ -23,6 +23,7 @@ import (
 
 	"fmt"
 	"k8s.io/klog"
+	"strings"
 )
 
 const (
@@ -102,6 +103,20 @@ func NewIPSet(handle utilipset.Interface, name string, setType utilipset.Type, i
 	hashFamily := utilipset.ProtocolFamilyIPV4
 	if isIPv6 {
 		hashFamily = utilipset.ProtocolFamilyIPV6
+		// In dual-stack both ipv4 and ipv6 ipset's can co-exist. To
+		// ensure unique names the prefix for ipv6 is changed from
+		// "KUBE-" to "KUBE-6-". The "KUBE-" prefix is kept for
+		// backward compatibility. The maximum name length of an ipset
+		// is 31 characters which must be taken into account.  The
+		// ipv4 names are not altered to minimize the risk for
+		// problems on upgrades.
+		if strings.HasPrefix(name, "KUBE-") {
+			name = strings.Replace(name, "KUBE-", "KUBE-6-", 1)
+			if len(name) > 31 {
+				klog.Warningf("ipset name truncated; [%s] -> [%s]", name, name[:31])
+				name = name[:31]
+			}
+		}
 	}
 	set := &IPSet{
 		IPSet: utilipset.IPSet{
