@@ -136,10 +136,18 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
 		rejected := false
 		if err != nil {
-			// ErrCallingWebhook is ignored if the webhook is configured to failopen.
-			// Otherwise the request is rejected.
-			if _, ok := err.(*webhookutil.ErrCallingWebhook); !ok || !ignoreClientCallFailures {
+			switch err := err.(type) {
+			case *webhookutil.ErrCallingWebhook:
+				if !ignoreClientCallFailures {
+					rejected = true
+					admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, 0)
+				}
+			case *webhookutil.ErrWebhookRejection:
 				rejected = true
+				admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionNoError, int(err.Status.ErrStatus.Code))
+			default:
+				rejected = true
+				admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "admit", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionAPIServerInternalError, 0)
 			}
 		}
 		admissionmetrics.Metrics.ObserveWebhook(time.Since(t), rejected, versionedAttr.Attributes, "admit", hook.Name)
@@ -171,6 +179,9 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			}
 			klog.Warningf("Failed calling webhook, failing closed %v: %v", hook.Name, err)
 			return apierrors.NewInternalError(err)
+		}
+		if rejectionErr, ok := err.(*webhookutil.ErrWebhookRejection); ok {
+			return rejectionErr.Status
 		}
 		return err
 	}
@@ -257,7 +268,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 	}
 
 	if !result.Allowed {
-		return false, webhookerrors.ToStatusErr(h.Name, result.Result)
+		return false, &webhookutil.ErrWebhookRejection{Status: webhookerrors.ToStatusErr(h.Name, result.Result)}
 	}
 
 	if len(result.Patch) == 0 {
