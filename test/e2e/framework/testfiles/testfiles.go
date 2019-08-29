@@ -34,7 +34,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/onsi/ginkgo"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 var filesources []FileSource
@@ -73,7 +73,7 @@ type FileSource interface {
 func ReadOrDie(filePath string) []byte {
 	data, err := Read(filePath)
 	if err != nil {
-		ginkgo.Fail(err.Error(), 1)
+		e2elog.Fail(err.Error(), 1)
 	}
 	return data
 }
@@ -110,7 +110,7 @@ func Exists(filePath string) bool {
 	for _, filesource := range filesources {
 		data, err := filesource.ReadTestFile(filePath)
 		if err != nil {
-			ginkgo.Fail(fmt.Sprintf("fatal error looking for test file %s: %s", filePath, err), 1)
+			e2elog.Fail(fmt.Sprintf("fatal error looking for test file %s: %s", filePath, err), 1)
 		}
 		if data != nil {
 			return true

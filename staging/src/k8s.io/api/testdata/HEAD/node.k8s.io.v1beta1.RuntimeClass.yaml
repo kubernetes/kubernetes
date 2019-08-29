@@ -1,5 +1,5 @@
 apiVersion: node.k8s.io/v1beta1
-handler: "18"
+handler: "19"
 kind: RuntimeClass
 metadata:
   annotations:
@@ -15,6 +15,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -34,9 +35,9 @@ overhead:
     qJ枊a8衍`Ĩ: "652"
 scheduling:
   nodeSelector:
-    "19": "20"
+    "20": "21"
   tolerations:
   - effect: 6ċ
-    key: "21"
+    key: "22"
     tolerationSeconds: -5658031457286093454
-    value: "22"
+    value: "23"

@@ -226,6 +226,7 @@ func TestCNIPlugin(t *testing.T) {
 	cniPlugin.loNetwork.CNIConfig = mockLoCNI
 
 	mockLoCNI.On("AddNetworkList", context.TODO(), cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(&types020.Result{IP4: &types020.IPConfig{IP: net.IPNet{IP: []byte{127, 0, 0, 1}}}}, nil)
+	mockLoCNI.On("DelNetworkList", context.TODO(), cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 
 	// Check that status returns an error
 	if err := cniPlugin.Status(); err == nil {

@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -30,24 +31,24 @@ metadata:
   uid: "7"
 spec:
   extra:
-    "29":
-    - "30"
+    "30":
+    - "31"
   groups:
-  - "28"
+  - "29"
   nonResourceAttributes:
-    path: "25"
-    verb: "26"
+    path: "26"
+    verb: "27"
   resourceAttributes:
-    group: "20"
-    name: "24"
-    namespace: "18"
-    resource: "22"
-    subresource: "23"
-    verb: "19"
-    version: "21"
-  uid: "31"
-  user: "27"
+    group: "21"
+    name: "25"
+    namespace: "19"
+    resource: "23"
+    subresource: "24"
+    verb: "20"
+    version: "22"
+  uid: "32"
+  user: "28"
 status:
   allowed: false
-  evaluationError: "33"
-  reason: "32"
+  evaluationError: "34"
+  reason: "33"

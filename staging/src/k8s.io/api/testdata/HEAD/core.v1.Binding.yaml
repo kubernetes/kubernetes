@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -29,10 +30,10 @@ metadata:
   selfLink: "5"
   uid: "7"
 target:
-  apiVersion: "21"
-  fieldPath: "23"
-  kind: "18"
-  name: "20"
-  namespace: "19"
-  resourceVersion: "22"
+  apiVersion: "22"
+  fieldPath: "24"
+  kind: "19"
+  name: "21"
+  namespace: "20"
+  resourceVersion: "23"
   uid: īqJ枊a8衍`Ĩɘ.蘯

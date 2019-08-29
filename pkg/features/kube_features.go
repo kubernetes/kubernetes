@@ -109,6 +109,7 @@ const (
 
 	// owner: @gnufied
 	// alpha: v1.14
+	// beta: v1.16
 	// Ability to expand CSI volumes
 	ExpandCSIVolumes featuregate.Feature = "ExpandCSIVolumes"
 
@@ -171,11 +172,23 @@ const (
 	// Enable pods to set sysctls on a pod
 	Sysctls featuregate.Feature = "Sysctls"
 
+	// owner @smarterclayton
+	// alpha: v1.16
+	//
+	// Enable legacy behavior to vary cluster functionality on the node-role.kubernetes.io labels. On by default (legacy), will be turned off in 1.18.
+	LegacyNodeRoleBehavior featuregate.Feature = "LegacyNodeRoleBehavior"
+
 	// owner @brendandburns
 	// alpha: v1.9
 	//
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion featuregate.Feature = "ServiceNodeExclusion"
+
+	// owner @smarterclayton
+	// alpha: v1.16
+	//
+	// Enable nodes to exclude themselves from network disruption checks
+	NodeDisruptionExclusion featuregate.Feature = "NodeDisruptionExclusion"
 
 	// owner: @jsafrane
 	// alpha: v1.9
@@ -495,12 +508,13 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	QOSReserved:                         {Default: false, PreRelease: featuregate.Alpha},
 	ExpandPersistentVolumes:             {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
-	ExpandCSIVolumes:                    {Default: false, PreRelease: featuregate.Alpha},
+	ExpandCSIVolumes:                    {Default: true, PreRelease: featuregate.Beta},
 	AttachVolumeLimit:                   {Default: true, PreRelease: featuregate.Beta},
 	CPUManager:                          {Default: true, PreRelease: featuregate.Beta},
 	CPUCFSQuotaPeriod:                   {Default: false, PreRelease: featuregate.Alpha},
 	TopologyManager:                     {Default: false, PreRelease: featuregate.Alpha},
 	ServiceNodeExclusion:                {Default: false, PreRelease: featuregate.Alpha},
+	NodeDisruptionExclusion:             {Default: false, PreRelease: featuregate.Alpha},
 	MountContainers:                     {Default: false, PreRelease: featuregate.Alpha},
 	CSIDriverRegistry:                   {Default: true, PreRelease: featuregate.Beta},
 	CSINodeInfo:                         {Default: true, PreRelease: featuregate.Beta},
@@ -561,13 +575,14 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	apiextensionsfeatures.CustomResourceValidation:        {Default: true, PreRelease: featuregate.Beta},
-	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: featuregate.Beta},
-	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.Beta},
-	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.Beta},
+	apiextensionsfeatures.CustomResourceValidation:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	apiextensionsfeatures.CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.Beta},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
-	HPAScaleToZero: {Default: false, PreRelease: featuregate.Alpha},
+	HPAScaleToZero:         {Default: false, PreRelease: featuregate.Alpha},
+	LegacyNodeRoleBehavior: {Default: true, PreRelease: featuregate.Alpha},
 }

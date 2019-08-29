@@ -23,6 +23,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
@@ -32,7 +33,7 @@ func topologyHintLessThan(a topologymanager.TopologyHint, b topologymanager.Topo
 	if a.Preferred != b.Preferred {
 		return a.Preferred == true
 	}
-	return a.SocketAffinity.IsNarrowerThan(b.SocketAffinity)
+	return a.NUMANodeAffinity.IsNarrowerThan(b.NUMANodeAffinity)
 }
 
 func TestGetTopologyHints(t *testing.T) {
@@ -49,30 +50,41 @@ func TestGetTopologyHints(t *testing.T) {
 	secondSocketMask, _ := socketmask.NewSocketMask(1)
 	crossSocketMask, _ := socketmask.NewSocketMask(0, 1)
 
-	m := manager{
-		policy: &staticPolicy{},
-		machineInfo: &cadvisorapi.MachineInfo{
-			NumCores: 12,
-			Topology: []cadvisorapi.Node{
-				{Id: 0,
-					Cores: []cadvisorapi.Core{
-						{Id: 0, Threads: []int{0, 6}},
-						{Id: 1, Threads: []int{1, 7}},
-						{Id: 2, Threads: []int{2, 8}},
-					},
-				},
-				{Id: 1,
-					Cores: []cadvisorapi.Core{
-						{Id: 0, Threads: []int{3, 9}},
-						{Id: 1, Threads: []int{4, 10}},
-						{Id: 2, Threads: []int{5, 11}},
-					},
+	machineInfo := cadvisorapi.MachineInfo{
+		NumCores: 12,
+		Topology: []cadvisorapi.Node{
+			{Id: 0,
+				Cores: []cadvisorapi.Core{
+					{Id: 0, Threads: []int{0, 6}},
+					{Id: 1, Threads: []int{1, 7}},
+					{Id: 2, Threads: []int{2, 8}},
 				},
 			},
+			{Id: 1,
+				Cores: []cadvisorapi.Core{
+					{Id: 0, Threads: []int{3, 9}},
+					{Id: 1, Threads: []int{4, 10}},
+					{Id: 2, Threads: []int{5, 11}},
+				},
+			},
+		},
+	}
+
+	numaNodeInfo := topology.NUMANodeInfo{
+		0: cpuset.NewCPUSet(0, 6, 1, 7, 2, 8),
+		1: cpuset.NewCPUSet(3, 9, 4, 10, 5, 11),
+	}
+
+	topology, _ := topology.Discover(&machineInfo, numaNodeInfo)
+
+	m := manager{
+		policy: &staticPolicy{
+			topology: topology,
 		},
 		state: &mockState{
 			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
+		topology: topology,
 	}
 
 	tcases := []struct {
@@ -87,16 +99,16 @@ func TestGetTopologyHints(t *testing.T) {
 			container: *testContainer1,
 			expectedHints: []topologymanager.TopologyHint{
 				{
-					SocketAffinity: firstSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: firstSocketMask,
+					Preferred:        true,
 				},
 				{
-					SocketAffinity: secondSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: secondSocketMask,
+					Preferred:        true,
 				},
 				{
-					SocketAffinity: crossSocketMask,
-					Preferred:      false,
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        false,
 				},
 			},
 		},
@@ -106,12 +118,12 @@ func TestGetTopologyHints(t *testing.T) {
 			container: *testContainer2,
 			expectedHints: []topologymanager.TopologyHint{
 				{
-					SocketAffinity: secondSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: secondSocketMask,
+					Preferred:        true,
 				},
 				{
-					SocketAffinity: crossSocketMask,
-					Preferred:      false,
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        false,
 				},
 			},
 		},
@@ -121,8 +133,8 @@ func TestGetTopologyHints(t *testing.T) {
 			container: *testContainer3,
 			expectedHints: []topologymanager.TopologyHint{
 				{
-					SocketAffinity: crossSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        true,
 				},
 			},
 		},

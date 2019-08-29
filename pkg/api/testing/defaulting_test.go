@@ -89,6 +89,8 @@ func TestDefaulting(t *testing.T) {
 		{Group: "batch", Version: "v2alpha1", Kind: "JobTemplate"}:                                {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequest"}:     {},
 		{Group: "certificates.k8s.io", Version: "v1beta1", Kind: "CertificateSigningRequestList"}: {},
+		{Group: "discovery.k8s.io", Version: "v1alpha1", Kind: "EndpointSlice"}:                   {},
+		{Group: "discovery.k8s.io", Version: "v1alpha1", Kind: "EndpointSliceList"}:               {},
 		{Group: "kubeadm.k8s.io", Version: "v1alpha1", Kind: "MasterConfiguration"}:               {},
 		// This object contains only int fields which currently breaks the defaulting test because
 		// it's pretty stupid. Once we add non integer fields, we should uncomment this.

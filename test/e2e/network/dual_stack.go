@@ -23,7 +23,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 
-	apps "k8s.io/api/apps/v1"
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -136,7 +136,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			map[string]string{"test": "dual-stack-server"},
 			"dualstack-test-server",
 			imageutils.GetE2EImage(imageutils.TestWebserver),
-			apps.RollingUpdateDeploymentStrategyType)
+			appsv1.RollingUpdateDeploymentStrategyType)
 
 		// to ensure all the pods land on different nodes and we can thereby
 		// validate connectivity across all nodes.
@@ -164,7 +164,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 			map[string]string{"test": "dual-stack-client"},
 			"dualstack-test-client",
 			imageutils.GetE2EImage(imageutils.Agnhost),
-			apps.RollingUpdateDeploymentStrategyType)
+			appsv1.RollingUpdateDeploymentStrategyType)
 
 		clientDeploymentSpec.Spec.Template.Spec.Containers[0].Command = []string{"sleep", "3600"}
 		clientDeploymentSpec.Spec.Template.Spec.Affinity = &v1.Affinity{

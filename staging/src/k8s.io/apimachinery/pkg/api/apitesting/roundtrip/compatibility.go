@@ -231,8 +231,8 @@ func CompatibilityTestFuzzer(scheme *runtime.Scheme, fuzzFuncs []interface{}) *f
 		func(f *[]metav1.ManagedFieldsEntry, c fuzz.Continue) {
 			field := metav1.ManagedFieldsEntry{}
 			c.Fuzz(&field)
-			if field.Fields != nil {
-				field.Fields.Raw = []byte("{}")
+			if field.FieldsV1 != nil {
+				field.FieldsV1.Raw = []byte("{}")
 			}
 			*f = []metav1.ManagedFieldsEntry{field}
 		},

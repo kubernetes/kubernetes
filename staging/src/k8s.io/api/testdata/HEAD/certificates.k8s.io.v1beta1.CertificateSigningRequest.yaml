@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -30,19 +31,19 @@ metadata:
   uid: "7"
 spec:
   extra:
-    "21":
-    - "22"
+    "22":
+    - "23"
   groups:
-  - "20"
+  - "21"
   request: OA==
-  uid: "19"
+  uid: "20"
   usages:
   - J枊a
-  username: "18"
+  username: "19"
 status:
   certificate: 9Q==
   conditions:
   - lastUpdateTime: "2901-11-14T22:54:07Z"
-    message: "24"
-    reason: "23"
+    message: "25"
+    reason: "24"
     type: o,c鮽ort昍řČ扷5Ɨ

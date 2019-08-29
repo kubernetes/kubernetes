@@ -34,7 +34,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
@@ -90,7 +89,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.DumpDebugInfo(c, ns)
 			}
-			e2elog.Logf("Deleting all statefulset in ns %v", ns)
+			framework.Logf("Deleting all statefulset in ns %v", ns)
 			e2esset.DeleteAllStatefulSets(c, ns)
 		})
 
@@ -712,7 +711,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 
 			ginkgo.By("Waiting until pod " + podName + " will start running in namespace " + f.Namespace.Name)
 			if err := f.WaitForPodRunning(podName); err != nil {
-				e2elog.Failf("Pod %v did not start running: %v", podName, err)
+				framework.Failf("Pod %v did not start running: %v", podName, err)
 			}
 
 			var initialStatefulPodUID types.UID
@@ -726,19 +725,19 @@ var _ = SIGDescribe("StatefulSet", func() {
 				pod := event.Object.(*v1.Pod)
 				switch event.Type {
 				case watch.Deleted:
-					e2elog.Logf("Observed delete event for stateful pod %v in namespace %v", pod.Name, pod.Namespace)
+					framework.Logf("Observed delete event for stateful pod %v in namespace %v", pod.Name, pod.Namespace)
 					if initialStatefulPodUID == "" {
 						return false, nil
 					}
 					return true, nil
 				}
-				e2elog.Logf("Observed stateful pod in namespace: %v, name: %v, uid: %v, status phase: %v. Waiting for statefulset controller to delete.",
+				framework.Logf("Observed stateful pod in namespace: %v, name: %v, uid: %v, status phase: %v. Waiting for statefulset controller to delete.",
 					pod.Namespace, pod.Name, pod.UID, pod.Status.Phase)
 				initialStatefulPodUID = pod.UID
 				return false, nil
 			})
 			if err != nil {
-				e2elog.Failf("Pod %v expected to be re-created at least once", statefulPodName)
+				framework.Failf("Pod %v expected to be re-created at least once", statefulPodName)
 			}
 
 			ginkgo.By("Removing pod with conflicting port in namespace " + f.Namespace.Name)
@@ -780,7 +779,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			ginkgo.By("getting scale subresource")
 			scale, err := c.AppsV1().StatefulSets(ns).GetScale(ssName, metav1.GetOptions{})
 			if err != nil {
-				e2elog.Failf("Failed to get scale subresource: %v", err)
+				framework.Failf("Failed to get scale subresource: %v", err)
 			}
 			framework.ExpectEqual(scale.Spec.Replicas, int32(1))
 			framework.ExpectEqual(scale.Status.Replicas, int32(1))
@@ -789,14 +788,14 @@ var _ = SIGDescribe("StatefulSet", func() {
 			scale.Spec.Replicas = 2
 			scaleResult, err := c.AppsV1().StatefulSets(ns).UpdateScale(ssName, scale)
 			if err != nil {
-				e2elog.Failf("Failed to put scale subresource: %v", err)
+				framework.Failf("Failed to put scale subresource: %v", err)
 			}
 			framework.ExpectEqual(scaleResult.Spec.Replicas, int32(2))
 
 			ginkgo.By("verifying the statefulset Spec.Replicas was modified")
 			ss, err = c.AppsV1().StatefulSets(ns).Get(ssName, metav1.GetOptions{})
 			if err != nil {
-				e2elog.Failf("Failed to get statefulset resource: %v", err)
+				framework.Failf("Failed to get statefulset resource: %v", err)
 			}
 			framework.ExpectEqual(*(ss.Spec.Replicas), int32(2))
 		})
@@ -813,7 +812,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.DumpDebugInfo(c, ns)
 			}
-			e2elog.Logf("Deleting all statefulset in ns %v", ns)
+			framework.Logf("Deleting all statefulset in ns %v", ns)
 			e2esset.DeleteAllStatefulSets(c, ns)
 		})
 
@@ -853,9 +852,9 @@ func kubectlExecWithRetries(args ...string) (out string) {
 		if out, err = framework.RunKubectl(args...); err == nil {
 			return
 		}
-		e2elog.Logf("Retrying %v:\nerror %v\nstdout %v", args, err, out)
+		framework.Logf("Retrying %v:\nerror %v\nstdout %v", args, err, out)
 	}
-	e2elog.Failf("Failed to execute \"%v\" with retries: %v", args, err)
+	framework.Failf("Failed to execute \"%v\" with retries: %v", args, err)
 	return
 }
 
@@ -892,7 +891,7 @@ func (c *clusterAppTester) run() {
 
 	ginkgo.By("Reading value under foo from member with index 2")
 	if err := pollReadWithTimeout(c.statefulPod, 2, "foo", "bar"); err != nil {
-		e2elog.Failf("%v", err)
+		framework.Failf("%v", err)
 	}
 }
 
@@ -915,7 +914,7 @@ func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
 	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-		e2elog.Logf(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
+		framework.Logf(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
 	}
 }
 
@@ -946,12 +945,12 @@ func (m *mysqlGaleraTester) mysqlExec(cmd, ns, podName string) string {
 func (m *mysqlGaleraTester) deploy(ns string) *appsv1.StatefulSet {
 	m.ss = e2esset.CreateStatefulSet(m.client, mysqlGaleraManifestPath, ns)
 
-	e2elog.Logf("Deployed statefulset %v, initializing database", m.ss.Name)
+	framework.Logf("Deployed statefulset %v, initializing database", m.ss.Name)
 	for _, cmd := range []string{
 		"create database statefulset;",
 		"use statefulset; create table foo (k varchar(20), v varchar(20));",
 	} {
-		e2elog.Logf(m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
+		framework.Logf(m.mysqlExec(cmd, ns, fmt.Sprintf("%v-0", m.ss.Name)))
 	}
 	return m.ss
 }
@@ -960,7 +959,7 @@ func (m *mysqlGaleraTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("use statefulset; insert into foo (k, v) values (\"%v\", \"%v\");", k, v)
-		e2elog.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
+		framework.Logf(m.mysqlExec(cmd, m.ss.Namespace, name))
 	}
 }
 
@@ -991,7 +990,7 @@ func (m *redisTester) deploy(ns string) *appsv1.StatefulSet {
 func (m *redisTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", m.ss.Name, statefulPodIndex)
 	for k, v := range kv {
-		e2elog.Logf(m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
+		framework.Logf(m.redisExec(fmt.Sprintf("SET %v %v", k, v), m.ss.Namespace, name))
 	}
 }
 
@@ -1016,12 +1015,12 @@ func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
 
 func (c *cockroachDBTester) deploy(ns string) *appsv1.StatefulSet {
 	c.ss = e2esset.CreateStatefulSet(c.client, cockroachDBManifestPath, ns)
-	e2elog.Logf("Deployed statefulset %v, initializing database", c.ss.Name)
+	framework.Logf("Deployed statefulset %v, initializing database", c.ss.Name)
 	for _, cmd := range []string{
 		"CREATE DATABASE IF NOT EXISTS foo;",
 		"CREATE TABLE IF NOT EXISTS foo.bar (k STRING PRIMARY KEY, v STRING);",
 	} {
-		e2elog.Logf(c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
+		framework.Logf(c.cockroachDBExec(cmd, ns, fmt.Sprintf("%v-0", c.ss.Name)))
 	}
 	return c.ss
 }
@@ -1030,7 +1029,7 @@ func (c *cockroachDBTester) write(statefulPodIndex int, kv map[string]string) {
 	name := fmt.Sprintf("%v-%d", c.ss.Name, statefulPodIndex)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("UPSERT INTO foo.bar VALUES ('%v', '%v');", k, v)
-		e2elog.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
+		framework.Logf(c.cockroachDBExec(cmd, c.ss.Namespace, name))
 	}
 }
 func (c *cockroachDBTester) read(statefulPodIndex int, key string) string {
@@ -1175,14 +1174,14 @@ func confirmStatefulPodCount(c clientset.Interface, count int, ss *appsv1.Statef
 		if statefulPodCount != count {
 			e2epod.LogPodStates(podList.Items)
 			if hard {
-				e2elog.Failf("StatefulSet %v scaled unexpectedly scaled to %d -> %d replicas", ss.Name, count, len(podList.Items))
+				framework.Failf("StatefulSet %v scaled unexpectedly scaled to %d -> %d replicas", ss.Name, count, len(podList.Items))
 			} else {
-				e2elog.Logf("StatefulSet %v has not reached scale %d, at %d", ss.Name, count, statefulPodCount)
+				framework.Logf("StatefulSet %v has not reached scale %d, at %d", ss.Name, count, statefulPodCount)
 			}
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		e2elog.Logf("Verifying statefulset %v doesn't scale past %d for another %+v", ss.Name, count, deadline.Sub(t))
+		framework.Logf("Verifying statefulset %v doesn't scale past %d for another %+v", ss.Name, count, deadline.Sub(t))
 		time.Sleep(1 * time.Second)
 	}
 }

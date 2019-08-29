@@ -18,11 +18,13 @@ package kubenet
 
 import (
 	"fmt"
+	"strings"
+	"testing"
+
+	"github.com/containernetworking/cni/libcni"
+	"github.com/containernetworking/cni/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"strings"
-
-	"testing"
 
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -159,6 +161,12 @@ func TestTeardownCallsShaper(t *testing.T) {
 	mockcni := &mock_cni.MockCNI{}
 	ips := make(map[kubecontainer.ContainerID]utilsets.String)
 	kubenet := newFakeKubenetPlugin(ips, fexec, fhost)
+	kubenet.loConfig = &libcni.NetworkConfig{
+		Network: &types.NetConf{
+			Name: "loopback-fake",
+			Type: "loopback",
+		},
+	}
 	kubenet.cniConfig = mockcni
 	kubenet.iptables = ipttest.NewFake()
 	kubenet.bandwidthShaper = fshaper
@@ -255,6 +263,12 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 
 		ips := make(map[kubecontainer.ContainerID]utilsets.String)
 		kubenet := newFakeKubenetPlugin(ips, fexec, fhost)
+		kubenet.loConfig = &libcni.NetworkConfig{
+			Network: &types.NetConf{
+				Name: "loopback-fake",
+				Type: "loopback",
+			},
+		}
 		kubenet.cniConfig = mockcni
 		kubenet.iptables = ipttest.NewFake()
 

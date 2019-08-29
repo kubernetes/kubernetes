@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -34,9 +35,9 @@ spec:
     - protocol: ɗ
     to:
     - ipBlock:
-        cidr: "50"
+        cidr: "51"
         except:
-        - "51"
+        - "52"
       namespaceSelector:
         matchExpressions:
         - key: 4a--0o8m3-d0w7p8vl-1z---883d-v3j4-7y-5.9-q390/niTl.1-.VT--5mj_9.M.134-5-.q6H5
@@ -57,9 +58,9 @@ spec:
   ingress:
   - from:
     - ipBlock:
-        cidr: "36"
+        cidr: "37"
         except:
-        - "37"
+        - "38"
       namespaceSelector:
         matchExpressions:
         - key: 2_28.-.7_8B.HF-U-_ik_--DSXr.n-A9..9__Y-H-Mqpt._.-_..051

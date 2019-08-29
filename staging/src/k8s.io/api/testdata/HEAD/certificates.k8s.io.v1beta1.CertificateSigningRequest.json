@@ -35,7 +35,8 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
@@ -44,14 +45,14 @@
     "usages": [
       "J枊a"
     ],
-    "username": "18",
-    "uid": "19",
+    "username": "19",
+    "uid": "20",
     "groups": [
-      "20"
+      "21"
     ],
     "extra": {
-      "21": [
-  "22"
+      "22": [
+  "23"
 ]
     }
   },
@@ -59,8 +60,8 @@
     "conditions": [
       {
         "type": "o,c鮽ort昍řČ扷5Ɨ",
-        "reason": "23",
-        "message": "24",
+        "reason": "24",
+        "message": "25",
         "lastUpdateTime": "2901-11-14T22:54:07Z"
       }
     ],
