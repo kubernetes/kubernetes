@@ -12,7 +12,6 @@ pkg/controller/disruption
 pkg/controller/garbagecollector
 pkg/controller/namespace/deletion
 pkg/controller/nodeipam
-pkg/controller/nodeipam/ipam/cidrset
 pkg/controller/podautoscaler
 pkg/controller/podgc
 pkg/controller/replicaset
