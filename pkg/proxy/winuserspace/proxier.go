@@ -27,12 +27,13 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/util/netsh"
 )
 
@@ -80,6 +81,9 @@ func logTimeout(err error) bool {
 // Proxier is a simple proxy for TCP connections between a localhost:lport
 // and services that provide the actual implementations.
 type Proxier struct {
+	// EndpointSlice support has not been added for this proxier yet.
+	config.NoopEndpointSliceHandler
+
 	loadBalancer   LoadBalancer
 	mu             sync.Mutex // protects serviceMap
 	serviceMap     map[ServicePortPortalName]*serviceInfo
