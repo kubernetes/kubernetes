@@ -269,7 +269,7 @@ func performEtcdStaticPodUpgrade(certsRenewMgr *renewal.Manager, client clientse
 	}
 
 	// Checking health state of etcd before proceeding with the upgrade
-	_, err := oldEtcdClient.GetClusterStatus()
+	err := oldEtcdClient.CheckClusterHealth()
 	if err != nil {
 		return true, errors.Wrap(err, "etcd cluster is not healthy")
 	}

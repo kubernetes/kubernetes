@@ -22,7 +22,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
 	"github.com/pkg/errors"
 	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -76,14 +75,12 @@ type fakeEtcdClient struct {
 	mismatchedVersions bool
 }
 
-func (f fakeEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
-
 func (f fakeEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 
-func (f fakeEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
-	return make(map[string]*clientv3.StatusResponse), nil
+func (f fakeEtcdClient) CheckClusterHealth() error {
+	return nil
 }
 
 func (f fakeEtcdClient) GetVersion() (string, error) {
