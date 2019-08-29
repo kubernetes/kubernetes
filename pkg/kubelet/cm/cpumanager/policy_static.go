@@ -258,7 +258,7 @@ func (p *staticPolicy) allocateCPUs(s state.State, numCPUs int, numaAffinity soc
 	if numaAffinity != nil {
 		alignedCPUs := cpuset.NewCPUSet()
 		for _, numaNodeID := range numaAffinity.GetSockets() {
-			alignedCPUs = alignedCPUs.Union(p.assignableCPUs(s).Intersection(p.topology.CPUDetails.CPUsInNUMANode(numaNodeID)))
+			alignedCPUs = alignedCPUs.Union(p.assignableCPUs(s).Intersection(p.topology.CPUDetails.CPUsInNUMANodes(numaNodeID)))
 		}
 
 		numAlignedToAlloc := alignedCPUs.Size()
