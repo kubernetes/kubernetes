@@ -447,6 +447,12 @@ function update-coredns-config() {
   local -r tmpdir=/tmp
   local -r download_dir=$(mktemp --tmpdir=${tmpdir} -d coredns-migration.XXXXXXXXXX) || exit 1
 
+  # clean up
+  cleanup() {
+    rm -rf "${download_dir}"
+  }
+  trap cleanup EXIT
+
   # Get the new installed CoreDNS version
   echo "Waiting for CoreDNS to update"
   until [[ $(${KUBE_ROOT}/cluster/kubectl.sh -n kube-system get deployment coredns -o=jsonpath='{$.metadata.resourceVersion}') -ne ${COREDNS_DEPLOY_RESOURCE_VERSION} ]]; do
@@ -458,30 +464,35 @@ function update-coredns-config() {
   case "$(uname -m)" in
       x86_64*)
         host_arch=amd64
+        corefile_tool_SHA="fd4d8a42d8a1c38cb49b75cca3c7c82677b97c0c6e5ee2a7d5fb02314ccfbb59"
         ;;
       i?86_64*)
         host_arch=amd64
+        corefile_tool_SHA="fd4d8a42d8a1c38cb49b75cca3c7c82677b97c0c6e5ee2a7d5fb02314ccfbb59"
         ;;
       amd64*)
         host_arch=amd64
+        corefile_tool_SHA="fd4d8a42d8a1c38cb49b75cca3c7c82677b97c0c6e5ee2a7d5fb02314ccfbb59"
         ;;
       aarch64*)
         host_arch=arm64
+        corefile_tool_SHA="05503f379eaaa703034c50da7ce7c273d7a7b3569eddb55afe300bd6d6c40988"
         ;;
       arm64*)
         host_arch=arm64
+        corefile_tool_SHA="05503f379eaaa703034c50da7ce7c273d7a7b3569eddb55afe300bd6d6c40988"
         ;;
       arm*)
         host_arch=arm
-        ;;
-      i?86*)
-        host_arch=x86
+        corefile_tool_SHA="bc826bde6662c11cbb6e6e215397d07d4fedb754c1a6e208271d7d784eb28600"
         ;;
       s390x*)
         host_arch=s390x
+        corefile_tool_SHA="4ed6b7067f65dc8f147a4dd116242495fbec5e6057bb68e1868ef1fb25e07993"
         ;;
       ppc64le*)
         host_arch=ppc64le
+         corefile_tool_SHA="7bce38ed762a2607e158c65b378e6f23e2b80fc4e93dcf50a55f986c7ea2db43"
         ;;
       *)
         echo "Unsupported host arch. Must be x86_64, 386, arm, arm64, s390x or ppc64le." >&2
@@ -492,10 +503,9 @@ function update-coredns-config() {
   # Download the CoreDNS migration tool
   echo "== Downloading the CoreDNS migration tool =="
   wget -P ${download_dir} "https://github.com/coredns/corefile-migration/releases/download/v1.0.2/corefile-tool-${host_arch}" >/dev/null 2>&1
-  wget -P ${download_dir} "https://github.com/coredns/corefile-migration/releases/download/v1.0.2/corefile-tool-${host_arch}.sha256" >/dev/null 2>&1
 
-  local -r checkSHA=$(echo "$(cat ${download_dir}/corefile-tool-${host_arch}.sha256 | cut -d " " -f 1) ${download_dir}/corefile-tool-${host_arch}" | sha256sum --check | cut -d " " -f 2)
-  if [[ "${checkSHA}" != "corefile-tool-${host_arch}: OK" ]]; then
+  local -r checkSHA=$(sha256sum ${download_dir}/corefile-tool-${host_arch} | cut -d " " -f 1)
+  if [[ "${checkSHA}" != "${corefile_tool_SHA}" ]]; then
     echo "!!! CheckSum for the CoreDNS migration tool did not match !!!" >&2
     exit 1
   fi
@@ -516,12 +526,6 @@ function update-coredns-config() {
      gcloud compute --project ${PROJECT}  scp --zone ${ZONE} ${MASTER_NAME}:${coredns_addon_path}/coredns.yaml ${download_dir}/coredns-manifest.yaml > /dev/null
      ${KUBE_ROOT}/cluster/kubectl.sh apply -f ${download_dir}/coredns-manifest.yaml
   fi
-
-  # clean up
-  cleanup() {
-    rm -rf "${download_dir}"
-  }
-  trap cleanup EXIT
 
   echo "== The CoreDNS Config has been updated =="
 }
