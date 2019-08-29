@@ -87,7 +87,7 @@ message FlowSchemaList {
 // FlowSchemaSpec describes how the flow-schema's specification looks like.
 message FlowSchemaSpec {
   // `priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot
-  // be resolved, the flow-schema will ignored and marked as invalid in its status.
+  // be resolved, the flow-schema will be ignored and marked as invalid in its status.
   // Required.
   optional PriorityLevelConfigurationReference priorityLevelConfiguration = 1;
 
