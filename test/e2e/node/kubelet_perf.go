@@ -27,7 +27,6 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -285,7 +284,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 // If an error occurs, nothing will be printed.
 func printPerfData(p *perftype.PerfData) {
 	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
-	if str := e2emetrics.PrettyPrintJSON(p); str != "" {
+	if str := framework.PrettyPrintJSON(p); str != "" {
 		framework.Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
 	}
 }
