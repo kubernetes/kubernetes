@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/gpu"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/scheduling"
 	"k8s.io/kubernetes/test/utils/image"
@@ -102,7 +101,7 @@ func testStackdriverAcceleratorMonitoring(f *framework.Framework) {
 	pollingFunction := checkForAcceleratorMetrics(projectID, gcmService, time.Now(), metricsMap)
 	err = wait.Poll(pollFrequency, pollTimeout, pollingFunction)
 	if err != nil {
-		e2elog.Logf("Missing metrics: %+v", metricsMap)
+		framework.Logf("Missing metrics: %+v", metricsMap)
 	}
 	framework.ExpectNoError(err)
 }
@@ -120,9 +119,9 @@ func checkForAcceleratorMetrics(projectID string, gcmService *gcm.Service, start
 			if len(ts) > 0 {
 				counter = counter + 1
 				metricsMap[metric] = true
-				e2elog.Logf("Received %v timeseries for metric %v", len(ts), metric)
+				framework.Logf("Received %v timeseries for metric %v", len(ts), metric)
 			} else {
-				e2elog.Logf("No timeseries for metric %v", metric)
+				framework.Logf("No timeseries for metric %v", metric)
 			}
 		}
 		if counter < 3 {
