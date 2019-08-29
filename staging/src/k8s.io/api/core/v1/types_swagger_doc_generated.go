@@ -994,6 +994,16 @@ func (Namespace) SwaggerDoc() map[string]string {
 	return map_Namespace
 }
 
+var map_NamespaceCondition = map[string]string{
+	"":       "NamespaceCondition contains details about state of namespace.",
+	"type":   "Type of namespace controller condition.",
+	"status": "Status of the condition, one of True, False, Unknown.",
+}
+
+func (NamespaceCondition) SwaggerDoc() map[string]string {
+	return map_NamespaceCondition
+}
+
 var map_NamespaceList = map[string]string{
 	"":         "NamespaceList is a list of Namespaces.",
 	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
@@ -1014,8 +1024,9 @@ func (NamespaceSpec) SwaggerDoc() map[string]string {
 }
 
 var map_NamespaceStatus = map[string]string{
-	"":      "NamespaceStatus is information about the current status of a Namespace.",
-	"phase": "Phase is the current lifecycle phase of the namespace. More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/",
+	"":           "NamespaceStatus is information about the current status of a Namespace.",
+	"phase":      "Phase is the current lifecycle phase of the namespace. More info: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/",
+	"conditions": "Represents the latest available observations of a namespace's current state.",
 }
 
 func (NamespaceStatus) SwaggerDoc() map[string]string {

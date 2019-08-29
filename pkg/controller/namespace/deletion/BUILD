@@ -8,7 +8,10 @@ load(
 
 go_library(
     name = "go_default_library",
-    srcs = ["namespaced_resources_deleter.go"],
+    srcs = [
+        "namespaced_resources_deleter.go",
+        "status_condition_utils.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/controller/namespace/deletion",
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
