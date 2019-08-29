@@ -51,7 +51,7 @@ const (
 
 // Validate is part of the system.Validator interface.
 // TODO(random-liu): Add more validating items.
-func (d *DockerValidator) Validate(spec SysSpec) (error, error) {
+func (d *DockerValidator) Validate(spec SysSpec) ([]error, []error) {
 	if spec.RuntimeSpec.DockerSpec == nil {
 		// If DockerSpec is not specified, assume current runtime is not
 		// docker, skip the docker configuration validation.
@@ -62,10 +62,10 @@ func (d *DockerValidator) Validate(spec SysSpec) (error, error) {
 	info := dockerInfo{}
 	out, err := exec.Command("docker", "info", "--format", "{{json .}}").CombinedOutput()
 	if err != nil {
-		return nil, errors.Errorf(`failed executing "docker info --format '{{json .}}'"\noutput: %s\nerror: %v`, string(out), err)
+		return nil, []error{errors.Errorf(`failed executing "docker info --format '{{json .}}'"\noutput: %s\nerror: %v`, string(out), err)}
 	}
 	if err := d.unmarshalDockerInfo(out, &info); err != nil {
-		return nil, err
+		return nil, []error{err}
 	}
 
 	// validate the resulted docker info object against the spec
@@ -79,7 +79,7 @@ func (d *DockerValidator) unmarshalDockerInfo(b []byte, info *dockerInfo) error 
 	return nil
 }
 
-func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info dockerInfo) (error, error) {
+func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info dockerInfo) ([]error, []error) {
 	// Validate docker version.
 	matched := false
 	for _, v := range spec.Version {
@@ -101,10 +101,10 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info dockerInfo) 
 				info.ServerVersion,
 				latestValidatedDockerVersion,
 			)
-			return w, nil
+			return []error{w}, nil
 		}
 		d.Reporter.Report(dockerConfigPrefix+"VERSION", info.ServerVersion, bad)
-		return nil, errors.Errorf("unsupported docker version: %s", info.ServerVersion)
+		return nil, []error{errors.Errorf("unsupported docker version: %s", info.ServerVersion)}
 	}
 	// Validate graph driver.
 	item := dockerConfigPrefix + "GRAPH_DRIVER"
@@ -115,5 +115,5 @@ func (d *DockerValidator) validateDockerInfo(spec *DockerSpec, info dockerInfo) 
 		}
 	}
 	d.Reporter.Report(item, info.Driver, bad)
-	return nil, errors.Errorf("unsupported graph driver: %s", info.Driver)
+	return nil, []error{errors.Errorf("unsupported graph driver: %s", info.Driver)}
 }

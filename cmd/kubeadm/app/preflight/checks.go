@@ -546,10 +546,10 @@ func (sysver SystemVerificationCheck) Check() (warnings, errorList []error) {
 	for _, v := range validators {
 		warn, err := v.Validate(system.DefaultSysSpec)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, err...)
 		}
 		if warn != nil {
-			warns = append(warns, warn)
+			warns = append(warns, warn...)
 		}
 	}
 
