@@ -45,7 +45,7 @@ var _ TestSuite = &ephemeralTestSuite{}
 func InitEphemeralTestSuite() TestSuite {
 	return &ephemeralTestSuite{
 		tsInfo: TestSuiteInfo{
-			name: "ephemeral [Feature:CSIInlineVolume]",
+			name: "ephemeral",
 			testPatterns: []testpatterns.TestPattern{
 				{
 					Name:    "inline ephemeral CSI volume",

@@ -154,8 +154,8 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			klog.Infof("Starting test %s", test.name)
 			// Modes must be set if (and only if) CSIInlineVolume is enabled.
 			var modes []storagev1beta1.VolumeLifecycleMode
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, test.csiInlineVolume)()
 			if test.csiInlineVolume {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 				modes = append(modes, storagev1beta1.VolumeLifecyclePersistent)
 			}
 			fakeClient := fakeclient.NewSimpleClientset(

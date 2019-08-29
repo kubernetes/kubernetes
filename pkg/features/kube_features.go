@@ -329,6 +329,7 @@ const (
 
 	// owner: @vladimirvivien
 	// alpha: v1.14
+	// beta: v1.16
 	//
 	// Enables CSI Inline volumes support for pods
 	CSIInlineVolume featuregate.Feature = "CSIInlineVolume"
@@ -549,7 +550,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumeSubpathEnvExpansion:           {Default: true, PreRelease: featuregate.Beta},
 	ResourceQuotaScopeSelectors:         {Default: true, PreRelease: featuregate.Beta},
 	CSIBlockVolume:                      {Default: true, PreRelease: featuregate.Beta},
-	CSIInlineVolume:                     {Default: false, PreRelease: featuregate.Alpha},
+	CSIInlineVolume:                     {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                        {Default: true, PreRelease: featuregate.Beta},
 	NodeLease:                           {Default: true, PreRelease: featuregate.Beta},
 	SCTPSupport:                         {Default: false, PreRelease: featuregate.Alpha},
