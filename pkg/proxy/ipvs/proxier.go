@@ -97,7 +97,6 @@ var iptablesJumpChain = []struct {
 }{
 	{utiliptables.TableNAT, utiliptables.ChainOutput, kubeServicesChain, "kubernetes service portals"},
 	{utiliptables.TableNAT, utiliptables.ChainPrerouting, kubeServicesChain, "kubernetes service portals"},
-	{utiliptables.TableNAT, utiliptables.ChainPostrouting, kubePostroutingChain, "kubernetes postrouting rules"},
 	{utiliptables.TableFilter, utiliptables.ChainForward, KubeForwardChain, "kubernetes forwarding rules"},
 }
 
@@ -106,7 +105,6 @@ var iptablesChains = []struct {
 	chain utiliptables.Chain
 }{
 	{utiliptables.TableNAT, kubeServicesChain},
-	{utiliptables.TableNAT, kubePostroutingChain},
 	{utiliptables.TableNAT, KubeFireWallChain},
 	{utiliptables.TableNAT, KubeNodePortChain},
 	{utiliptables.TableNAT, KubeLoadBalancerChain},
