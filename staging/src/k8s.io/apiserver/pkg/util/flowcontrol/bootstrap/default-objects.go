@@ -160,19 +160,23 @@ func PredefinedFlowSchemas() []*rmv1a1.FlowSchema {
 			rmv1a1.FlowDistinguisherMethodByUserType,
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: groups(user.NodesGroup),
-				Rule:     ruleRscAll},
+				Rule:     ruleRscAll,
+			},
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: kubeSystemServiceAccount(rmv1a1.NameAll),
-				Rule:     resourceRule(verbAll, []string{apiGroupCore}, []string{"endpoints", "configmaps", "leases"})},
+				Rule:     resourceRule(verbAll, []string{apiGroupCore}, []string{"endpoints", "configmaps", "leases"}),
+			},
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: kubeSystemServiceAccount(rmv1a1.NameAll),
-				Rule:     ruleNonRscAll},
+				Rule:     ruleNonRscAll,
+			},
 		),
 		fs("system-leader-election", "system", 2500,
 			rmv1a1.FlowDistinguisherMethodByUserType,
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: users(user.KubeControllerManager, user.KubeScheduler),
-				Rule:     resourceRule(verbAll, []string{"coordination.k8s.io"}, []string{"leases"})},
+				Rule:     resourceRule(verbAll, []string{"coordination.k8s.io"}, []string{"leases"}),
+			},
 		),
 		fs("kube-controller-manager", "workload-high", 3500,
 			rmv1a1.FlowDistinguisherMethodByNamespaceType,
@@ -205,7 +209,9 @@ func PredefinedFlowSchemas() []*rmv1a1.FlowSchema {
 				Rule:     ruleRscAll},
 			rmv1a1.PolicyRuleWithSubjects{
 				Subjects: groups("system:serviceaccounts"),
-				Rule:     ruleNonRscAll}),
+				Rule:     ruleNonRscAll,
+			},
+		),
 		DefaultFlowSchemaDefault,
 	}
 }

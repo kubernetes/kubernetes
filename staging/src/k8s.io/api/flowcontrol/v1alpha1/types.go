@@ -94,7 +94,7 @@ type FlowSchemaList struct {
 // FlowSchemaSpec describes how the flow-schema's specification looks like.
 type FlowSchemaSpec struct {
 	// `priorityLevelConfiguration` should reference a PriorityLevelConfiguration in the cluster. If the reference cannot
-	// be resolved, the flow-schema will ignored and marked as invalid in its status.
+	// be resolved, the flow-schema will be ignored and marked as invalid in its status.
 	// Required.
 	PriorityLevelConfiguration PriorityLevelConfigurationReference `json:"priorityLevelConfiguration,omitempty" protobuf:"bytes,1,opt,name=priorityLevelConfiguration"`
 	// `matchingPrecedence` is used to choose among the FlowSchemas that match a given request.  The chosen

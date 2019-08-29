@@ -28,13 +28,13 @@ import (
 	"k8s.io/kubernetes/pkg/apis/flowcontrol/validation"
 )
 
-// flowSchemaStrategy implements verification logic for FlowSchema.
+// priorityLevelConfigurationStrategy implements verification logic for priority level configurations.
 type priorityLevelConfigurationStrategy struct {
 	runtime.ObjectTyper
 	names.NameGenerator
 }
 
-// Strategy is the default logic that applies when creating and updating Replication Controller objects.
+// Strategy is the default logic that applies when creating and updating priority level configuration objects.
 var Strategy = priorityLevelConfigurationStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
 
 // NamespaceScoped returns false because all PriorityClasses are global.
@@ -61,7 +61,7 @@ func (priorityLevelConfigurationStrategy) PrepareForUpdate(ctx context.Context, 
 	newPriorityLevelConfiguration.Status = oldPriorityLevelConfiguration.Status
 }
 
-// Validate validates a new flow-schema.
+// Validate validates a new priority-level.
 func (priorityLevelConfigurationStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	return validation.ValidatePriorityLevelConfiguration(obj.(*flowcontrol.PriorityLevelConfiguration))
 }

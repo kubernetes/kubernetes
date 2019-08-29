@@ -18,6 +18,7 @@ package storage
 
 import (
 	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
@@ -30,7 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration"
 )
 
-// Container includes dummy storage for RC pods and experimental storage for Scale.
+// PriorityLevelConfigurationStorage implements storage for priority level configuration.
 type PriorityLevelConfigurationStorage struct {
 	PriorityLevelConfiguration *REST
 	Status                     *StatusREST
@@ -45,12 +46,12 @@ func NewStorage(optsGetter generic.RESTOptionsGetter) PriorityLevelConfiguration
 	}
 }
 
-// REST implements a RESTStorage for jobs against etcd
+// REST implements a RESTStorage for priority level configuration against etcd
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a RESTStorage object that will work against Jobs.
+// NewREST returns a RESTStorage object that will work against priority level configuration.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &flowcontrol.PriorityLevelConfiguration{} },
@@ -81,12 +82,12 @@ func (r *REST) ShortNames() []string {
 	return []string{"pl"}
 }
 
-// StatusREST implements the REST endpoint for changing the status of a resourcequota.
+// StatusREST implements the REST endpoint for changing the status of a priority level configuration.
 type StatusREST struct {
 	store *genericregistry.Store
 }
 
-// New creates a new Job object.
+// New creates a new priority level configuration object.
 func (r *StatusREST) New() runtime.Object {
 	return &flowcontrol.PriorityLevelConfiguration{}
 }
