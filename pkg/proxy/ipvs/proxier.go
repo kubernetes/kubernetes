@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"k8s.io/kubernetes/pkg/kubelet"
 	"net"
 	"os"
 	"regexp"
@@ -63,9 +64,6 @@ const (
 
 	// kubePostroutingChain is the kubernetes postrouting chain
 	kubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
-
-	// KubeMarkMasqChain is the mark-for-masquerade chain
-	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
 
 	// KubeNodePortChain is the kubernetes node port chain
 	KubeNodePortChain utiliptables.Chain = "KUBE-NODE-PORT"
@@ -152,10 +150,10 @@ var ipsetWithIptablesChain = []struct {
 	{kubeLoadBalancerSourceIPSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
 	{kubeLoadBalancerLocalSet, string(KubeLoadBalancerChain), "RETURN", "dst,dst", ""},
 	{kubeNodePortLocalSetTCP, string(KubeNodePortChain), "RETURN", "dst", "tcp"},
-	{kubeNodePortSetTCP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "tcp"},
+	{kubeNodePortSetTCP, string(KubeNodePortChain), string(kubelet.KubeMarkMasqChain), "dst", "tcp"},
 	{kubeNodePortLocalSetUDP, string(KubeNodePortChain), "RETURN", "dst", "udp"},
-	{kubeNodePortSetUDP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst", "udp"},
-	{kubeNodePortSetSCTP, string(KubeNodePortChain), string(KubeMarkMasqChain), "dst,dst", "sctp"},
+	{kubeNodePortSetUDP, string(KubeNodePortChain), string(kubelet.KubeMarkMasqChain), "dst", "udp"},
+	{kubeNodePortSetSCTP, string(KubeNodePortChain), string(kubelet.KubeMarkMasqChain), "dst,dst", "sctp"},
 	{kubeNodePortLocalSetSCTP, string(KubeNodePortChain), "RETURN", "dst,dst", "sctp"},
 }
 
@@ -1477,14 +1475,14 @@ func (proxier *Proxier) writeIptablesRules() {
 			"-m", "set", "--match-set", kubeClusterIPSet,
 		)
 		if proxier.masqueradeAll {
-			writeLine(proxier.natRules, append(args, "dst,dst", "-j", string(KubeMarkMasqChain))...)
+			writeLine(proxier.natRules, append(args, "dst,dst", "-j", string(kubelet.KubeMarkMasqChain))...)
 		} else if len(proxier.clusterCIDR) > 0 {
 			// This masquerades off-cluster traffic to a service VIP.  The idea
 			// is that you can establish a static route for your Service range,
 			// routing to any node, and that node will bridge into the Service
 			// for you.  Since that might bounce off-node, we masquerade here.
 			// If/when we support "Local" policy for VIPs, we should update this.
-			writeLine(proxier.natRules, append(args, "dst,dst", "! -s", proxier.clusterCIDR, "-j", string(KubeMarkMasqChain))...)
+			writeLine(proxier.natRules, append(args, "dst,dst", "! -s", proxier.clusterCIDR, "-j", string(kubelet.KubeMarkMasqChain))...)
 		} else {
 			// Masquerade all OUTPUT traffic coming from a service ip.
 			// The kube dummy interface has all service VIPs assigned which
@@ -1493,7 +1491,7 @@ func (proxier *Proxier) writeIptablesRules() {
 			// VIP:<service port>.
 			// Always masquerading OUTPUT (node-originating) traffic with a VIP
 			// source ip and service port destination fixes the outgoing connections.
-			writeLine(proxier.natRules, append(args, "src,dst", "-j", string(KubeMarkMasqChain))...)
+			writeLine(proxier.natRules, append(args, "src,dst", "-j", string(kubelet.KubeMarkMasqChain))...)
 		}
 	}
 
@@ -1505,7 +1503,7 @@ func (proxier *Proxier) writeIptablesRules() {
 			"-m", "set", "--match-set", kubeExternalIPSet,
 			"dst,dst",
 		)
-		writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+		writeLine(proxier.natRules, append(args, "-j", string(kubelet.KubeMarkMasqChain))...)
 		// Allow traffic for external IPs that does not come from a bridge (i.e. not from a container)
 		// nor from a local process to be forwarded to the service.
 		// This rule roughly translates to "all traffic from off-machine".
@@ -1530,7 +1528,7 @@ func (proxier *Proxier) writeIptablesRules() {
 	// mark masq for KUBE-LOAD-BALANCER
 	writeLine(proxier.natRules, []string{
 		"-A", string(KubeLoadBalancerChain),
-		"-j", string(KubeMarkMasqChain),
+		"-j", string(kubelet.KubeMarkMasqChain),
 	}...)
 
 	// mark drop for KUBE-FIRE-WALL

@@ -637,7 +637,7 @@ func TestNodePort(t *testing.T) {
 			},
 			expectedIptablesChains: netlinktest.ExpectedIptablesChain{
 				string(KubeNodePortChain): {{
-					JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetUDP,
+					JumpChain: string(kubelet.KubeMarkMasqChain), MatchSet: kubeNodePortSetUDP,
 				}},
 				string(kubeServicesChain): {{
 					JumpChain: string(KubeNodePortChain), MatchSet: "",
@@ -1314,7 +1314,7 @@ func TestLoadBalancer(t *testing.T) {
 			JumpChain: string(KubeLoadBalancerChain), MatchSet: kubeLoadBalancerSet,
 		}},
 		string(kubeLoadBalancerSet): {{
-			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+			JumpChain: string(kubelet.KubeMarkMasqChain), MatchSet: "",
 		}},
 	}
 	checkIptables(t, ipt, epIpt)
@@ -1414,7 +1414,7 @@ func TestOnlyLocalNodePorts(t *testing.T) {
 		string(KubeNodePortChain): {{
 			JumpChain: "RETURN", MatchSet: kubeNodePortLocalSetTCP,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: kubeNodePortSetTCP,
+			JumpChain: string(kubelet.KubeMarkMasqChain), MatchSet: kubeNodePortSetTCP,
 		}},
 	}
 	checkIptables(t, ipt, epIpt)
@@ -1506,7 +1506,7 @@ func TestLoadBalanceSourceRanges(t *testing.T) {
 		string(KubeLoadBalancerChain): {{
 			JumpChain: string(KubeFireWallChain), MatchSet: kubeLoadbalancerFWSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+			JumpChain: string(kubelet.KubeMarkMasqChain), MatchSet: "",
 		}},
 		string(KubeFireWallChain): {{
 			JumpChain: "RETURN", MatchSet: kubeLoadBalancerSourceCIDRSet,
@@ -1676,7 +1676,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 		string(KubeLoadBalancerChain): {{
 			JumpChain: "RETURN", MatchSet: kubeLoadBalancerLocalSet,
 		}, {
-			JumpChain: string(KubeMarkMasqChain), MatchSet: "",
+			JumpChain: string(kubelet.KubeMarkMasqChain), MatchSet: "",
 		}},
 	}
 	checkIptables(t, ipt, epIpt)

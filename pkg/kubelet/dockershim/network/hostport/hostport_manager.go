@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet"
 	"strconv"
 	"strings"
 	"sync"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/klog"
-	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/utils/exec"
@@ -139,7 +139,7 @@ func (hm *hostportManager) Add(id string, podPortMapping *PodPortMapping, natInt
 		writeLine(natRules, "-A", string(chain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, podFullName, pm.HostPort),
 			"-s", podIP,
-			"-j", string(iptablesproxy.KubeMarkMasqChain))
+			"-j", string(kubelet.KubeMarkMasqChain))
 
 		// DNAT to the podIP:containerPort
 		writeLine(natRules, "-A", string(chain),

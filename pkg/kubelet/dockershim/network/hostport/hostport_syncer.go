@@ -21,6 +21,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
-	iptablesproxy "k8s.io/kubernetes/pkg/proxy/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
 
@@ -250,7 +250,7 @@ func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMap
 		args = []string{
 			"-A", string(hostportChain),
 			"-m", "comment", "--comment", fmt.Sprintf(`"%s hostport %d"`, target.podFullName, port.HostPort),
-			"-s", target.podIP, "-j", string(iptablesproxy.KubeMarkMasqChain),
+			"-s", target.podIP, "-j", string(kubelet.KubeMarkMasqChain),
 		}
 		writeLine(natRules, args...)
 

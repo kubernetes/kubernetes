@@ -25,6 +25,7 @@ import (
 	"crypto/sha256"
 	"encoding/base32"
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet"
 	"net"
 	"strconv"
 	"strings"
@@ -61,9 +62,6 @@ const (
 
 	// the nodeports chain
 	kubeNodePortsChain utiliptables.Chain = "KUBE-NODEPORTS"
-
-	// KubeMarkMasqChain is the mark-for-masquerade chain
-	KubeMarkMasqChain utiliptables.Chain = "KUBE-MARK-MASQ"
 
 	// KubeMarkDropChain is the mark-for-drop chain
 	KubeMarkDropChain utiliptables.Chain = "KUBE-MARK-DROP"
@@ -844,14 +842,14 @@ func (proxier *Proxier) syncProxyRules() {
 				"--dport", strconv.Itoa(svcInfo.Port()),
 			)
 			if proxier.masqueradeAll {
-				writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+				writeLine(proxier.natRules, append(args, "-j", string(kubelet.KubeMarkMasqChain))...)
 			} else if len(proxier.clusterCIDR) > 0 {
 				// This masquerades off-cluster traffic to a service VIP.  The idea
 				// is that you can establish a static route for your Service range,
 				// routing to any node, and that node will bridge into the Service
 				// for you.  Since that might bounce off-node, we masquerade here.
 				// If/when we support "Local" policy for VIPs, we should update this.
-				writeLine(proxier.natRules, append(args, "! -s", proxier.clusterCIDR, "-j", string(KubeMarkMasqChain))...)
+				writeLine(proxier.natRules, append(args, "! -s", proxier.clusterCIDR, "-j", string(kubelet.KubeMarkMasqChain))...)
 			}
 			writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
 		} else {
@@ -911,7 +909,7 @@ func (proxier *Proxier) syncProxyRules() {
 					"--dport", strconv.Itoa(svcInfo.Port()),
 				)
 				// We have to SNAT packets to external IPs.
-				writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+				writeLine(proxier.natRules, append(args, "-j", string(kubelet.KubeMarkMasqChain))...)
 
 				// Allow traffic for external IPs that does not come from a bridge (i.e. not from a container)
 				// nor from a local process to be forwarded to the service.
@@ -974,7 +972,7 @@ func (proxier *Proxier) syncProxyRules() {
 					// If we are proxying globally, we need to masquerade in case we cross nodes.
 					// If we are proxying only locally, we can retain the source IP.
 					if !svcInfo.OnlyNodeLocalEndpoints() {
-						writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+						writeLine(proxier.natRules, append(args, "-j", string(kubelet.KubeMarkMasqChain))...)
 						chosenChain = svcChain
 					}
 
@@ -1081,7 +1079,7 @@ func (proxier *Proxier) syncProxyRules() {
 				)
 				if !svcInfo.OnlyNodeLocalEndpoints() {
 					// Nodeports need SNAT, unless they're local.
-					writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
+					writeLine(proxier.natRules, append(args, "-j", string(kubelet.KubeMarkMasqChain))...)
 					// Jump to the service chain.
 					writeLine(proxier.natRules, append(args, "-j", string(svcChain))...)
 				} else {
@@ -1093,7 +1091,7 @@ func (proxier *Proxier) syncProxyRules() {
 					if isIPv6 {
 						loopback = "::1/128"
 					}
-					writeLine(proxier.natRules, append(args, "-s", loopback, "-j", string(KubeMarkMasqChain))...)
+					writeLine(proxier.natRules, append(args, "-s", loopback, "-j", string(kubelet.KubeMarkMasqChain))...)
 					writeLine(proxier.natRules, append(args, "-j", string(svcXlbChain))...)
 				}
 			} else {
@@ -1191,7 +1189,7 @@ func (proxier *Proxier) syncProxyRules() {
 			// Handle traffic that loops back to the originator with SNAT.
 			writeLine(proxier.natRules, append(args,
 				"-s", utilproxy.ToCIDR(net.ParseIP(epIP)),
-				"-j", string(KubeMarkMasqChain))...)
+				"-j", string(kubelet.KubeMarkMasqChain))...)
 			// Update client-affinity lists.
 			if svcInfo.SessionAffinityType() == v1.ServiceAffinityClientIP {
 				args = append(args, "-m", "recent", "--name", string(endpointChain), "--set")
@@ -1226,7 +1224,7 @@ func (proxier *Proxier) syncProxyRules() {
 		args = append(args[:0], "-A", string(svcXlbChain))
 		writeLine(proxier.natRules, append(args,
 			"-m", "comment", "--comment", fmt.Sprintf(`"masquerade LOCAL traffic for %s LB IP"`, svcNameString),
-			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(KubeMarkMasqChain))...)
+			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(kubelet.KubeMarkMasqChain))...)
 		writeLine(proxier.natRules, append(args,
 			"-m", "comment", "--comment", fmt.Sprintf(`"route LOCAL traffic for %s LB IP to service chain"`, svcNameString),
 			"-m", "addrtype", "--src-type", "LOCAL", "-j", string(svcChain))...)

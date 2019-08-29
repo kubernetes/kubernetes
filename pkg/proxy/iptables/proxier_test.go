@@ -19,6 +19,7 @@ package iptables
 import (
 	"bytes"
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet"
 	"net"
 	"reflect"
 	"strconv"
@@ -721,7 +722,7 @@ func TestLoadBalancer(t *testing.T) {
 	}
 
 	fwRules := ipt.GetRules(fwChain)
-	if !hasJump(fwRules, svcChain, "", 0) || !hasJump(fwRules, string(KubeMarkMasqChain), "", 0) {
+	if !hasJump(fwRules, svcChain, "", 0) || !hasJump(fwRules, string(kubelet.KubeMarkMasqChain), "", 0) {
 		errorf(fmt.Sprintf("Failed to find jump from firewall chain %v to svc chain %v", fwChain, svcChain), fwRules, t)
 	}
 }
@@ -925,7 +926,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 	if !hasJump(fwRules, lbChain, "", 0) {
 		errorf(fmt.Sprintf("Failed to find jump from firewall chain %v to svc chain %v", fwChain, lbChain), fwRules, t)
 	}
-	if hasJump(fwRules, string(KubeMarkMasqChain), "", 0) {
+	if hasJump(fwRules, string(kubelet.KubeMarkMasqChain), "", 0) {
 		errorf(fmt.Sprintf("Found jump from fw chain %v to MASQUERADE", fwChain), fwRules, t)
 	}
 
@@ -1017,8 +1018,8 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	if !hasJump(kubeNodePortRules, lbChain, "", svcNodePort) {
 		errorf(fmt.Sprintf("Failed to find jump to lb chain %v", lbChain), kubeNodePortRules, t)
 	}
-	if !hasJump(kubeNodePortRules, string(KubeMarkMasqChain), "", svcNodePort) {
-		errorf(fmt.Sprintf("Failed to find jump to %s chain for destination IP %d", KubeMarkMasqChain, svcNodePort), kubeNodePortRules, t)
+	if !hasJump(kubeNodePortRules, string(kubelet.KubeMarkMasqChain), "", svcNodePort) {
+		errorf(fmt.Sprintf("Failed to find jump to %s chain for destination IP %d", kubelet.KubeMarkMasqChain, svcNodePort), kubeNodePortRules, t)
 	}
 
 	kubeServiceRules := ipt.GetRules(string(kubeServicesChain))
