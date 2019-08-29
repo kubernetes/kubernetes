@@ -5127,6 +5127,11 @@ func (in *ServiceSpec) DeepCopyInto(out *ServiceSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.IPFamily != nil {
+		in, out := &in.IPFamily, &out.IPFamily
+		*out = new(IPFamily)
+		**out = **in
+	}
 	return
 }
 

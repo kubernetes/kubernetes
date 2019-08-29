@@ -46,6 +46,10 @@ import (
 	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -219,6 +223,37 @@ func (e *EndpointController) addPod(obj interface{}) {
 	}
 }
 
+func podToEndpointAddressForService(svc *v1.Service, pod *v1.Pod) (*v1.EndpointAddress, error) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		return podToEndpointAddress(pod), nil
+	}
+
+	// api-server service controller ensured that the service got the correct IP Family
+	// according to user setup, here we only need to match EndPoint IPs' family to service
+	// actual IP family. as in, we don't need to check service.IPFamily
+
+	ipv6ClusterIP := utilnet.IsIPv6String(svc.Spec.ClusterIP)
+	for _, podIP := range pod.Status.PodIPs {
+		ipv6PodIP := utilnet.IsIPv6String(podIP.IP)
+		// same family?
+		// TODO (khenidak) when we remove the max of 2 PodIP limit from pods
+		// we will have to return multiple endpoint addresses
+		if ipv6ClusterIP == ipv6PodIP {
+			return &v1.EndpointAddress{
+				IP:       podIP.IP,
+				NodeName: &pod.Spec.NodeName,
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       pod.ObjectMeta.Namespace,
+					Name:            pod.ObjectMeta.Name,
+					UID:             pod.ObjectMeta.UID,
+					ResourceVersion: pod.ObjectMeta.ResourceVersion,
+				}}, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to find a matching endpoint for service %v", svc.Name)
+}
+
 func podToEndpointAddress(pod *v1.Pod) *v1.EndpointAddress {
 	return &v1.EndpointAddress{
 		IP:       pod.Status.PodIP,
@@ -245,7 +280,9 @@ func podChanged(oldPod, newPod *v1.Pod) bool {
 		return true
 	}
 	// Convert the pod to an EndpointAddress, clear inert fields,
-	// and see if they are the same.
+	// and see if they are the same. Even in a dual stack (multi pod IP) a pod
+	// will never change just one of its IPs, it will always change all. the below
+	// comparison to check if a pod has changed will still work
 	newEndpointAddress := podToEndpointAddress(newPod)
 	oldEndpointAddress := podToEndpointAddress(oldPod)
 	// Ignore the ResourceVersion because it changes
@@ -474,7 +511,14 @@ func (e *EndpointController) syncService(key string) error {
 			continue
 		}
 
-		epa := *podToEndpointAddress(pod)
+		ep, err := podToEndpointAddressForService(service, pod)
+		if err != nil {
+			// this will happen, if the cluster runs with some nodes configured as dual stack and some as not
+			// such as the case of an upgrade..
+			klog.V(2).Infof("failed to find endpoint for service:%v with ClusterIP:%v on pod:%v with error:%v", service.Name, service.Spec.ClusterIP, pod.Name, err)
+			continue
+		}
+		epa := *ep
 
 		hostname := pod.Spec.Hostname
 		if len(hostname) > 0 && pod.Spec.Subdomain == service.Name && service.Namespace == pod.Namespace {
