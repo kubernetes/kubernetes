@@ -575,7 +575,7 @@ func (EnvVarSource) SwaggerDoc() map[string]string {
 }
 
 var map_EphemeralContainer = map[string]string{
-	"":                    "An EphemeralContainer is a special type of container which doesn't come with any resource or scheduling guarantees but can be added to a pod that has already been created. They are intended for user-initiated activities such as troubleshooting a running pod. Ephemeral containers will not be restarted when they exit, and they will be killed if the pod is removed or restarted. If an ephemeral container causes a pod to exceed its resource allocation, the pod may be evicted. Ephemeral containers are added via a pod's ephemeralcontainers subresource and will appear in the pod spec once added. No fields in EphemeralContainer may be changed once added. This is an alpha feature enabled by the EphemeralContainers feature flag.",
+	"":                    "An EphemeralContainer is a container that may be added temporarily to an existing pod for user-initiated activities such as debugging. Ephemeral containers have no resource or scheduling guarantees, and they will not be restarted when they exit or when a pod is removed or restarted. If an ephemeral container causes a pod to exceed its resource allocation, the pod may be evicted. Ephemeral containers may not be added by directly updating the pod spec. They must be added via the pod's ephemeralcontainers subresource, and they will appear in the pod spec once added. This is an alpha feature enabled by the EphemeralContainers feature flag.",
 	"targetContainerName": "If set, the name of the container from PodSpec that this ephemeral container targets. The ephemeral container will be run in the namespaces (IPC, PID, etc) of this container. If not set then the ephemeral container is run in whatever namespaces are shared for the pod. Note that the container runtime must support this feature.",
 }
 
@@ -584,6 +584,7 @@ func (EphemeralContainer) SwaggerDoc() map[string]string {
 }
 
 var map_EphemeralContainerCommon = map[string]string{
+	"":                         "EphemeralContainerCommon is a copy of all fields in Container to be inlined in EphemeralContainer. This separate type allows easy conversion from EphemeralContainer to Container and allows separate documentation for the fields of EphemeralContainer. When a new field is added to Container it must be added here as well.",
 	"name":                     "Name of the ephemeral container specified as a DNS_LABEL. This name must be unique among all containers, init containers and ephemeral containers.",
 	"image":                    "Docker image name. More info: https://kubernetes.io/docs/concepts/containers/images",
 	"command":                  "Entrypoint array. Not executed within a shell. The docker image's ENTRYPOINT is used if this is not provided. Variable references $(VAR_NAME) are expanded using the container's environment. If a variable cannot be resolved, the reference in the input string will be unchanged. The $(VAR_NAME) syntax can be escaped with a double $$, ie: $$(VAR_NAME). Escaped references will never be expanded, regardless of whether the variable exists or not. Cannot be updated. More info: https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container/#running-a-command-in-a-shell",
@@ -612,8 +613,8 @@ func (EphemeralContainerCommon) SwaggerDoc() map[string]string {
 }
 
 var map_EphemeralContainers = map[string]string{
-	"":                    "A list of ephemeral containers used in API operations",
-	"ephemeralContainers": "The new set of ephemeral containers to use for a pod.",
+	"":                    "A list of ephemeral containers used with the Pod ephemeralcontainers subresource.",
+	"ephemeralContainers": "A list of ephemeral containers associated with this pod. New ephemeral containers may be appended to this list, but existing ephemeral containers may not be removed or modified.",
 }
 
 func (EphemeralContainers) SwaggerDoc() map[string]string {
@@ -1596,7 +1597,7 @@ var map_PodSpec = map[string]string{
 	"volumes":                       "List of volumes that can be mounted by containers belonging to the pod. More info: https://kubernetes.io/docs/concepts/storage/volumes",
 	"initContainers":                "List of initialization containers belonging to the pod. Init containers are executed in order prior to containers being started. If any init container fails, the pod is considered to have failed and is handled according to its restartPolicy. The name for an init container or normal container must be unique among all containers. Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes. The resourceRequirements of an init container are taken into account during scheduling by finding the highest request/limit for each resource type, and then using the max of of that value or the sum of the normal containers. Limits are applied to init containers in a similar fashion. Init containers cannot currently be added or removed. Cannot be updated. More info: https://kubernetes.io/docs/concepts/workloads/pods/init-containers/",
 	"containers":                    "List of containers belonging to the pod. Containers cannot currently be added or removed. There must be at least one container in a Pod. Cannot be updated.",
-	"ephemeralContainers":           "EphemeralContainers is the list of ephemeral containers that run in this pod. Ephemeral containers are added to an existing pod as a result of a user-initiated action such as troubleshooting. This list is read-only in the pod spec. It may not be specified in a create or modified in an update of a pod or pod template. To add an ephemeral container use the pod's ephemeralcontainers subresource, which allows update using the EphemeralContainers kind. This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.",
+	"ephemeralContainers":           "List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing pod to perform user-initiated actions such as debugging. This list cannot be specified when creating a pod, and it cannot be modified by updating the pod spec. In order to add an ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource. This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.",
 	"restartPolicy":                 "Restart policy for all containers within the pod. One of Always, OnFailure, Never. Default to Always. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#restart-policy",
 	"terminationGracePeriodSeconds": "Optional duration in seconds the pod needs to terminate gracefully. May be decreased in delete request. Value must be non-negative integer. The value zero indicates delete immediately. If this value is nil, the default grace period will be used instead. The grace period is the duration in seconds after the processes running in the pod are sent a termination signal and the time when the processes are forcibly halted with a kill signal. Set this value longer than the expected cleanup time for your process. Defaults to 30 seconds.",
 	"activeDeadlineSeconds":         "Optional duration in seconds the pod may be active on the node relative to StartTime before the system will actively try to mark it failed and kill associated containers. Value must be a positive integer.",
@@ -1647,7 +1648,7 @@ var map_PodStatus = map[string]string{
 	"initContainerStatuses":      "The list has one entry per init container in the manifest. The most recent successful init container will have ready = true, the most recently started container will have startTime set. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
 	"containerStatuses":          "The list has one entry per container in the manifest. Each entry is currently the output of `docker inspect`. More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#pod-and-container-status",
 	"qosClass":                   "The Quality of Service (QOS) classification assigned to the pod based on resource requirements See PodQOSClass type for available QOS classes More info: https://git.k8s.io/community/contributors/design-proposals/node/resource-qos.md",
-	"ephemeralContainerStatuses": "Status for any ephemeral containers that running in this pod. This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.",
+	"ephemeralContainerStatuses": "Status for any ephemeral containers that have run in this pod. This field is alpha-level and is only populated by servers that enable the EphemeralContainers feature.",
 }
 
 func (PodStatus) SwaggerDoc() map[string]string {

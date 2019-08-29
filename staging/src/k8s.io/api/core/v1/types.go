@@ -2843,12 +2843,10 @@ type PodSpec struct {
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	Containers []Container `json:"containers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=containers"`
-	// EphemeralContainers is the list of ephemeral containers that run in this pod. Ephemeral containers
-	// are added to an existing pod as a result of a user-initiated action such as troubleshooting.
-	// This list is read-only in the pod spec. It may not be specified in a create or modified in an
-	// update of a pod or pod template.
-	// To add an ephemeral container use the pod's ephemeralcontainers subresource, which allows update
-	// using the EphemeralContainers kind.
+	// List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
+	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
+	// creating a pod, and it cannot be modified by updating the pod spec. In order to add an
+	// ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.
 	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
 	// +optional
 	// +patchMergeKey=name
@@ -3220,6 +3218,10 @@ type PodIP struct {
 	IP string `json:"ip,omitempty" protobuf:"bytes,1,opt,name=ip"`
 }
 
+// EphemeralContainerCommon is a copy of all fields in Container to be inlined in
+// EphemeralContainer. This separate type allows easy conversion from EphemeralContainer
+// to Container and allows separate documentation for the fields of EphemeralContainer.
+// When a new field is added to Container it must be added here as well.
 type EphemeralContainerCommon struct {
 	// Name of the ephemeral container specified as a DNS_LABEL.
 	// This name must be unique among all containers, init containers and ephemeral containers.
@@ -3350,16 +3352,20 @@ type EphemeralContainerCommon struct {
 // these two types.
 var _ = Container(EphemeralContainerCommon{})
 
-// An EphemeralContainer is a special type of container which doesn't come with any resource
-// or scheduling guarantees but can be added to a pod that has already been created. They are
-// intended for user-initiated activities such as troubleshooting a running pod.
-// Ephemeral containers will not be restarted when they exit, and they will be killed if the
-// pod is removed or restarted. If an ephemeral container causes a pod to exceed its resource
+// An EphemeralContainer is a container that may be added temporarily to an existing pod for
+// user-initiated activities such as debugging. Ephemeral containers have no resource or
+// scheduling guarantees, and they will not be restarted when they exit or when a pod is
+// removed or restarted. If an ephemeral container causes a pod to exceed its resource
 // allocation, the pod may be evicted.
-// Ephemeral containers are added via a pod's ephemeralcontainers subresource and will appear
-// in the pod spec once added. No fields in EphemeralContainer may be changed once added.
+// Ephemeral containers may not be added by directly updating the pod spec. They must be added
+// via the pod's ephemeralcontainers subresource, and they will appear in the pod spec
+// once added.
 // This is an alpha feature enabled by the EphemeralContainers feature flag.
 type EphemeralContainer struct {
+	// Ephemeral containers have all of the fields of Container, plus additional fields
+	// specific to ephemeral containers. Fields in common with Container are in the
+	// following inlined struct so than an EphemeralContainer may easily be converted
+	// to a Container.
 	EphemeralContainerCommon `json:",inline" protobuf:"bytes,1,req"`
 
 	// If set, the name of the container from PodSpec that this ephemeral container targets.
@@ -3454,8 +3460,8 @@ type PodStatus struct {
 	// More info: https://git.k8s.io/community/contributors/design-proposals/node/resource-qos.md
 	// +optional
 	QOSClass PodQOSClass `json:"qosClass,omitempty" protobuf:"bytes,9,rep,name=qosClass"`
-	// Status for any ephemeral containers that running in this pod.
-	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
+	// Status for any ephemeral containers that have run in this pod.
+	// This field is alpha-level and is only populated by servers that enable the EphemeralContainers feature.
 	// +optional
 	EphemeralContainerStatuses []ContainerStatus `json:"ephemeralContainerStatuses,omitempty" protobuf:"bytes,13,rep,name=ephemeralContainerStatuses"`
 }
@@ -4718,13 +4724,15 @@ type Binding struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// A list of ephemeral containers used in API operations
+// A list of ephemeral containers used with the Pod ephemeralcontainers subresource.
 type EphemeralContainers struct {
 	metav1.TypeMeta `json:",inline"`
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 
-	// The new set of ephemeral containers to use for a pod.
+	// A list of ephemeral containers associated with this pod. New ephemeral containers
+	// may be appended to this list, but existing ephemeral containers may not be removed
+	// or modified.
 	// +patchMergeKey=name
 	// +patchStrategy=merge
 	EphemeralContainers []EphemeralContainer `json:"ephemeralContainers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=ephemeralContainers"`

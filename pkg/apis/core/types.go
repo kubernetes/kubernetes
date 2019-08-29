@@ -2591,12 +2591,10 @@ type PodSpec struct {
 	InitContainers []Container
 	// List of containers belonging to the pod.
 	Containers []Container
-	// EphemeralContainers is the list of ephemeral containers that run in this pod. Ephemeral containers
-	// are added to an existing pod as a result of a user-initiated action such as troubleshooting.
-	// This list is read-only in the pod spec. It may not be specified in a create or modified in an
-	// update of a pod or pod template.
-	// To add an ephemeral container use the pod's ephemeralcontainers subresource, which allows update
-	// using the EphemeralContainers kind.
+	// List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
+	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
+	// creating a pod, and it cannot be modified by updating the pod spec. In order to add an
+	// ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.
 	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
 	// +optional
 	EphemeralContainers []EphemeralContainer
@@ -2882,6 +2880,10 @@ type PodIP struct {
 	IP string
 }
 
+// EphemeralContainerCommon is a copy of all fields in Container to be inlined in
+// EphemeralContainer. This separate type allows easy conversion from EphemeralContainer
+// to Container and allows separate documentation for the fields of EphemeralContainer.
+// When a new field is added to Container it must be added here as well.
 type EphemeralContainerCommon struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
 	// have a unique name.
@@ -2962,16 +2964,20 @@ type EphemeralContainerCommon struct {
 // these two types.
 var _ = Container(EphemeralContainerCommon{})
 
-// An EphemeralContainer is a special type of container which doesn't come with any resource
-// or scheduling guarantees but can be added to a pod that has already been created. They are
-// intended for user-initiated activities such as troubleshooting a running pod.
-// Ephemeral containers will not be restarted when they exit, and they will be killed if the
-// pod is removed or restarted. If an ephemeral container causes a pod to exceed its resource
+// An EphemeralContainer is a temporary container that may be added to an existing pod for
+// user-initiated activities such as debugging. Ephemeral containers have no resource or
+// scheduling guarantees, and they will not be restarted when they exit or when a pod is
+// removed or restarted. If an ephemeral container causes a pod to exceed its resource
 // allocation, the pod may be evicted.
-// Ephemeral containers are added via a pod's ephemeralcontainers subresource and will appear
-// in the pod spec once added.
+// Ephemeral containers may not be added by directly updating the pod spec. They must be added
+// via the pod's ephemeralcontainers subresource, and they will appear in the pod spec
+// once added.
 // This is an alpha feature enabled by the EphemeralContainers feature flag.
 type EphemeralContainer struct {
+	// Ephemeral containers have all of the fields of Container, plus additional fields
+	// specific to ephemeral containers. Fields in common with Container are in the
+	// following inlined struct so than an EphemeralContainer may easily be converted
+	// to a Container.
 	EphemeralContainerCommon
 
 	// If set, the name of the container from PodSpec that this ephemeral container targets.
@@ -3030,7 +3036,7 @@ type PodStatus struct {
 	// +optional
 	ContainerStatuses []ContainerStatus
 
-	// Status for any ephemeral containers that running in this pod.
+	// Status for any ephemeral containers that have run in this pod.
 	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
 	// +optional
 	EphemeralContainerStatuses []ContainerStatus
@@ -4089,13 +4095,15 @@ type Binding struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// A list of ephemeral containers used in API operations
+// A list of ephemeral containers used with the Pod ephemeralcontainers subresource.
 type EphemeralContainers struct {
 	metav1.TypeMeta
 	// +optional
 	metav1.ObjectMeta
 
-	// The new set of ephemeral containers to use for a pod.
+	// A list of ephemeral containers associated with this pod. New ephemeral containers
+	// may be appended to this list, but existing ephemeral containers may not be removed
+	// or modified.
 	EphemeralContainers []EphemeralContainer
 }
 
