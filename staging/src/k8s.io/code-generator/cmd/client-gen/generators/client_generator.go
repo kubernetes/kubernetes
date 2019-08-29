@@ -43,7 +43,7 @@ func NameSystems() namer.NameSystems {
 	}
 	lowercaseNamer := namer.NewAllLowercasePluralNamer(pluralExceptions)
 
-	publicNamer := &ExceptionNamer{
+	publicNamer := &codegennamer.ExceptionNamer{
 		Exceptions: map[string]string{
 			// these exceptions are used to deconflict the generated code
 			// you can put your fully qualified package like
@@ -55,7 +55,7 @@ func NameSystems() namer.NameSystems {
 		},
 		Delegate: namer.NewPublicNamer(0),
 	}
-	privateNamer := &ExceptionNamer{
+	privateNamer := &codegennamer.ExceptionNamer{
 		Exceptions: map[string]string{
 			// these exceptions are used to deconflict the generated code
 			// you can put your fully qualified package like
@@ -67,7 +67,7 @@ func NameSystems() namer.NameSystems {
 		},
 		Delegate: namer.NewPrivateNamer(0),
 	}
-	publicPluralNamer := &ExceptionNamer{
+	publicPluralNamer := &codegennamer.ExceptionNamer{
 		Exceptions: map[string]string{
 			// these exceptions are used to deconflict the generated code
 			// you can put your fully qualified package like
@@ -79,7 +79,7 @@ func NameSystems() namer.NameSystems {
 		},
 		Delegate: namer.NewPublicPluralNamer(pluralExceptions),
 	}
-	privatePluralNamer := &ExceptionNamer{
+	privatePluralNamer := &codegennamer.ExceptionNamer{
 		Exceptions: map[string]string{
 			// you can put your fully qualified package like
 			// to generate a name that doesn't conflict with your group.
@@ -96,32 +96,14 @@ func NameSystems() namer.NameSystems {
 
 	return namer.NameSystems{
 		"singularKind":       namer.NewPublicNamer(0),
-		"public":             publicNamer,
-		"private":            privateNamer,
+		"public":             codegennamer.NewTagOverrideNamer("publicName", publicNamer),
+		"private":            codegennamer.NewTagOverrideNamer("privateName", privateNamer),
 		"raw":                namer.NewRawNamer("", nil),
-		"publicPlural":       publicPluralNamer,
-		"privatePlural":      privatePluralNamer,
-		"allLowercasePlural": lowercaseNamer,
+		"publicPlural":       codegennamer.NewTagOverrideNamer("pluralName", publicPluralNamer),
+		"privatePlural":      codegennamer.NewTagOverrideNamer("privatePluralName", privatePluralNamer),
+		"allLowercasePlural": codegennamer.NewTagOverrideNamer("allLowercasePluralName", lowercaseNamer),
 		"resource":           codegennamer.NewTagOverrideNamer("resourceName", lowercaseNamer),
 	}
-}
-
-// ExceptionNamer allows you specify exceptional cases with exact names.  This allows you to have control
-// for handling various conflicts, like group and resource names for instance.
-type ExceptionNamer struct {
-	Exceptions map[string]string
-	KeyFunc    func(*types.Type) string
-
-	Delegate namer.Namer
-}
-
-// Name provides the requested name for a type.
-func (n *ExceptionNamer) Name(t *types.Type) string {
-	key := n.KeyFunc(t)
-	if exception, ok := n.Exceptions[key]; ok {
-		return exception
-	}
-	return n.Delegate.Name(t)
 }
 
 // DefaultNameSystem returns the default name system for ordering the types to be

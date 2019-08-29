@@ -55,8 +55,8 @@ func (g *genericGenerator) Namers(c *generator.Context) namer.NameSystems {
 	}
 	return namer.NameSystems{
 		"raw":                namer.NewRawNamer(g.outputPackage, g.imports),
-		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),
-		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
+		"allLowercasePlural": codegennamer.NewTagOverrideNamer("allLowercasePluralName", namer.NewAllLowercasePluralNamer(pluralExceptions)),
+		"publicPlural":       codegennamer.NewTagOverrideNamer("publicPluralName", namer.NewPublicPluralNamer(pluralExceptions)),
 		"resource":           codegennamer.NewTagOverrideNamer("resourceName", namer.NewAllLowercasePluralNamer(pluralExceptions)),
 	}
 }

@@ -22,6 +22,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	codegennamer "k8s.io/code-generator/pkg/namer"
+
 	"k8s.io/gengo/args"
 	"k8s.io/gengo/generator"
 	"k8s.io/gengo/namer"
@@ -39,12 +41,12 @@ func NameSystems() namer.NameSystems {
 		"Endpoints": "Endpoints",
 	}
 	return namer.NameSystems{
-		"public":             namer.NewPublicNamer(0),
-		"private":            namer.NewPrivateNamer(0),
+		"public":             codegennamer.NewTagOverrideNamer("publicName", namer.NewPublicNamer(0)),
+		"private":            codegennamer.NewTagOverrideNamer("privateName", namer.NewPrivateNamer(0)),
 		"raw":                namer.NewRawNamer("", nil),
-		"publicPlural":       namer.NewPublicPluralNamer(pluralExceptions),
-		"allLowercasePlural": namer.NewAllLowercasePluralNamer(pluralExceptions),
-		"lowercaseSingular":  &lowercaseSingularNamer{},
+		"publicPlural":       codegennamer.NewTagOverrideNamer("publicPluralName", namer.NewPublicPluralNamer(pluralExceptions)),
+		"allLowercasePlural": codegennamer.NewTagOverrideNamer("lowercasePluralName", namer.NewAllLowercasePluralNamer(pluralExceptions)),
+		"lowercaseSingular":  codegennamer.NewTagOverrideNamer("lowercaseSingularName",&lowercaseSingularNamer{},
 	}
 }
 
