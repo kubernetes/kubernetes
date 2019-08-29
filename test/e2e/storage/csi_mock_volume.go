@@ -370,10 +370,14 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 					framework.ExpectNoError(err, "failed to test for CSIInlineVolumes")
 				}
 
+				ginkgo.By("Deleting the previously created pod")
+				err = e2epod.DeletePodWithWait(m.cs, pod)
+				framework.ExpectNoError(err, "while deleting")
+
 				ginkgo.By("Checking CSI driver logs")
 				// The driver is deployed as a statefulset with stable pod names
 				driverPodName := "csi-mockplugin-0"
-				err = checkPodInfo(m.cs, f.Namespace.Name, driverPodName, "mock", pod, test.expectPodInfo, test.expectEphemeral, csiInlineVolumesEnabled)
+				err = checkPodLogs(m.cs, f.Namespace.Name, driverPodName, "mock", pod, test.expectPodInfo, test.expectEphemeral, csiInlineVolumesEnabled)
 				framework.ExpectNoError(err)
 			})
 		}
@@ -719,8 +723,9 @@ func startPausePodWithVolumeSource(cs clientset.Interface, volumeSource v1.Volum
 	return cs.CoreV1().Pods(ns).Create(pod)
 }
 
-// checkPodInfo tests that NodePublish was called with expected volume_context
-func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContainerName string, pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled bool) error {
+// checkPodLogs tests that NodePublish was called with expected volume_context and (for ephemeral inline volumes)
+// has the matching NodeUnpublish
+func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContainerName string, pod *v1.Pod, expectPodInfo, ephemeralVolume, csiInlineVolumesEnabled bool) error {
 	expectedAttributes := map[string]string{
 		"csi.storage.k8s.io/pod.name":            pod.Name,
 		"csi.storage.k8s.io/pod.namespace":       namespace,
@@ -741,6 +746,8 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 	// Find NodePublish in the logs
 	foundAttributes := sets.NewString()
 	logLines := strings.Split(log, "\n")
+	numNodePublishVolume := 0
+	numNodeUnpublishVolume := 0
 	for _, line := range logLines {
 		if !strings.HasPrefix(line, "gRPCCall:") {
 			continue
@@ -759,19 +766,23 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 			e2elog.Logf("Could not parse CSI driver log line %q: %s", line, err)
 			continue
 		}
-		if call.Method != "/csi.v1.Node/NodePublishVolume" {
-			continue
-		}
-		// Check that NodePublish had expected attributes
-		for k, v := range expectedAttributes {
-			vv, found := call.Request.VolumeContext[k]
-			if found && v == vv {
-				foundAttributes.Insert(k)
-				e2elog.Logf("Found volume attribute %s: %s", k, v)
+		switch call.Method {
+		case "/csi.v1.Node/NodePublishVolume":
+			numNodePublishVolume++
+			if numNodePublishVolume == 1 {
+				// Check that NodePublish had expected attributes for first volume
+				for k, v := range expectedAttributes {
+					vv, found := call.Request.VolumeContext[k]
+					if found && v == vv {
+						foundAttributes.Insert(k)
+						e2elog.Logf("Found volume attribute %s: %s", k, v)
+					}
+				}
 			}
+		case "/csi.v1.Node/NodeUnpublishVolume":
+			e2elog.Logf("Found NodeUnpublishVolume: %+v", call)
+			numNodeUnpublishVolume++
 		}
-		// Process just the first NodePublish, the rest of the log is useless.
-		break
 	}
 	if expectPodInfo {
 		if foundAttributes.Len() != len(expectedAttributes) {
@@ -781,6 +792,9 @@ func checkPodInfo(cs clientset.Interface, namespace, driverPodName, driverContai
 	}
 	if foundAttributes.Len() != 0 {
 		return fmt.Errorf("some unexpected volume attributes were found: %+v", foundAttributes.List())
+	}
+	if numNodePublishVolume != numNodeUnpublishVolume {
+		return fmt.Errorf("number of NodePublishVolume %d != number of NodeUnpublishVolume %d", numNodePublishVolume, numNodeUnpublishVolume)
 	}
 	return nil
 }

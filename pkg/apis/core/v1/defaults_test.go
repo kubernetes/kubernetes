@@ -35,6 +35,10 @@ import (
 
 	// enforce that all types are installed
 	_ "k8s.io/kubernetes/pkg/api/testapi"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // TestWorkloadDefaults detects changes to defaults within PodTemplateSpec.
@@ -973,6 +977,140 @@ func TestSetDefaultService(t *testing.T) {
 	}
 	if svc2.Spec.Type != v1.ServiceTypeClusterIP {
 		t.Errorf("Expected default type:%s, got: %s", v1.ServiceTypeClusterIP, svc2.Spec.Type)
+	}
+}
+
+func TestSetDefaultServiceIPFamily(t *testing.T) {
+	svc := v1.Service{
+		Spec: v1.ServiceSpec{
+			SessionAffinity: v1.ServiceAffinityNone,
+			Type:            v1.ServiceTypeClusterIP,
+		},
+	}
+	testCases := []struct {
+		name            string
+		inSvcTweak      func(s v1.Service) v1.Service
+		outSvcTweak     func(s v1.Service) v1.Service
+		enableDualStack bool
+	}{
+		{
+			name:            "dualstack off. ipfamily not set",
+			inSvcTweak:      func(s v1.Service) v1.Service { return s },
+			outSvcTweak:     func(s v1.Service) v1.Service { return s },
+			enableDualStack: false,
+		},
+		{
+			name: "dualstack on. ipfamily not set, service is *not* ClusterIP-able",
+			inSvcTweak: func(s v1.Service) v1.Service {
+				s.Spec.Type = v1.ServiceTypeExternalName
+				return s
+			},
+			outSvcTweak:     func(s v1.Service) v1.Service { return s },
+			enableDualStack: true,
+		},
+		{
+			name: "dualstack off. ipfamily set",
+			inSvcTweak: func(s v1.Service) v1.Service {
+				ipv4Service := v1.IPv4Protocol
+				s.Spec.IPFamily = &ipv4Service
+				return s
+			},
+			outSvcTweak: func(s v1.Service) v1.Service {
+				ipv4Service := v1.IPv4Protocol
+				s.Spec.IPFamily = &ipv4Service
+				return s
+			},
+			enableDualStack: false,
+		},
+		{
+			name: "dualstack off. ipfamily not set. clusterip set",
+			inSvcTweak: func(s v1.Service) v1.Service {
+				s.Spec.ClusterIP = "1.1.1.1"
+				return s
+			},
+			outSvcTweak: func(s v1.Service) v1.Service {
+				return s
+			},
+			enableDualStack: false,
+		},
+		{
+			name: "dualstack on. ipfamily not set (clusterIP is v4)",
+			inSvcTweak: func(s v1.Service) v1.Service {
+				s.Spec.ClusterIP = "1.1.1.1"
+				return s
+			},
+			outSvcTweak: func(s v1.Service) v1.Service {
+				ipv4Service := v1.IPv4Protocol
+				s.Spec.IPFamily = &ipv4Service
+				return s
+			},
+			enableDualStack: true,
+		},
+		{
+			name: "dualstack on. ipfamily not set (clusterIP is v6)",
+			inSvcTweak: func(s v1.Service) v1.Service {
+				s.Spec.ClusterIP = "fdd7:7713:8917:77ed:ffff:ffff:ffff:ffff"
+				return s
+			},
+			outSvcTweak: func(s v1.Service) v1.Service {
+				ipv6Service := v1.IPv6Protocol
+				s.Spec.IPFamily = &ipv6Service
+				return s
+			},
+			enableDualStack: true,
+		},
+		{
+			name: "dualstack on. ipfamily set (clusterIP is v4)",
+			inSvcTweak: func(s v1.Service) v1.Service {
+				ipv4Service := v1.IPv4Protocol
+				s.Spec.IPFamily = &ipv4Service
+				s.Spec.ClusterIP = "1.1.1.1"
+				return s
+			},
+			outSvcTweak: func(s v1.Service) v1.Service {
+				ipv4Service := v1.IPv4Protocol
+				s.Spec.IPFamily = &ipv4Service
+				return s
+			},
+			enableDualStack: true,
+		},
+		{
+			name: "dualstack on. ipfamily set (clusterIP is v6)",
+			inSvcTweak: func(s v1.Service) v1.Service {
+				ipv6Service := v1.IPv6Protocol
+				s.Spec.IPFamily = &ipv6Service
+				s.Spec.ClusterIP = "fdd7:7713:8917:77ed:ffff:ffff:ffff:ffff"
+				return s
+			},
+			outSvcTweak: func(s v1.Service) v1.Service {
+				ipv6Service := v1.IPv6Protocol
+				s.Spec.IPFamily = &ipv6Service
+				return s
+			},
+			enableDualStack: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.IPv6DualStack, tc.enableDualStack)()
+			tweakedIn := tc.inSvcTweak(svc)
+			expectedSvc := tc.outSvcTweak(svc)
+			defaulted := roundTrip(t, runtime.Object(&tweakedIn))
+
+			defaultedSvc := defaulted.(*v1.Service)
+			if expectedSvc.Spec.IPFamily != nil {
+				if defaultedSvc.Spec.IPFamily == nil {
+					t.Fatalf("defaulted service ipfamily is nil while expected is not")
+				}
+				if *(expectedSvc.Spec.IPFamily) != *(defaultedSvc.Spec.IPFamily) {
+					t.Fatalf("defaulted service ipfamily %v does not match expected %v", defaultedSvc.Spec.IPFamily, expectedSvc.Spec.IPFamily)
+				}
+			}
+
+			if expectedSvc.Spec.IPFamily == nil && defaultedSvc.Spec.IPFamily != nil {
+				t.Fatalf("defaulted service ipfamily is not nil, while expected service ipfamily is")
+			}
+		})
 	}
 }
 

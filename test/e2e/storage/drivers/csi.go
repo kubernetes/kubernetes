@@ -62,11 +62,12 @@ const (
 
 // hostpathCSI
 type hostpathCSIDriver struct {
-	driverInfo testsuites.DriverInfo
-	manifests  []string
+	driverInfo       testsuites.DriverInfo
+	manifests        []string
+	volumeAttributes []map[string]string
 }
 
-func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]bool, manifests ...string) testsuites.TestDriver {
+func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]bool, volumeAttributes []map[string]string, manifests ...string) testsuites.TestDriver {
 	return &hostpathCSIDriver{
 		driverInfo: testsuites.DriverInfo{
 			Name:        name,
@@ -77,13 +78,15 @@ func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]b
 			),
 			Capabilities: capabilities,
 		},
-		manifests: manifests,
+		manifests:        manifests,
+		volumeAttributes: volumeAttributes,
 	}
 }
 
 var _ testsuites.TestDriver = &hostpathCSIDriver{}
 var _ testsuites.DynamicPVTestDriver = &hostpathCSIDriver{}
 var _ testsuites.SnapshottableTestDriver = &hostpathCSIDriver{}
+var _ testsuites.EphemeralTestDriver = &hostpathCSIDriver{}
 
 // InitHostPathCSIDriver returns hostpathCSIDriver that implements TestDriver interface
 func InitHostPathCSIDriver() testsuites.TestDriver {
@@ -97,16 +100,20 @@ func InitHostPathCSIDriver() testsuites.TestDriver {
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
+		// Volume attributes don't matter, but we have to provide at least one map.
+		[]map[string]string{
+			{"foo": "bar"},
+		},
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-snapshotter/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-attacher.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-driverinfo.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-plugin.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-provisioner.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-resizer.yaml",
-		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpathplugin.yaml",
+		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/csi-hostpath-snapshotter.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath/e2e-test-rbac.yaml",
 	)
 }
@@ -116,6 +123,9 @@ func (h *hostpathCSIDriver) GetDriverInfo() *testsuites.DriverInfo {
 }
 
 func (h *hostpathCSIDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
+	if pattern.VolType == testpatterns.CSIInlineVolume && len(h.volumeAttributes) == 0 {
+		framework.Skipf("%s has no volume attributes defined, doesn't support ephemeral inline volumes", h.driverInfo.Name)
+	}
 }
 
 func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
@@ -125,6 +135,14 @@ func (h *hostpathCSIDriver) GetDynamicProvisionStorageClass(config *testsuites.P
 	suffix := fmt.Sprintf("%s-sc", provisioner)
 
 	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+}
+
+func (h *hostpathCSIDriver) GetVolume(config *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
+	return h.volumeAttributes[volumeNumber%len(h.volumeAttributes)], false /* not shared */, false /* read-write */
+}
+
+func (h *hostpathCSIDriver) GetCSIDriverName(config *testsuites.PerTestConfig) string {
+	return config.GetUniqueDriverName()
 }
 
 func (h *hostpathCSIDriver) GetSnapshotClass(config *testsuites.PerTestConfig) *unstructured.Unstructured {
@@ -205,7 +223,6 @@ var _ testsuites.DynamicPVTestDriver = &mockCSIDriver{}
 // InitMockCSIDriver returns a mockCSIDriver that implements TestDriver interface
 func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 	driverManifests := []string{
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-resizer/rbac.yaml",
@@ -235,9 +252,10 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 				"", // Default fsType
 			),
 			Capabilities: map[testsuites.Capability]bool{
-				testsuites.CapPersistence: false,
-				testsuites.CapFsGroup:     false,
-				testsuites.CapExec:        false,
+				testsuites.CapPersistence:  false,
+				testsuites.CapFsGroup:      false,
+				testsuites.CapExec:         false,
+				testsuites.CapVolumeLimits: true,
 			},
 		},
 		manifests:           driverManifests,
@@ -305,7 +323,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 		NodeName:                 config.ClientNodeName,
 		PodInfo:                  m.podInfo,
 		CanAttach:                &m.attachable,
-		VolumeLifecycleModes: []storagev1beta1.VolumeLifecycleMode{
+		VolumeLifecycleModes: &[]storagev1beta1.VolumeLifecycleMode{
 			storagev1beta1.VolumeLifecyclePersistent,
 			storagev1beta1.VolumeLifecycleEphemeral,
 		},
@@ -329,7 +347,10 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 func InitHostPathV0CSIDriver() testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath-v0",
 		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapMultiPODs: true},
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
+		nil, /* no volume attributes -> no ephemeral volume testing */
+		// Using the current set of rbac.yaml files is problematic here because they don't
+		// match the version of the rules that were written for the releases of external-attacher
+		// and external-provisioner that we are using here. It happens to work in practice...
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/hostpath/hostpath-v0/csi-hostpath-attacher.yaml",
@@ -367,6 +388,9 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
 				testsuites.CapMultiPODs:   true,
+				// GCE supports volume limits, but the test creates large
+				// number of volumes and times out test suites.
+				testsuites.CapVolumeLimits: false,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 		},
@@ -423,7 +447,6 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 	createGCESecrets(f.ClientSet, f.Namespace.Name)
 
 	manifests := []string{
-		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/gce-pd/csi-controller-rbac.yaml",

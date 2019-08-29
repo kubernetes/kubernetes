@@ -33,12 +33,6 @@ func NewTestSocketMask(sockets ...int) socketmask.SocketMask {
 	return s
 }
 
-func NewTestSocketMaskFull() socketmask.SocketMask {
-	s, _ := socketmask.NewSocketMask()
-	s.Fill()
-	return s
-}
-
 func TestNewManager(t *testing.T) {
 	tcases := []struct {
 		description    string
@@ -64,7 +58,7 @@ func TestNewManager(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		mngr, err := NewManager(tc.policyName)
+		mngr, err := NewManager(nil, tc.policyName)
 
 		if tc.expectedError != nil {
 			if !strings.Contains(err.Error(), tc.expectedError.Error()) {
@@ -111,6 +105,8 @@ func TestGetAffinity(t *testing.T) {
 }
 
 func TestCalculateAffinity(t *testing.T) {
+	numaNodes := []int{0, 1}
+
 	tcases := []struct {
 		name     string
 		hp       []HintProvider
@@ -120,8 +116,8 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "TopologyHint not set",
 			hp:   []HintProvider{},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				Preferred:        true,
 			},
 		},
 		{
@@ -132,8 +128,8 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				Preferred:        true,
 			},
 		},
 		{
@@ -146,8 +142,8 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				Preferred:        true,
 			},
 		},
 		{
@@ -160,46 +156,46 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      false,
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				Preferred:        false,
 			},
 		},
 		{
-			name: "Single TopologyHint with Preferred as true and SocketAffinity as nil",
+			name: "Single TopologyHint with Preferred as true and NUMANodeAffinity as nil",
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								SocketAffinity: nil,
-								Preferred:      true,
+								NUMANodeAffinity: nil,
+								Preferred:        true,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				Preferred:        true,
 			},
 		},
 		{
-			name: "Single TopologyHint with Preferred as false and SocketAffinity as nil",
+			name: "Single TopologyHint with Preferred as false and NUMANodeAffinity as nil",
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								SocketAffinity: nil,
-								Preferred:      false,
+								NUMANodeAffinity: nil,
+								Preferred:        false,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				Preferred:        true,
 			},
 		},
 		{
@@ -209,8 +205,8 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 						},
 					},
@@ -219,16 +215,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(0),
+				Preferred:        true,
 			},
 		},
 		{
@@ -238,8 +234,8 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 						},
 					},
@@ -248,16 +244,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(1),
+				Preferred:        true,
 			},
 		},
 		{
@@ -267,8 +263,8 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 						},
 					},
@@ -277,16 +273,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        true,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(0),
+				Preferred:        true,
 			},
 		},
 		{
@@ -296,8 +292,8 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 						},
 					},
@@ -306,16 +302,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        true,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(1),
+				Preferred:        true,
 			},
 		},
 		{
@@ -325,8 +321,8 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 						},
 					},
@@ -335,16 +331,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMaskFull(),
-				Preferred:      false,
+				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				Preferred:        false,
 			},
 		},
 		{
@@ -354,8 +350,8 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 						},
 					},
@@ -364,16 +360,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        false,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      false,
+				NUMANodeAffinity: NewTestSocketMask(0),
+				Preferred:        false,
 			},
 		},
 		{
@@ -383,8 +379,8 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 						},
 					},
@@ -393,16 +389,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        false,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      false,
+				NUMANodeAffinity: NewTestSocketMask(1),
+				Preferred:        false,
 			},
 		},
 		{
@@ -413,16 +409,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(0),
+				Preferred:        true,
 			},
 		},
 		{
@@ -433,16 +429,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(1),
+				Preferred:        true,
 			},
 		},
 		{
@@ -452,12 +448,12 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 						},
 					},
@@ -466,16 +462,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(0),
+				Preferred:        true,
 			},
 		},
 		{
@@ -485,12 +481,12 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 						},
 					},
@@ -499,16 +495,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(1),
+				Preferred:        true,
 			},
 		},
 		{
@@ -518,12 +514,12 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 						},
 					},
@@ -532,16 +528,16 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      false,
+				NUMANodeAffinity: NewTestSocketMask(0),
+				Preferred:        false,
 			},
 		},
 		{
@@ -551,12 +547,12 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 						},
 					},
@@ -565,20 +561,20 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(0),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(0),
+				Preferred:        true,
 			},
 		},
 		{
@@ -588,12 +584,12 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 					},
@@ -602,24 +598,24 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(1),
+				Preferred:        true,
 			},
 		},
 		{
@@ -629,44 +625,46 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 						"resource2": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 					},
 				},
 			},
 			expected: TopologyHint{
-				SocketAffinity: NewTestSocketMask(1),
-				Preferred:      true,
+				NUMANodeAffinity: NewTestSocketMask(1),
+				Preferred:        true,
 			},
 		},
 	}
 
 	for _, tc := range tcases {
-		mngr := manager{}
-		mngr.hintProviders = tc.hp
+		mngr := manager{
+			hintProviders: tc.hp,
+			numaNodes:     numaNodes,
+		}
 		actual := mngr.calculateAffinity(v1.Pod{}, v1.Container{})
-		if !actual.SocketAffinity.IsEqual(tc.expected.SocketAffinity) {
-			t.Errorf("Expected SocketAffinity in result to be %v, got %v", tc.expected.SocketAffinity, actual.SocketAffinity)
+		if !actual.NUMANodeAffinity.IsEqual(tc.expected.NUMANodeAffinity) {
+			t.Errorf("Expected NUMANodeAffinity in result to be %v, got %v", tc.expected.NUMANodeAffinity, actual.NUMANodeAffinity)
 		}
 		if actual.Preferred != tc.expected.Preferred {
 			t.Errorf("Expected Affinity preference in result to be %v, got %v", tc.expected.Preferred, actual.Preferred)
@@ -801,12 +799,12 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 					},
@@ -823,16 +821,16 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 					},
@@ -849,8 +847,8 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 					},
@@ -867,12 +865,12 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 					},
@@ -889,16 +887,16 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								SocketAffinity: NewTestSocketMask(0),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(1),
-								Preferred:      true,
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
 							},
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 					},
@@ -915,8 +913,8 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								SocketAffinity: NewTestSocketMask(0, 1),
-								Preferred:      false,
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
 							},
 						},
 					},
@@ -926,10 +924,13 @@ func TestAdmit(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		man := manager{}
-		man.policy = tc.policy
-		man.podTopologyHints = make(map[string]map[string]TopologyHint)
-		man.hintProviders = tc.hp
+		man := manager{
+			policy:           tc.policy,
+			podTopologyHints: make(map[string]map[string]TopologyHint),
+			hintProviders:    tc.hp,
+			numaNodes:        []int{0, 1},
+		}
+
 		pod := &v1.Pod{
 			Spec: v1.PodSpec{
 				Containers: []v1.Container{
@@ -938,10 +939,15 @@ func TestAdmit(t *testing.T) {
 					},
 				},
 			},
+			Status: v1.PodStatus{
+				QOSClass: tc.qosClass,
+			},
 		}
-		podAttr := lifecycle.PodAdmitAttributes{}
-		pod.Status.QOSClass = tc.qosClass
-		podAttr.Pod = pod
+
+		podAttr := lifecycle.PodAdmitAttributes{
+			Pod: pod,
+		}
+
 		actual := man.Admit(&podAttr)
 		if actual.Admit != tc.expected {
 			t.Errorf("Error occurred, expected Admit in result to be %v got %v", tc.expected, actual.Admit)

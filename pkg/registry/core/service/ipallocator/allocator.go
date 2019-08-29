@@ -32,6 +32,7 @@ type Interface interface {
 	AllocateNext() (net.IP, error)
 	Release(net.IP) error
 	ForEach(func(net.IP))
+	CIDR() net.IPNet
 
 	// For testing
 	Has(ip net.IP) bool

@@ -34,6 +34,7 @@ const (
 
 	// Parameter names defined in azure disk CSI driver, refer to
 	// https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
+	azureDiskKind        = "kind"
 	azureDiskCachingMode = "cachingMode"
 	azureDiskFSType      = "fsType"
 )
@@ -79,7 +80,7 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 					VolumeHandle:     azureSource.DataDiskURI,
 					ReadOnly:         *azureSource.ReadOnly,
 					FSType:           *azureSource.FSType,
-					VolumeAttributes: map[string]string{},
+					VolumeAttributes: map[string]string{azureDiskKind: "Managed"},
 				},
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
@@ -91,6 +92,9 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 	}
 	if *azureSource.FSType != "" {
 		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskFSType] = *azureSource.FSType
+	}
+	if azureSource.Kind != nil {
+		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskKind] = string(*azureSource.Kind)
 	}
 
 	return pv, nil
@@ -111,15 +115,19 @@ func (t *azureDiskCSITranslator) TranslateInTreePVToCSI(pv *v1.PersistentVolume)
 		VolumeHandle:     azureSource.DataDiskURI,
 		ReadOnly:         *azureSource.ReadOnly,
 		FSType:           *azureSource.FSType,
-		VolumeAttributes: map[string]string{},
+		VolumeAttributes: map[string]string{azureDiskKind: "Managed"},
 	}
 
-	if *azureSource.CachingMode != "" {
+	if azureSource.CachingMode != nil {
 		csiSource.VolumeAttributes[azureDiskCachingMode] = string(*azureSource.CachingMode)
 	}
 
-	if *azureSource.FSType != "" {
+	if azureSource.FSType != nil {
 		csiSource.VolumeAttributes[azureDiskFSType] = *azureSource.FSType
+	}
+
+	if azureSource.Kind != nil {
+		csiSource.VolumeAttributes[azureDiskKind] = string(*azureSource.Kind)
 	}
 
 	pv.Spec.PersistentVolumeSource.AzureDisk = nil
@@ -144,11 +152,13 @@ func (t *azureDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 	}
 
 	// refer to https://github.com/kubernetes-sigs/azuredisk-csi-driver/blob/master/docs/driver-parameters.md
+	managed := v1.AzureManagedDisk
 	azureSource := &v1.AzureDiskVolumeSource{
 		DiskName:    diskName,
 		DataDiskURI: diskURI,
 		FSType:      &csiSource.FSType,
 		ReadOnly:    &csiSource.ReadOnly,
+		Kind:        &managed,
 	}
 
 	if csiSource.VolumeAttributes != nil {
@@ -159,6 +169,11 @@ func (t *azureDiskCSITranslator) TranslateCSIPVToInTree(pv *v1.PersistentVolume)
 
 		if fsType, ok := csiSource.VolumeAttributes[azureDiskFSType]; ok && fsType != "" {
 			azureSource.FSType = &fsType
+		}
+
+		if kind, ok := csiSource.VolumeAttributes[azureDiskKind]; ok && kind != "" {
+			diskKind := v1.AzureDataDiskKind(kind)
+			azureSource.Kind = &diskKind
 		}
 	}
 

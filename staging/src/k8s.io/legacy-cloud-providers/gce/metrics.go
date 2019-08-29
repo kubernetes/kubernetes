@@ -21,7 +21,8 @@ package gce
 import (
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const (
@@ -32,8 +33,8 @@ const (
 )
 
 type apiCallMetrics struct {
-	latency *prometheus.HistogramVec
-	errors  *prometheus.CounterVec
+	latency *metrics.HistogramVec
+	errors  *metrics.CounterVec
 }
 
 var (
@@ -84,24 +85,26 @@ func newGenericMetricContext(prefix, request, region, zone, version string) *met
 // registerApiMetrics adds metrics definitions for a category of API calls.
 func registerAPIMetrics(attributes ...string) *apiCallMetrics {
 	metrics := &apiCallMetrics{
-		latency: prometheus.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Name: "cloudprovider_gce_api_request_duration_seconds",
-				Help: "Latency of a GCE API call",
+		latency: metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Name:           "cloudprovider_gce_api_request_duration_seconds",
+				Help:           "Latency of a GCE API call",
+				StabilityLevel: metrics.ALPHA,
 			},
 			attributes,
 		),
-		errors: prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "cloudprovider_gce_api_request_errors",
-				Help: "Number of errors for an API call",
+		errors: metrics.NewCounterVec(
+			&metrics.CounterOpts{
+				Name:           "cloudprovider_gce_api_request_errors",
+				Help:           "Number of errors for an API call",
+				StabilityLevel: metrics.ALPHA,
 			},
 			attributes,
 		),
 	}
 
-	prometheus.MustRegister(metrics.latency)
-	prometheus.MustRegister(metrics.errors)
+	legacyregistry.MustRegister(metrics.latency)
+	legacyregistry.MustRegister(metrics.errors)
 
 	return metrics
 }

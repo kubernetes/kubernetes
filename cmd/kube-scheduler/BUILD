@@ -20,10 +20,9 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kube-scheduler",
     deps = [
         "//cmd/kube-scheduler/app:go_default_library",
-        "//pkg/util/prometheusclientgo:go_default_library",
-        "//pkg/version/prometheus:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/clientgo:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )

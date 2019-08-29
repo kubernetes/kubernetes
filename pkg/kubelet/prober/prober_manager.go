@@ -19,12 +19,12 @@ package prober
 import (
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/component-base/metrics"
 	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -33,11 +33,12 @@ import (
 )
 
 // ProberResults stores the cumulative number of a probe by result as prometheus metrics.
-var ProberResults = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Subsystem: "prober",
-		Name:      "probe_total",
-		Help:      "Cumulative number of a liveness or readiness probe for a container by result.",
+var ProberResults = metrics.NewCounterVec(
+	&metrics.CounterOpts{
+		Subsystem:      "prober",
+		Name:           "probe_total",
+		Help:           "Cumulative number of a liveness or readiness probe for a container by result.",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"probe_type",
 		"result",

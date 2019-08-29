@@ -20,7 +20,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
@@ -69,29 +68,21 @@ func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) map[strin
 // available CPUs and the number of CPUs being requested.
 //
 // It follows the convention of marking all hints that have the same number of
-// bits set as the narrowest matching SocketAffinity with 'Preferred: true', and
+// bits set as the narrowest matching NUMANodeAffinity with 'Preferred: true', and
 // marking all others with 'Preferred: false'.
 func (m *manager) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
-	// Discover topology in order to establish the number
-	// of available CPUs per socket.
-	topo, err := topology.Discover(m.machineInfo)
-	if err != nil {
-		klog.Warningf("[cpu manager] Error discovering topology for TopologyHint generation")
-		return nil
-	}
-
 	// Initialize minAffinity to a full affinity mask.
 	minAffinity, _ := socketmask.NewSocketMask()
 	minAffinity.Fill()
 
 	// Iterate through all combinations of socketMasks and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	socketmask.IterateSocketMasks(topo.CPUDetails.Sockets().ToSlice(), func(mask socketmask.SocketMask) {
+	socketmask.IterateSocketMasks(m.topology.CPUDetails.NUMANodes().ToSlice(), func(mask socketmask.SocketMask) {
 		// Check to see if we have enough CPUs available on the current
 		// SocketMask to satisfy the CPU request.
 		numMatching := 0
 		for _, c := range availableCPUs.ToSlice() {
-			if mask.IsSet(topo.CPUDetails[c].SocketID) {
+			if mask.IsSet(m.topology.CPUDetails[c].NUMANodeID) {
 				numMatching++
 			}
 		}
@@ -105,8 +96,8 @@ func (m *manager) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request 
 		// list of hints.  We set all hint preferences to 'false' on the first
 		// pass through.
 		hints = append(hints, topologymanager.TopologyHint{
-			SocketAffinity: mask,
-			Preferred:      false,
+			NUMANodeAffinity: mask,
+			Preferred:        false,
 		})
 
 		// Update minAffinity if relevant
@@ -120,7 +111,7 @@ func (m *manager) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request 
 	// to the minAffinity. Only those with an equal number of bits set will be
 	// considered preferred.
 	for i := range hints {
-		if hints[i].SocketAffinity.Count() == minAffinity.Count() {
+		if hints[i].NUMANodeAffinity.Count() == minAffinity.Count() {
 			hints[i].Preferred = true
 		}
 	}

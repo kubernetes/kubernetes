@@ -351,6 +351,8 @@ func getResourceList(cpu, memory string) corev1.ResourceList {
 }
 
 func TestDescribeService(t *testing.T) {
+	defaultServiceIPFamily := corev1.IPv4Protocol
+
 	testCases := []struct {
 		name    string
 		service *corev1.Service
@@ -364,7 +366,8 @@ func TestDescribeService(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: corev1.ServiceSpec{
-					Type: corev1.ServiceTypeLoadBalancer,
+					Type:     corev1.ServiceTypeLoadBalancer,
+					IPFamily: &defaultServiceIPFamily,
 					Ports: []corev1.ServicePort{{
 						Name:       "port-tcp",
 						Port:       8080,
@@ -402,7 +405,8 @@ func TestDescribeService(t *testing.T) {
 					Namespace: "foo",
 				},
 				Spec: corev1.ServiceSpec{
-					Type: corev1.ServiceTypeLoadBalancer,
+					Type:     corev1.ServiceTypeLoadBalancer,
+					IPFamily: &defaultServiceIPFamily,
 					Ports: []corev1.ServicePort{{
 						Name:       "port-tcp",
 						Port:       8080,
@@ -424,6 +428,46 @@ func TestDescribeService(t *testing.T) {
 				"Selector", "blah=heh",
 				"Type", "LoadBalancer",
 				"IP", "1.2.3.4",
+				"Port", "port-tcp", "8080/TCP",
+				"TargetPort", "targetPort/TCP",
+				"NodePort", "port-tcp", "31111/TCP",
+				"Session Affinity", "None",
+				"External Traffic Policy", "Local",
+				"HealthCheck NodePort", "32222",
+			},
+		},
+		{
+			name: "test-ServiceIPFamily",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+				Spec: corev1.ServiceSpec{
+					Type:     corev1.ServiceTypeLoadBalancer,
+					IPFamily: &defaultServiceIPFamily,
+					Ports: []corev1.ServicePort{{
+						Name:       "port-tcp",
+						Port:       8080,
+						Protocol:   corev1.ProtocolTCP,
+						TargetPort: intstr.FromString("targetPort"),
+						NodePort:   31111,
+					}},
+					Selector:              map[string]string{"blah": "heh"},
+					ClusterIP:             "1.2.3.4",
+					LoadBalancerIP:        "5.6.7.8",
+					SessionAffinity:       "None",
+					ExternalTrafficPolicy: "Local",
+					HealthCheckNodePort:   32222,
+				},
+			},
+			expect: []string{
+				"Name", "bar",
+				"Namespace", "foo",
+				"Selector", "blah=heh",
+				"Type", "LoadBalancer",
+				"IP", "1.2.3.4",
+				"IPFamily", "IPv4",
 				"Port", "port-tcp", "8080/TCP",
 				"TargetPort", "targetPort/TCP",
 				"NodePort", "port-tcp", "31111/TCP",

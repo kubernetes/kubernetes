@@ -40,6 +40,12 @@ import (
  * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
  * the metric stability policy.
  */
+const (
+	successLabel = "success"
+	failureLabel = "failure"
+	errorLabel   = "error"
+)
+
 var (
 	authenticatedUserCounter = metrics.NewCounterVec(
 		&metrics.CounterOpts{
@@ -49,10 +55,19 @@ var (
 		},
 		[]string{"username"},
 	)
+
+	authenticatedAttemptsCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name: "authentication_attempts",
+			Help: "Counter of authenticated attempts.",
+		},
+		[]string{"result"},
+	)
 )
 
 func init() {
 	legacyregistry.MustRegister(authenticatedUserCounter)
+	legacyregistry.MustRegister(authenticatedAttemptsCounter)
 }
 
 // WithAuthentication creates an http handler that tries to authenticate the given request as a user, and then
@@ -72,7 +87,11 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		if err != nil || !ok {
 			if err != nil {
 				klog.Errorf("Unable to authenticate the request due to an error: %v", err)
+				authenticatedAttemptsCounter.WithLabelValues(errorLabel).Inc()
+			} else if !ok {
+				authenticatedAttemptsCounter.WithLabelValues(failureLabel).Inc()
 			}
+
 			failed.ServeHTTP(w, req)
 			return
 		}
@@ -86,6 +105,7 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		req = req.WithContext(genericapirequest.WithUser(req.Context(), resp.User))
 
 		authenticatedUserCounter.WithLabelValues(compressUsername(resp.User.GetName())).Inc()
+		authenticatedAttemptsCounter.WithLabelValues(successLabel).Inc()
 
 		handler.ServeHTTP(w, req)
 	})
