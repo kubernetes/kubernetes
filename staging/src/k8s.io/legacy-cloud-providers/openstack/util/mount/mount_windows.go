@@ -1,4 +1,4 @@
-// +build windows
+// +build windows,!providerless
 
 /*
 Copyright 2017 The Kubernetes Authors.
