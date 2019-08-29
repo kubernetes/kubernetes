@@ -1009,14 +1009,14 @@ func TestBindPlugin(t *testing.T) {
 			}
 			if test.expectBoundByScheduler {
 				if pod.Annotations[bindPluginAnnotation] != "" {
-					t.Errorf("test #%v: Expected the pod to be binded by scheduler instead of by bindplugin %s", i, pod.Annotations[bindPluginAnnotation])
+					t.Errorf("test #%v: Expected the pod to be bound by scheduler instead of by bindplugin %s", i, pod.Annotations[bindPluginAnnotation])
 				}
 				if bindPlugin1.numBindCalled != 1 || bindPlugin2.numBindCalled != 1 {
 					t.Errorf("test #%v: Expected each bind plugin to be called once, was called %d and %d times.", i, bindPlugin1.numBindCalled, bindPlugin2.numBindCalled)
 				}
 			} else {
 				if pod.Annotations[bindPluginAnnotation] != test.expectBindPluginName {
-					t.Errorf("test #%v: Expected the pod to be binded by bindplugin %s instead of by bindplugin %s", i, test.expectBindPluginName, pod.Annotations[bindPluginAnnotation])
+					t.Errorf("test #%v: Expected the pod to be bound by bindplugin %s instead of by bindplugin %s", i, test.expectBindPluginName, pod.Annotations[bindPluginAnnotation])
 				}
 				if bindPlugin1.numBindCalled != 1 {
 					t.Errorf("test #%v: Expected %s to be called once, was called %d times.", i, bindPlugin1.Name(), bindPlugin1.numBindCalled)
