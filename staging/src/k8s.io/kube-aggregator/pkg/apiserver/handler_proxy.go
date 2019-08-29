@@ -20,8 +20,6 @@ import (
 	"context"
 	"net/http"
 	"net/url"
-	"os"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -31,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream/spdy"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/proxy"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
 	endpointmetrics "k8s.io/apiserver/pkg/endpoints/metrics"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -50,19 +47,6 @@ const (
 	aggregatedDiscoveryTimeout = 5 * time.Second
 )
 
-var (
-	// TODO this should be unconditionally true once we remove the env var override
-	enableAggregatedDiscoveryTimeout = true
-)
-
-func init() {
-	disableAggregatedDiscoveryTimeout, err := strconv.ParseBool(os.Getenv("DEPRECATED_DISABLE_AGGREGATOR_DISCOVERY_TIMEOUT"))
-	if err != nil {
-		utilruntime.HandleError(err)
-	}
-	enableAggregatedDiscoveryTimeout = !disableAggregatedDiscoveryTimeout
-}
-
 // proxyHandler provides a http.Handler which will proxy traffic to locations
 // specified by items implementing Redirector.
 type proxyHandler struct {
@@ -79,6 +63,8 @@ type proxyHandler struct {
 	serviceResolver ServiceResolver
 
 	handlingInfo atomic.Value
+
+	enableAggregatedDiscoveryTimeout bool
 }
 
 type proxyHandlingInfo struct {
@@ -162,7 +148,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	location.Path = req.URL.Path
 	location.RawQuery = req.URL.Query().Encode()
 
-	newReq, cancelFn := newRequestForProxy(location, req)
+	newReq, cancelFn := newRequestForProxy(location, req, r.enableAggregatedDiscoveryTimeout)
 	defer cancelFn()
 
 	if handlingInfo.proxyRoundTripper == nil {
@@ -191,7 +177,7 @@ func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 // newRequestForProxy returns a shallow copy of the original request with a context that may include a timeout for discovery requests
-func newRequestForProxy(location *url.URL, req *http.Request) (*http.Request, context.CancelFunc) {
+func newRequestForProxy(location *url.URL, req *http.Request, enableAggregatedDiscoveryTimeout bool) (*http.Request, context.CancelFunc) {
 	newCtx := context.Background()
 	cancelFn := func() {}
 
