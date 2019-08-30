@@ -26,6 +26,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -40,6 +41,16 @@ import (
 	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 )
+
+// OverlappingBuiltInResources returns the set of built-in group/resources that are persisted
+// in storage paths that overlap with CRD storage paths, and should not be deleted
+// by this controller if an associated CRD is deleted.
+func OverlappingBuiltInResources() map[schema.GroupResource]bool {
+	return map[schema.GroupResource]bool{
+		{Group: "apiregistration.k8s.io", Resource: "apiservices"}:             true,
+		{Group: "apiextensions.k8s.io", Resource: "customresourcedefinitions"}: true,
+	}
+}
 
 // CRDFinalizer is a controller that finalizes the CRD by deleting all the CRs associated with it.
 type CRDFinalizer struct {
@@ -126,7 +137,15 @@ func (c *CRDFinalizer) sync(key string) error {
 
 	// Now we can start deleting items.  We should use the REST API to ensure that all normal admission runs.
 	// Since we control the endpoints, we know that delete collection works. No need to delete if not established.
-	if apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+	if OverlappingBuiltInResources()[schema.GroupResource{Group: crd.Spec.Group, Resource: crd.Spec.Names.Plural}] {
+		// Skip deletion, explain why, and proceed to remove the finalizer and delete the CRD
+		apiextensions.SetCRDCondition(crd, apiextensions.CustomResourceDefinitionCondition{
+			Type:    apiextensions.Terminating,
+			Status:  apiextensions.ConditionFalse,
+			Reason:  "OverlappingBuiltInResource",
+			Message: "instances overlap with built-in resources in storage",
+		})
+	} else if apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
 		cond, deleteErr := c.deleteInstances(crd)
 		apiextensions.SetCRDCondition(crd, cond)
 		if deleteErr != nil {
