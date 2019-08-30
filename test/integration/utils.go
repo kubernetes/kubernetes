@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -82,8 +83,12 @@ func GetEtcdClients(config storagebackend.TransportConfig) (*clientv3.Client, cl
 	}
 
 	cfg := clientv3.Config{
-		Endpoints: config.ServerList,
-		TLS:       tlsConfig,
+		Endpoints:   config.ServerList,
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+		TLS: tlsConfig,
 	}
 
 	c, err := clientv3.New(cfg)
