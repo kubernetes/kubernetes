@@ -31,8 +31,6 @@ import (
 
 const (
 	OpenAPIVersion = "2.0"
-	// TODO: Make this configurable.
-	extensionPrefix = "x-kubernetes-"
 )
 
 type openAPI struct {
@@ -154,6 +152,11 @@ func (o *openAPI) buildDefinitionRecursively(name string) error {
 				schema.Extensions[k] = v
 			}
 		}
+		if v, ok := item.Schema.Extensions[common.ExtensionV2Schema]; ok {
+			if v2Schema, isOpenAPISchema := v.(spec.Schema); isOpenAPISchema {
+				schema = v2Schema
+			}
+		}
 		o.swagger.Definitions[uniqueName] = schema
 		for _, v := range item.Dependencies {
 			if err := o.buildDefinitionRecursively(v); err != nil {
@@ -270,7 +273,7 @@ func (o *openAPI) buildOperations(route restful.Route, inPathCommonParamsMap map
 		},
 	}
 	for k, v := range route.Metadata {
-		if strings.HasPrefix(k, extensionPrefix) {
+		if strings.HasPrefix(k, common.ExtensionPrefix) {
 			if ret.Extensions == nil {
 				ret.Extensions = spec.Extensions{}
 			}
