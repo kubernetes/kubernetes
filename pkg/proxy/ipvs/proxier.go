@@ -62,9 +62,6 @@ const (
 	// KubeFireWallChain is the kubernetes firewall chain.
 	KubeFireWallChain utiliptables.Chain = "KUBE-FIREWALL"
 
-	// kubePostroutingChain is the kubernetes postrouting chain
-	kubePostroutingChain utiliptables.Chain = "KUBE-POSTROUTING"
-
 	// KubeNodePortChain is the kubernetes node port chain
 	KubeNodePortChain utiliptables.Chain = "KUBE-NODE-PORT"
 
@@ -140,7 +137,7 @@ var ipsetWithIptablesChain = []struct {
 	matchType     string
 	protocolMatch string
 }{
-	{kubeLoopBackIPSet, string(kubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
+	{kubeLoopBackIPSet, string(kubelet.KubePostroutingChain), "MASQUERADE", "dst,dst,src", ""},
 	{kubeLoadBalancerSet, string(kubeServicesChain), string(KubeLoadBalancerChain), "dst,dst", ""},
 	{kubeLoadbalancerFWSet, string(KubeLoadBalancerChain), string(KubeFireWallChain), "dst,dst", ""},
 	{kubeLoadBalancerSourceCIDRSet, string(KubeFireWallChain), "RETURN", "dst,dst,src", ""},
