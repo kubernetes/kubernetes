@@ -7,7 +7,6 @@ go 1.12
 require (
 	github.com/coreos/etcd v3.3.15+incompatible
 	github.com/emicklei/go-restful v2.9.5+incompatible
-	github.com/ghodss/yaml v0.0.0-20180820084758-c7ce16629ff4 // indirect
 	github.com/go-openapi/errors v0.19.2
 	github.com/go-openapi/spec v0.19.2
 	github.com/go-openapi/strfmt v0.19.0
