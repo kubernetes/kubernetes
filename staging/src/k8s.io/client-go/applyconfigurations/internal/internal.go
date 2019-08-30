@@ -862,6 +862,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.apps.v1.RollingUpdateStatefulSetStrategy
   map:
     fields:
+    - name: maxUnavailable
+      type:
+        namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
     - name: partition
       type:
         scalar: numeric
@@ -1162,6 +1165,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.apps.v1beta1.RollingUpdateStatefulSetStrategy
   map:
     fields:
+    - name: maxUnavailable
+      type:
+        namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
     - name: partition
       type:
         scalar: numeric
@@ -1660,6 +1666,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: io.k8s.api.apps.v1beta2.RollingUpdateStatefulSetStrategy
   map:
     fields:
+    - name: maxUnavailable
+      type:
+        namedType: io.k8s.apimachinery.pkg.util.intstr.IntOrString
     - name: partition
       type:
         scalar: numeric

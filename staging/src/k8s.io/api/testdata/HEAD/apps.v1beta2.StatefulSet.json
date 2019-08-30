@@ -1742,7 +1742,8 @@
     "updateStrategy": {
       "type": "typeValue",
       "rollingUpdate": {
-        "partition": 1
+        "partition": 1,
+        "maxUnavailable": "maxUnavailableValue"
       }
     },
     "revisionHistoryLimit": 8,

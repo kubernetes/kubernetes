@@ -597,6 +597,11 @@ func (in *RollingUpdateStatefulSetStrategy) DeepCopyInto(out *RollingUpdateState
 		*out = new(int32)
 		**out = **in
 	}
+	if in.MaxUnavailable != nil {
+		in, out := &in.MaxUnavailable, &out.MaxUnavailable
+		*out = new(intstr.IntOrString)
+		**out = **in
+	}
 	return
 }
 
