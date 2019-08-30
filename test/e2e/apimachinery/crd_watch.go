@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -34,17 +35,18 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
-var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
+var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", func() {
 
 	f := framework.NewDefaultFramework("crd-watch")
 
 	ginkgo.Context("CustomResourceDefinition Watch", func() {
 		/*
-			   	   Testname: crd-watch
-			   	   Description: Create a Custom Resource Definition and make sure
-				   watches observe events on create/delete.
+			Release: v1.16
+			Testname: Custom Resource Definition, watch
+			Description: Create a Custom Resource Definition. Attempt to watch it; the watch MUST observe create,
+			modify and delete events.
 		*/
-		ginkgo.It("watch on custom resource definition objects", func() {
+		framework.ConformanceIt("watch on custom resource definition objects", func() {
 
 			const (
 				watchCRNameA = "name1"
@@ -99,6 +101,18 @@ var _ = SIGDescribe("CustomResourceDefinition Watch", func() {
 			expectEvent(watchB, watch.Added, testCrB)
 			expectNoEvent(watchA, watch.Added, testCrB)
 
+			ginkgo.By("Modifying first CR")
+			err = patchCustomResource(noxuResourceClient, watchCRNameA)
+			framework.ExpectNoError(err, "failed to patch custom resource: %s", watchCRNameA)
+			expectEvent(watchA, watch.Modified, nil)
+			expectNoEvent(watchB, watch.Modified, nil)
+
+			ginkgo.By("Modifying second CR")
+			err = patchCustomResource(noxuResourceClient, watchCRNameB)
+			framework.ExpectNoError(err, "failed to patch custom resource: %s", watchCRNameB)
+			expectEvent(watchB, watch.Modified, nil)
+			expectNoEvent(watchA, watch.Modified, nil)
+
 			ginkgo.By("Deleting first CR")
 			err = deleteCustomResource(noxuResourceClient, watchCRNameA)
 			framework.ExpectNoError(err, "failed to delete custom resource: %s", watchCRNameA)
@@ -150,6 +164,15 @@ func instantiateCustomResource(instanceToCreate *unstructured.Unstructured, clie
 		return nil, fmt.Errorf("expected %v, got %v", e, a)
 	}
 	return createdInstance, nil
+}
+
+func patchCustomResource(client dynamic.ResourceInterface, name string) error {
+	_, err := client.Patch(
+		name,
+		types.JSONPatchType,
+		[]byte(`[{ "op": "add", "path": "/dummy", "value": "test" }]`),
+		metav1.PatchOptions{})
+	return err
 }
 
 func deleteCustomResource(client dynamic.ResourceInterface, name string) error {
