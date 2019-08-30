@@ -76,7 +76,8 @@ type FakeEventClock struct {
 	clock.FakePassiveClock
 
 	// waiters is a heap of waiting work, sorted by time
-	waiters eventWaiterHeap
+	waiters     eventWaiterHeap
+	waitersLock sync.RWMutex
 
 	// clientWG may be nil and if not supplies constraints on time
 	// passing in Run.  The Run method will not pick a new time until
@@ -125,6 +126,8 @@ func NewFakeEventClock(t time.Time, clientWG *sync.WaitGroup, fuzz time.Duration
 // GetNextTime returns the next time at which there is work scheduled,
 // and a bool indicating whether there is any such time
 func (fec *FakeEventClock) GetNextTime() (time.Time, bool) {
+	fec.waitersLock.RLock()
+	defer fec.waitersLock.RUnlock()
 	if len(fec.waiters) > 0 {
 		return fec.waiters[0].targetTime, true
 	}
@@ -154,28 +157,34 @@ func (fec *FakeEventClock) Run(limit *time.Time) {
 func (fec *FakeEventClock) SetTime(t time.Time) {
 	fec.FakePassiveClock.SetTime(t)
 	for {
-		// This loop is because events run at a given time may schedule more
-		// events to run at that or an earlier time.
-		// Events should not advance the clock.  But just in case they do...
-		now := fec.Now()
-		var wg sync.WaitGroup
 		foundSome := false
-		for len(fec.waiters) > 0 && !now.Before(fec.waiters[0].targetTime) {
-			ew := heap.Pop(&fec.waiters).(eventWaiter)
-			wg.Add(1)
-			go func(f EventFunc) { f(now); wg.Done() }(ew.f)
-			foundSome = true
-		}
+		func() {
+			fec.waitersLock.Lock()
+			defer fec.waitersLock.Unlock()
+			// This loop is because events run at a given time may schedule more
+			// events to run at that or an earlier time.
+			// Events should not advance the clock.  But just in case they do...
+			now := fec.Now()
+			var wg sync.WaitGroup
+			for len(fec.waiters) > 0 && !now.Before(fec.waiters[0].targetTime) {
+				ew := heap.Pop(&fec.waiters).(eventWaiter)
+				wg.Add(1)
+				go func(f EventFunc) { f(now); wg.Done() }(ew.f)
+				foundSome = true
+			}
+			wg.Wait()
+		}()
 		if !foundSome {
 			break
 		}
-		wg.Wait()
 	}
 }
 
 // EventAfterDuration schedules the given function to be invoked once
 // the given duration has passed.
 func (fec *FakeEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
+	fec.waitersLock.Lock()
+	defer fec.waitersLock.Unlock()
 	now := fec.Now()
 	fd := time.Duration(float32(fec.fuzz) * fec.rand.Float32())
 	heap.Push(&fec.waiters, eventWaiter{targetTime: now.Add(d + fd), f: f})
@@ -184,6 +193,8 @@ func (fec *FakeEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
 // EventAfterTime schedules the given function to be invoked once
 // the given time has arrived.
 func (fec *FakeEventClock) EventAfterTime(f EventFunc, t time.Time) {
+	fec.waitersLock.Lock()
+	defer fec.waitersLock.Unlock()
 	fd := time.Duration(float32(fec.fuzz) * fec.rand.Float32())
 	heap.Push(&fec.waiters, eventWaiter{targetTime: t.Add(fd), f: f})
 }
