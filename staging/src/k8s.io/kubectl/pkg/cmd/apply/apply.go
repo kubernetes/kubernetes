@@ -204,11 +204,11 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if o.ForceConflicts && !o.ServerSideApply {
-		return fmt.Errorf("--experimental-force-conflicts only works with --experimental-server-side")
+		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
 	if o.DryRun && o.ServerSideApply {
-		return fmt.Errorf("--dry-run doesn't work with --experimental-server-side (did you mean --server-dry-run instead?)")
+		return fmt.Errorf("--dry-run doesn't work with --server-side (did you mean --server-dry-run instead?)")
 	}
 
 	if o.DryRun && o.ServerDryRun {
