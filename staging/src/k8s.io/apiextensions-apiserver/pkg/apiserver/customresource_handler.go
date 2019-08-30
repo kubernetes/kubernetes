@@ -655,7 +655,11 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			}
 			specs = append(specs, s)
 		}
-		mergedOpenAPI := builder.MergeSpecs(r.staticOpenAPISpec, specs...)
+		mergedOpenAPI, err := builder.MergeSpecs(r.staticOpenAPISpec, specs...)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly merge the CR schema")
+		}
 		openAPIModels, err = utilopenapi.ToProtoModels(mergedOpenAPI)
 		if err != nil {
 			utilruntime.HandleError(err)

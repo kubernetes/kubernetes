@@ -108,12 +108,12 @@ type Extensions struct {
 	//      Atomic lists will be entirely replaced when updated. This extension
 	//      may be used on any type of list (struct, scalar, ...).
 	// 2) `set`:
-	//      Sets are lists that must not have multiple times the same value. Each
+	//      Sets are lists that must not have multiple items with the same value. Each
 	//      value must be a scalar (or another atomic type).
 	// 3) `map`:
 	//      These lists are like maps in that their elements have a non-index key
 	//      used to identify them. Order is preserved upon merge. The map tag
-	//      must only be used on a list with struct elements.
+	//      must only be used on a list with elements of type object.
 	XListType *string
 }
 

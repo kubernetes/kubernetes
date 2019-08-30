@@ -250,7 +250,7 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 		out.VendorExtensible.AddExtension("x-kubernetes-list-map-keys", in.XListMapKeys)
 	}
 	if in.XListType != nil {
-		out.VendorExtensible.AddExtension("x-kubernetes-list-type", in.XListType)
+		out.VendorExtensible.AddExtension("x-kubernetes-list-type", *in.XListType)
 	}
 
 	return nil

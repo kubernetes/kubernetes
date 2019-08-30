@@ -19,12 +19,14 @@ package apiserver
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"testing"
 
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
 	"k8s.io/apiextensions-apiserver/test/integration/fixtures"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -83,6 +85,7 @@ spec:
 	if err != nil {
 		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 	}
+	verifyReplicas(t, result, 1)
 
 	// Patch object to change the number of replicas
 	result, err = rest.Patch(types.MergePatchType).
@@ -93,6 +96,7 @@ spec:
 	if err != nil {
 		t.Fatalf("failed to update number of replicas with merge patch: %v:\n%v", err, string(result))
 	}
+	verifyReplicas(t, result, 5)
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
 	result, err = rest.Patch(types.ApplyPatchType).
@@ -108,8 +112,8 @@ spec:
 	if !ok {
 		t.Fatalf("Expecting to get conflicts as API error")
 	}
-	if len(status.Status().Details.Causes) < 1 {
-		t.Fatalf("Expecting to get at least one conflict when applying object after updating replicas, got: %v", status.Status().Details.Causes)
+	if len(status.Status().Details.Causes) != 1 {
+		t.Fatalf("Expecting to get one conflict when applying object after updating replicas, got: %v", status.Status().Details.Causes)
 	}
 
 	// Re-apply with force, should work fine.
@@ -123,6 +127,7 @@ spec:
 	if err != nil {
 		t.Fatalf("failed to apply object with force after updating replicas: %v:\n%v", err, string(result))
 	}
+	verifyReplicas(t, result, 1)
 }
 
 // TestApplyCRDStructuralSchema tests that when a CRD has a structural schema in its validation field,
@@ -239,27 +244,38 @@ spec:
 	if err != nil {
 		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 	}
+	verifyNumFinalizers(t, result, 1)
+	verifyFinalizersIncludes(t, result, "test-finalizer")
+	verifyReplicas(t, result, 1)
+	verifyNumPorts(t, result, 1)
 
 	// Patch object to add another finalizer to the finalizers list
 	result, err = rest.Patch(types.MergePatchType).
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Body([]byte(`{"metadata":{"finalizers":["another-one"]}}`)).
+		Body([]byte(`{"metadata":{"finalizers":["test-finalizer","another-one"]}}`)).
 		DoRaw()
 	if err != nil {
 		t.Fatalf("failed to add finalizer with merge patch: %v:\n%v", err, string(result))
 	}
+	verifyNumFinalizers(t, result, 2)
+	verifyFinalizersIncludes(t, result, "test-finalizer")
+	verifyFinalizersIncludes(t, result, "another-one")
 
 	// Re-apply the same config, should work fine, since finalizers should have the list-type extension 'set'.
 	result, err = rest.Patch(types.ApplyPatchType).
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
+		SetHeader("Accept", "application/json").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
 		t.Fatalf("failed to apply same config after adding a finalizer: %v:\n%v", err, string(result))
 	}
+	verifyNumFinalizers(t, result, 2)
+	verifyFinalizersIncludes(t, result, "test-finalizer")
+	verifyFinalizersIncludes(t, result, "another-one")
 
 	// Patch object to change the number of replicas
 	result, err = rest.Patch(types.MergePatchType).
@@ -270,6 +286,7 @@ spec:
 	if err != nil {
 		t.Fatalf("failed to update number of replicas with merge patch: %v:\n%v", err, string(result))
 	}
+	verifyReplicas(t, result, 5)
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
 	result, err = rest.Patch(types.ApplyPatchType).
@@ -285,8 +302,8 @@ spec:
 	if !ok {
 		t.Fatalf("Expecting to get conflicts as API error")
 	}
-	if len(status.Status().Details.Causes) < 1 {
-		t.Fatalf("Expecting to get at least one conflict when applying object after updating replicas, got: %v", status.Status().Details.Causes)
+	if len(status.Status().Details.Causes) != 1 {
+		t.Fatalf("Expecting to get one conflict when applying object after updating replicas, got: %v", status.Status().Details.Causes)
 	}
 
 	// Re-apply with force, should work fine.
@@ -300,6 +317,7 @@ spec:
 	if err != nil {
 		t.Fatalf("failed to apply object with force after updating replicas: %v:\n%v", err, string(result))
 	}
+	verifyReplicas(t, result, 1)
 
 	// New applier tries to edit an existing list item, we should get conflicts.
 	result, err = rest.Patch(types.ApplyPatchType).
@@ -324,8 +342,8 @@ spec:
 	if !ok {
 		t.Fatalf("Expecting to get conflicts as API error")
 	}
-	if len(status.Status().Details.Causes) < 1 {
-		t.Fatalf("Expecting to get at least one conflict when a different applier updates existing list item, got: %v", status.Status().Details.Causes)
+	if len(status.Status().Details.Causes) != 1 {
+		t.Fatalf("Expecting to get one conflict when a different applier updates existing list item, got: %v", status.Status().Details.Causes)
 	}
 
 	// New applier tries to add a new list item, should work fine.
@@ -343,10 +361,12 @@ spec:
   - name: "y"
     containerPort: 8080
     protocol: TCP`, apiVersion, kind, name))).
+		SetHeader("Accept", "application/json").
 		DoRaw()
 	if err != nil {
 		t.Fatalf("failed to add a new list item to the object as a different applier: %v:\n%v", err, string(result))
 	}
+	verifyNumPorts(t, result, 2)
 }
 
 // TestApplyCRDNonStructuralSchema tests that when a CRD has a non-structural schema in its validation field,
@@ -430,27 +450,37 @@ spec:
 	if err != nil {
 		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(result))
 	}
+	verifyNumFinalizers(t, result, 1)
+	verifyFinalizersIncludes(t, result, "test-finalizer")
+	verifyReplicas(t, result, 1.0)
 
 	// Patch object to add another finalizer to the finalizers list
 	result, err = rest.Patch(types.MergePatchType).
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
-		Body([]byte(`{"metadata":{"finalizers":["another-one"]}}`)).
+		Body([]byte(`{"metadata":{"finalizers":["test-finalizer","another-one"]}}`)).
 		DoRaw()
 	if err != nil {
 		t.Fatalf("failed to add finalizer with merge patch: %v:\n%v", err, string(result))
 	}
+	verifyNumFinalizers(t, result, 2)
+	verifyFinalizersIncludes(t, result, "test-finalizer")
+	verifyFinalizersIncludes(t, result, "another-one")
 
 	// Re-apply the same config, should work fine, since finalizers should have the list-type extension 'set'.
 	result, err = rest.Patch(types.ApplyPatchType).
 		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
 		Name(name).
 		Param("fieldManager", "apply_test").
+		SetHeader("Accept", "application/json").
 		Body(yamlBody).
 		DoRaw()
 	if err != nil {
 		t.Fatalf("failed to apply same config after adding a finalizer: %v:\n%v", err, string(result))
 	}
+	verifyNumFinalizers(t, result, 2)
+	verifyFinalizersIncludes(t, result, "test-finalizer")
+	verifyFinalizersIncludes(t, result, "another-one")
 
 	// Patch object to change the number of replicas
 	result, err = rest.Patch(types.MergePatchType).
@@ -461,6 +491,7 @@ spec:
 	if err != nil {
 		t.Fatalf("failed to update number of replicas with merge patch: %v:\n%v", err, string(result))
 	}
+	verifyReplicas(t, result, 5.0)
 
 	// Re-apply, we should get conflicts now, since the number of replicas was changed.
 	result, err = rest.Patch(types.ApplyPatchType).
@@ -476,8 +507,8 @@ spec:
 	if !ok {
 		t.Fatalf("Expecting to get conflicts as API error")
 	}
-	if len(status.Status().Details.Causes) < 1 {
-		t.Fatalf("Expecting to get at least one conflict when applying object after updating replicas, got: %v", status.Status().Details.Causes)
+	if len(status.Status().Details.Causes) != 1 {
+		t.Fatalf("Expecting to get one conflict when applying object after updating replicas, got: %v", status.Status().Details.Causes)
 	}
 
 	// Re-apply with force, should work fine.
@@ -490,5 +521,89 @@ spec:
 		DoRaw()
 	if err != nil {
 		t.Fatalf("failed to apply object with force after updating replicas: %v:\n%v", err, string(result))
+	}
+	verifyReplicas(t, result, 1.0)
+}
+
+// verifyNumFinalizers checks that len(.metadata.finalizers) == n
+func verifyNumFinalizers(t *testing.T, b []byte, n int) {
+	obj := unstructured.Unstructured{}
+	err := obj.UnmarshalJSON(b)
+	if err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if actual, expected := len(obj.GetFinalizers()), n; actual != expected {
+		t.Fatalf("expected %v finalizers but got %v:\n%v", expected, actual, string(b))
+	}
+}
+
+// verifyFinalizersIncludes checks that .metadata.finalizers includes e
+func verifyFinalizersIncludes(t *testing.T, b []byte, e string) {
+	obj := unstructured.Unstructured{}
+	err := obj.UnmarshalJSON(b)
+	if err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	for _, a := range obj.GetFinalizers() {
+		if a == e {
+			return
+		}
+	}
+	t.Fatalf("expected finalizers to include %q but got: %v", e, obj.GetFinalizers())
+}
+
+// verifyReplicas checks that .spec.replicas == r
+func verifyReplicas(t *testing.T, b []byte, r int) {
+	obj := unstructured.Unstructured{}
+	err := obj.UnmarshalJSON(b)
+	if err != nil {
+		t.Fatalf("failed to find replicas number in response: %v:\n%v", err, string(b))
+	}
+	spec, ok := obj.Object["spec"]
+	if !ok {
+		t.Fatalf("failed to find replicas number in response:\n%v", string(b))
+	}
+	specMap, ok := spec.(map[string]interface{})
+	if !ok {
+		t.Fatalf("failed to find replicas number in response:\n%v", string(b))
+	}
+	replicas, ok := specMap["replicas"]
+	if !ok {
+		t.Fatalf("failed to find replicas number in response:\n%v", string(b))
+	}
+	replicasNumber, ok := replicas.(int64)
+	if !ok {
+		t.Fatalf("failed to find replicas number in response: expected int64 but got: %v", reflect.TypeOf(replicas))
+	}
+	if actual, expected := replicasNumber, int64(r); actual != expected {
+		t.Fatalf("expected %v ports but got %v:\n%v", expected, actual, string(b))
+	}
+}
+
+// verifyNumPorts checks that len(.spec.ports) == n
+func verifyNumPorts(t *testing.T, b []byte, n int) {
+	obj := unstructured.Unstructured{}
+	err := obj.UnmarshalJSON(b)
+	if err != nil {
+		t.Fatalf("failed to find ports list in response: %v:\n%v", err, string(b))
+	}
+	spec, ok := obj.Object["spec"]
+	if !ok {
+		t.Fatalf("failed to find ports list in response:\n%v", string(b))
+	}
+	specMap, ok := spec.(map[string]interface{})
+	if !ok {
+		t.Fatalf("failed to find ports list in response:\n%v", string(b))
+	}
+	ports, ok := specMap["ports"]
+	if !ok {
+		t.Fatalf("failed to find ports list in response:\n%v", string(b))
+	}
+	portsList, ok := ports.([]interface{})
+	if !ok {
+		t.Fatalf("failed to find ports list in response: expected array but got: %v", reflect.TypeOf(ports))
+	}
+	if actual, expected := len(portsList), n; actual != expected {
+		t.Fatalf("expected %v ports but got %v:\n%v", expected, actual, string(b))
 	}
 }
