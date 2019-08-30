@@ -25,7 +25,7 @@ import (
 	"sort"
 
 	certificates "k8s.io/api/certificates/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	certificatesclient "k8s.io/client-go/kubernetes/typed/certificates/v1beta1"
@@ -80,6 +80,9 @@ func NewKubeletServerCertificateManager(kubeClient clientset.Interface, kubeCfg 
 	}
 
 	m, err := certificate.NewManager(&certificate.Config{
+		// Allow reuse of the private key so that approvers can more easily
+		// renew server certs
+		AllowPrivateKeyReuse: true,
 		ClientFn: func(current *tls.Certificate) (certificatesclient.CertificateSigningRequestInterface, error) {
 			return certSigningRequestClient, nil
 		},

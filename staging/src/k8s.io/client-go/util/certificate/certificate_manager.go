@@ -23,7 +23,6 @@ import (
 	cryptorand "crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"fmt"
 	"reflect"
 	"sync"
@@ -115,6 +114,11 @@ type Config struct {
 	// CertificateExpiration will record a metric that shows the remaining
 	// lifetime of the certificate.
 	CertificateExpiration Gauge
+	// AllowPrivateKeyReuse will attempt to use the private key when requesting
+	// a new certificate. The caller will then be responsible for rotating that
+	// private key if they believe that is important. If no private key is found
+	// a new one will be generated.
+	AllowPrivateKeyReuse bool
 }
 
 // Store is responsible for getting and updating the current certificate.
@@ -156,9 +160,10 @@ type manager struct {
 	lastRequestCancel context.CancelFunc
 	lastRequest       *x509.CertificateRequest
 
-	dynamicTemplate bool
-	usages          []certificates.KeyUsage
-	forceRotation   bool
+	allowPrivateKeyReuse bool
+	dynamicTemplate      bool
+	usages               []certificates.KeyUsage
+	forceRotation        bool
 
 	certStore Store
 
@@ -198,6 +203,7 @@ func NewManager(config *Config) (Manager, error) {
 		clientFn:              config.ClientFn,
 		getTemplate:           getTemplate,
 		dynamicTemplate:       config.GetTemplate != nil,
+		allowPrivateKeyReuse:  config.AllowPrivateKeyReuse,
 		usages:                config.Usages,
 		certStore:             config.CertificateStore,
 		cert:                  cert,
@@ -556,27 +562,39 @@ func (m *manager) updateServerError(err error) error {
 }
 
 func (m *manager) generateCSR() (template *x509.CertificateRequest, csrPEM []byte, keyPEM []byte, key interface{}, err error) {
-	// Generate a new private key.
-	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("unable to generate a new private key: %v", err)
+	// Generate a new private key if necessary
+	if m.allowPrivateKeyReuse {
+		if current := m.Current(); current != nil && current.PrivateKey != nil {
+			key = current.PrivateKey
+			keyPEM, err = keyutil.MarshalPrivateKeyToPEM(key)
+			if err != nil {
+				klog.V(2).Infof("Unable to reuse existing private key: %v", err)
+				key = nil
+				keyPEM = nil
+			}
+		}
 	}
-	der, err := x509.MarshalECPrivateKey(privateKey)
-	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("unable to marshal the new key to DER: %v", err)
+	if key == nil {
+		privateKey, err := ecdsa.GenerateKey(elliptic.P256(), cryptorand.Reader)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("unable to generate a new private key: %v", err)
+		}
+		key = privateKey
+		keyPEM, err = keyutil.MarshalPrivateKeyToPEM(key)
+		if err != nil {
+			return nil, nil, nil, nil, fmt.Errorf("unable to marshal the new key to DER: %v", err)
+		}
 	}
-
-	keyPEM = pem.EncodeToMemory(&pem.Block{Type: keyutil.ECPrivateKeyBlockType, Bytes: der})
 
 	template = m.getTemplate()
 	if template == nil {
 		return nil, nil, nil, nil, fmt.Errorf("unable to create a csr, no template available")
 	}
-	csrPEM, err = cert.MakeCSRFromTemplate(privateKey, template)
+	csrPEM, err = cert.MakeCSRFromTemplate(key, template)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("unable to create a csr from the private key: %v", err)
 	}
-	return template, csrPEM, keyPEM, privateKey, nil
+	return template, csrPEM, keyPEM, key, nil
 }
 
 func (m *manager) getLastRequest() (context.CancelFunc, *x509.CertificateRequest) {
