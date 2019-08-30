@@ -565,9 +565,9 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		}
 	}
 
-	requestManagementHookName := "generic-apiserver-request-management"
-	if feature.DefaultFeatureGate.Enabled(features.RequestManagement) && !s.isPostStartHookRegistered(requestManagementHookName) {
-		err := s.AddPostStartHook(requestManagementHookName, func(context PostStartHookContext) error {
+	requestManagerConfigControllerHookName := "apiserver/request-management-config-controller"
+	if feature.DefaultFeatureGate.Enabled(features.RequestManagement) && !s.isPostStartHookRegistered(requestManagerConfigControllerHookName) {
+		err := s.AddPostStartHook(requestManagerConfigControllerHookName, func(context PostStartHookContext) error {
 			go c.FlowControl.Run(context.StopCh)
 			return nil
 		})
