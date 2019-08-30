@@ -1204,15 +1204,15 @@ func TestForwardingRuleCompositeEqual(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
-	frcGA, err := ToForwardingRuleComposite(gaRule)
+	frcGA, err := toForwardingRuleComposite(gaRule)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
-	frcBeta, err := ToForwardingRuleComposite(betaRule)
+	frcBeta, err := toForwardingRuleComposite(betaRule)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
-	frcBetaGlobalAccess, err := ToForwardingRuleComposite(betaRuleGlobalAccess)
+	frcBetaGlobalAccess, err := toForwardingRuleComposite(betaRuleGlobalAccess)
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}

@@ -768,8 +768,8 @@ func (f *forwardingRuleComposite) Equal(other *forwardingRuleComposite) bool {
 		f.allowGlobalAccess == other.allowGlobalAccess
 }
 
-// ToForwardingRuleComposite converts a compute beta or GA ForwardingRule into the composite type
-func ToForwardingRuleComposite(rule interface{}) (frc *forwardingRuleComposite, err error) {
+// toForwardingRuleComposite converts a compute beta or GA ForwardingRule into the composite type
+func toForwardingRuleComposite(rule interface{}) (frc *forwardingRuleComposite, err error) {
 	switch fr := rule.(type) {
 	case *compute.ForwardingRule:
 		frc = &forwardingRuleComposite{
@@ -895,12 +895,12 @@ func (g *Cloud) ensureInternalForwardingRule(existingFwdRule *compute.Forwarding
 			if err != nil {
 				return err
 			}
-			oldFRC, err = ToForwardingRuleComposite(betaRule)
+			oldFRC, err = toForwardingRuleComposite(betaRule)
 		case meta.VersionGA:
-			oldFRC, err = ToForwardingRuleComposite(existingFwdRule)
+			oldFRC, err = toForwardingRuleComposite(existingFwdRule)
 		default:
 			klog.Errorf("invalid version string for %s, assuming GA", existingFwdRule.Name)
-			oldFRC, err = ToForwardingRuleComposite(existingFwdRule)
+			oldFRC, err = toForwardingRuleComposite(existingFwdRule)
 		}
 		if err != nil {
 			return err
