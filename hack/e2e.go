@@ -90,6 +90,7 @@ func wait(cmd string, args ...string) error {
 	c := exec.Command(cmd, args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
+	c.Env = append(os.Environ(), "GO111MODULE=on")
 	if err := c.Start(); err != nil {
 		return err
 	}
@@ -156,7 +157,10 @@ func (t tester) getKubetest(get bool, old time.Duration) (string, error) {
 		return "", fmt.Errorf("cannot install kubetest until $GOPATH is set")
 	}
 	log.Print("Updating kubetest binary...")
-	cmd := []string{"go", "get", "-u", "k8s.io/test-infra/kubetest"}
+	// per: https://github.com/kubernetes/test-infra/pull/14094#issuecomment-526717609
+	// it is recommended to download kubetest with 1.11 modules and no -u
+	// GO111MODULE=on is set in Env Command in wait()
+	cmd := []string{"go", "get", "k8s.io/test-infra/kubetest"}
 	if err = t.wait(cmd[0], cmd[1:]...); err != nil {
 		return "", fmt.Errorf("%s: %v", strings.Join(cmd, " "), err) // Could not upgrade
 	}

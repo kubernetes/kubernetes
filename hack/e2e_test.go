@@ -200,7 +200,7 @@ func TestGetKubetest(t *testing.T) {
 	p := "PATH"
 	pk := filepath.Join(p, "kubetest")
 	eu := errors.New("upgrade failed")
-	euVerbose := fmt.Errorf("go get -u k8s.io/test-infra/kubetest: %v", eu)
+	euVerbose := fmt.Errorf("go get k8s.io/test-infra/kubetest: %v", eu)
 	et := errors.New("touch failed")
 	cases := []struct {
 		name string
