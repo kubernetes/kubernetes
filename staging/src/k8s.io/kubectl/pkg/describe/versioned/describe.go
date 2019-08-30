@@ -40,6 +40,7 @@ import (
 	batchv1beta1 "k8s.io/api/batch/v1beta1"
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingv1 "k8s.io/api/networking/v1"
 	networkingv1beta1 "k8s.io/api/networking/v1beta1"
@@ -169,6 +170,7 @@ func describerMap(clientConfig *rest.Config) (map[schema.GroupKind]describe.Desc
 		{Group: corev1.GroupName, Kind: "Endpoints"}:                              &EndpointsDescriber{c},
 		{Group: corev1.GroupName, Kind: "ConfigMap"}:                              &ConfigMapDescriber{c},
 		{Group: corev1.GroupName, Kind: "PriorityClass"}:                          &PriorityClassDescriber{c},
+		{Group: discoveryv1alpha1.GroupName, Kind: "EndpointSlice"}:               &EndpointSliceDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "ReplicaSet"}:                  &ReplicaSetDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "NetworkPolicy"}:               &NetworkPolicyDescriber{c},
 		{Group: extensionsv1beta1.GroupName, Kind: "PodSecurityPolicy"}:           &PodSecurityPolicyDescriber{c},
@@ -2601,6 +2603,103 @@ func describeEndpoints(ep *corev1.Endpoints, events *corev1.EventList) (string, 
 				}
 			}
 			w.Write(LEVEL_0, "\n")
+		}
+
+		if events != nil {
+			DescribeEvents(events, w)
+		}
+		return nil
+	})
+}
+
+// EndpointSliceDescriber generates information about an EndpointSlice.
+type EndpointSliceDescriber struct {
+	clientset.Interface
+}
+
+func (d *EndpointSliceDescriber) Describe(namespace, name string, describerSettings describe.DescriberSettings) (string, error) {
+	c := d.DiscoveryV1alpha1().EndpointSlices(namespace)
+
+	eps, err := c.Get(name, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+
+	var events *corev1.EventList
+	if describerSettings.ShowEvents {
+		events, _ = d.CoreV1().Events(namespace).Search(scheme.Scheme, eps)
+	}
+
+	return describeEndpointSlice(eps, events)
+}
+
+func describeEndpointSlice(eps *discoveryv1alpha1.EndpointSlice, events *corev1.EventList) (string, error) {
+	return tabbedString(func(out io.Writer) error {
+		w := NewPrefixWriter(out)
+		w.Write(LEVEL_0, "Name:\t%s\n", eps.Name)
+		w.Write(LEVEL_0, "Namespace:\t%s\n", eps.Namespace)
+		printLabelsMultiline(w, "Labels", eps.Labels)
+		printAnnotationsMultiline(w, "Annotations", eps.Annotations)
+
+		addressType := "<unset>"
+		if eps.AddressType != nil {
+			addressType = string(*eps.AddressType)
+		}
+		w.Write(LEVEL_0, "AddressType:\t%s\n", addressType)
+
+		if len(eps.Ports) == 0 {
+			w.Write(LEVEL_0, "Ports: <unset>\n")
+		} else {
+			w.Write(LEVEL_0, "Ports:\n")
+			w.Write(LEVEL_1, "Name\tPort\tProtocol\n")
+			w.Write(LEVEL_1, "----\t----\t--------\n")
+			for _, port := range eps.Ports {
+				portName := "<unset>"
+				if port.Name != nil && len(*port.Name) > 0 {
+					portName = *port.Name
+				}
+
+				portNum := "<unset>"
+				if port.Port != nil {
+					portNum = strconv.Itoa(int(*port.Port))
+				}
+
+				w.Write(LEVEL_1, "%s\t%s\t%s\n", portName, portNum, *port.Protocol)
+			}
+		}
+
+		if len(eps.Endpoints) == 0 {
+			w.Write(LEVEL_0, "Endpoints: <none>\n")
+		} else {
+			w.Write(LEVEL_0, "Endpoints:\n")
+			for i := range eps.Endpoints {
+				endpoint := &eps.Endpoints[i]
+
+				addressesString := strings.Join(endpoint.Addresses, ",")
+				if len(addressesString) == 0 {
+					addressesString = "<none>"
+				}
+				w.Write(LEVEL_1, "- Addresses:\t%s\n", addressesString)
+
+				w.Write(LEVEL_2, "Conditions:\n")
+				readyText := "<unset>"
+				if endpoint.Conditions.Ready != nil {
+					readyText = strconv.FormatBool(*endpoint.Conditions.Ready)
+				}
+				w.Write(LEVEL_3, "Ready:\t%s\n", readyText)
+
+				hostnameText := "<unset>"
+				if endpoint.Hostname != nil {
+					hostnameText = *endpoint.Hostname
+				}
+				w.Write(LEVEL_2, "Hostname:\t%s\n", hostnameText)
+
+				if endpoint.TargetRef != nil {
+					w.Write(LEVEL_2, "TargetRef:\t%s/%s\n", endpoint.TargetRef.Kind, endpoint.TargetRef.Name)
+				}
+
+				printLabelsMultilineWithIndent(w, "    ", "Topology", "\t", endpoint.Topology, sets.NewString())
+			}
 		}
 
 		if events != nil {
