@@ -96,6 +96,29 @@ func exerciseTestableEventClock(t *testing.T, ec TestableEventClock, fuzz time.D
 	}
 }
 
+func exercisePassiveClock(t *testing.T, pc SettablePassiveClock) {
+	t1 := time.Now()
+	t2 := t1.Add(time.Hour)
+	pc.SetTime(t1)
+	tx := pc.Now()
+	if tx != t1 {
+		t.Errorf("SetTime(%#+v); Now() => %#+v", t1, tx)
+	}
+	dx := pc.Since(t1)
+	if dx != 0 {
+		t.Errorf("Since() => %v", dx)
+	}
+	pc.SetTime(t2)
+	dx = pc.Since(t1)
+	if dx != time.Hour {
+		t.Errorf("Since() => %v", dx)
+	}
+	tx = pc.Now()
+	if tx != t2 {
+		t.Errorf("Now() => %#+v", tx)
+	}
+}
+
 func TestFakeEventClock(t *testing.T) {
 	startTime := time.Now()
 	fec := NewFakeEventClock(startTime, nil, 0, nil)
