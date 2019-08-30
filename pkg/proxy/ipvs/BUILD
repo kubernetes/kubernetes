@@ -43,10 +43,12 @@ go_library(
     srcs = [
         "graceful_termination.go",
         "ipset.go",
+        "meta_proxier.go",
         "netlink.go",
         "netlink_linux.go",
         "netlink_unsupported.go",
         "proxier.go",
+        "safe_ipset.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy/ipvs",
     deps = [
