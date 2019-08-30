@@ -34,6 +34,10 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+func intStrAddr(intOrStr intstr.IntOrString) *intstr.IntOrString {
+	return &intOrStr
+}
+
 func TestValidateStatefulSet(t *testing.T) {
 	validLabels := map[string]string{"a": "b"}
 	validPodTemplate := api.PodTemplate{
@@ -139,6 +143,22 @@ func TestValidateStatefulSet(t *testing.T) {
 				PersistentVolumeClaimRetentionPolicy: &apps.StatefulSetPersistentVolumeClaimRetentionPolicy{
 					WhenDeleted: apps.DeletePersistentVolumeClaimRetentionPolicyType,
 					WhenScaled:  apps.RetainPersistentVolumeClaimRetentionPolicyType,
+				},
+			},
+		},
+		"maxUnavailable with parallel pod management": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.ParallelPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            3,
+				UpdateStrategy: apps.StatefulSetUpdateStrategy{
+					Type: apps.RollingUpdateStatefulSetStrategyType,
+					RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+						Partition:      2,
+						MaxUnavailable: intStrAddr(intstr.FromInt(2)),
+					},
 				},
 			},
 		},
@@ -394,6 +414,51 @@ func TestValidateStatefulSet(t *testing.T) {
 				UpdateStrategy:      apps.StatefulSetUpdateStrategy{Type: apps.RollingUpdateStatefulSetStrategyType},
 			},
 		},
+		"zero maxUnavailable": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.OrderedReadyPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            3,
+				UpdateStrategy: apps.StatefulSetUpdateStrategy{
+					Type: apps.RollingUpdateStatefulSetStrategyType,
+					RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+						MaxUnavailable: intStrAddr(intstr.FromInt(0)),
+					},
+				},
+			},
+		},
+		"zero percent maxUnavailable": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.ParallelPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            3,
+				UpdateStrategy: apps.StatefulSetUpdateStrategy{
+					Type: apps.RollingUpdateStatefulSetStrategyType,
+					RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+						MaxUnavailable: intStrAddr(intstr.FromString("0%")),
+					},
+				},
+			},
+		},
+		"greater than 100 percent maxUnavailable": {
+			ObjectMeta: metav1.ObjectMeta{Name: "abc-123", Namespace: metav1.NamespaceDefault},
+			Spec: apps.StatefulSetSpec{
+				PodManagementPolicy: apps.ParallelPodManagement,
+				Selector:            &metav1.LabelSelector{MatchLabels: validLabels},
+				Template:            validPodTemplate.Template,
+				Replicas:            3,
+				UpdateStrategy: apps.StatefulSetUpdateStrategy{
+					Type: apps.RollingUpdateStatefulSetStrategyType,
+					RollingUpdate: &apps.RollingUpdateStatefulSetStrategy{
+						MaxUnavailable: intStrAddr(intstr.FromString("101%")),
+					},
+				},
+			},
+		},
 	}
 
 	for k, v := range errorCases {
@@ -426,6 +491,7 @@ func TestValidateStatefulSet(t *testing.T) {
 					field != "spec.persistentVolumeClaimRetentionPolicy" &&
 					field != "spec.persistentVolumeClaimRetentionPolicy.whenDeleted" &&
 					field != "spec.persistentVolumeClaimRetentionPolicy.whenScaled" &&
+					field != "spec.updateStrategy.rollingUpdate.maxUnavailable" &&
 					field != "spec.template.spec.activeDeadlineSeconds" {
 					t.Errorf("%s: missing prefix for: %v", k, errs[i])
 				}

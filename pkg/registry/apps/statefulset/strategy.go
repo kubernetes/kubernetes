@@ -79,6 +79,18 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
 }
 
+// maxUnavailableInUse returns true if StatefulSet's maxUnavailable set(used)
+func maxUnavailableInUse(statefulset *apps.StatefulSet) bool {
+	if statefulset == nil {
+		return false
+	}
+	if statefulset.Spec.UpdateStrategy.RollingUpdate == nil {
+		return false
+	}
+
+	return statefulset.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable != nil
+}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newStatefulSet := obj.(*apps.StatefulSet)
@@ -113,6 +125,11 @@ func dropStatefulSetDisabledFields(newSS *apps.StatefulSet, oldSS *apps.Stateful
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StatefulSetAutoDeletePVC) {
 		if oldSS == nil || oldSS.Spec.PersistentVolumeClaimRetentionPolicy == nil {
 			newSS.Spec.PersistentVolumeClaimRetentionPolicy = nil
+		}
+	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.MaxUnavailableStatefulSet) && !maxUnavailableInUse(oldSS) {
+		if newSS.Spec.UpdateStrategy.RollingUpdate != nil {
+			newSS.Spec.UpdateStrategy.RollingUpdate.MaxUnavailable = nil
 		}
 	}
 }
