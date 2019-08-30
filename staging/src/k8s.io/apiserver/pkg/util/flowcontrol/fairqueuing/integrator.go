@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apiserver/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 // Integrator computes the integral of some variable X over time as

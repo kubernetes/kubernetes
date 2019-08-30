@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "dummy.go",
+        "event_clock.go",
         "fairqueuing.go",
         "integrator.go",
         "interface.go",
@@ -14,8 +15,8 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/waitgroup:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/flowcontrol/metrics:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/shufflesharding:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
@@ -25,6 +26,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "event_clock_test.go",
         "fairqueuing_test.go",
         "fq_test.go",
     ],
@@ -32,7 +34,6 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/waitgroup:go_default_library",
-        "//staging/src/k8s.io/apiserver/pkg/util/clock:go_default_library",
     ],
 )
 
