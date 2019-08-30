@@ -95,6 +95,67 @@ func TestUpdateOnlyDoesNotTrackManagedFields(t *testing.T) {
 	}
 }
 
+// TestUpdateApplyConflict tests that applying to an object, which wasn't created by apply, will give conflicts
+func TestUpdateApplyConflict(t *testing.T) {
+	f := NewTestFieldManager()
+
+	obj := &corev1.Pod{}
+	obj.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{{}}
+
+	patch := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+                        "replicas": 3,
+                        "selector": {
+                                "matchLabels": {
+                                         "app": "nginx"
+                                }
+                        },
+                        "template": {
+                                "metadata": {
+                                        "labels": {
+                                                "app": "nginx"
+                                        }
+                                },
+                                "spec": {
+				        "containers": [{
+					        "name":  "nginx",
+					        "image": "nginx:latest"
+				        }]
+                                }
+                        }
+		}
+	}`)
+	newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal(patch, &newObj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+
+	savedObject, err := f.Update(obj, newObj, "fieldmanager_test")
+	if err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+
+	_, err = f.Apply(savedObject, []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+		},
+		"spec": {
+			"replicas": 101,
+		}
+	}`), "fieldmanager_conflict", false)
+	if err == nil || !apierrors.IsConflict(err) {
+		t.Fatalf("Expecting to get conflicts but got %v", err)
+	}
+}
+
 func TestApplyStripsFields(t *testing.T) {
 	f := NewTestFieldManager()
 
