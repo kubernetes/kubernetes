@@ -70,9 +70,12 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
@@ -217,7 +220,13 @@ type Master struct {
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointClient)
+	var endpointSliceClient discoveryclient.EndpointSlicesGetter
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		endpointSliceClient = discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	}
+	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
+
+	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointsAdapter)
 }
 
 func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
@@ -226,6 +235,12 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	var endpointSliceClient discoveryclient.EndpointSlicesGetter
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		endpointSliceClient = discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	}
+	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
+
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
@@ -236,7 +251,8 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 		klog.Fatalf("Error creating storage factory: %v", err)
 	}
 	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
-	return reconcilers.NewLeaseEndpointReconciler(endpointClient, masterLeases)
+
+	return reconcilers.NewLeaseEndpointReconciler(endpointsAdapter, masterLeases)
 }
 
 func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
