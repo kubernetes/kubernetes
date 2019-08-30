@@ -64,6 +64,7 @@ func main(cmd *cobra.Command, args []string) {
 	config := Config{CertFile: certFile, KeyFile: keyFile}
 
 	http.HandleFunc("/crdconvert", converter.ServeExampleConvert)
+	http.HandleFunc("/readyz", func(w http.ResponseWriter, req *http.Request) { w.Write([]byte("ok")) })
 	clientset := getClient()
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", port),
