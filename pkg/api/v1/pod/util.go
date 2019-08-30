@@ -50,6 +50,55 @@ func FindPort(pod *v1.Pod, svcPort *v1.ServicePort) (int, error) {
 	return 0, fmt.Errorf("no suitable port for manifest: %s", pod.UID)
 }
 
+// ContainerType specifies the type of container
+type ContainerType int
+
+const (
+	// InitContainer is for init container
+	InitContainer = 1 << iota
+	// Container is for container
+	Container
+	// EphemeralContainer is for ephemeral container
+	EphemeralContainer
+	// AllContainers cover all containers
+	AllContainers = InitContainer | Container | EphemeralContainer
+	// NonEphemeralContainers cover all containers except ephemeral container
+	NonEphemeralContainers = InitContainer | Container
+)
+
+// ContainerVisitorV2 is called with container spec of given container type, and returns true
+// if visiting should continue.
+type ContainerVisitorV2 func(container *v1.Container, containerType ContainerType) (shouldContinue bool)
+
+// VisitContainersV2 invokes the visitor function with a pointer to the container
+// spec of given container type in the given pod spec. If visitor returns false,
+// visiting is short-circuited. VisitContainersV2 returns true if visiting completes,
+// false if visiting was short-circuited.
+func VisitContainersV2(podSpec *v1.PodSpec, containerTypes int, visitor ContainerVisitorV2) bool {
+	if (containerTypes | InitContainer) > 0 {
+		for i := range podSpec.InitContainers {
+			if !visitor(&podSpec.InitContainers[i], InitContainer) {
+				return false
+			}
+		}
+	}
+	if (containerTypes | Container) > 0 {
+		for i := range podSpec.Containers {
+			if !visitor(&podSpec.Containers[i], Container) {
+				return false
+			}
+		}
+	}
+	if (containerTypes|EphemeralContainer) > 0 && utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		for i := range podSpec.EphemeralContainers {
+			if !visitor((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon), EphemeralContainer) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
 // ContainerVisitor is called with each container spec, and returns true
 // if visiting should continue.
 type ContainerVisitor func(container *v1.Container) (shouldContinue bool)
