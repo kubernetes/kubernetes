@@ -32,6 +32,11 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/log"
 )
 
+func runTests(t *testing.T, reporter ginkgo.Reporter) {
+	// This source code line will be part of the stack dump comparison.
+	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "Logging Suite", []ginkgo.Reporter{reporter})
+}
+
 var _ = ginkgo.Describe("log", func() {
 	ginkgo.BeforeEach(func() {
 		log.Logf("before")
@@ -46,7 +51,10 @@ var _ = ginkgo.Describe("log", func() {
 	})
 	ginkgo.It("error", func() {
 		err := errors.New("an error with a long, useless description")
-		framework.ExpectNoErrorWithOffset(1, err, "hard-coded error") // ExpectNoError includes util.go in the full stack trace with a varying line number, which we don't want as it makes this test sensitive to unrelated changes.
+		framework.ExpectNoError(err, "hard-coded error")
+	})
+	ginkgo.It("equal", func() {
+		framework.ExpectEqual(0, 1, "of course it's not equal...")
 	})
 	ginkgo.AfterEach(func() {
 		log.Logf("after")
@@ -62,7 +70,7 @@ func TestFailureOutput(t *testing.T) {
 	gomega.RegisterFailHandler(log.Fail)
 	fakeT := &testing.T{}
 	reporter := reporters.NewFakeReporter()
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(fakeT, "Logging Suite", []ginkgo.Reporter{reporter})
+	runTests(fakeT, reporter)
 
 	// Now check the output.
 	// TODO: all of the stacks are currently broken because Ginkgo doesn't properly skip
@@ -71,25 +79,39 @@ func TestFailureOutput(t *testing.T) {
 	// when updating to a fixed Ginkgo.
 	g := gomega.NewGomegaWithT(t)
 	actual := normalizeReport(*reporter)
+
+	// output from AfterEach
+	commonOutput := "\n\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.6()\n\tlogger_test.go:61\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n\n"
+
+	// Sorted by name!
 	expected := suiteResults{
 		testResult{
 			name:    "[Top Level] log asserts",
-			output:  "INFO: before\nFAIL: false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n",
+			output:  "INFO: before\nFAIL: false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.3()\n\tlogger_test.go:50\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
 			failure: "false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true",
-			stack:   "k8s.io/kubernetes/vendor/github.com/onsi/gomega/internal/assertion.(*Assertion).To()\n\tassertion.go:38\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.3()\n\tlogger_test.go:45\nk8s.io/kubernetes/test/e2e/framework/log_test.TestFailureOutput()\n\tlogger_test.go:65",
+			// TODO: off-by-one error in Ginkgo, it should skip that first stack entry.
+			stack: "k8s.io/kubernetes/vendor/github.com/onsi/gomega/internal/assertion.(*Assertion).To()\n\tassertion.go:38\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.3()\n\tlogger_test.go:50\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
+		},
+		testResult{
+			name:    "[Top Level] log equal",
+			output:  "INFO: before\nFAIL: of course it's not equal...\nExpected\n    <int>: 0\nto equal\n    <int>: 1\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.5()\n\tlogger_test.go:57\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
+			failure: "of course it's not equal...\nExpected\n    <int>: 0\nto equal\n    <int>: 1",
+			// TODO: off-by-one error in Ginkgo, it should skip that first stack entry.
+			stack: "k8s.io/kubernetes/test/e2e/framework.ExpectEqual()\n\tutil.go:1335\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.5()\n\tlogger_test.go:57\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
 		},
 		testResult{
 			name:    "[Top Level] log error",
-			output:  "INFO: before\nFAIL: hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n",
+			output:  "INFO: before\nFAIL: hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()\n\tlogger_test.go:54\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
 			failure: "hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred",
-			// TODO: this skips framework/util.go only because we ExpectNoErrorWithOffset. Should ExpectNoError skip itself?
-			stack: "k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()\n\tlogger_test.go:49\nk8s.io/kubernetes/test/e2e/framework/log_test.TestFailureOutput()\n\tlogger_test.go:65",
+			// TODO: off-by-one error in Ginkgo, it should skip that first stack entry.
+			stack: "k8s.io/kubernetes/test/e2e/framework.ExpectNoError()\n\tutil.go:1350\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()\n\tlogger_test.go:54\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
 		},
 		testResult{
 			name:    "[Top Level] log fails",
-			output:  "INFO: before\nFAIL: I'm failing.\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n",
+			output:  "INFO: before\nFAIL: I'm failing.\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)\n\tlogger_test.go:46\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2()\n\tlogger_test.go:47\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
 			failure: "I'm failing.",
-			stack:   "k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)\n\tlogger_test.go:41\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2()\n\tlogger_test.go:42\nk8s.io/kubernetes/test/e2e/framework/log_test.TestFailureOutput()\n\tlogger_test.go:65",
+			// TODO: off-by-one error in Ginkgo, it should skip that first stack entry.
+			stack: "k8s.io/kubernetes/test/e2e/framework/log.Failf()\n\tlogger.go:47\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)\n\tlogger_test.go:46\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2()\n\tlogger_test.go:47\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
 		},
 	}
 	// Compare individual fields. Comparing the slices leads to unreadable error output when there is any mismatch.
@@ -102,7 +124,7 @@ func TestFailureOutput(t *testing.T) {
 		// There may be additional stack entries from the "testing" package at the
 		// end. We ignore those in the comparison because the line number in them
 		// varies.
-		g.Expect(a.stack).To(gomega.HavePrefix(b.stack), "stack in %d: %s", i, a.stack)
+		g.Expect(a.stack).To(gomega.Equal(b.stack), "stack in %d: %s", i, a.stack)
 	}
 }
 
@@ -124,7 +146,7 @@ func normalizeReport(report reporters.FakeReporter) suiteResults {
 	for _, spec := range report.SpecSummaries {
 		results = append(results, testResult{
 			name:    strings.Join(spec.ComponentTexts, " "),
-			output:  stripAddresses(stripTimes(spec.CapturedOutput)),
+			output:  normalizeLocation(stripAddresses(stripTimes(spec.CapturedOutput))),
 			failure: stripAddresses(stripTimes(spec.Failure.Message)),
 			stack:   normalizeLocation(spec.Failure.Location.FullStackTrace),
 		})
@@ -156,8 +178,15 @@ var stackLocation = regexp.MustCompile(`(?:/|vendor/|test/|GOROOT/).*/([[:^space
 // functionArgs matches "<function name>(...)".
 var functionArgs = regexp.MustCompile(`([[:alpha:]]+)\(.*\)`)
 
-// testingStackEntries matches "testing.tRunner" and "created by" entries.
-var testingStackEntries = regexp.MustCompile(`(?m)(?:testing\.|created by).*\n\t.*\n`)
+// testFailureOutput matches TestFailureOutput() and its source followed by additional stack entries:
+//
+// k8s.io/kubernetes/test/e2e/framework/log_test.TestFailureOutput(0xc000558800)
+//	/nvme/gopath/src/k8s.io/kubernetes/test/e2e/framework/log/logger_test.go:73 +0x1c9
+// testing.tRunner(0xc000558800, 0x1af2848)
+// 	/nvme/gopath/go/src/testing/testing.go:865 +0xc0
+// created by testing.(*T).Run
+//	/nvme/gopath/go/src/testing/testing.go:916 +0x35a
+var testFailureOutput = regexp.MustCompile(`(?m)^k8s.io/kubernetes/test/e2e/framework/log_test\.TestFailureOutput\(.*\n\t.*(\n.*\n\t.*)*`)
 
 // normalizeLocation removes path prefix and function parameters and certain stack entries
 // that we don't care about.
@@ -165,6 +194,6 @@ func normalizeLocation(in string) string {
 	out := in
 	out = stackLocation.ReplaceAllString(out, "$1")
 	out = functionArgs.ReplaceAllString(out, "$1()")
-	out = testingStackEntries.ReplaceAllString(out, "")
+	out = testFailureOutput.ReplaceAllString(out, "")
 	return out
 }
