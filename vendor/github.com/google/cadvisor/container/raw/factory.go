@@ -30,6 +30,7 @@ import (
 )
 
 var dockerOnly = flag.Bool("docker_only", false, "Only report docker containers in addition to root stats")
+var disableRootCgroupStats = flag.Bool("disable_root_cgroup_stats", false, "Disable collecting root Cgroup stats")
 
 type rawFactory struct {
 	// Factory for machine information.
