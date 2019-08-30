@@ -73,10 +73,6 @@ func TestFailureOutput(t *testing.T) {
 	runTests(fakeT, reporter)
 
 	// Now check the output.
-	// TODO: all of the stacks are currently broken because Ginkgo doesn't properly skip
-	// over the initial entries returned by runtime.Stack. Fix is pending in
-	// https://github.com/onsi/ginkgo/pull/590, "stack" texts need to be updated
-	// when updating to a fixed Ginkgo.
 	g := gomega.NewGomegaWithT(t)
 	actual := normalizeReport(*reporter)
 
@@ -89,29 +85,25 @@ func TestFailureOutput(t *testing.T) {
 			name:    "[Top Level] log asserts",
 			output:  "INFO: before\nFAIL: false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.3()\n\tlogger_test.go:50\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
 			failure: "false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true",
-			// TODO: off-by-one error in Ginkgo, it should skip that first stack entry.
-			stack: "k8s.io/kubernetes/vendor/github.com/onsi/gomega/internal/assertion.(*Assertion).To()\n\tassertion.go:38\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.3()\n\tlogger_test.go:50\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
+			stack:   "k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.3()\n\tlogger_test.go:50\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
 		},
 		testResult{
 			name:    "[Top Level] log equal",
 			output:  "INFO: before\nFAIL: of course it's not equal...\nExpected\n    <int>: 0\nto equal\n    <int>: 1\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.5()\n\tlogger_test.go:57\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
 			failure: "of course it's not equal...\nExpected\n    <int>: 0\nto equal\n    <int>: 1",
-			// TODO: off-by-one error in Ginkgo, it should skip that first stack entry.
-			stack: "k8s.io/kubernetes/test/e2e/framework.ExpectEqual()\n\tutil.go:1335\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.5()\n\tlogger_test.go:57\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
+			stack:   "k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.5()\n\tlogger_test.go:57\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
 		},
 		testResult{
 			name:    "[Top Level] log error",
 			output:  "INFO: before\nFAIL: hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()\n\tlogger_test.go:54\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
 			failure: "hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred",
-			// TODO: off-by-one error in Ginkgo, it should skip that first stack entry.
-			stack: "k8s.io/kubernetes/test/e2e/framework.ExpectNoError()\n\tutil.go:1350\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()\n\tlogger_test.go:54\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
+			stack:   "k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()\n\tlogger_test.go:54\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
 		},
 		testResult{
 			name:    "[Top Level] log fails",
 			output:  "INFO: before\nFAIL: I'm failing.\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)\n\tlogger_test.go:46\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2()\n\tlogger_test.go:47\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
 			failure: "I'm failing.",
-			// TODO: off-by-one error in Ginkgo, it should skip that first stack entry.
-			stack: "k8s.io/kubernetes/test/e2e/framework/log.Failf()\n\tlogger.go:47\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)\n\tlogger_test.go:46\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2()\n\tlogger_test.go:47\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
+			stack:   "k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)\n\tlogger_test.go:46\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2()\n\tlogger_test.go:47\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
 		},
 	}
 	// Compare individual fields. Comparing the slices leads to unreadable error output when there is any mismatch.

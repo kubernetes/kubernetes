@@ -1,3 +1,8 @@
+## 1.10.1
+
+## Fixes
+- stack backtrace: fix skipping (#600) [2a4c0bd]
+
 ## 1.10.0
 
 ## Fixes

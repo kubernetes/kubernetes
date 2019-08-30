@@ -11,7 +11,7 @@ import (
 
 func New(skip int) types.CodeLocation {
 	_, file, line, _ := runtime.Caller(skip + 1)
-	stackTrace := PruneStack(string(debug.Stack()), skip)
+	stackTrace := PruneStack(string(debug.Stack()), skip+1)
 	return types.CodeLocation{FileName: file, LineNumber: line, FullStackTrace: stackTrace}
 }
 
