@@ -800,10 +800,10 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		allErrs = append(allErrs, field.NotSupported(fldPath.Child("x-kubernetes-list-type"), *schema.XListType, []string{"atomic", "set", "map"}))
 	}
 
-	if len(schema.XListMapKeys) > 0 && (schema.XListType == nil || *schema.XListType != "map") {
+	if len(schema.XListMapKeys) > 0 {
 		if schema.XListType == nil {
 			allErrs = append(allErrs, field.Required(fldPath.Child("x-kubernetes-list-type"), "must be map if x-kubernetes-list-map-keys is non-empty"))
-		} else {
+		} else if *schema.XListType != "map" {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-list-type"), *schema.XListType, "must be map if x-kubernetes-list-map-keys is non-empty"))
 		}
 	}
