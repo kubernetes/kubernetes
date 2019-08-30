@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clock
+package fairqueuing
 
 import (
 	"math/rand"
@@ -22,12 +22,6 @@ import (
 	"testing"
 	"time"
 )
-
-type EventClock interface {
-	PassiveClock
-	EventAfterDuration(f EventFunc, d time.Duration)
-	EventAfterTime(f EventFunc, t time.Time)
-}
 
 type TestableEventClock interface {
 	EventClock
@@ -154,5 +148,5 @@ func exerciseEventClock(t *testing.T, ec EventClock, relax func(time.Duration)) 
 }
 
 func TestRealEventClock(t *testing.T) {
-	exerciseEventClock(t, RealClock{}, func(d time.Duration) { time.Sleep(d) })
+	exerciseEventClock(t, RealEventClock{}, func(d time.Duration) { time.Sleep(d) })
 }

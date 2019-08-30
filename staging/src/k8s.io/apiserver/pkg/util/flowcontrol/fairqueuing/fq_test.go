@@ -21,8 +21,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"k8s.io/apiserver/pkg/util/clock"
 )
 
 type uniformScenario []uniformClient
@@ -41,7 +39,7 @@ type uniformClient struct {
 func exerciseQueueSetUniformScenario(t *testing.T, qs QueueSet, sc uniformScenario, handSize int32, totalDuration time.Duration, expectPass bool) {
 	wg := new(sync.WaitGroup)
 	now := time.Now()
-	clk := clock.NewFakeEventClock(now, wg, 0, nil)
+	clk := NewFakeEventClock(now, wg, 0, nil)
 	t.Logf("%s: Start", clk.Now().Format("2006-01-02 15:04:05.000000000"))
 	integrators := make([]Integrator, len(sc))
 	for i, uc := range sc {
@@ -106,7 +104,7 @@ func TestDummy(t *testing.T) {
 	}, 1, time.Second*10, false)
 }
 
-func ClockWait(clk *clock.FakeEventClock, wg *sync.WaitGroup, duration time.Duration) {
+func ClockWait(clk *FakeEventClock, wg *sync.WaitGroup, duration time.Duration) {
 	dunch := make(chan struct{})
 	clk.EventAfterDuration(func(time.Time) {
 		wg.Add(1)

@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/waitgroup"
-	"k8s.io/apiserver/pkg/util/clock"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	"k8s.io/apiserver/pkg/util/shufflesharding"
 	"k8s.io/klog"
