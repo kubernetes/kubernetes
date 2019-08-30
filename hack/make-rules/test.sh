@@ -78,13 +78,6 @@ KUBE_COVERPROCS=${KUBE_COVERPROCS:-4}
 KUBE_RACE=${KUBE_RACE:-}   # use KUBE_RACE="-race" to enable race testing
 # Set to the goveralls binary path to report coverage results to Coveralls.io.
 KUBE_GOVERALLS_BIN=${KUBE_GOVERALLS_BIN:-}
-# Lists of API Versions of each groups that should be tested, groups are
-# separated by comma, lists are separated by semicolon. e.g.,
-# "v1,compute/v1alpha1,experimental/v1alpha2;v1,compute/v2,experimental/v1alpha3"
-# FIXME: due to current implementation of a test client (see: pkg/api/testapi/testapi.go)
-# ONLY the last version is tested in each group.
-ALL_VERSIONS_CSV=$(IFS=',';echo "${KUBE_AVAILABLE_GROUP_VERSIONS[*]// /,}";IFS=$)
-KUBE_TEST_API_VERSIONS="${KUBE_TEST_API_VERSIONS:-${ALL_VERSIONS_CSV}}"
 # once we have multiple group supports
 # Create a junit-style XML test report in this directory if set.
 KUBE_JUNIT_REPORT_DIR=${KUBE_JUNIT_REPORT_DIR:-}
@@ -365,16 +358,7 @@ checkFDs() {
 
 checkFDs
 
-
-# Convert the CSVs to arrays.
-IFS=';' read -r -a apiVersions <<< "${KUBE_TEST_API_VERSIONS}"
-apiVersionsCount=${#apiVersions[@]}
-for (( i=0; i<apiVersionsCount; i++ )); do
-  apiVersion=${apiVersions[i]}
-  echo "Running tests for APIVersion: ${apiVersion}"
-  # KUBE_TEST_API sets the version of each group to be tested.
-  KUBE_TEST_API="${apiVersion}" runTests "$@"
-done
+runTests
 
 # We might run the tests for multiple versions, but we want to report only
 # one of them to coveralls. Here we report coverage from the last run.
