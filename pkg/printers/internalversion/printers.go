@@ -2120,7 +2120,7 @@ func printVolumeAttachmentList(list *storage.VolumeAttachmentList, options print
 	return rows, nil
 }
 
-func printFlowSchema(obj *flowcontrol.FlowSchema, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printFlowSchema(obj *flowcontrol.FlowSchema, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -2136,7 +2136,7 @@ func printFlowSchema(obj *flowcontrol.FlowSchema, options printers.PrintOptions)
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printFlowSchemaList(list *flowcontrol.FlowSchemaList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printFlowSchemaList(list *flowcontrol.FlowSchemaList, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	fsSeq := make(flowcontrol.FlowSchemaSequence, len(list.Items))
 	for i := range list.Items {
@@ -2153,7 +2153,7 @@ func printFlowSchemaList(list *flowcontrol.FlowSchemaList, options printers.Prin
 	return rows, nil
 }
 
-func printPriorityLevelConfiguration(obj *flowcontrol.PriorityLevelConfiguration, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPriorityLevelConfiguration(obj *flowcontrol.PriorityLevelConfiguration, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
@@ -2168,7 +2168,7 @@ func printPriorityLevelConfiguration(obj *flowcontrol.PriorityLevelConfiguration
 	return []metav1beta1.TableRow{row}, nil
 }
 
-func printPriorityLevelConfigurationList(list *flowcontrol.PriorityLevelConfigurationList, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func printPriorityLevelConfigurationList(list *flowcontrol.PriorityLevelConfigurationList, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printPriorityLevelConfiguration(&list.Items[i], options)
