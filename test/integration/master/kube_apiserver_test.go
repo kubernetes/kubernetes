@@ -23,7 +23,6 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -104,35 +103,16 @@ func endpointReturnsStatusOK(client *kubernetes.Clientset, path string) bool {
 	return status == http.StatusOK
 }
 
-func TestStartupSequenceHealthzAndReadyz(t *testing.T) {
-	hc := &delayedCheck{}
-	instanceOptions := &kubeapiservertesting.TestServerInstanceOptions{
-		InjectedHealthChecker: hc,
-	}
-	server := kubeapiservertesting.StartTestServerOrDie(t, instanceOptions, []string{"--maximum-startup-sequence-duration", "15s"}, framework.SharedEtcd())
+func TestLivezAndReadyz(t *testing.T) {
+	server := kubeapiservertesting.StartTestServerOrDie(t, nil, []string{"--livez-grace-period", "0s"}, framework.SharedEtcd())
 	defer server.TearDownFn()
 
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if endpointReturnsStatusOK(client, "/readyz") {
-		t.Fatalf("readyz should start unready")
-	}
-	// we need to wait longer than our grace period
-	err = wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		return !endpointReturnsStatusOK(client, "/healthz"), nil
-	})
-	if err != nil {
-		t.Fatalf("healthz should have become unhealthy: %v", err)
-	}
-	hc.makeHealthy()
-	err = wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
-		return endpointReturnsStatusOK(client, "/healthz"), nil
-	})
-	if err != nil {
-		t.Fatalf("healthz should have become healthy again: %v", err)
+	if !endpointReturnsStatusOK(client, "/livez") {
+		t.Fatalf("livez should be healthy")
 	}
 	if !endpointReturnsStatusOK(client, "/readyz") {
 		t.Fatalf("readyz should be healthy")
@@ -504,28 +484,4 @@ func TestReconcilerMasterLeaseMultiMoreMasters(t *testing.T) {
 
 func TestReconcilerMasterLeaseMultiCombined(t *testing.T) {
 	testReconcilersMasterLease(t, 3, 3)
-}
-
-type delayedCheck struct {
-	healthLock sync.Mutex
-	isHealthy  bool
-}
-
-func (h *delayedCheck) Name() string {
-	return "delayed-check"
-}
-
-func (h *delayedCheck) Check(req *http.Request) error {
-	h.healthLock.Lock()
-	defer h.healthLock.Unlock()
-	if h.isHealthy {
-		return nil
-	}
-	return fmt.Errorf("isn't healthy")
-}
-
-func (h *delayedCheck) makeHealthy() {
-	h.healthLock.Lock()
-	defer h.healthLock.Unlock()
-	h.isHealthy = true
 }
