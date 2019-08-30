@@ -243,7 +243,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, pluginContext *framework.Plugin
 		metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
 		return ScheduleResult{
 			SuggestedHost:  filteredNodes[0].Name,
-			EvaluatedNodes: 1 + len(failedPredicateMap),
+			EvaluatedNodes: 1 + len(failedPredicateMap) + len(filteredNodesStatuses),
 			FeasibleNodes:  1,
 		}, nil
 	}
@@ -263,7 +263,7 @@ func (g *genericScheduler) Schedule(pod *v1.Pod, pluginContext *framework.Plugin
 	trace.Step("Selecting host done")
 	return ScheduleResult{
 		SuggestedHost:  host,
-		EvaluatedNodes: len(filteredNodes) + len(failedPredicateMap),
+		EvaluatedNodes: len(filteredNodes) + len(failedPredicateMap) + len(filteredNodesStatuses),
 		FeasibleNodes:  len(filteredNodes),
 	}, err
 }
