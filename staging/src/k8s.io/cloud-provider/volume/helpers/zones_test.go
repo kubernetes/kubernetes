@@ -27,7 +27,7 @@ import (
 func TestZonesToSet(t *testing.T) {
 	functionUnderTest := "ZonesToSet"
 	// First part: want an error
-	sliceOfZones := []string{"", ",", "us-east-1a, , us-east-1d", ", us-west-1b", "us-west-2b,"}
+	sliceOfZones := []string{"", ",", "us-east-1a, , us-east-1d", ", us-west-1b", "us-west-2b,", ",,us-west-2b"}
 	for _, zones := range sliceOfZones {
 		if got, err := ZonesToSet(zones); err == nil {
 			t.Errorf("%v(%v) returned (%v), want (%v)", functionUnderTest, zones, got, "an error")
@@ -48,6 +48,13 @@ func TestZonesToSet(t *testing.T) {
 			want: sets.String{
 				"us-east-1a": sets.Empty{},
 				"us-west-2a": sets.Empty{},
+			},
+		},
+		{
+			zones: "us-east-1b,us-west-2b",
+			want: sets.String{
+				"us-east-1b": sets.Empty{},
+				"us-west-2b": sets.Empty{},
 			},
 		},
 	}
