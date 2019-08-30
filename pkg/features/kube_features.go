@@ -496,6 +496,13 @@ const (
 	//
 	// Enables the startupProbe in kubelet worker.
 	StartupProbe featuregate.Feature = "StartupProbe"
+
+	// owner @deads2k
+	// deprecated: v1.16
+	//
+	// Enable the aggregated discovery timeout to ensure client responsiveness. Note this feature is present
+	// only for backward compatibility, it will be removed in the 1.17 release.
+	EnableAggregatedDiscoveryTimeout featuregate.Feature = "EnableAggregatedDiscoveryTimeout"
 )
 
 func init() {
@@ -597,6 +604,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	apiextensionsfeatures.CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.Beta},
+
+	EnableAggregatedDiscoveryTimeout: {Default: true, PreRelease: featuregate.Deprecated},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
