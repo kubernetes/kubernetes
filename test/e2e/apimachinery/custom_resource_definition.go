@@ -188,7 +188,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		Description: Fetch /apis, /apis/apiextensions.k8s.io, and /apis/apiextensions.k8s.io/v1 discovery documents,
 		and ensure they indicate CustomResourceDefinition apiextensions.k8s.io/v1 resources are available.
 	*/
-	ginkgo.It("should include custom resource definition resources in discovery documents", func() {
+	framework.ConformanceIt("should include custom resource definition resources in discovery documents", func() {
 		{
 			ginkgo.By("fetching the /apis discovery document")
 			apiGroupList := &metav1.APIGroupList{}
