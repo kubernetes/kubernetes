@@ -41,7 +41,7 @@ func Logf(format string, args ...interface{}) {
 
 // Failf logs the fail info.
 func Failf(format string, args ...interface{}) {
-	FailfWithOffset(1, format, args...)
+	FailfWithOffset(2, format, args...)
 }
 
 // FailfWithOffset calls "Fail" and logs the error at "offset" levels above its caller

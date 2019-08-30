@@ -89,8 +89,7 @@ func TestFailureOutput(t *testing.T) {
 			name:    "[Top Level] log fails",
 			output:  "INFO: before\nFAIL: I'm failing.\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n",
 			failure: "I'm failing.",
-			// TODO: should framework/log.Failf be skipped?
-			stack: "k8s.io/kubernetes/test/e2e/framework/log.Failf()\n\tlogger.go:44\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)\n\tlogger_test.go:41\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2()\n\tlogger_test.go:42\nk8s.io/kubernetes/test/e2e/framework/log_test.TestFailureOutput()\n\tlogger_test.go:65",
+			stack:   "k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)\n\tlogger_test.go:41\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2()\n\tlogger_test.go:42\nk8s.io/kubernetes/test/e2e/framework/log_test.TestFailureOutput()\n\tlogger_test.go:65",
 		},
 	}
 	// Compare individual fields. Comparing the slices leads to unreadable error output when there is any mismatch.
