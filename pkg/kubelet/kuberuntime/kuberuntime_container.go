@@ -566,7 +566,7 @@ func (m *kubeGenericRuntimeManager) killContainer(pod *v1.Pod, containerID kubec
 			restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(containerID)
 			if err != nil {
 				return fmt.Errorf("failed to get containerSpec %q(id=%q) in pod %q when killing container for reason %q. error: %v",
-					containerName, containerID.String(), format.Pod(pod), reason, err)
+					containerName, containerID.String(), format.Pod(pod), message, err)
 			}
 			pod, containerSpec = restoredPod, restoredContainer
 		}
