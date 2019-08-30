@@ -58,7 +58,7 @@ func WithPriorityAndFairness(
 		}
 		requestDigest := utilflowcontrol.RequestDigest{requestInfo, user}
 
-		// Skip tracking long running events.
+		// Skip tracking long running requests.
 		if longRunningRequestCheck != nil && longRunningRequestCheck(r, requestInfo) {
 			klog.V(6).Infof("Serving RequestInfo=%#+v, user.Info=%#+v as longrunning\n", requestInfo, user)
 			handler.ServeHTTP(w, r)

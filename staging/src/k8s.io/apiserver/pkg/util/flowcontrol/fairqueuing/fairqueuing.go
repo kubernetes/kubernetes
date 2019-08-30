@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -29,8 +29,7 @@ import (
 )
 
 // queueSetFactoryImpl implements the QueueSetFactory interface
-// queueSetFactoryImpl makes QueueSetSystem objects.
-// This filter makes a QueueSetSystem for each priority level.
+// queueSetFactoryImpl makes QueueSet objects.
 type queueSetFactoryImpl struct {
 	// wg can be nil and is ignored in that case
 	wg waitgroup.OptionalWaitGroup
@@ -38,7 +37,7 @@ type queueSetFactoryImpl struct {
 	clk clock.PassiveClock
 }
 
-// NewQueueSetFactory creates a new NewQueueSetFactory object
+// NewQueueSetFactory creates a new QueueSetFactory object
 func NewQueueSetFactory(clk clock.PassiveClock, wg waitgroup.OptionalWaitGroup) QueueSetFactory {
 	return &queueSetFactoryImpl{
 		wg:  wg,
@@ -46,7 +45,7 @@ func NewQueueSetFactory(clk clock.PassiveClock, wg waitgroup.OptionalWaitGroup) 
 	}
 }
 
-// NewQueueSet creates a new QueueSetSystem object
+// NewQueueSet creates a new QueueSet object
 // There is a new QueueSet created for each priority level.
 func (qsf queueSetFactoryImpl) NewQueueSet(name string, concurrencyLimit, desiredNumQueues, queueLengthLimit int, requestWaitLimit time.Duration) QueueSet {
 	return newQueueSetImpl(name, concurrencyLimit, desiredNumQueues,
@@ -70,7 +69,7 @@ type queueSetImpl struct {
 	estimatedServiceTime float64
 	lastRealTime         time.Time
 	robinIdx             int
-	// numRequestsEnqueued is the number of packets currently enqueued
+	// numRequestsEnqueued is the number of requests currently enqueued
 	// (eg: incremeneted on Enqueue, decremented on Dequue)
 	numRequestsEnqueued int
 	concurrencyLimit    int
@@ -92,7 +91,7 @@ func initQueues(numQueues int) []*Queue {
 	return fqqueues
 }
 
-// newQueueSetImpl creates a new queueSetImpl from passed in parameters and
+// newQueueSetImpl creates a new queueSetImpl from passed in parameters
 func newQueueSetImpl(name string, concurrencyLimit, desiredNumQueues, queueLengthLimit int,
 	requestWaitLimit time.Duration, clk clock.PassiveClock, wg waitgroup.OptionalWaitGroup) *queueSetImpl {
 	fq := &queueSetImpl{
@@ -145,12 +144,12 @@ func (qs *queueSetImpl) SetConfiguration(concurrencyLimit, desiredNumQueues, que
 }
 
 // TimeoutOldRequestsAndRejectOrEnqueue encapsulates the lock sharing logic required
-// to validated and enqueue a request for the queueSetImpl/QueueSetSystem:
+// to validate and enqueue a request for the queueSetImpl/QueueSet:
 // 1) Start with shuffle sharding, to pick a queue.
 // 2) Reject old requests that have been waiting too long
 // 3) Reject current request if there is not enough concurrency shares and
 // we are at max queue length
-// 4) If not rejected, create a packet and enqueue
+// 4) If not rejected, create a request and enqueue
 // returns true on a successful enqueue
 // returns false in the case that there is no available concurrency or
 // the queuelengthlimit has been reached
@@ -166,17 +165,17 @@ func (qs *queueSetImpl) TimeoutOldRequestsAndRejectOrEnqueue(hashValue uint64, h
 	// requests that are in the queue longer than the timeout if there are no new requests
 	// We think this is a fine tradeoff
 
-	// Create a packet and enqueue
-	pkt := &Request{
+	// Create a request and enqueue
+	req := &Request{
 		DequeueChannel: make(chan bool, 1),
 		EnqueueTime:    qs.clk.Now(),
 		Queue:          queue,
 	}
-	if ok := qs.rejectOrEnqueue(pkt); !ok {
+	if ok := qs.rejectOrEnqueue(req); !ok {
 		return nil
 	}
 	metrics.ObserveQueueLength(qs.name, len(queue.Requests))
-	return pkt
+	return req
 
 }
 
@@ -228,7 +227,7 @@ func (qs *queueSetImpl) GetRequestsExecuting() int {
 	return total
 }
 
-// ChooseQueueIdx uses shuffle sharding to select an queue index
+// ChooseQueueIdx uses shuffle sharding to select a queue index
 // using a 'hashValue'.  The 'hashValue' derives a hand from a set range of
 // indexes (range 'desiredNumQueues') and returns the queue with the least queued packets
 // from a dealt hand (of size 'handSize')
@@ -354,7 +353,7 @@ func (qs *queueSetImpl) FinishRequestAndDequeueWithChannelAsMuchAsPossible(pkt *
 	qs.DequeueWithChannelAsMuchAsPossible()
 }
 
-// FinishRequest is a callback that should be used when a previously dequeud packet
+// FinishRequest is a callback that should be used when a previously dequeued packet
 // has completed it's service.  This callback updates imporatnt state in the
 // queueSetImpl
 func (qs *queueSetImpl) finishRequest(p *Request) {
@@ -444,7 +443,7 @@ func (qs *queueSetImpl) DequeueWithChannelAsMuchAsPossible() {
 
 // dequeueWithChannel is convenience method for dequeueing packets that
 // require a message to be sent through the packets channel
-// this is a required pattern for the QueueSetSystem the queueSetImpl supports
+// this is a required pattern for the QueueSet the queueSetImpl supports
 func (qs *queueSetImpl) dequeueWithChannel() (*Request, bool) {
 	pkt, ok := qs.dequeue()
 	if !ok {
