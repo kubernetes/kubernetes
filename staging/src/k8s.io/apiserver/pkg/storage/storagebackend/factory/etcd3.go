@@ -19,6 +19,8 @@ package factory
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
 	"path"
 	"sync"
 	"sync/atomic"
@@ -29,7 +31,9 @@ import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -106,17 +110,36 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 	if len(c.CertFile) == 0 && len(c.KeyFile) == 0 && len(c.CAFile) == 0 {
 		tlsConfig = nil
 	}
+	networkContext := egressselector.Etcd.AsNetworkContext()
+	var egressDialer utilnet.DialFunc
+	if c.EgressLookup != nil {
+		egressDialer, err = c.EgressLookup(networkContext)
+		if err != nil {
+			return nil, err
+		}
+	}
+	dialOptions := []grpc.DialOption{
+		grpc.WithBlock(), // block until the underlying connection is up
+		grpc.WithUnaryInterceptor(grpcprom.UnaryClientInterceptor),
+		grpc.WithStreamInterceptor(grpcprom.StreamClientInterceptor),
+	}
+	if egressDialer != nil {
+		dialer := func(ctx context.Context, addr string) (net.Conn, error) {
+			u, err := url.Parse(addr)
+			if err != nil {
+				return nil, err
+			}
+			return egressDialer(ctx, "tcp", u.Host)
+		}
+		dialOptions = append(dialOptions, grpc.WithContextDialer(dialer))
+	}
 	cfg := clientv3.Config{
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
 		DialKeepAliveTimeout: keepaliveTimeout,
-		DialOptions: []grpc.DialOption{
-			grpc.WithBlock(), // block until the underlying connection is up
-			grpc.WithUnaryInterceptor(grpcprom.UnaryClientInterceptor),
-			grpc.WithStreamInterceptor(grpcprom.StreamClientInterceptor),
-		},
-		Endpoints: c.ServerList,
-		TLS:       tlsConfig,
+		DialOptions:          dialOptions,
+		Endpoints:            c.ServerList,
+		TLS:                  tlsConfig,
 	}
 
 	return clientv3.New(cfg)
