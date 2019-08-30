@@ -757,6 +757,7 @@ func makeFakeLogStats(seed int) *volume.Metrics {
 func TestGetContainerUsageNanoCores(t *testing.T) {
 	var value0 uint64
 	var value1 uint64 = 10000000000
+	var value2 uint64 = 188427786383
 
 	tests := []struct {
 		desc          string
@@ -855,6 +856,31 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 				},
 			},
 			expected: &value1,
+		},
+		{
+			desc: "should return correct value if elapsed UsageCoreNanoSeconds exceeds 18446744073",
+			stats: &runtimeapi.ContainerStats{
+				Attributes: &runtimeapi.ContainerAttributes{
+					Id: "1",
+				},
+				Cpu: &runtimeapi.CpuUsage{
+					Timestamp: int64(time.Second / time.Nanosecond),
+					UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+						Value: 68172016162105,
+					},
+				},
+			},
+			cpuUsageCache: map[string]*cpuUsageRecord{
+				"1": {
+					stats: &runtimeapi.CpuUsage{
+						Timestamp: 0,
+						UsageCoreNanoSeconds: &runtimeapi.UInt64Value{
+							Value: 67983588375722,
+						},
+					},
+				},
+			},
+			expected: &value2,
 		},
 	}
 
