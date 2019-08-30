@@ -30,7 +30,6 @@ go_test(
     srcs = ["logger_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//test/e2e/framework:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
