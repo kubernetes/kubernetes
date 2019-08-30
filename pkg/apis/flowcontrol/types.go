@@ -253,6 +253,14 @@ type PriorityLevelConfigurationSpec struct {
 	// preset priority level can be exempt.
 	// +optional
 	Exempt bool
+	// `globalDefault` specifies whether this priority level can be
+	// used for non-exempt requests that do not match any FlowSchema.
+	// If multiple PriorityLevelConfiguration objects have this field
+	// `true` then the implementation freely chooses among them.  If
+	// none have this field `true` then the implementation pretends that
+	// a default one exists.
+	// +optional
+	GlobalDefault bool
 }
 
 // PriorityLevelConfigurationConditionType is a valid value for PriorityLevelConfigurationStatusCondition.Type

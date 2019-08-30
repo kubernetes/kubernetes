@@ -502,6 +502,7 @@ func autoConvert_v1alpha1_PriorityLevelConfigurationSpec_To_flowcontrol_Priority
 	out.HandSize = in.HandSize
 	out.QueueLengthLimit = in.QueueLengthLimit
 	out.Exempt = in.Exempt
+	out.GlobalDefault = in.GlobalDefault
 	return nil
 }
 
@@ -516,6 +517,7 @@ func autoConvert_flowcontrol_PriorityLevelConfigurationSpec_To_v1alpha1_Priority
 	out.HandSize = in.HandSize
 	out.QueueLengthLimit = in.QueueLengthLimit
 	out.Exempt = in.Exempt
+	out.GlobalDefault = in.GlobalDefault
 	return nil
 }
 

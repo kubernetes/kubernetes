@@ -23,7 +23,6 @@ import (
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
@@ -85,14 +84,17 @@ type PredefinedData struct {
 func (d PredefinedData) EnsurePredefinedConfiguration() genericapiserver.PostStartHookFunc {
 	return func(hookContext genericapiserver.PostStartHookContext) error {
 		flowcontrolClientSet := flowcontrolclient.NewForConfigOrDie(hookContext.LoopbackClientConfig)
-		// Adding system priority classes is important. If they fail to add, many critical system
-		// components may fail and cluster may break.
+		// Add the predefined config objects if there is no exempt PriorityLevelConfiguration.
 		err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
+			plcs, err := flowcontrolClientSet.PriorityLevelConfigurations().List(metav1.ListOptions{})
 			if err != nil {
-				utilruntime.HandleError(fmt.Errorf("unable to initialize client: %v", err))
-				return false, nil
+				return false, fmt.Errorf("Unable to list PriorityLevelConfiguration objects: %s", err.Error())
 			}
-
+			for _, plc := range plcs.Items {
+				if plc.Spec.Exempt {
+					return true, nil
+				}
+			}
 			for _, flowSchema := range d.FlowSchemas {
 				_, err := flowcontrolClientSet.FlowSchemas().Get(flowSchema.Name, metav1.GetOptions{})
 				if err != nil {
@@ -112,7 +114,8 @@ func (d PredefinedData) EnsurePredefinedConfiguration() genericapiserver.PostSta
 					}
 				}
 			}
-			for _, priorityLevelConfiguration := range d.PriorityLevelConfigurations {
+			for idx := len(d.PriorityLevelConfigurations) - 1; idx >= 0; idx-- {
+				priorityLevelConfiguration := d.PriorityLevelConfigurations[idx]
 				_, err := flowcontrolClientSet.PriorityLevelConfigurations().Get(priorityLevelConfiguration.Name, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {

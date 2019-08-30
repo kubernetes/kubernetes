@@ -17,6 +17,8 @@ limitations under the License.
 package bootstrap
 
 import (
+	"math"
+
 	rmv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -24,6 +26,7 @@ import (
 
 // The objects that define an apiserver's initial behavior
 var (
+	// InitialPriorityLevelConfigurations lists exempt first, default second
 	InitialPriorityLevelConfigurations = []*rmv1a1.PriorityLevelConfiguration{
 		DefaultPriorityLevelConfigurationExempt,
 		DefaultPriorityLevelConfigurationDefault,
@@ -40,58 +43,35 @@ var (
 		rmv1a1.PriorityLevelConfigurationNameExempt,
 		rmv1a1.PriorityLevelConfigurationSpec{Exempt: true},
 	)
-	DefaultPriorityLevelConfigurationDefault = pl(
+	DefaultPriorityLevelConfigurationDefault = setDefault(pl(
 		"default",
 		rmv1a1.PriorityLevelConfigurationSpec{
 			AssuredConcurrencyShares: 100,
 			Queues:                   128,
 			HandSize:                 6,
 			QueueLengthLimit:         100,
-		})
+		}))
 )
 
 // Initial FlowSchema objects
 var (
-	DefaultFlowSchemaExempt = fs(
+	DefaultFlowSchemaExempt = NewFSAllGroups(
 		"exempt",
 		rmv1a1.PriorityLevelConfigurationNameExempt,
 		1500, "",
-		rmv1a1.PolicyRuleWithSubjects{
-			Subjects: groups(user.SystemPrivilegedGroup),
-			Rule: resourceRule(
-				[]string{rmv1a1.VerbAll},
-				[]string{rmv1a1.APIGroupAll},
-				[]string{rmv1a1.ResourceAll},
-			)},
-		rmv1a1.PolicyRuleWithSubjects{
-			Subjects: groups(user.SystemPrivilegedGroup),
-			Rule: nonResourceRule(
-				[]string{rmv1a1.VerbAll},
-				[]string{rmv1a1.NonResourceAll},
-			)},
+		user.SystemPrivilegedGroup,
 	)
-	DefaultFlowSchemaDefault = fs(
+	DefaultFlowSchemaDefault = NewFSAllGroups(
 		"default",
 		"default",
-		10000, rmv1a1.FlowDistinguisherMethodByUserType,
-		rmv1a1.PolicyRuleWithSubjects{
-			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
-			Rule: resourceRule(
-				[]string{rmv1a1.VerbAll},
-				[]string{rmv1a1.APIGroupAll},
-				[]string{rmv1a1.ResourceAll},
-			)},
-		rmv1a1.PolicyRuleWithSubjects{
-			Subjects: groups(user.AllUnauthenticated, user.AllAuthenticated),
-			Rule: nonResourceRule(
-				[]string{rmv1a1.VerbAll},
-				[]string{rmv1a1.NonResourceAll},
-			)},
+		math.MaxInt32, rmv1a1.FlowDistinguisherMethodByUserType,
+		user.AllUnauthenticated, user.AllAuthenticated,
 	)
 )
 
 // PredefinedPriorityLevelConfigurations returns the instances of
 // the ones defined in the KEP
+// with the exempt one appearing first
 func PredefinedPriorityLevelConfigurations() []*rmv1a1.PriorityLevelConfiguration {
 	return []*rmv1a1.PriorityLevelConfiguration{
 		DefaultPriorityLevelConfigurationExempt,
@@ -113,17 +93,20 @@ func PredefinedPriorityLevelConfigurations() []*rmv1a1.PriorityLevelConfiguratio
 	}
 }
 
+var (
+	verbAll       = []string{rmv1a1.VerbAll}
+	apiGroupAll   = []string{rmv1a1.APIGroupAll}
+	apiGroupCore  = ""
+	resourceAll   = []string{rmv1a1.ResourceAll}
+	ruleRscAll    = resourceRule(verbAll, apiGroupAll, resourceAll)
+	ruleNonRscAll = rmv1a1.PolicyRule{
+		Verbs:           verbAll,
+		NonResourceURLs: []string{rmv1a1.NonResourceAll}}
+)
+
 // PredefinedFlowSchemas returns instances of the FlowSchema
 // objects shown in the Example Configuration section of the KEP
 func PredefinedFlowSchemas() []*rmv1a1.FlowSchema {
-	verbAll := []string{rmv1a1.VerbAll}
-	apiGroupAll := []string{rmv1a1.APIGroupAll}
-	apiGroupCore := ""
-	resourceAll := []string{rmv1a1.ResourceAll}
-	ruleRscAll := resourceRule(verbAll, apiGroupAll, resourceAll)
-	ruleNonRscAll := rmv1a1.PolicyRule{
-		Verbs:           verbAll,
-		NonResourceURLs: []string{rmv1a1.NonResourceAll}}
 	allServiceAccountKubeControllerManager := []string{
 		"attachdetach-controller",
 		"certificate-controller",
@@ -176,48 +159,41 @@ func PredefinedFlowSchemas() []*rmv1a1.FlowSchema {
 				Rule:     resourceRule(verbAll, []string{"coordination.k8s.io"}, []string{"leases"}),
 			},
 		),
-		fs("kube-controller-manager", "workload-high", 3500,
-			rmv1a1.FlowDistinguisherMethodByNamespaceType,
-			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: append(users(user.KubeControllerManager),
-					kubeSystemServiceAccount(allServiceAccountKubeControllerManager...)...),
-				Rule: ruleRscAll,
-			},
-			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: append(users(user.KubeControllerManager),
-					kubeSystemServiceAccount(allServiceAccountKubeControllerManager...)...),
-				Rule: ruleNonRscAll,
-			},
-		),
-		fs("kube-scheduler", "workload-high", 3500,
-			rmv1a1.FlowDistinguisherMethodByNamespaceType,
-			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: users(user.KubeScheduler),
-				Rule:     ruleRscAll,
-			},
-			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: users(user.KubeScheduler),
-				Rule:     ruleNonRscAll,
-			},
-		),
-		fs("service-accounts", "workload-low", 7500,
-			rmv1a1.FlowDistinguisherMethodByUserType,
-			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: groups("system:serviceaccounts"),
-				Rule:     ruleRscAll},
-			rmv1a1.PolicyRuleWithSubjects{
-				Subjects: groups("system:serviceaccounts"),
-				Rule:     ruleNonRscAll,
-			},
-		),
+		NewFSAll("kube-controller-manager", "workload-high", 3500, rmv1a1.FlowDistinguisherMethodByNamespaceType, append(users(user.KubeControllerManager), kubeSystemServiceAccount(allServiceAccountKubeControllerManager...)...)...),
+		NewFSAllUsers("kube-scheduler", "workload-high", 3500, rmv1a1.FlowDistinguisherMethodByNamespaceType, user.KubeScheduler),
+		NewFSAllGroups("service-accounts", "workload-low", 7500, rmv1a1.FlowDistinguisherMethodByUserType, "system:serviceaccounts"),
 		DefaultFlowSchemaDefault,
 	}
+}
+
+func NewFSAllUsers(name, plName string, matchingPrecedence int32, dmType rmv1a1.FlowDistinguisherMethodType, userNames ...string) *rmv1a1.FlowSchema {
+	return NewFSAll(name, plName, matchingPrecedence, dmType, users(userNames...)...)
+}
+
+func NewFSAllGroups(name, plName string, matchingPrecedence int32, dmType rmv1a1.FlowDistinguisherMethodType, groupNames ...string) *rmv1a1.FlowSchema {
+	return NewFSAll(name, plName, matchingPrecedence, dmType, groups(groupNames...)...)
+}
+
+func NewFSAll(name, plName string, matchingPrecedence int32, dmType rmv1a1.FlowDistinguisherMethodType, subjects ...rmv1a1.Subject) *rmv1a1.FlowSchema {
+	return fs(name, plName, matchingPrecedence, dmType,
+		rmv1a1.PolicyRuleWithSubjects{
+			Subjects: subjects,
+			Rule:     ruleRscAll},
+		rmv1a1.PolicyRuleWithSubjects{
+			Subjects: subjects,
+			Rule:     ruleNonRscAll},
+	)
 }
 
 func pl(name string, spec rmv1a1.PriorityLevelConfigurationSpec) *rmv1a1.PriorityLevelConfiguration {
 	return &rmv1a1.PriorityLevelConfiguration{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec:       spec}
+}
+
+func setDefault(pl *rmv1a1.PriorityLevelConfiguration) *rmv1a1.PriorityLevelConfiguration {
+	pl.Spec.GlobalDefault = true
+	return pl
 }
 
 func fs(name, plName string, matchingPrecedence int32, dmType rmv1a1.FlowDistinguisherMethodType, rules ...rmv1a1.PolicyRuleWithSubjects) *rmv1a1.FlowSchema {

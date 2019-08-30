@@ -31,7 +31,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/waitgroup"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/endpoints/request"
@@ -43,7 +42,6 @@ import (
 	"k8s.io/klog"
 
 	rmtypesv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
-	fcbootstrap "k8s.io/apiserver/pkg/util/flowcontrol/bootstrap"
 	rmclientv1alpha1 "k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1"
 	rmlistersv1alpha1 "k8s.io/client-go/listers/flowcontrol/v1alpha1"
 )
@@ -81,7 +79,11 @@ type requestManagerState struct {
 
 // priorityLevelState holds the state specific to a priority level.
 type priorityLevelState struct {
-	// config holds the configuration after defaulting logic has been applied
+	// config holds the configuration after defaulting logic has been applied.
+	// Exempt may be true while there are queues, in the case of a priority
+	// level that recently switched from being non-exempt to exempt and whose
+	// queues are still draining.
+	// If there are queues then their parameters are here.
 	config rmtypesv1alpha1.PriorityLevelConfigurationSpec
 
 	// concurrencyLimit is the limit on number executing
@@ -89,6 +91,9 @@ type priorityLevelState struct {
 
 	queues fq.QueueSet
 
+	// Non-nil while waiting for queues to drain.
+	// May be non-nil only if queues is non-nil.
+	// May be non-nil while exempt.
 	emptyHandler *emptyRelay
 }
 
@@ -163,15 +168,6 @@ func NewRequestManagerTestable(
 	wg waitgroup.OptionalWaitGroup,
 	queueSetFactory fq.QueueSetFactory,
 ) Interface {
-	initialPLCs := fcbootstrap.InitialPriorityLevelConfigurations
-	initialFSs := fcbootstrap.InitialFlowSchemas
-	waitPLCs := initialPLCs
-	waitFSs := initialFSs
-	if waitForAllPredefined {
-		waitPLCs = fcbootstrap.PredefinedPriorityLevelConfigurations()
-		waitFSs = fcbootstrap.PredefinedFlowSchemas()
-	}
-
 	reqMgr := &requestManager{
 		wg:                     wg,
 		queueSetFactory:        queueSetFactory,
@@ -185,42 +181,19 @@ func NewRequestManagerTestable(
 		priorityLevelStates: make(map[string]*priorityLevelState),
 	}
 	reqMgr.curState.Store(emptyRMState)
-	reqMgr.digestConfigObjects(
-		initialPLCs,
-		initialFSs,
-	)
+	reqMgr.digestConfigObjects(nil, nil)
 	reqMgr.readyFunc = func() bool {
-		existingFSNames, existingPLNames := sets.NewString(), sets.NewString()
-		existingFlowSchemas, err := reqMgr.fsLister.List(labels.Everything())
-		if err != nil {
-			klog.Errorf("failed to list flow-schemas: %v", err)
-			return false
-		}
 		existingPriorityLevels, err := reqMgr.plLister.List(labels.Everything())
 		if err != nil {
 			klog.Errorf("failed to list priority-levels: %v", err)
 			return false
 		}
-
-		for _, fs := range existingFlowSchemas {
-			existingFSNames.Insert(fs.Name)
-		}
-		for _, fs := range waitFSs {
-			if !existingFSNames.Has(fs.Name) {
-				klog.V(5).Infof("waiting for flow-schema %s to be ready", fs.Name)
-				return false
-			}
-		}
 		for _, pl := range existingPriorityLevels {
-			existingPLNames.Insert(pl.Name)
-		}
-		for _, pl := range waitPLCs {
-			if !existingPLNames.Has(pl.Name) {
-				klog.V(5).Infof("waiting for priority-level %s to be ready", pl.Name)
-				return false
+			if pl.Spec.Exempt {
+				return true
 			}
 		}
-		return true
+		return false
 	}
 	return reqMgr
 }

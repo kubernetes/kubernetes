@@ -494,6 +494,7 @@ func AddHandlers(h printers.PrintHandler) {
 	priorityLevelColumnDefinitions := []metav1beta1.TableColumnDefinition{
 		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
 		{Name: "Exempt", Type: "string", Description: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{}.SwaggerDoc()["exempt"]},
+		{Name: "GlobalDefault", Type: "string", Description: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{}.SwaggerDoc()["globalDefault"]},
 		{Name: "AssuredConcurrencyShares", Type: "string", Description: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{}.SwaggerDoc()["assuredConcurrencyShares"]},
 		{Name: "QueueLengthLimit", Type: "string", Description: flowcontrolv1alpha1.PriorityLevelConfigurationSpec{}.SwaggerDoc()["queueLengthLimit"]},
 		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
@@ -2101,13 +2102,9 @@ func printPriorityLevelConfiguration(obj *flowcontrol.PriorityLevelConfiguration
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-
+	sayIfTrue := map[bool]string{false: "", true: "true"}
 	name := obj.Name
-	exempt := ""
-	if obj.Spec.Exempt {
-		exempt = "true"
-	}
-	row.Cells = append(row.Cells, name, exempt, obj.Spec.AssuredConcurrencyShares, obj.Spec.QueueLengthLimit, translateTimestampSince(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, name, sayIfTrue[obj.Spec.Exempt], sayIfTrue[obj.Spec.GlobalDefault], obj.Spec.AssuredConcurrencyShares, obj.Spec.QueueLengthLimit, translateTimestampSince(obj.CreationTimestamp))
 
 	return []metav1beta1.TableRow{row}, nil
 }
