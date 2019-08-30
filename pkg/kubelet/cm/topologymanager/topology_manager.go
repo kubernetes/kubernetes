@@ -231,6 +231,11 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 				if !hint.Preferred {
 					preferred = false
 				}
+				// Special case PolicySingleNumaNode to only prefer hints where
+				// all providers have a single NUMA affinity set.
+				if m.policy != nil && m.policy.Name() == PolicySingleNumaNode && hint.NUMANodeAffinity.Count() > 1 {
+					preferred = false
+				}
 				numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
 			}
 		}
