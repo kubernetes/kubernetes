@@ -109,12 +109,13 @@ func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 func (c *KubeletClientConfig) transportConfig() *transport.Config {
 	cfg := &transport.Config{
 		TLS: transport.TLSConfig{
-			CAFile:   c.CAFile,
-			CAData:   c.CAData,
-			CertFile: c.CertFile,
-			CertData: c.CertData,
-			KeyFile:  c.KeyFile,
-			KeyData:  c.KeyData,
+			CAFile:     c.CAFile,
+			CAData:     c.CAData,
+			CertFile:   c.CertFile,
+			CertData:   c.CertData,
+			KeyFile:    c.KeyFile,
+			KeyData:    c.KeyData,
+			NextProtos: c.NextProtos,
 		},
 		BearerToken: c.BearerToken,
 	}
