@@ -647,7 +647,7 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 			}
 
 			var volumePlugin volume.VolumePlugin
-			if useCSIPlugin(oe.operationGenerator.GetVolumePluginMgr(), volumeAttached.VolumeSpec) && nu {
+			if useCSIPlugin(oe.operationGenerator.GetVolumePluginMgr(), volumeAttached.VolumeSpec, &node) && nu {
 				// The volume represented by this spec is CSI and thus should be migrated
 				volumePlugin, err = oe.operationGenerator.GetVolumePluginMgr().FindPluginByName(csi.CSIPluginName)
 				if err != nil || volumePlugin == nil {
