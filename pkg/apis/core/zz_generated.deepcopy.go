@@ -773,6 +773,11 @@ func (in *Container) DeepCopyInto(out *Container) {
 		*out = new(Probe)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.StartupProbe != nil {
+		in, out := &in.StartupProbe, &out.StartupProbe
+		*out = new(Probe)
+		(*in).DeepCopyInto(*out)
+	}
 	if in.Lifecycle != nil {
 		in, out := &in.Lifecycle, &out.Lifecycle
 		*out = new(Lifecycle)
@@ -920,6 +925,11 @@ func (in *ContainerStatus) DeepCopyInto(out *ContainerStatus) {
 	*out = *in
 	in.State.DeepCopyInto(&out.State)
 	in.LastTerminationState.DeepCopyInto(&out.LastTerminationState)
+	if in.Started != nil {
+		in, out := &in.Started, &out.Started
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 
@@ -1347,6 +1357,11 @@ func (in *EphemeralContainerCommon) DeepCopyInto(out *EphemeralContainerCommon) 
 	}
 	if in.ReadinessProbe != nil {
 		in, out := &in.ReadinessProbe, &out.ReadinessProbe
+		*out = new(Probe)
+		(*in).DeepCopyInto(*out)
+	}
+	if in.StartupProbe != nil {
+		in, out := &in.StartupProbe, &out.StartupProbe
 		*out = new(Probe)
 		(*in).DeepCopyInto(*out)
 	}

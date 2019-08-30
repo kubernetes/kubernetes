@@ -701,6 +701,17 @@ message Container {
   // +optional
   optional Probe readinessProbe = 11;
 
+  // StartupProbe indicates that the Pod has successfully initialized.
+  // If specified, no other probes are executed until this completes successfully.
+  // If this probe fails, the Pod will be restarted, just as if the livenessProbe failed.
+  // This can be used to provide different probe parameters at the beginning of a Pod's lifecycle,
+  // when it might take a long time to load data or warm a cache, than during steady-state operation.
+  // This cannot be updated.
+  // This is an alpha feature enabled by the StartupProbe feature flag.
+  // More info: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle#container-probes
+  // +optional
+  optional Probe startupProbe = 22;
+
   // Actions that the management system should take in response to container lifecycle events.
   // Cannot be updated.
   // +optional
@@ -901,6 +912,13 @@ message ContainerStatus {
   // Container's ID in the format 'docker://<container_id>'.
   // +optional
   optional string containerID = 8;
+
+  // Specifies whether the container has passed its startup probe.
+  // Initialized as false, becomes true after startupProbe is considered successful.
+  // Resets to false when the container is restarted, or if kubelet loses state temporarily.
+  // Is always true when no startupProbe is defined.
+  // +optional
+  optional bool started = 9;
 }
 
 // DaemonEndpoint contains information about a single Daemon endpoint.
@@ -1253,6 +1271,10 @@ message EphemeralContainerCommon {
   // Probes are not allowed for ephemeral containers.
   // +optional
   optional Probe readinessProbe = 11;
+
+  // Probes are not allowed for ephemeral containers.
+  // +optional
+  optional Probe startupProbe = 22;
 
   // Lifecycle is not allowed for ephemeral containers.
   // +optional
@@ -1862,7 +1884,7 @@ message Lifecycle {
   optional Handler postStart = 1;
 
   // PreStop is called immediately before a container is terminated due to an
-  // API request or management event such as liveness probe failure,
+  // API request or management event such as liveness/startup probe failure,
   // preemption, resource contention, etc. The handler is not called if the
   // container crashes or exits. The reason for termination is passed to the
   // handler. The Pod's termination grace period countdown begins before the
@@ -3240,7 +3262,7 @@ message PodSpec {
   // init container fails, the pod is considered to have failed and is handled according
   // to its restartPolicy. The name for an init container or normal container must be
   // unique among all containers.
-  // Init containers may not have Lifecycle actions, Readiness probes, or Liveness probes.
+  // Init containers may not have Lifecycle actions, Readiness probes, Liveness probes, or Startup probes.
   // The resourceRequirements of an init container are taken into account during scheduling
   // by finding the highest request/limit for each resource type, and then using the max of
   // of that value or the sum of the normal containers. Limits are applied to init containers
@@ -3704,7 +3726,7 @@ message Probe {
   optional int32 periodSeconds = 4;
 
   // Minimum consecutive successes for the probe to be considered successful after having failed.
-  // Defaults to 1. Must be 1 for liveness. Minimum value is 1.
+  // Defaults to 1. Must be 1 for liveness and startup. Minimum value is 1.
   // +optional
   optional int32 successThreshold = 5;
 

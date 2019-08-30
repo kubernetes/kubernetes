@@ -1924,7 +1924,7 @@ type Probe struct {
 	// +optional
 	PeriodSeconds int32
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
-	// Must be 1 for liveness.
+	// Must be 1 for liveness and startup.
 	// +optional
 	SuccessThreshold int32
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
@@ -2042,6 +2042,8 @@ type Container struct {
 	// +optional
 	ReadinessProbe *Probe
 	// +optional
+	StartupProbe *Probe
+	// +optional
 	Lifecycle *Lifecycle
 	// Required.
 	// +optional
@@ -2090,7 +2092,7 @@ type Lifecycle struct {
 	// +optional
 	PostStart *Handler
 	// PreStop is called immediately before a container is terminated due to an
-	// API request or management event such as liveness probe failure,
+	// API request or management event such as liveness/startup probe failure,
 	// preemption, resource contention, etc. The handler is not called if the
 	// container crashes or exits. The reason for termination is passed to the
 	// handler. The Pod's termination grace period countdown begins before the
@@ -2174,6 +2176,7 @@ type ContainerStatus struct {
 	ImageID      string
 	// +optional
 	ContainerID string
+	Started     *bool
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -2936,6 +2939,9 @@ type EphemeralContainerCommon struct {
 	// Probes are not allowed for ephemeral containers.
 	// +optional
 	ReadinessProbe *Probe
+	// Probes are not allowed for ephemeral containers.
+	// +optional
+	StartupProbe *Probe
 	// Lifecycle is not allowed for ephemeral containers.
 	// +optional
 	Lifecycle *Lifecycle
