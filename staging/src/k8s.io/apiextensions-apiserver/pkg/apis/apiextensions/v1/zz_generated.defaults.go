@@ -38,14 +38,6 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 func SetObjectDefaults_CustomResourceDefinition(in *CustomResourceDefinition) {
 	SetDefaults_CustomResourceDefinition(in)
 	SetDefaults_CustomResourceDefinitionSpec(&in.Spec)
-	for i := range in.Spec.Versions {
-		a := &in.Spec.Versions[i]
-		if a.Schema != nil {
-			if a.Schema.OpenAPIV3Schema != nil {
-				SetDefaults_JSONSchemaProps(a.Schema.OpenAPIV3Schema)
-			}
-		}
-	}
 	if in.Spec.Conversion != nil {
 		if in.Spec.Conversion.Webhook != nil {
 			if in.Spec.Conversion.Webhook.ClientConfig != nil {

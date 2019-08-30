@@ -124,47 +124,6 @@ func TestDefaults(t *testing.T) {
 				},
 			},
 		},
-		{
-			name: "list type extension defaults",
-			original: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Scope:      NamespaceScoped,
-					Conversion: &CustomResourceConversion{Strategy: NoneConverter},
-					Versions: []CustomResourceDefinitionVersion{
-						{
-							Name:    "v1",
-							Storage: true,
-							Schema: &CustomResourceValidation{
-								OpenAPIV3Schema: &JSONSchemaProps{
-									Type: "array",
-								},
-							},
-						},
-					},
-				},
-			},
-			expected: &CustomResourceDefinition{
-				Spec: CustomResourceDefinitionSpec{
-					Scope:      NamespaceScoped,
-					Conversion: &CustomResourceConversion{Strategy: NoneConverter},
-					Versions: []CustomResourceDefinitionVersion{
-						{
-							Name:    "v1",
-							Storage: true,
-							Schema: &CustomResourceValidation{
-								OpenAPIV3Schema: &JSONSchemaProps{
-									Type:      "array",
-									XListType: utilpointer.StringPtr("atomic"),
-								},
-							},
-						},
-					},
-				},
-				Status: CustomResourceDefinitionStatus{
-					StoredVersions: []string{"v1"},
-				},
-			},
-		},
 	}
 
 	for _, test := range tests {

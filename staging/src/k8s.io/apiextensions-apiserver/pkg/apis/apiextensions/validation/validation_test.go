@@ -6510,9 +6510,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 						"array": {
 							Type:     "array",
 							Nullable: true,
-
-							// This value is defaulted
-							XListType: strPtr("atomic"),
 						},
 						"number": {
 							Type:     "number",
@@ -6595,15 +6592,6 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			wantError: true,
 		},
 		{
-			name: "unset list type extension with type array",
-			input: apiextensions.CustomResourceValidation{
-				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
-					Type: "array",
-				},
-			},
-			wantError: true,
-		},
-		{
 			name: "invalid list type extension",
 			input: apiextensions.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
@@ -6639,6 +6627,17 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
 					Type:      "array",
 					XListType: strPtr("map"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "no items schema with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key"},
 				},
 			},
 			wantError: true,
