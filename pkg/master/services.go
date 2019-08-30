@@ -25,8 +25,10 @@ import (
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 )
 
-// ServiceIPRange takes a the serviceIPRange flag and returns the defaulted service ip range (if  needed),
-// api server service IP, and an error
+// ServiceIPRange checks if the serviceClusterIPRange flag is nil, raising a warning if so and
+// setting service ip range to the default value in kubeoptions.DefaultServiceIPCIDR
+// for now until the default is removed per the deprecation timeline guidelines.
+// Returns service ip range, api server service IP, and an error
 func ServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, net.IP, error) {
 	serviceClusterIPRange := passedServiceClusterIPRange
 	if passedServiceClusterIPRange.IP == nil {
