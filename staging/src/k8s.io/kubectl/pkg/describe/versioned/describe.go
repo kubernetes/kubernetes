@@ -1707,6 +1707,10 @@ func describeContainerProbe(container corev1.Container, w PrefixWriter) {
 		probe := DescribeProbe(container.ReadinessProbe)
 		w.Write(LEVEL_2, "Readiness:\t%s\n", probe)
 	}
+	if container.StartupProbe != nil {
+		probe := DescribeProbe(container.StartupProbe)
+		w.Write(LEVEL_2, "Startup:\t%s\n", probe)
+	}
 }
 
 func describeContainerVolumes(container corev1.Container, w PrefixWriter) {

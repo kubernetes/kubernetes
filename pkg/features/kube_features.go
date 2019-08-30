@@ -329,6 +329,7 @@ const (
 
 	// owner: @vladimirvivien
 	// alpha: v1.14
+	// beta: v1.16
 	//
 	// Enables CSI Inline volumes support for pods
 	CSIInlineVolume featuregate.Feature = "CSIInlineVolume"
@@ -460,6 +461,7 @@ const (
 
 	// owner: @j-griffith
 	// alpha: v1.15
+	// beta: v1.16
 	//
 	// Enable support for specifying an existing PVC as a DataSource
 	VolumePVCDataSource featuregate.Feature = "VolumePVCDataSource"
@@ -487,6 +489,12 @@ const (
 	//
 	// Schedule pods evenly across available topology domains.
 	EvenPodsSpread featuregate.Feature = "EvenPodsSpread"
+
+	// owner: @matthyx
+	// alpha: v1.16
+	//
+	// Enables the startupProbe in kubelet worker.
+	StartupProbe featuregate.Feature = "StartupProbe"
 )
 
 func init() {
@@ -549,7 +557,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	VolumeSubpathEnvExpansion:           {Default: true, PreRelease: featuregate.Beta},
 	ResourceQuotaScopeSelectors:         {Default: true, PreRelease: featuregate.Beta},
 	CSIBlockVolume:                      {Default: true, PreRelease: featuregate.Beta},
-	CSIInlineVolume:                     {Default: false, PreRelease: featuregate.Alpha},
+	CSIInlineVolume:                     {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                        {Default: true, PreRelease: featuregate.Beta},
 	NodeLease:                           {Default: true, PreRelease: featuregate.Beta},
 	SCTPSupport:                         {Default: false, PreRelease: featuregate.Alpha},
@@ -562,11 +570,12 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ServiceLoadBalancerFinalizer:        {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
-	VolumePVCDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
+	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.Beta},
 	PodOverhead:                                    {Default: false, PreRelease: featuregate.Alpha},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EndpointSlice:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EvenPodsSpread:                                 {Default: false, PreRelease: featuregate.Alpha},
+	StartupProbe:                                   {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
@@ -577,7 +586,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.DryRun:                  {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.ServerSideApply:         {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.RequestManagement:       {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed

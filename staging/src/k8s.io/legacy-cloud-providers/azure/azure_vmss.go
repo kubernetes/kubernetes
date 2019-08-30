@@ -35,6 +35,9 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilnet "k8s.io/utils/net"
 )
 
 var (
@@ -684,6 +687,25 @@ func getPrimaryIPConfigFromVMSSNetworkConfig(config *compute.VirtualMachineScale
 	return nil, fmt.Errorf("failed to find a primary IP configuration")
 }
 
+func (ss *scaleSet) getConfigForScaleSetByIPFamily(config *compute.VirtualMachineScaleSetNetworkConfiguration, nodeName string, IPv6 bool) (*compute.VirtualMachineScaleSetIPConfiguration, error) {
+	ipConfigurations := *config.IPConfigurations
+
+	var ipVersion compute.IPVersion
+	if IPv6 {
+		ipVersion = compute.IPv6
+	} else {
+		ipVersion = compute.IPv4
+	}
+	for idx := range ipConfigurations {
+		ipConfig := &ipConfigurations[idx]
+		if ipConfig.PrivateIPAddressVersion == ipVersion {
+			return ipConfig, nil
+		}
+	}
+
+	return nil, fmt.Errorf("failed to find a  IPconfiguration(IPv6=%v) for the scale set VM %q", IPv6, nodeName)
+}
+
 // EnsureHostInPool ensures the given VM's Primary NIC's Primary IP Configuration is
 // participating in the specified LoadBalancer Backend Pool.
 func (ss *scaleSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeName, backendPoolID string, vmSetName string, isInternal bool) error {
@@ -708,16 +730,27 @@ func (ss *scaleSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeNam
 		klog.V(4).Infof("EnsureHostInPool: cannot obtain the primary network interface configuration, of vm %s, probably because the vm's being deleted", vmName)
 		return nil
 	}
+
 	networkInterfaceConfigurations := *vm.NetworkProfileConfiguration.NetworkInterfaceConfigurations
 	primaryNetworkInterfaceConfiguration, err := ss.getPrimaryNetworkInterfaceConfiguration(networkInterfaceConfigurations, vmName)
 	if err != nil {
 		return err
 	}
 
-	// Find primary IP configuration.
-	primaryIPConfiguration, err := getPrimaryIPConfigFromVMSSNetworkConfig(primaryNetworkInterfaceConfiguration)
-	if err != nil {
-		return err
+	var primaryIPConfiguration *compute.VirtualMachineScaleSetIPConfiguration
+	// Find primary network interface configuration.
+	if !utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+		// Find primary IP configuration.
+		primaryIPConfiguration, err = getPrimaryIPConfigFromVMSSNetworkConfig(primaryNetworkInterfaceConfiguration)
+		if err != nil {
+			return err
+		}
+	} else {
+		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+		primaryIPConfiguration, err = ss.getConfigForScaleSetByIPFamily(primaryNetworkInterfaceConfiguration, vmName, ipv6)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Update primary IP configuration's LoadBalancerBackendAddressPools.

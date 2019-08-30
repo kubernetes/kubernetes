@@ -29,7 +29,7 @@ package v1beta1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_CSIDriver = map[string]string{
 	"":         "CSIDriver captures information about a Container Storage Interface (CSI) volume driver deployed on the cluster. CSI drivers do not need to create the CSIDriver object directly. Instead they may use the cluster-driver-registrar sidecar container. When deployed with a CSI driver it automatically creates a CSIDriver object representing the driver. Kubernetes attach detach controller uses this object to determine whether attach is required. Kubelet uses this object to determine whether pod information needs to be passed on mount. CSIDriver objects are non-namespaced.",
-	"metadata": "Standard object metadata. metadata.Name indicates the name of the CSI driver that this object refers to; it MUST be the same name returned by the CSI GetPluginName() call for that driver. The driver name must be 63 characters or less, beginning and ending with an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and alphanumerics between. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard object metadata. metadata.Name indicates the name of the CSI driver that this object refers to; it MUST be the same name returned by the CSI GetPluginName() call for that driver. The driver name must be 63 characters or less, beginning and ending with an alphanumeric character ([a-z0-9A-Z]) with dashes (-), dots (.), and alphanumerics between. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "Specification of the CSI Driver.",
 }
 
@@ -39,7 +39,7 @@ func (CSIDriver) SwaggerDoc() map[string]string {
 
 var map_CSIDriverList = map[string]string{
 	"":         "CSIDriverList is a collection of CSIDriver objects.",
-	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "items is the list of CSIDriver",
 }
 
@@ -82,7 +82,7 @@ func (CSINodeDriver) SwaggerDoc() map[string]string {
 
 var map_CSINodeList = map[string]string{
 	"":         "CSINodeList is a collection of CSINode objects.",
-	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "items is the list of CSINode",
 }
 
@@ -101,7 +101,7 @@ func (CSINodeSpec) SwaggerDoc() map[string]string {
 
 var map_StorageClass = map[string]string{
 	"":                     "StorageClass describes the parameters for a class of storage for which PersistentVolumes can be dynamically provisioned.\n\nStorageClasses are non-namespaced; the name of the storage class according to etcd is in ObjectMeta.Name.",
-	"metadata":             "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata":             "Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"provisioner":          "Provisioner indicates the type of the provisioner.",
 	"parameters":           "Parameters holds the parameters for the provisioner that should create volumes of this storage class.",
 	"reclaimPolicy":        "Dynamically provisioned PersistentVolumes of this storage class are created with this reclaimPolicy. Defaults to Delete.",
@@ -117,7 +117,7 @@ func (StorageClass) SwaggerDoc() map[string]string {
 
 var map_StorageClassList = map[string]string{
 	"":         "StorageClassList is a collection of storage classes.",
-	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is the list of StorageClasses",
 }
 
@@ -127,7 +127,7 @@ func (StorageClassList) SwaggerDoc() map[string]string {
 
 var map_VolumeAttachment = map[string]string{
 	"":         "VolumeAttachment captures the intent to attach or detach the specified volume to/from the specified node.\n\nVolumeAttachment objects are non-namespaced.",
-	"metadata": "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard object metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"spec":     "Specification of the desired attach/detach volume behavior. Populated by the Kubernetes system.",
 	"status":   "Status of the VolumeAttachment request. Populated by the entity completing the attach or detach operation, i.e. the external-attacher.",
 }
@@ -138,7 +138,7 @@ func (VolumeAttachment) SwaggerDoc() map[string]string {
 
 var map_VolumeAttachmentList = map[string]string{
 	"":         "VolumeAttachmentList is a collection of VolumeAttachment objects.",
-	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+	"metadata": "Standard list metadata More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
 	"items":    "Items is the list of VolumeAttachments",
 }
 

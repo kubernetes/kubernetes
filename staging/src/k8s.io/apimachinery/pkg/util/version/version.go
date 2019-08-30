@@ -183,8 +183,8 @@ func (v *Version) WithPreRelease(preRelease string) *Version {
 	return &result
 }
 
-// WithBuildeMetadata returns copy of the version object with requested buildMetadata
-func (v *Version) WithBuildeMetadata(buildMetadata string) *Version {
+// WithBuildMetadata returns copy of the version object with requested buildMetadata
+func (v *Version) WithBuildMetadata(buildMetadata string) *Version {
 	result := *v
 	result.components = []uint{v.Major(), v.Minor(), v.Patch()}
 	result.buildMetadata = buildMetadata

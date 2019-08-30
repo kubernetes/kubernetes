@@ -201,11 +201,11 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	return notMnt, nil
 }
 
-// IsBind detects whether a bind mount is being requested and makes the remount options to
+// MakeBindOpts detects whether a bind mount is being requested and makes the remount options to
 // use in case of bind mount, due to the fact that bind mount doesn't respect mount options.
 // The list equals:
 //   options - 'bind' + 'remount' (no duplicate)
-func IsBind(options []string) (bool, []string, []string) {
+func MakeBindOpts(options []string) (bool, []string, []string) {
 	// Because we have an FD opened on the subpath bind mount, the "bind" option
 	// needs to be included, otherwise the mount target will error as busy if you
 	// remount as readonly.

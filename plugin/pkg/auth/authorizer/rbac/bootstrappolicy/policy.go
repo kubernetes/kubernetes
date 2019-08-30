@@ -198,7 +198,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(
-					"/readyz", "/healthz", "/version", "/version/",
+					"/livez", "/readyz", "/healthz",
+					"/version", "/version/",
 					"/openapi", "/openapi/*",
 					"/api", "/api/*",
 					"/apis", "/apis/*",
@@ -218,7 +219,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:public-info-viewer"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(
-					"/readyz", "/healthz", "/version", "/version/",
+					"/livez", "/readyz", "/healthz", "/version", "/version/",
 				).RuleOrDie(),
 			},
 		},

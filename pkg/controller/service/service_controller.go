@@ -42,7 +42,6 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
@@ -195,7 +194,7 @@ func New(
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
 func (s *ServiceController) enqueueService(obj interface{}) {
-	key, err := controller.KeyFunc(obj)
+	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return

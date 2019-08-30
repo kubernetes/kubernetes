@@ -196,9 +196,9 @@ func TestEnforceVersionPolicies(t *testing.T) {
 			vg: &fakeVersionGetter{
 				clusterVersion: constants.MinimumControlPlaneVersion.String(),
 				kubeletVersion: constants.MinimumControlPlaneVersion.String(),
-				kubeadmVersion: constants.MinimumControlPlaneVersion.WithBuildeMetadata("build").String(),
+				kubeadmVersion: constants.MinimumControlPlaneVersion.WithBuildMetadata("build").String(),
 			},
-			newK8sVersion: constants.MinimumControlPlaneVersion.WithBuildeMetadata("build").String(),
+			newK8sVersion: constants.MinimumControlPlaneVersion.WithBuildMetadata("build").String(),
 		},
 	}
 

@@ -461,6 +461,26 @@ var (
 		},
 		[]string{"runtime_handler"},
 	)
+
+	// RunningPodCount is a gauge that tracks the number of Pods currently running
+	RunningPodCount = metrics.NewGauge(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "running_pod_count",
+			Help:           "Number of pods currently running",
+			StabilityLevel: metrics.ALPHA,
+		},
+	)
+	// RunningContainerCount is a gauge that tracks the number of containers currently running
+	RunningContainerCount = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      KubeletSubsystem,
+			Name:           "running_container_count",
+			Help:           "Number of containers currently running",
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"container_state"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -475,7 +495,6 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...prometheu
 		legacyregistry.MustRegister(CgroupManagerDuration)
 		legacyregistry.MustRegister(PodWorkerStartDuration)
 		legacyregistry.MustRegister(ContainersPerPodCount)
-		legacyregistry.RawMustRegister(newPodAndContainerCollector(containerCache))
 		legacyregistry.MustRegister(PLEGRelistDuration)
 		legacyregistry.MustRegister(PLEGDiscardEvents)
 		legacyregistry.MustRegister(PLEGRelistInterval)
@@ -498,6 +517,8 @@ func Register(containerCache kubecontainer.RuntimeCache, collectors ...prometheu
 		legacyregistry.MustRegister(DeprecatedEvictionStatsAge)
 		legacyregistry.MustRegister(DeprecatedDevicePluginRegistrationCount)
 		legacyregistry.MustRegister(DeprecatedDevicePluginAllocationLatency)
+		legacyregistry.MustRegister(RunningContainerCount)
+		legacyregistry.MustRegister(RunningPodCount)
 		if utilfeature.DefaultFeatureGate.Enabled(features.DynamicKubeletConfig) {
 			legacyregistry.MustRegister(AssignedConfig)
 			legacyregistry.MustRegister(ActiveConfig)
@@ -518,60 +539,6 @@ func SinceInMicroseconds(start time.Time) float64 {
 // SinceInSeconds gets the time since the specified start in seconds.
 func SinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
-}
-
-func newPodAndContainerCollector(containerCache kubecontainer.RuntimeCache) *podAndContainerCollector {
-	return &podAndContainerCollector{
-		containerCache: containerCache,
-	}
-}
-
-// Custom collector for current pod and container counts.
-type podAndContainerCollector struct {
-	// Cache for accessing information about running containers.
-	containerCache kubecontainer.RuntimeCache
-}
-
-// TODO(vmarmol): Split by source?
-var (
-	runningPodCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", KubeletSubsystem, "running_pod_count"),
-		"Number of pods currently running",
-		nil, nil)
-	runningContainerCountDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", KubeletSubsystem, "running_container_count"),
-		"Number of containers currently running",
-		nil, nil)
-)
-
-// Describe implements Prometheus' Describe method from the Collector interface. It sends all
-// available descriptions to the provided channel and retunrs once the last description has been sent.
-func (pc *podAndContainerCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- runningPodCountDesc
-	ch <- runningContainerCountDesc
-}
-
-// Collect implements Prometheus' Collect method from the Collector interface. It's called by the Prometheus
-// registry when collecting metrics.
-func (pc *podAndContainerCollector) Collect(ch chan<- prometheus.Metric) {
-	runningPods, err := pc.containerCache.GetPods()
-	if err != nil {
-		klog.Warningf("Failed to get running container information while collecting metrics: %v", err)
-		return
-	}
-
-	runningContainers := 0
-	for _, p := range runningPods {
-		runningContainers += len(p.Containers)
-	}
-	ch <- prometheus.MustNewConstMetric(
-		runningPodCountDesc,
-		prometheus.GaugeValue,
-		float64(len(runningPods)))
-	ch <- prometheus.MustNewConstMetric(
-		runningContainerCountDesc,
-		prometheus.GaugeValue,
-		float64(runningContainers))
 }
 
 const configMapAPIPathFmt = "/api/v1/namespaces/%s/configmaps/%s"

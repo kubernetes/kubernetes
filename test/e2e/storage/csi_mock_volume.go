@@ -322,8 +322,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				expectEphemeral:        false,
 			},
 			{
-				// TODO(pohly): remove the feature tag when moving to beta
-				name:                   "contain ephemeral=true when using inline volume [Feature:CSIInlineVolume]",
+				name:                   "contain ephemeral=true when using inline volume",
 				podInfoOnMount:         &podInfoTrue,
 				deployClusterRegistrar: true,
 				expectPodInfo:          true,

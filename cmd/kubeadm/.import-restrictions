@@ -174,13 +174,7 @@
 				"golang.org/x/text/unicode/bidi",
 				"golang.org/x/text/unicode/norm",
 				"golang.org/x/text/width",
-				"golang.org/x/time/rate"
-			]
-		},
-		{
-			"SelectorRegexp": "google[.]golang[.]org",
-			"AllowedPrefixes": [
-				"google.golang.org/genproto/googleapis/rpc/status",
+				"golang.org/x/time/rate",
 				"google.golang.org/grpc"
 			]
 		},

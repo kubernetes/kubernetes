@@ -26,7 +26,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 )
@@ -38,7 +37,7 @@ func WaitForServiceResponding(c clientset.Interface, ns, name string) error {
 	return wait.PollImmediate(framework.Poll, RespondingTimeout, func() (done bool, err error) {
 		proxyRequest, errProxy := GetServicesProxyRequest(c, c.CoreV1().RESTClient().Get())
 		if errProxy != nil {
-			e2elog.Logf("Failed to get services proxy request: %v:", errProxy)
+			framework.Logf("Failed to get services proxy request: %v:", errProxy)
 			return false, nil
 		}
 
@@ -52,18 +51,18 @@ func WaitForServiceResponding(c clientset.Interface, ns, name string) error {
 			Raw()
 		if err != nil {
 			if ctx.Err() != nil {
-				e2elog.Failf("Failed to GET from service %s: %v", name, err)
+				framework.Failf("Failed to GET from service %s: %v", name, err)
 				return true, err
 			}
-			e2elog.Logf("Failed to GET from service %s: %v:", name, err)
+			framework.Logf("Failed to GET from service %s: %v:", name, err)
 			return false, nil
 		}
 		got := string(body)
 		if len(got) == 0 {
-			e2elog.Logf("Service %s: expected non-empty response", name)
+			framework.Logf("Service %s: expected non-empty response", name)
 			return false, err // stop polling
 		}
-		e2elog.Logf("Service %s: found nonempty answer: %s", name, got)
+		framework.Logf("Service %s: found nonempty answer: %s", name, got)
 		return true, nil
 	})
 }
@@ -72,7 +71,7 @@ func WaitForServiceResponding(c clientset.Interface, ns, name string) error {
 func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name string) {
 	ginkgo.By("Delete service with finalizer")
 	if err := cs.CoreV1().Services(namespace).Delete(name, nil); err != nil {
-		e2elog.Failf("Failed to delete service %s/%s", namespace, name)
+		framework.Failf("Failed to delete service %s/%s", namespace, name)
 	}
 
 	ginkgo.By("Wait for service to disappear")
@@ -80,15 +79,15 @@ func WaitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name 
 		svc, err := cs.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
-				e2elog.Logf("Service %s/%s is gone.", namespace, name)
+				framework.Logf("Service %s/%s is gone.", namespace, name)
 				return true, nil
 			}
 			return false, err
 		}
-		e2elog.Logf("Service %s/%s still exists with finalizers: %v", namespace, name, svc.Finalizers)
+		framework.Logf("Service %s/%s still exists with finalizers: %v", namespace, name, svc.Finalizers)
 		return false, nil
 	}); pollErr != nil {
-		e2elog.Failf("Failed to wait for service to disappear: %v", pollErr)
+		framework.Failf("Failed to wait for service to disappear: %v", pollErr)
 	}
 }
 
@@ -108,11 +107,11 @@ func WaitForServiceUpdatedWithFinalizer(cs clientset.Interface, namespace, name 
 			}
 		}
 		if foundFinalizer != hasFinalizer {
-			e2elog.Logf("Service %s/%s hasFinalizer=%t, want %t", namespace, name, foundFinalizer, hasFinalizer)
+			framework.Logf("Service %s/%s hasFinalizer=%t, want %t", namespace, name, foundFinalizer, hasFinalizer)
 			return false, nil
 		}
 		return true, nil
 	}); pollErr != nil {
-		e2elog.Failf("Failed to wait for service to hasFinalizer=%t: %v", hasFinalizer, pollErr)
+		framework.Failf("Failed to wait for service to hasFinalizer=%t: %v", hasFinalizer, pollErr)
 	}
 }
