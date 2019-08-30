@@ -14,6 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// This test only makes sure that the kubelet correctly passes down GMSA cred specs
+// down to the runtime.
+// It's a much lighter test than gmsa_full, that tests the whole GMSA process, but
+// also requires a heavy weight setup to run.
+
 package windows
 
 import (
@@ -31,15 +36,15 @@ import (
 	"github.com/onsi/gomega"
 )
 
-var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA [Slow]", func() {
-	f := framework.NewDefaultFramework("gmsa-test-windows")
+var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA Kubelet [Slow]", func() {
+	f := framework.NewDefaultFramework("gmsa-kubelet-test-windows")
 
 	ginkgo.Describe("kubelet GMSA support", func() {
 		ginkgo.Context("when creating a pod with correct GMSA credential specs", func() {
 			ginkgo.It("passes the credential specs down to the Pod's containers", func() {
 				defer ginkgo.GinkgoRecover()
 
-				podName := "with-correct-gmsa-annotations"
+				podName := "with-correct-gmsa-specs"
 
 				container1Name := "container1"
 				podDomain := "acme.com"
@@ -75,7 +80,7 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA [Slow]", func(
 					},
 				}
 
-				ginkgo.By("creating a pod with correct GMSA annotations")
+				ginkgo.By("creating a pod with correct GMSA specs")
 				f.PodClient().CreateSync(pod)
 
 				ginkgo.By("checking the domain reported by nltest in the containers")
