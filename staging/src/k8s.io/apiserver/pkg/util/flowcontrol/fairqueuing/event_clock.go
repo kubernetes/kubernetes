@@ -14,13 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package clock
+package fairqueuing
 
 import (
 	"container/heap"
 	"math/rand"
 	"sync"
+	"testing"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 // EventFunc does some work that needs to be done at or after the
@@ -30,10 +33,47 @@ import (
 // no other work is left to be completed in goroutines.
 type EventFunc func(time.Time)
 
+type SettablePassiveClock interface {
+	clock.PassiveClock
+	SetTime(time.Time)
+}
+
+type EventClock interface {
+	clock.PassiveClock
+	EventAfterDuration(f EventFunc, d time.Duration)
+	EventAfterTime(f EventFunc, t time.Time)
+}
+
+type RealEventClock struct {
+	clock.RealClock
+}
+
+// EventAfterDuration schedules an EventFunc
+func (RealEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
+	ch := time.After(d)
+	go func() {
+		select {
+		case t := <-ch:
+			f(t)
+		}
+	}()
+}
+
+// EventAfterTime schedules an EventFunc
+func (r RealEventClock) EventAfterTime(f EventFunc, t time.Time) {
+	now := time.Now()
+	d := t.Sub(now)
+	if d <= 0 {
+		go f(now)
+	} else {
+		r.EventAfterDuration(f, d)
+	}
+}
+
 // FakeEventClock is one whose time does not pass implicitly but
 // rather is explicitly set by invocations of its SetTime method
 type FakeEventClock struct {
-	FakePassiveClock
+	clock.FakePassiveClock
 
 	// waiters is a heap of waiting work, sorted by time
 	waiters eventWaiterHeap
@@ -75,7 +115,7 @@ func NewFakeEventClock(t time.Time, clientWG *sync.WaitGroup, fuzz time.Duration
 		r.Uint64()
 	}
 	return &FakeEventClock{
-		FakePassiveClock: *NewFakePassiveClock(t),
+		FakePassiveClock: *clock.NewFakePassiveClock(t),
 		clientWG:         clientWG,
 		fuzz:             fuzz,
 		rand:             r,
@@ -112,13 +152,12 @@ func (fec *FakeEventClock) Run(limit *time.Time) {
 // be started by the given time --- including any further events they
 // schedule
 func (fec *FakeEventClock) SetTime(t time.Time) {
-	fec.lock.Lock()
-	fec.time = t
+	fec.FakePassiveClock.SetTime(t)
 	for {
 		// This loop is because events run at a given time may schedule more
 		// events to run at that or an earlier time.
 		// Events should not advance the clock.  But just in case they do...
-		now := fec.time
+		now := fec.Now()
 		var wg sync.WaitGroup
 		foundSome := false
 		for len(fec.waiters) > 0 && !now.Before(fec.waiters[0].targetTime) {
@@ -130,19 +169,14 @@ func (fec *FakeEventClock) SetTime(t time.Time) {
 		if !foundSome {
 			break
 		}
-		fec.lock.Unlock()
 		wg.Wait()
-		fec.lock.Lock()
 	}
-	fec.lock.Unlock()
 }
 
 // EventAfterDuration schedules the given function to be invoked once
 // the given duration has passed.
 func (fec *FakeEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
-	fec.lock.Lock()
-	defer fec.lock.Unlock()
-	now := fec.time
+	now := fec.Now()
 	fd := time.Duration(float32(fec.fuzz) * fec.rand.Float32())
 	heap.Push(&fec.waiters, eventWaiter{targetTime: now.Add(d + fd), f: f})
 }
@@ -150,8 +184,6 @@ func (fec *FakeEventClock) EventAfterDuration(f EventFunc, d time.Duration) {
 // EventAfterTime schedules the given function to be invoked once
 // the given time has arrived.
 func (fec *FakeEventClock) EventAfterTime(f EventFunc, t time.Time) {
-	fec.lock.Lock()
-	defer fec.lock.Unlock()
 	fd := time.Duration(float32(fec.fuzz) * fec.rand.Float32())
 	heap.Push(&fec.waiters, eventWaiter{targetTime: t.Add(fd), f: f})
 }
@@ -172,4 +204,27 @@ func (ewh *eventWaiterHeap) Pop() interface{} {
 	x := old[n-1]
 	*ewh = old[:n-1]
 	return x
+}
+
+func exercisePassiveClock(t *testing.T, pc SettablePassiveClock) {
+	t1 := time.Now()
+	t2 := t1.Add(time.Hour)
+	pc.SetTime(t1)
+	tx := pc.Now()
+	if tx != t1 {
+		t.Errorf("SetTime(%#+v); Now() => %#+v", t1, tx)
+	}
+	dx := pc.Since(t1)
+	if dx != 0 {
+		t.Errorf("Since() => %v", dx)
+	}
+	pc.SetTime(t2)
+	dx = pc.Since(t1)
+	if dx != time.Hour {
+		t.Errorf("Since() => %v", dx)
+	}
+	tx = pc.Now()
+	if tx != t2 {
+		t.Errorf("Now() => %#+v", tx)
+	}
 }
