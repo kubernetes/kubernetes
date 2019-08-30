@@ -55,7 +55,7 @@ const (
 	// watches to observe changes to objects that are in its interest.
 	WatchChangeDetectionStrategy ResourceChangeDetectionStrategy = "Watch"
 	// RestrictedTopologyManagerPolicy is a mode in which kubelet only allows
-	// pods with a single NUMA alignment of CPU and device resources.
+	// pods with optimal NUMA node alignment for requested resources
 	RestrictedTopologyManagerPolicy = "restricted"
 	// BestEffortTopologyManagerPolicy is a mode in which kubelet will favour
 	// pods with NUMA alignment of CPU and device resources.
@@ -63,6 +63,9 @@ const (
 	// NoneTopologyManager Policy is a mode in which kubelet has no knowledge
 	// of NUMA alignment of a pod's CPU and device resources.
 	NoneTopologyManagerPolicy = "none"
+	// SingleNumaNodeTopologyManager Policy iis a mode in which kubelet only allows
+	// pods with a single NUMA alignment of CPU and device resources.
+	SingleNumaNodeTopologyManager = "single-numa-node"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

@@ -20,24 +20,24 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-type restrictedPolicy struct{}
+type singleNumaNodePolicy struct{}
 
-var _ Policy = &restrictedPolicy{}
+var _ Policy = &singleNumaNodePolicy{}
 
-// PolicyRestricted policy name.
-const PolicyRestricted string = "restricted"
+// PolicySingleNumaNode policy name.
+const PolicySingleNumaNode string = "single-numa-node"
 
-// NewRestrictedPolicy returns restricted policy.
-func NewRestrictedPolicy() Policy {
-	return &restrictedPolicy{}
+// NewSingleNumaNodePolicy returns single-numa-node policy.
+func NewSingleNumaNodePolicy() Policy {
+	return &singleNumaNodePolicy{}
 }
 
-func (p *restrictedPolicy) Name() string {
-	return PolicyRestricted
+func (p *singleNumaNodePolicy) Name() string {
+	return PolicySingleNumaNode
 }
 
-func (p *restrictedPolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
-	if !hint.Preferred {
+func (p *singleNumaNodePolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
+	if !hint.Preferred || hint.NUMANodeAffinity.Count() > 1 {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
 			Reason:  "Topology Affinity Error",

@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
+func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 	tcases := []struct {
 		name     string
 		hint     TopologyHint
@@ -29,21 +29,35 @@ func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 		{
 			name:     "Preferred is set to false in topology hints",
 			hint:     TopologyHint{nil, false},
-			expected: true,
+			expected: false,
 		},
 		{
-			name:     "Preferred is set to true in topology hints",
-			hint:     TopologyHint{nil, true},
+			name:     "NUMANodeAffinity has multiple NUMA Nodes masked in topology hints",
+			hint:     TopologyHint{NewTestSocketMask(0, 1), true},
+			expected: false,
+		},
+		{
+			name:     "NUMANodeAffinity has one NUMA Node masked in topology hints",
+			hint:     TopologyHint{NewTestSocketMask(0), true},
 			expected: true,
 		},
 	}
 
 	for _, tc := range tcases {
-		policy := NewBestEffortPolicy()
+		policy := NewSingleNumaNodePolicy()
 		result := policy.CanAdmitPodResult(&tc.hint)
 
 		if result.Admit != tc.expected {
 			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
+		}
+
+		if tc.expected == false {
+			if len(result.Reason) == 0 {
+				t.Errorf("Expected Reason field to be not empty")
+			}
+			if len(result.Message) == 0 {
+				t.Errorf("Expected Message field to be not empty")
+			}
 		}
 	}
 }

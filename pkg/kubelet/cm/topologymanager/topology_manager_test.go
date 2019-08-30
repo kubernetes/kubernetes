@@ -111,6 +111,7 @@ func TestCalculateAffinity(t *testing.T) {
 		name     string
 		hp       []HintProvider
 		expected TopologyHint
+		policy   Policy
 	}{
 		{
 			name: "TopologyHint not set",
@@ -655,10 +656,45 @@ func TestCalculateAffinity(t *testing.T) {
 				Preferred:        true,
 			},
 		},
+		{
+			name:   "Special cased PolicySingleNumaNode for single NUMA hint generation",
+			policy: NewSingleNumaNodePolicy(),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        true,
+							},
+						},
+						"resource2": {
+							{
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestSocketMask(0),
+				Preferred:        false,
+			},
+		},
 	}
 
 	for _, tc := range tcases {
 		mngr := manager{
+			policy:        tc.policy,
 			hintProviders: tc.hp,
 			numaNodes:     numaNodes,
 		}
