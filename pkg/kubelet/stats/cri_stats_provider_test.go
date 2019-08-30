@@ -754,6 +754,7 @@ func makeFakeLogStats(seed int) *volume.Metrics {
 func TestGetContainerUsageNanoCores(t *testing.T) {
 	var value0 uint64
 	var value1 uint64 = 10000000000
+	var value2 uint64 = 188427786383
 
 	// Test with a large container of 100+ CPUs
 	var value2 uint64 = 188427786383
