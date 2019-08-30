@@ -821,6 +821,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			SelfLinkPathPrefix: selfLinkPrefix,
 			SelfLinkPathSuffix: "/scale",
 		}
+		// TODO(issues.k8s.io/82046): We can't effectively track ownership on scale requests yet.
+		scaleScope.FieldManager = nil
 		scaleScopes[v.Name] = &scaleScope
 
 		// override status subresource values
