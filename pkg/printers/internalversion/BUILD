@@ -71,6 +71,7 @@ go_library(
         "//pkg/apis/events/install:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/flowcontrol:go_default_library",
+        "//pkg/apis/flowcontrol/install:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/node:go_default_library",
         "//pkg/apis/policy:go_default_library",
