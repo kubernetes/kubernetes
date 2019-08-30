@@ -20,11 +20,13 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/wait"
+	fcboot "k8s.io/apiserver/pkg/util/flowcontrol/bootstrap"
 	fq "k8s.io/apiserver/pkg/util/flowcontrol/fairqueuing"
 	"k8s.io/apiserver/pkg/util/flowcontrol/metrics"
 	kubeinformers "k8s.io/client-go/informers"
@@ -35,6 +37,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rmtypesv1a1 "k8s.io/api/flowcontrol/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 // initializeConfigController sets up the controller that processes
@@ -75,7 +78,7 @@ func (reqMgr *requestManager) OnDelete(obj interface{}) {
 func (reqMgr *requestManager) Run(stopCh <-chan struct{}) error {
 	defer reqMgr.configQueue.ShutDown()
 	klog.Info("Starting reqmgmt config controller")
-	if ok := cache.WaitForCacheSync(stopCh, reqMgr.readyFunc, reqMgr.plInformerSynced, reqMgr.fsInformerSynced); !ok {
+	if ok := cache.WaitForCacheSync(stopCh, reqMgr.plInformerSynced, reqMgr.fsInformerSynced); !ok {
 		return fmt.Errorf("Never achieved initial sync")
 	}
 	klog.Info("Running reqmgmt config worker")
@@ -133,8 +136,8 @@ func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.Priority
 		priorityLevelStates: make(map[string]*priorityLevelState),
 	}
 	newlyQuiescent := make([]*priorityLevelState, 0)
-	plByName := map[string]*rmtypesv1a1.PriorityLevelConfiguration{}
-	for i, pl := range newPLs {
+	exemptPLName, defaultPLName := "", ""
+	for _, pl := range newPLs {
 		state := oldRMState.priorityLevelStates[pl.Name]
 		if state == nil {
 			state = &priorityLevelState{
@@ -143,18 +146,43 @@ func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.Priority
 		} else {
 			oState := *state
 			state = &oState
-			state.config = pl.Spec
-			if state.emptyHandler != nil { // it was undesired, but no longer
-				klog.V(3).Infof("Priority level %s was undesired and has become desired again", pl.Name)
+			if state.emptyHandler != nil && state.emptyHandler.IsEmpty() {
+				// The queues are empty and will never get any more requests
+				state.queues = nil
+				state.emptyHandler = nil
+				klog.V(3).Infof("Retired queues for quiescing desired priority level %q", pl.Name)
+			}
+			if pl.Spec.Exempt && state.queues != nil {
+				// Do not forget about the queues and their parameters!
+				if !state.config.Exempt {
+					klog.V(3).Infof("Priority level %q became exempt", pl.Name)
+					// Get notified when the queues are drained
+					state.emptyHandler = &emptyRelay{reqMgr: reqMgr}
+					newlyQuiescent = append(newlyQuiescent, state)
+					state.config.Exempt = true
+				}
+			} else {
+				if state.config.Exempt && !pl.Spec.Exempt {
+					klog.V(3).Infof("Priority level %q became non-exempt", pl.Name)
+				}
+				state.config = pl.Spec
+			}
+			if state.emptyHandler != nil && !state.config.Exempt { // it was undesired, but no longer
+				klog.V(3).Infof("Priority level %q was undesired and has become desired again", pl.Name)
 				state.emptyHandler = nil
 				state.queues.Quiesce(nil)
 			}
 		}
-		if !pl.Spec.Exempt {
+		if pl.Spec.Exempt {
+			exemptPLName = pl.Name
+		}
+		if state.queues != nil || !state.config.Exempt {
 			shareSum += float64(state.config.AssuredConcurrencyShares)
 		}
+		if pl.Spec.GlobalDefault {
+			defaultPLName = pl.Name
+		}
 		newRMState.priorityLevelStates[pl.Name] = state
-		plByName[pl.Name] = newPLs[i]
 	}
 
 	fsSeq := make(rmtypesv1a1.FlowSchemaSequence, 0, len(newFSs))
@@ -166,45 +194,74 @@ func (reqMgr *requestManager) digestConfigObjects(newPLs []*rmtypesv1a1.Priority
 		}
 	}
 	sort.Sort(fsSeq)
-	newRMState.flowSchemas = fsSeq
 
+	for plName, plState := range oldRMState.priorityLevelStates {
+		if newRMState.priorityLevelStates[plName] != nil {
+			// Still desired and already updated
+			continue
+		}
+		newState := *plState
+		plState = &newState
+		if plState.emptyHandler != nil && plState.emptyHandler.IsEmpty() {
+			// The queues are empty and will never get any more requests
+			plState.queues = nil
+			plState.emptyHandler = nil
+			klog.V(3).Infof("Retired queues for undesired quiescing priority level %q", plName)
+		}
+		if plState.config.Exempt && exemptPLName == "" || plState.config.GlobalDefault && defaultPLName == "" {
+			klog.V(3).Infof("Retaining old priority level %q with Exempt=%v, GlobalDefault=%v because of lack of replacement", plName, plState.config.Exempt, plState.config.GlobalDefault)
+		} else {
+			if plState.queues == nil {
+				klog.V(3).Infof("Immediately removing undesired priority level %q, Exempt=%v", plName, plState.config.Exempt)
+				continue
+			}
+			if plState.emptyHandler == nil {
+				klog.V(3).Infof("Priority level %q became undesired", plName)
+				plState.emptyHandler = &emptyRelay{reqMgr: reqMgr}
+				newlyQuiescent = append(newlyQuiescent, plState)
+			}
+		}
+		newRMState.priorityLevelStates[plName] = plState
+		if plState.config.Exempt {
+			exemptPLName = plName
+		}
+		if plState.queues != nil {
+			shareSum += float64(plState.config.AssuredConcurrencyShares)
+		}
+		if plState.config.GlobalDefault {
+			defaultPLName = plName
+		}
+	}
+
+	if exemptPLName == "" {
+		exemptPLName = newRMState.imaginePL(0, &shareSum)
+	}
+	if defaultPLName == "" {
+		defaultPLName = newRMState.imaginePL(1, &shareSum)
+	}
+	fsSeq = append(fsSeq, fcboot.NewFSAllGroups("backstop to "+exemptPLName, exemptPLName, math.MaxInt32, "", user.SystemPrivilegedGroup))
+	fsSeq = append(fsSeq, fcboot.NewFSAllGroups("backstop to "+defaultPLName, defaultPLName, math.MaxInt32, rmtypesv1a1.FlowDistinguisherMethodByUserType, user.AllAuthenticated, user.AllUnauthenticated))
+
+	newRMState.flowSchemas = fsSeq
 	if klog.V(5) {
 		for _, fs := range fsSeq {
 			klog.Infof("Using FlowSchema %s: %#+v", fs.Name, fs.Spec)
 		}
 	}
-	for plName, plState := range oldRMState.priorityLevelStates {
-		if newRMState.priorityLevelStates[plName] != nil {
-			// Still desired
-		} else if plState.emptyHandler != nil && plState.emptyHandler.IsEmpty() {
-			// undesired, empty, and never going to get another request
-			klog.V(3).Infof("Priority level %s removed from implementation", plName)
-		} else {
-			if plState.emptyHandler == nil {
-				klog.V(3).Infof("Priority level %s became undesired", plName)
-				newState := *plState
-				plState = &newState
-				plState.emptyHandler = &emptyRelay{reqMgr: reqMgr}
-				newlyQuiescent = append(newlyQuiescent, plState)
-			}
-			newRMState.priorityLevelStates[plName] = plState
-			if !plState.config.Exempt {
-				shareSum += float64(plState.config.AssuredConcurrencyShares)
-			}
-		}
-	}
 	for plName, plState := range newRMState.priorityLevelStates {
-		if plState.config.Exempt {
-			klog.V(5).Infof("Using exempt priority level %s: quiescent=%v", plName, plState.emptyHandler != nil)
+		if plState.queues == nil && plState.config.Exempt {
+			klog.V(5).Infof("Using exempt priority level %q: quiescent=%v", plName, plState.emptyHandler != nil)
 			continue
 		}
+
 		plState.concurrencyLimit = int(math.Ceil(float64(reqMgr.serverConcurrencyLimit) * float64(plState.config.AssuredConcurrencyShares) / shareSum))
 		metrics.UpdateSharedConcurrencyLimit(plName, plState.concurrencyLimit)
+
 		if plState.queues == nil {
-			klog.V(5).Infof("Introducing priority level %s: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.concurrencyLimit, plState.emptyHandler != nil, plState.config.AssuredConcurrencyShares, shareSum)
+			klog.V(5).Infof("Introducing queues for priority level %q: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.concurrencyLimit, plState.emptyHandler != nil, plState.config.AssuredConcurrencyShares, shareSum)
 			plState.queues = reqMgr.queueSetFactory.NewQueueSet(plName, plState.concurrencyLimit, int(plState.config.Queues), int(plState.config.QueueLengthLimit), reqMgr.requestWaitLimit)
 		} else {
-			klog.V(5).Infof("Retaining priority level %s: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.concurrencyLimit, plState.emptyHandler != nil, plState.config.AssuredConcurrencyShares, shareSum)
+			klog.V(5).Infof("Retaining queues for priority level %q: config=%#+v, concurrencyLimit=%d, quiescent=%v (shares=%v, shareSum=%v)", plName, plState.config, plState.concurrencyLimit, plState.emptyHandler != nil, plState.config.AssuredConcurrencyShares, shareSum)
 			plState.queues.SetConfiguration(plState.concurrencyLimit, int(plState.config.Queues), int(plState.config.QueueLengthLimit), reqMgr.requestWaitLimit)
 		}
 	}
@@ -245,6 +302,24 @@ func (reqMgr *requestManager) syncFlowSchemaStatus(fs *rmtypesv1a1.FlowSchema, i
 	if err != nil {
 		klog.Warningf("failed updating condition for flow-schema %s", fs.Name)
 	}
+}
+
+func (newRMState *requestManagerState) imaginePL(protoIdx int, shareSum *float64) string {
+	proto := fcboot.InitialPriorityLevelConfigurations[protoIdx]
+	base, name := proto.Name, ""
+	for i := 1; true; i++ {
+		name = strings.TrimSuffix(fmt.Sprintf("%s-%d", base, i), "-1")
+		if newRMState.priorityLevelStates[name] == nil {
+			break
+		}
+	}
+	role := []string{"Exempt", "GlobalDefault"}[protoIdx]
+	klog.Warningf("No %s PriorityLevelConfiguration found, imagining one named %q", role, name)
+	newRMState.priorityLevelStates[name] = &priorityLevelState{
+		config: proto.Spec,
+	}
+	*shareSum += float64(protoIdx) * float64(proto.Spec.AssuredConcurrencyShares)
+	return name
 }
 
 type emptyRelay struct {

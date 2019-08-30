@@ -236,6 +236,15 @@ message PriorityLevelConfigurationSpec {
   // preset priority level can be exempt.
   // +optional
   optional bool exempt = 5;
+
+  // `globalDefault` specifies whether this priority level can be
+  // used for non-exempt requests that do not match any FlowSchema.
+  // If multiple PriorityLevelConfiguration objects have this field
+  // `true` then the implementation freely chooses among them.  If
+  // none have this field `true` then the implementation pretends that
+  // a default one exists.
+  // +optional
+  optional bool globalDefault = 6;
 }
 
 // PriorityLevelConfigurationStatus represents the current state of a "request-priority".

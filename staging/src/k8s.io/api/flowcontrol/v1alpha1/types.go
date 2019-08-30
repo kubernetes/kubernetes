@@ -245,6 +245,14 @@ type PriorityLevelConfigurationSpec struct {
 	// preset priority level can be exempt.
 	// +optional
 	Exempt bool `json:"exempt,omitempty" protobuf:"varint,5,opt,name=exempt"`
+	// `globalDefault` specifies whether this priority level can be
+	// used for non-exempt requests that do not match any FlowSchema.
+	// If multiple PriorityLevelConfiguration objects have this field
+	// `true` then the implementation freely chooses among them.  If
+	// none have this field `true` then the implementation pretends that
+	// a default one exists.
+	// +optional
+	GlobalDefault bool `json:"globalDefault,omitempty" protobuf:"varint,6,opt,name=globalDefault"`
 }
 
 // PriorityLevelConfigurationConditionType is a valid value for PriorityLevelConfigurationStatusCondition.Type
