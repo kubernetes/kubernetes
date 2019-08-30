@@ -21,6 +21,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -42,10 +43,6 @@ import (
 )
 
 const (
-	// serviceNameLabel is used to indicate the name of a Kubernetes service
-	// associated with an EndpointSlice.
-	serviceNameLabel = "kubernetes.io/service-name"
-
 	// maxRetries is the number of times a service will be retried before it is
 	// dropped out of the queue. Any sync error, such as a failure to create or
 	// update an EndpointSlice could trigger a retry. With the current
@@ -276,7 +273,7 @@ func (c *Controller) syncService(key string) error {
 		return err
 	}
 
-	esLabelSelector := labels.Set(map[string]string{serviceNameLabel: service.Name}).AsSelectorPreValidated()
+	esLabelSelector := labels.Set(map[string]string{discovery.LabelServiceName: service.Name}).AsSelectorPreValidated()
 	endpointSlices, err := c.endpointSliceLister.EndpointSlices(service.Namespace).List(esLabelSelector)
 
 	if err != nil {

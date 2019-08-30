@@ -390,6 +390,7 @@ func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Pro
 		nodePortAddresses:        make([]string, 0),
 		networkInterfacer:        utilproxytest.NewFakeNetwork(),
 	}
+	p.setInitialized(true)
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
 	return p
 }
@@ -2335,9 +2336,9 @@ COMMIT
 	ipAddressType := discovery.AddressTypeIP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("%s-1", serviceName),
-			Namespace:       namespaceName,
-			OwnerReferences: []metav1.OwnerReference{{Kind: "Service", Name: serviceName}},
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports: []discovery.EndpointPort{{
 			Name: utilpointer.StringPtr(""),

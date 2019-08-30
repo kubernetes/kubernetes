@@ -13,6 +13,7 @@ go_library(
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
+        "//pkg/apis/discovery/validation:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/util/endpoint:go_default_library",
         "//pkg/util/hash:go_default_library",

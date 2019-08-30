@@ -25,12 +25,6 @@ import (
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
 )
 
-const (
-	// serviceNameLabel is used to indicate the name of a Kubernetes service
-	// associated with an EndpointSlice.
-	serviceNameLabel = "kubernetes.io/service-name"
-)
-
 // EndpointsAdapter provides a simple interface for reading and writing both
 // Endpoints and Endpoint Slices.
 // NOTE: This is an incomplete adapter implementation that is only suitable for
@@ -103,8 +97,7 @@ func (adapter *EndpointsAdapter) ensureEndpointSliceFromEndpoints(namespace stri
 func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.EndpointSlice {
 	endpointSlice := &discovery.EndpointSlice{}
 	endpointSlice.Name = endpoints.Name
-	endpointSlice.Labels = map[string]string{serviceNameLabel: endpoints.Name}
-	endpointSlice.OwnerReferences = []metav1.OwnerReference{{Kind: "Service", Name: endpoints.Name}}
+	endpointSlice.Labels = map[string]string{discovery.LabelServiceName: endpoints.Name}
 
 	ipAddressType := discovery.AddressTypeIP
 	endpointSlice.AddressType = &ipAddressType

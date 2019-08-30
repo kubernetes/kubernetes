@@ -179,7 +179,11 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 		return false
 	}
 
-	namespacedName, _ := endpointSliceCacheKeys(endpointSlice)
+	namespacedName, _, err := endpointSliceCacheKeys(endpointSlice)
+	if err != nil {
+		klog.Warningf("Error getting endpoint slice cache keys: %v", err)
+		return false
+	}
 
 	metrics.EndpointChangesTotal.Inc()
 

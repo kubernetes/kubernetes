@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -58,8 +57,8 @@ func TestNewEndpointSlice(t *testing.T) {
 
 	expectedSlice := discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:          map[string]string{serviceNameLabel: service.Name},
-			GenerateName:    fmt.Sprintf("%s.", service.Name),
+			Labels:          map[string]string{discovery.LabelServiceName: service.Name},
+			GenerateName:    fmt.Sprintf("%s-", service.Name),
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       service.Namespace,
 		},
@@ -81,7 +80,7 @@ func TestPodToEndpoint(t *testing.T) {
 
 	multiIPPod.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}, {IP: "1234::5678:0000:0000:9abc:def0"}}
 
-	node1 := &corev1.Node{
+	node1 := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: readyPod.Spec.NodeName,
 			Labels: map[string]string{
@@ -288,14 +287,14 @@ func newClientset() *fake.Clientset {
 	return client
 }
 
-func newServiceAndendpointMeta(name, namespace string) (corev1.Service, endpointMeta) {
+func newServiceAndendpointMeta(name, namespace string) (v1.Service, endpointMeta) {
 	portNum := int32(80)
 	portNameIntStr := intstr.IntOrString{
 		Type:   intstr.Int,
 		IntVal: portNum,
 	}
 
-	svc := corev1.Service{
+	svc := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace},
 		Spec: v1.ServiceSpec{
 			Ports: []v1.ServicePort{{
@@ -317,7 +316,7 @@ func newServiceAndendpointMeta(name, namespace string) (corev1.Service, endpoint
 	return svc, endpointMeta
 }
 
-func newEmptyEndpointSlice(n int, namespace string, endpointMeta endpointMeta, svc corev1.Service) *discovery.EndpointSlice {
+func newEmptyEndpointSlice(n int, namespace string, endpointMeta endpointMeta, svc v1.Service) *discovery.EndpointSlice {
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s.%d", svc.Name, n),

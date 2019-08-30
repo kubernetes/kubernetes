@@ -819,7 +819,11 @@ func (proxier *Proxier) OnServiceDelete(service *v1.Service) {
 func (proxier *Proxier) OnServiceSynced() {
 	proxier.mu.Lock()
 	proxier.servicesSynced = true
-	proxier.setInitialized(proxier.endpointsSynced || proxier.endpointSlicesSynced)
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		proxier.setInitialized(proxier.endpointSlicesSynced)
+	} else {
+		proxier.setInitialized(proxier.endpointsSynced)
+	}
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
@@ -847,7 +851,7 @@ func (proxier *Proxier) OnEndpointsDelete(endpoints *v1.Endpoints) {
 func (proxier *Proxier) OnEndpointsSynced() {
 	proxier.mu.Lock()
 	proxier.endpointsSynced = true
-	proxier.setInitialized(proxier.servicesSynced && proxier.endpointsSynced)
+	proxier.setInitialized(proxier.servicesSynced)
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
@@ -883,7 +887,7 @@ func (proxier *Proxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointS
 func (proxier *Proxier) OnEndpointSlicesSynced() {
 	proxier.mu.Lock()
 	proxier.endpointSlicesSynced = true
-	proxier.setInitialized(proxier.servicesSynced && proxier.endpointSlicesSynced)
+	proxier.setInitialized(proxier.servicesSynced)
 	proxier.mu.Unlock()
 
 	// Sync unconditionally - this is called once per lifetime.
@@ -900,7 +904,7 @@ func (proxier *Proxier) syncProxyRules() {
 	defer proxier.mu.Unlock()
 
 	// don't sync rules till we've received services and endpoints
-	if !proxier.endpointsSynced || !proxier.servicesSynced {
+	if !proxier.isInitialized() {
 		klog.V(2).Info("Not syncing ipvs rules until Services and Endpoints have been received from master")
 		return
 	}
