@@ -11,6 +11,7 @@ spec:
       labels:
         app: gcp-compute-persistent-disk-csi-driver
     spec:
+      hostNetwork: true
       containers:
         - name: csi-driver-registrar
           image: gcr.io/gke-release/csi-node-driver-registrar:v1.1.0-gke.0

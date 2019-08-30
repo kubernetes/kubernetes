@@ -14,6 +14,7 @@ spec:
         app: gcp-compute-persistent-disk-csi-driver
     spec:
       serviceAccountName: csi-controller-sa
+      hostNetwork: true
       containers:
         - name: csi-provisioner
           # TODO: replace with official 1.4.0 release when ready
