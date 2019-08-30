@@ -512,18 +512,21 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 	// Loopback network deletion failure should not be fatal on teardown
 	if err := plugin.delContainerFromNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
 		klog.Warningf("Failed to delete loopback network: %v", err)
-	}
+		errList = append(errList, err)
 
-	// fail fast if there is no IP registered
-	iplist, exists := plugin.getCachedPodIPs(id)
-	if !exists || len(iplist) == 0 {
-		klog.V(5).Infof("container %s (%s/%s) does not have recorded. ignoring teardown call", id, name, namespace)
-		return nil
 	}
 
 	// no ip dependent actions
 	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
+		klog.Warningf("Failed to delete %q network: %v", network.DefaultInterfaceName, err)
 		errList = append(errList, err)
+	}
+
+	// If there are no IPs registered we can't teardown pod's IP dependencies
+	iplist, exists := plugin.getCachedPodIPs(id)
+	if !exists || len(iplist) == 0 {
+		klog.V(5).Infof("container %s (%s/%s) does not have recorded. ignoring teardown call", id, name, namespace)
+		return nil
 	}
 
 	// get the list of port mappings
