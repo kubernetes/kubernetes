@@ -68,7 +68,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	bindSource := source
 
 	// tell it's going to mount azure disk or azure file according to options
-	if bind, _, _ := IsBind(options); bind {
+	if bind, _, _ := MakeBindOpts(options); bind {
 		// mount azure disk
 		bindSource = NormalizeWindowsPath(source)
 	} else {

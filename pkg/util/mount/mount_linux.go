@@ -73,7 +73,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	// Path to mounter binary if containerized mounter is needed. Otherwise, it is set to empty.
 	// All Linux distros are expected to be shipped with a mount utility that a support bind mounts.
 	mounterPath := ""
-	bind, bindOpts, bindRemountOpts := IsBind(options)
+	bind, bindOpts, bindRemountOpts := MakeBindOpts(options)
 	if bind {
 		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts)
 		if err != nil {
