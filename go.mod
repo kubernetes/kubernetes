@@ -66,7 +66,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock v1.2.0
 	github.com/golang/protobuf v1.3.1
-	github.com/google/cadvisor v0.33.2-0.20190719172907-9fa3b1429966
+	github.com/google/cadvisor v0.34.0
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
 	github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz v1.0.0
@@ -282,7 +282,7 @@ replace (
 	github.com/golangplus/fmt => github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
 	github.com/google/btree => github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c
-	github.com/google/cadvisor => github.com/google/cadvisor v0.33.2-0.20190719172907-9fa3b1429966
+	github.com/google/cadvisor => github.com/google/cadvisor v0.34.0
 	github.com/google/certificate-transparency-go => github.com/google/certificate-transparency-go v1.0.21
 	github.com/google/go-cmp => github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz => github.com/google/gofuzz v1.0.0
