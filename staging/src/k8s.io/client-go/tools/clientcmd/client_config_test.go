@@ -180,12 +180,12 @@ func TestCAOverridesCAData(t *testing.T) {
 	matchByteArg(nil, actualCfg.TLSClientConfig.CAData, t)
 }
 
-func TestServerName(t *testing.T) {
+func TestTLSServerName(t *testing.T) {
 	config := createValidTestConfig()
 
 	clientBuilder := NewNonInteractiveClientConfig(*config, "clean", &ConfigOverrides{
 		ClusterInfo: clientcmdapi.Cluster{
-			ServerName: "overridden-server-name",
+			TLSServerName: "overridden-server-name",
 		},
 	}, nil)
 
@@ -430,7 +430,7 @@ func TestCreateClean(t *testing.T) {
 	matchStringArg("", clientConfig.APIPath, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
-	matchStringArg(config.Clusters["clean"].ServerName, clientConfig.ServerName, t)
+	matchStringArg(config.Clusters["clean"].TLSServerName, clientConfig.ServerName, t)
 }
 
 func TestCreateCleanWithPrefix(t *testing.T) {
@@ -481,7 +481,7 @@ func TestCreateCleanDefault(t *testing.T) {
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
-	matchStringArg(config.Clusters["clean"].ServerName, clientConfig.ServerName, t)
+	matchStringArg(config.Clusters["clean"].TLSServerName, clientConfig.ServerName, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }
@@ -498,7 +498,7 @@ func TestCreateCleanDefaultCluster(t *testing.T) {
 	}
 
 	matchStringArg(config.Clusters["clean"].Server, clientConfig.Host, t)
-	matchStringArg(config.Clusters["clean"].ServerName, clientConfig.ServerName, t)
+	matchStringArg(config.Clusters["clean"].TLSServerName, clientConfig.ServerName, t)
 	matchBoolArg(config.Clusters["clean"].InsecureSkipTLSVerify, clientConfig.Insecure, t)
 	matchStringArg(config.AuthInfos["clean"].Token, clientConfig.BearerToken, t)
 }

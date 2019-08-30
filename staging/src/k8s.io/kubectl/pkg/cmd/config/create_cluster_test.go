@@ -43,12 +43,12 @@ func TestCreateCluster(t *testing.T) {
 		args:        []string{"my-cluster"},
 		flags: []string{
 			"--server=http://192.168.0.1",
-			"--server-name=my-cluster-name",
+			"--tls-server-name=my-cluster-name",
 		},
 		expected: `Cluster "my-cluster" set.` + "\n",
 		expectedConfig: clientcmdapi.Config{
 			Clusters: map[string]*clientcmdapi.Cluster{
-				"my-cluster": {Server: "http://192.168.0.1", ServerName: "my-cluster-name"},
+				"my-cluster": {Server: "http://192.168.0.1", TLSServerName: "my-cluster-name"},
 			},
 		},
 	}
@@ -116,8 +116,8 @@ func (test createClusterTest) run(t *testing.T) {
 		if cluster.Server != test.expectedConfig.Clusters[test.args[0]].Server {
 			t.Errorf("Fail in %q\n expected cluster server %v\n but got %v\n ", test.description, test.expectedConfig.Clusters[test.args[0]].Server, cluster.Server)
 		}
-		if cluster.ServerName != test.expectedConfig.Clusters[test.args[0]].ServerName {
-			t.Errorf("Fail in %q\n expected cluster server name %v\n but got %v\n ", test.description, test.expectedConfig.Clusters[test.args[0]].ServerName, cluster.ServerName)
+		if cluster.TLSServerName != test.expectedConfig.Clusters[test.args[0]].TLSServerName {
+			t.Errorf("Fail in %q\n expected cluster TLS server name %v\n but got %v\n ", test.description, test.expectedConfig.Clusters[test.args[0]].TLSServerName, cluster.TLSServerName)
 		}
 	}
 }
