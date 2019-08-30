@@ -716,10 +716,10 @@ func (m *kubeGenericRuntimeManager) killContainer(ctx context.Context, pod *v1.P
 			// after a kubelet restart, it's not 100% certain that the
 			// pod we're given has the container we need in the spec
 			// -- we try to recover that here.
-			restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(containerID)
+			restoredPod, restoredContainer, err := m.restoreSpecsFromContainerLabels(ctx, containerID)
 			if err != nil {
 				return fmt.Errorf("failed to get containerSpec %q(id=%q) in pod %q when killing container for reason %q. error: %v",
-					containerName, containerID.String(), format.Pod(pod), reason, err)
+					containerName, containerID.String(), format.Pod(pod), message, err)
 			}
 			pod, containerSpec = restoredPod, restoredContainer
 		}
