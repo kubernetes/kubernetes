@@ -14204,9 +14204,9 @@ func TestValidateWindowsSecurityContextOptions(t *testing.T) {
 		{
 			testName: "RunAsUserName's User is too long",
 			windowsOptions: &core.WindowsSecurityContextOptions{
-				RunAsUserName: toPtr(strings.Repeat("a", maxRunAsUserNameUserLength)),
+				RunAsUserName: toPtr(strings.Repeat("a", maxRunAsUserNameUserLength+1)),
 			},
-			expectedErrorSubstring: "runAsUserName's User length must be under",
+			expectedErrorSubstring: "runAsUserName's User length must not be longer than",
 		},
 		{
 			testName: "RunAsUserName's User cannot contain only spaces or periods",
