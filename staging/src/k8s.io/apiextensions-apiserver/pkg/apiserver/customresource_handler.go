@@ -40,6 +40,7 @@ import (
 	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
 	"k8s.io/apiextensions-apiserver/pkg/controller/establish"
 	"k8s.io/apiextensions-apiserver/pkg/controller/finalizer"
+	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
@@ -74,11 +75,13 @@ import (
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/scale"
 	"k8s.io/client-go/scale/scheme/autoscalingv1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/klog"
+	"k8s.io/kube-openapi/pkg/util/proto"
 )
 
 // crdHandler serves the `/apis` endpoint.
@@ -117,6 +120,11 @@ type crdHandler struct {
 
 	// minRequestTimeout applies to CR's list/watch calls
 	minRequestTimeout time.Duration
+
+	// staticOpenAPISpec is used as a base for the schema of CR's for the
+	// purpose of managing fields, it is how CR handlers get the structure
+	// of TypeMeta and ObjectMeta
+	staticOpenAPISpec *spec.Swagger
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -160,7 +168,8 @@ func NewCustomResourceDefinitionHandler(
 	masterCount int,
 	authorizer authorizer.Authorizer,
 	requestTimeout time.Duration,
-	minRequestTimeout time.Duration) (*crdHandler, error) {
+	minRequestTimeout time.Duration,
+	staticOpenAPISpec *spec.Swagger) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -175,6 +184,7 @@ func NewCustomResourceDefinitionHandler(
 		authorizer:              authorizer,
 		requestTimeout:          requestTimeout,
 		minRequestTimeout:       minRequestTimeout,
+		staticOpenAPISpec:       staticOpenAPISpec,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    ret.createCustomResourceDefinition,
@@ -634,6 +644,29 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		structuralSchemas[v.Name] = s
 	}
 
+	var openAPIModels proto.Models
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) && r.staticOpenAPISpec != nil {
+		specs := []*spec.Swagger{}
+		for _, v := range crd.Spec.Versions {
+			s, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: false, StripDefaults: true, StripValueValidation: true})
+			if err != nil {
+				utilruntime.HandleError(err)
+				return nil, fmt.Errorf("the server could not properly serve the CR schema")
+			}
+			specs = append(specs, s)
+		}
+		mergedOpenAPI, err := builder.MergeSpecs(r.staticOpenAPISpec, specs...)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly merge the CR schema")
+		}
+		openAPIModels, err = utilopenapi.ToProtoModels(mergedOpenAPI)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, fmt.Errorf("the server could not properly serve the CR schema")
+		}
+	}
+
 	for _, v := range crd.Spec.Versions {
 		safeConverter, unsafeConverter, err := r.converterFactory.NewConverter(crd)
 		if err != nil {
@@ -799,12 +832,17 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 			reqScope := *requestScopes[v.Name]
-			reqScope.FieldManager = fieldmanager.NewCRDFieldManager(
+			reqScope.FieldManager, err = fieldmanager.NewCRDFieldManager(
+				openAPIModels,
 				reqScope.Convertor,
 				reqScope.Defaulter,
 				reqScope.Kind.GroupVersion(),
 				reqScope.HubGroupVersion,
+				*crd.Spec.PreserveUnknownFields,
 			)
+			if err != nil {
+				return nil, err
+			}
 			requestScopes[v.Name] = &reqScope
 		}
 

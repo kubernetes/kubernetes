@@ -910,6 +910,8 @@ func autoConvert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JSONSch
 	out.XPreserveUnknownFields = (*bool)(unsafe.Pointer(in.XPreserveUnknownFields))
 	out.XEmbeddedResource = in.XEmbeddedResource
 	out.XIntOrString = in.XIntOrString
+	out.XListMapKeys = *(*[]string)(unsafe.Pointer(&in.XListMapKeys))
+	out.XListType = (*string)(unsafe.Pointer(in.XListType))
 	return nil
 }
 
@@ -1095,6 +1097,8 @@ func autoConvert_apiextensions_JSONSchemaProps_To_v1_JSONSchemaProps(in *apiexte
 	out.XPreserveUnknownFields = (*bool)(unsafe.Pointer(in.XPreserveUnknownFields))
 	out.XEmbeddedResource = in.XEmbeddedResource
 	out.XIntOrString = in.XIntOrString
+	out.XListMapKeys = *(*[]string)(unsafe.Pointer(&in.XListMapKeys))
+	out.XListType = (*string)(unsafe.Pointer(in.XListType))
 	return nil
 }
 

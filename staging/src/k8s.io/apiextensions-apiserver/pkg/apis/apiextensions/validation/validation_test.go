@@ -6572,6 +6572,194 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			opts:      validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
 			wantError: true,
 		},
+		{
+			name: "invalid type with list type extension set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "object",
+					XListType: strPtr("set"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "unset type with list type extension set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					XListType: strPtr("set"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "invalid list type extension",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("invalid"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "invalid list type extension with list map keys extension non-empty",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("set"),
+					XListMapKeys: []string{"key"},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "unset list type extension with list map keys extension non-empty",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					XListMapKeys: []string{"key"},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "empty list map keys extension with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("map"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "no items schema with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key"},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "multiple schema items with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						JSONSchemas: []apiextensions.JSONSchemaProps{
+							{
+								Type: "string",
+							}, {
+								Type: "integer",
+							},
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "non object item with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "string",
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "items with key missing from properties with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "items with non scalar key property type with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"key": {
+									Type: "object",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "duplicate map keys with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key", "key"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"key": {
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "allowed schema with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"keyA", "keyB"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"keyA": {
+									Type: "string",
+								},
+								"keyB": {
+									Type: "integer",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantError: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
