@@ -2061,8 +2061,8 @@ func registerValidatingWebhookForCRD(f *framework.Framework, configName string, 
 				},
 				SideEffects:             &sideEffectsNone,
 				AdmissionReviewVersions: []string{"v1", "v1beta1"},
-				// Scope the webhook to just this namespace
-				NamespaceSelector: &metav1.LabelSelector{
+				// Scope the webhook to just this test
+				ObjectSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{f.UniqueName: "true"},
 				},
 			},
@@ -2113,6 +2113,9 @@ func testCRDDenyWebhook(f *framework.Framework) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name + "s." + group,
 			Labels: map[string]string{
+				// this label ensures our object is routed to this test's webhook
+				f.UniqueName: "true",
+				// this is the label the webhook disallows
 				"webhook-e2e-test": "webhook-disallow",
 			},
 		},
