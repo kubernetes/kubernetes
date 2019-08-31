@@ -830,7 +830,7 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 			for _, k := range schema.XListMapKeys {
 				if s, ok := schema.Items.Schema.Properties[k]; ok {
 					if s.Type == "array" || s.Type == "object" {
-						allErrs = append(allErrs, field.Invalid(fldPath.Child("items").Child("properties").Child(k).Child("type"), schema.Items.Schema.Type, "must be a scalar type if parent array's x-kubernetes-list-type is map"))
+						allErrs = append(allErrs, field.Invalid(fldPath.Child("items").Child("properties").Key(k).Child("type"), schema.Items.Schema.Type, "must be a scalar type if parent array's x-kubernetes-list-type is map"))
 					}
 				} else {
 					allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-list-map-keys"), schema.XListMapKeys, "entries must all be names of item properties"))
