@@ -20,6 +20,9 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 // Cloud Provider API constants
@@ -43,45 +46,49 @@ const (
 )
 
 // vsphereAPIMetric is for recording latency of Single API Call.
-var vsphereAPIMetric = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name: "cloudprovider_vsphere_api_request_duration_seconds",
-		Help: "Latency of vsphere api call",
+var vsphereAPIMetric = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
+		Name:           "cloudprovider_vsphere_api_request_duration_seconds",
+		Help:           "Latency of vsphere api call",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"request"},
 )
 
-var vsphereAPIErrorMetric = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "cloudprovider_vsphere_api_request_errors",
-		Help: "vsphere Api errors",
+var vsphereAPIErrorMetric = metrics.NewCounterVec(
+	&metrics.CounterOpts{
+		Name:           "cloudprovider_vsphere_api_request_errors",
+		Help:           "vsphere Api errors",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"request"},
 )
 
 // vsphereOperationMetric is for recording latency of vSphere Operation which invokes multiple APIs to get the task done.
-var vsphereOperationMetric = prometheus.NewHistogramVec(
-	prometheus.HistogramOpts{
-		Name: "cloudprovider_vsphere_operation_duration_seconds",
-		Help: "Latency of vsphere operation call",
+var vsphereOperationMetric = metrics.NewHistogramVec(
+	&metrics.HistogramOpts{
+		Name:           "cloudprovider_vsphere_operation_duration_seconds",
+		Help:           "Latency of vsphere operation call",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"operation"},
 )
 
-var vsphereOperationErrorMetric = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "cloudprovider_vsphere_operation_errors",
-		Help: "vsphere operation errors",
+var vsphereOperationErrorMetric = metrics.NewCounterVec(
+	&metrics.CounterOpts{
+		Name:           "cloudprovider_vsphere_operation_errors",
+		Help:           "vsphere operation errors",
+		StabilityLevel: metrics.ALPHA,
 	},
 	[]string{"operation"},
 )
 
 // RegisterMetrics registers all the API and Operation metrics
 func RegisterMetrics() {
-	prometheus.MustRegister(vsphereAPIMetric)
-	prometheus.MustRegister(vsphereAPIErrorMetric)
-	prometheus.MustRegister(vsphereOperationMetric)
-	prometheus.MustRegister(vsphereOperationErrorMetric)
+	legacyregistry.MustRegister(vsphereAPIMetric)
+	legacyregistry.MustRegister(vsphereAPIErrorMetric)
+	legacyregistry.MustRegister(vsphereOperationMetric)
+	legacyregistry.MustRegister(vsphereOperationErrorMetric)
 }
 
 // RecordvSphereMetric records the vSphere API and Operation metrics

@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -32,7 +33,7 @@ spec:
   maxReplicas: -1971381490
   metrics:
   - external:
-      metricName: "38"
+      metricName: "39"
       metricSelector:
         matchExpressions:
         - key: 1295at-o7qff7-x--r7v66bm71u-n4f9wk-3--652x01--p--n4-4-t--2gk-0/d.83_iq_-y.-25C.A-j..9dfn3Y8d_0_.---M_4FpF_W-1._-vL_i.-_-a--GI
@@ -43,7 +44,7 @@ spec:
       targetValue: "570"
     object:
       averageValue: "954"
-      metricName: "24"
+      metricName: "25"
       selector:
         matchExpressions:
         - key: 1d3-7-fP81.-.9Vdx.TB_M-H5
@@ -53,12 +54,12 @@ spec:
         matchLabels:
           An---v_-5-_8LXP-o-9..1l-_5---5w9vL_-.M.y._-_R58_HLU..8._Q: 7-dG6c-.6--_x.--0wmZk1_8._3s_-_Bq.m_-q
       target:
-        apiVersion: "23"
-        kind: "21"
-        name: "22"
+        apiVersion: "24"
+        kind: "22"
+        name: "23"
       targetValue: "79"
     pods:
-      metricName: "31"
+      metricName: "32"
       selector:
         matchExpressions:
         - key: 20h-OK-_8gI_z_-tY-R6S17_.8CnK_Od
@@ -76,21 +77,21 @@ spec:
     type: 枊a8衍`Ĩɘ.蘯6ċV夸eɑeʤ脽ě
   minReplicas: 896585016
   scaleTargetRef:
-    apiVersion: "20"
-    kind: "18"
-    name: "19"
+    apiVersion: "21"
+    kind: "19"
+    name: "20"
 status:
   conditions:
   - lastTransitionTime: "2416-12-01T11:47:49Z"
-    message: "70"
-    reason: "69"
+    message: "71"
+    reason: "70"
     status: aTGÒ鵌Ē3
     type: 鯶縆
   currentMetrics:
   - external:
       currentAverageValue: "606"
       currentValue: "229"
-      metricName: "62"
+      metricName: "63"
       metricSelector:
         matchExpressions:
         - key: FC-rtSY.g._2F7.-_e..OP
@@ -100,7 +101,7 @@ status:
     object:
       averageValue: "14"
       currentValue: "55"
-      metricName: "48"
+      metricName: "49"
       selector:
         matchExpressions:
         - key: 665--4-j8---t6-r7--9.9dy/XvSA..1
@@ -108,12 +109,12 @@ status:
         matchLabels:
           8._Wxpe..J7rs6.0_OHz_.B-.-_w_--.8_r_N-.3n-xu: o_-Nm-_X8
       target:
-        apiVersion: "47"
-        kind: "45"
-        name: "46"
+        apiVersion: "48"
+        kind: "46"
+        name: "47"
     pods:
       currentAverageValue: "878"
-      metricName: "55"
+      metricName: "56"
       selector:
         matchExpressions:
         - key: g-..__._____K_g1cXfr.4_.B

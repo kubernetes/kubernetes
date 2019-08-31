@@ -11,7 +11,6 @@ go_library(
     srcs = ["crdregistration_controller.go"],
     importpath = "k8s.io/kubernetes/pkg/master/controller/crdregistration",
     deps = [
-        "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion:go_default_library",

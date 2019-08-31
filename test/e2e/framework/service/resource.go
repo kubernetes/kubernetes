@@ -26,7 +26,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // GetServicesProxyRequest returns a request for a service proxy.
@@ -103,10 +102,10 @@ func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(sv
 
 // DescribeSvc logs the output of kubectl describe svc for the given namespace
 func DescribeSvc(ns string) {
-	e2elog.Logf("\nOutput of kubectl describe svc:\n")
+	framework.Logf("\nOutput of kubectl describe svc:\n")
 	desc, _ := framework.RunKubectl(
 		"describe", "svc", fmt.Sprintf("--namespace=%v", ns))
-	e2elog.Logf(desc)
+	framework.Logf(desc)
 }
 
 // GetServiceLoadBalancerCreationTimeout returns a timeout value for creating a load balancer of a service.

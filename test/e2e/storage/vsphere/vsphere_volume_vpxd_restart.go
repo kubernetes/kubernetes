@@ -164,7 +164,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 				volumePath := volumePaths[i]
 
 				ginkgo.By(fmt.Sprintf("Deleting pod on node %s", nodeName))
-				err = framework.DeletePodWithWait(f, client, pod)
+				err = e2epod.DeletePodWithWait(client, pod)
 				framework.ExpectNoError(err)
 
 				ginkgo.By(fmt.Sprintf("Waiting for volume %s to be detached from node %s", volumePath, nodeName))

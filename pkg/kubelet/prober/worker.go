@@ -98,6 +98,10 @@ func newWorker(
 		w.spec = container.LivenessProbe
 		w.resultsManager = m.livenessManager
 		w.initialValue = results.Success
+	case startup:
+		w.spec = container.StartupProbe
+		w.resultsManager = m.startupManager
+		w.initialValue = results.Failure
 	}
 
 	basicMetricLabels := prometheus.Labels{
@@ -218,8 +222,21 @@ func (w *worker) doProbe() (keepGoing bool) {
 			w.pod.Spec.RestartPolicy != v1.RestartPolicyNever
 	}
 
+	// Probe disabled for InitialDelaySeconds.
 	if int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
 		return true
+	}
+
+	if c.Started != nil && *c.Started {
+		// Stop probing for startup once container has started.
+		if w.probeType == startup {
+			return true
+		}
+	} else {
+		// Disable other probes until container has started.
+		if w.probeType != startup {
+			return true
+		}
 	}
 
 	// TODO: in order for exec probes to correctly handle downward API env, we must be able to reconstruct
@@ -255,8 +272,8 @@ func (w *worker) doProbe() (keepGoing bool) {
 
 	w.resultsManager.Set(w.containerID, result, w.pod)
 
-	if w.probeType == liveness && result == results.Failure {
-		// The container fails a liveness check, it will need to be restarted.
+	if (w.probeType == liveness || w.probeType == startup) && result == results.Failure {
+		// The container fails a liveness/startup check, it will need to be restarted.
 		// Stop probing until we see a new container ID. This is to reduce the
 		// chance of hitting #21751, where running `docker exec` when a
 		// container is being stopped may lead to corrupted container state.

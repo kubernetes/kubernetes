@@ -49,12 +49,14 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/printers"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var testData = TestStruct{
@@ -3852,6 +3854,106 @@ func TestPrintRuntimeClass(t *testing.T) {
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
 		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.rc, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintEndpointSlice(t *testing.T) {
+	ipAddressType := discovery.AddressTypeIP
+	tcpProtocol := api.ProtocolTCP
+
+	tests := []struct {
+		endpointSlice discovery.EndpointSlice
+		expect        string
+	}{
+		{
+			discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "abcslice.123",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				AddressType: &ipAddressType,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.3", "2001:db8::1234:5678"},
+				}},
+			},
+			"abcslice.123   IP    80    10.1.2.3,2001:db8::1234:5678   0s\n",
+		}, {
+			discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "longerslicename.123",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				AddressType: &ipAddressType,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}, {
+					Name:     utilpointer.StringPtr("https"),
+					Port:     utilpointer.Int32Ptr(443),
+					Protocol: &tcpProtocol,
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.3", "2001:db8::1234:5678"},
+				}, {
+					Addresses: []string{"10.2.3.4", "2001:db8::2345:6789"},
+				}},
+			},
+			"longerslicename.123   IP    80,443   10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...   5m\n",
+		}, {
+			discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "multiportslice.123",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				AddressType: &ipAddressType,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}, {
+					Name:     utilpointer.StringPtr("https"),
+					Port:     utilpointer.Int32Ptr(443),
+					Protocol: &tcpProtocol,
+				}, {
+					Name:     utilpointer.StringPtr("extra1"),
+					Port:     utilpointer.Int32Ptr(3000),
+					Protocol: &tcpProtocol,
+				}, {
+					Name:     utilpointer.StringPtr("extra2"),
+					Port:     utilpointer.Int32Ptr(3001),
+					Protocol: &tcpProtocol,
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.3", "2001:db8::1234:5678"},
+				}, {
+					Addresses: []string{"10.2.3.4", "2001:db8::2345:6789"},
+				}},
+			},
+			"multiportslice.123   IP    80,443,3000 + 1 more...   10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...   5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.endpointSlice, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}

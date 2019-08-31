@@ -327,15 +327,15 @@ func TestNewBuilder(t *testing.T) {
       "required":["kind","apiVersion"],
       "properties":{
         "apiVersion":{
-          "description":"apiVersion defines the versioned schema of this representation of an object. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources",
+          "description":"apiVersion defines the versioned schema of this representation of an object. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources",
           "type":"string"
         },
         "kind":{
-          "description":"kind is a string value representing the type of this object. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+          "description":"kind is a string value representing the type of this object. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
           "type":"string"
         },
         "metadata":{
-          "description":"Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata",
+          "description":"Standard object's metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata",
           "$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"
         }
       }

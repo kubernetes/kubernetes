@@ -45,6 +45,7 @@ const (
 	autoscalingGroup    = "autoscaling"
 	batchGroup          = "batch"
 	certificatesGroup   = "certificates.k8s.io"
+	discoveryGroup      = "discovery.k8s.io"
 	extensionsGroup     = "extensions"
 	policyGroup         = "policy"
 	rbacGroup           = "rbac.authorization.k8s.io"
@@ -197,7 +198,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(
-					"/readyz", "/healthz", "/version", "/version/",
+					"/livez", "/readyz", "/healthz",
+					"/version", "/version/",
 					"/openapi", "/openapi/*",
 					"/api", "/api/*",
 					"/apis", "/apis/*",
@@ -217,7 +219,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:public-info-viewer"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(
-					"/readyz", "/healthz", "/version", "/version/",
+					"/livez", "/readyz", "/healthz", "/version", "/version/",
 				).RuleOrDie(),
 			},
 		},
@@ -351,17 +353,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 		{
-			// a role to use for setting up a proxy
-			ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},
-			Rules: []rbacv1.PolicyRule{
-				// Used to build serviceLister
-				rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
-				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-
-				eventsRule(),
-			},
-		},
-		{
 			// a role to use for full access to the kubelet API
 			ObjectMeta: metav1.ObjectMeta{Name: "system:kubelet-api-admin"},
 			Rules: []rbacv1.PolicyRule{
@@ -470,6 +461,21 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 	}
+
+	// node-proxier role is used by kube-proxy.
+	nodeProxierRules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
+		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+
+		eventsRule(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
+	}
+	roles = append(roles, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},
+		Rules:      nodeProxierRules,
+	})
 
 	kubeSchedulerRules := []rbacv1.PolicyRule{
 		eventsRule(),

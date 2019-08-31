@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -29,11 +30,11 @@ metadata:
   selfLink: "5"
   uid: "7"
 roleRef:
-  apiGroup: "22"
-  kind: "23"
-  name: "24"
+  apiGroup: "23"
+  kind: "24"
+  name: "25"
 subjects:
-- apiVersion: "19"
-  kind: "18"
-  name: "20"
-  namespace: "21"
+- apiVersion: "20"
+  kind: "19"
+  name: "21"
+  namespace: "22"

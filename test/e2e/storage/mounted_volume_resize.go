@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -151,7 +152,7 @@ var _ = utils.SIGDescribe("Mounted volume expand", func() {
 		pod := podList.Items[0]
 
 		ginkgo.By("Deleting the pod from deployment")
-		err = framework.DeletePodWithWait(f, c, &pod)
+		err = e2epod.DeletePodWithWait(c, &pod)
 		framework.ExpectNoError(err, "while deleting pod for resizing")
 
 		ginkgo.By("Waiting for deployment to create new pod")

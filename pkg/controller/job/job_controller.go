@@ -143,7 +143,7 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting job controller")
 	defer klog.Infof("Shutting down job controller")
 
-	if !controller.WaitForCacheSync("job", stopCh, jm.podStoreSynced, jm.jobStoreSynced) {
+	if !cache.WaitForNamedCacheSync("job", stopCh, jm.podStoreSynced, jm.jobStoreSynced) {
 		return
 	}
 

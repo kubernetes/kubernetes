@@ -89,7 +89,7 @@ type CIDRAllocator interface {
 }
 
 // New creates a new CIDR range allocator.
-func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, clusterCIDRs []*net.IPNet, serviceCIDR *net.IPNet, nodeCIDRMaskSize int) (CIDRAllocator, error) {
+func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInformer informers.NodeInformer, allocatorType CIDRAllocatorType, clusterCIDRs []*net.IPNet, serviceCIDR *net.IPNet, secondaryServiceCIDR *net.IPNet, nodeCIDRMaskSize int) (CIDRAllocator, error) {
 	nodeList, err := listNodes(kubeClient)
 	if err != nil {
 		return nil, err
@@ -97,7 +97,7 @@ func New(kubeClient clientset.Interface, cloud cloudprovider.Interface, nodeInfo
 
 	switch allocatorType {
 	case RangeAllocatorType:
-		return NewCIDRRangeAllocator(kubeClient, nodeInformer, clusterCIDRs, serviceCIDR, nodeCIDRMaskSize, nodeList)
+		return NewCIDRRangeAllocator(kubeClient, nodeInformer, clusterCIDRs, serviceCIDR, secondaryServiceCIDR, nodeCIDRMaskSize, nodeList)
 	case CloudAllocatorType:
 		return NewCloudCIDRAllocator(kubeClient, cloud, nodeInformer)
 	default:

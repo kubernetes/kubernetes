@@ -6,12 +6,16 @@ go_library(
     name = "go_default_library",
     srcs = [
         "density.go",
+        "dns.go",
         "framework.go",
-        "gmsa.go",
+        "gmsa_full.go",
+        "gmsa_kubelet.go",
         "hybrid_network.go",
         "memory_limits.go",
         "networking.go",
+        "security_context.go",
         "service.go",
+        "utils.go",
         "volumes.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/windows",
@@ -19,6 +23,7 @@ go_library(
     deps = [
         "//pkg/kubelet/apis/config:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -37,9 +42,11 @@ go_library(
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/service:go_default_library",
+        "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
+        "//vendor/github.com/pkg/errors:go_default_library",
     ],
 )
 

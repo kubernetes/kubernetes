@@ -131,6 +131,14 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 			gomega.Eventually(func() error {
 				return verifyEvents(f, eventListOptions, 1, "AUFSUmountHung", node.Name)
 			}, pollTimeout, pollInterval).Should(gomega.Succeed())
+
+			// Node problem detector reports kubelet start events automatically starting from NPD v0.7.0+.
+			// Since Kubelet may be restarted for a few times after node is booted. We just check the event
+			// is detected, but do not check how many times Kubelet is started.
+			ginkgo.By(fmt.Sprintf("Check node-problem-detector posted KubeletStart event on node %q", node.Name))
+			gomega.Eventually(func() error {
+				return verifyEventExists(f, eventListOptions, "KubeletStart", node.Name)
+			}, pollTimeout, pollInterval).Should(gomega.Succeed())
 		}
 
 		ginkgo.By("Gather node-problem-detector cpu and memory stats")
@@ -200,6 +208,19 @@ func verifyEvents(f *framework.Framework, options metav1.ListOptions, num int, r
 		return fmt.Errorf("expect event number %d, got %d: %v", num, count, events.Items)
 	}
 	return nil
+}
+
+func verifyEventExists(f *framework.Framework, options metav1.ListOptions, reason, nodeName string) error {
+	events, err := f.ClientSet.CoreV1().Events(metav1.NamespaceDefault).List(options)
+	if err != nil {
+		return err
+	}
+	for _, event := range events.Items {
+		if event.Reason == reason && event.Source.Host == nodeName && event.Count > 0 {
+			return nil
+		}
+	}
+	return fmt.Errorf("Event %s does not exist: %v", reason, events.Items)
 }
 
 func verifyNodeCondition(f *framework.Framework, condition v1.NodeConditionType, status v1.ConditionStatus, reason, nodeName string) error {

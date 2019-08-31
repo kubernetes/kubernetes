@@ -36,7 +36,6 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/cmd/clusterinfo:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/completion:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/config:all-srcs",
-        "//staging/src/k8s.io/kubectl/pkg/cmd/cp:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/create:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/delete:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/cmd/describe:all-srcs",

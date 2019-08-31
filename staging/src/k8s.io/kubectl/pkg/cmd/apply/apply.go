@@ -204,11 +204,11 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if o.ForceConflicts && !o.ServerSideApply {
-		return fmt.Errorf("--experimental-force-conflicts only works with --experimental-server-side")
+		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
 	if o.DryRun && o.ServerSideApply {
-		return fmt.Errorf("--dry-run doesn't work with --experimental-server-side (did you mean --server-dry-run instead?)")
+		return fmt.Errorf("--dry-run doesn't work with --server-side (did you mean --server-dry-run instead?)")
 	}
 
 	if o.DryRun && o.ServerDryRun {
@@ -418,7 +418,22 @@ func (o *ApplyOptions) Run() error {
 				if isIncompatibleServerError(err) {
 					err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)
 				}
+				if errors.IsConflict(err) {
+					err = fmt.Errorf(`%v
 
+Please review the fields above--they currently have other managers. Here
+are the ways you can resolve this warning:
+* If you intend to manage all of these fields, please re-run the apply
+  command with the `+"`--force-conflicts`"+` flag.
+* If you do not intend to manage all of the fields, please edit your
+  manifest to remove references to the fields that should keep their
+  current managers.
+* You may co-own fields by updating your manifest to match the existing
+  value; in this case, you'll become the manager if the other manager(s)
+  stop managing the field (remove it from their configuration).
+
+See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
+				}
 				return err
 			}
 

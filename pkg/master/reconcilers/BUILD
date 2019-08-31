@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "doc.go",
+        "endpointsadapter.go",
         "lease.go",
         "mastercount.go",
         "none.go",
@@ -14,6 +15,7 @@ go_library(
     deps = [
         "//pkg/api/v1/endpoints:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -21,6 +23,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/typed/discovery/v1alpha1:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
@@ -28,11 +31,18 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["lease_test.go"],
+    srcs = [
+        "endpointsadapter_test.go",
+        "lease_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
     ],
 )

@@ -17,7 +17,7 @@ limitations under the License.
 package priorities
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
@@ -45,7 +45,6 @@ func NewPriorityMetadataFactory(serviceLister algorithm.ServiceLister, controlle
 
 // priorityMetadata is a type that is passed as metadata for priority functions
 type priorityMetadata struct {
-	nonZeroRequest          *schedulernodeinfo.Resource
 	podLimits               *schedulernodeinfo.Resource
 	podTolerations          []v1.Toleration
 	affinity                *v1.Affinity
@@ -62,7 +61,6 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo
 		return nil
 	}
 	return &priorityMetadata{
-		nonZeroRequest:          getNonZeroRequests(pod),
 		podLimits:               getResourceLimits(pod),
 		podTolerations:          getAllTolerationPreferNoSchedule(pod.Spec.Tolerations),
 		affinity:                pod.Spec.Affinity,

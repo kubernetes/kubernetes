@@ -153,6 +153,7 @@ func addCertRotation(stopCh <-chan struct{}, period time.Duration, clientConfig 
 	clientConfig.CAData = nil
 	clientConfig.CAFile = ""
 	clientConfig.Insecure = false
+	clientConfig.NextProtos = nil
 
 	return nil
 }

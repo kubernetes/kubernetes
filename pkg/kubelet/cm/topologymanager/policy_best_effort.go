@@ -36,7 +36,7 @@ func (p *bestEffortPolicy) Name() string {
 	return PolicyBestEffort
 }
 
-func (p *bestEffortPolicy) CanAdmitPodResult(admit bool) lifecycle.PodAdmitResult {
+func (p *bestEffortPolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
 	return lifecycle.PodAdmitResult{
 		Admit: true,
 	}

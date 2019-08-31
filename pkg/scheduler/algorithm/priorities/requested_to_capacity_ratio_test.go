@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -32,6 +32,17 @@ func TestCreatingFunctionShapeErrorsIfEmptyPoints(t *testing.T) {
 	var err error
 	_, err = NewFunctionShape([]FunctionShapePoint{})
 	assert.Equal(t, "at least one point must be specified", err.Error())
+}
+
+func TestCreatingResourceNegativeWeight(t *testing.T) {
+	err := validateResourceWeightMap(ResourceToWeightMap{v1.ResourceCPU: -1})
+	assert.Equal(t, "resource cpu weight -1 must not be less than 1", err.Error())
+}
+
+func TestCreatingResourceDefaultWeight(t *testing.T) {
+	err := validateResourceWeightMap(ResourceToWeightMap{})
+	assert.Equal(t, "resourceToWeightMap cannot be nil", err.Error())
+
 }
 
 func TestCreatingFunctionShapeErrorsIfXIsNotSorted(t *testing.T) {
@@ -237,5 +248,380 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 		if !reflect.DeepEqual(test.expectedPriorities, list) {
 			t.Errorf("%s: expected %#v, got %#v", test.test, test.expectedPriorities, list)
 		}
+	}
+}
+func TestResourceBinPackingSingleExtended(t *testing.T) {
+	extendedResource := "intel.com/foo"
+	extendedResource1 := map[string]int64{
+		"intel.com/foo": 4,
+	}
+
+	extendedResource2 := map[string]int64{
+		"intel.com/foo": 8,
+	}
+
+	noResources := v1.PodSpec{
+		Containers: []v1.Container{},
+	}
+	extendedResourcePod1 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceName(extendedResource): resource.MustParse("2"),
+					},
+				},
+			},
+		},
+	}
+	extendedResourcePod2 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceName(extendedResource): resource.MustParse("4"),
+					},
+				},
+			},
+		},
+	}
+	machine2Pod := extendedResourcePod1
+	machine2Pod.NodeName = "machine2"
+	tests := []struct {
+		pod          *v1.Pod
+		pods         []*v1.Pod
+		nodes        []*v1.Node
+		expectedList schedulerapi.HostPriorityList
+		name         string
+	}{
+		{
+
+			//	Node1 scores (used resources) on 0-10 scale
+			//	Node1 Score:
+			//	rawScoringFunction(used + requested / available)
+			//	resourceScoringFunction((0+0),8)
+			//		= 100 - (8-0)*(100/8) = 0 = rawScoringFunction(0)
+			//	Node1 Score: 0
+			//	Node2 scores (used resources) on 0-10 scale
+			//	rawScoringFunction(used + requested / available)
+			//	resourceScoringFunction((0+0),4)
+			//		= 100 - (4-0)*(100/4) = 0 = rawScoringFunction(0)
+			//	Node2 Score: 0
+
+			pod:          &v1.Pod{Spec: noResources},
+			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
+			name:         "nothing scheduled, nothing requested",
+		},
+
+		{
+
+			// Node1 scores (used resources) on 0-10 scale
+			// Node1 Score:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+2),8)
+			// 	= 100 - (8-2)*(100/8) = 25 = rawScoringFunction(25)
+			// Node1 Score: 2
+			// Node2 scores (used resources) on 0-10 scale
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+2),4)
+			// 	= 100 - (4-2)*(100/4) = 50 = rawScoringFunction(50)
+			// Node2 Score: 5
+
+			pod:          &v1.Pod{Spec: extendedResourcePod1},
+			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 2}, {Host: "machine2", Score: 5}},
+			name:         "resources requested, pods scheduled with less resources",
+			pods: []*v1.Pod{
+				{Spec: noResources},
+			},
+		},
+
+		{
+
+			// Node1 scores (used resources) on 0-10 scale
+			// Node1 Score:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+2),8)
+			// 	= 100 - (8-2)*(100/8) = 25 =rawScoringFunction(25)
+			// Node1 Score: 2
+			// Node2 scores (used resources) on 0-10 scale
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((2+2),4)
+			// 	= 100 - (4-4)*(100/4) = 100 = rawScoringFunction(100)
+			// Node2 Score: 10
+
+			pod:          &v1.Pod{Spec: extendedResourcePod1},
+			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 2}, {Host: "machine2", Score: 10}},
+			name:         "resources requested, pods scheduled with resources, on node with existing pod running ",
+			pods: []*v1.Pod{
+				{Spec: machine2Pod},
+			},
+		},
+
+		{
+
+			// Node1 scores (used resources) on 0-10 scale
+			// Node1 Score:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+4),8)
+			// 	= 100 - (8-4)*(100/8) = 50 = rawScoringFunction(50)
+			// Node1 Score: 5
+			// Node2 scores (used resources) on 0-10 scale
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+4),4)
+			// 	= 100 - (4-4)*(100/4) = 100 = rawScoringFunction(100)
+			// Node2 Score: 10
+
+			pod:          &v1.Pod{Spec: extendedResourcePod2},
+			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResource2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResource1)},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 5}, {Host: "machine2", Score: 10}},
+			name:         "resources requested, pods scheduled with more resources",
+			pods: []*v1.Pod{
+				{Spec: noResources},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			functionShape, _ := NewFunctionShape([]FunctionShapePoint{{0, 0}, {100, 10}})
+			resourceToWeightMap := ResourceToWeightMap{v1.ResourceName("intel.com/foo"): 1}
+			prior := RequestedToCapacityRatioResourceAllocationPriority(functionShape, resourceToWeightMap)
+			list, err := priorityFunction(prior.PriorityMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(test.expectedList, list) {
+				t.Errorf("expected %#v, got %#v", test.expectedList, list)
+			}
+		})
+	}
+}
+
+func TestResourceBinPackingMultipleExtended(t *testing.T) {
+	extendedResource1 := "intel.com/foo"
+	extendedResource2 := "intel.com/bar"
+	extendedResources1 := map[string]int64{
+		"intel.com/foo": 4,
+		"intel.com/bar": 8,
+	}
+
+	extendedResources2 := map[string]int64{
+		"intel.com/foo": 8,
+		"intel.com/bar": 4,
+	}
+
+	noResources := v1.PodSpec{
+		Containers: []v1.Container{},
+	}
+	extnededResourcePod1 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceName(extendedResource1): resource.MustParse("2"),
+						v1.ResourceName(extendedResource2): resource.MustParse("2"),
+					},
+				},
+			},
+		},
+	}
+	extnededResourcePod2 := v1.PodSpec{
+		Containers: []v1.Container{
+			{
+				Resources: v1.ResourceRequirements{
+					Requests: v1.ResourceList{
+						v1.ResourceName(extendedResource1): resource.MustParse("4"),
+						v1.ResourceName(extendedResource2): resource.MustParse("2"),
+					},
+				},
+			},
+		},
+	}
+	machine2Pod := extnededResourcePod1
+	machine2Pod.NodeName = "machine2"
+	tests := []struct {
+		pod          *v1.Pod
+		pods         []*v1.Pod
+		nodes        []*v1.Node
+		expectedList schedulerapi.HostPriorityList
+		name         string
+	}{
+		{
+
+			// resources["intel.com/foo"] = 3
+			// resources["intel.com/bar"] = 5
+			// Node1 scores (used resources) on 0-10 scale
+			// Node1 Score:
+			// intel.com/foo:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+0),8)
+			// 	= 100 - (8-0)*(100/8) = 0 = rawScoringFunction(0)
+			// intel.com/bar:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+0),4)
+			// 	= 100 - (4-0)*(100/4) = 0 = rawScoringFunction(0)
+			// Node1 Score: (0 * 3) + (0 * 5) / 8 = 0
+
+			// Node2 scores (used resources) on 0-10 scale
+			// rawScoringFunction(used + requested / available)
+			// intel.com/foo:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+0),4)
+			// 	= 100 - (4-0)*(100/4) = 0 = rawScoringFunction(0)
+			// intel.com/bar:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+0),8)
+			// 	= 100 - (8-0)*(100/8) = 0 = rawScoringFunction(0)
+			// Node2 Score: (0 * 3) + (0 * 5) / 8 = 0
+
+			pod:          &v1.Pod{Spec: noResources},
+			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
+			name:         "nothing scheduled, nothing requested",
+		},
+
+		{
+
+			// resources["intel.com/foo"] = 3
+			// resources["intel.com/bar"] = 5
+			// Node1 scores (used resources) on 0-10 scale
+			// Node1 Score:
+			// intel.com/foo:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+2),8)
+			// 	= 100 - (8-2)*(100/8) = 25 = rawScoringFunction(25)
+			// intel.com/bar:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+2),4)
+			// 	= 100 - (4-2)*(100/4) = 50 = rawScoringFunction(50)
+			// Node1 Score: (2 * 3) + (5 * 5) / 8 = 4
+
+			// Node2 scores (used resources) on 0-10 scale
+			// rawScoringFunction(used + requested / available)
+			// intel.com/foo:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+2),4)
+			// 	= 100 - (4-2)*(100/4) = 50 = rawScoringFunction(50)
+			// intel.com/bar:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+2),8)
+			// 	= 100 - (8-2)*(100/8) = 25 = rawScoringFunction(25)
+			// Node2 Score: (5 * 3) + (2 * 5) / 8 = 3
+
+			pod:          &v1.Pod{Spec: extnededResourcePod1},
+			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 4}, {Host: "machine2", Score: 3}},
+			name:         "resources requested, pods scheduled with less resources",
+			pods: []*v1.Pod{
+				{Spec: noResources},
+			},
+		},
+
+		{
+
+			// resources["intel.com/foo"] = 3
+			// resources["intel.com/bar"] = 5
+			// Node1 scores (used resources) on 0-10 scale
+			// Node1 Score:
+			// intel.com/foo:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+2),8)
+			// 	= 100 - (8-2)*(100/8) = 25 = rawScoringFunction(25)
+			// intel.com/bar:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+2),4)
+			// 	= 100 - (4-2)*(100/4) = 50 = rawScoringFunction(50)
+			// Node1 Score: (2 * 3) + (5 * 5) / 8 = 4
+			// Node2 scores (used resources) on 0-10 scale
+			// rawScoringFunction(used + requested / available)
+			// intel.com/foo:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((2+2),4)
+			// 	= 100 - (4-4)*(100/4) = 100 = rawScoringFunction(100)
+			// intel.com/bar:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((2+2),8)
+			// 	= 100 - (8-4)*(100/8) = 50 = rawScoringFunction(50)
+			// Node2 Score: (10 * 3) + (5 * 5) / 8 = 7
+
+			pod:          &v1.Pod{Spec: extnededResourcePod1},
+			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 4}, {Host: "machine2", Score: 7}},
+			name:         "resources requested, pods scheduled with resources, on node with existing pod running ",
+			pods: []*v1.Pod{
+				{Spec: machine2Pod},
+			},
+		},
+
+		{
+
+			// resources["intel.com/foo"] = 3
+			// resources["intel.com/bar"] = 5
+			// Node1 scores (used resources) on 0-10 scale
+			// used + requested / available
+			// intel.com/foo Score: { (0 + 4) / 8 } * 10 = 0
+			// intel.com/bar Score: { (0 + 2) / 4 } * 10 = 0
+			// Node1 Score: (0.25 * 3) + (0.5 * 5) / 8 = 5
+			// resources["intel.com/foo"] = 3
+			// resources["intel.com/bar"] = 5
+			// Node2 scores (used resources) on 0-10 scale
+			// used + requested / available
+			// intel.com/foo Score: { (0 + 4) / 4 } * 10 = 0
+			// intel.com/bar Score: { (0 + 2) / 8 } * 10 = 0
+			// Node2 Score: (1 * 3) + (0.25 * 5) / 8 = 5
+
+			// resources["intel.com/foo"] = 3
+			// resources["intel.com/bar"] = 5
+			// Node1 scores (used resources) on 0-10 scale
+			// Node1 Score:
+			// intel.com/foo:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+4),8)
+			// 	= 100 - (8-4)*(100/8) = 50 = rawScoringFunction(50)
+			// intel.com/bar:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+2),4)
+			// 	= 100 - (4-2)*(100/4) = 50 = rawScoringFunction(50)
+			// Node1 Score: (5 * 3) + (5 * 5) / 8 = 5
+			// Node2 scores (used resources) on 0-10 scale
+			// rawScoringFunction(used + requested / available)
+			// intel.com/foo:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+4),4)
+			// 	= 100 - (4-4)*(100/4) = 100 = rawScoringFunction(100)
+			// intel.com/bar:
+			// rawScoringFunction(used + requested / available)
+			// resourceScoringFunction((0+2),8)
+			// 	= 100 - (8-2)*(100/8) = 25 = rawScoringFunction(25)
+			// Node2 Score: (10 * 3) + (2 * 5) / 8 = 5
+
+			pod:          &v1.Pod{Spec: extnededResourcePod2},
+			nodes:        []*v1.Node{makeNodeWithExtendedResource("machine1", 4000, 10000*1024*1024, extendedResources2), makeNodeWithExtendedResource("machine2", 4000, 10000*1024*1024, extendedResources1)},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 5}, {Host: "machine2", Score: 5}},
+			name:         "resources requested, pods scheduled with more resources",
+			pods: []*v1.Pod{
+				{Spec: noResources},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			functionShape, _ := NewFunctionShape([]FunctionShapePoint{{0, 0}, {100, 10}})
+			resourceToWeightMap := ResourceToWeightMap{v1.ResourceName("intel.com/foo"): 3, v1.ResourceName("intel.com/bar"): 5}
+			prior := RequestedToCapacityRatioResourceAllocationPriority(functionShape, resourceToWeightMap)
+			list, err := priorityFunction(prior.PriorityMap, nil, nil)(test.pod, nodeNameToInfo, test.nodes)
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+			if !reflect.DeepEqual(test.expectedList, list) {
+				t.Errorf("expected %#v, got %#v", test.expectedList, list)
+			}
+		})
 	}
 }

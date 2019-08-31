@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/klog"
 
-	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/version"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -62,7 +62,7 @@ func SetupSuite() {
 				metav1.NamespaceSystem,
 				metav1.NamespaceDefault,
 				metav1.NamespacePublic,
-				corev1.NamespaceNodeLease,
+				v1.NamespaceNodeLease,
 			})
 		if err != nil {
 			e2elog.Failf("Error deleting orphaned namespaces: %v", err)
@@ -116,21 +116,30 @@ func SetupSuite() {
 		e2elog.Logf("kube-apiserver version: %s", serverVersion.GitVersion)
 	}
 
-	// Obtain the default IP family of the cluster
-	// Some e2e test are designed to work on IPv4 only, this global variable
-	// allows to adapt those tests to work on both IPv4 and IPv6
-	// TODO(dual-stack): dual stack clusters should pass full e2e testing at least with the primary IP family
-	// the dual stack clusters can be ipv4-ipv6 or ipv6-ipv4, order matters,
-	// and services use the primary IP family by default
-	// If we´ll need to provide additional context for dual-stack, we can detect it
-	// because pods have two addresses (one per family)
-	TestContext.IPFamily = getDefaultClusterIPFamily(c)
-	e2elog.Logf("Cluster IP family: %s", TestContext.IPFamily)
-
 	if TestContext.NodeKiller.Enabled {
 		nodeKiller := NewNodeKiller(TestContext.NodeKiller, c, TestContext.Provider)
 		go nodeKiller.Run(TestContext.NodeKiller.NodeKillerStopCh)
 	}
+}
+
+// SetupSuitePerGinkgoNode is the boilerplate that can be used to setup ginkgo test suites, on the SynchronizedBeforeSuite step.
+// There are certain operations we only want to run once per overall test invocation on each Ginkgo node
+// such as making some global variables accessible to all parallel executions
+// Because of the way Ginkgo runs tests in parallel, we must use SynchronizedBeforeSuite
+// Ref: https://onsi.github.io/ginkgo/#parallel-specs
+func SetupSuitePerGinkgoNode() {
+	// Obtain the default IP family of the cluster
+	// Some e2e test are designed to work on IPv4 only, this global variable
+	// allows to adapt those tests to work on both IPv4 and IPv6
+	// TODO: dual-stack
+	// the dual stack clusters can be ipv4-ipv6 or ipv6-ipv4, order matters,
+	// and services use the primary IP family by default
+	c, err := LoadClientset()
+	if err != nil {
+		klog.Fatal("Error loading client: ", err)
+	}
+	TestContext.IPFamily = getDefaultClusterIPFamily(c)
+	e2elog.Logf("Cluster IP family: %s", TestContext.IPFamily)
 }
 
 // CleanupSuite is the boilerplate that can be used after tests on ginkgo were run, on the SynchronizedAfterSuite step.

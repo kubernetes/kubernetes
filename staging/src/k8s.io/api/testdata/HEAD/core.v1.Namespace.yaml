@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -32,4 +33,10 @@ spec:
   finalizers:
   - '@Hr鯹)晿'
 status:
+  conditions:
+  - lastTransitionTime: "2956-02-24T15:15:18Z"
+    message: "20"
+    reason: "19"
+    status: Ȋ甞谐颋ǅSǡƏS$+½H牗洝尿
+    type: 夸eɑeʤ脽ěĂ凗蓏Ŋ蛊ĉy
   phase: '`Ĩɘ.蘯6ċ'

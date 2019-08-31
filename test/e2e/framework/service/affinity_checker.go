@@ -17,7 +17,7 @@ limitations under the License.
 package service
 
 import (
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 // affinityTracker tracks the destination of a request for the affinity tests.
@@ -28,7 +28,7 @@ type affinityTracker struct {
 // Record the response going to a given host.
 func (at *affinityTracker) recordHost(host string) {
 	at.hostTrace = append(at.hostTrace, host)
-	e2elog.Logf("Received response from host: %s", host)
+	framework.Logf("Received response from host: %s", host)
 }
 
 // Check that we got a constant count requests going to the same host.
@@ -51,6 +51,6 @@ func (at *affinityTracker) checkHostTrace(count int) (fulfilled, affinityHolds b
 }
 
 func checkAffinityFailed(tracker affinityTracker, err string) {
-	e2elog.Logf("%v", tracker.hostTrace)
-	e2elog.Failf(err)
+	framework.Logf("%v", tracker.hostTrace)
+	framework.Failf(err)
 }

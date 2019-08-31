@@ -112,7 +112,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			ClaimSize:    repdMinSize,
 			ExpectedSize: repdMinSize,
 			PvCheck: func(claim *v1.PersistentVolumeClaim) {
-				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 				gomega.Expect(volume).NotTo(gomega.BeNil())
 
 				err := checkGCEPD(volume, "pd-standard")
@@ -133,7 +133,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			ClaimSize:    repdMinSize,
 			ExpectedSize: repdMinSize,
 			PvCheck: func(claim *v1.PersistentVolumeClaim) {
-				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 				gomega.Expect(volume).NotTo(gomega.BeNil())
 
 				err := checkGCEPD(volume, "pd-standard")

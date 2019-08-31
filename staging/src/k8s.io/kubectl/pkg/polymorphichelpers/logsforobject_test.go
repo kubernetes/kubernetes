@@ -70,6 +70,11 @@ func TestLogsForObject(t *testing.T) {
 						{Name: "c1"},
 						{Name: "c2"},
 					},
+					EphemeralContainers: []corev1.EphemeralContainer{
+						{
+							EphemeralContainerCommon: corev1.EphemeralContainerCommon{Name: "e1"},
+						},
+					},
 				},
 			},
 			opts:          &corev1.PodLogOptions{},
@@ -80,6 +85,7 @@ func TestLogsForObject(t *testing.T) {
 				getLogsAction("test", &corev1.PodLogOptions{Container: "initc2"}),
 				getLogsAction("test", &corev1.PodLogOptions{Container: "c1"}),
 				getLogsAction("test", &corev1.PodLogOptions{Container: "c2"}),
+				getLogsAction("test", &corev1.PodLogOptions{Container: "e1"}),
 			},
 		},
 		{
@@ -215,17 +221,21 @@ func TestLogsForObject(t *testing.T) {
 			continue
 		}
 
-		for i := range test.actions {
+		var i int
+		for i = range test.actions {
 			if len(fakeClientset.Actions()) < i {
-				t.Errorf("%s: action %d does not exists in actual actions: %#v",
+				t.Errorf("%s: expected action %d does not exists in actual actions: %#v",
 					test.name, i, fakeClientset.Actions())
 				continue
 			}
 			got := fakeClientset.Actions()[i]
 			want := test.actions[i]
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("%s: unexpected action: %s", test.name, diff.ObjectDiff(got, want))
+				t.Errorf("%s: unexpected diff for action: %s", test.name, diff.ObjectDiff(got, want))
 			}
+		}
+		for i++; i < len(fakeClientset.Actions()); i++ {
+			t.Errorf("%s: actual action %d does not exist in expected: %v", test.name, i, fakeClientset.Actions()[i])
 		}
 	}
 }

@@ -1924,7 +1924,7 @@ type Probe struct {
 	// +optional
 	PeriodSeconds int32
 	// Minimum consecutive successes for the probe to be considered successful after having failed.
-	// Must be 1 for liveness.
+	// Must be 1 for liveness and startup.
 	// +optional
 	SuccessThreshold int32
 	// Minimum consecutive failures for the probe to be considered failed after having succeeded.
@@ -2042,6 +2042,8 @@ type Container struct {
 	// +optional
 	ReadinessProbe *Probe
 	// +optional
+	StartupProbe *Probe
+	// +optional
 	Lifecycle *Lifecycle
 	// Required.
 	// +optional
@@ -2090,7 +2092,7 @@ type Lifecycle struct {
 	// +optional
 	PostStart *Handler
 	// PreStop is called immediately before a container is terminated due to an
-	// API request or management event such as liveness probe failure,
+	// API request or management event such as liveness/startup probe failure,
 	// preemption, resource contention, etc. The handler is not called if the
 	// container crashes or exits. The reason for termination is passed to the
 	// handler. The Pod's termination grace period countdown begins before the
@@ -2174,6 +2176,7 @@ type ContainerStatus struct {
 	ImageID      string
 	// +optional
 	ContainerID string
+	Started     *bool
 }
 
 // PodPhase is a label for the condition of a pod at the current time.
@@ -2591,12 +2594,10 @@ type PodSpec struct {
 	InitContainers []Container
 	// List of containers belonging to the pod.
 	Containers []Container
-	// EphemeralContainers is the list of ephemeral containers that run in this pod. Ephemeral containers
-	// are added to an existing pod as a result of a user-initiated action such as troubleshooting.
-	// This list is read-only in the pod spec. It may not be specified in a create or modified in an
-	// update of a pod or pod template.
-	// To add an ephemeral container use the pod's ephemeralcontainers subresource, which allows update
-	// using the EphemeralContainers kind.
+	// List of ephemeral containers run in this pod. Ephemeral containers may be run in an existing
+	// pod to perform user-initiated actions such as debugging. This list cannot be specified when
+	// creating a pod, and it cannot be modified by updating the pod spec. In order to add an
+	// ephemeral container to an existing pod, use the pod's ephemeralcontainers subresource.
 	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
 	// +optional
 	EphemeralContainers []EphemeralContainer
@@ -2882,6 +2883,10 @@ type PodIP struct {
 	IP string
 }
 
+// EphemeralContainerCommon is a copy of all fields in Container to be inlined in
+// EphemeralContainer. This separate type allows easy conversion from EphemeralContainer
+// to Container and allows separate documentation for the fields of EphemeralContainer.
+// When a new field is added to Container it must be added here as well.
 type EphemeralContainerCommon struct {
 	// Required: This must be a DNS_LABEL.  Each container in a pod must
 	// have a unique name.
@@ -2934,6 +2939,9 @@ type EphemeralContainerCommon struct {
 	// Probes are not allowed for ephemeral containers.
 	// +optional
 	ReadinessProbe *Probe
+	// Probes are not allowed for ephemeral containers.
+	// +optional
+	StartupProbe *Probe
 	// Lifecycle is not allowed for ephemeral containers.
 	// +optional
 	Lifecycle *Lifecycle
@@ -2962,16 +2970,20 @@ type EphemeralContainerCommon struct {
 // these two types.
 var _ = Container(EphemeralContainerCommon{})
 
-// An EphemeralContainer is a special type of container which doesn't come with any resource
-// or scheduling guarantees but can be added to a pod that has already been created. They are
-// intended for user-initiated activities such as troubleshooting a running pod.
-// Ephemeral containers will not be restarted when they exit, and they will be killed if the
-// pod is removed or restarted. If an ephemeral container causes a pod to exceed its resource
+// An EphemeralContainer is a temporary container that may be added to an existing pod for
+// user-initiated activities such as debugging. Ephemeral containers have no resource or
+// scheduling guarantees, and they will not be restarted when they exit or when a pod is
+// removed or restarted. If an ephemeral container causes a pod to exceed its resource
 // allocation, the pod may be evicted.
-// Ephemeral containers are added via a pod's ephemeralcontainers subresource and will appear
-// in the pod spec once added.
+// Ephemeral containers may not be added by directly updating the pod spec. They must be added
+// via the pod's ephemeralcontainers subresource, and they will appear in the pod spec
+// once added.
 // This is an alpha feature enabled by the EphemeralContainers feature flag.
 type EphemeralContainer struct {
+	// Ephemeral containers have all of the fields of Container, plus additional fields
+	// specific to ephemeral containers. Fields in common with Container are in the
+	// following inlined struct so than an EphemeralContainer may easily be converted
+	// to a Container.
 	EphemeralContainerCommon
 
 	// If set, the name of the container from PodSpec that this ephemeral container targets.
@@ -3030,7 +3042,7 @@ type PodStatus struct {
 	// +optional
 	ContainerStatuses []ContainerStatus
 
-	// Status for any ephemeral containers that running in this pod.
+	// Status for any ephemeral containers that have run in this pod.
 	// This field is alpha-level and is only honored by servers that enable the EphemeralContainers feature.
 	// +optional
 	EphemeralContainerStatuses []ContainerStatus
@@ -3330,6 +3342,17 @@ type LoadBalancerIngress struct {
 	Hostname string
 }
 
+// IPFamily represents the IP Family (IPv4 or IPv6). This type is used
+// to express the family of an IP expressed by a type (i.e. service.Spec.IPFamily)
+type IPFamily string
+
+const (
+	// IPv4Protocol indicates that this IP is IPv4 protocol
+	IPv4Protocol IPFamily = "IPv4"
+	// IPv6Protocol indicates that this IP is IPv6 protocol
+	IPv6Protocol IPFamily = "IPv6"
+)
+
 // ServiceSpec describes the attributes that a user creates on a service
 type ServiceSpec struct {
 	// Type determines how the Service is exposed. Defaults to ClusterIP. Valid
@@ -3430,6 +3453,16 @@ type ServiceSpec struct {
 	// of peer discovery.
 	// +optional
 	PublishNotReadyAddresses bool
+
+	// ipFamily specifies whether this Service has a preference for a particular IP family (e.g. IPv4 vs.
+	// IPv6).  If a specific IP family is requested, the clusterIP field will be allocated from that family, if it is
+	// available in the cluster.  If no IP family is requested, the cluster's primary IP family will be used.
+	// Other IP fields (loadBalancerIP, loadBalancerSourceRanges, externalIPs) and controllers which
+	// allocate external load-balancers should use the same IP family.  Endpoints for this Service will be of
+	// this family.  This field is immutable after creation. Assigning a ServiceIPFamily not available in the
+	// cluster (e.g. IPv6 in IPv4 only cluster) is an error condition and will fail during clusterIP assignment.
+	// +optional
+	IPFamily *IPFamily
 }
 
 type ServicePort struct {
@@ -3985,6 +4018,8 @@ type NamespaceStatus struct {
 	// Phase is the current lifecycle phase of the namespace.
 	// +optional
 	Phase NamespacePhase
+	// +optional
+	Conditions []NamespaceCondition
 }
 
 type NamespacePhase string
@@ -3996,6 +4031,30 @@ const (
 	// NamespaceTerminating means the namespace is undergoing graceful termination
 	NamespaceTerminating NamespacePhase = "Terminating"
 )
+
+// NamespaceConditionType defines constants reporting on status during namespace lifetime and deletion progress
+type NamespaceConditionType string
+
+// These are valid conditions of a namespace.
+const (
+	NamespaceDeletionDiscoveryFailure NamespaceConditionType = "NamespaceDeletionDiscoveryFailure"
+	NamespaceDeletionContentFailure   NamespaceConditionType = "NamespaceDeletionContentFailure"
+	NamespaceDeletionGVParsingFailure NamespaceConditionType = "NamespaceDeletionGroupVersionParsingFailure"
+)
+
+// NamespaceCondition contains details about state of namespace.
+type NamespaceCondition struct {
+	// Type of namespace controller condition.
+	Type NamespaceConditionType
+	// Status of the condition, one of True, False, Unknown.
+	Status ConditionStatus
+	// +optional
+	LastTransitionTime metav1.Time
+	// +optional
+	Reason string
+	// +optional
+	Message string
+}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
@@ -4042,13 +4101,15 @@ type Binding struct {
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// A list of ephemeral containers used in API operations
+// A list of ephemeral containers used with the Pod ephemeralcontainers subresource.
 type EphemeralContainers struct {
 	metav1.TypeMeta
 	// +optional
 	metav1.ObjectMeta
 
-	// The new set of ephemeral containers to use for a pod.
+	// A list of ephemeral containers associated with this pod. New ephemeral containers
+	// may be appended to this list, but existing ephemeral containers may not be removed
+	// or modified.
 	EphemeralContainers []EphemeralContainer
 }
 

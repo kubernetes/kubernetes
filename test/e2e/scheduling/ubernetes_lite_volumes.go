@@ -234,7 +234,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 
 	ginkgo.By("Creating pods for each static PV")
 	for _, config := range configs {
-		podConfig := framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{config.pvc}, false, "")
+		podConfig := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{config.pvc}, false, "")
 		config.pod, err = c.CoreV1().Pods(ns).Create(podConfig)
 		framework.ExpectNoError(err)
 	}

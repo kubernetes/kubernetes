@@ -5,6 +5,7 @@ go_test(
     srcs = [
         "admission_test.go",
         "broken_webhook_test.go",
+        "load_balance_test.go",
         "main_test.go",
         "reinvocation_test.go",
         "timeout_test.go",

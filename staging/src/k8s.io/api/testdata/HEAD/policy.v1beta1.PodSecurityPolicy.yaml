@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -31,23 +32,23 @@ metadata:
 spec:
   allowPrivilegeEscalation: false
   allowedCSIDrivers:
-  - name: "24"
+  - name: "25"
   allowedCapabilities:
   - ɑ
   allowedFlexVolumes:
-  - driver: "23"
+  - driver: "24"
   allowedHostPaths:
-  - pathPrefix: "22"
+  - pathPrefix: "23"
     readOnly: true
   allowedProcMountTypes:
   - ǣ偐圠=l畣潁
   allowedUnsafeSysctls:
-  - "25"
+  - "26"
   defaultAddCapabilities:
   - qJ枊a8衍`Ĩ
   defaultAllowPrivilegeEscalation: false
   forbiddenSysctls:
-  - "26"
+  - "27"
   fsGroup:
     ranges:
     - max: 3058121789713366904
@@ -73,15 +74,15 @@ spec:
     rule: +½H牗洝尿彀亞螩
   runtimeClass:
     allowedRuntimeClassNames:
-    - "27"
-    defaultRuntimeClassName: "28"
+    - "28"
+    defaultRuntimeClassName: "29"
   seLinux:
     rule: S
     seLinuxOptions:
-      level: "21"
-      role: "19"
-      type: "20"
-      user: "18"
+      level: "22"
+      role: "20"
+      type: "21"
+      user: "19"
   supplementalGroups:
     ranges:
     - max: -236027028483226507

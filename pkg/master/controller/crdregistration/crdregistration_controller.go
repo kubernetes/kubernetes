@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
-	"k8s.io/kubernetes/pkg/controller"
 )
 
 // AutoAPIServiceRegistration is an interface which callers can re-declare locally and properly cast to for
@@ -113,7 +112,7 @@ func (c *crdRegistrationController) Run(threadiness int, stopCh <-chan struct{})
 	defer klog.Infof("Shutting down crd-autoregister controller")
 
 	// wait for your secondary caches to fill before starting your work
-	if !controller.WaitForCacheSync("crd-autoregister", stopCh, c.crdSynced) {
+	if !cache.WaitForNamedCacheSync("crd-autoregister", stopCh, c.crdSynced) {
 		return
 	}
 

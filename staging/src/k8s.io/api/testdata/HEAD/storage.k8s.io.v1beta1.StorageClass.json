@@ -35,17 +35,18 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
-  "provisioner": "18",
+  "provisioner": "19",
   "parameters": {
-    "19": "20"
+    "20": "21"
   },
   "reclaimPolicy": "qJ枊a8衍`Ĩ",
   "mountOptions": [
-    "21"
+    "22"
   ],
   "allowVolumeExpansion": true,
   "volumeBindingMode": "",
@@ -53,9 +54,9 @@
     {
       "matchLabelExpressions": [
         {
-          "key": "22",
+          "key": "23",
           "values": [
-            "23"
+            "24"
           ]
         }
       ]

@@ -35,19 +35,20 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
   "webhooks": [
     {
-      "name": "18",
+      "name": "19",
       "clientConfig": {
-        "url": "19",
+        "url": "20",
         "service": {
-          "namespace": "20",
-          "name": "21",
-          "path": "22",
+          "namespace": "21",
+          "name": "22",
+          "path": "23",
           "port": -1971381490
         },
         "caBundle": "IQ=="
@@ -58,13 +59,13 @@
             "8衍`Ĩɘ.蘯"
           ],
           "apiGroups": [
-            "23"
-          ],
-          "apiVersions": [
             "24"
           ],
-          "resources": [
+          "apiVersions": [
             "25"
+          ],
+          "resources": [
+            "26"
           ],
           "scope": "昍řČ扷5ƗǸƢ6/"
         }
@@ -99,7 +100,7 @@
       "sideEffects": "Ɵ)Ù",
       "timeoutSeconds": 1132918207,
       "admissionReviewVersions": [
-        "38"
+        "39"
       ],
       "reinvocationPolicy": "錯ƶ"
     }

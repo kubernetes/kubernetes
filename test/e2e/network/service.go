@@ -29,7 +29,6 @@ import (
 	compute "google.golang.org/api/compute/v1"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -346,6 +345,33 @@ var _ = SIGDescribe("Services", func() {
 			ginkgo.By("Verifying the preserved source ip")
 			framework.ExpectEqual(sourceIP, execPodIP)
 		}
+	})
+
+	ginkgo.It("should allow pods to hairpin back to themselves through services", func() {
+		serviceName := "hairpin-test"
+		ns := f.Namespace.Name
+
+		ginkgo.By("creating a TCP service " + serviceName + " with type=ClusterIP in namespace " + ns)
+		jig := e2eservice.NewTestJig(cs, serviceName)
+		servicePort := 8080
+		svc := jig.CreateTCPServiceWithPort(ns, nil, int32(servicePort))
+		jig.SanityCheckService(svc, v1.ServiceTypeClusterIP)
+		serviceIP := svc.Spec.ClusterIP
+		framework.Logf("hairpin-test cluster ip: %s", serviceIP)
+
+		ginkgo.By("creating a client/server pod")
+		serverPodName := "hairpin"
+		podTemplate := f.NewAgnhostPod(serverPodName, "netexec", "--http-port", strconv.Itoa(servicePort))
+		podTemplate.Labels = jig.Labels
+		pod, err := cs.CoreV1().Pods(ns).Create(podTemplate)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("waiting for the service to expose an endpoint")
+		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{serverPodName: {servicePort}})
+		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
+
+		ginkgo.By("Checking if the pod can reach itself")
+		jig.CheckServiceReachability(ns, svc, pod)
 	})
 
 	ginkgo.It("should be able to up and down services", func() {
@@ -1907,6 +1933,68 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceDown(cs, host, svcDisabledIP, servicePort))
 	})
 
+	ginkgo.It("should implement service.kubernetes.io/headless", func() {
+		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
+		// this test does not work if the Node does not support SSH Key
+		framework.SkipUnlessSSHKeyPresent()
+
+		ns := f.Namespace.Name
+		numPods, servicePort := 3, defaultServeHostnameServicePort
+		serviceHeadlessLabels := map[string]string{v1.IsHeadlessService: ""}
+
+		// We will create 2 services to test creating services in both states and also dynamic updates
+		// svcHeadless: Created with the label, will always be disabled. We create this early and
+		//              test again late to make sure it never becomes available.
+		// svcHeadlessToggled: Created without the label then the label is toggled verifying reachability at each step.
+
+		ginkgo.By("creating service-headless in namespace " + ns)
+		svcHeadless := getServeHostnameService("service-headless")
+		svcHeadless.ObjectMeta.Labels = serviceHeadlessLabels
+		// This should be improved, as we do not want a Headlesss Service to contain an IP...
+		_, svcHeadlessIP, err := e2eservice.StartServeHostnameService(cs, svcHeadless, ns, numPods)
+		framework.ExpectNoError(err, "failed to create replication controller with headless service: %s in the namespace: %s", svcHeadlessIP, ns)
+
+		ginkgo.By("creating service in namespace " + ns)
+		svcHeadlessToggled := getServeHostnameService("service-headless-toggled")
+		podHeadlessToggledNames, svcHeadlessToggledIP, err := e2eservice.StartServeHostnameService(cs, svcHeadlessToggled, ns, numPods)
+		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svcHeadlessToggledIP, ns)
+
+		jig := e2eservice.NewTestJig(cs, svcHeadlessToggled.ObjectMeta.Name)
+
+		hosts, err := e2essh.NodeSSHHosts(cs)
+		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
+		if len(hosts) == 0 {
+			e2elog.Failf("No ssh-able nodes")
+		}
+		host := hosts[0]
+
+		ginkgo.By("verifying service is up")
+		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
+
+		ginkgo.By("verifying service-headless is not up")
+		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceDown(cs, host, svcHeadlessIP, servicePort))
+
+		ginkgo.By("adding service.kubernetes.io/headless label")
+		jig.UpdateServiceOrFail(ns, svcHeadlessToggled.ObjectMeta.Name, func(svc *v1.Service) {
+			svc.ObjectMeta.Labels = serviceHeadlessLabels
+		})
+
+		ginkgo.By("verifying service is not up")
+		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceDown(cs, host, svcHeadlessToggledIP, servicePort))
+
+		ginkgo.By("removing service.kubernetes.io/headless annotation")
+		jig.UpdateServiceOrFail(ns, svcHeadlessToggled.ObjectMeta.Name, func(svc *v1.Service) {
+			svc.ObjectMeta.Labels = nil
+		})
+
+		ginkgo.By("verifying service is up")
+		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podHeadlessToggledNames, svcHeadlessToggledIP, servicePort))
+
+		ginkgo.By("verifying service-headless is still not up")
+		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceDown(cs, host, svcHeadlessIP, servicePort))
+	})
+
 	ginkgo.It("should be rejected when no endpoints exist", func() {
 		namespace := f.Namespace.Name
 		serviceName := "no-pods"
@@ -1958,39 +2046,13 @@ var _ = SIGDescribe("Services", func() {
 		}
 	})
 
-	// This test verifies if service load balancer cleanup finalizer can be removed
-	// when feature gate isn't enabled on the cluster.
-	// This ensures downgrading from higher version cluster will not break LoadBalancer
-	// type service.
-	ginkgo.It("should remove load balancer cleanup finalizer when service is deleted [Slow]", func() {
-		jig := e2eservice.NewTestJig(cs, "lb-remove-finalizer")
-
-		ginkgo.By("Create load balancer service")
-		svc := jig.CreateTCPServiceOrFail(f.Namespace.Name, func(svc *v1.Service) {
-			svc.Spec.Type = v1.ServiceTypeLoadBalancer
-		})
-
-		defer func() {
-			waitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
-		}()
-
-		ginkgo.By("Wait for load balancer to serve traffic")
-		svc = jig.WaitForLoadBalancerOrFail(svc.Namespace, svc.Name, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
-
-		ginkgo.By("Manually add load balancer cleanup finalizer to service")
-		svc.Finalizers = append(svc.Finalizers, "service.kubernetes.io/load-balancer-cleanup")
-		if _, err := cs.CoreV1().Services(svc.Namespace).Update(svc); err != nil {
-			e2elog.Failf("Failed to add finalizer to service %s/%s: %v", svc.Namespace, svc.Name, err)
-		}
-	})
-
 	// This test verifies if service load balancer cleanup finalizer is properly
 	// handled during service lifecycle.
 	// 1. Create service with type=LoadBalancer. Finalizer should be added.
 	// 2. Update service to type=ClusterIP. Finalizer should be removed.
 	// 3. Update service to type=LoadBalancer. Finalizer should be added.
 	// 4. Delete service with type=LoadBalancer. Finalizer should be removed.
-	ginkgo.It("should handle load balancer cleanup finalizer for service [Slow] [Feature:ServiceFinalizer]", func() {
+	ginkgo.It("should handle load balancer cleanup finalizer for service [Slow]", func() {
 		jig := e2eservice.NewTestJig(cs, "lb-finalizer")
 
 		ginkgo.By("Create load balancer service")
@@ -1999,70 +2061,25 @@ var _ = SIGDescribe("Services", func() {
 		})
 
 		defer func() {
-			waitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
+			ginkgo.By("Check that service can be deleted with finalizer")
+			e2eservice.WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
 		}()
 
 		ginkgo.By("Wait for load balancer to serve traffic")
 		svc = jig.WaitForLoadBalancerOrFail(svc.Namespace, svc.Name, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
 
 		ginkgo.By("Check if finalizer presents on service with type=LoadBalancer")
-		waitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, true)
+		e2eservice.WaitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, true)
 
 		ginkgo.By("Check if finalizer is removed on service after changed to type=ClusterIP")
 		jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
-		waitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, false)
+		e2eservice.WaitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, false)
 
 		ginkgo.By("Check if finalizer is added back to service after changed to type=LoadBalancer")
 		jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeLoadBalancer, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
-		waitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, true)
+		e2eservice.WaitForServiceUpdatedWithFinalizer(cs, svc.Namespace, svc.Name, true)
 	})
 })
-
-func waitForServiceDeletedWithFinalizer(cs clientset.Interface, namespace, name string) {
-	ginkgo.By("Delete service with finalizer")
-	if err := cs.CoreV1().Services(namespace).Delete(name, nil); err != nil {
-		e2elog.Failf("Failed to delete service %s/%s", namespace, name)
-	}
-
-	ginkgo.By("Wait for service to disappear")
-	if pollErr := wait.PollImmediate(e2eservice.LoadBalancerPollInterval, e2eservice.GetServiceLoadBalancerCreationTimeout(cs), func() (bool, error) {
-		svc, err := cs.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
-		if err != nil {
-			if apierrors.IsNotFound(err) {
-				e2elog.Logf("Service %s/%s is gone.", namespace, name)
-				return true, nil
-			}
-			return false, err
-		}
-		e2elog.Logf("Service %s/%s still exists with finalizers: %v", namespace, name, svc.Finalizers)
-		return false, nil
-	}); pollErr != nil {
-		e2elog.Failf("Failed to wait for service to disappear: %v", pollErr)
-	}
-}
-
-func waitForServiceUpdatedWithFinalizer(cs clientset.Interface, namespace, name string, hasFinalizer bool) {
-	ginkgo.By(fmt.Sprintf("Wait for service to hasFinalizer=%t", hasFinalizer))
-	if pollErr := wait.PollImmediate(e2eservice.LoadBalancerPollInterval, e2eservice.GetServiceLoadBalancerCreationTimeout(cs), func() (bool, error) {
-		svc, err := cs.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
-		if err != nil {
-			return false, err
-		}
-		foundFinalizer := false
-		for _, finalizer := range svc.Finalizers {
-			if finalizer == "service.kubernetes.io/load-balancer-cleanup" {
-				foundFinalizer = true
-			}
-		}
-		if foundFinalizer != hasFinalizer {
-			e2elog.Logf("Service %s/%s hasFinalizer=%t, want %t", namespace, name, foundFinalizer, hasFinalizer)
-			return false, nil
-		}
-		return true, nil
-	}); pollErr != nil {
-		e2elog.Failf("Failed to wait for service to hasFinalizer=%t: %v", hasFinalizer, pollErr)
-	}
-}
 
 // TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
 var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {

@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -101,7 +102,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
 		ginkgo.By("Creating the Client Pod")
-		clientPod, err = framework.CreateClientPod(c, ns, pvc)
+		clientPod, err = e2epod.CreateClientPod(c, ns, pvc)
 		framework.ExpectNoError(err)
 		node = clientPod.Spec.NodeName
 
@@ -114,7 +115,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	ginkgo.AfterEach(func() {
 		e2elog.Logf("AfterEach: Cleaning up test resources")
 		if c != nil {
-			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
+			framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
 
 			if pv != nil {
 				framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "AfterEach: failed to delete PV ", pv.Name)
@@ -153,7 +154,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		pvc = nil
 
 		ginkgo.By("Deleting the Pod")
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "Failed to delete pod ", clientPod.Name)
 	})
 
 	/*
@@ -169,7 +170,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 		pv = nil
 
 		ginkgo.By("Deleting the pod")
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod), "Failed to delete pod ", clientPod.Name)
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "Failed to delete pod ", clientPod.Name)
 	})
 	/*
 		This test verifies that a volume mounted to a pod remains mounted after a kubelet restarts.

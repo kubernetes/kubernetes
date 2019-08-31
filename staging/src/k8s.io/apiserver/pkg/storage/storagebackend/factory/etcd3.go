@@ -19,6 +19,8 @@ package factory
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/url"
 	"path"
 	"sync"
 	"sync/atomic"
@@ -29,11 +31,14 @@ import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/apiserver/pkg/storage/value"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 // The short keepalive timeout and interval have been chosen to aggressively
@@ -45,6 +50,14 @@ const keepaliveTimeout = 10 * time.Second
 // It is set to 20 seconds as times shorter than that will cause TLS connections to fail
 // on heavily loaded arm64 CPUs (issue #64649)
 const dialTimeout = 20 * time.Second
+
+func init() {
+	// grpcprom auto-registers (via an init function) their client metrics, since we are opting out of
+	// using the global prometheus registry and using our own wrapped global registry,
+	// we need to explicitly register these metrics to our global registry here.
+	// For reference: https://github.com/kubernetes/kubernetes/pull/81387
+	legacyregistry.RawMustRegister(grpcprom.DefaultClientMetrics)
+}
 
 func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 	// constructing the etcd v3 client blocks and times out if etcd is not available.
@@ -97,16 +110,36 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 	if len(c.CertFile) == 0 && len(c.KeyFile) == 0 && len(c.CAFile) == 0 {
 		tlsConfig = nil
 	}
+	networkContext := egressselector.Etcd.AsNetworkContext()
+	var egressDialer utilnet.DialFunc
+	if c.EgressLookup != nil {
+		egressDialer, err = c.EgressLookup(networkContext)
+		if err != nil {
+			return nil, err
+		}
+	}
+	dialOptions := []grpc.DialOption{
+		grpc.WithBlock(), // block until the underlying connection is up
+		grpc.WithUnaryInterceptor(grpcprom.UnaryClientInterceptor),
+		grpc.WithStreamInterceptor(grpcprom.StreamClientInterceptor),
+	}
+	if egressDialer != nil {
+		dialer := func(ctx context.Context, addr string) (net.Conn, error) {
+			u, err := url.Parse(addr)
+			if err != nil {
+				return nil, err
+			}
+			return egressDialer(ctx, "tcp", u.Host)
+		}
+		dialOptions = append(dialOptions, grpc.WithContextDialer(dialer))
+	}
 	cfg := clientv3.Config{
 		DialTimeout:          dialTimeout,
 		DialKeepAliveTime:    keepaliveTime,
 		DialKeepAliveTimeout: keepaliveTimeout,
-		DialOptions: []grpc.DialOption{
-			grpc.WithUnaryInterceptor(grpcprom.UnaryClientInterceptor),
-			grpc.WithStreamInterceptor(grpcprom.StreamClientInterceptor),
-		},
-		Endpoints: c.ServerList,
-		TLS:       tlsConfig,
+		DialOptions:          dialOptions,
+		Endpoints:            c.ServerList,
+		TLS:                  tlsConfig,
 	}
 
 	return clientv3.New(cfg)

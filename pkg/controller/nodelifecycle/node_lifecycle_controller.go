@@ -23,13 +23,14 @@ package nodelifecycle
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"k8s.io/klog"
 
 	coordv1beta1 "k8s.io/api/coordination/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,11 +55,11 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
-	"k8s.io/kubernetes/pkg/util/system"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 )
 
@@ -457,7 +458,7 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting node controller")
 	defer klog.Infof("Shutting down node controller")
 
-	if !controller.WaitForCacheSync("taint", stopCh, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
+	if !cache.WaitForNamedCacheSync("taint", stopCh, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
 	}
 
@@ -715,8 +716,8 @@ func (nc *Controller) monitorNodeHealth() error {
 			continue
 		}
 
-		// We do not treat a master node as a part of the cluster for network disruption checking.
-		if !system.IsMasterNode(node.Name) {
+		// Some nodes may be excluded from disruption checking
+		if !isNodeExcludedFromDisruptionChecks(node) {
 			zoneToNodeConditions[utilnode.GetZoneKey(node)] = append(zoneToNodeConditions[utilnode.GetZoneKey(node)], currentReadyCondition)
 		}
 
@@ -804,6 +805,45 @@ func (nc *Controller) monitorNodeHealth() error {
 	nc.handleDisruption(zoneToNodeConditions, nodes)
 
 	return nil
+}
+
+// labelNodeDisruptionExclusion is a label on nodes that controls whether they are
+// excluded from being considered for disruption checks by the node controller.
+const labelNodeDisruptionExclusion = "node.kubernetes.io/exclude-disruption"
+
+func isNodeExcludedFromDisruptionChecks(node *v1.Node) bool {
+	// DEPRECATED: will be removed in 1.19
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyNodeRoleBehavior) {
+		if legacyIsMasterNode(node.Name) {
+			return true
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeDisruptionExclusion) {
+		if _, ok := node.Labels[labelNodeDisruptionExclusion]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// legacyIsMasterNode returns true if given node is a registered master according
+// to the logic historically used for this function. This code path is deprecated
+// and the node disruption exclusion label should be used in the future.
+// This code will not be allowed to update to use the node-role label, since
+// node-roles may not be used for feature enablement.
+// DEPRECATED: Will be removed in 1.19
+func legacyIsMasterNode(nodeName string) bool {
+	// We are trying to capture "master(-...)?$" regexp.
+	// However, using regexp.MatchString() results even in more than 35%
+	// of all space allocations in ControllerManager spent in this function.
+	// That's why we are trying to be a bit smarter.
+	if strings.HasSuffix(nodeName, "master") {
+		return true
+	}
+	if len(nodeName) >= 10 {
+		return strings.HasSuffix(nodeName[:len(nodeName)-3], "master-")
+	}
+	return false
 }
 
 // tryUpdateNodeHealth checks a given node's conditions and tries to update it. Returns grace period to

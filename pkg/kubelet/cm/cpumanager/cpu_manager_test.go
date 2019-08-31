@@ -343,7 +343,7 @@ func TestCPUManagerGenerate(t *testing.T) {
 			}
 			defer os.RemoveAll(sDir)
 
-			mgr, err := NewManager(testCase.cpuPolicyName, 5*time.Second, machineInfo, testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
+			mgr, err := NewManager(testCase.cpuPolicyName, 5*time.Second, machineInfo, nil, testCase.nodeAllocatableReservation, sDir, topologymanager.NewFakeManager())
 			if testCase.expectedError != nil {
 				if !strings.Contains(err.Error(), testCase.expectedError.Error()) {
 					t.Errorf("Unexpected error message. Have: %s wants %s", err.Error(), testCase.expectedError.Error())
@@ -352,6 +352,16 @@ func TestCPUManagerGenerate(t *testing.T) {
 				rawMgr := mgr.(*manager)
 				if rawMgr.policy.Name() != testCase.expectedPolicy {
 					t.Errorf("Unexpected policy name. Have: %q wants %q", rawMgr.policy.Name(), testCase.expectedPolicy)
+				}
+				if rawMgr.policy.Name() == string(PolicyNone) {
+					if rawMgr.topology != nil {
+						t.Errorf("Expected topology to be nil for 'none' policy. Have: %q", rawMgr.topology)
+					}
+				}
+				if rawMgr.policy.Name() != string(PolicyNone) {
+					if rawMgr.topology == nil {
+						t.Errorf("Expected topology to be non-nil for policy '%v'. Have: %q", rawMgr.policy.Name(), rawMgr.topology)
+					}
 				}
 			}
 		})

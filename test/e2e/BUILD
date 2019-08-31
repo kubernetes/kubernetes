@@ -113,6 +113,7 @@ filegroup(
         "//test/e2e/scheduling:all-srcs",
         "//test/e2e/servicecatalog:all-srcs",
         "//test/e2e/storage:all-srcs",
+        "//test/e2e/system:all-srcs",
         "//test/e2e/testing-manifests:all-srcs",
         "//test/e2e/ui:all-srcs",
         "//test/e2e/upgrades:all-srcs",

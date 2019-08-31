@@ -92,107 +92,107 @@ func TestParseMountInfo(t *testing.T) {
 	tests := []struct {
 		name         string
 		id           int
-		expectedInfo mountInfo
+		expectedInfo MountInfo
 	}{
 		{
 			"simple bind mount",
 			189,
-			mountInfo{
-				id:             189,
-				parentID:       80,
-				majorMinor:     "8:1",
-				root:           "/var/lib/kubelet",
-				source:         "/dev/sda1",
-				mountPoint:     "/var/lib/kubelet",
-				optionalFields: []string{"shared:30"},
-				fsType:         "ext4",
-				mountOptions:   []string{"rw", "relatime"},
-				superOptions:   []string{"rw", "commit=30", "data=ordered"},
+			MountInfo{
+				ID:             189,
+				ParentID:       80,
+				MajorMinor:     "8:1",
+				Root:           "/var/lib/kubelet",
+				Source:         "/dev/sda1",
+				MountPoint:     "/var/lib/kubelet",
+				OptionalFields: []string{"shared:30"},
+				FsType:         "ext4",
+				MountOptions:   []string{"rw", "relatime"},
+				SuperOptions:   []string{"rw", "commit=30", "data=ordered"},
 			},
 		},
 		{
 			"bind mount a directory",
 			222,
-			mountInfo{
-				id:             222,
-				parentID:       24,
-				majorMinor:     "253:0",
-				root:           "/tmp/src",
-				source:         "/dev/mapper/vagrant--vg-root",
-				mountPoint:     "/mnt/dst",
-				optionalFields: []string{"shared:1"},
-				fsType:         "ext4",
-				mountOptions:   []string{"rw", "relatime"},
-				superOptions:   []string{"rw", "errors=remount-ro", "data=ordered"},
+			MountInfo{
+				ID:             222,
+				ParentID:       24,
+				MajorMinor:     "253:0",
+				Root:           "/tmp/src",
+				Source:         "/dev/mapper/vagrant--vg-root",
+				MountPoint:     "/mnt/dst",
+				OptionalFields: []string{"shared:1"},
+				FsType:         "ext4",
+				MountOptions:   []string{"rw", "relatime"},
+				SuperOptions:   []string{"rw", "errors=remount-ro", "data=ordered"},
 			},
 		},
 		{
 			"more than one optional fields",
 			224,
-			mountInfo{
-				id:             224,
-				parentID:       62,
-				majorMinor:     "253:0",
-				root:           "/var/lib/docker/devicemapper/test/shared",
-				source:         "/dev/mapper/ssd-root",
-				mountPoint:     "/var/lib/docker/devicemapper/test/shared",
-				optionalFields: []string{"master:1", "shared:44"},
-				fsType:         "ext4",
-				mountOptions:   []string{"rw", "relatime"},
-				superOptions:   []string{"rw", "seclabel", "data=ordered"},
+			MountInfo{
+				ID:             224,
+				ParentID:       62,
+				MajorMinor:     "253:0",
+				Root:           "/var/lib/docker/devicemapper/test/shared",
+				Source:         "/dev/mapper/ssd-root",
+				MountPoint:     "/var/lib/docker/devicemapper/test/shared",
+				OptionalFields: []string{"master:1", "shared:44"},
+				FsType:         "ext4",
+				MountOptions:   []string{"rw", "relatime"},
+				SuperOptions:   []string{"rw", "seclabel", "data=ordered"},
 			},
 		},
 		{
 			"cgroup-mountpoint",
 			28,
-			mountInfo{
-				id:             28,
-				parentID:       18,
-				majorMinor:     "0:24",
-				root:           "/",
-				source:         "tmpfs",
-				mountPoint:     "/sys/fs/cgroup",
-				optionalFields: []string{"shared:9"},
-				fsType:         "tmpfs",
-				mountOptions:   []string{"ro", "nosuid", "nodev", "noexec"},
-				superOptions:   []string{"ro", "mode=755"},
+			MountInfo{
+				ID:             28,
+				ParentID:       18,
+				MajorMinor:     "0:24",
+				Root:           "/",
+				Source:         "tmpfs",
+				MountPoint:     "/sys/fs/cgroup",
+				OptionalFields: []string{"shared:9"},
+				FsType:         "tmpfs",
+				MountOptions:   []string{"ro", "nosuid", "nodev", "noexec"},
+				SuperOptions:   []string{"ro", "mode=755"},
 			},
 		},
 		{
 			"cgroup-subsystem-systemd-mountpoint",
 			29,
-			mountInfo{
-				id:             29,
-				parentID:       28,
-				majorMinor:     "0:25",
-				root:           "/",
-				source:         "cgroup",
-				mountPoint:     "/sys/fs/cgroup/systemd",
-				optionalFields: []string{"shared:10"},
-				fsType:         "cgroup",
-				mountOptions:   []string{"rw", "nosuid", "nodev", "noexec", "relatime"},
-				superOptions:   []string{"rw", "xattr", "release_agent=/lib/systemd/systemd-cgroups-agent", "name=systemd"},
+			MountInfo{
+				ID:             29,
+				ParentID:       28,
+				MajorMinor:     "0:25",
+				Root:           "/",
+				Source:         "cgroup",
+				MountPoint:     "/sys/fs/cgroup/systemd",
+				OptionalFields: []string{"shared:10"},
+				FsType:         "cgroup",
+				MountOptions:   []string{"rw", "nosuid", "nodev", "noexec", "relatime"},
+				SuperOptions:   []string{"rw", "xattr", "release_agent=/lib/systemd/systemd-cgroups-agent", "name=systemd"},
 			},
 		},
 		{
 			"cgroup-subsystem-cpuset-mountpoint",
 			31,
-			mountInfo{
-				id:             31,
-				parentID:       28,
-				majorMinor:     "0:27",
-				root:           "/",
-				source:         "cgroup",
-				mountPoint:     "/sys/fs/cgroup/cpuset",
-				optionalFields: []string{"shared:13"},
-				fsType:         "cgroup",
-				mountOptions:   []string{"rw", "nosuid", "nodev", "noexec", "relatime"},
-				superOptions:   []string{"rw", "cpuset"},
+			MountInfo{
+				ID:             31,
+				ParentID:       28,
+				MajorMinor:     "0:27",
+				Root:           "/",
+				Source:         "cgroup",
+				MountPoint:     "/sys/fs/cgroup/cpuset",
+				OptionalFields: []string{"shared:13"},
+				FsType:         "cgroup",
+				MountOptions:   []string{"rw", "nosuid", "nodev", "noexec", "relatime"},
+				SuperOptions:   []string{"rw", "cpuset"},
 			},
 		},
 	}
 
-	infos, err := parseMountInfo(filename)
+	infos, err := ParseMountInfo(filename)
 	if err != nil {
 		t.Fatalf("Cannot parse %s: %s", filename, err)
 	}
@@ -200,7 +200,7 @@ func TestParseMountInfo(t *testing.T) {
 	for _, test := range tests {
 		found := false
 		for _, info := range infos {
-			if info.id == test.id {
+			if info.ID == test.id {
 				found = true
 				if !reflect.DeepEqual(info, test.expectedInfo) {
 					t.Errorf("Test case %q:\n expected: %+v\n got:      %+v", test.name, test.expectedInfo, info)

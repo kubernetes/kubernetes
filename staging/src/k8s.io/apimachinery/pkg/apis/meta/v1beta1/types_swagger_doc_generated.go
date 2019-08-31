@@ -29,7 +29,7 @@ package v1beta1
 // AUTO-GENERATED FUNCTIONS START HERE. DO NOT EDIT.
 var map_PartialObjectMetadataList = map[string]string{
 	"":         "PartialObjectMetadataList contains a list of objects containing only their metadata.",
-	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds",
+	"metadata": "Standard list metadata. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds",
 	"items":    "items contains each of the included items.",
 }
 

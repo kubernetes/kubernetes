@@ -168,11 +168,13 @@ func (c *Controller) sync(name string) error {
 			return nil
 		}
 		delete(c.crdSpecs, name)
+		klog.V(2).Infof("Updating CRD OpenAPI spec because %s was removed", name)
+		regenerationCounter.With(map[string]string{"crd": name, "reason": "remove"})
 		return c.updateSpecLocked()
 	}
 
 	// compute CRD spec and see whether it changed
-	oldSpecs := c.crdSpecs[crd.Name]
+	oldSpecs, updated := c.crdSpecs[crd.Name]
 	newSpecs, changed, err := buildVersionSpecs(crd, oldSpecs)
 	if err != nil {
 		return err
@@ -183,6 +185,12 @@ func (c *Controller) sync(name string) error {
 
 	// update specs of this CRD
 	c.crdSpecs[crd.Name] = newSpecs
+	klog.V(2).Infof("Updating CRD OpenAPI spec because %s changed", name)
+	reason := "add"
+	if updated {
+		reason = "update"
+	}
+	regenerationCounter.With(map[string]string{"crd": name, "reason": reason})
 	return c.updateSpecLocked()
 }
 
@@ -218,7 +226,11 @@ func (c *Controller) updateSpecLocked() error {
 			crdSpecs = append(crdSpecs, s)
 		}
 	}
-	return c.openAPIService.UpdateSpec(builder.MergeSpecs(c.staticSpec, crdSpecs...))
+	mergedSpec, err := builder.MergeSpecs(c.staticSpec, crdSpecs...)
+	if err != nil {
+		return fmt.Errorf("failed to merge specs: %v", err)
+	}
+	return c.openAPIService.UpdateSpec(mergedSpec)
 }
 
 func (c *Controller) addCustomResourceDefinition(obj interface{}) {

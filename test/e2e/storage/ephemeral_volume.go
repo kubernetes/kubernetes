@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -60,7 +61,7 @@ var _ = utils.SIGDescribe("Ephemeralstorage", func() {
 				// Allow it to sleep for 30 seconds
 				time.Sleep(30 * time.Second)
 				e2elog.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-				framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 			})
 		}
 	})

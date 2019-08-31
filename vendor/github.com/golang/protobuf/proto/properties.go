@@ -334,9 +334,6 @@ func GetProperties(t reflect.Type) *StructProperties {
 	sprop, ok := propertiesMap[t]
 	propertiesMu.RUnlock()
 	if ok {
-		if collectStats {
-			stats.Chit++
-		}
 		return sprop
 	}
 
@@ -346,16 +343,19 @@ func GetProperties(t reflect.Type) *StructProperties {
 	return sprop
 }
 
+type (
+	oneofFuncsIface interface {
+		XXX_OneofFuncs() (func(Message, *Buffer) error, func(Message, int, int, *Buffer) (bool, error), func(Message) int, []interface{})
+	}
+	oneofWrappersIface interface {
+		XXX_OneofWrappers() []interface{}
+	}
+)
+
 // getPropertiesLocked requires that propertiesMu is held.
 func getPropertiesLocked(t reflect.Type) *StructProperties {
 	if prop, ok := propertiesMap[t]; ok {
-		if collectStats {
-			stats.Chit++
-		}
 		return prop
-	}
-	if collectStats {
-		stats.Cmiss++
 	}
 
 	prop := new(StructProperties)
@@ -391,13 +391,14 @@ func getPropertiesLocked(t reflect.Type) *StructProperties {
 	// Re-order prop.order.
 	sort.Sort(prop)
 
-	type oneofMessage interface {
-		XXX_OneofFuncs() (func(Message, *Buffer) error, func(Message, int, int, *Buffer) (bool, error), func(Message) int, []interface{})
+	var oots []interface{}
+	switch m := reflect.Zero(reflect.PtrTo(t)).Interface().(type) {
+	case oneofFuncsIface:
+		_, _, _, oots = m.XXX_OneofFuncs()
+	case oneofWrappersIface:
+		oots = m.XXX_OneofWrappers()
 	}
-	if om, ok := reflect.Zero(reflect.PtrTo(t)).Interface().(oneofMessage); ok {
-		var oots []interface{}
-		_, _, _, oots = om.XXX_OneofFuncs()
-
+	if len(oots) > 0 {
 		// Interpret oneof metadata.
 		prop.OneofTypes = make(map[string]*OneofProperties)
 		for _, oot := range oots {

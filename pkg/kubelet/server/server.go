@@ -32,7 +32,7 @@ import (
 	"strings"
 	"time"
 
-	restful "github.com/emicklei/go-restful"
+	"github.com/emicklei/go-restful"
 	cadvisormetrics "github.com/google/cadvisor/container"
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/google/cadvisor/metrics"
@@ -56,6 +56,7 @@ import (
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/component-base/logs"
 	compbasemetrics "k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
@@ -297,7 +298,7 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 
 	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer, enableCAdvisorJSONEndpoints))
 	//lint:ignore SA1019 https://github.com/kubernetes/enhancements/issues/1206
-	s.restfulCont.Handle(metricsPath, prometheus.Handler())
+	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := prometheus.NewRegistry()
@@ -325,8 +326,9 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	)
 
 	// prober metrics are exposed under a different endpoint
-	p := prometheus.NewRegistry()
-	compbasemetrics.RegisterProcessStartTime(p)
+
+	p := compbasemetrics.NewKubeRegistry()
+	compbasemetrics.RegisterProcessStartTime(p.RawRegister)
 	p.MustRegister(prober.ProberResults)
 	s.restfulCont.Handle(proberMetricsPath,
 		promhttp.HandlerFor(p, promhttp.HandlerOpts{ErrorHandling: promhttp.ContinueOnError}),

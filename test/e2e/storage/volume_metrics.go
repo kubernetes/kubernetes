@@ -115,7 +115,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
 
-		pod := framework.MakePod(ns, nil, claims, false, "")
+		pod := e2epod.MakePod(ns, nil, claims, false, "")
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
 		framework.ExpectNoError(err)
 
@@ -123,7 +123,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(c, pod), "Error starting pod %s", pod.Name)
 
 		e2elog.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 
 		updatedStorageMetrics := waitForDetachAndGrabMetrics(storageOpMetrics, metricsGrabber)
 
@@ -174,7 +174,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		claims := []*v1.PersistentVolumeClaim{pvc}
 
 		ginkgo.By("Creating a pod and expecting it to fail")
-		pod := framework.MakePod(ns, nil, claims, false, "")
+		pod := e2epod.MakePod(ns, nil, claims, false, "")
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
 		framework.ExpectNoError(err, "failed to create Pod %s/%s", pod.Namespace, pod.Name)
 
@@ -182,7 +182,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectError(err)
 
 		e2elog.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 
 		ginkgo.By("Checking failure metrics")
 		updatedControllerMetrics, err := metricsGrabber.GrabFromControllerManager()
@@ -200,7 +200,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNotEqual(pvc, nil)
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
-		pod := framework.MakePod(ns, nil, claims, false, "")
+		pod := e2epod.MakePod(ns, nil, claims, false, "")
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
 		framework.ExpectNoError(err)
 
@@ -247,7 +247,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		}
 
 		e2elog.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 	})
 
 	ginkgo.It("should create metrics for total time taken in volume operations in P/V Controller", func() {
@@ -257,7 +257,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNotEqual(pvc, nil)
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
-		pod := framework.MakePod(ns, nil, claims, false, "")
+		pod := e2epod.MakePod(ns, nil, claims, false, "")
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
 		framework.ExpectNoError(err)
 
@@ -278,7 +278,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		gomega.Expect(valid).To(gomega.BeTrue(), "Invalid metric in P/V Controller metrics: %q", metricKey)
 
 		e2elog.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 	})
 
 	ginkgo.It("should create volume metrics in Volume Manager", func() {
@@ -288,7 +288,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNotEqual(pvc, nil)
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
-		pod := framework.MakePod(ns, nil, claims, false, "")
+		pod := e2epod.MakePod(ns, nil, claims, false, "")
 		pod, err = c.CoreV1().Pods(ns).Create(pod)
 		framework.ExpectNoError(err)
 
@@ -308,7 +308,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		gomega.Expect(valid).To(gomega.BeTrue(), "Invalid metric in Volume Manager metrics: %q", totalVolumesKey)
 
 		e2elog.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 	})
 
 	ginkgo.It("should create metrics for total number of volumes in A/D Controller", func() {
@@ -318,7 +318,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		framework.ExpectNotEqual(pvc, nil)
 
 		claims := []*v1.PersistentVolumeClaim{pvc}
-		pod := framework.MakePod(ns, nil, claims, false, "")
+		pod := e2epod.MakePod(ns, nil, claims, false, "")
 
 		// Get metrics
 		controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
@@ -368,7 +368,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		}
 
 		e2elog.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
-		framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod))
+		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
 	})
 
 	// Test for pv controller metrics, concretely: bound/unbound pv/pvc count.

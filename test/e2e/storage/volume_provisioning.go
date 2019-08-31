@@ -279,7 +279,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:    "1.5Gi",
 					ExpectedSize: "2Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
 
 						err := checkGCEPD(volume, "pd-ssd")
@@ -296,7 +296,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:    "1.5Gi",
 					ExpectedSize: "2Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
 
 						err := checkGCEPD(volume, "pd-standard")
@@ -315,7 +315,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:    "1.5Gi",
 					ExpectedSize: "2Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
 
 						err := checkAWSEBS(volume, "gp2", false)
@@ -333,7 +333,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:    "3.5Gi",
 					ExpectedSize: "4Gi", // 4 GiB is minimum for io1
 					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
 
 						err := checkAWSEBS(volume, "io1", false)
@@ -350,7 +350,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:    "500Gi", // minimum for sc1
 					ExpectedSize: "500Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
 
 						err := checkAWSEBS(volume, "sc1", false)
@@ -367,7 +367,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:    "500Gi", // minimum for st1
 					ExpectedSize: "500Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
 
 						err := checkAWSEBS(volume, "st1", false)
@@ -384,7 +384,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:    "1Gi",
 					ExpectedSize: "1Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+						volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 						gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
 
 						err := checkAWSEBS(volume, "gp2", true)
@@ -400,7 +400,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:      "1.5Gi",
 					ExpectedSize:   "2Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 					},
 				},
 				{
@@ -414,7 +414,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:    "1.5Gi",
 					ExpectedSize: "2Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 					},
 				},
 				// vSphere generic test
@@ -426,7 +426,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:      "1.5Gi",
 					ExpectedSize:   "1.5Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 					},
 				},
 				// Azure
@@ -438,7 +438,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 					ClaimSize:      "1Gi",
 					ExpectedSize:   "1Gi",
 					PvCheck: func(claim *v1.PersistentVolumeClaim) {
-						testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+						testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 					},
 				},
 			}
@@ -504,7 +504,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				ClaimSize:    "1Gi",
 				ExpectedSize: "1Gi",
 				PvCheck: func(claim *v1.PersistentVolumeClaim) {
-					volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+					volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 					gomega.Expect(volume).NotTo(gomega.BeNil(), "get bound PV")
 
 					err := checkGCEPD(volume, "pd-standard")
@@ -1159,7 +1159,7 @@ func startGlusterDpServerPod(c clientset.Interface, ns string) *v1.Pod {
 			Containers: []v1.Container{
 				{
 					Name:  "glusterdynamic-provisioner",
-					Image: "docker.io/humblec/glusterdynamic-provisioner:v1.0",
+					Image: "docker.io/gluster/glusterdynamic-provisioner:v1.0",
 					Args: []string{
 						"-config=" + "/etc/heketi/heketi.json",
 					},

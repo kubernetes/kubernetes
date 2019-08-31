@@ -25,6 +25,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -71,10 +72,34 @@ func TestFieldManagerCreation(t *testing.T) {
 	}
 }
 
+func TestUpdateOnlyDoesNotTrackManagedFields(t *testing.T) {
+	f := NewTestFieldManager()
+
+	liveObj := &corev1.Pod{}
+
+	updatedObj := liveObj.DeepCopy()
+	updatedObj.ObjectMeta.Labels = map[string]string{"k": "v"}
+
+	newObj, err := f.Update(liveObj, updatedObj, "fieldmanager_test")
+	if err != nil {
+		t.Fatalf("failed to update object: %v", err)
+	}
+
+	accessor, err := meta.Accessor(newObj)
+	if err != nil {
+		t.Fatalf("couldn't get accessor: %v", err)
+	}
+
+	if m := accessor.GetManagedFields(); len(m) != 0 {
+		t.Fatalf("managedFields were tracked on update only: %v", m)
+	}
+}
+
 func TestApplyStripsFields(t *testing.T) {
 	f := NewTestFieldManager()
 
 	obj := &corev1.Pod{}
+	obj.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{{}}
 
 	newObj, err := f.Apply(obj, []byte(`{
 		"apiVersion": "apps/v1",
@@ -153,6 +178,7 @@ func TestApplyDoesNotStripLabels(t *testing.T) {
 	f := NewTestFieldManager()
 
 	obj := &corev1.Pod{}
+	obj.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{{}}
 
 	newObj, err := f.Apply(obj, []byte(`{
 		"apiVersion": "apps/v1",

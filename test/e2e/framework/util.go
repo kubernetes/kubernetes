@@ -74,7 +74,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/controller/service"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -415,6 +414,8 @@ func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
 // getDefaultClusterIPFamily obtains the default IP family of the cluster
 // using the Cluster IP address of the kubernetes service created in the default namespace
 // This unequivocally identifies the default IP family because services are single family
+// TODO: dual-stack may support multiple families per service
+// but we can detect if a cluster is dual stack because pods have two addresses (one per family)
 func getDefaultClusterIPFamily(c clientset.Interface) string {
 	// Get the ClusterIP of the kubernetes service created in the default namespace
 	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
@@ -426,6 +427,11 @@ func getDefaultClusterIPFamily(c clientset.Interface) string {
 		return "ipv6"
 	}
 	return "ipv4"
+}
+
+// ClusterIsIPv6 returns true if the cluster is IPv6
+func ClusterIsIPv6() bool {
+	return TestContext.IPFamily == "ipv6"
 }
 
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
@@ -1967,7 +1973,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			if _, hasMasterRoleLabel := node.ObjectMeta.Labels[service.LabelNodeRoleMaster]; hasMasterRoleLabel {
+			if _, hasMasterRoleLabel := node.ObjectMeta.Labels["node-role.kubernetes.io/master"]; hasMasterRoleLabel {
 				// Kops clusters have masters with spec.unscheduable = false and
 				// node-role.kubernetes.io/master NoSchedule taint.
 				// Don't wait for them.

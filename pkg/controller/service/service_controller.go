@@ -42,10 +42,7 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/controller"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/metrics"
-	"k8s.io/kubernetes/pkg/util/slice"
 )
 
 const (
@@ -60,13 +57,38 @@ const (
 	minRetryDelay = 5 * time.Second
 	maxRetryDelay = 300 * time.Second
 
-	// LabelNodeRoleMaster specifies that a node is a master
-	// It's copied over to kubeadm until it's merged in core: https://github.com/kubernetes/kubernetes/pull/39112
-	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
+	// labelNodeRoleMaster specifies that a node is a master. The use of this label within the
+	// controller is deprecated and only considered when the LegacyNodeRoleBehavior feature gate
+	// is on.
+	labelNodeRoleMaster = "node-role.kubernetes.io/master"
 
-	// LabelNodeRoleExcludeBalancer specifies that the node should be
-	// exclude from load balancers created by a cloud provider.
-	LabelNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
+	// labelNodeRoleExcludeBalancer specifies that the node should not be considered as a target
+	// for external load-balancers which use nodes as a second hop (e.g. many cloud LBs which only
+	// understand nodes). For services that use externalTrafficPolicy=Local, this may mean that
+	// any backends on excluded nodes are not reachable by those external load-balancers.
+	// Implementations of this exclusion may vary based on provider. This label is honored starting
+	// in 1.16 when the ServiceNodeExclusion gate is on.
+	labelNodeRoleExcludeBalancer = "node.kubernetes.io/exclude-from-external-load-balancers"
+
+	// labelAlphaNodeRoleExcludeBalancer specifies that the node should be
+	// exclude from load balancers created by a cloud provider. This label is deprecated and will
+	// be removed in 1.17.
+	labelAlphaNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
+
+	// serviceNodeExclusionFeature is the feature gate name that
+	// enables nodes to exclude themselves from service load balancers
+	// originated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L178
+	serviceNodeExclusionFeature = "ServiceNodeExclusion"
+
+	// serviceLoadBalancerFinalizerFeature is the feature gate name that
+	// enables Finalizer Protection for Service LoadBalancers.
+	// orginated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L433
+	serviceLoadBalancerFinalizerFeature = "ServiceLoadBalancerFinalizer"
+
+	// legacyNodeRoleBehaviro is the feature gate name that enables legacy
+	// behavior to vary cluster functionality on the node-role.kubernetes.io
+	// labels.
+	legacyNodeRoleBehaviorFeature = "LegacyNodeRoleBehavior"
 )
 
 type cachedService struct {
@@ -150,7 +172,7 @@ func New(
 				}
 			},
 			DeleteFunc: func(old interface{}) {
-				if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceLoadBalancerFinalizer) {
+				if utilfeature.DefaultFeatureGate.Enabled(serviceLoadBalancerFinalizerFeature) {
 					// No need to handle deletion event if finalizer feature gate is
 					// enabled. Because the deletion would be handled by the update
 					// path when the deletion timestamp is added.
@@ -172,7 +194,7 @@ func New(
 
 // obj could be an *v1.Service, or a DeletionFinalStateUnknown marker item.
 func (s *ServiceController) enqueueService(obj interface{}) {
-	key, err := controller.KeyFunc(obj)
+	key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 	if err != nil {
 		runtime.HandleError(fmt.Errorf("couldn't get key for object %#v: %v", obj, err))
 		return
@@ -197,7 +219,7 @@ func (s *ServiceController) Run(stopCh <-chan struct{}, workers int) {
 	klog.Info("Starting service controller")
 	defer klog.Info("Shutting down service controller")
 
-	if !controller.WaitForCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
+	if !cache.WaitForNamedCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
 		return
 	}
 
@@ -327,7 +349,7 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 		op = ensureLoadBalancer
 		klog.V(2).Infof("Ensuring load balancer for service %s", key)
 		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceLoadBalancerFinalizer) {
+		if utilfeature.DefaultFeatureGate.Enabled(serviceLoadBalancerFinalizerFeature) {
 			// Always try to add finalizer prior to load balancer creation.
 			// It will be a no-op if finalizer already exists.
 			// Note this also retrospectively puts on finalizer if the cluster
@@ -617,14 +639,19 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 			return false
 		}
 
-		// As of 1.6, we will taint the master, but not necessarily mark it unschedulable.
-		// Recognize nodes labeled as master, and filter them also, as we were doing previously.
-		if _, hasMasterRoleLabel := node.Labels[LabelNodeRoleMaster]; hasMasterRoleLabel {
-			return false
+		if utilfeature.DefaultFeatureGate.Enabled(legacyNodeRoleBehaviorFeature) {
+			// As of 1.6, we will taint the master, but not necessarily mark it unschedulable.
+			// Recognize nodes labeled as master, and filter them also, as we were doing previously.
+			if _, hasMasterRoleLabel := node.Labels[labelNodeRoleMaster]; hasMasterRoleLabel {
+				return false
+			}
 		}
-
-		if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.ServiceNodeExclusion) {
-			if _, hasExcludeBalancerLabel := node.Labels[LabelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+		if utilfeature.DefaultFeatureGate.Enabled(serviceNodeExclusionFeature) {
+			// Will be removed in 1.17
+			if _, hasExcludeBalancerLabel := node.Labels[labelAlphaNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
+				return false
+			}
+			if _, hasExcludeBalancerLabel := node.Labels[labelNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
 				return false
 			}
 		}
@@ -818,11 +845,23 @@ func (s *ServiceController) removeFinalizer(service *v1.Service) error {
 
 	// Make a copy so we don't mutate the shared informer cache.
 	updated := service.DeepCopy()
-	updated.ObjectMeta.Finalizers = slice.RemoveString(updated.ObjectMeta.Finalizers, servicehelper.LoadBalancerCleanupFinalizer, nil)
+	updated.ObjectMeta.Finalizers = removeString(updated.ObjectMeta.Finalizers, servicehelper.LoadBalancerCleanupFinalizer)
 
 	klog.V(2).Infof("Removing finalizer from service %s/%s", updated.Namespace, updated.Name)
 	_, err := patch(s.kubeClient.CoreV1(), service, updated)
 	return err
+}
+
+// removeString returns a newly created []string that contains all items from slice that
+// are not equal to s.
+func removeString(slice []string, s string) []string {
+	var newSlice []string
+	for _, item := range slice {
+		if item != s {
+			newSlice = append(newSlice, item)
+		}
+	}
+	return newSlice
 }
 
 // patchStatus patches the service with the given LoadBalancerStatus.

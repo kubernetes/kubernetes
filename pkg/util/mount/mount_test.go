@@ -21,7 +21,7 @@ import (
 	"testing"
 )
 
-func TestIsBind(t *testing.T) {
+func TestMakeBindOpts(t *testing.T) {
 	tests := []struct {
 		mountOption         []string
 		isBind              bool
@@ -43,7 +43,7 @@ func TestIsBind(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		bind, bindOpts, bindRemountOpts := IsBind(test.mountOption)
+		bind, bindOpts, bindRemountOpts := MakeBindOpts(test.mountOption)
 		if bind != test.isBind {
 			t.Errorf("Expected bind to be %v but got %v", test.isBind, bind)
 		}

@@ -26,6 +26,9 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // svcStrategy implements behavior for Services
@@ -114,6 +117,21 @@ func (svcStrategy) Export(ctx context.Context, obj runtime.Object, exact bool) e
 //         newSvc.Spec.MyFeature = nil
 //     }
 func dropServiceDisabledFields(newSvc *api.Service, oldSvc *api.Service) {
+	// Drop IPFamily if DualStack is not enabled
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) && !serviceIPFamilyInUse(oldSvc) {
+		newSvc.Spec.IPFamily = nil
+	}
+}
+
+// returns true if svc.Spec.ServiceIPFamily field is in use
+func serviceIPFamilyInUse(svc *api.Service) bool {
+	if svc == nil {
+		return false
+	}
+	if svc.Spec.IPFamily != nil {
+		return true
+	}
+	return false
 }
 
 type serviceStatusStrategy struct {

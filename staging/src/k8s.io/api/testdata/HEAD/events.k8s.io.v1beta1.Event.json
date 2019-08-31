@@ -35,7 +35,8 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
@@ -45,33 +46,33 @@
     "lastObservedTime": "2429-02-18T17:57:56.343118Z",
     "state": "鯹)晿\u003c"
   },
-  "reportingController": "18",
-  "reportingInstance": "19",
-  "action": "20",
-  "reason": "21",
+  "reportingController": "19",
+  "reportingInstance": "20",
+  "action": "21",
+  "reason": "22",
   "regarding": {
-    "kind": "22",
-    "namespace": "23",
-    "name": "24",
+    "kind": "23",
+    "namespace": "24",
+    "name": "25",
     "uid": "Ĩɘ.蘯6ċV夸eɑeʤ脽ěĂ",
-    "apiVersion": "25",
-    "resourceVersion": "26",
-    "fieldPath": "27"
+    "apiVersion": "26",
+    "resourceVersion": "27",
+    "fieldPath": "28"
   },
   "related": {
-    "kind": "28",
-    "namespace": "29",
-    "name": "30",
+    "kind": "29",
+    "namespace": "30",
+    "name": "31",
     "uid": "蓏Ŋ",
-    "apiVersion": "31",
-    "resourceVersion": "32",
-    "fieldPath": "33"
+    "apiVersion": "32",
+    "resourceVersion": "33",
+    "fieldPath": "34"
   },
-  "note": "34",
-  "type": "35",
+  "note": "35",
+  "type": "36",
   "deprecatedSource": {
-    "component": "36",
-    "host": "37"
+    "component": "37",
+    "host": "38"
   },
   "deprecatedFirstTimestamp": "2964-12-12T12:04:40Z",
   "deprecatedLastTimestamp": "2452-08-27T22:01:15Z",
