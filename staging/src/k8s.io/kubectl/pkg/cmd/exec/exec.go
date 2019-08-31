@@ -349,7 +349,7 @@ func (p *ExecOptions) Run() error {
 			Name(pod.Name).
 			Namespace(pod.Namespace).
 			SubResource("exec")
-		req.VersionedParams(&corev1.PodExecOptions{
+		params := &corev1.PodExecOptions{
 			Container: containerName,
 			Command:   p.Command,
 			User:      p.Username,
@@ -357,7 +357,11 @@ func (p *ExecOptions) Run() error {
 			Stdout:    p.Out != nil,
 			Stderr:    p.ErrOut != nil,
 			TTY:       t.Raw,
-		}, scheme.ParameterCodec)
+		}
+		if len(p.Username) > 0 {
+			params.User = p.Username
+		}
+		req.VersionedParams(params, scheme.ParameterCodec)
 
 		return p.Executor.Execute("POST", req.URL(), p.Config, p.In, p.Out, p.ErrOut, t.Raw, sizeQueue)
 	}
