@@ -42,7 +42,7 @@ func (c *Cloud) findRouteTable(clusterName string) (*ec2.RouteTable, error) {
 
 		tables = response
 	} else {
-		request := &ec2.DescribeRouteTablesInput{Filters: c.tagging.addFilters(nil)}
+		request := &ec2.DescribeRouteTablesInput{}
 		response, err := c.ec2.DescribeRouteTables(request)
 		if err != nil {
 			return nil, err

@@ -247,9 +247,32 @@ func (t *awsTagging) addFilters(filters []*ec2.Filter) []*ec2.Filter {
 		}
 		return filters
 	}
-	// For 1.6, we always recognize the legacy tag, for the 1.5 -> 1.6 upgrade
-	// There are no "or" filters by key, so we look for both the legacy and new key, and then we have to post-filter
-	f := newEc2Filter("tag-key", TagNameKubernetesClusterLegacy, t.clusterTagKey())
+
+	f := newEc2Filter("tag-key", t.clusterTagKey())
+
+	// We can't pass a zero-length Filters to AWS (it's an error)
+	// So if we end up with no filters; we need to return nil
+	filters = append(filters, f)
+	return filters
+}
+
+// Add additional filters, to match on our tags. This uses the tag for legacy
+// 1.5 -> 1.6 clusters and exists for backwards compatibility
+//
+// This lets us run multiple k8s clusters in a single EC2 AZ
+func (t *awsTagging) addLegacyFilters(filters []*ec2.Filter) []*ec2.Filter {
+	// if there are no clusterID configured - no filtering by special tag names
+	// should be applied to revert to legacy behaviour.
+	if len(t.ClusterID) == 0 {
+		if len(filters) == 0 {
+			// We can't pass a zero-length Filters to AWS (it's an error)
+			// So if we end up with no filters; just return nil
+			return nil
+		}
+		return filters
+	}
+
+	f := newEc2Filter(fmt.Sprintf("tag:%s", TagNameKubernetesClusterLegacy), t.ClusterID)
 
 	// We can't pass a zero-length Filters to AWS (it's an error)
 	// So if we end up with no filters; we need to return nil
