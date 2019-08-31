@@ -1304,7 +1304,7 @@ metadata:
 			Testname: Kubectl, logs
 			Description: When a Pod is running then it MUST generate logs.
 			Starting a Pod should have a log line indicating the server is running and ready to accept connections. Also log command options MUST work as expected and described below.
-				‘kubectl log -tail=1’ should generate a output of one line, the last line in the log.
+				‘kubectl logs -tail=1’ should generate a output of one line, the last line in the log.
 				‘kubectl --limit-bytes=1’ should generate a single byte output.
 				‘kubectl --tail=1 --timestamp should generate one line with timestamp in RFC3339 format
 				‘kubectl --since=1s’ should output logs that are only 1 second older from now
@@ -1325,17 +1325,17 @@ metadata:
 				framework.ExpectNoError(err)
 
 				ginkgo.By("limiting log lines")
-				out := framework.RunKubectlOrDie("log", pod.Name, containerName, nsFlag, "--tail=1")
+				out := framework.RunKubectlOrDie("logs", pod.Name, containerName, nsFlag, "--tail=1")
 				gomega.Expect(len(out)).NotTo(gomega.BeZero())
 				gomega.Expect(len(lines(out))).To(gomega.Equal(1))
 
 				ginkgo.By("limiting log bytes")
-				out = framework.RunKubectlOrDie("log", pod.Name, containerName, nsFlag, "--limit-bytes=1")
+				out = framework.RunKubectlOrDie("logs", pod.Name, containerName, nsFlag, "--limit-bytes=1")
 				gomega.Expect(len(lines(out))).To(gomega.Equal(1))
 				gomega.Expect(len(out)).To(gomega.Equal(1))
 
 				ginkgo.By("exposing timestamps")
-				out = framework.RunKubectlOrDie("log", pod.Name, containerName, nsFlag, "--tail=1", "--timestamps")
+				out = framework.RunKubectlOrDie("logs", pod.Name, containerName, nsFlag, "--tail=1", "--timestamps")
 				l := lines(out)
 				gomega.Expect(len(l)).To(gomega.Equal(1))
 				words := strings.Split(l[0], " ")
@@ -1351,9 +1351,9 @@ metadata:
 				// because the granularity is only 1 second and
 				// it could end up rounding the wrong way.
 				time.Sleep(2500 * time.Millisecond) // ensure that startup logs on the node are seen as older than 1s
-				recentOut := framework.RunKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=1s")
+				recentOut := framework.RunKubectlOrDie("logs", pod.Name, containerName, nsFlag, "--since=1s")
 				recent := len(strings.Split(recentOut, "\n"))
-				olderOut := framework.RunKubectlOrDie("log", pod.Name, containerName, nsFlag, "--since=24h")
+				olderOut := framework.RunKubectlOrDie("logs", pod.Name, containerName, nsFlag, "--since=24h")
 				older := len(strings.Split(olderOut, "\n"))
 				gomega.Expect(recent).To(gomega.BeNumerically("<", older), "expected recent(%v) to be less than older(%v)\nrecent lines:\n%v\nolder lines:\n%v\n", recent, older, recentOut, olderOut)
 			})
