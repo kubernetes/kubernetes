@@ -35,6 +35,7 @@ go_library(
         "//pkg/volume/emptydir:go_default_library",
         "//pkg/volume/projected:go_default_library",
         "//pkg/volume/secret:go_default_library",
+        "//pkg/volume/util/hostutil:go_default_library",
         "//pkg/volume/util/subpath:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

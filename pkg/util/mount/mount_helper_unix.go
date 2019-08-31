@@ -55,38 +55,38 @@ func IsCorruptedMnt(err error) bool {
 	return underlyingError == syscall.ENOTCONN || underlyingError == syscall.ESTALE || underlyingError == syscall.EIO || underlyingError == syscall.EACCES
 }
 
-// This represents a single line in /proc/<pid>/mountinfo.
-type mountInfo struct {
+// MountInfo represents a single line in /proc/<pid>/mountinfo.
+type MountInfo struct {
 	// Unique ID for the mount (maybe reused after umount).
-	id int
+	ID int
 	// The ID of the parent mount (or of self for the root of this mount namespace's mount tree).
-	parentID int
+	ParentID int
 	// The value of `st_dev` for files on this filesystem.
-	majorMinor string
+	MajorMinor string
 	// The pathname of the directory in the filesystem which forms the root of this mount.
-	root string
+	Root string
 	// Mount source, filesystem-specific information. e.g. device, tmpfs name.
-	source string
+	Source string
 	// Mount point, the pathname of the mount point.
-	mountPoint string
+	MountPoint string
 	// Optional fieds, zero or more fields of the form "tag[:value]".
-	optionalFields []string
+	OptionalFields []string
 	// The filesystem type in the form "type[.subtype]".
-	fsType string
+	FsType string
 	// Per-mount options.
-	mountOptions []string
+	MountOptions []string
 	// Per-superblock options.
-	superOptions []string
+	SuperOptions []string
 }
 
-// parseMountInfo parses /proc/xxx/mountinfo.
-func parseMountInfo(filename string) ([]mountInfo, error) {
+// ParseMountInfo parses /proc/xxx/mountinfo.
+func ParseMountInfo(filename string) ([]MountInfo, error) {
 	content, err := utilio.ConsistentRead(filename, maxListTries)
 	if err != nil {
-		return []mountInfo{}, err
+		return []MountInfo{}, err
 	}
 	contentStr := string(content)
-	infos := []mountInfo{}
+	infos := []MountInfo{}
 
 	for _, line := range strings.Split(contentStr, "\n") {
 		if line == "" {
@@ -106,27 +106,27 @@ func parseMountInfo(filename string) ([]mountInfo, error) {
 		if err != nil {
 			return nil, err
 		}
-		info := mountInfo{
-			id:           id,
-			parentID:     parentID,
-			majorMinor:   fields[2],
-			root:         fields[3],
-			mountPoint:   fields[4],
-			mountOptions: strings.Split(fields[5], ","),
+		info := MountInfo{
+			ID:           id,
+			ParentID:     parentID,
+			MajorMinor:   fields[2],
+			Root:         fields[3],
+			MountPoint:   fields[4],
+			MountOptions: strings.Split(fields[5], ","),
 		}
 		// All fields until "-" are "optional fields".
 		i := 6
 		for ; i < len(fields) && fields[i] != "-"; i++ {
-			info.optionalFields = append(info.optionalFields, fields[i])
+			info.OptionalFields = append(info.OptionalFields, fields[i])
 		}
 		// Parse the rest 3 fields.
 		i++
 		if len(fields)-i < 3 {
 			return nil, fmt.Errorf("expect 3 fields in %s, got %d", line, len(fields)-i)
 		}
-		info.fsType = fields[i]
-		info.source = fields[i+1]
-		info.superOptions = strings.Split(fields[i+2], ",")
+		info.FsType = fields[i]
+		info.Source = fields[i+1]
+		info.SuperOptions = strings.Split(fields[i+2], ",")
 		infos = append(infos, info)
 	}
 	return infos, nil

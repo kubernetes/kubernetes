@@ -14,22 +14,36 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package hostutil
 
 import (
 	"errors"
 	"os"
 	"sync"
+
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-// FakeHostUtil is a fake mount.HostUtils implementation for testing
+// FakeHostUtil is a fake HostUtils implementation for testing
 type FakeHostUtil struct {
-	MountPoints []MountPoint
+	MountPoints []mount.MountPoint
 	Filesystem  map[string]FileType
 
 	mutex sync.Mutex
 }
 
+// NewFakeHostUtil returns a struct that implements the HostUtils interface
+// for testing
+// TODO: no callers were initializing the struct with any MountPoints. Check
+// if those are still being used by any callers and if MountPoints still need
+// to be a part of the struct.
+func NewFakeHostUtil(fs map[string]FileType) *FakeHostUtil {
+	return &FakeHostUtil{
+		Filesystem: fs,
+	}
+}
+
+// Compile-time check to make sure FakeHostUtil implements interface
 var _ HostUtils = &FakeHostUtil{}
 
 // DeviceOpened checks if block device referenced by pathname is in use by
@@ -52,7 +66,7 @@ func (hu *FakeHostUtil) PathIsDevice(pathname string) (bool, error) {
 }
 
 // GetDeviceNameFromMount given a mount point, find the volume id
-func (hu *FakeHostUtil) GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
+func (hu *FakeHostUtil) GetDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error) {
 	return getDeviceNameFromMount(mounter, mountPath, pluginMountDir)
 }
 

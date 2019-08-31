@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mount
+package hostutil
 
 import (
 	"fmt"
@@ -310,4 +310,18 @@ func isOperationNotPermittedError(err error) bool {
 		return true
 	}
 	return false
+}
+
+func writeFile(content string) (string, string, error) {
+	tempDir, err := ioutil.TempDir("", "mounter_shared_test")
+	if err != nil {
+		return "", "", err
+	}
+	filename := filepath.Join(tempDir, "mountinfo")
+	err = ioutil.WriteFile(filename, []byte(content), 0600)
+	if err != nil {
+		os.RemoveAll(tempDir)
+		return "", "", err
+	}
+	return tempDir, filename, nil
 }

@@ -180,8 +180,7 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	}
 
 	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts.
-	hu := NewHostUtil()
-	resolvedFile, err := hu.EvalHostSymlinks(file)
+	resolvedFile, err := filepath.EvalSymlinks(file)
 	if err != nil {
 		return true, err
 	}

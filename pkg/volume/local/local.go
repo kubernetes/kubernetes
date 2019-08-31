@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/utils/keymutex"
 	utilstrings "k8s.io/utils/strings"
@@ -246,9 +247,9 @@ func (plugin *localVolumePlugin) getGlobalLocalPath(spec *volume.Spec) (string, 
 		return "", err
 	}
 	switch fileType {
-	case mount.FileTypeDirectory:
+	case hostutil.FileTypeDirectory:
 		return spec.PersistentVolume.Spec.Local.Path, nil
-	case mount.FileTypeBlockDev:
+	case hostutil.FileTypeBlockDev:
 		return filepath.Join(plugin.generateBlockDeviceBaseGlobalPath(), spec.Name()), nil
 	default:
 		return "", fmt.Errorf("only directory and block device are supported")
@@ -260,7 +261,7 @@ var _ volume.DeviceMountableVolumePlugin = &localVolumePlugin{}
 type deviceMounter struct {
 	plugin   *localVolumePlugin
 	mounter  *mount.SafeFormatAndMount
-	hostUtil mount.HostUtils
+	hostUtil hostutil.HostUtils
 }
 
 var _ volume.DeviceMounter = &deviceMounter{}
@@ -332,11 +333,11 @@ func (dm *deviceMounter) MountDevice(spec *volume.Spec, devicePath string, devic
 	}
 
 	switch fileType {
-	case mount.FileTypeBlockDev:
+	case hostutil.FileTypeBlockDev:
 		// local volume plugin does not implement AttachableVolumePlugin interface, so set devicePath to Path in PV spec directly
 		devicePath = spec.PersistentVolume.Spec.Local.Path
 		return dm.mountLocalBlockDevice(spec, devicePath, deviceMountPath)
-	case mount.FileTypeDirectory:
+	case hostutil.FileTypeDirectory:
 		// if the given local volume path is of already filesystem directory, return directly
 		return nil
 	default:
@@ -410,7 +411,7 @@ type localVolume struct {
 	globalPath string
 	// Mounter interface that provides system calls to mount the global path to the pod local path.
 	mounter  mount.Interface
-	hostUtil mount.HostUtils
+	hostUtil hostutil.HostUtils
 	plugin   *localVolumePlugin
 	volume.MetricsProvider
 }

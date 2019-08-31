@@ -23,7 +23,7 @@ import (
 	"sync"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -39,6 +39,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 )
@@ -341,8 +342,8 @@ type KubeletVolumeHost interface {
 	CSIDriversSynced() cache.InformerSynced
 	// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
 	WaitForCacheSync() error
-	// Returns HostUtils Interface
-	GetHostUtil() mount.HostUtils
+	// Returns hostutil.HostUtils
+	GetHostUtil() hostutil.HostUtils
 }
 
 // AttachDetachVolumeHost is a AttachDetach Controller specific interface that plugins can use
