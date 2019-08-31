@@ -26,13 +26,14 @@ import (
 	"runtime"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 )
 
 const (
@@ -109,10 +110,10 @@ func getDeviceMountablePluginWithBlockPath(t *testing.T, isBlockDevice bool) (st
 	}
 
 	plugMgr := volume.VolumePluginMgr{}
-	var pathToFSType map[string]mount.FileType
+	var pathToFSType map[string]hostutil.FileType
 	if isBlockDevice {
-		pathToFSType = map[string]mount.FileType{
-			tmpDir: mount.FileTypeBlockDev,
+		pathToFSType = map[string]hostutil.FileType{
+			tmpDir: hostutil.FileTypeBlockDev,
 		}
 	}
 

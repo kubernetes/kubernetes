@@ -85,9 +85,11 @@ func BenchmarkValidate(b *testing.B) {
 			attr := webhooktesting.NewAttribute(ns, nil, tt.IsDryRun)
 
 			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				wh.Validate(context.TODO(), attr, objectInterfaces)
-			}
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					wh.Validate(context.TODO(), attr, objectInterfaces)
+				}
+			})
 		})
 	}
 }

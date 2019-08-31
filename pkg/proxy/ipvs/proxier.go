@@ -471,6 +471,62 @@ func NewProxier(ipt utiliptables.Interface,
 	return proxier, nil
 }
 
+// NewDualStackProxier returns a new Proxier for dual-stack operation
+func NewDualStackProxier(
+	ipt [2]utiliptables.Interface,
+	ipvs utilipvs.Interface,
+	ipset utilipset.Interface,
+	sysctl utilsysctl.Interface,
+	exec utilexec.Interface,
+	syncPeriod time.Duration,
+	minSyncPeriod time.Duration,
+	excludeCIDRs []string,
+	strictARP bool,
+	masqueradeAll bool,
+	masqueradeBit int,
+	clusterCIDR [2]string,
+	hostname string,
+	nodeIP [2]net.IP,
+	recorder record.EventRecorder,
+	healthzServer healthcheck.HealthzUpdater,
+	scheduler string,
+	nodePortAddresses []string,
+) (proxy.Provider, error) {
+
+	safeIpset := newSafeIpset(ipset)
+
+	// Create an ipv4 instance of the single-stack proxier
+	ipv4Proxier, err := NewProxier(ipt[0], ipvs, safeIpset, sysctl,
+		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
+		masqueradeAll, masqueradeBit, clusterCIDR[0], hostname, nodeIP[0],
+		recorder, healthzServer, scheduler, nodePortAddresses)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
+	}
+
+	ipv6Proxier, err := NewProxier(ipt[1], ipvs, safeIpset, sysctl,
+		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
+		masqueradeAll, masqueradeBit, clusterCIDR[1], hostname, nodeIP[1],
+		nil, nil, scheduler, nodePortAddresses)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
+	}
+
+	// Return a meta-proxier that dispatch calls between the two
+	// single-stack proxier instances
+	return NewMetaProxier(ipv4Proxier, ipv6Proxier), nil
+}
+
+func filterCIDRs(wantIPv6 bool, cidrs []string) []string {
+	var filteredCIDRs []string
+	for _, cidr := range cidrs {
+		if utilnet.IsIPv6CIDRString(cidr) == wantIPv6 {
+			filteredCIDRs = append(filteredCIDRs, cidr)
+		}
+	}
+	return filteredCIDRs
+}
+
 // internal struct for string service information
 type serviceInfo struct {
 	*proxy.BaseServiceInfo
@@ -1478,7 +1534,7 @@ func (proxier *Proxier) writeIptablesRules() {
 			}
 			args = append(args,
 				"-m", "comment", "--comment", proxier.ipsetList[set.name].getComment(),
-				"-m", "set", "--match-set", set.name,
+				"-m", "set", "--match-set", proxier.ipsetList[set.name].Name,
 				set.matchType,
 			)
 			writeLine(proxier.natRules, append(args, "-j", set.to)...)
@@ -1489,7 +1545,7 @@ func (proxier *Proxier) writeIptablesRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", proxier.ipsetList[kubeClusterIPSet].getComment(),
-			"-m", "set", "--match-set", kubeClusterIPSet,
+			"-m", "set", "--match-set", proxier.ipsetList[kubeClusterIPSet].Name,
 		)
 		if proxier.masqueradeAll {
 			writeLine(proxier.natRules, append(args, "dst,dst", "-j", string(KubeMarkMasqChain))...)
@@ -1517,7 +1573,7 @@ func (proxier *Proxier) writeIptablesRules() {
 		args = append(args[:0],
 			"-A", string(kubeServicesChain),
 			"-m", "comment", "--comment", proxier.ipsetList[kubeExternalIPSet].getComment(),
-			"-m", "set", "--match-set", kubeExternalIPSet,
+			"-m", "set", "--match-set", proxier.ipsetList[kubeExternalIPSet].Name,
 			"dst,dst",
 		)
 		writeLine(proxier.natRules, append(args, "-j", string(KubeMarkMasqChain))...)
@@ -1611,7 +1667,7 @@ func (proxier *Proxier) acceptIPVSTraffic() {
 			}
 			writeLine(proxier.natRules, []string{
 				"-A", string(kubeServicesChain),
-				"-m", "set", "--match-set", set, matchType,
+				"-m", "set", "--match-set", proxier.ipsetList[set].Name, matchType,
 				"-j", "ACCEPT",
 			}...)
 		}
@@ -1845,9 +1901,14 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 }
 
 func (proxier *Proxier) cleanLegacyService(activeServices map[string]bool, currentServices map[string]*utilipvs.VirtualServer, legacyBindAddrs map[string]bool) {
+	isIPv6 := utilnet.IsIPv6(proxier.nodeIP)
 	for cs := range currentServices {
 		svc := currentServices[cs]
 		if proxier.isIPInExcludeCIDRs(svc.Address) {
+			continue
+		}
+		if utilnet.IsIPv6(svc.Address) != isIPv6 {
+			// Not our family
 			continue
 		}
 		if _, ok := activeServices[cs]; !ok {

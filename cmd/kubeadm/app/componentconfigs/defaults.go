@@ -17,8 +17,9 @@ limitations under the License.
 package componentconfigs
 
 import (
-	"k8s.io/klog"
 	"path/filepath"
+
+	"k8s.io/klog"
 
 	kubeproxyconfigv1alpha1 "k8s.io/kube-proxy/config/v1alpha1"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
@@ -58,6 +59,7 @@ const (
 // DefaultKubeProxyConfiguration assigns default values for the kube-proxy ComponentConfig
 func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	externalproxycfg := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
+	kind := "KubeProxyConfiguration"
 
 	// Do a roundtrip to the external version for defaulting
 	if internalcfg.ComponentConfigs.KubeProxy != nil {
@@ -67,13 +69,13 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration)
 	if externalproxycfg.ClusterCIDR == "" && internalcfg.Networking.PodSubnet != "" {
 		externalproxycfg.ClusterCIDR = internalcfg.Networking.PodSubnet
 	} else if internalcfg.Networking.PodSubnet != "" && externalproxycfg.ClusterCIDR != internalcfg.Networking.PodSubnet {
-		warnDefaultComponentConfigValue(externalproxycfg.Kind, "cluster-cidr", internalcfg.Networking.PodSubnet, externalproxycfg.ClusterCIDR)
+		warnDefaultComponentConfigValue(kind, "clusterCIDR", internalcfg.Networking.PodSubnet, externalproxycfg.ClusterCIDR)
 	}
 
 	if externalproxycfg.ClientConnection.Kubeconfig == "" {
 		externalproxycfg.ClientConnection.Kubeconfig = kubeproxyKubeConfigFileName
 	} else if externalproxycfg.ClientConnection.Kubeconfig != kubeproxyKubeConfigFileName {
-		warnDefaultComponentConfigValue(externalproxycfg.Kind, "kubeconfig", kubeproxyKubeConfigFileName, externalproxycfg.ClientConnection.Kubeconfig)
+		warnDefaultComponentConfigValue(kind, "clientConnection.kubeconfig", kubeproxyKubeConfigFileName, externalproxycfg.ClientConnection.Kubeconfig)
 	}
 
 	// TODO: The following code should be remvoved after dual-stack is GA.
@@ -97,6 +99,7 @@ func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration)
 // DefaultKubeletConfiguration assigns default values for the kubelet ComponentConfig
 func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	externalkubeletcfg := &kubeletconfigv1beta1.KubeletConfiguration{}
+	kind := "KubeletConfiguration"
 
 	// Do a roundtrip to the external version for defaulting
 	if internalcfg.ComponentConfigs.Kubelet != nil {
@@ -106,7 +109,7 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	if externalkubeletcfg.StaticPodPath == "" {
 		externalkubeletcfg.StaticPodPath = kubeadmapiv1beta2.DefaultManifestsDir
 	} else if externalkubeletcfg.StaticPodPath != kubeadmapiv1beta2.DefaultManifestsDir {
-		warnDefaultComponentConfigValue(externalkubeletcfg.Kind, "pod-manifest-path", kubeadmapiv1beta2.DefaultManifestsDir, externalkubeletcfg.StaticPodPath)
+		warnDefaultComponentConfigValue(kind, "staticPodPath", kubeadmapiv1beta2.DefaultManifestsDir, externalkubeletcfg.StaticPodPath)
 	}
 
 	clusterDNS := ""
@@ -120,13 +123,13 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	if externalkubeletcfg.ClusterDNS == nil {
 		externalkubeletcfg.ClusterDNS = []string{clusterDNS}
 	} else if len(externalkubeletcfg.ClusterDNS) != 1 || externalkubeletcfg.ClusterDNS[0] != clusterDNS {
-		warnDefaultComponentConfigValue(externalkubeletcfg.Kind, "cluster-dns", []string{clusterDNS}, externalkubeletcfg.ClusterDNS)
+		warnDefaultComponentConfigValue(kind, "clusterDNS", []string{clusterDNS}, externalkubeletcfg.ClusterDNS)
 	}
 
 	if externalkubeletcfg.ClusterDomain == "" {
 		externalkubeletcfg.ClusterDomain = internalcfg.Networking.DNSDomain
 	} else if internalcfg.Networking.DNSDomain != "" && externalkubeletcfg.ClusterDomain != internalcfg.Networking.DNSDomain {
-		warnDefaultComponentConfigValue(externalkubeletcfg.Kind, "cluster-domain", internalcfg.Networking.DNSDomain, externalkubeletcfg.ClusterDomain)
+		warnDefaultComponentConfigValue(kind, "clusterDomain", internalcfg.Networking.DNSDomain, externalkubeletcfg.ClusterDomain)
 	}
 
 	// Require all clients to the kubelet API to have client certs signed by the cluster CA
@@ -134,13 +137,13 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	if externalkubeletcfg.Authentication.X509.ClientCAFile == "" {
 		externalkubeletcfg.Authentication.X509.ClientCAFile = clientCAFile
 	} else if externalkubeletcfg.Authentication.X509.ClientCAFile != clientCAFile {
-		warnDefaultComponentConfigValue(externalkubeletcfg.Kind, "client-ca-file", clientCAFile, externalkubeletcfg.Authentication.X509.ClientCAFile)
+		warnDefaultComponentConfigValue(kind, "authentication.x509.clientCAFile", clientCAFile, externalkubeletcfg.Authentication.X509.ClientCAFile)
 	}
 
 	if externalkubeletcfg.Authentication.Anonymous.Enabled == nil {
 		externalkubeletcfg.Authentication.Anonymous.Enabled = utilpointer.BoolPtr(kubeletAuthenticationAnonymousEnabled)
 	} else if *externalkubeletcfg.Authentication.Anonymous.Enabled != kubeletAuthenticationAnonymousEnabled {
-		warnDefaultComponentConfigValue(externalkubeletcfg.Kind, "anonymous-auth", kubeletAuthenticationAnonymousEnabled, *externalkubeletcfg.Authentication.Anonymous.Enabled)
+		warnDefaultComponentConfigValue(kind, "authentication.anonymous.enabled", kubeletAuthenticationAnonymousEnabled, *externalkubeletcfg.Authentication.Anonymous.Enabled)
 	}
 
 	// On every client request to the kubelet API, execute a webhook (SubjectAccessReview request) to the API server
@@ -148,36 +151,36 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	if externalkubeletcfg.Authorization.Mode == "" {
 		externalkubeletcfg.Authorization.Mode = kubeletAuthorizationMode
 	} else if externalkubeletcfg.Authorization.Mode != kubeletAuthorizationMode {
-		warnDefaultComponentConfigValue(externalkubeletcfg.Kind, "authorization-mode", kubeletAuthorizationMode, externalkubeletcfg.Authorization.Mode)
+		warnDefaultComponentConfigValue(kind, "authorization.mode", kubeletAuthorizationMode, externalkubeletcfg.Authorization.Mode)
 	}
 
 	// Let clients using other authentication methods like ServiceAccount tokens also access the kubelet API
 	if externalkubeletcfg.Authentication.Webhook.Enabled == nil {
 		externalkubeletcfg.Authentication.Webhook.Enabled = utilpointer.BoolPtr(kubeletAuthenticationWebhookEnabled)
 	} else if *externalkubeletcfg.Authentication.Webhook.Enabled != kubeletAuthenticationWebhookEnabled {
-		warnDefaultComponentConfigValue(externalkubeletcfg.Kind, "authentication-token-webhook", kubeletAuthenticationWebhookEnabled, *externalkubeletcfg.Authentication.Webhook.Enabled)
+		warnDefaultComponentConfigValue(kind, "authentication.webhook.enabled", kubeletAuthenticationWebhookEnabled, *externalkubeletcfg.Authentication.Webhook.Enabled)
 	}
 
 	// Serve a /healthz webserver on localhost:10248 that kubeadm can talk to
 	if externalkubeletcfg.HealthzBindAddress == "" {
 		externalkubeletcfg.HealthzBindAddress = kubeletHealthzBindAddress
 	} else if externalkubeletcfg.HealthzBindAddress != kubeletHealthzBindAddress {
-		warnDefaultComponentConfigValue(externalkubeletcfg.Kind, "healthz-bind-address", kubeletHealthzBindAddress, externalkubeletcfg.HealthzBindAddress)
+		warnDefaultComponentConfigValue(kind, "healthzBindAddress", kubeletHealthzBindAddress, externalkubeletcfg.HealthzBindAddress)
 	}
 
 	if externalkubeletcfg.HealthzPort == nil {
 		externalkubeletcfg.HealthzPort = utilpointer.Int32Ptr(constants.KubeletHealthzPort)
 	} else if *externalkubeletcfg.HealthzPort != constants.KubeletHealthzPort {
-		warnDefaultComponentConfigValue(externalkubeletcfg.Kind, "healthz-port", constants.KubeletHealthzPort, *externalkubeletcfg.HealthzPort)
+		warnDefaultComponentConfigValue(kind, "healthzPort", constants.KubeletHealthzPort, *externalkubeletcfg.HealthzPort)
 	}
 
 	if externalkubeletcfg.ReadOnlyPort != kubeletReadOnlyPort {
-		warnDefaultComponentConfigValue(externalkubeletcfg.Kind, "read-only-port", kubeletReadOnlyPort, externalkubeletcfg.ReadOnlyPort)
+		warnDefaultComponentConfigValue(kind, "readOnlyPort", kubeletReadOnlyPort, externalkubeletcfg.ReadOnlyPort)
 	}
 
-	if externalkubeletcfg.RotateCertificates != kubeletRotateCertificates {
-		warnDefaultComponentConfigValue(externalkubeletcfg.Kind, "rotate-certificates", kubeletRotateCertificates, externalkubeletcfg.RotateCertificates)
-	}
+	// We cannot show a warning for RotateCertificates==false and we must hardcode it to true.
+	// There is no way to determine if the user has set this or not, given the field is a non-pointer.
+	externalkubeletcfg.RotateCertificates = kubeletRotateCertificates
 
 	Scheme.Default(externalkubeletcfg)
 

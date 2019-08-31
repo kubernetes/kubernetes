@@ -37,7 +37,7 @@ import (
 
 var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin]", func() {
 
-	framework.NewDefaultFramework("custom-resource-definition")
+	f := framework.NewDefaultFramework("custom-resource-definition")
 
 	ginkgo.Context("Simple CustomResourceDefinition", func() {
 		/*
@@ -181,6 +181,77 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			expectCondition(patched.Status.Conditions, patchCondition)
 		})
 	})
+
+	/*
+		Release: v1.16
+		Testname: Custom Resource Definition, discovery
+		Description: Fetch /apis, /apis/apiextensions.k8s.io, and /apis/apiextensions.k8s.io/v1 discovery documents,
+		and ensure they indicate CustomResourceDefinition apiextensions.k8s.io/v1 resources are available.
+	*/
+	ginkgo.It("should include custom resource definition resources in discovery documents", func() {
+		{
+			ginkgo.By("fetching the /apis discovery document")
+			apiGroupList := &metav1.APIGroupList{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis").Do().Into(apiGroupList)
+			framework.ExpectNoError(err, "fetching /apis")
+
+			ginkgo.By("finding the apiextensions.k8s.io API group in the /apis discovery document")
+			var group *metav1.APIGroup
+			for _, g := range apiGroupList.Groups {
+				if g.Name == v1.GroupName {
+					group = &g
+					break
+				}
+			}
+			framework.ExpectNotEqual(group, nil, "apiextensions.k8s.io API group not found in /apis discovery document")
+
+			ginkgo.By("finding the apiextensions.k8s.io/v1 API group/version in the /apis discovery document")
+			var version *metav1.GroupVersionForDiscovery
+			for _, v := range group.Versions {
+				if v.Version == v1.SchemeGroupVersion.Version {
+					version = &v
+					break
+				}
+			}
+			framework.ExpectNotEqual(version, nil, "apiextensions.k8s.io/v1 API group version not found in /apis discovery document")
+		}
+
+		{
+			ginkgo.By("fetching the /apis/apiextensions.k8s.io discovery document")
+			group := &metav1.APIGroup{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io").Do().Into(group)
+			framework.ExpectNoError(err, "fetching /apis/apiextensions.k8s.io")
+			framework.ExpectEqual(group.Name, v1.GroupName, "verifying API group name in /apis/apiextensions.k8s.io discovery document")
+
+			ginkgo.By("finding the apiextensions.k8s.io/v1 API group/version in the /apis/apiextensions.k8s.io discovery document")
+			var version *metav1.GroupVersionForDiscovery
+			for _, v := range group.Versions {
+				if v.Version == v1.SchemeGroupVersion.Version {
+					version = &v
+					break
+				}
+			}
+			framework.ExpectNotEqual(version, nil, "apiextensions.k8s.io/v1 API group version not found in /apis/apiextensions.k8s.io discovery document")
+		}
+
+		{
+			ginkgo.By("fetching the /apis/apiextensions.k8s.io/v1 discovery document")
+			apiResourceList := &metav1.APIResourceList{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io/v1").Do().Into(apiResourceList)
+			framework.ExpectNoError(err, "fetching /apis/apiextensions.k8s.io/v1")
+			framework.ExpectEqual(apiResourceList.GroupVersion, v1.SchemeGroupVersion.String(), "verifying API group/version in /apis/apiextensions.k8s.io/v1 discovery document")
+
+			ginkgo.By("finding customresourcedefinitions resources in the /apis/apiextensions.k8s.io/v1 discovery document")
+			var crdResource *metav1.APIResource
+			for i := range apiResourceList.APIResources {
+				if apiResourceList.APIResources[i].Name == "customresourcedefinitions" {
+					crdResource = &apiResourceList.APIResources[i]
+				}
+			}
+			framework.ExpectNotEqual(crdResource, nil, "customresourcedefinitions resource not found in /apis/apiextensions.k8s.io/v1 discovery document")
+		}
+	})
+
 })
 
 func unstructuredToCRD(obj *unstructured.Unstructured) *v1.CustomResourceDefinition {

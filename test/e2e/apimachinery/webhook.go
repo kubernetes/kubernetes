@@ -419,6 +419,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			},
 			Webhooks: []admissionregistrationv1.ValidatingWebhook{
 				newDenyConfigMapWebhookFixture(f, context, servicePort),
+				newValidatingIsReadyWebhookFixture(f, context, servicePort),
 			},
 		})
 		framework.ExpectNoError(err, "Creating validating webhook configuration")
@@ -426,6 +427,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(hook.Name, nil)
 			framework.ExpectNoError(err, "Deleting validating webhook configuration")
 		}()
+		// ensure backend is ready before proceeding
+		waitWebhookConfigurationReady(f)
 		ginkgo.By("Creating a configMap that does not comply to the validation webhook rules")
 		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 			cm := namedNonCompliantConfigMap(string(uuid.NewUUID()), f)
@@ -509,6 +512,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			},
 			Webhooks: []admissionregistrationv1.MutatingWebhook{
 				newMutateConfigMapWebhookFixture(f, context, 1, servicePort),
+				newMutatingIsReadyWebhookFixture(f, context, servicePort),
 			},
 		})
 		framework.ExpectNoError(err, "Creating mutating webhook configuration")
@@ -516,7 +520,8 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(hook.Name, nil)
 			framework.ExpectNoError(err, "Deleting mutating webhook configuration")
 		}()
-
+		// ensure backend is ready before proceeding
+		waitWebhookConfigurationReady(f)
 		hook, err = admissionClient.MutatingWebhookConfigurations().Get(f.UniqueName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Getting mutating webhook configuration")
 		ginkgo.By("Updating a mutating webhook configuration's rules to not include the create operation")
@@ -777,6 +782,18 @@ func deployWebhookAndService(f *framework.Framework, image string, context *cert
 				"-v=4",
 				// Use a non-default port for containers.
 				fmt.Sprintf("--port=%d", containerPort),
+			},
+			ReadinessProbe: &v1.Probe{
+				Handler: v1.Handler{
+					HTTPGet: &v1.HTTPGetAction{
+						Scheme: v1.URISchemeHTTPS,
+						Port:   intstr.FromInt(int(containerPort)),
+						Path:   "/readyz",
+					},
+				},
+				PeriodSeconds:    1,
+				SuccessThreshold: 1,
+				FailureThreshold: 30,
 			},
 			Image: image,
 			Ports: []v1.ContainerPort{{ContainerPort: containerPort}},
@@ -2049,8 +2066,8 @@ func registerValidatingWebhookForCRD(f *framework.Framework, configName string, 
 				},
 				SideEffects:             &sideEffectsNone,
 				AdmissionReviewVersions: []string{"v1", "v1beta1"},
-				// Scope the webhook to just this namespace
-				NamespaceSelector: &metav1.LabelSelector{
+				// Scope the webhook to just this test
+				ObjectSelector: &metav1.LabelSelector{
 					MatchLabels: map[string]string{f.UniqueName: "true"},
 				},
 			},
@@ -2101,6 +2118,9 @@ func testCRDDenyWebhook(f *framework.Framework) {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name + "s." + group,
 			Labels: map[string]string{
+				// this label ensures our object is routed to this test's webhook
+				f.UniqueName: "true",
+				// this is the label the webhook disallows
 				"webhook-e2e-test": "webhook-disallow",
 			},
 		},
@@ -2434,6 +2454,7 @@ func waitWebhookConfigurationReady(f *framework.Framework) error {
 // with "marker" requests via waitWebhookConfigurationReady to wait for a webhook configuration to be ready.
 func newValidatingIsReadyWebhookFixture(f *framework.Framework, context *certContext, servicePort int32) admissionregistrationv1.ValidatingWebhook {
 	sideEffectsNone := admissionregistrationv1.SideEffectClassNone
+	failOpen := admissionregistrationv1.Ignore
 	return admissionregistrationv1.ValidatingWebhook{
 		Name: "validating-is-webhook-configuration-ready.k8s.io",
 		Rules: []admissionregistrationv1.RuleWithOperations{{
@@ -2453,6 +2474,8 @@ func newValidatingIsReadyWebhookFixture(f *framework.Framework, context *certCon
 			},
 			CABundle: context.signingCert,
 		},
+		// network failures while the service network routing is being set up should be ignored by the marker
+		FailurePolicy:           &failOpen,
 		SideEffects:             &sideEffectsNone,
 		AdmissionReviewVersions: []string{"v1", "v1beta1"},
 		// Scope the webhook to just the markers namespace
@@ -2470,6 +2493,7 @@ func newValidatingIsReadyWebhookFixture(f *framework.Framework, context *certCon
 // with "marker" requests via waitWebhookConfigurationReady to wait for a webhook configuration to be ready.
 func newMutatingIsReadyWebhookFixture(f *framework.Framework, context *certContext, servicePort int32) admissionregistrationv1.MutatingWebhook {
 	sideEffectsNone := admissionregistrationv1.SideEffectClassNone
+	failOpen := admissionregistrationv1.Ignore
 	return admissionregistrationv1.MutatingWebhook{
 		Name: "mutating-is-webhook-configuration-ready.k8s.io",
 		Rules: []admissionregistrationv1.RuleWithOperations{{
@@ -2489,6 +2513,8 @@ func newMutatingIsReadyWebhookFixture(f *framework.Framework, context *certConte
 			},
 			CABundle: context.signingCert,
 		},
+		// network failures while the service network routing is being set up should be ignored by the marker
+		FailurePolicy:           &failOpen,
 		SideEffects:             &sideEffectsNone,
 		AdmissionReviewVersions: []string{"v1", "v1beta1"},
 		// Scope the webhook to just the markers namespace

@@ -113,7 +113,7 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 
 	case PolicyStatic:
 		var err error
-		topo, err := topology.Discover(machineInfo, numaNodeInfo)
+		topo, err = topology.Discover(machineInfo, numaNodeInfo)
 		if err != nil {
 			return nil, err
 		}

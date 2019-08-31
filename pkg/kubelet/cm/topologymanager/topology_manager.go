@@ -103,6 +103,9 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 	case PolicyRestricted:
 		policy = NewRestrictedPolicy()
 
+	case PolicySingleNumaNode:
+		policy = NewSingleNumaNodePolicy()
+
 	default:
 		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
 	}
@@ -228,6 +231,11 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 				if !hint.Preferred {
 					preferred = false
 				}
+				// Special case PolicySingleNumaNode to only prefer hints where
+				// all providers have a single NUMA affinity set.
+				if m.policy != nil && m.policy.Name() == PolicySingleNumaNode && hint.NUMANodeAffinity.Count() > 1 {
+					preferred = false
+				}
 				numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
 			}
 		}
@@ -308,7 +316,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	if pod.Status.QOSClass == v1.PodQOSGuaranteed {
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 			result := m.calculateAffinity(*pod, container)
-			admitPod := m.policy.CanAdmitPodResult(result.Preferred)
+			admitPod := m.policy.CanAdmitPodResult(&result)
 			if !admitPod.Admit {
 				return admitPod
 			}

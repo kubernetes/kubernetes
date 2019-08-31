@@ -443,6 +443,9 @@ func buildGenericConfig(
 	if lastErr != nil {
 		return
 	}
+	if genericConfig.EgressSelector != nil {
+		storageFactory.StorageConfig.Transport.EgressLookup = genericConfig.EgressSelector.Lookup
+	}
 	if lastErr = s.Etcd.ApplyWithStorageFactoryTo(storageFactory, genericConfig); lastErr != nil {
 		return
 	}

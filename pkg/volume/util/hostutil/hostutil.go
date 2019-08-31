@@ -14,14 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// TODO(thockin): This whole pkg is pretty linux-centric.  As soon as we have
-// an alternate platform, we will need to abstract further.
-
-package mount
+package hostutil
 
 import (
 	"fmt"
 	"os"
+
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 // FileType enumerates the known set of possible file types.
@@ -51,7 +50,7 @@ type HostUtils interface {
 	PathIsDevice(pathname string) (bool, error)
 	// GetDeviceNameFromMount finds the device name by checking the mount path
 	// to get the global mount path within its plugin directory.
-	GetDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error)
+	GetDeviceNameFromMount(mounter mount.Interface, mountPath, pluginMountDir string) (string, error)
 	// MakeRShared checks that given path is on a mount with 'rshared' mount
 	// propagation. If not, it bind-mounts the path as rshared.
 	MakeRShared(path string) error
@@ -72,8 +71,8 @@ type HostUtils interface {
 }
 
 // Compile-time check to ensure all HostUtil implementations satisfy
-// the HostUtils Interface.
-var _ HostUtils = &hostUtil{}
+// the Interface.
+var _ HostUtils = &HostUtil{}
 
 // getFileType checks for file/directory/socket and block/character devices.
 func getFileType(pathname string) (FileType, error) {

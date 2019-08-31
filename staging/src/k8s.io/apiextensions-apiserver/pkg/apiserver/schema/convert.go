@@ -244,6 +244,8 @@ func newExtensions(s *apiextensions.JSONSchemaProps) (*Extensions, error) {
 	ret := &Extensions{
 		XEmbeddedResource: s.XEmbeddedResource,
 		XIntOrString:      s.XIntOrString,
+		XListMapKeys:      s.XListMapKeys,
+		XListType:         s.XListType,
 	}
 
 	if s.XPreserveUnknownFields != nil {

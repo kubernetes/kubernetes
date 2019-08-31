@@ -418,6 +418,7 @@ const (
 
 	// owner: @wk8
 	// alpha: v1.14
+	// beta: v1.16
 	//
 	// Enables GMSA support for Windows workloads.
 	WindowsGMSA featuregate.Feature = "WindowsGMSA"
@@ -495,6 +496,13 @@ const (
 	//
 	// Enables the startupProbe in kubelet worker.
 	StartupProbe featuregate.Feature = "StartupProbe"
+
+	// owner @deads2k
+	// deprecated: v1.16
+	//
+	// Enable the aggregated discovery timeout to ensure client responsiveness. Note this feature is present
+	// only for backward compatibility, it will be removed in the 1.17 release.
+	EnableAggregatedDiscoveryTimeout featuregate.Feature = "EnableAggregatedDiscoveryTimeout"
 )
 
 func init() {
@@ -565,7 +573,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	ProcMountType:                       {Default: false, PreRelease: featuregate.Alpha},
 	TTLAfterFinished:                    {Default: false, PreRelease: featuregate.Alpha},
 	KubeletPodResources:                 {Default: true, PreRelease: featuregate.Beta},
-	WindowsGMSA:                         {Default: false, PreRelease: featuregate.Alpha},
+	WindowsGMSA:                         {Default: true, PreRelease: featuregate.Beta},
 	WindowsRunAsUserName:                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceLoadBalancerFinalizer:        {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
@@ -596,6 +604,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	apiextensionsfeatures.CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.Beta},
+
+	EnableAggregatedDiscoveryTimeout: {Default: true, PreRelease: featuregate.Deprecated},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

@@ -18,6 +18,7 @@ package cp
 
 import (
 	"archive/tar"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -27,6 +28,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/lithammer/dedent"
+	"github.com/spf13/cobra"
+
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -34,11 +38,6 @@ import (
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-
-	"bytes"
-
-	"github.com/lithammer/dedent"
-	"github.com/spf13/cobra"
 )
 
 var (

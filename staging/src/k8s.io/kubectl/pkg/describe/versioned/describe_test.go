@@ -29,6 +29,7 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -2579,6 +2580,14 @@ func TestDescribeEvents(t *testing.T) {
 				},
 			}, events),
 		},
+		"EndpointSliceDescriber": &EndpointSliceDescriber{
+			fake.NewSimpleClientset(&discoveryv1alpha1.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "bar",
+					Namespace: "foo",
+				},
+			}, events),
+		},
 		// TODO(jchaloup): add tests for:
 		// - IngressDescriber
 		// - JobDescriber
@@ -3234,6 +3243,83 @@ func TestDescribeStatefulSet(t *testing.T) {
 			t.Errorf("unexpected out: %s", out)
 			break
 		}
+	}
+}
+
+func TestDescribeEndpointSlice(t *testing.T) {
+	addressTypeIP := discoveryv1alpha1.AddressTypeIP
+	protocolTCP := corev1.ProtocolTCP
+	port80 := int32(80)
+
+	fake := fake.NewSimpleClientset(&discoveryv1alpha1.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "foo.123",
+			Namespace: "bar",
+		},
+		AddressType: &addressTypeIP,
+		Endpoints: []discoveryv1alpha1.Endpoint{
+			{
+				Addresses:  []string{"1.2.3.4", "1.2.3.5"},
+				Conditions: discoveryv1alpha1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-123"},
+				Topology: map[string]string{
+					"topology.kubernetes.io/zone":   "us-central1-a",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+			}, {
+				Addresses:  []string{"1.2.3.6", "1.2.3.7"},
+				Conditions: discoveryv1alpha1.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				TargetRef:  &corev1.ObjectReference{Kind: "Pod", Name: "test-124"},
+				Topology: map[string]string{
+					"topology.kubernetes.io/zone":   "us-central1-b",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+			},
+		},
+		Ports: []discoveryv1alpha1.EndpointPort{
+			{
+				Protocol: &protocolTCP,
+				Port:     &port80,
+			},
+		},
+	})
+
+	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
+	d := EndpointSliceDescriber{c}
+	out, err := d.Describe("bar", "foo.123", describe.DescriberSettings{ShowEvents: true})
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	expectedOut := `Name:         foo.123
+Namespace:    bar
+Labels:       <none>
+Annotations:  <none>
+AddressType:  IP
+Ports:
+  Name     Port  Protocol
+  ----     ----  --------
+  <unset>  80    TCP
+Endpoints:
+  - Addresses:  1.2.3.4,1.2.3.5
+    Conditions:
+      Ready:    true
+    Hostname:   <unset>
+    TargetRef:  Pod/test-123
+    Topology:   topology.kubernetes.io/region=us-central1
+                topology.kubernetes.io/zone=us-central1-a
+  - Addresses:  1.2.3.6,1.2.3.7
+    Conditions:
+      Ready:    true
+    Hostname:   <unset>
+    TargetRef:  Pod/test-124
+    Topology:   topology.kubernetes.io/region=us-central1
+                topology.kubernetes.io/zone=us-central1-b
+Events:         <none>` + "\n"
+
+	if out != expectedOut {
+		t.Logf(out)
+		t.Errorf("expected : %q\n but got output:\n %q", expectedOut, out)
 	}
 }
 

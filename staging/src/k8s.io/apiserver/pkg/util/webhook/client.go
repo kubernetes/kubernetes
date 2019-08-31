@@ -136,6 +136,11 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 		}
 		cfg.TLSClientConfig.CAData = append(cfg.TLSClientConfig.CAData, cc.CABundle...)
 
+		// Use http/1.1 instead of http/2.
+		// This is a workaround for http/2-enabled clients not load-balancing concurrent requests to multiple backends.
+		// See http://issue.k8s.io/75791 for details.
+		cfg.NextProtos = []string{"http/1.1"}
+
 		cfg.ContentConfig.NegotiatedSerializer = cm.negotiatedSerializer
 		cfg.ContentConfig.ContentType = runtime.ContentTypeJSON
 		client, err := rest.UnversionedRESTClientFor(cfg)
