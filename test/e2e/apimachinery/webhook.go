@@ -778,6 +778,18 @@ func deployWebhookAndService(f *framework.Framework, image string, context *cert
 				// Use a non-default port for containers.
 				fmt.Sprintf("--port=%d", containerPort),
 			},
+			ReadinessProbe: &v1.Probe{
+				Handler: v1.Handler{
+					HTTPGet: &v1.HTTPGetAction{
+						Scheme: v1.URISchemeHTTPS,
+						Port:   intstr.FromInt(int(containerPort)),
+						Path:   "/readyz",
+					},
+				},
+				PeriodSeconds:    1,
+				SuccessThreshold: 1,
+				FailureThreshold: 30,
+			},
 			Image: image,
 			Ports: []v1.ContainerPort{{ContainerPort: containerPort}},
 		},
