@@ -556,7 +556,7 @@ func TestValidateContainerFailures(t *testing.T) {
 	}
 
 	failPrivPod := defaultPod()
-	var priv bool = true
+	var priv = true
 	failPrivPod.Spec.Containers[0].SecurityContext.Privileged = &priv
 
 	failProcMountPod := defaultPod()
@@ -1043,7 +1043,7 @@ func TestValidateContainerSuccess(t *testing.T) {
 	privPSP := defaultPSP()
 	privPSP.Spec.Privileged = true
 	privPod := defaultPod()
-	var priv bool = true
+	var priv = true
 	privPod.Spec.Containers[0].SecurityContext.Privileged = &priv
 
 	capsPSP := defaultPSP()
@@ -1275,7 +1275,7 @@ func defaultNamedPSP(name string) *policy.PodSecurityPolicy {
 }
 
 func defaultPod() *api.Pod {
-	var notPriv bool = false
+	var notPriv = false
 	return &api.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{},
@@ -1299,7 +1299,7 @@ func defaultPod() *api.Pod {
 }
 
 func defaultV1Pod() *v1.Pod {
-	var notPriv bool = false
+	var notPriv = false
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{},
