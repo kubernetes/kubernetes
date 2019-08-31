@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -167,6 +168,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 			return
 		}
 		defer testcrd.CleanUp()
+		waitWebhookConversionReady(f, testcrd.Crd, testcrd.DynamicClients, "v2")
 		testCustomResourceConversionWebhook(f, testcrd.Crd, testcrd.DynamicClients)
 	})
 
@@ -201,6 +203,7 @@ var _ = SIGDescribe("CustomResourceConversionWebhook [Privileged:ClusterAdmin]",
 			return
 		}
 		defer testcrd.CleanUp()
+		waitWebhookConversionReady(f, testcrd.Crd, testcrd.DynamicClients, "v2")
 		testCRListConversion(f, testcrd)
 	})
 })
@@ -484,4 +487,30 @@ func testCRListConversion(f *framework.Framework, testCrd *crd.TestCrd) {
 		(list.Items[0].GetName() == name2 && list.Items[1].GetName() == name1)).To(gomega.BeTrue())
 	verifyV2Object(f, crd, &list.Items[0])
 	verifyV2Object(f, crd, &list.Items[1])
+}
+
+// waitWebhookConversionReady sends stub custom resource creation requests requiring conversion until one succeeds.
+func waitWebhookConversionReady(f *framework.Framework, crd *apiextensionsv1.CustomResourceDefinition, customResourceClients map[string]dynamic.ResourceInterface, version string) {
+	framework.ExpectNoError(wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
+		crInstance := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"kind":       crd.Spec.Names.Kind,
+				"apiVersion": crd.Spec.Group + "/" + version,
+				"metadata": map[string]interface{}{
+					"name":      f.UniqueName,
+					"namespace": f.Namespace.Name,
+				},
+			},
+		}
+		_, err := customResourceClients[version].Create(crInstance, metav1.CreateOptions{})
+		if err != nil {
+			// tolerate clusters that do not set --enable-aggregator-routing and have to wait for kube-proxy
+			// to program the service network, during which conversion requests return errors
+			e2elog.Logf("error waiting for conversion to succeed during setup: %v", err)
+			return false, nil
+		}
+
+		framework.ExpectNoError(customResourceClients[version].Delete(crInstance.GetName(), nil), "cleaning up stub object")
+		return true, nil
+	}))
 }
