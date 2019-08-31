@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -1188,9 +1189,14 @@ func TestPodTimestamp(t *testing.T) {
 		},
 	}
 
+	fwk, err := framework.NewFramework(schedulerframework.NewRegistry(), nil, nil)
+	if err != nil {
+		t.Errorf("Failed to NewFramework: %v", err)
+	}
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), fwk)
 			var podInfoList []*framework.PodInfo
 
 			for i, op := range test.operations {
@@ -1318,10 +1324,15 @@ func TestPendingPodsMetric(t *testing.T) {
 		metrics.UnschedulablePods().Set(0)
 	}
 
+	fwk, err := framework.NewFramework(schedulerframework.NewRegistry(), nil, nil)
+	if err != nil {
+		t.Errorf("Failed to NewFramework: %v", err)
+	}
+
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			resetMetrics()
-			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+			queue := NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), fwk)
 			for i, op := range test.operations {
 				for _, pInfo := range test.operands[i] {
 					op(queue, pInfo)

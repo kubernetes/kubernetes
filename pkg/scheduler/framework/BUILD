@@ -11,7 +11,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/scheduler/framework/plugins/examples:all-srcs",
+        "//pkg/scheduler/framework/plugins:all-srcs",
         "//pkg/scheduler/framework/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
@@ -23,5 +23,8 @@ go_library(
     srcs = ["register.go"],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework",
     visibility = ["//visibility:public"],
-    deps = ["//pkg/scheduler/framework/v1alpha1:go_default_library"],
+    deps = [
+        "//pkg/scheduler/framework/plugins/queuesort:go_default_library",
+        "//pkg/scheduler/framework/v1alpha1:go_default_library",
+    ],
 )

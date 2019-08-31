@@ -17,6 +17,7 @@ limitations under the License.
 package framework
 
 import (
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/queuesort"
 	"k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -33,5 +34,6 @@ func NewRegistry() v1alpha1.Registry {
 		//  stateful_plugin.Name: stateful.NewStatefulMultipointExample,
 		//  fooplugin.Name: fooplugin.New,
 		// }
+		queuesort.Name: queuesort.New,
 	}
 }

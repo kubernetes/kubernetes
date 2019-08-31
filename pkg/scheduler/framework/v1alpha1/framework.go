@@ -27,6 +27,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -67,6 +68,9 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		pluginNameToWeightMap: make(map[string]int),
 		waitingPods:           newWaitingPodsMap(),
 	}
+
+	plugins = setDefaultPluginSetIfNeeded(plugins)
+
 	if plugins == nil {
 		return f, nil
 	}
@@ -271,6 +275,24 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	}
 
 	return f, nil
+}
+
+// setDefaultPluginSetIfNeed will set default enable plugins if we need it and it is empty.
+func setDefaultPluginSetIfNeeded(plugins *config.Plugins) *config.Plugins {
+	if plugins == nil {
+		plugins = &config.Plugins{}
+	}
+
+	if plugins.QueueSort == nil {
+		plugins.QueueSort = &config.PluginSet{}
+	}
+	if len(plugins.QueueSort.Enabled) == 0 {
+		plugins.QueueSort.Enabled = append(plugins.QueueSort.Enabled,
+			config.Plugin{Name: frameworkplugins.DefaultQueueSortPluginName})
+		// TODO: need we check whether the default queue sort plugin has been disabled?
+	}
+
+	return plugins
 }
 
 // QueueSortFunc returns the function to sort pods in scheduling queue

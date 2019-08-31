@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
@@ -148,17 +149,6 @@ func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
 	}
 }
 
-// activeQComp is the function used by the activeQ heap algorithm to sort pods.
-// It sorts pods based on their priority. When priorities are equal, it uses
-// PodInfo.timestamp.
-func activeQComp(podInfo1, podInfo2 interface{}) bool {
-	pInfo1 := podInfo1.(*framework.PodInfo)
-	pInfo2 := podInfo2.(*framework.PodInfo)
-	prio1 := util.GetPodPriority(pInfo1.Pod)
-	prio2 := util.GetPodPriority(pInfo2.Pod)
-	return (prio1 > prio2) || (prio1 == prio2 && pInfo1.Timestamp.Before(pInfo2.Timestamp))
-}
-
 // NewPriorityQueue creates a PriorityQueue object.
 func NewPriorityQueue(stop <-chan struct{}, fwk framework.Framework) *PriorityQueue {
 	return NewPriorityQueueWithClock(stop, util.RealClock{}, fwk)
@@ -166,15 +156,18 @@ func NewPriorityQueue(stop <-chan struct{}, fwk framework.Framework) *PriorityQu
 
 // NewPriorityQueueWithClock creates a PriorityQueue which uses the passed clock for time.
 func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, fwk framework.Framework) *PriorityQueue {
-	comp := activeQComp
-	if fwk != nil {
-		if queueSortFunc := fwk.QueueSortFunc(); queueSortFunc != nil {
-			comp = func(podInfo1, podInfo2 interface{}) bool {
-				pInfo1 := podInfo1.(*framework.PodInfo)
-				pInfo2 := podInfo2.(*framework.PodInfo)
+	// TODO: fwk could be nil only for tests. After cleaning up those tons of tests, we could remove it.
+	if fwk == nil {
+		fwk, _ = framework.NewFramework(schedulerframework.NewRegistry(), nil, nil)
+	}
 
-				return queueSortFunc(pInfo1, pInfo2)
-			}
+	var comp func(podInfo1, podInfo2 interface{}) bool
+	if queueSortFunc := fwk.QueueSortFunc(); queueSortFunc != nil {
+		comp = func(podInfo1, podInfo2 interface{}) bool {
+			pInfo1 := podInfo1.(*framework.PodInfo)
+			pInfo2 := podInfo2.(*framework.PodInfo)
+
+			return queueSortFunc(pInfo1, pInfo2)
 		}
 	}
 
