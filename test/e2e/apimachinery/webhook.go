@@ -427,8 +427,11 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().Delete(hook.Name, nil)
 			framework.ExpectNoError(err, "Deleting validating webhook configuration")
 		}()
+
 		// ensure backend is ready before proceeding
-		waitWebhookConfigurationReady(f)
+		err = waitWebhookConfigurationReady(f)
+		framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
+
 		ginkgo.By("Creating a configMap that does not comply to the validation webhook rules")
 		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
 			cm := namedNonCompliantConfigMap(string(uuid.NewUUID()), f)
@@ -520,8 +523,11 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 			err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().Delete(hook.Name, nil)
 			framework.ExpectNoError(err, "Deleting mutating webhook configuration")
 		}()
+
 		// ensure backend is ready before proceeding
-		waitWebhookConfigurationReady(f)
+		err = waitWebhookConfigurationReady(f)
+		framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
+
 		hook, err = admissionClient.MutatingWebhookConfigurations().Get(f.UniqueName, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Getting mutating webhook configuration")
 		ginkgo.By("Updating a mutating webhook configuration's rules to not include the create operation")
@@ -586,6 +592,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 				},
 				Webhooks: []admissionregistrationv1.ValidatingWebhook{
 					newDenyConfigMapWebhookFixture(f, context, servicePort),
+					newValidatingIsReadyWebhookFixture(f, context, servicePort),
 				},
 			})
 			framework.ExpectNoError(err, "Creating validating webhook configuration")
@@ -596,6 +603,10 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		list, err := client.AdmissionregistrationV1().ValidatingWebhookConfigurations().List(selectorListOpts)
 		framework.ExpectNoError(err, "Listing validating webhook configurations")
 		framework.ExpectEqual(len(list.Items), testListSize)
+
+		// ensure backend is ready before proceeding
+		err = waitWebhookConfigurationReady(f)
+		framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
 
 		ginkgo.By("Creating a configMap that does not comply to the validation webhook rules")
 		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
@@ -655,6 +666,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 				},
 				Webhooks: []admissionregistrationv1.MutatingWebhook{
 					newMutateConfigMapWebhookFixture(f, context, 1, servicePort),
+					newMutatingIsReadyWebhookFixture(f, context, servicePort),
 				},
 			})
 			framework.ExpectNoError(err, "Creating mutating webhook configuration")
@@ -665,6 +677,10 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		list, err := client.AdmissionregistrationV1().MutatingWebhookConfigurations().List(selectorListOpts)
 		framework.ExpectNoError(err, "Listing mutating webhook configurations")
 		framework.ExpectEqual(len(list.Items), testListSize)
+
+		// ensure backend is ready before proceeding
+		err = waitWebhookConfigurationReady(f)
+		framework.ExpectNoError(err, "waiting for webhook configuration to be ready")
 
 		ginkgo.By("Creating a configMap that should be mutated")
 		err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, func() (bool, error) {
