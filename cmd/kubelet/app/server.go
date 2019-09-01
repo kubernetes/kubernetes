@@ -531,15 +531,11 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		}
 	}
 
-	hostName, err := nodeutil.GetHostname(s.HostnameOverride)
+	nodeNameDetail, err := getNodeNameDetails(s.HostnameOverride, kubeDeps)
 	if err != nil {
 		return err
 	}
-	nodeName, err := getNodeName(kubeDeps.Cloud, hostName)
-	if err != nil {
-		return err
-	}
-
+	nodeName := nodeNameDetail.NodeName
 	// if in standalone mode, indicate as much by setting all clients to nil
 	switch {
 	case standaloneMode:
@@ -717,7 +713,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		klog.Warning(err)
 	}
 
-	if err := RunKubelet(s, kubeDeps, s.RunOnce); err != nil {
+	if err := RunKubelet(s, kubeDeps, s.RunOnce, nodeNameDetail); err != nil {
 		return err
 	}
 
@@ -878,6 +874,18 @@ func kubeClientConfigOverrides(s *options.KubeletServer, clientConfig *restclien
 	clientConfig.Burst = int(s.KubeAPIBurst)
 }
 
+func getNodeNameDetails(hostnameOverride string, kubeDeps *kubelet.Dependencies) (*types.NodeNameDetail, error) {
+	hostName, err := nodeutil.GetHostname(hostnameOverride)
+	if err != nil {
+		return nil, err
+	}
+	nodeName, err := getNodeName(kubeDeps.Cloud, hostName)
+	if err != nil {
+		return nil, err
+	}
+	return &types.NodeNameDetail{HostnameOverride: hostnameOverride, HostName: hostName, NodeName: nodeName}, nil
+}
+
 // getNodeName returns the node name according to the cloud provider
 // if cloud provider is specified. Otherwise, returns the hostname of the node.
 func getNodeName(cloud cloudprovider.Interface, hostname string) (types.NodeName, error) {
@@ -986,18 +994,19 @@ func setContentTypeForClient(cfg *restclient.Config, contentType string) {
 //   2 Kubelet binary
 //   3 Standalone 'kubernetes' binary
 // Eventually, #2 will be replaced with instances of #3
-func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencies, runOnce bool) error {
-	hostname, err := nodeutil.GetHostname(kubeServer.HostnameOverride)
-	if err != nil {
-		return err
+func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencies, runOnce bool, nodeNameDetail *types.NodeNameDetail) error {
+
+	needCalculateNodeName := nodeNameDetail == nil
+	if needCalculateNodeName {
+		nodeNames, err := getNodeNameDetails(kubeServer.HostnameOverride, kubeDeps)
+		if err != nil {
+			return err
+		}
+		nodeNameDetail = nodeNames
 	}
-	// Query the cloud provider for our node name, default to hostname if kubeDeps.Cloud == nil
-	nodeName, err := getNodeName(kubeDeps.Cloud, hostname)
-	if err != nil {
-		return err
-	}
+
 	// Setup event recorder if required.
-	makeEventRecorder(kubeDeps, nodeName)
+	makeEventRecorder(kubeDeps, nodeNameDetail.NodeName)
 
 	capabilities.Initialize(capabilities.Capabilities{
 		AllowPrivileged: true,
@@ -1015,7 +1024,7 @@ func RunKubelet(kubeServer *options.KubeletServer, kubeDeps *kubelet.Dependencie
 		&kubeServer.ContainerRuntimeOptions,
 		kubeServer.ContainerRuntime,
 		kubeServer.RuntimeCgroups,
-		kubeServer.HostnameOverride,
+		nodeNameDetail,
 		kubeServer.NodeIP,
 		kubeServer.ProviderID,
 		kubeServer.CloudProvider,
@@ -1091,7 +1100,7 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	crOptions *config.ContainerRuntimeOptions,
 	containerRuntime string,
 	runtimeCgroups string,
-	hostnameOverride string,
+	nodeNameDetail *types.NodeNameDetail,
 	nodeIP string,
 	providerID string,
 	cloudProvider string,
@@ -1125,7 +1134,7 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		crOptions,
 		containerRuntime,
 		runtimeCgroups,
-		hostnameOverride,
+		nodeNameDetail,
 		nodeIP,
 		providerID,
 		cloudProvider,

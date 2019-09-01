@@ -40,4 +40,12 @@ package types
 //   For AWS, the InstanceID is not yet suitable for use as a Node.Name, so we actually use the
 //   PrivateDnsName for the Node.Name.  And this is _not_ always the same as the hostname: if
 //   we are using a custom DHCP domain it won't be.
+// * HostnameOverride is the hostname used to identify the kubelet instead of the actual hostname.
+
 type NodeName string
+
+type NodeNameDetail struct {
+	NodeName NodeName
+	HostName      string
+	HostnameOverride string
+}

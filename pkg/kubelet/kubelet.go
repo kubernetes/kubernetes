@@ -17,7 +17,6 @@ limitations under the License.
 package kubelet
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"math"
@@ -112,7 +111,6 @@ import (
 	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilipt "k8s.io/kubernetes/pkg/util/iptables"
 	"k8s.io/kubernetes/pkg/util/mount"
-	nodeutil "k8s.io/kubernetes/pkg/util/node"
 	"k8s.io/kubernetes/pkg/util/oom"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/volume"
@@ -337,7 +335,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	crOptions *config.ContainerRuntimeOptions,
 	containerRuntime string,
 	runtimeCgroups string,
-	hostnameOverride string,
+	nodeNameDetail *types.NodeNameDetail,
 	nodeIP string,
 	providerID string,
 	cloudProvider string,
@@ -382,27 +380,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
-	hostname, err := nodeutil.GetHostname(hostnameOverride)
-	if err != nil {
-		return nil, err
-	}
-	// Query the cloud provider for our node name, default to hostname
-	nodeName := types.NodeName(hostname)
-	if kubeDeps.Cloud != nil {
-		var err error
-		instances, ok := kubeDeps.Cloud.Instances()
-		if !ok {
-			return nil, fmt.Errorf("failed to get instances from cloud provider")
-		}
-
-		nodeName, err = instances.CurrentNodeName(context.TODO(), hostname)
-		if err != nil {
-			return nil, fmt.Errorf("error fetching current instance name from cloud provider: %v", err)
-		}
-
-		klog.V(2).Infof("cloud provider determined current node name to be %s", nodeName)
-	}
-
+	nodeName := nodeNameDetail.NodeName
 	if kubeDeps.PodConfig == nil {
 		var err error
 		kubeDeps.PodConfig, err = makePodSourceConfig(kubeCfg, kubeDeps, nodeName, bootstrapCheckpointPath)
@@ -493,8 +471,8 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	}
 
 	klet := &Kubelet{
-		hostname:                                hostname,
-		hostnameOverridden:                      len(hostnameOverride) > 0,
+		hostname:                                nodeNameDetail.HostName,
+		hostnameOverridden:                      len(nodeNameDetail.HostnameOverride) > 0,
 		nodeName:                                nodeName,
 		kubeClient:                              kubeDeps.KubeClient,
 		heartbeatClient:                         kubeDeps.HeartbeatClient,
