@@ -208,11 +208,8 @@ func validateIngressTLS(spec *networking.IngressSpec, fldPath *field.Path) field
 // ValidateIngressSpec tests if required fields in the IngressSpec are set.
 func ValidateIngressSpec(spec *networking.IngressSpec, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
-	// TODO: Is a default backend mandatory?
 	if spec.Backend != nil {
 		allErrs = append(allErrs, validateIngressBackend(spec.Backend, fldPath.Child("backend"))...)
-	} else if len(spec.Rules) == 0 {
-		allErrs = append(allErrs, field.Invalid(fldPath, spec.Rules, "either `backend` or `rules` must be specified"))
 	}
 	if len(spec.Rules) > 0 {
 		allErrs = append(allErrs, validateIngressRules(spec.Rules, fldPath.Child("rules"))...)

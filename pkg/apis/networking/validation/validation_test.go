@@ -838,6 +838,13 @@ func TestValidateIngress(t *testing.T) {
 			}
 		}
 	}
+
+	backendLess := newValid()
+	backendLess.Spec.Backend = nil
+	err := ValidateIngress(&backendLess)
+	if len(err) != 0 {
+		t.Errorf("unexpected error(s): %v", err)
+	}
 }
 
 func TestValidateIngressTLS(t *testing.T) {
