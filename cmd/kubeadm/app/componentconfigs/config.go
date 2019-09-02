@@ -18,7 +18,9 @@ package componentconfigs
 
 import (
 	"github.com/pkg/errors"
+	"k8s.io/klog"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/version"
@@ -63,6 +65,13 @@ func GetFromKubeProxyConfigMap(client clientset.Interface, version *version.Vers
 	// Read the ConfigMap from the cluster
 	kubeproxyCfg, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, kubeadmconstants.KubeProxyConfigMap)
 	if err != nil {
+		// The Kube-Proxy config map may be non-existent, because the user has decided to manage it by themselves
+		// or to use other proxy solution. It may also be forbidden - if the kube-proxy phase was skipped we have neither
+		// the config map, nor the RBAC rules allowing join access to it.
+		if apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
+			klog.Warningf("Warning: No kube-proxy config is loaded. Continuing without it: %v", err)
+			return nil, nil
+		}
 		return nil, err
 	}
 
