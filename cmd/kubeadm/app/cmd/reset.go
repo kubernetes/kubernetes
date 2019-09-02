@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 )
@@ -103,7 +102,6 @@ func newResetData(cmd *cobra.Command, options *resetOptions, in io.Reader, out i
 	if err != nil {
 		return nil, err
 	}
-	kubeadmutil.CheckErr(err)
 	if cfg != nil {
 		// Also set the union of pre-flight errors to InitConfiguration, to provide a consistent view of the runtime configuration:
 		cfg.NodeRegistration.IgnorePreflightErrors = ignorePreflightErrorsSet.List()
@@ -166,12 +164,16 @@ func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 	cmd := &cobra.Command{
 		Use:   "reset",
 		Short: "Performs a best effort revert of changes made to this host by 'kubeadm init' or 'kubeadm join'",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := resetRunner.InitData(args)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			err = resetRunner.Run(args)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			// Then clean contents from the stateful kubelet, etcd and cni directories
 			data := c.(*resetData)
@@ -179,6 +181,7 @@ func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 
 			// Output help text instructing user how to remove iptables rules
 			fmt.Print(iptablesCleanupInstructions)
+			return nil
 		},
 	}
 

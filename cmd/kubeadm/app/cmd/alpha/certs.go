@@ -35,7 +35,6 @@ import (
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
 )
@@ -93,10 +92,13 @@ func NewCmdCertificateKey() *cobra.Command {
 		Short: "Generate certificate keys",
 		Long:  certificateKeyLongDesc,
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			key, err := copycerts.CreateCertificateKey()
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 			fmt.Println(key)
+			return nil
 		},
 	}
 }
@@ -137,10 +139,12 @@ func getRenewSubCommands(kdir string) []*cobra.Command {
 	// Get a renewal manager for a generic Cluster configuration, that is used only for getting
 	// the list of certificates for building subcommands
 	rm, err := renewal.NewManager(&kubeadmapi.ClusterConfiguration{}, "")
-	kubeadmutil.CheckErr(err)
+	if err != nil {
+		return nil
+	}
 
 	cmdList := []*cobra.Command{}
-	funcList := []func(){}
+	funcList := []func() error{}
 
 	for _, handler := range rm.Certificates() {
 		// get the cobra.Command skeleton for this command
@@ -151,11 +155,13 @@ func getRenewSubCommands(kdir string) []*cobra.Command {
 		}
 		addRenewFlags(cmd, flags)
 		// get the implementation of renewing this certificate
-		renewalFunc := func(handler *renewal.CertificateRenewHandler) func() {
-			return func() { renewCert(flags, kdir, handler) }
+		renewalFunc := func(handler *renewal.CertificateRenewHandler) func() error {
+			return func() error {
+				return renewCert(flags, kdir, handler)
+			}
 		}(handler)
 		// install the implementation into the command
-		cmd.Run = func(*cobra.Command, []string) { renewalFunc() }
+		cmd.RunE = func(*cobra.Command, []string) error { return renewalFunc() }
 		cmdList = append(cmdList, cmd)
 		// Collect renewal functions for `renew all`
 		funcList = append(funcList, renewalFunc)
@@ -165,10 +171,13 @@ func getRenewSubCommands(kdir string) []*cobra.Command {
 		Use:   "all",
 		Short: "Renew all available certificates",
 		Long:  allLongDesc,
-		Run: func(*cobra.Command, []string) {
+		RunE: func(*cobra.Command, []string) error {
 			for _, f := range funcList {
-				f()
+				if err := f(); err != nil {
+					return err
+				}
 			}
+			return nil
 		},
 	}
 	addRenewFlags(allCmd, flags)
@@ -186,23 +195,25 @@ func addRenewFlags(cmd *cobra.Command, flags *renewFlags) {
 	cmd.Flags().BoolVar(&flags.useAPI, "use-api", flags.useAPI, "Use the Kubernetes certificate API to renew certificates")
 }
 
-func renewCert(flags *renewFlags, kdir string, handler *renewal.CertificateRenewHandler) {
+func renewCert(flags *renewFlags, kdir string, handler *renewal.CertificateRenewHandler) error {
 	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(flags.cfgPath, &kubeadmapiv1beta2.InitConfiguration{}, &flags.cfg)
-	kubeadmutil.CheckErr(err)
+	if err != nil {
+		return err
+	}
 
 	// Get a renewal manager for the given cluster configuration
 	rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
-	kubeadmutil.CheckErr(err)
+	if err != nil {
+		return err
+	}
 
 	// if the renewal operation is set to generate CSR request only
 	if flags.csrOnly {
 		// checks a path for storing CSR request is given
 		if flags.csrPath == "" {
-			kubeadmutil.CheckErr(errors.New("please provide a path where CSR request should be stored"))
+			return errors.New("please provide a path where CSR request should be stored")
 		}
-		err := rm.CreateRenewCSR(handler.Name, flags.csrPath)
-		kubeadmutil.CheckErr(err)
-		return
+		return rm.CreateRenewCSR(handler.Name, flags.csrPath)
 	}
 
 	// otherwise, the renewal operation has to actually renew a certificate
@@ -212,21 +223,27 @@ func renewCert(flags *renewFlags, kdir string, handler *renewal.CertificateRenew
 		// renew using K8s certificate API
 		kubeConfigPath := cmdutil.GetKubeConfigPath(flags.kubeconfigPath)
 		client, err := kubeconfigutil.ClientSetFromFile(kubeConfigPath)
-		kubeadmutil.CheckErr(err)
+		if err != nil {
+			return err
+		}
 
-		err = rm.RenewUsingCSRAPI(handler.Name, client)
-		kubeadmutil.CheckErr(err)
+		if err := rm.RenewUsingCSRAPI(handler.Name, client); err != nil {
+			return err
+		}
 	} else {
 		// renew using local certificate authorities.
 		// this operation can't complete in case the certificate key is not provided (external CA)
 		renewed, err := rm.RenewUsingLocalCA(handler.Name)
-		kubeadmutil.CheckErr(err)
+		if err != nil {
+			return err
+		}
 		if !renewed {
 			fmt.Printf("Detected external %s, %s can't be renewed\n", handler.CABaseName, handler.LongName)
-			return
+			return nil
 		}
 	}
 	fmt.Printf("%s renewed\n", handler.LongName)
+	return nil
 }
 
 // newCmdCertsExpiration creates a new `cert check-expiration` command.
@@ -244,13 +261,17 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 		Use:   "check-expiration",
 		Short: "Check certificates expiration for a Kubernetes cluster",
 		Long:  expirationLongDesc,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(flags.cfgPath, &kubeadmapiv1beta2.InitConfiguration{}, &flags.cfg)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			// Get a renewal manager for the given cluster configuration
 			rm, err := renewal.NewManager(&internalcfg.ClusterConfiguration, kdir)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
 			// Get all the certificate expiration info
 			yesNo := func(b bool) string {
@@ -264,7 +285,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 			for _, handler := range rm.Certificates() {
 				e, err := rm.GetExpirationInfo(handler.Name)
 				if err != nil {
-					kubeadmutil.CheckErr(err)
+					return err
 				}
 
 				s := fmt.Sprintf("%s\t%s\t%s\t%-8v",
@@ -277,6 +298,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 				fmt.Fprintln(w, s)
 			}
 			w.Flush()
+			return nil
 		},
 	}
 	addExpirationFlags(cmd, flags)

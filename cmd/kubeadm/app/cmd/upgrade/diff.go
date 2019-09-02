@@ -65,9 +65,9 @@ func NewCmdDiff(out io.Writer) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "diff [version]",
 		Short: "Show what differences would be applied to existing static pod manifests. See also: kubeadm upgrade apply --dry-run",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// TODO: Run preflight checks for diff to check that the manifests already exist.
-			kubeadmutil.CheckErr(runDiff(flags, args))
+			return runDiff(flags, args)
 		},
 	}
 
