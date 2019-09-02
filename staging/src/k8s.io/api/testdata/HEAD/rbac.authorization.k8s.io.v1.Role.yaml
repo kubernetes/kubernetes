@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -30,12 +31,12 @@ metadata:
   uid: "7"
 rules:
 - apiGroups:
-  - "19"
-  nonResourceURLs:
-  - "22"
-  resourceNames:
-  - "21"
-  resources:
   - "20"
+  nonResourceURLs:
+  - "23"
+  resourceNames:
+  - "22"
+  resources:
+  - "21"
   verbs:
-  - "18"
+  - "19"

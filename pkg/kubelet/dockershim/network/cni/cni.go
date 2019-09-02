@@ -328,6 +328,14 @@ func (plugin *cniNetworkPlugin) TearDownPod(namespace string, name string, id ku
 		klog.Warningf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
+	// Windows doesn't have loNetwork. It comes only with Linux
+	if plugin.loNetwork != nil {
+		// Loopback network deletion failure should not be fatal on teardown
+		if err := plugin.deleteFromNetwork(plugin.loNetwork, name, namespace, id, netnsPath, nil); err != nil {
+			klog.Warningf("CNI failed to delete loopback network: %v", err)
+		}
+	}
+
 	return plugin.deleteFromNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil)
 }
 

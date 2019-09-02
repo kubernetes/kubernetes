@@ -35,7 +35,8 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
@@ -43,39 +44,39 @@
     {
       "addresses": [
         {
-          "ip": "18",
-          "hostname": "19",
-          "nodeName": "20",
+          "ip": "19",
+          "hostname": "20",
+          "nodeName": "21",
           "targetRef": {
-            "kind": "21",
-            "namespace": "22",
-            "name": "23",
+            "kind": "22",
+            "namespace": "23",
+            "name": "24",
             "uid": "Hr鯹)晿\u003co,c鮽ort昍řČ扷5Ɨ",
-            "apiVersion": "24",
-            "resourceVersion": "25",
-            "fieldPath": "26"
+            "apiVersion": "25",
+            "resourceVersion": "26",
+            "fieldPath": "27"
           }
         }
       ],
       "notReadyAddresses": [
         {
-          "ip": "27",
-          "hostname": "28",
-          "nodeName": "29",
+          "ip": "28",
+          "hostname": "29",
+          "nodeName": "30",
           "targetRef": {
-            "kind": "30",
-            "namespace": "31",
-            "name": "32",
+            "kind": "31",
+            "namespace": "32",
+            "name": "33",
             "uid": "Ă凗蓏Ŋ蛊ĉy",
-            "apiVersion": "33",
-            "resourceVersion": "34",
-            "fieldPath": "35"
+            "apiVersion": "34",
+            "resourceVersion": "35",
+            "fieldPath": "36"
           }
         }
       ],
       "ports": [
         {
-          "name": "36",
+          "name": "37",
           "port": 1546792211,
           "protocol": "\u003eŽ燹憍峕?狱³-Ǐ忄*"
         }

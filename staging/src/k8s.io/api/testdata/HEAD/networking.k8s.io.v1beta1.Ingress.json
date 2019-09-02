@@ -35,33 +35,34 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
   "spec": {
     "backend": {
-      "serviceName": "18",
-      "servicePort": "19"
+      "serviceName": "19",
+      "servicePort": "20"
     },
     "tls": [
       {
         "hosts": [
-          "20"
+          "21"
         ],
-        "secretName": "21"
+        "secretName": "22"
       }
     ],
     "rules": [
       {
-        "host": "22",
+        "host": "23",
         "http": {
           "paths": [
             {
-              "path": "23",
+              "path": "24",
               "backend": {
-                "serviceName": "24",
-                "servicePort": "25"
+                "serviceName": "25",
+                "servicePort": "26"
               }
             }
           ]
@@ -73,8 +74,8 @@
     "loadBalancer": {
       "ingress": [
         {
-          "ip": "26",
-          "hostname": "27"
+          "ip": "27",
+          "hostname": "28"
         }
       ]
     }

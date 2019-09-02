@@ -15,6 +15,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -29,4 +30,4 @@ metadata:
   resourceVersion: "11042405498087606203"
   selfLink: "5"
   uid: "7"
-range: "18"
+range: "19"

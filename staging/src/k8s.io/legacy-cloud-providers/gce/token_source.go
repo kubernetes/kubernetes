@@ -25,12 +25,13 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/client-go/util/flowcontrol"
-
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/googleapi"
+
+	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 const (
@@ -40,24 +41,34 @@ const (
 	tokenURLBurst = 3
 )
 
+/*
+ * By default, all the following metrics are defined as falling under
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ *
+ * Promoting the stability level of the metric is a responsibility of the component owner, since it
+ * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
+ * the metric stability policy.
+ */
 var (
-	getTokenCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "get_token_count",
-			Help: "Counter of total Token() requests to the alternate token source",
+	getTokenCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "get_token_count",
+			Help:           "Counter of total Token() requests to the alternate token source",
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	getTokenFailCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "get_token_fail_count",
-			Help: "Counter of failed Token() requests to the alternate token source",
+	getTokenFailCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "get_token_fail_count",
+			Help:           "Counter of failed Token() requests to the alternate token source",
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
 )
 
 func init() {
-	prometheus.MustRegister(getTokenCounter)
-	prometheus.MustRegister(getTokenFailCounter)
+	legacyregistry.MustRegister(getTokenCounter)
+	legacyregistry.MustRegister(getTokenFailCounter)
 }
 
 // AltTokenSource is the structure holding the data for the functionality needed to generates tokens

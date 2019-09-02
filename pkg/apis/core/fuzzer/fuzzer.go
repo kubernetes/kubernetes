@@ -279,6 +279,11 @@ var Funcs = func(codecs runtimeserializer.CodecFactory) []interface{} {
 			types := []core.ServiceType{core.ServiceTypeClusterIP, core.ServiceTypeNodePort, core.ServiceTypeLoadBalancer}
 			*p = types[c.Rand.Intn(len(types))]
 		},
+		func(p *core.IPFamily, c fuzz.Continue) {
+			types := []core.IPFamily{core.IPv4Protocol, core.IPv6Protocol}
+			selected := types[c.Rand.Intn(len(types))]
+			*p = selected
+		},
 		func(p *core.ServiceExternalTrafficPolicyType, c fuzz.Continue) {
 			types := []core.ServiceExternalTrafficPolicyType{core.ServiceExternalTrafficPolicyTypeCluster, core.ServiceExternalTrafficPolicyTypeLocal}
 			*p = types[c.Rand.Intn(len(types))]

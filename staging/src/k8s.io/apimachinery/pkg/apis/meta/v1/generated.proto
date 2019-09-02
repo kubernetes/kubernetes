@@ -212,7 +212,7 @@ message ExportOptions {
   optional bool exact = 2;
 }
 
-// Fields stores a set of fields in a data structure like a Trie.
+// FieldsV1 stores a set of fields in a data structure like a Trie, in JSON format.
 //
 // Each key is either a '.' representing the field itself, and will always map to an empty set,
 // or a string representing a sub-field or item. The string will follow one of these four formats:
@@ -223,15 +223,9 @@ message ExportOptions {
 // If a key maps to an empty Fields value, the field that key represents is part of the set.
 //
 // The exact format is defined in sigs.k8s.io/structured-merge-diff
-// +protobuf.options.marshal=false
-// +protobuf.as=ProtoFields
-// +protobuf.options.(gogoproto.goproto_stringer)=false
-message Fields {
-  // Map is the representation used in the alpha version of this API
-  map<string, Fields> map = 1;
-
+message FieldsV1 {
   // Raw is the underlying serialization of this object.
-  optional bytes raw = 2;
+  optional bytes Raw = 1;
 }
 
 // GetOptions is the standard query options to the standard REST get call.
@@ -345,7 +339,7 @@ message LabelSelectorRequirement {
 // List holds a list of objects, which may not be known by the server.
 message List {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional ListMeta metadata = 1;
 
@@ -371,7 +365,7 @@ message ListMeta {
   // Value must be treated as opaque by clients and passed unmodified back to the server.
   // Populated by the system.
   // Read-only.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
   // +optional
   optional string resourceVersion = 2;
 
@@ -497,9 +491,13 @@ message ManagedFieldsEntry {
   // +optional
   optional Time time = 4;
 
-  // Fields identifies a set of fields.
+  // FieldsType is the discriminator for the different fields format and version.
+  // There is currently only one possible value: "FieldsV1"
+  optional string fieldsType = 6;
+
+  // FieldsV1 holds the first JSON version format as described in the "FieldsV1" type.
   // +optional
-  optional Fields fields = 5;
+  optional FieldsV1 fieldsV1 = 7;
 }
 
 // MicroTime is version of Time with microsecond level precision.
@@ -546,7 +544,7 @@ message ObjectMeta {
   // should retry (optionally after the time indicated in the Retry-After header).
   //
   // Applied only if Name is not specified.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#idempotency
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#idempotency
   // +optional
   optional string generateName = 2;
 
@@ -590,7 +588,7 @@ message ObjectMeta {
   // Populated by the system.
   // Read-only.
   // Value must be treated as opaque by clients and .
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#concurrency-control-and-consistency
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency
   // +optional
   optional string resourceVersion = 6;
 
@@ -606,7 +604,7 @@ message ObjectMeta {
   // Populated by the system.
   // Read-only.
   // Null for lists.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional Time creationTimestamp = 8;
 
@@ -627,7 +625,7 @@ message ObjectMeta {
   //
   // Populated by the system when a graceful deletion is requested.
   // Read-only.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional Time deletionTimestamp = 9;
 
@@ -697,7 +695,7 @@ message OwnerReference {
   optional string apiVersion = 5;
 
   // Kind of the referent.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   optional string kind = 1;
 
   // Name of the referent.
@@ -727,7 +725,7 @@ message OwnerReference {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message PartialObjectMetadata {
   // Standard object's metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#metadata
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata
   // +optional
   optional ObjectMeta metadata = 1;
 }
@@ -736,7 +734,7 @@ message PartialObjectMetadata {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 message PartialObjectMetadataList {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional ListMeta metadata = 1;
 
@@ -787,17 +785,6 @@ message Preconditions {
   optional string resourceVersion = 2;
 }
 
-// ProtoFields is a struct that is equivalent to Fields, but intended for
-// protobuf marshalling/unmarshalling. It is generated into a serialization
-// that matches Fields. Do not use in Go structs.
-message ProtoFields {
-  // Map is the representation used in the alpha version of this API
-  map<string, Fields> map = 1;
-
-  // Raw is the underlying serialization of this object.
-  optional bytes raw = 2;
-}
-
 // RootPaths lists the paths available at root.
 // For example: "/healthz", "/apis".
 message RootPaths {
@@ -818,13 +805,13 @@ message ServerAddressByClientCIDR {
 // Status is a return value for calls that don't return other objects.
 message Status {
   // Standard list metadata.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional ListMeta metadata = 1;
 
   // Status of the operation.
   // One of: "Success" or "Failure".
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#spec-and-status
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
   // +optional
   optional string status = 2;
 
@@ -895,7 +882,7 @@ message StatusDetails {
 
   // The kind attribute of the resource associated with the status StatusReason.
   // On some operations may differ from the requested resource Kind.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional string kind = 3;
 
@@ -973,14 +960,14 @@ message TypeMeta {
   // Servers may infer this from the endpoint the client submits requests to.
   // Cannot be updated.
   // In CamelCase.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#types-kinds
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
   // +optional
   optional string kind = 1;
 
   // APIVersion defines the versioned schema of this representation of an object.
   // Servers should convert recognized schemas to the latest internal value, and
   // may reject unrecognized values.
-  // More info: https://git.k8s.io/community/contributors/devel/api-conventions.md#resources
+  // More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
   // +optional
   optional string apiVersion = 2;
 }

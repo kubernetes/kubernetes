@@ -21,15 +21,15 @@ import (
 	"os"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes/fake"
-	utilmount "k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	utilpath "k8s.io/utils/path"
 )
 
@@ -358,13 +358,13 @@ func TestOSFileTypeChecker(t *testing.T) {
 		{
 			name:        "Existing Folder",
 			path:        "/tmp/ExistingFolder",
-			desiredType: string(utilmount.FileTypeDirectory),
+			desiredType: string(hostutil.FileTypeDirectory),
 			isDir:       true,
 		},
 		{
 			name:        "Existing File",
 			path:        "/tmp/ExistingFolder/foo",
-			desiredType: string(utilmount.FileTypeFile),
+			desiredType: string(hostutil.FileTypeFile),
 			isFile:      true,
 		},
 		{
@@ -388,11 +388,10 @@ func TestOSFileTypeChecker(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		fakeFTC := &utilmount.FakeHostUtil{
-			Filesystem: map[string]utilmount.FileType{
-				tc.path: utilmount.FileType(tc.desiredType),
-			},
-		}
+		fakeFTC := hostutil.NewFakeHostUtil(
+			map[string]hostutil.FileType{
+				tc.path: hostutil.FileType(tc.desiredType),
+			})
 		oftc := newFileTypeChecker(tc.path, fakeFTC)
 
 		path := oftc.GetPath()

@@ -119,7 +119,7 @@
     "entries": {
       "methods": {
         "list": {
-          "description": "Lists log entries. Use this method to retrieve log entries from Logging. For ways to export log entries, see Exporting Logs.",
+          "description": "Lists log entries. Use this method to retrieve log entries that originated from a project/folder/organization/billing account. For ways to export log entries, see Exporting Logs.",
           "flatPath": "v2beta1/entries:list",
           "httpMethod": "POST",
           "id": "logging.entries.list",
@@ -485,7 +485,7 @@
               ]
             },
             "update": {
-              "description": "Updates a sink. This method replaces the following fields in the existing sink with values from the new sink: destination, and filter. The updated sink might also have a new writer_identity; see the unique_writer_identity field.",
+              "description": "Updates a sink. This method replaces the following fields in the existing sink with values from the new sink: destination, and filter.The updated sink might also have a new writer_identity; see the unique_writer_identity field.",
               "flatPath": "v2beta1/projects/{projectsId}/sinks/{sinksId}",
               "httpMethod": "PUT",
               "id": "logging.projects.sinks.update",
@@ -529,7 +529,7 @@
       }
     }
   },
-  "revision": "20181020",
+  "revision": "20190316",
   "rootUrl": "https://logging.googleapis.com/",
   "schemas": {
     "BucketOptions": {
@@ -660,7 +660,7 @@
           "type": "integer"
         },
         "userAgent": {
-          "description": "The user agent sent by the client. Example: \"Mozilla/4.0 (compatible; MSIE 6.0; Windows 98; Q312461; .NET CLR 1.0.3705)\".",
+          "description": "The user agent sent by the client. Example: \"Mozilla/4.0 (compatible; MSIE 6.0; Windows 98; Q312461; .NET\nCLR 1.0.3705)\".",
           "type": "string"
         }
       },
@@ -739,7 +739,7 @@
           "type": "string"
         },
         "projectIds": {
-          "description": "Deprecated. Use resource_names instead. One or more project identifiers or project numbers from which to retrieve log entries. Example: \"my-project-1A\". If present, these project identifiers are converted to resource name format and added to the list of resources in resource_names.",
+          "description": "Deprecated. Use resource_names instead. One or more project identifiers or project numbers from which to retrieve log entries. Example: \"my-project-1A\".",
           "items": {
             "type": "string"
           },
@@ -855,12 +855,12 @@
           "type": "object"
         },
         "logName": {
-          "description": "Required. The resource name of the log to which this log entry belongs:\n\"projects/[PROJECT_ID]/logs/[LOG_ID]\"\n\"organizations/[ORGANIZATION_ID]/logs/[LOG_ID]\"\n\"billingAccounts/[BILLING_ACCOUNT_ID]/logs/[LOG_ID]\"\n\"folders/[FOLDER_ID]/logs/[LOG_ID]\"\nA project number may optionally be used in place of PROJECT_ID. The  project number is translated to its corresponding PROJECT_ID internally  and the log_name field will contain PROJECT_ID in queries and exports.[LOG_ID] must be URL-encoded within log_name. Example: \"organizations/1234567890/logs/cloudresourcemanager.googleapis.com%2Factivity\". [LOG_ID] must be less than 512 characters long and can only include the following characters: upper and lower case alphanumeric characters, forward-slash, underscore, hyphen, and period.For backward compatibility, if log_name begins with a forward-slash, such as /projects/..., then the log entry is ingested as usual but the forward-slash is removed. Listing the log entry will not show the leading slash and filtering for a log name with a leading slash will never return any results.",
+          "description": "Required. The resource name of the log to which this log entry belongs:\n\"projects/[PROJECT_ID]/logs/[LOG_ID]\"\n\"organizations/[ORGANIZATION_ID]/logs/[LOG_ID]\"\n\"billingAccounts/[BILLING_ACCOUNT_ID]/logs/[LOG_ID]\"\n\"folders/[FOLDER_ID]/logs/[LOG_ID]\"\nA project number may optionally be used in place of PROJECT_ID. The project number is translated to its corresponding PROJECT_ID internally and the log_name field will contain PROJECT_ID in queries and exports.[LOG_ID] must be URL-encoded within log_name. Example: \"organizations/1234567890/logs/cloudresourcemanager.googleapis.com%2Factivity\". [LOG_ID] must be less than 512 characters long and can only include the following characters: upper and lower case alphanumeric characters, forward-slash, underscore, hyphen, and period.For backward compatibility, if log_name begins with a forward-slash, such as /projects/..., then the log entry is ingested as usual but the forward-slash is removed. Listing the log entry will not show the leading slash and filtering for a log name with a leading slash will never return any results.",
           "type": "string"
         },
         "metadata": {
           "$ref": "MonitoredResourceMetadata",
-          "description": "Output only. Additional metadata about the monitored resource. Only k8s_container, k8s_pod, and k8s_node MonitoredResources have this field populated."
+          "description": "Deprecated. Output only. Additional metadata about the monitored resource.Only k8s_container, k8s_pod, and k8s_node MonitoredResources have this field populated for GKE versions older than 1.12.6. For GKE versions 1.12.6 and above, the metadata field has been deprecated. The Kubernetes pod labels that used to be in metadata.userLabels will now be present in the labels field with a key prefix of k8s-pod/. The Stackdriver system labels that were present in the metadata.systemLabels field will no longer be available in the LogEntry."
         },
         "operation": {
           "$ref": "LogEntryOperation",
@@ -881,7 +881,7 @@
         },
         "resource": {
           "$ref": "MonitoredResource",
-          "description": "Required. The primary monitored resource associated with this log entry. Example: a log entry that reports a database error would be associated with the monitored resource designating the particular database that reported the error."
+          "description": "Required. The primary monitored resource associated with this log entry.Example: a log entry that reports a database error would be associated with the monitored resource designating the particular database that reported the error."
         },
         "severity": {
           "description": "Optional. The severity of the log entry. The default value is LogSeverity.DEFAULT.",
@@ -914,7 +914,7 @@
           "description": "Optional. Source code location information associated with the log entry, if any."
         },
         "spanId": {
-          "description": "Optional. The span ID within the trace associated with the log entry. For Trace spans, this is the same format that the Trace API v2 uses: a 16-character hexadecimal encoding of an 8-byte array, such as \u003ccode\u003e\"000000000000004a\"\u003c/code\u003e.",
+          "description": "Optional. The span ID within the trace associated with the log entry.For Trace spans, this is the same format that the Trace API v2 uses: a 16-character hexadecimal encoding of an 8-byte array, such as \u003ccode\u003e\"000000000000004a\"\u003c/code\u003e.",
           "type": "string"
         },
         "textPayload": {
@@ -931,7 +931,7 @@
           "type": "string"
         },
         "traceSampled": {
-          "description": "Optional. The sampling decision of the trace associated with the log entry. True means that the trace resource name in the trace field was sampled for storage in a trace backend. False means that the trace was not sampled for storage when this log entry was written, or the sampling decision was unknown at the time. A non-sampled trace value is still useful as a request correlation identifier. The default is False.",
+          "description": "Optional. The sampling decision of the trace associated with the log entry.True means that the trace resource name in the trace field was sampled for storage in a trace backend. False means that the trace was not sampled for storage when this log entry was written, or the sampling decision was unknown at the time. A non-sampled trace value is still useful as a request correlation identifier. The default is False.",
           "type": "boolean"
         }
       },
@@ -1034,6 +1034,11 @@
           "$ref": "BucketOptions",
           "description": "Optional. The bucket_options are required when the logs-based metric is using a DISTRIBUTION value type and it describes the bucket boundaries used to create a histogram of the extracted values."
         },
+        "createTime": {
+          "description": "Output only. The creation timestamp of the metric.This field may not be present for older metrics.",
+          "format": "google-datetime",
+          "type": "string"
+        },
         "description": {
           "description": "Optional. A description of this metric, which is used in documentation. The maximum length of the description is 8000 characters.",
           "type": "string"
@@ -1055,6 +1060,11 @@
         },
         "name": {
           "description": "Required. The client-assigned metric identifier. Examples: \"error_count\", \"nginx/requests\".Metric identifiers are limited to 100 characters and can include only the following characters: A-Z, a-z, 0-9, and the special characters _-.,+!*',()%/. The forward-slash character (/) denotes a hierarchy of name pieces, and it cannot be the first character of the name.The metric identifier in this field must not be URL-encoded (https://en.wikipedia.org/wiki/Percent-encoding). However, when the metric identifier appears as the [METRIC_ID] part of a metric_name API parameter, then the metric identifier must be URL-encoded. Example: \"projects/my-project/metrics/nginx%2Frequests\".",
+          "type": "string"
+        },
+        "updateTime": {
+          "description": "Output only. The last update timestamp of the metric.This field may not be present for older metrics.",
+          "format": "google-datetime",
           "type": "string"
         },
         "valueExtractor": {
@@ -1080,8 +1090,13 @@
       "description": "Describes a sink used to export log entries to one of the following destinations in any project: a Cloud Storage bucket, a BigQuery dataset, or a Cloud Pub/Sub topic. A logs filter controls which log entries are exported. The sink must be created within a project, organization, billing account, or folder.",
       "id": "LogSink",
       "properties": {
+        "createTime": {
+          "description": "Output only. The creation timestamp of the sink.This field may not be present for older sinks.",
+          "format": "google-datetime",
+          "type": "string"
+        },
         "destination": {
-          "description": "Required. The export destination:\n\"storage.googleapis.com/[GCS_BUCKET]\"\n\"bigquery.googleapis.com/projects/[PROJECT_ID]/datasets/[DATASET]\"\n\"pubsub.googleapis.com/projects/[PROJECT_ID]/topics/[TOPIC_ID]\"\nThe sink's writer_identity, set when the sink is created, must have permission to write to the destination or else the log entries are not exported. For more information, see Exporting Logs With Sinks.",
+          "description": "Required. The export destination:\n\"storage.googleapis.com/[GCS_BUCKET]\"\n\"bigquery.googleapis.com/projects/[PROJECT_ID]/datasets/[DATASET]\"\n\"pubsub.googleapis.com/projects/[PROJECT_ID]/topics/[TOPIC_ID]\"\nThe sink's writer_identity, set when the sink is created, must have permission to write to the destination or else the log entries are not exported. For more information, see Exporting Logs with Sinks.",
           "type": "string"
         },
         "filter": {
@@ -1110,8 +1125,13 @@
           ],
           "type": "string"
         },
+        "updateTime": {
+          "description": "Output only. The last update timestamp of the sink.This field may not be present for older sinks.",
+          "format": "google-datetime",
+          "type": "string"
+        },
         "writerIdentity": {
-          "description": "Output only. An IAM identity\u0026mdash;a service account or group\u0026mdash;under which Logging writes the exported log entries to the sink's destination. This field is set by sinks.create and sinks.update, based on the setting of unique_writer_identity in those methods.Until you grant this identity write-access to the destination, log entry exports from this sink will fail. For more information, see Granting access for a resource. Consult the destination service's documentation to determine the appropriate IAM roles to assign to the identity.",
+          "description": "Output only. An IAM identity\u0026mdash;a service account or group\u0026mdash;under which Logging writes the exported log entries to the sink's destination. This field is set by sinks.create and sinks.update based on the value of unique_writer_identity in those methods.Until you grant this identity write-access to the destination, log entry exports from this sink will fail. For more information, see Granting Access for a Resource. Consult the destination service's documentation to determine the appropriate IAM roles to assign to the identity.",
           "type": "string"
         }
       },

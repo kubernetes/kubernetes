@@ -32,6 +32,7 @@ import (
 	certificatesv1beta1 "k8s.io/api/certificates/v1beta1"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	apiv1 "k8s.io/api/core/v1"
+	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
@@ -467,6 +469,16 @@ func AddHandlers(h printers.PrintHandler) {
 	}
 	h.TableHandler(volumeAttachmentColumnDefinitions, printVolumeAttachment)
 	h.TableHandler(volumeAttachmentColumnDefinitions, printVolumeAttachmentList)
+
+	endpointSliceColumnDefinitions := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "AddressType", Type: "string", Description: discoveryv1alpha1.EndpointSlice{}.SwaggerDoc()["addressType"]},
+		{Name: "Ports", Type: "string", Description: discoveryv1alpha1.EndpointSlice{}.SwaggerDoc()["ports"]},
+		{Name: "Endpoints", Type: "string", Description: discoveryv1alpha1.EndpointSlice{}.SwaggerDoc()["endpoints"]},
+		{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+	}
+	h.TableHandler(endpointSliceColumnDefinitions, printEndpointSlice)
+	h.TableHandler(endpointSliceColumnDefinitions, printEndpointSliceList)
 }
 
 // Pass ports=nil for all ports.
@@ -514,6 +526,57 @@ func formatEndpoints(endpoints *api.Endpoints, ports sets.String) string {
 	ret := strings.Join(list, ",")
 	if more {
 		return fmt.Sprintf("%s + %d more...", ret, count-max)
+	}
+	return ret
+}
+
+func formatDiscoveryPorts(ports []discovery.EndpointPort) string {
+	list := []string{}
+	max := 3
+	more := false
+	count := 0
+	for _, port := range ports {
+		if len(list) < max {
+			portNum := "*"
+			if port.Port != nil {
+				portNum = strconv.Itoa(int(*port.Port))
+			} else if port.Name != nil {
+				portNum = *port.Name
+			}
+			list = append(list, portNum)
+		} else if len(list) == max {
+			more = true
+		}
+		count++
+	}
+	return listWithMoreString(list, more, count, max)
+}
+
+func formatDiscoveryEndpoints(endpoints []discovery.Endpoint) string {
+	list := []string{}
+	max := 3
+	more := false
+	count := 0
+	for _, endpoint := range endpoints {
+		for _, address := range endpoint.Addresses {
+			if len(list) < max {
+				list = append(list, address)
+			} else if len(list) == max {
+				more = true
+			}
+			count++
+		}
+	}
+	return listWithMoreString(list, more, count, max)
+}
+
+func listWithMoreString(list []string, more bool, count, max int) string {
+	ret := strings.Join(list, ",")
+	if more {
+		return fmt.Sprintf("%s + %d more...", ret, count-max)
+	}
+	if ret == "" {
+		ret = "<unset>"
 	}
 	return ret
 }
@@ -1095,6 +1158,30 @@ func printEndpointsList(list *api.EndpointsList, options printers.GenerateOption
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
 	for i := range list.Items {
 		r, err := printEndpoints(&list.Items[i], options)
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, r...)
+	}
+	return rows, nil
+}
+
+func printEndpointSlice(obj *discovery.EndpointSlice, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
+	row := metav1beta1.TableRow{
+		Object: runtime.RawExtension{Object: obj},
+	}
+	addressType := "<unset>"
+	if obj.AddressType != nil {
+		addressType = string(*obj.AddressType)
+	}
+	row.Cells = append(row.Cells, obj.Name, addressType, formatDiscoveryPorts(obj.Ports), formatDiscoveryEndpoints(obj.Endpoints), translateTimestampSince(obj.CreationTimestamp))
+	return []metav1beta1.TableRow{row}, nil
+}
+
+func printEndpointSliceList(list *discovery.EndpointSliceList, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
+	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
+	for i := range list.Items {
+		r, err := printEndpointSlice(&list.Items[i], options)
 		if err != nil {
 			return nil, err
 		}

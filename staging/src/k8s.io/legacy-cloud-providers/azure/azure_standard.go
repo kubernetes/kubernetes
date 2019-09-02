@@ -39,9 +39,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/component-base/featuregate"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
+	// IPv6DualStack is here to avoid having to import features pkg
+	// and violate import rules
+	IPv6DualStack featuregate.Feature = "IPv6DualStack"
+
 	loadBalancerMinimumPriority = 500
 	loadBalancerMaximumPriority = 4096
 
@@ -220,11 +228,50 @@ func getPrimaryIPConfig(nic network.Interface) (*network.InterfaceIPConfiguratio
 	return nil, fmt.Errorf("failed to determine the primary ipconfig. nicname=%q", *nic.Name)
 }
 
+// returns first ip configuration on a nic by family
+func getIPConfigByIPFamily(nic network.Interface, IPv6 bool) (*network.InterfaceIPConfiguration, error) {
+	if nic.IPConfigurations == nil {
+		return nil, fmt.Errorf("nic.IPConfigurations for nic (nicname=%q) is nil", *nic.Name)
+	}
+
+	var ipVersion network.IPVersion
+	if IPv6 {
+		ipVersion = network.IPv6
+	} else {
+		ipVersion = network.IPv4
+	}
+	for _, ref := range *nic.IPConfigurations {
+		if ref.PrivateIPAddress != nil && ref.PrivateIPAddressVersion == ipVersion {
+			return &ref, nil
+		}
+	}
+	return nil, fmt.Errorf("failed to determine the ipconfig(IPv6=%v). nicname=%q", IPv6, *nic.Name)
+}
+
 func isInternalLoadBalancer(lb *network.LoadBalancer) bool {
 	return strings.HasSuffix(*lb.Name, InternalLoadBalancerNameSuffix)
 }
 
-func getBackendPoolName(clusterName string) string {
+// getBackendPoolName the LB BackendPool name for a service.
+// to ensure backword and forward compat:
+// SingleStack -v4 (pre v1.16) => BackendPool name == clusterName
+// SingleStack -v6 => BackendPool name == clusterName (all cluster bootstrap uses this name)
+// DualStack
+//	=> IPv4 BackendPool name == clusterName
+//  => IPv6 BackendPool name == <clusterName>-IPv6
+// This means:
+// clusters moving from IPv4 to duakstack will require no changes
+// clusters moving from IPv6 (while not seen in the wild, we can not rule out their existence)
+// to dualstack will require deleting backend pools (the reconciler will take care of creating correct backendpools)
+func getBackendPoolName(clusterName string, service *v1.Service) string {
+	if !utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+		return clusterName
+	}
+	IPv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+	if IPv6 {
+		return fmt.Sprintf("%v-IPv6", clusterName)
+	}
+
 	return clusterName
 }
 
@@ -674,9 +721,17 @@ func (as *availabilitySet) EnsureHostInPool(service *v1.Service, nodeName types.
 	}
 
 	var primaryIPConfig *network.InterfaceIPConfiguration
-	primaryIPConfig, err = getPrimaryIPConfig(nic)
-	if err != nil {
-		return err
+	if !utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+		primaryIPConfig, err = getPrimaryIPConfig(nic)
+		if err != nil {
+			return err
+		}
+	} else {
+		ipv6 := utilnet.IsIPv6String(service.Spec.ClusterIP)
+		primaryIPConfig, err = getIPConfigByIPFamily(nic, ipv6)
+		if err != nil {
+			return err
+		}
 	}
 
 	foundPool := false

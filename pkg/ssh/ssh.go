@@ -36,33 +36,44 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/ssh"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog"
 )
 
+/*
+ * By default, all the following metrics are defined as falling under
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ *
+ * Promoting the stability level of the metric is a responsibility of the component owner, since it
+ * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
+ * the metric stability policy.
+ */
 var (
-	tunnelOpenCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "ssh_tunnel_open_count",
-			Help: "Counter of ssh tunnel total open attempts",
+	tunnelOpenCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "ssh_tunnel_open_count",
+			Help:           "Counter of ssh tunnel total open attempts",
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	tunnelOpenFailCounter = prometheus.NewCounter(
-		prometheus.CounterOpts{
-			Name: "ssh_tunnel_open_fail_count",
-			Help: "Counter of ssh tunnel failed open attempts",
+	tunnelOpenFailCounter = metrics.NewCounter(
+		&metrics.CounterOpts{
+			Name:           "ssh_tunnel_open_fail_count",
+			Help:           "Counter of ssh tunnel failed open attempts",
+			StabilityLevel: metrics.ALPHA,
 		},
 	)
 )
 
 func init() {
-	prometheus.MustRegister(tunnelOpenCounter)
-	prometheus.MustRegister(tunnelOpenFailCounter)
+	legacyregistry.MustRegister(tunnelOpenCounter)
+	legacyregistry.MustRegister(tunnelOpenFailCounter)
 }
 
 // TODO: Unit tests for this code, we can spin up a test SSH server with instructions here:

@@ -70,7 +70,3 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
 	return true, errUnsupported
 }
-
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	return "", errUnsupported
-}

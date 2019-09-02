@@ -226,7 +226,11 @@ func (c *Controller) updateSpecLocked() error {
 			crdSpecs = append(crdSpecs, s)
 		}
 	}
-	return c.openAPIService.UpdateSpec(builder.MergeSpecs(c.staticSpec, crdSpecs...))
+	mergedSpec, err := builder.MergeSpecs(c.staticSpec, crdSpecs...)
+	if err != nil {
+		return fmt.Errorf("failed to merge specs: %v", err)
+	}
+	return c.openAPIService.UpdateSpec(mergedSpec)
 }
 
 func (c *Controller) addCustomResourceDefinition(obj interface{}) {

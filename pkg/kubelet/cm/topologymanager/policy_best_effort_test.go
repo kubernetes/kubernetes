@@ -23,25 +23,24 @@ import (
 func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 	tcases := []struct {
 		name     string
-		admit    bool
+		hint     TopologyHint
 		expected bool
 	}{
 		{
-			name:     "Affinity is set to false in topology hints",
-			admit:    false,
+			name:     "Preferred is set to false in topology hints",
+			hint:     TopologyHint{nil, false},
 			expected: true,
 		},
 		{
-			name:     "Affinity is set to true in topology hints",
-			admit:    true,
+			name:     "Preferred is set to true in topology hints",
+			hint:     TopologyHint{nil, true},
 			expected: true,
 		},
 	}
 
 	for _, tc := range tcases {
 		policy := NewBestEffortPolicy()
-		admit := tc.admit
-		result := policy.CanAdmitPodResult(admit)
+		result := policy.CanAdmitPodResult(&tc.hint)
 
 		if result.Admit != tc.expected {
 			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)

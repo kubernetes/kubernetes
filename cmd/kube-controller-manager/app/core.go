@@ -83,6 +83,7 @@ func startServiceController(ctx ControllerContext) (http.Handler, bool, error) {
 }
 func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) {
 	var serviceCIDR *net.IPNet
+	var secondaryServiceCIDR *net.IPNet
 
 	// should we start nodeIPAM
 	if !ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs {
@@ -118,12 +119,37 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		}
 	}
 
+	if len(strings.TrimSpace(ctx.ComponentConfig.NodeIPAMController.SecondaryServiceCIDR)) != 0 {
+		_, secondaryServiceCIDR, err = net.ParseCIDR(ctx.ComponentConfig.NodeIPAMController.SecondaryServiceCIDR)
+		if err != nil {
+			klog.Warningf("Unsuccessful parsing of service CIDR %v: %v", ctx.ComponentConfig.NodeIPAMController.SecondaryServiceCIDR, err)
+		}
+	}
+
+	// the following checks are triggered if both serviceCIDR and secondaryServiceCIDR are provided
+	if serviceCIDR != nil && secondaryServiceCIDR != nil {
+		// should have dual stack flag enabled
+		if !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
+			return nil, false, fmt.Errorf("secondary service cidr is provided and IPv6DualStack feature is not enabled")
+		}
+
+		// should be dual stack (from different IPFamilies)
+		dualstackServiceCIDR, err := netutils.IsDualStackCIDRs([]*net.IPNet{serviceCIDR, secondaryServiceCIDR})
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to perform dualstack check on serviceCIDR and secondaryServiceCIDR error:%v", err)
+		}
+		if !dualstackServiceCIDR {
+			return nil, false, fmt.Errorf("serviceCIDR and secondaryServiceCIDR are not dualstack (from different IPfamiles)")
+		}
+	}
+
 	nodeIpamController, err := nodeipamcontroller.NewNodeIpamController(
 		ctx.InformerFactory.Core().V1().Nodes(),
 		ctx.Cloud,
 		ctx.ClientBuilder.ClientOrDie("node-controller"),
 		clusterCIDRs,
 		serviceCIDR,
+		secondaryServiceCIDR,
 		int(ctx.ComponentConfig.NodeIPAMController.NodeCIDRMaskSize),
 		ipam.CIDRAllocatorType(ctx.ComponentConfig.KubeCloudShared.CIDRAllocatorType),
 	)

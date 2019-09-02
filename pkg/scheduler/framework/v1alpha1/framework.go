@@ -292,7 +292,7 @@ func (f *framework) RunPreFilterPlugins(
 	for _, pl := range f.preFilterPlugins {
 		status := pl.PreFilter(pc, pod)
 		if !status.IsSuccess() {
-			if status.Code() == Unschedulable {
+			if status.IsUnschedulable() {
 				msg := fmt.Sprintf("rejected by %q at prefilter: %v", pl.Name(), status.Message())
 				klog.V(4).Infof(msg)
 				return NewStatus(status.Code(), msg)
@@ -315,7 +315,7 @@ func (f *framework) RunFilterPlugins(pc *PluginContext,
 	for _, pl := range f.filterPlugins {
 		status := pl.Filter(pc, pod, nodeName)
 		if !status.IsSuccess() {
-			if status.Code() != Unschedulable {
+			if !status.IsUnschedulable() {
 				errMsg := fmt.Sprintf("error while running %q filter plugin for pod %q: %v",
 					pl.Name(), pod.Name, status.Message())
 				klog.Error(errMsg)
@@ -433,7 +433,7 @@ func (f *framework) RunPreBindPlugins(
 	for _, pl := range f.preBindPlugins {
 		status := pl.PreBind(pc, pod, nodeName)
 		if !status.IsSuccess() {
-			if status.Code() == Unschedulable {
+			if status.IsUnschedulable() {
 				msg := fmt.Sprintf("rejected by %q at prebind: %v", pl.Name(), status.Message())
 				klog.V(4).Infof(msg)
 				return NewStatus(status.Code(), msg)
@@ -513,7 +513,7 @@ func (f *framework) RunPermitPlugins(
 	for _, pl := range f.permitPlugins {
 		status, d := pl.Permit(pc, pod, nodeName)
 		if !status.IsSuccess() {
-			if status.Code() == Unschedulable {
+			if status.IsUnschedulable() {
 				msg := fmt.Sprintf("rejected by %q at permit: %v", pl.Name(), status.Message())
 				klog.V(4).Infof(msg)
 				return NewStatus(status.Code(), msg)
@@ -547,7 +547,7 @@ func (f *framework) RunPermitPlugins(
 			return NewStatus(Unschedulable, msg)
 		case s := <-w.s:
 			if !s.IsSuccess() {
-				if s.Code() == Unschedulable {
+				if s.IsUnschedulable() {
 					msg := fmt.Sprintf("rejected while waiting at permit: %v", s.Message())
 					klog.V(4).Infof(msg)
 					return NewStatus(s.Code(), msg)

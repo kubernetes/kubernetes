@@ -41,7 +41,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubeexternalinformers "k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
+	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	v1helper "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1"
 	aggregatorapiserver "k8s.io/kube-aggregator/pkg/apiserver"
@@ -50,6 +50,7 @@ import (
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master/controller/crdregistration"
 )
 
@@ -109,10 +110,11 @@ func createAggregatorConfig(
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
-			ProxyClientCert: certBytes,
-			ProxyClientKey:  keyBytes,
-			ServiceResolver: serviceResolver,
-			ProxyTransport:  proxyTransport,
+			ProxyClientCert:                  certBytes,
+			ProxyClientKey:                   keyBytes,
+			ServiceResolver:                  serviceResolver,
+			ProxyTransport:                   proxyTransport,
+			EnableAggregatedDiscoveryTimeout: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.EnableAggregatedDiscoveryTimeout),
 		},
 	}
 
@@ -153,7 +155,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 		return nil, err
 	}
 
-	err = aggregatorServer.GenericAPIServer.AddHealthChecks(
+	err = aggregatorServer.GenericAPIServer.AddBootSequenceHealthChecks(
 		makeAPIServiceAvailableHealthCheck(
 			"autoregister-completion",
 			apiServices,
@@ -281,6 +283,7 @@ var apiVersionPriorities = map[schema.GroupVersion]priority{
 	{Group: "auditregistration.k8s.io", Version: "v1alpha1"}:    {group: 16400, version: 1},
 	{Group: "node.k8s.io", Version: "v1alpha1"}:                 {group: 16300, version: 1},
 	{Group: "node.k8s.io", Version: "v1beta1"}:                  {group: 16300, version: 9},
+	{Group: "discovery.k8s.io", Version: "v1alpha1"}:            {group: 16200, version: 9},
 	// Append a new group to the end of the list if unsure.
 	// You can use min(existing group)-100 as the initial value for a group.
 	// Version can be set to 9 (to have space around) for a new group.

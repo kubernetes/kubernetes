@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -29,21 +30,21 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  namespace: "18"
+  namespace: "19"
 status:
-  evaluationError: "25"
+  evaluationError: "26"
   incomplete: true
   nonResourceRules:
   - nonResourceURLs:
-    - "24"
+    - "25"
     verbs:
-    - "23"
+    - "24"
   resourceRules:
   - apiGroups:
-    - "20"
-    resourceNames:
-    - "22"
-    resources:
     - "21"
+    resourceNames:
+    - "23"
+    resources:
+    - "22"
     verbs:
-    - "19"
+    - "20"

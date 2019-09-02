@@ -35,24 +35,25 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
   "spec": {
     "audiences": [
-      "18"
+      "19"
     ],
     "expirationSeconds": 3850803321873644574,
     "boundObjectRef": {
-      "kind": "19",
-      "apiVersion": "20",
-      "name": "21",
+      "kind": "20",
+      "apiVersion": "21",
+      "name": "22",
       "uid": "r鯹)晿\u003co,c鮽ort昍řČ扷5ƗǸ"
     }
   },
   "status": {
-    "token": "22",
+    "token": "23",
     "expirationTimestamp": "1999-07-03T22:31:10Z"
   }
 }

@@ -204,7 +204,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 		}
 		l.testCase.TestDynamicProvisioning()
 	})
-	ginkgo.It("should provision storage with pvc data source [Feature:VolumePVCDataSource]", func() {
+	ginkgo.It("should provision storage with pvc data source", func() {
 		if !dInfo.Capabilities[CapPVCDataSource] {
 			framework.Skipf("Driver %q does not support cloning - skipping", dInfo.Name)
 		}
@@ -588,7 +588,8 @@ func StartInPodWithVolume(c clientset.Interface, ns, claimName, podName, command
 	return pod
 }
 
-// StopPod first tries to log the output of the pod's container, then deletes the pod.
+// StopPod first tries to log the output of the pod's container, then deletes the pod and
+// waits for that to succeed.
 func StopPod(c clientset.Interface, pod *v1.Pod) {
 	if pod == nil {
 		return
@@ -600,6 +601,7 @@ func StopPod(c clientset.Interface, pod *v1.Pod) {
 		e2elog.Logf("Pod %s has the following logs: %s", pod.Name, body)
 	}
 	e2epod.DeletePodOrFail(c, pod.Namespace, pod.Name)
+	e2epod.WaitForPodNoLongerRunningInNamespace(c, pod.Name, pod.Namespace)
 }
 
 func verifyPVCsPending(client clientset.Interface, pvcs []*v1.PersistentVolumeClaim) {

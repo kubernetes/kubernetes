@@ -47,7 +47,6 @@ filegroup(
         "//pkg/util/selinux:all-srcs",
         "//pkg/util/slice:all-srcs",
         "//pkg/util/sysctl:all-srcs",
-        "//pkg/util/system:all-srcs",
         "//pkg/util/tail:all-srcs",
         "//pkg/util/taints:all-srcs",
         "//pkg/util/tolerations:all-srcs",

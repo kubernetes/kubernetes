@@ -21,8 +21,21 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
+	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
+)
+
+const (
+	// maxAllowableNUMANodes specifies the maximum number of NUMA Nodes that
+	// the TopologyManager supports on the underlying machine.
+	//
+	// At present, having more than this number of NUMA Nodes will result in a
+	// state explosion when trying to enumerate possible NUMAAffinity masks and
+	// generate hints for them. As such, if more NUMA Nodes than this are
+	// present on a machine and the TopologyManager is enabled, an error will
+	// be returned and the TopologyManager will not be loaded.
+	maxAllowableNUMANodes = 8
 )
 
 //Manager interface provides methods for Kubelet to manage pod topology hints
@@ -50,6 +63,8 @@ type manager struct {
 	podMap map[string]string
 	//Topology Manager Policy
 	policy Policy
+	//List of NUMA Nodes available on the underlying machine
+	numaNodes []int
 }
 
 //HintProvider interface is to be implemented by Hint Providers
@@ -62,10 +77,10 @@ type Store interface {
 	GetAffinity(podUID string, containerName string) TopologyHint
 }
 
-//TopologyHint is a struct containing a SocketMask for a Container
+//TopologyHint is a struct containing the NUMANodeAffinity for a Container
 type TopologyHint struct {
-	SocketAffinity socketmask.SocketMask
-	// Preferred is set to true when the SocketMask encodes a preferred
+	NUMANodeAffinity socketmask.SocketMask
+	// Preferred is set to true when the NUMANodeAffinity encodes a preferred
 	// allocation for the Container. It is set to false otherwise.
 	Preferred bool
 }
@@ -73,7 +88,7 @@ type TopologyHint struct {
 var _ Manager = &manager{}
 
 //NewManager creates a new TopologyManager based on provided policy
-func NewManager(topologyPolicyName string) (Manager, error) {
+func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string) (Manager, error) {
 	klog.Infof("[topologymanager] Creating topology manager with %s policy", topologyPolicyName)
 	var policy Policy
 
@@ -85,11 +100,23 @@ func NewManager(topologyPolicyName string) (Manager, error) {
 	case PolicyBestEffort:
 		policy = NewBestEffortPolicy()
 
-	case PolicyStrict:
-		policy = NewStrictPolicy()
+	case PolicyRestricted:
+		policy = NewRestrictedPolicy()
+
+	case PolicySingleNumaNode:
+		policy = NewSingleNumaNodePolicy()
 
 	default:
 		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
+	}
+
+	var numaNodes []int
+	for node := range numaNodeInfo {
+		numaNodes = append(numaNodes, node)
+	}
+
+	if len(numaNodes) > maxAllowableNUMANodes {
+		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
 	}
 
 	var hp []HintProvider
@@ -100,6 +127,7 @@ func NewManager(topologyPolicyName string) (Manager, error) {
 		podTopologyHints: pth,
 		podMap:           pm,
 		policy:           policy,
+		numaNodes:        numaNodes,
 	}
 
 	return manager, nil
@@ -149,12 +177,9 @@ func (m *manager) iterateAllProviderTopologyHints(allProviderHints [][]TopologyH
 
 // Merge the hints from all hint providers to find the best one.
 func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) TopologyHint {
-	// Set the default hint to return from this function as an any-socket
-	// affinity with an unpreferred allocation. This will only be returned if
-	// no better hint can be found when merging hints from each hint provider.
-	defaultAffinity, _ := socketmask.NewSocketMask()
-	defaultAffinity.Fill()
-	defaultHint := TopologyHint{defaultAffinity, false}
+	// Set the default affinity as an any-numa affinity containing the list
+	// of NUMA Nodes available on this machine.
+	defaultAffinity, _ := socketmask.NewSocketMask(m.numaNodes...)
 
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider. If no hints are provided, assume
@@ -164,30 +189,24 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		// Get the TopologyHints from a provider.
 		hints := provider.GetTopologyHints(pod, container)
 
-		// If hints is empty, insert a single, preferred any-socket hint into allProviderHints.
+		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
-			klog.Infof("[topologymanager] Hint Provider has no preference for socket affinity with any resource")
-			affinity, _ := socketmask.NewSocketMask()
-			affinity.Fill()
-			allProviderHints = append(allProviderHints, []TopologyHint{{affinity, true}})
+			klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with any resource")
+			allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, true}})
 			continue
 		}
 
 		// Otherwise, accumulate the hints for each resource type into allProviderHints.
 		for resource := range hints {
 			if hints[resource] == nil {
-				klog.Infof("[topologymanager] Hint Provider has no preference for socket affinity with resource '%s'", resource)
-				affinity, _ := socketmask.NewSocketMask()
-				affinity.Fill()
-				allProviderHints = append(allProviderHints, []TopologyHint{{affinity, true}})
+				klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with resource '%s'", resource)
+				allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, true}})
 				continue
 			}
 
 			if len(hints[resource]) == 0 {
-				klog.Infof("[topologymanager] Hint Provider has no possible socket affinities for resource '%s'", resource)
-				affinity, _ := socketmask.NewSocketMask()
-				affinity.Fill()
-				allProviderHints = append(allProviderHints, []TopologyHint{{affinity, false}})
+				klog.Infof("[topologymanager] Hint Provider has no possible NUMA affinities for resource '%s'", resource)
+				allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, false}})
 				continue
 			}
 
@@ -197,37 +216,41 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 
 	// Iterate over all permutations of hints in 'allProviderHints'. Merge the
 	// hints in each permutation by taking the bitwise-and of their affinity masks.
-	// Return the hint with the narrowest SocketAffinity of all merged
-	// permutations that have at least one socket set. If no merged mask can be
-	// found that has at least one socket set, return the 'defaultHint'.
-	bestHint := defaultHint
+	// Return the hint with the narrowest NUMANodeAffinity of all merged
+	// permutations that have at least one NUMA ID set. If no merged mask can be
+	// found that has at least one NUMA ID set, return the 'defaultAffinity'.
+	bestHint := TopologyHint{defaultAffinity, false}
 	m.iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
-		// Get the SocketAffinity from each hint in the permutation and see if any
+		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
 		preferred := true
-		var socketAffinities []socketmask.SocketMask
+		var numaAffinities []socketmask.SocketMask
 		for _, hint := range permutation {
-			// Only consider hints that have an actual SocketAffinity set.
-			if hint.SocketAffinity != nil {
+			// Only consider hints that have an actual NUMANodeAffinity set.
+			if hint.NUMANodeAffinity != nil {
 				if !hint.Preferred {
 					preferred = false
 				}
-				socketAffinities = append(socketAffinities, hint.SocketAffinity)
+				// Special case PolicySingleNumaNode to only prefer hints where
+				// all providers have a single NUMA affinity set.
+				if m.policy != nil && m.policy.Name() == PolicySingleNumaNode && hint.NUMANodeAffinity.Count() > 1 {
+					preferred = false
+				}
+				numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
 			}
 		}
 
 		// Merge the affinities using a bitwise-and operation.
-		mergedAffinity, _ := socketmask.NewSocketMask()
-		mergedAffinity.Fill()
-		mergedAffinity.And(socketAffinities...)
+		mergedAffinity, _ := socketmask.NewSocketMask(m.numaNodes...)
+		mergedAffinity.And(numaAffinities...)
 
 		// Build a mergedHintfrom the merged affinity mask, indicating if an
 		// preferred allocation was used to generate the affinity mask or not.
 		mergedHint := TopologyHint{mergedAffinity, preferred}
 
-		// Only consider mergedHints that result in a SocketAffinity > 0 to
+		// Only consider mergedHints that result in a NUMANodeAffinity > 0 to
 		// replace the current bestHint.
-		if mergedHint.SocketAffinity.Count() == 0 {
+		if mergedHint.NUMANodeAffinity.Count() == 0 {
 			return
 		}
 
@@ -246,9 +269,9 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		}
 
 		// If mergedHint and bestHint has the same preference, only consider
-		// mergedHints that have a narrower SocketAffinity than the
-		// SocketAffinity in the current bestHint.
-		if !mergedHint.SocketAffinity.IsNarrowerThan(bestHint.SocketAffinity) {
+		// mergedHints that have a narrower NUMANodeAffinity than the
+		// NUMANodeAffinity in the current bestHint.
+		if !mergedHint.NUMANodeAffinity.IsNarrowerThan(bestHint.NUMANodeAffinity) {
 			return
 		}
 
@@ -293,7 +316,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	if pod.Status.QOSClass == v1.PodQOSGuaranteed {
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
 			result := m.calculateAffinity(*pod, container)
-			admitPod := m.policy.CanAdmitPodResult(result.Preferred)
+			admitPod := m.policy.CanAdmitPodResult(&result)
 			if !admitPod.Admit {
 				return admitPod
 			}

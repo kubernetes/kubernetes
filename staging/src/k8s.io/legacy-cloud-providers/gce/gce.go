@@ -38,6 +38,7 @@ import (
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	container "google.golang.org/api/container/v1"
+	"google.golang.org/api/option"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 
@@ -395,31 +396,19 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		config.NetworkProjectID = config.ProjectID
 	}
 
-	client, err := newOauthClient(config.TokenSource)
-	if err != nil {
-		return nil, err
-	}
-	service, err := compute.New(client)
+	service, err := compute.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
 	service.UserAgent = userAgent
 
-	client, err = newOauthClient(config.TokenSource)
-	if err != nil {
-		return nil, err
-	}
-	serviceBeta, err := computebeta.New(client)
+	serviceBeta, err := computebeta.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
 	serviceBeta.UserAgent = userAgent
 
-	client, err = newOauthClient(config.TokenSource)
-	if err != nil {
-		return nil, err
-	}
-	serviceAlpha, err := computealpha.New(client)
+	serviceAlpha, err := computealpha.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
@@ -435,7 +424,7 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		serviceAlpha.BasePath = fmt.Sprintf("%sprojects/", strings.Replace(config.APIEndpoint, "v1", "alpha", -1))
 	}
 
-	containerService, err := container.New(client)
+	containerService, err := container.NewService(context.Background(), option.WithTokenSource(config.TokenSource))
 	if err != nil {
 		return nil, err
 	}
@@ -444,6 +433,10 @@ func CreateGCECloud(config *CloudConfig) (*Cloud, error) {
 		containerService.BasePath = config.ContainerAPIEndpoint
 	}
 
+	client, err := newOauthClient(config.TokenSource)
+	if err != nil {
+		return nil, err
+	}
 	tpuService, err := newTPUService(client)
 	if err != nil {
 		return nil, err

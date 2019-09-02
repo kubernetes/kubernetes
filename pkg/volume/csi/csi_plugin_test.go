@@ -231,6 +231,7 @@ func TestPluginGetVolumeNameWithInline(t *testing.T) {
 
 func TestPluginCanSupport(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, false)()
 
 	tests := []struct {
 		name       string

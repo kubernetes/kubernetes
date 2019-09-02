@@ -32,6 +32,7 @@ pkg/apis/core/v1/helper
 pkg/apis/core/v1/helper/qos
 pkg/apis/core/v1/validation
 pkg/apis/core/validation
+pkg/apis/discovery/v1alpha1
 pkg/apis/events/v1beta1
 pkg/apis/extensions
 pkg/apis/extensions/v1beta1
@@ -65,6 +66,7 @@ pkg/controller/deployment/config/v1alpha1
 pkg/controller/disruption
 pkg/controller/endpoint
 pkg/controller/endpoint/config/v1alpha1
+pkg/controller/endpointslice/config/v1alpha1
 pkg/controller/garbagecollector
 pkg/controller/garbagecollector/config/v1alpha1
 pkg/controller/job

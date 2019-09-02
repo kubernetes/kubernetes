@@ -1,11 +1,11 @@
 apiVersion: policy/v1beta1
 deleteOptions:
   dryRun:
-  - "19"
+  - "20"
   gracePeriodSeconds: 3850803321873644574
   orphanDependents: true
   preconditions:
-    resourceVersion: "18"
+    resourceVersion: "19"
     uid: 枊a8衍`Ĩɘ.蘯6ċV夸eɑeʤ脽ě
   propagationPolicy: 蓏Ŋ
 kind: Eviction
@@ -23,6 +23,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"

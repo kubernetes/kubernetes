@@ -439,8 +439,8 @@ func (a ActionImpl) GetSubresource() string {
 	return a.Subresource
 }
 func (a ActionImpl) Matches(verb, resource string) bool {
-	return strings.ToLower(verb) == strings.ToLower(a.Verb) &&
-		strings.ToLower(resource) == strings.ToLower(a.Resource.Resource)
+	return strings.EqualFold(verb, a.Verb) &&
+		strings.EqualFold(resource, a.Resource.Resource)
 }
 func (a ActionImpl) DeepCopy() Action {
 	ret := a

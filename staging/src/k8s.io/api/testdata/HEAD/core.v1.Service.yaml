@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -29,24 +30,25 @@ metadata:
   selfLink: "5"
   uid: "7"
 spec:
-  clusterIP: "22"
+  clusterIP: "23"
   externalIPs:
-  - "23"
-  externalName: "26"
+  - "24"
+  externalName: "27"
   externalTrafficPolicy: ʤ脽ěĂ凗蓏Ŋ蛊ĉy緅縕>Ž
   healthCheckNodePort: -1095807277
-  loadBalancerIP: "24"
+  ipFamily: ³-Ǐ忄*齧獚敆ȎțêɘĲ斬
+  loadBalancerIP: "25"
   loadBalancerSourceRanges:
-  - "25"
+  - "26"
   ports:
-  - name: "18"
+  - name: "19"
     nodePort: -474380055
     port: 202283346
     protocol: '@Hr鯹)晿'
-    targetPort: "19"
+    targetPort: "20"
   publishNotReadyAddresses: true
   selector:
-    "20": "21"
+    "21": "22"
   sessionAffinity: ɑ
   sessionAffinityConfig:
     clientIP:
@@ -55,5 +57,5 @@ spec:
 status:
   loadBalancer:
     ingress:
-    - hostname: "28"
-      ip: "27"
+    - hostname: "29"
+      ip: "28"

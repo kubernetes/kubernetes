@@ -23,10 +23,12 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func (proxier *FakeProxier) addEndpoints(endpoints *v1.Endpoints) {
@@ -133,7 +135,7 @@ func makeTestEndpoints(namespace, name string, eptFunc func(*v1.Endpoints)) *v1.
 
 // This is a coarse test, but it offers some modicum of confidence as the code is evolved.
 func TestEndpointsToEndpointsMap(t *testing.T) {
-	epTracker := NewEndpointChangeTracker("test-hostname", nil, nil, nil)
+	epTracker := NewEndpointChangeTracker("test-hostname", nil, nil, nil, false)
 
 	trueVal := true
 	falseVal := false
@@ -1382,13 +1384,246 @@ func TestLastChangeTriggerTime(t *testing.T) {
 	}
 }
 
+func TestEndpointSliceUpdate(t *testing.T) {
+	testCases := map[string]struct {
+		startingSlices        []*discovery.EndpointSlice
+		endpointChangeTracker *EndpointChangeTracker
+		namespacedName        types.NamespacedName
+		paramEndpointSlice    *discovery.EndpointSlice
+		paramRemoveSlice      bool
+		expectedReturnVal     bool
+		expectedCurrentChange map[ServicePortName][]*BaseEndpointInfo
+	}{
+		// test starting from an empty state
+		"add a simple slice that doesn't already exist": {
+			startingSlices:        []*discovery.EndpointSlice{},
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			paramRemoveSlice:      false,
+			expectedReturnVal:     true,
+			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "svc1", "port-0"): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.3:80"},
+				},
+				makeServicePortName("ns1", "svc1", "port-1"): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:443"},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.3:443"},
+				},
+			},
+		},
+		// test no modification to state - current change should be nil as nothing changes
+		"add the same slice that already exists": {
+			startingSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			},
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			paramRemoveSlice:      false,
+			expectedReturnVal:     false,
+			expectedCurrentChange: nil,
+		},
+		// test additions to existing state
+		"add a slice that overlaps with existing state": {
+			startingSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			},
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			paramRemoveSlice:      false,
+			expectedReturnVal:     true,
+			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "svc1", "port-0"): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.4:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.5:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.2.1:80"},
+					&BaseEndpointInfo{Endpoint: "10.0.2.2:80", IsLocal: true},
+				},
+				makeServicePortName("ns1", "svc1", "port-1"): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.3:443", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.4:443", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.5:443", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.2.1:443"},
+					&BaseEndpointInfo{Endpoint: "10.0.2.2:443", IsLocal: true},
+				},
+			},
+		},
+		// test additions to existing state with partially overlapping slices and ports
+		"add a slice that overlaps with existing state and partial ports": {
+			startingSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			},
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:    generateEndpointSliceWithOffset("svc1", "ns1", 3, 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80)}),
+			paramRemoveSlice:      false,
+			expectedReturnVal:     true,
+			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "svc1", "port-0"): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.4:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.5:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.2.1:80"},
+					&BaseEndpointInfo{Endpoint: "10.0.2.2:80", IsLocal: true},
+				},
+				makeServicePortName("ns1", "svc1", "port-1"): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:443"},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.3:443"},
+					&BaseEndpointInfo{Endpoint: "10.0.2.1:443"},
+					&BaseEndpointInfo{Endpoint: "10.0.2.2:443", IsLocal: true},
+				},
+			},
+		},
+		// test deletions from existing state with partially overlapping slices and ports
+		"remove a slice that overlaps with existing state": {
+			startingSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			},
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			paramRemoveSlice:      true,
+			expectedReturnVal:     true,
+			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "svc1", "port-0"): {
+					&BaseEndpointInfo{Endpoint: "10.0.2.1:80"},
+					&BaseEndpointInfo{Endpoint: "10.0.2.2:80", IsLocal: true},
+				},
+				makeServicePortName("ns1", "svc1", "port-1"): {
+					&BaseEndpointInfo{Endpoint: "10.0.2.1:443"},
+					&BaseEndpointInfo{Endpoint: "10.0.2.2:443", IsLocal: true},
+				},
+			},
+		},
+		// ensure a removal that has no effect turns into a no-op
+		"remove a slice that doesn't even exist in current state": {
+			startingSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+				generateEndpointSlice("svc1", "ns1", 2, 2, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			},
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 3, 5, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			paramRemoveSlice:      true,
+			expectedReturnVal:     false,
+			expectedCurrentChange: nil,
+		},
+		// start with all endpoints ready, transition to no endpoints ready
+		"transition all endpoints to unready state": {
+			startingSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			},
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 1, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			paramRemoveSlice:      false,
+			expectedReturnVal:     true,
+			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{},
+		},
+		// start with no endpoints ready, transition to all endpoints ready
+		"transition all endpoints to ready state": {
+			startingSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 2, 1, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			},
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 2, 999, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			paramRemoveSlice:      false,
+			expectedReturnVal:     true,
+			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "svc1", "port-0"): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
+				},
+				makeServicePortName("ns1", "svc1", "port-1"): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true},
+				},
+			},
+		},
+		// start with some endpoints ready, transition to more endpoints ready
+		"transition some endpoints to ready state": {
+			startingSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 3, 2, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+				generateEndpointSlice("svc1", "ns1", 2, 2, 2, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			},
+			endpointChangeTracker: NewEndpointChangeTracker("host1", nil, nil, nil, true),
+			namespacedName:        types.NamespacedName{Name: "svc1", Namespace: "ns1"},
+			paramEndpointSlice:    generateEndpointSlice("svc1", "ns1", 1, 3, 3, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			paramRemoveSlice:      false,
+			expectedReturnVal:     true,
+			expectedCurrentChange: map[ServicePortName][]*BaseEndpointInfo{
+				makeServicePortName("ns1", "svc1", "port-0"): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.2.1:80", IsLocal: true},
+				},
+				makeServicePortName("ns1", "svc1", "port-1"): {
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true},
+					&BaseEndpointInfo{Endpoint: "10.0.2.1:443", IsLocal: true},
+				},
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		for _, startingSlice := range tc.startingSlices {
+			tc.endpointChangeTracker.endpointSliceCache.Update(startingSlice)
+		}
+
+		got := tc.endpointChangeTracker.EndpointSliceUpdate(tc.paramEndpointSlice, tc.paramRemoveSlice)
+		if !reflect.DeepEqual(got, tc.expectedReturnVal) {
+			t.Errorf("[%s] EndpointSliceUpdate return value got: %v, want %v", name, got, tc.expectedReturnVal)
+		}
+		if tc.endpointChangeTracker.items == nil {
+			t.Errorf("[%s] Expected ect.items to not be nil", name)
+		}
+		if tc.expectedCurrentChange == nil {
+			if tc.endpointChangeTracker.items[tc.namespacedName] != nil {
+				t.Errorf("[%s] Expected ect.items[%s] to be nil", name, tc.namespacedName)
+			}
+		} else {
+			if tc.endpointChangeTracker.items[tc.namespacedName] == nil {
+				t.Errorf("[%s] Expected ect.items[%s] to not be nil", name, tc.namespacedName)
+			}
+			compareEndpointsMapsStr(t, name, tc.endpointChangeTracker.items[tc.namespacedName].current, tc.expectedCurrentChange)
+		}
+	}
+}
+
+// Test helpers
+
 func compareEndpointsMaps(t *testing.T, tci int, newMap EndpointsMap, expected map[ServicePortName][]*BaseEndpointInfo) {
+	t.Helper()
+	compareEndpointsMapsStr(t, string(tci), newMap, expected)
+}
+
+func compareEndpointsMapsStr(t *testing.T, testName string, newMap EndpointsMap, expected map[ServicePortName][]*BaseEndpointInfo) {
+	t.Helper()
 	if len(newMap) != len(expected) {
-		t.Errorf("[%d] expected %d results, got %d: %v", tci, len(expected), len(newMap), newMap)
+		t.Errorf("[%s] expected %d results, got %d: %v", testName, len(expected), len(newMap), newMap)
 	}
 	for x := range expected {
 		if len(newMap[x]) != len(expected[x]) {
-			t.Errorf("[%d] expected %d endpoints for %v, got %d", tci, len(expected[x]), x, len(newMap[x]))
+			t.Errorf("[%s] expected %d endpoints for %v, got %d", testName, len(expected[x]), x, len(newMap[x]))
+			t.Logf("Endpoints %+v", newMap[x])
 		} else {
 			for i := range expected[x] {
 				newEp, ok := newMap[x][i].(*BaseEndpointInfo)
@@ -1397,7 +1632,7 @@ func compareEndpointsMaps(t *testing.T, tci int, newMap EndpointsMap, expected m
 					continue
 				}
 				if *newEp != *(expected[x][i]) {
-					t.Errorf("[%d] expected new[%v][%d] to be %v, got %v", tci, x, i, expected[x][i], newEp)
+					t.Errorf("[%s] expected new[%v][%d] to be %v, got %v (IsLocal expected %v, got %v)", testName, x, i, expected[x][i], newEp, expected[x][i].IsLocal, newEp.IsLocal)
 				}
 			}
 		}

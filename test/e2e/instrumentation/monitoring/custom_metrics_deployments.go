@@ -27,7 +27,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -266,20 +265,20 @@ func CreateAdapter(adapterDeploymentFile string) error {
 		return err
 	}
 	stat, err := framework.RunKubectl("create", "-f", adapterURL)
-	e2elog.Logf(stat)
+	framework.Logf(stat)
 	return err
 }
 
 func createClusterAdminBinding() error {
 	stdout, stderr, err := framework.RunCmd("gcloud", "config", "get-value", "core/account")
 	if err != nil {
-		e2elog.Logf(stderr)
+		framework.Logf(stderr)
 		return err
 	}
 	serviceAccount := strings.TrimSpace(stdout)
-	e2elog.Logf("current service account: %q", serviceAccount)
+	framework.Logf("current service account: %q", serviceAccount)
 	stat, err := framework.RunKubectl("create", "clusterrolebinding", ClusterAdminBinding, "--clusterrole=cluster-admin", "--user="+serviceAccount)
-	e2elog.Logf(stat)
+	framework.Logf(stat)
 	return err
 }
 
@@ -308,32 +307,32 @@ func CreateDescriptors(service *gcm.Service, projectID string) error {
 func CleanupDescriptors(service *gcm.Service, projectID string) {
 	_, err := service.Projects.MetricDescriptors.Delete(fmt.Sprintf("projects/%s/metricDescriptors/custom.googleapis.com/%s", projectID, CustomMetricName)).Do()
 	if err != nil {
-		e2elog.Logf("Failed to delete descriptor for metric '%s': %v", CustomMetricName, err)
+		framework.Logf("Failed to delete descriptor for metric '%s': %v", CustomMetricName, err)
 	}
 	_, err = service.Projects.MetricDescriptors.Delete(fmt.Sprintf("projects/%s/metricDescriptors/custom.googleapis.com/%s", projectID, UnusedMetricName)).Do()
 	if err != nil {
-		e2elog.Logf("Failed to delete descriptor for metric '%s': %v", CustomMetricName, err)
+		framework.Logf("Failed to delete descriptor for metric '%s': %v", CustomMetricName, err)
 	}
 }
 
 // CleanupAdapter deletes Custom Metrics - Stackdriver adapter deployments.
 func CleanupAdapter(adapterDeploymentFile string) {
 	stat, err := framework.RunKubectl("delete", "-f", adapterDeploymentFile)
-	e2elog.Logf(stat)
+	framework.Logf(stat)
 	if err != nil {
-		e2elog.Logf("Failed to delete adapter deployments: %s", err)
+		framework.Logf("Failed to delete adapter deployments: %s", err)
 	}
 	err = exec.Command("rm", adapterDeploymentFile).Run()
 	if err != nil {
-		e2elog.Logf("Failed to delete adapter deployment file: %s", err)
+		framework.Logf("Failed to delete adapter deployment file: %s", err)
 	}
 	cleanupClusterAdminBinding()
 }
 
 func cleanupClusterAdminBinding() {
 	stat, err := framework.RunKubectl("delete", "clusterrolebinding", ClusterAdminBinding)
-	e2elog.Logf(stat)
+	framework.Logf(stat)
 	if err != nil {
-		e2elog.Logf("Failed to delete cluster admin binding: %s", err)
+		framework.Logf("Failed to delete cluster admin binding: %s", err)
 	}
 }

@@ -332,7 +332,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, scheduleErr error) (*v1.Node, []
 	if len(allNodes) == 0 {
 		return nil, nil, nil, ErrNoNodesAvailable
 	}
-	potentialNodes := nodesWherePreemptionMightHelp(allNodes, fitError.FailedPredicates)
+	potentialNodes := nodesWherePreemptionMightHelp(allNodes, fitError)
 	if len(potentialNodes) == 0 {
 		klog.V(3).Infof("Preemption will not help schedule pod %v/%v on any node.", pod.Namespace, pod.Name)
 		// In this case, we should clean-up any existing nominated node name of the pod.
@@ -509,7 +509,7 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 				if !status.IsSuccess() {
 					predicateResultLock.Lock()
 					filteredNodesStatuses[nodeName] = status
-					if status.Code() != framework.Unschedulable {
+					if !status.IsUnschedulable() {
 						errs[status.Message()]++
 					}
 					predicateResultLock.Unlock()
@@ -1168,10 +1168,13 @@ func unresolvablePredicateExists(failedPredicates []predicates.PredicateFailureR
 
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
-func nodesWherePreemptionMightHelp(nodes []*v1.Node, failedPredicatesMap FailedPredicateMap) []*v1.Node {
+func nodesWherePreemptionMightHelp(nodes []*v1.Node, fitErr *FitError) []*v1.Node {
 	potentialNodes := []*v1.Node{}
 	for _, node := range nodes {
-		failedPredicates, _ := failedPredicatesMap[node.Name]
+		if fitErr.FilteredNodesStatuses[node.Name].Code() == framework.UnschedulableAndUnresolvable {
+			continue
+		}
+		failedPredicates, _ := fitErr.FailedPredicates[node.Name]
 		// If we assume that scheduler looks at all nodes and populates the failedPredicateMap
 		// (which is the case today), the !found case should never happen, but we'd prefer
 		// to rely less on such assumptions in the code when checking does not impose

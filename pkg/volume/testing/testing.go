@@ -28,7 +28,7 @@ import (
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,6 +43,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	. "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -70,7 +71,7 @@ type fakeVolumeHost struct {
 	pluginMgr       VolumePluginMgr
 	cloud           cloudprovider.Interface
 	mounter         mount.Interface
-	hostUtil        mount.HostUtils
+	hostUtil        hostutil.HostUtils
 	exec            mount.Exec
 	nodeLabels      map[string]string
 	nodeName        string
@@ -105,12 +106,10 @@ func NewFakeVolumeHostWithCSINodeName(rootDir string, kubeClient clientset.Inter
 	return volHost
 }
 
-func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]mount.FileType) *fakeVolumeHost {
+func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, cloud cloudprovider.Interface, pathToTypeMap map[string]hostutil.FileType) *fakeVolumeHost {
 	host := &fakeVolumeHost{rootDir: rootDir, kubeClient: kubeClient, cloud: cloud}
 	host.mounter = &mount.FakeMounter{}
-	host.hostUtil = &mount.FakeHostUtil{
-		Filesystem: pathToTypeMap,
-	}
+	host.hostUtil = hostutil.NewFakeHostUtil(pathToTypeMap)
 	host.exec = mount.NewFakeExec(nil)
 	host.pluginMgr.InitPlugins(plugins, nil /* prober */, host)
 	host.subpather = &subpath.FakeSubpath{}
@@ -118,7 +117,7 @@ func newFakeVolumeHost(rootDir string, kubeClient clientset.Interface, plugins [
 	return host
 }
 
-func NewFakeVolumeHostWithMounterFSType(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]mount.FileType) *fakeVolumeHost {
+func NewFakeVolumeHostWithMounterFSType(rootDir string, kubeClient clientset.Interface, plugins []VolumePlugin, pathToTypeMap map[string]hostutil.FileType) *fakeVolumeHost {
 	volHost := newFakeVolumeHost(rootDir, kubeClient, plugins, nil, pathToTypeMap)
 	return volHost
 }
@@ -159,7 +158,7 @@ func (f *fakeVolumeHost) GetMounter(pluginName string) mount.Interface {
 	return f.mounter
 }
 
-func (f *fakeVolumeHost) GetHostUtil() mount.HostUtils {
+func (f *fakeVolumeHost) GetHostUtil() hostutil.HostUtils {
 	return f.hostUtil
 }
 

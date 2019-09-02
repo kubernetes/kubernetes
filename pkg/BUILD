@@ -38,6 +38,7 @@ filegroup(
         "//pkg/apis/certificates:all-srcs",
         "//pkg/apis/coordination:all-srcs",
         "//pkg/apis/core:all-srcs",
+        "//pkg/apis/discovery:all-srcs",
         "//pkg/apis/events:all-srcs",
         "//pkg/apis/extensions:all-srcs",
         "//pkg/apis/imagepolicy:all-srcs",

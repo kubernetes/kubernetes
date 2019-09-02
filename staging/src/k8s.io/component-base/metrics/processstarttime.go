@@ -32,17 +32,22 @@ var processStartTime = prometheus.NewGaugeVec(
 	[]string{},
 )
 
+// Registerer is an interface expected by RegisterProcessStartTime in order to register the metric
+type Registerer interface {
+	Register(prometheus.Collector) error
+}
+
 // RegisterProcessStartTime registers the process_start_time_seconds to
 // a prometheus registry. This metric needs to be included to ensure counter
 // data fidelity.
-func RegisterProcessStartTime(registerer prometheus.Registerer) error {
+func RegisterProcessStartTime(registrationFunc func(prometheus.Collector) error) error {
 	start, err := getProcessStart()
 	if err != nil {
 		klog.Errorf("Could not get process start time, %v", err)
 		start = float64(time.Now().Unix())
 	}
 	processStartTime.WithLabelValues().Set(start)
-	return registerer.Register(processStartTime)
+	return registrationFunc(processStartTime)
 }
 
 func getProcessStart() (float64, error) {
