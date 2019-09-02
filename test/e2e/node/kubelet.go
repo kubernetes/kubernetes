@@ -356,6 +356,31 @@ var _ = SIGDescribe("kubelet", func() {
 				}
 			})
 		}
+
+		ginkgo.It("should let Kubelet delete 10 pods per node with in 1 minute", func() {
+			totalPods := 10 * numNodes
+			ginkgo.By(fmt.Sprintf("Creating a RC of %d pods and wait until all pods of this RC are running", totalPods))
+			rcName := fmt.Sprintf("cleanup%d-%s", totalPods, string(uuid.NewUUID()))
+
+			err := framework.RunRC(testutils.RCConfig{
+				Client:       f.ClientSet,
+				Name:         rcName,
+				Namespace:    f.Namespace.Name,
+				Image:        imageutils.GetPauseImageName(),
+				Replicas:     totalPods,
+				NodeSelector: nodeLabels,
+			})
+			framework.ExpectNoError(err, "failed creating a ReplicationController")
+			if resourceMonitor != nil {
+				resourceMonitor.LogLatest()
+			}
+
+			ginkgo.By("Deleting the RC")
+			framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
+			if resourceMonitor != nil {
+				resourceMonitor.LogCPUSummary()
+			}
+		})
 	})
 
 	// Test host cleanup when disrupting the volume environment.
