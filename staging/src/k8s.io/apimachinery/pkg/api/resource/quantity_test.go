@@ -76,6 +76,13 @@ func TestQuantityParseZero(t *testing.T) {
 	}
 }
 
+func TestQuantityHasStringFieldAfterParse(t *testing.T) {
+	q := MustParse("512Mi")
+	if expected, actual := "512Mi", q.String(); expected != actual {
+		t.Errorf("Expected %v, actual %v", expected, actual)
+	}
+}
+
 // TestQuantityParseNonNumericPanic ensures that when a non-numeric string is parsed
 // it panics
 func TestQuantityParseNonNumericPanic(t *testing.T) {

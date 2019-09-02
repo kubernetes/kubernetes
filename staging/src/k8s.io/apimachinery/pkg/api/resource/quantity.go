@@ -126,6 +126,8 @@ func MustParse(str string) Quantity {
 	if err != nil {
 		panic(fmt.Errorf("cannot parse '%v': %v", str, err))
 	}
+	// fill the s field of q so that DeepEqual is idempotent across invocation of String()
+	q.String()
 	return q
 }
 
