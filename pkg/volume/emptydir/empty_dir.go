@@ -422,9 +422,11 @@ func (ed *emptyDir) teardownDefault(dir string) error {
 	}
 	// Renaming the directory is not required anymore because the operation executor
 	// now handles duplicate operations on the same volume
-	err = os.RemoveAll(dir)
-	if err != nil {
+	if err := os.RemoveAll(dir); err != nil {
 		return err
+	}
+	if err := os.RemoveAll(ed.getMetaDir()); err != nil {
+		klog.Warningf("Warning: Failed to reset volume %s state", ed.volName)
 	}
 	return nil
 }
@@ -438,6 +440,9 @@ func (ed *emptyDir) teardownTmpfsOrHugetlbfs(dir string) error {
 	}
 	if err := os.RemoveAll(dir); err != nil {
 		return err
+	}
+	if err := os.RemoveAll(ed.getMetaDir()); err != nil {
+		klog.Warningf("Warning: Failed to reset volume %s state", ed.volName)
 	}
 	return nil
 }

@@ -218,8 +218,13 @@ func doTestPlugin(t *testing.T, config pluginTestConfig) {
 	} else if !os.IsNotExist(err) {
 		t.Errorf("TearDown() failed: %v", err)
 	}
+	if _, err := os.Stat(metadataDir); err == nil {
+		t.Errorf("TearDown() failed, metadata path still exists: %s", metadataDir)
+	} else if !os.IsNotExist(err) {
+		t.Errorf("TearDown() failed: %v", err)
+	}
 
-	// Check the number of physicalMounter calls during tardown
+	// Check the number of physicalMounter calls during teardown
 	if e, a := config.expectedTeardownMounts, len(physicalMounter.Log); e != a {
 		t.Errorf("Expected %v physicalMounter calls during teardown, got %v", e, a)
 	} else if config.expectedTeardownMounts == 1 && physicalMounter.Log[0].Action != mount.FakeActionUnmount {
