@@ -20,6 +20,8 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	schedulingv1 "k8s.io/api/scheduling/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeapi "k8s.io/kubernetes/pkg/apis/core"
@@ -34,15 +36,15 @@ import (
 )
 
 const (
-	criticalPodName   = "critical-pod"
-	guaranteedPodName = "guaranteed"
-	burstablePodName  = "burstable"
-	bestEffortPodName = "best-effort"
+	criticalPodName            = "critical-pod"
+	guaranteedPodName          = "guaranteed"
+	burstablePodName           = "burstable"
+	bestEffortPodName          = "best-effort"
+	systemCriticalPriorityName = "critical-pod-test-high-priority"
 )
 
 var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:CriticalPod]", func() {
 	f := framework.NewDefaultFramework("critical-pod-test")
-
 	ginkgo.Context("when we need to admit a critical pod", func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			if initialConfig.FeatureGates == nil {
@@ -56,6 +58,8 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			if !configEnabled {
 				framework.Skipf("unable to run test without dynamic kubelet config enabled.")
 			}
+			// because adminssion Priority enable, If the priority class is not found, the Pod is rejected.
+			systemCriticalPriority := &schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: systemCriticalPriorityName}, Value: scheduling.SystemCriticalPriority}
 
 			// Define test pods
 			nonCriticalGuaranteed := getTestPod(false, guaranteedPodName, v1.ResourceRequirements{
@@ -81,6 +85,9 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 				Requests: getNodeCPUAndMemoryCapacity(f),
 			})
 
+			_, err = f.ClientSet.SchedulingV1().PriorityClasses().Create(systemCriticalPriority)
+			gomega.Expect(err == nil || errors.IsAlreadyExists(err)).To(gomega.BeTrue(), "failed to create PriorityClasses with an error: %v", err)
+
 			// Create pods, starting with non-critical so that the critical preempts the other pods.
 			f.PodClient().CreateBatch([]*v1.Pod{nonCriticalBestEffort, nonCriticalBurstable, nonCriticalGuaranteed})
 			f.PodClientNS(kubeapi.NamespaceSystem).CreateSyncInNamespace(criticalPod, kubeapi.NamespaceSystem)
@@ -102,6 +109,8 @@ var _ = framework.KubeDescribe("CriticalPod [Serial] [Disruptive] [NodeFeature:C
 			f.PodClient().DeleteSync(burstablePodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			f.PodClient().DeleteSync(bestEffortPodName, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
 			f.PodClientNS(kubeapi.NamespaceSystem).DeleteSyncInNamespace(criticalPodName, kubeapi.NamespaceSystem, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+			err := f.ClientSet.SchedulingV1().PriorityClasses().Delete(systemCriticalPriorityName, &metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
 			// Log Events
 			logPodEvents(f)
 			logNodeEvents(f)
@@ -123,6 +132,7 @@ func getNodeCPUAndMemoryCapacity(f *framework.Framework) v1.ResourceList {
 }
 
 func getTestPod(critical bool, name string, resources v1.ResourceRequirements) *v1.Pod {
+	value := scheduling.SystemCriticalPriority
 	pod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -144,8 +154,8 @@ func getTestPod(critical bool, name string, resources v1.ResourceRequirements) *
 		pod.ObjectMeta.Annotations = map[string]string{
 			kubelettypes.ConfigSourceAnnotationKey: kubelettypes.FileSource,
 		}
-		podPriority := scheduling.SystemCriticalPriority
-		pod.Spec.Priority = &podPriority
+		pod.Spec.PriorityClassName = systemCriticalPriorityName
+		pod.Spec.Priority = &value
 
 		gomega.Expect(kubelettypes.IsCriticalPod(pod)).To(gomega.BeTrue(), "pod should be a critical pod")
 	} else {
