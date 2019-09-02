@@ -38,7 +38,7 @@ var _ = ginkgo.Describe("log", func() {
 	})
 	ginkgo.It("fails", func() {
 		func() {
-			log.Failf("I'm failing.")
+			log.Failf("I'm failing XXX.")
 		}()
 	})
 	ginkgo.It("asserts", func() {
