@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package log_test
+package framework_test
 
 import (
 	"errors"
@@ -29,8 +29,18 @@ import (
 	"github.com/onsi/gomega"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/log"
 )
+
+// The line number of the following code is checked in TestFailureOutput below.
+// Be careful when moving it around or changing the import statements above.
+// Here are some intentionally blank lines that can be removed to compensate
+// for future additional import statements.
+//
+//
+//
+//
+//
+//
 
 func runTests(t *testing.T, reporter ginkgo.Reporter) {
 	// This source code line will be part of the stack dump comparison.
@@ -39,11 +49,11 @@ func runTests(t *testing.T, reporter ginkgo.Reporter) {
 
 var _ = ginkgo.Describe("log", func() {
 	ginkgo.BeforeEach(func() {
-		log.Logf("before")
+		framework.Logf("before")
 	})
 	ginkgo.It("fails", func() {
 		func() {
-			log.Failf("I'm failing.")
+			framework.Failf("I'm failing.")
 		}()
 	})
 	ginkgo.It("asserts", func() {
@@ -57,7 +67,7 @@ var _ = ginkgo.Describe("log", func() {
 		framework.ExpectEqual(0, 1, "of course it's not equal...")
 	})
 	ginkgo.AfterEach(func() {
-		log.Logf("after")
+		framework.Logf("after")
 		gomega.Expect(true).To(gomega.Equal(false), "true is never false either")
 	})
 })
@@ -67,7 +77,7 @@ func TestFailureOutput(t *testing.T) {
 	// reporter in adddition to the default one. To see what the full
 	// Ginkgo report looks like, run this test with "go test -v".
 	config.DefaultReporterConfig.FullTrace = true
-	gomega.RegisterFailHandler(log.Fail)
+	gomega.RegisterFailHandler(framework.Fail)
 	fakeT := &testing.T{}
 	reporter := reporters.NewFakeReporter()
 	runTests(fakeT, reporter)
@@ -77,33 +87,33 @@ func TestFailureOutput(t *testing.T) {
 	actual := normalizeReport(*reporter)
 
 	// output from AfterEach
-	commonOutput := "\n\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.6()\n\tlogger_test.go:61\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n\n"
+	commonOutput := "\n\nINFO: after\nFAIL: true is never false either\nExpected\n    <bool>: true\nto equal\n    <bool>: false\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.6()\n\tlog_test.go:71\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n\n"
 
 	// Sorted by name!
 	expected := suiteResults{
 		testResult{
 			name:    "[Top Level] log asserts",
-			output:  "INFO: before\nFAIL: false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.3()\n\tlogger_test.go:50\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
+			output:  "INFO: before\nFAIL: false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()\n\tlog_test.go:60\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47" + commonOutput,
 			failure: "false is never true\nExpected\n    <bool>: false\nto equal\n    <bool>: true",
-			stack:   "k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.3()\n\tlogger_test.go:50\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
+			stack:   "k8s.io/kubernetes/test/e2e/framework_test.glob..func1.3()\n\tlog_test.go:60\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n",
 		},
 		testResult{
 			name:    "[Top Level] log equal",
-			output:  "INFO: before\nFAIL: of course it's not equal...\nExpected\n    <int>: 0\nto equal\n    <int>: 1\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.5()\n\tlogger_test.go:57\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
+			output:  "INFO: before\nFAIL: of course it's not equal...\nExpected\n    <int>: 0\nto equal\n    <int>: 1\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()\n\tlog_test.go:67\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47" + commonOutput,
 			failure: "of course it's not equal...\nExpected\n    <int>: 0\nto equal\n    <int>: 1",
-			stack:   "k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.5()\n\tlogger_test.go:57\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
+			stack:   "k8s.io/kubernetes/test/e2e/framework_test.glob..func1.5()\n\tlog_test.go:67\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n",
 		},
 		testResult{
 			name:    "[Top Level] log error",
-			output:  "INFO: before\nFAIL: hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()\n\tlogger_test.go:54\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
+			output:  "INFO: before\nFAIL: hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()\n\tlog_test.go:64\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47" + commonOutput,
 			failure: "hard-coded error\nUnexpected error:\n    <*errors.errorString>: {\n        s: \"an error with a long, useless description\",\n    }\n    an error with a long, useless description\noccurred",
-			stack:   "k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.4()\n\tlogger_test.go:54\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
+			stack:   "k8s.io/kubernetes/test/e2e/framework_test.glob..func1.4()\n\tlog_test.go:64\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n",
 		},
 		testResult{
 			name:    "[Top Level] log fails",
-			output:  "INFO: before\nFAIL: I'm failing.\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)\n\tlogger_test.go:46\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2()\n\tlogger_test.go:47\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37" + commonOutput,
+			output:  "INFO: before\nFAIL: I'm failing.\n\nFull Stack Trace\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.2.1(...)\n\tlog_test.go:56\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()\n\tlog_test.go:57\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47" + commonOutput,
 			failure: "I'm failing.",
-			stack:   "k8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2.1(...)\n\tlogger_test.go:46\nk8s.io/kubernetes/test/e2e/framework/log_test.glob..func1.2()\n\tlogger_test.go:47\nk8s.io/kubernetes/test/e2e/framework/log_test.runTests()\n\tlogger_test.go:37\n",
+			stack:   "k8s.io/kubernetes/test/e2e/framework_test.glob..func1.2.1(...)\n\tlog_test.go:56\nk8s.io/kubernetes/test/e2e/framework_test.glob..func1.2()\n\tlog_test.go:57\nk8s.io/kubernetes/test/e2e/framework_test.runTests()\n\tlog_test.go:47\n",
 		},
 	}
 	// Compare individual fields. Comparing the slices leads to unreadable error output when there is any mismatch.
@@ -172,13 +182,13 @@ var functionArgs = regexp.MustCompile(`([[:alpha:]]+)\(.*\)`)
 
 // testFailureOutput matches TestFailureOutput() and its source followed by additional stack entries:
 //
-// k8s.io/kubernetes/test/e2e/framework/log_test.TestFailureOutput(0xc000558800)
-//	/nvme/gopath/src/k8s.io/kubernetes/test/e2e/framework/log/logger_test.go:73 +0x1c9
+// k8s.io/kubernetes/test/e2e/framework_test.TestFailureOutput(0xc000558800)
+//	/nvme/gopath/src/k8s.io/kubernetes/test/e2e/framework/log/log_test.go:73 +0x1c9
 // testing.tRunner(0xc000558800, 0x1af2848)
 // 	/nvme/gopath/go/src/testing/testing.go:865 +0xc0
 // created by testing.(*T).Run
 //	/nvme/gopath/go/src/testing/testing.go:916 +0x35a
-var testFailureOutput = regexp.MustCompile(`(?m)^k8s.io/kubernetes/test/e2e/framework/log_test\.TestFailureOutput\(.*\n\t.*(\n.*\n\t.*)*`)
+var testFailureOutput = regexp.MustCompile(`(?m)^k8s.io/kubernetes/test/e2e/framework_test\.TestFailureOutput\(.*\n\t.*(\n.*\n\t.*)*`)
 
 // normalizeLocation removes path prefix and function parameters and certain stack entries
 // that we don't care about.
