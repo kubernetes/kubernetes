@@ -275,7 +275,7 @@ func TestSetCRDCondition(t *testing.T) {
 				t.Errorf("%v expected %v, got %v", tc.name, tc.expectedcrdCondition, crd.Status.Conditions)
 			}
 			if crd.Status.Conditions[i].LastTransitionTime.IsZero() {
-				t.Errorf("%q lastTransitionTime should not be null: %v", tc.name, i, crd.Status.Conditions)
+				t.Errorf("%q condition %v, lastTransitionTime should not be null: %v", tc.name, i, crd.Status.Conditions)
 			}
 		}
 	}
