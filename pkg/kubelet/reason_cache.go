@@ -40,8 +40,8 @@ type ReasonCache struct {
 	cache *lru.Cache
 }
 
-// Reason is the cached item in ReasonCache
-type reasonItem struct {
+// ReasonItem is the cached item in ReasonCache
+type ReasonItem struct {
 	Err     error
 	Message string
 }
@@ -64,7 +64,7 @@ func (c *ReasonCache) composeKey(uid types.UID, name string) string {
 func (c *ReasonCache) add(uid types.UID, name string, reason error, message string) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	c.cache.Add(c.composeKey(uid, name), reasonItem{reason, message})
+	c.cache.Add(c.composeKey(uid, name), ReasonItem{reason, message})
 }
 
 // Update updates the reason cache with the SyncPodResult. Only SyncResult with
@@ -93,13 +93,13 @@ func (c *ReasonCache) Remove(uid types.UID, name string) {
 // Get gets error reason from the cache. The return values are error reason, error message and
 // whether an error reason is found in the cache. If no error reason is found, empty string will
 // be returned for error reason and error message.
-func (c *ReasonCache) Get(uid types.UID, name string) (*reasonItem, bool) {
+func (c *ReasonCache) Get(uid types.UID, name string) (*ReasonItem, bool) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	value, ok := c.cache.Get(c.composeKey(uid, name))
 	if !ok {
 		return nil, false
 	}
-	info := value.(reasonItem)
+	info := value.(ReasonItem)
 	return &info, true
 }
