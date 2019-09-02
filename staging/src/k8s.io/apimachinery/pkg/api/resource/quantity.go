@@ -126,6 +126,8 @@ func MustParse(str string) Quantity {
 	if err != nil {
 		panic(fmt.Errorf("cannot parse '%v': %v", str, err))
 	}
+	// fill the s field of q so that DeepEqual is idempotent across invocation of String()
+	q.String()
 	return q
 }
 
@@ -265,7 +267,9 @@ func ParseQuantity(str string) (Quantity, error) {
 		return Quantity{}, ErrFormatWrong
 	}
 	if str == "0" {
-		return Quantity{Format: DecimalSI, s: str}, nil
+		q := Quantity{Format: DecimalSI, s: str}
+		q.String()
+		return q, nil
 	}
 
 	positive, value, num, denom, suf, err := parseQuantityString(str)
@@ -318,14 +322,20 @@ func ParseQuantity(str string) (Quantity, error) {
 				switch format {
 				case BinarySI:
 					if exponent%10 == 0 && (value&0x07 != 0) {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+						q := Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}
+						q.String()
+						return q, nil
 					}
 				default:
 					if scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+						q := Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}
+						q.String()
+						return q, nil
 					}
 				}
-				return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
+				q := Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}
+				q.String()
+				return q, nil
 			}
 		}
 	}
@@ -373,7 +383,9 @@ func ParseQuantity(str string) (Quantity, error) {
 		amount.Neg(amount)
 	}
 
-	return Quantity{d: infDecAmount{amount}, Format: format}, nil
+	q := Quantity{d: infDecAmount{amount}, Format: format}
+	q.String()
+	return q, nil
 }
 
 // DeepCopy returns a deep-copy of the Quantity value.  Note that the method
