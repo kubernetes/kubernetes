@@ -14,6 +14,7 @@ test/e2e/apimachinery/crd_watch.go: "watch on custom resource definition objects
 test/e2e/apimachinery/custom_resource_definition.go: "creating/deleting custom resource definition objects works"
 test/e2e/apimachinery/custom_resource_definition.go: "listing custom resource definition objects works"
 test/e2e/apimachinery/custom_resource_definition.go: "getting/updating/patching custom resource definition status sub-resource works"
+test/e2e/apimachinery/custom_resource_definition.go: "should include custom resource definition resources in discovery documents"
 test/e2e/apimachinery/garbage_collector.go: "should delete pods created by rc when not orphaning"
 test/e2e/apimachinery/garbage_collector.go: "should orphan pods created by rc if delete options say so"
 test/e2e/apimachinery/garbage_collector.go: "should delete RS created by deployment when not orphaning"
