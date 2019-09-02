@@ -21,7 +21,6 @@ import (
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
@@ -387,14 +386,8 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:    "test-container",
-							Image:   imageutils.GetE2EImage(imageutils.BusyBox),
-							Command: []string{"sleep", "10000"},
-							Resources: v1.ResourceRequirements{
-								Requests: v1.ResourceList{
-									v1.ResourceCPU: resource.MustParse("10m"),
-								},
-							},
+							Name:         "test-container",
+							Image:        imageutils.GetE2EImage(imageutils.Pause),
 							VolumeMounts: volumeMounts,
 						},
 					},
