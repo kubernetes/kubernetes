@@ -106,7 +106,7 @@ function log() {
 
 # Generate kubectl prune-whitelist flags from provided resource list.
 function generate_prune_whitelist_flags() {
-  local -r resources=($@)
+  local -r resources=( "$@" )
   for resource in "${resources[@]}"; do
     printf "%s" "--prune-whitelist ${resource} "
   done
@@ -116,10 +116,10 @@ function generate_prune_whitelist_flags() {
 # besides the default ones.
 extra_prune_whitelist=
 if [ -n "${KUBECTL_EXTRA_PRUNE_WHITELIST:-}" ]; then
-  extra_prune_whitelist=( ${KUBECTL_EXTRA_PRUNE_WHITELIST:-} )
+  extra_prune_whitelist=( "${KUBECTL_EXTRA_PRUNE_WHITELIST:-}" )
 fi
-prune_whitelist=( ${KUBECTL_PRUNE_WHITELIST[@]}  ${extra_prune_whitelist[@]} )
-prune_whitelist_flags=$(generate_prune_whitelist_flags ${prune_whitelist[@]})
+prune_whitelist=( "${KUBECTL_PRUNE_WHITELIST[@]}"  "${extra_prune_whitelist[@]}" )
+prune_whitelist_flags=$(generate_prune_whitelist_flags "${prune_whitelist[@]}")
 
 log INFO "== Generated kubectl prune whitelist flags: $prune_whitelist_flags =="
 
@@ -133,7 +133,7 @@ function start_addon() {
   local -r delay=$3;
   local -r namespace=$4
 
-  create_resource_from_string "$(cat ${addon_filename})" "${tries}" "${delay}" "${addon_filename}" "${namespace}"
+  create_resource_from_string "$(cat "${addon_filename}")" "${tries}" "${delay}" "${addon_filename}" "${namespace}"
 }
 
 # $1 string with json or yaml.
@@ -147,13 +147,15 @@ function create_resource_from_string() {
   local -r delay=$3;
   local -r config_name=$4;
   local -r namespace=$5;
-  while [ ${tries} -gt 0 ]; do
+  while [ "${tries}" -gt 0 ]; do
+    # shellcheck disable=SC2086
+    # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
     echo "${config_string}" | ${KUBECTL} ${KUBECTL_OPTS} --namespace="${namespace}" apply -f - && \
       log INFO "== Successfully started ${config_name} in namespace ${namespace} at $(date -Is)" && \
       return 0;
-    let tries=tries-1;
+    (( tries-- ))
     log WRN "== Failed to start ${config_name} in namespace ${namespace} at $(date -Is). ${tries} tries remaining. =="
-    sleep ${delay};
+    sleep "${delay}";
   done
   return 1;
 }
@@ -165,11 +167,15 @@ function reconcile_addons() {
   # Filter out `configured` message to not noisily log.
   # `created`, `pruned` and errors will be logged.
   log INFO "== Reconciling with deprecated label =="
+  # shellcheck disable=SC2086
+  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}=true,${ADDON_MANAGER_LABEL}!=EnsureExists \
     --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
 
   log INFO "== Reconciling with addon-manager label =="
+  # shellcheck disable=SC2086
+  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   ${KUBECTL} ${KUBECTL_OPTS} apply -f ${ADDON_PATH} \
     -l ${CLUSTER_SERVICE_LABEL}!=true,${ADDON_MANAGER_LABEL}=Reconcile \
     --prune=true ${prune_whitelist_flags} --recursive | grep -v configured
@@ -180,6 +186,8 @@ function reconcile_addons() {
 function ensure_addons() {
   # Create objects already exist should fail.
   # Filter out `AlreadyExists` message to not noisily log.
+  # shellcheck disable=SC2086
+  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
   ${KUBECTL} ${KUBECTL_OPTS} create -f ${ADDON_PATH} \
     -l ${ADDON_MANAGER_LABEL}=EnsureExists --recursive 2>&1 | grep -v AlreadyExists
 
@@ -194,9 +202,11 @@ function is_leader() {
     log INFO "Leader election disabled."
     return 0;
   fi
-  KUBE_CONTROLLER_MANAGER_LEADER=`${KUBECTL} ${KUBECTL_OPTS} -n kube-system get ep kube-controller-manager \
+  # shellcheck disable=SC2086
+  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
+  KUBE_CONTROLLER_MANAGER_LEADER=$(${KUBECTL} ${KUBECTL_OPTS} -n kube-system get ep kube-controller-manager \
     -o go-template=$'{{index .metadata.annotations "control-plane.alpha.kubernetes.io/leader"}}' \
-    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/' | awk -F'_' '{print $1}'`
+    | sed 's/^.*"holderIdentity":"\([^"]*\)".*/\1/' | awk -F'_' '{print $1}')
   # If there was any problem with getting the leader election results, var will
   # be empty. Since it's better to have multiple addon managers than no addon
   # managers at all, we're going to assume that we're the leader in such case.
@@ -214,8 +224,9 @@ log INFO "== Kubernetes addon manager started at $(date -Is) with ADDON_CHECK_IN
 token_found=""
 while [ -z "${token_found}" ]; do
   sleep .5
-  token_found=$(${KUBECTL} ${KUBECTL_OPTS} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default -o go-template="{{with index .secrets 0}}{{.name}}{{end}}")
-  if [[ $? -ne 0 ]]; then
+  # shellcheck disable=SC2086
+  # Disabling because "${KUBECTL_OPTS}" needs to allow for expansion here
+  if ! token_found=$(${KUBECTL} ${KUBECTL_OPTS} get --namespace="${SYSTEM_NAMESPACE}" serviceaccount default -o go-template="{{with index .secrets 0}}{{.name}}{{end}}"); then
     token_found="";
     log WRN "== Error getting default service account, retry in 0.5 second =="
   fi
@@ -226,10 +237,10 @@ log INFO "== Default service account in the ${SYSTEM_NAMESPACE} namespace has to
 # Create admission_control objects if defined before any other addon services. If the limits
 # are defined in a namespace other than default, we should still create the limits for the
 # default namespace.
-for obj in $(find /etc/kubernetes/admission-controls \( -name \*.yaml -o -name \*.json \)); do
+while IFS=$'\n' read -r obj; do
   start_addon "${obj}" 100 10 default &
   log INFO "++ obj ${obj} is created ++"
-done
+done < <(find /etc/kubernetes/admission-controls \( -name \*.yaml -o -name \*.json \))
 
 # Start the apply loop.
 # Check if the configuration has changed recently - in case the user
@@ -244,10 +255,10 @@ while true; do
     log INFO "Not elected leader, going back to sleep."
   fi
   end_sec=$(date +"%s")
-  len_sec=$((${end_sec}-${start_sec}))
+  len_sec=$((end_sec-start_sec))
   # subtract the time passed from the sleep time
   if [[ ${len_sec} -lt ${ADDON_CHECK_INTERVAL_SEC} ]]; then
-    sleep_time=$((${ADDON_CHECK_INTERVAL_SEC}-${len_sec}))
+    sleep_time=$((ADDON_CHECK_INTERVAL_SEC-len_sec))
     sleep ${sleep_time}
   fi
 done
