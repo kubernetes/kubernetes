@@ -467,7 +467,7 @@ func InitRbdDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "rbd",
 			InTreePluginName: "kubernetes.io/rbd",
-			FeatureTag:       "[Feature:Volumes]",
+			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -596,7 +596,7 @@ func InitCephFSDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "ceph",
 			InTreePluginName: "kubernetes.io/cephfs",
-			FeatureTag:       "[Feature:Volumes]",
+			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
