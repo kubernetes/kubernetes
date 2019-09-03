@@ -84,14 +84,19 @@ function FetchAndImport-ModuleFromMetadata {
   Import-Module -Force C:\$Filename
 }
 
-# Returns true if the ENABLE_NODE_LOGGING field in kube_env is true.
+# Returns true if the ENABLE_STACKDRIVER_WINDOWS or ENABLE_NODE_LOGGING field in kube_env is true.
 # $KubeEnv is a hash table containing the kube-env metadata keys+values.
+# ENABLE_NODE_LOGGING is used for legacy Stackdriver Logging, and will be deprecated (always set to False)
+# soon. ENABLE_STACKDRIVER_WINDOWS is added to indicate whether logging is enabled for windows nodes.
 function IsLoggingEnabled {
   param (
     [parameter(Mandatory=$true)] [hashtable]$KubeEnv
   )
 
-  if ($KubeEnv.Contains('ENABLE_NODE_LOGGING') -and `
+  if ($KubeEnv.Contains('ENABLE_STACKDRIVER_WINDOWS') -and `
+      ($KubeEnv['ENABLE_STACKDRIVER_WINDOWS'] -eq 'true')) {
+    return $true
+  } elseif ($KubeEnv.Contains('ENABLE_NODE_LOGGING') -and `
       ($KubeEnv['ENABLE_NODE_LOGGING'] -eq 'true')) {
     return $true
   }
