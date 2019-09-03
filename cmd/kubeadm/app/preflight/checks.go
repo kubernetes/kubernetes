@@ -431,9 +431,12 @@ func (hst HTTPProxyCheck) Name() string {
 // Check validates http connectivity type, direct or via proxy.
 func (hst HTTPProxyCheck) Check() (warnings, errorList []error) {
 	klog.V(1).Infoln("validating if the connectivity type is via proxy or direct")
-	u := (&url.URL{Scheme: hst.Proto, Host: hst.Host}).String()
+	u := &url.URL{Scheme: hst.Proto, Host: hst.Host}
+	if utilsnet.IsIPv6String(hst.Host) {
+		u.Host = net.JoinHostPort(hst.Host, "1234")
+	}
 
-	req, err := http.NewRequest("GET", u, nil)
+	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
 		return nil, []error{err}
 	}
