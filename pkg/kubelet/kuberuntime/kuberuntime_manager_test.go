@@ -494,6 +494,13 @@ func TestSyncPod(t *testing.T) {
 			Name:            "foo1",
 			Image:           "busybox",
 			ImagePullPolicy: v1.PullIfNotPresent,
+			Lifecycle:       &v1.Lifecycle{
+				PostStart: &v1.Handler{
+					Exec: &v1.ExecAction{
+						Command: []string{"sh", "-c", "while true; do sleep 3600; done"},
+					},
+				},
+			},
 		},
 		{
 			Name:            "foo2",
@@ -579,6 +586,13 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 			Name:            "foo1",
 			Image:           "busybox",
 			ImagePullPolicy: v1.PullIfNotPresent,
+			Lifecycle:       &v1.Lifecycle{
+				PostStart: &v1.Handler{
+					Exec: &v1.ExecAction{
+						Command: []string{"sh", "-c", "while true; do sleep 3600; done"},
+					},
+				},
+			},
 		},
 		{
 			Name:            "foo2",
@@ -617,7 +631,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 	assert.NoError(t, result.Error())
 	verifyContainerStatuses(t, fakeRuntime, expected, "init container still running; do nothing")
 
-	// 3. should create all app containers because init container finished.
+	// 3. should create all app containers in parallel because init container finished.
 	// Stop init container instance 0.
 	sandboxIDs, err := m.getSandboxIDByPodUID(pod.UID, nil)
 	require.NoError(t, err)
