@@ -127,6 +127,7 @@ try {
     StartProcess-WriteSshKeys
   }
 
+  # Even if Stackdriver is already installed, the function will still [re]start the service.
   if (IsLoggingEnabled $kube_env) {
     InstallAndStart-LoggingAgent
   }
