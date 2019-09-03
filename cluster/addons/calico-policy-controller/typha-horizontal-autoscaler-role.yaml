@@ -10,6 +10,6 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get"]
-  - apiGroups: ["extensions"]
+  - apiGroups: ["apps", "extensions"]
     resources: ["deployments/scale"]
     verbs: ["get", "update"]
