@@ -49,6 +49,7 @@ func NewCSRApprovingController(client clientset.Interface, csrInformer certifica
 		recognizers: recognizers(),
 	}
 	return certificates.NewCertificateController(
+		"csrapproving",
 		client,
 		csrInformer,
 		approver.handle,
