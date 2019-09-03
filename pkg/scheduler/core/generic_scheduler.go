@@ -797,12 +797,12 @@ func PrioritizeNodes(
 		}
 
 		for j := range scoresMap {
-			result[i].Score += scoresMap[j][i].Score
+			result[i].Score += int64(scoresMap[j][i].Score)
 		}
 	}
 
 	if len(extenders) != 0 && nodes != nil {
-		combinedScores := make(map[string]int, len(nodeNameToInfo))
+		combinedScores := make(map[string]int64, len(nodeNameToInfo))
 		for i := range extenders {
 			if !extenders[i].IsInterested(pod) {
 				continue
@@ -868,7 +868,7 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 	if len(nodesToVictims) == 0 {
 		return nil
 	}
-	minNumPDBViolatingPods := math.MaxInt32
+	minNumPDBViolatingPods := int64(math.MaxInt32)
 	var minNodes1 []*v1.Node
 	lenNodes1 := 0
 	for node, victims := range nodesToVictims {
@@ -1019,7 +1019,7 @@ func (g *genericScheduler) selectNodesForPreemption(
 			resultLock.Lock()
 			victims := schedulerapi.Victims{
 				Pods:             pods,
-				NumPDBViolations: numPDBViolations,
+				NumPDBViolations: int64(numPDBViolations),
 			}
 			nodeToVictims[potentialNodes[i]] = &victims
 			resultLock.Unlock()

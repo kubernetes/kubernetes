@@ -45,7 +45,7 @@ type HTTPExtender struct {
 	filterVerb       string
 	prioritizeVerb   string
 	bindVerb         string
-	weight           int
+	weight           int64
 	client           *http.Client
 	nodeCacheCapable bool
 	managedResources sets.String
@@ -321,7 +321,7 @@ func (h *HTTPExtender) Filter(
 // Prioritize based on extender implemented priority functions. Weight*priority is added
 // up for each such priority function. The returned score is added to the score computed
 // by Kubernetes scheduler. The total score is used to do the host selection.
-func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, int, error) {
+func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, int64, error) {
 	var (
 		result    schedulerapi.HostPriorityList
 		nodeList  *v1.NodeList

@@ -88,7 +88,7 @@ func numericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.N
 		}
 		result = append(result, schedulerapi.HostPriority{
 			Host:  node.Name,
-			Score: score,
+			Score: int64(score),
 		})
 	}
 	return result, nil
@@ -110,7 +110,7 @@ func reverseNumericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernod
 	for _, hostPriority := range result {
 		reverseResult = append(reverseResult, schedulerapi.HostPriority{
 			Host:  hostPriority.Host,
-			Score: int(maxScore + minScore - float64(hostPriority.Score)),
+			Score: int64(maxScore + minScore - float64(hostPriority.Score)),
 		})
 	}
 
@@ -927,7 +927,7 @@ func TestZeroRequest(t *testing.T) {
 		pods          []*v1.Pod
 		nodes         []*v1.Node
 		name          string
-		expectedScore int
+		expectedScore int64
 	}{
 		// The point of these next two tests is to show you get the same priority for a zero-request pod
 		// as for a pod with the defaults requests, both when the zero-request pod is already on the machine

@@ -50,7 +50,7 @@ type PriorityConfig struct {
 	// TODO: Remove it after migrating all functions to
 	// Map-Reduce pattern.
 	Function PriorityFunction
-	Weight   int
+	Weight   int64
 }
 
 // EmptyPriorityMetadataProducer returns a no-op PriorityMetadataProducer type.
