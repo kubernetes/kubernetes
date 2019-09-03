@@ -57,7 +57,7 @@ func (a *authenticationInfoResolver) ClientConfigFor(hostPort string) (*rest.Con
 	return a.restConfig, nil
 }
 
-func (a *authenticationInfoResolver) ClientConfigForService(serviceName, serviceNamespace string) (*rest.Config, error) {
+func (a *authenticationInfoResolver) ClientConfigForService(serviceName, serviceNamespace string, servicePort int) (*rest.Config, error) {
 	atomic.AddInt32(a.cacheMisses, 1)
 	return a.restConfig, nil
 }
