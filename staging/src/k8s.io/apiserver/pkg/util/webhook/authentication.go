@@ -136,6 +136,23 @@ func (c *defaultAuthenticationInfoResolver) clientConfig(target string) (*rest.C
 		}
 	}
 
+	// If target included the default https port (443), search again without the port
+	if target, port, err := net.SplitHostPort(target); err == nil && port == "443" {
+		// exact match without port
+		if authConfig, ok := c.kubeconfig.AuthInfos[target]; ok {
+			return restConfigFromKubeconfig(authConfig)
+		}
+
+		// star prefixed match without port
+		serverSteps := strings.Split(target, ".")
+		for i := 1; i < len(serverSteps); i++ {
+			nickName := "*." + strings.Join(serverSteps[i:], ".")
+			if authConfig, ok := c.kubeconfig.AuthInfos[nickName]; ok {
+				return restConfigFromKubeconfig(authConfig)
+			}
+		}
+	}
+
 	// if we're trying to hit the kube-apiserver and there wasn't an explicit config, use the in-cluster config
 	if target == "kubernetes.default.svc" {
 		// if we can find an in-cluster-config use that.  If we can't, fall through.
