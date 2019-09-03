@@ -74,7 +74,7 @@ type PriorityFunctionFactory2 func(PluginFactoryArgs) (priorities.PriorityMapFun
 type PriorityConfigFactory struct {
 	Function          PriorityFunctionFactory
 	MapReduceFunction PriorityFunctionFactory2
-	Weight            int
+	Weight            int64
 }
 
 var (
@@ -329,7 +329,7 @@ func RegisterPriorityFunction(name string, function priorities.PriorityFunction,
 		Function: func(PluginFactoryArgs) priorities.PriorityFunction {
 			return function
 		},
-		Weight: weight,
+		Weight: int64(weight),
 	})
 }
 
@@ -344,7 +344,7 @@ func RegisterPriorityMapReduceFunction(
 		MapReduceFunction: func(PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 			return mapFunction, reduceFunction
 		},
-		Weight: weight,
+		Weight: int64(weight),
 	})
 }
 
@@ -549,7 +549,7 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]pr
 
 // validateSelectedConfigs validates the config weights to avoid the overflow.
 func validateSelectedConfigs(configs []priorities.PriorityConfig) error {
-	var totalPriority int
+	var totalPriority int64
 	for _, config := range configs {
 		// Checks totalPriority against MaxTotalPriority to avoid overflow
 		if config.Weight*schedulerapi.MaxPriority > schedulerapi.MaxTotalPriority-totalPriority {

@@ -55,7 +55,7 @@ func ImageLocalityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *scheduler
 
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
-		Score: score,
+		Score: int64(score),
 	}, nil
 }
 
