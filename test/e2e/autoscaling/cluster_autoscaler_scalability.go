@@ -36,7 +36,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -90,9 +89,9 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, sum, scaleUpTimeout))
 
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
 		nodeCount = len(nodes.Items)
-		gomega.Expect(nodeCount).NotTo(gomega.BeZero())
 		cpu := nodes.Items[0].Status.Capacity[v1.ResourceCPU]
 		mem := nodes.Items[0].Status.Capacity[v1.ResourceMemory]
 		coresPerNode = int((&cpu).MilliValue() / 1000)
@@ -324,7 +323,8 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		time.Sleep(scaleDownTimeout)
 
 		ginkgo.By("Checking if the number of nodes is as expected")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
 		klog.Infof("Nodes: %v, expected: %v", len(nodes.Items), totalNodes)
 		framework.ExpectEqual(len(nodes.Items), totalNodes)
 	})

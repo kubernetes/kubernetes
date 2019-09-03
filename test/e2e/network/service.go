@@ -566,7 +566,9 @@ var _ = SIGDescribe("Services", func() {
 			loadBalancerLagTimeout = e2eservice.LoadBalancerLagTimeoutAWS
 		}
 		loadBalancerCreateTimeout := e2eservice.LoadBalancerCreateTimeoutDefault
-		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
+		if len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
 			loadBalancerCreateTimeout = e2eservice.LoadBalancerCreateTimeoutLarge
 		}
 
@@ -1522,7 +1524,9 @@ var _ = SIGDescribe("Services", func() {
 			loadBalancerLagTimeout = e2eservice.LoadBalancerLagTimeoutAWS
 		}
 		loadBalancerCreateTimeout := e2eservice.LoadBalancerCreateTimeoutDefault
-		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
+		if len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
 			loadBalancerCreateTimeout = e2eservice.LoadBalancerCreateTimeoutLarge
 		}
 
@@ -1540,7 +1544,6 @@ var _ = SIGDescribe("Services", func() {
 		// This container is an nginx container listening on port 80
 		// See kubernetes/contrib/ingress/echoheaders/nginx.conf for content of response
 		jig.RunOrFail(namespace, nil)
-		var err error
 		// Make sure acceptPod is running. There are certain chances that pod might be teminated due to unexpected reasons.
 		acceptPod, err = cs.CoreV1().Pods(namespace).Get(acceptPod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err, "Unable to get pod %s", acceptPod.Name)
@@ -1598,7 +1601,9 @@ var _ = SIGDescribe("Services", func() {
 		framework.SkipUnlessProviderIs("azure", "gke", "gce")
 
 		createTimeout := e2eservice.LoadBalancerCreateTimeoutDefault
-		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
+		if len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
 			createTimeout = e2eservice.LoadBalancerCreateTimeoutLarge
 		}
 
@@ -2076,7 +2081,9 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 
 		cs = f.ClientSet
-		if nodes := framework.GetReadySchedulableNodesOrDie(cs); len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
+		if len(nodes.Items) > e2eservice.LargeClusterMinNodesNumber {
 			loadBalancerCreateTimeout = e2eservice.LoadBalancerCreateTimeoutLarge
 		}
 	})
@@ -2450,7 +2457,8 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 	framework.ExpectNoError(err, "failed to fetch service: %s in namespace: %s", serviceName, ns)
 	var svcIP string
 	if serviceType == v1.ServiceTypeNodePort {
-		nodes := framework.GetReadySchedulableNodesOrDie(cs)
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
 		addrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 		gomega.Expect(len(addrs)).To(gomega.BeNumerically(">", 0), "ginkgo.Failed to get Node internal IP")
 		svcIP = addrs[0]

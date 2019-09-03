@@ -47,7 +47,8 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 	ginkgo.It("should have ipv4 and ipv6 internal node ip", func() {
 		// TODO (aramase) can switch to new function to get all nodes
-		nodeList := framework.GetReadySchedulableNodesOrDie(cs)
+		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
 
 		for _, node := range nodeList.Items {
 			// get all internal ips for node
@@ -61,7 +62,8 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 	ginkgo.It("should have ipv4 and ipv6 node podCIDRs", func() {
 		// TODO (aramase) can switch to new function to get all nodes
-		nodeList := framework.GetReadySchedulableNodesOrDie(cs)
+		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
 
 		for _, node := range nodeList.Items {
 			framework.ExpectEqual(len(node.Spec.PodCIDRs), 2)
@@ -121,12 +123,8 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 		// get all schedulable nodes to determine the number of replicas for pods
 		// this is to ensure connectivity from all nodes on cluster
-		nodeList := framework.GetReadySchedulableNodesOrDie(cs)
-		gomega.Expect(nodeList).NotTo(gomega.BeNil())
-
-		if len(nodeList.Items) < 1 {
-			framework.Failf("Expect at least 1 node, got %v", len(nodeList.Items))
-		}
+		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
 
 		replicas := int32(len(nodeList.Items))
 

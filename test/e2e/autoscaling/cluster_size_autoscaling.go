@@ -111,7 +111,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		// Give instances time to spin up
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, sum, scaleUpTimeout))
 
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
 		nodeCount = len(nodes.Items)
 		coreCount = 0
 		for _, node := range nodes.Items {
@@ -363,7 +364,9 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		framework.ExpectEqual(status.timestamp.Add(freshStatusLimit).Before(time.Now()), false)
 		framework.ExpectEqual(status.status, caNoScaleUpStatus)
 		framework.ExpectEqual(status.ready, status.target)
-		framework.ExpectEqual(len(framework.GetReadySchedulableNodesOrDie(f.ClientSet).Items), status.target+unmanagedNodes)
+		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
+		framework.ExpectEqual(len(nodes.Items), status.target+unmanagedNodes)
 	})
 
 	ginkgo.It("should increase cluster size if pending pods are small and there is another node pool that is not autoscaled [Feature:ClusterSizeAutoscalingScaleUp]", func() {
@@ -723,7 +726,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		runDrainTest(f, originalSizes, f.Namespace.Name, 1, 0, func(increasedSize int) {
 			ginkgo.By("No nodes should be removed")
 			time.Sleep(scaleDownTimeout)
-			nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+			nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(nodes.Items), increasedSize)
 		})
 	})
@@ -919,7 +923,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 				ReserveMemory(f, "memory-reservation", 100, nodeCount*memAllocatableMb, false, defaultTimeout)
 				defer framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, "memory-reservation")
 				time.Sleep(scaleUpTimeout)
-				currentNodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+				currentNodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+				framework.ExpectNoError(err)
 				framework.Logf("Currently available nodes: %v, nodes available at the start of test: %v, disabled nodes: %v", len(currentNodes.Items), len(nodes.Items), nodesToBreakCount)
 				framework.ExpectEqual(len(currentNodes.Items), len(nodes.Items)-nodesToBreakCount)
 				status, err := getClusterwideStatus(c)
@@ -1271,7 +1276,8 @@ func getPoolInitialSize(poolName string) int {
 
 func getPoolSize(f *framework.Framework, poolName string) int {
 	size := 0
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	framework.ExpectNoError(err)
 	for _, node := range nodeList.Items {
 		if node.Labels[gkeNodepoolNameKey] == poolName {
 			size++

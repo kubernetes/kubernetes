@@ -317,7 +317,7 @@ func PickIP(c clientset.Interface) (string, error) {
 
 // GetPublicIps returns a public IP list of nodes.
 func GetPublicIps(c clientset.Interface) ([]string, error) {
-	nodes, err := GetReadySchedulableNodesOrDie(c)
+	nodes, err := GetReadySchedulableNodes(c)
 	if err != nil {
 		return nil, fmt.Errorf("get schedulable and ready nodes error: %s", err)
 	}
@@ -329,22 +329,23 @@ func GetPublicIps(c clientset.Interface) ([]string, error) {
 	return ips, nil
 }
 
-// GetReadySchedulableNodesOrDie addresses the common use case of getting nodes you can do work on.
+// GetReadySchedulableNodes addresses the common use case of getting nodes you can do work on.
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
 // If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
+// If there are no nodes that are both ready and schedulable, this will return an error.
 // TODO: remove references in framework/util.go.
-// TODO: remove "OrDie" suffix.
-func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList, err error) {
+func GetReadySchedulableNodes(c clientset.Interface) (nodes *v1.NodeList, err error) {
 	nodes, err = checkWaitListSchedulableNodes(c)
 	if err != nil {
 		return nil, fmt.Errorf("listing schedulable nodes error: %s", err)
 	}
-	// previous tests may have cause failures of some nodes. Let's skip
-	// 'Not Ready' nodes, just in case (there is no need to fail the test).
 	Filter(nodes, func(node v1.Node) bool {
 		return IsNodeSchedulable(&node) && IsNodeUntainted(&node)
 	})
+	if len(nodes.Items) == 0 {
+		return nil, fmt.Errorf("there are currently no ready, schedulable nodes in the cluster")
+	}
 	return nodes, nil
 }
 

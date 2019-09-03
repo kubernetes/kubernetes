@@ -2897,7 +2897,10 @@ func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testut
 
 // PrepareNodes prepares nodes in the cluster.
 func (p *E2ETestNodePreparer) PrepareNodes() error {
-	nodes := GetReadySchedulableNodesOrDie(p.client)
+	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
+	if err != nil {
+		return err
+	}
 	numTemplates := 0
 	for _, v := range p.countToStrategy {
 		numTemplates += v.Count
@@ -2923,9 +2926,11 @@ func (p *E2ETestNodePreparer) PrepareNodes() error {
 // CleanupNodes cleanups nodes in the cluster.
 func (p *E2ETestNodePreparer) CleanupNodes() error {
 	var encounteredError error
-	nodes := GetReadySchedulableNodesOrDie(p.client)
+	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
+	if err != nil {
+		return err
+	}
 	for i := range nodes.Items {
-		var err error
 		name := nodes.Items[i].Name
 		strategy, found := p.nodeToAppliedStrategy[name]
 		if found {

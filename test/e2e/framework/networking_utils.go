@@ -591,7 +591,8 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 	ginkgo.By("Getting node addresses")
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
-	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
+	nodeList, err := e2enode.GetReadySchedulableNodes(config.f.ClientSet)
+	ExpectNoError(err)
 	config.ExternalAddrs = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
 
 	SkipUnlessNodeCountIsAtLeast(2)

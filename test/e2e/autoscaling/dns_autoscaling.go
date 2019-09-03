@@ -33,7 +33,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 // Constants used in dns-autoscaling test.
@@ -57,11 +56,11 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		c = f.ClientSet
 
-		nodeCount := len(framework.GetReadySchedulableNodesOrDie(c).Items)
-		gomega.Expect(nodeCount).NotTo(gomega.BeZero())
+		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		framework.ExpectNoError(err)
+		nodeCount := len(nodes.Items)
 
 		ginkgo.By("Collecting original replicas count and DNS scaling params")
-		var err error
 		originDNSReplicasCount, err = getDNSReplicas(c)
 		framework.ExpectNoError(err)
 
@@ -236,12 +235,13 @@ func getExpectReplicasFuncLinear(c clientset.Interface, params *DNSParamsLinear)
 	return func(c clientset.Interface) int {
 		var replicasFromNodes float64
 		var replicasFromCores float64
-		nodes := framework.GetReadySchedulableNodesOrDie(c).Items
+		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		framework.ExpectNoError(err)
 		if params.nodesPerReplica > 0 {
-			replicasFromNodes = math.Ceil(float64(len(nodes)) / params.nodesPerReplica)
+			replicasFromNodes = math.Ceil(float64(len(nodes.Items)) / params.nodesPerReplica)
 		}
 		if params.coresPerReplica > 0 {
-			replicasFromCores = math.Ceil(float64(getScheduableCores(nodes)) / params.coresPerReplica)
+			replicasFromCores = math.Ceil(float64(getScheduableCores(nodes.Items)) / params.coresPerReplica)
 		}
 		return int(math.Max(1.0, math.Max(replicasFromNodes, replicasFromCores)))
 	}

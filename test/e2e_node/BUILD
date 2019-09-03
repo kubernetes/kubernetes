@@ -47,6 +47,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/gpu:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
+        "//test/e2e/framework/node:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/coreos/go-systemd/util:go_default_library",

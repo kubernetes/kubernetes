@@ -27,6 +27,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -76,7 +77,8 @@ var _ = instrumentation.SIGDescribe("Logging soak [Performance] [Slow] [Disrupti
 // was produced in each and every pod at least once.  The final arg is the timeout for the test to verify all the pods got logs.
 func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname string, timeout time.Duration) {
 
-	nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+	nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	framework.ExpectNoError(err)
 	totalPods := len(nodes.Items)
 	framework.ExpectNotEqual(totalPods, 0)
 

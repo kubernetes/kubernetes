@@ -188,10 +188,8 @@ var _ = SIGDescribe("Firewall rule", func() {
 	})
 
 	ginkgo.It("should have correct firewall rules for e2e cluster", func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(cs)
-		if len(nodes.Items) <= 0 {
-			framework.Failf("Expect at least 1 node, got: %v", len(nodes.Items))
-		}
+		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking if e2e firewall rules are correct")
 		for _, expFw := range gce.GetE2eFirewalls(cloudConfig.MasterName, cloudConfig.MasterTag, cloudConfig.NodeTag, cloudConfig.Network, cloudConfig.ClusterIPRange) {

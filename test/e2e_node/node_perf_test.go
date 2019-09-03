@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e_node/perf/workloads"
 
@@ -48,8 +49,9 @@ func setKubeletConfig(f *framework.Framework, cfg *kubeletconfig.KubeletConfigur
 
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		return len(nodeList.Items) == 1
+		nodes, err := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectNoError(err)
+		return nodes == 1
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
 }
 
