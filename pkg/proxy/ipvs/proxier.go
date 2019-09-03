@@ -111,6 +111,7 @@ var iptablesChains = []struct {
 	{utiliptables.TableNAT, KubeNodePortChain},
 	{utiliptables.TableNAT, KubeLoadBalancerChain},
 	{utiliptables.TableNAT, KubeMarkMasqChain},
+	{utiliptables.TableNAT, KubeMarkDropChain},
 	{utiliptables.TableFilter, KubeForwardChain},
 }
 
