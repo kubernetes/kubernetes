@@ -90,8 +90,6 @@ type Quantity struct {
 	i int64Amount
 	// d is the quantity in inf.Dec form if d.Dec != nil
 	d infDecAmount
-	// s is the generated value of this quantity to avoid recalculation
-	s string
 
 	// Change Format at will. See the comment for Canonicalize for
 	// more details.
@@ -265,7 +263,7 @@ func ParseQuantity(str string) (Quantity, error) {
 		return Quantity{}, ErrFormatWrong
 	}
 	if str == "0" {
-		return Quantity{Format: DecimalSI, s: str}, nil
+		return Quantity{Format: DecimalSI}, nil
 	}
 
 	positive, value, num, denom, suf, err := parseQuantityString(str)
@@ -318,11 +316,11 @@ func ParseQuantity(str string) (Quantity, error) {
 				switch format {
 				case BinarySI:
 					if exponent%10 == 0 && (value&0x07 != 0) {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
 					}
 				default:
 					if scale%3 == 0 && !strings.HasSuffix(shifted, "000") && shifted[0] != '0' {
-						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format, s: str}, nil
+						return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
 					}
 				}
 				return Quantity{i: int64Amount{value: result, scale: Scale(scale)}, Format: format}, nil
@@ -511,7 +509,6 @@ func (q *Quantity) AsScale(scale Scale) (CanonicalValue, bool) {
 // Negative numbers are rounded away from zero (-9 scale 1 rounds to -10).
 func (q *Quantity) RoundUp(scale Scale) bool {
 	if q.d.Dec != nil {
-		q.s = ""
 		d, exact := q.d.AsScale(scale)
 		q.d = d
 		return exact
@@ -520,7 +517,6 @@ func (q *Quantity) RoundUp(scale Scale) bool {
 	if q.i.scale >= scale {
 		return true
 	}
-	q.s = ""
 	i, exact := q.i.AsScale(scale)
 	q.i = i
 	return exact
@@ -529,7 +525,6 @@ func (q *Quantity) RoundUp(scale Scale) bool {
 // Add adds the provide y quantity to the current value. If the current value is zero,
 // the format of the quantity will be updated to the format of y.
 func (q *Quantity) Add(y Quantity) {
-	q.s = ""
 	if q.d.Dec == nil && y.d.Dec == nil {
 		if q.i.value == 0 {
 			q.Format = y.Format
@@ -546,7 +541,6 @@ func (q *Quantity) Add(y Quantity) {
 // Sub subtracts the provided quantity from the current value in place. If the current
 // value is zero, the format of the quantity will be updated to the format of y.
 func (q *Quantity) Sub(y Quantity) {
-	q.s = ""
 	if q.IsZero() {
 		q.Format = y.Format
 	}
@@ -576,7 +570,6 @@ func (q *Quantity) CmpInt64(y int64) int {
 
 // Neg sets quantity to be the negative value of itself.
 func (q *Quantity) Neg() {
-	q.s = ""
 	if q.d.Dec == nil {
 		q.i.value = -q.i.value
 		return
@@ -598,23 +591,14 @@ const int64QuantityExpectedBytes = 18
 // String is an expensive operation and caching this result significantly reduces the cost of
 // normal parse / marshal operations on Quantity.
 func (q *Quantity) String() string {
-	if len(q.s) == 0 {
-		result := make([]byte, 0, int64QuantityExpectedBytes)
-		number, suffix := q.CanonicalizeBytes(result)
-		number = append(number, suffix...)
-		q.s = string(number)
-	}
-	return q.s
+	result := make([]byte, 0, int64QuantityExpectedBytes)
+	number, suffix := q.CanonicalizeBytes(result)
+	number = append(number, suffix...)
+	return string(number)
 }
 
 // MarshalJSON implements the json.Marshaller interface.
 func (q Quantity) MarshalJSON() ([]byte, error) {
-	if len(q.s) > 0 {
-		out := make([]byte, len(q.s)+2)
-		out[0], out[len(out)-1] = '"', '"'
-		copy(out[1:], q.s)
-		return out, nil
-	}
 	result := make([]byte, int64QuantityExpectedBytes, int64QuantityExpectedBytes)
 	result[0] = '"'
 	number, suffix := q.CanonicalizeBytes(result[1:1])
@@ -722,7 +706,6 @@ func (q *Quantity) SetMilli(value int64) {
 
 // SetScaled sets q's value to be value * 10^scale
 func (q *Quantity) SetScaled(value int64, scale Scale) {
-	q.s = ""
 	q.d.Dec = nil
 	q.i = int64Amount{value: value, scale: scale}
 }

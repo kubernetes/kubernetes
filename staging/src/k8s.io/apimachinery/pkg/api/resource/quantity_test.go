@@ -19,6 +19,7 @@ package resource
 import (
 	"encoding/json"
 	"math/rand"
+	"reflect"
 	"strings"
 	"testing"
 	"unicode"
@@ -693,9 +694,7 @@ func TestQuantityString(t *testing.T) {
 		if err != nil {
 			t.Errorf("%#v: unexpected error: %v", item.expect, err)
 		}
-		if len(q.s) == 0 || q.s != item.expect {
-			t.Errorf("%#v: did not copy canonical string on parse: %s", item.expect, q.s)
-		}
+
 		if len(item.alternate) == 0 {
 			continue
 		}
@@ -704,14 +703,8 @@ func TestQuantityString(t *testing.T) {
 			t.Errorf("%#v: unexpected error: %v", item.expect, err)
 			continue
 		}
-		if len(q.s) != 0 {
-			t.Errorf("%#v: unexpected nested string: %v", item.expect, q.s)
-		}
 		if q.String() != item.expect {
 			t.Errorf("%#v: unexpected alternate canonical: %v", item.expect, q.String())
-		}
-		if len(q.s) == 0 || q.s != item.expect {
-			t.Errorf("%#v: did not set canonical string on ToString: %s", item.expect, q.s)
 		}
 	}
 	desired := &inf.Dec{} // Avoid modifying the values in the table.
@@ -1146,6 +1139,37 @@ func TestAddSubRoundTrip(t *testing.T) {
 	}
 }
 
+func TestDeepEqual(t *testing.T) {
+	tests := []struct {
+		a Quantity
+	}{
+		{a: Quantity{}},
+		{a: intQuantity(0, 0, DecimalSI)},
+		{a: intQuantity(10, 0, BinarySI)},
+		{a: intQuantity(-10, 0, BinarySI)},
+		{a: decQuantity(0, 0, DecimalSI)},
+		{a: decQuantity(1000, 0, DecimalSI)},
+		{a: decQuantity(-1000, 0, DecimalSI)},
+		{a: decQuantity(10, 0, BinarySI)},
+		{a: decQuantity(-10, 0, BinarySI)},
+		{a: decQuantity(1024, 0, BinarySI)},
+		{a: decQuantity(-1024, 0, BinarySI)},
+		{a: decQuantity(1000, 0, DecimalExponent)},
+		{a: decQuantity(-1000, 0, DecimalExponent)},
+	}
+
+	for i, test := range tests {
+		b := test.a.DeepCopy()
+		if !reflect.DeepEqual(&test.a, &b) {
+			t.Errorf("[%d] Expected %+v to deep equal %+v", i, test.a, b)
+		}
+		_ = b.String()
+		if !reflect.DeepEqual(&test.a, &b) {
+			t.Errorf("[%d] Expected %+v to deep equal %+v", i, test.a, b)
+		}
+	}
+}
+
 func TestAddSubRoundTripAcrossScales(t *testing.T) {
 	q := Quantity{Format: DecimalSI}
 	var order []int64
@@ -1204,7 +1228,6 @@ func BenchmarkQuantityString(b *testing.B) {
 	var s string
 	for i := 0; i < b.N; i++ {
 		q := values[i%len(values)]
-		q.s = ""
 		s = q.String()
 	}
 	b.StopTimer()
@@ -1239,7 +1262,6 @@ func BenchmarkQuantityStringBinarySI(b *testing.B) {
 	var s string
 	for i := 0; i < b.N; i++ {
 		q := values[i%len(values)]
-		q.s = ""
 		s = q.String()
 	}
 	b.StopTimer()
@@ -1253,7 +1275,6 @@ func BenchmarkQuantityMarshalJSON(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		q := values[i%len(values)]
-		q.s = ""
 		if _, err := q.MarshalJSON(); err != nil {
 			b.Fatal(err)
 		}
