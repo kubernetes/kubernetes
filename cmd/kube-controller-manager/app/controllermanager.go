@@ -69,6 +69,7 @@ import (
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 )
 
 const (
@@ -89,7 +90,7 @@ const (
 )
 
 // NewControllerManagerCommand creates a *cobra.Command object with default parameters
-func NewControllerManagerCommand(stopCh <-chan struct{}) *cobra.Command {
+func NewControllerManagerCommand() *cobra.Command {
 	s, err := options.NewKubeControllerManagerOptions()
 	if err != nil {
 		klog.Fatalf("unable to initialize command options: %v", err)
@@ -115,7 +116,7 @@ controller, and serviceaccounts controller.`,
 				os.Exit(1)
 			}
 
-			if err := Run(c.Complete(), stopCh); err != nil {
+			if err := Run(c.Complete(), genericapiserver.SetupSignalHandler()); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}

@@ -56,7 +56,7 @@ func main() {
 		doc.GenMarkdownTree(apiserver, outDir)
 	case "kube-controller-manager":
 		// generate docs for kube-controller-manager
-		controllermanager := cmapp.NewControllerManagerCommand(server.SetupSignalHandler())
+		controllermanager := cmapp.NewControllerManagerCommand()
 		doc.GenMarkdownTree(controllermanager, outDir)
 	case "kube-proxy":
 		// generate docs for kube-proxy
@@ -64,7 +64,7 @@ func main() {
 		doc.GenMarkdownTree(proxy, outDir)
 	case "kube-scheduler":
 		// generate docs for kube-scheduler
-		scheduler := schapp.NewSchedulerCommand(server.SetupSignalHandler())
+		scheduler := schapp.NewSchedulerCommand()
 		doc.GenMarkdownTree(scheduler, outDir)
 	case "kubelet":
 		// generate docs for kubelet

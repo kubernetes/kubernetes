@@ -55,6 +55,7 @@ import (
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 )
 
 // Option configures a framework.Registry.
@@ -77,7 +78,7 @@ constraints, affinity and anti-affinity specifications, data locality, inter-wor
 interference, deadlines, and so on. Workload-specific requirements will be exposed
 through the API as necessary.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			if err := runCommand(cmd, args, opts, registryOptions...); err != nil {
+			if err := runCommand(cmd, args, opts, genericapiserver.SetupSignalHandler(), registryOptions...); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -108,7 +109,7 @@ through the API as necessary.`,
 }
 
 // runCommand runs the scheduler.
-func runCommand(cmd *cobra.Command, args []string, opts *options.Options, registryOptions ...Option) error {
+func runCommand(cmd *cobra.Command, args []string, opts *options.Options, stopCh <-chan struct{}, registryOptions ...Option) error {
 	verflag.PrintAndExitIfRequested()
 	utilflag.PrintFlags(cmd.Flags())
 
