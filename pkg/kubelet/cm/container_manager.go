@@ -131,7 +131,7 @@ type NodeConfig struct {
 	ExperimentalPodPidsLimit              int64
 	EnforceCPULimits                      bool
 	CPUCFSQuotaPeriod                     time.Duration
-	ExperimentalTopologyManagerPolicy     string
+	TopologyManagerPolicy                 string
 }
 
 type NodeAllocatableConfig struct {

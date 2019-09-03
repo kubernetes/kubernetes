@@ -290,14 +290,14 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
 		cm.topologyManager, err = topologymanager.NewManager(
 			numaNodeInfo,
-			nodeConfig.ExperimentalTopologyManagerPolicy,
+			nodeConfig.TopologyManagerPolicy,
 		)
 
 		if err != nil {
 			return nil, err
 		}
 
-		klog.Infof("[topologymanager] Initilizing Topology Manager with %s policy", nodeConfig.ExperimentalTopologyManagerPolicy)
+		klog.Infof("[topologymanager] Initializing Topology Manager with %s policy", nodeConfig.TopologyManagerPolicy)
 	} else {
 		cm.topologyManager = topologymanager.NewFakeManager()
 	}
