@@ -146,6 +146,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 				strings.Join([]string{"get", "namespaces", ""}, "-"),
 				strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
 				strings.Join([]string{"list", "pods", ""}, "-"),
+				strings.Join([]string{"update", "namespaces", "status"}, "-"),
 				strings.Join([]string{"delete", "namespaces", ""}, "-"),
 			),
 			metadataClientActionSet: metadataClientActionSet,
@@ -187,68 +188,66 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 	}
 
 	for scenario, testInput := range scenarios {
-		testHandler := &fakeActionHandler{statusCode: 200}
-		srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
-		defer srv.Close()
+		t.Run(scenario, func(t *testing.T) {
+			testHandler := &fakeActionHandler{statusCode: 200}
+			srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+			defer srv.Close()
 
-		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
-		metadataClient, err := metadata.NewForConfig(clientConfig)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		fn := func() ([]*metav1.APIResourceList, error) {
-			return resources, testInput.gvrError
-		}
-		d := NewNamespacedResourcesDeleter(mockClient.CoreV1().Namespaces(), metadataClient, mockClient.CoreV1(), fn, v1.FinalizerKubernetes, true)
-		if err := d.Delete(testInput.testNamespace.Name); !matchErrors(err, testInput.expectErrorOnDelete) {
-			t.Errorf("scenario %s - expected error %q when syncing namespace, got %q, %v", scenario, testInput.expectErrorOnDelete, err, testInput.expectErrorOnDelete == err)
-		}
-
-		// validate traffic from kube client
-		actionSet := sets.NewString()
-		for _, action := range mockClient.Actions() {
-			actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
-		}
-		if !actionSet.Equal(testInput.kubeClientActionSet) {
-			t.Errorf("scenario %s - mock client expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario,
-				testInput.kubeClientActionSet, actionSet, testInput.kubeClientActionSet.Difference(actionSet))
-		}
-
-		// validate traffic from metadata client
-		actionSet = sets.NewString()
-		for _, action := range testHandler.actions {
-			actionSet.Insert(action.String())
-		}
-		if !actionSet.Equal(testInput.metadataClientActionSet) {
-			t.Errorf("scenario %s - metadata client expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario,
-				testInput.metadataClientActionSet, actionSet, testInput.metadataClientActionSet.Difference(actionSet))
-		}
-
-		// validate status conditions
-		if testInput.expectStatus != nil {
-			obj, err := mockClient.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}, testInput.testNamespace.Namespace, testInput.testNamespace.Name)
+			mockClient := fake.NewSimpleClientset(testInput.testNamespace)
+			metadataClient, err := metadata.NewForConfig(clientConfig)
 			if err != nil {
-				t.Errorf("Unexpected error in getting the namespace: %v", err)
-				continue
+				t.Fatal(err)
 			}
-			ns, ok := obj.(*v1.Namespace)
-			if !ok {
-				t.Errorf("Expected a namespace but received %v", obj)
-				continue
+
+			fn := func() ([]*metav1.APIResourceList, error) {
+				return resources, testInput.gvrError
 			}
-			if ns.Status.Phase != testInput.expectStatus.Phase {
-				t.Errorf("Expected namespace status phase %v but received %v", testInput.expectStatus.Phase, ns.Status.Phase)
-				continue
+			d := NewNamespacedResourcesDeleter(mockClient.CoreV1().Namespaces(), metadataClient, mockClient.CoreV1(), fn, v1.FinalizerKubernetes, true)
+			if err := d.Delete(testInput.testNamespace.Name); !matchErrors(err, testInput.expectErrorOnDelete) {
+				t.Errorf("expected error %q when syncing namespace, got %q, %v", testInput.expectErrorOnDelete, err, testInput.expectErrorOnDelete == err)
 			}
-			for _, expCondition := range testInput.expectStatus.Conditions {
-				nsCondition := getCondition(ns.Status.Conditions, expCondition.Type)
-				if nsCondition == nil {
-					t.Errorf("Missing namespace status condition %v", expCondition.Type)
-					continue
+
+			// validate traffic from kube client
+			actionSet := sets.NewString()
+			for _, action := range mockClient.Actions() {
+				actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+			}
+			if !actionSet.Equal(testInput.kubeClientActionSet) {
+				t.Errorf("mock client expected actions:\n%v\n but got:\n%v\nDifference:\n%v",
+					testInput.kubeClientActionSet, actionSet, testInput.kubeClientActionSet.Difference(actionSet))
+			}
+
+			// validate traffic from metadata client
+			actionSet = sets.NewString()
+			for _, action := range testHandler.actions {
+				actionSet.Insert(action.String())
+			}
+			if !actionSet.Equal(testInput.metadataClientActionSet) {
+				t.Errorf(" metadata client expected actions:\n%v\n but got:\n%v\nDifference:\n%v",
+					testInput.metadataClientActionSet, actionSet, testInput.metadataClientActionSet.Difference(actionSet))
+			}
+
+			// validate status conditions
+			if testInput.expectStatus != nil {
+				obj, err := mockClient.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}, testInput.testNamespace.Namespace, testInput.testNamespace.Name)
+				if err != nil {
+					t.Fatalf("Unexpected error in getting the namespace: %v", err)
+				}
+				ns, ok := obj.(*v1.Namespace)
+				if !ok {
+					t.Fatalf("Expected a namespace but received %v", obj)
+				}
+				if ns.Status.Phase != testInput.expectStatus.Phase {
+					t.Fatalf("Expected namespace status phase %v but received %v", testInput.expectStatus.Phase, ns.Status.Phase)
+				}
+				for _, expCondition := range testInput.expectStatus.Conditions {
+					nsCondition := getCondition(ns.Status.Conditions, expCondition.Type)
+					if nsCondition == nil {
+						t.Fatalf("Missing namespace status condition %v", expCondition.Type)
+					}
 				}
 			}
-		}
+		})
 	}
 }
 
