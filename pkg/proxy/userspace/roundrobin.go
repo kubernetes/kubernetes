@@ -244,6 +244,7 @@ func (lb *LoadBalancerRR) OnEndpointsAdd(endpoints *v1.Endpoints) {
 
 			// Reset the round-robin index.
 			state.index = 0
+			lb.services[svcPort] = state
 		}
 	}
 }
@@ -278,6 +279,7 @@ func (lb *LoadBalancerRR) OnEndpointsUpdate(oldEndpoints, endpoints *v1.Endpoint
 
 			// Reset the round-robin index.
 			state.index = 0
+			lb.services[svcPort] = state
 		}
 		registeredEndpoints[svcPort] = true
 	}
