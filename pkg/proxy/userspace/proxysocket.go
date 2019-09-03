@@ -104,7 +104,7 @@ func TryConnectEndpoints(service proxy.ServicePortName, srcAddr net.Addr, protoc
 		outConn, err := net.DialTimeout(protocol, endpoint, dialTimeout)
 		if err != nil {
 			if isTooManyFDsError(err) {
-				panic("Dial failed: " + err.Error())
+				return nil, fmt.Errorf("Dial failed: %v", err.Error())
 			}
 			klog.Errorf("Dial failed: %v", err)
 			sessionAffinityReset = true
