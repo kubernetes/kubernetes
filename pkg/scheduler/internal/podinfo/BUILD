@@ -11,6 +11,7 @@ go_test(
     srcs = ["podinfo_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/api/pod:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
@@ -22,8 +23,9 @@ go_library(
     srcs = ["podinfo.go"],
     importpath = "k8s.io/kubernetes/pkg/scheduler/internal/podinfo",
     deps = [
-        "//pkg/apis/scheduling:go_default_library",
+        "//pkg/api/pod:go_default_library",
         "//pkg/scheduler/api:go_default_library",
+        "//pkg/scheduler/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",

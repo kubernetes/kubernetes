@@ -28,12 +28,12 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
+	pod "k8s.io/kubernetes/pkg/api/v1/pod"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	podinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/scheduler/util"
-	podinfo "k8s.io/kubernetes/pkg/api/pod"
 )
 
 var negPriority, lowPriority, midPriority, highPriority, veryHighPriority = int32(-100), int32(0), int32(100), int32(1000), int32(10000)
@@ -158,8 +158,8 @@ type fakeFramework struct{}
 
 func (*fakeFramework) QueueSortFunc() framework.LessFunc {
 	return func(podInfo1, podInfo2 *framework.PodInfo) bool {
-		prio1 := podinfo.GetPodPriority(podInfo1.Pod)
-		prio2 := podinfo.GetPodPriority(podInfo2.Pod)
+		prio1 := podutil.GetPodPriority(podInfo1.Pod)
+		prio2 := podutil.GetPodPriority(podInfo2.Pod)
 		return prio1 < prio2
 	}
 }
@@ -674,35 +674,35 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			name:      "create, update, delete subset of pods",
 			podsToAdd: []*v1.Pod{pods[0], pods[1], pods[2], pods[3]},
 			expectedMapAfterAdd: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[0]): {Pod: pods[0]},
-				util.GetPodFullName(pods[1]): {Pod: pods[1]},
-				util.GetPodFullName(pods[2]): {Pod: pods[2]},
-				util.GetPodFullName(pods[3]): {Pod: pods[3]},
+				podinfo.GetPodFullName(pods[0]): {Pod: pods[0]},
+				podinfo.GetPodFullName(pods[1]): {Pod: pods[1]},
+				podinfo.GetPodFullName(pods[2]): {Pod: pods[2]},
+				podinfo.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[0]},
 			expectedMapAfterUpdate: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[0]): {Pod: updatedPods[0]},
-				util.GetPodFullName(pods[1]): {Pod: pods[1]},
-				util.GetPodFullName(pods[2]): {Pod: pods[2]},
-				util.GetPodFullName(pods[3]): {Pod: pods[3]},
+				podinfo.GetPodFullName(pods[0]): {Pod: updatedPods[0]},
+				podinfo.GetPodFullName(pods[1]): {Pod: pods[1]},
+				podinfo.GetPodFullName(pods[2]): {Pod: pods[2]},
+				podinfo.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
 			podsToDelete: []*v1.Pod{pods[0], pods[1]},
 			expectedMapAfterDelete: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[2]): {Pod: pods[2]},
-				util.GetPodFullName(pods[3]): {Pod: pods[3]},
+				podinfo.GetPodFullName(pods[2]): {Pod: pods[2]},
+				podinfo.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
 		},
 		{
 			name:      "create, update, delete all",
 			podsToAdd: []*v1.Pod{pods[0], pods[3]},
 			expectedMapAfterAdd: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[0]): {Pod: pods[0]},
-				util.GetPodFullName(pods[3]): {Pod: pods[3]},
+				podinfo.GetPodFullName(pods[0]): {Pod: pods[0]},
+				podinfo.GetPodFullName(pods[3]): {Pod: pods[3]},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[3]},
 			expectedMapAfterUpdate: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[0]): {Pod: pods[0]},
-				util.GetPodFullName(pods[3]): {Pod: updatedPods[3]},
+				podinfo.GetPodFullName(pods[0]): {Pod: pods[0]},
+				podinfo.GetPodFullName(pods[3]): {Pod: updatedPods[3]},
 			},
 			podsToDelete:           []*v1.Pod{pods[0], pods[3]},
 			expectedMapAfterDelete: map[string]*framework.PodInfo{},
@@ -711,17 +711,17 @@ func TestUnschedulablePodsMap(t *testing.T) {
 			name:      "delete non-existing and existing pods",
 			podsToAdd: []*v1.Pod{pods[1], pods[2]},
 			expectedMapAfterAdd: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[1]): {Pod: pods[1]},
-				util.GetPodFullName(pods[2]): {Pod: pods[2]},
+				podinfo.GetPodFullName(pods[1]): {Pod: pods[1]},
+				podinfo.GetPodFullName(pods[2]): {Pod: pods[2]},
 			},
 			podsToUpdate: []*v1.Pod{updatedPods[1]},
 			expectedMapAfterUpdate: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[1]): {Pod: updatedPods[1]},
-				util.GetPodFullName(pods[2]): {Pod: pods[2]},
+				podinfo.GetPodFullName(pods[1]): {Pod: updatedPods[1]},
+				podinfo.GetPodFullName(pods[2]): {Pod: pods[2]},
 			},
 			podsToDelete: []*v1.Pod{pods[2], pods[3]},
 			expectedMapAfterDelete: map[string]*framework.PodInfo{
-				util.GetPodFullName(pods[1]): {Pod: updatedPods[1]},
+				podinfo.GetPodFullName(pods[1]): {Pod: updatedPods[1]},
 			},
 		},
 	}
@@ -823,7 +823,7 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 		t.Errorf("Error while popping the head of the queue: %v", err)
 	}
 	// Update pod condition to unschedulable.
-	podutil.UpdatePodCondition(&p1.Status, &v1.PodCondition{
+	pod.UpdatePodCondition(&p1.Status, &v1.PodCondition{
 		Type:          v1.PodScheduled,
 		Status:        v1.ConditionFalse,
 		Reason:        v1.PodReasonUnschedulable,
@@ -872,7 +872,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	}
 
 	// Update pod condition to unschedulable.
-	podutil.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
+	pod.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  v1.PodReasonUnschedulable,
@@ -915,7 +915,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	q.Add(&newerPod)
 
 	// And then unschedulablePod was determined as unschedulable AGAIN.
-	podutil.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
+	pod.UpdatePodCondition(&unschedulablePod.Status, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  v1.PodReasonUnschedulable,
@@ -983,7 +983,7 @@ func TestHighPriorityBackoff(t *testing.T) {
 		t.Errorf("Expected to get high priority pod, got: %v", p)
 	}
 	// Update pod condition to unschedulable.
-	podutil.UpdatePodCondition(&p.Status, &v1.PodCondition{
+	pod.UpdatePodCondition(&p.Status, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  v1.PodReasonUnschedulable,
@@ -1035,7 +1035,7 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 	}
 
 	// Update pod condition to highPod.
-	podutil.UpdatePodCondition(&highPod.Status, &v1.PodCondition{
+	pod.UpdatePodCondition(&highPod.Status, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  v1.PodReasonUnschedulable,
@@ -1043,7 +1043,7 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 	})
 
 	// Update pod condition to midPod.
-	podutil.UpdatePodCondition(&midPod.Status, &v1.PodCondition{
+	pod.UpdatePodCondition(&midPod.Status, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  v1.PodReasonUnschedulable,
@@ -1081,7 +1081,7 @@ var (
 	addPodUnschedulableQ = func(queue *PriorityQueue, pInfo *framework.PodInfo) {
 		queue.lock.Lock()
 		// Update pod condition to unschedulable.
-		podutil.UpdatePodCondition(&pInfo.Pod.Status, &v1.PodCondition{
+		pod.UpdatePodCondition(&pInfo.Pod.Status, &v1.PodCondition{
 			Type:    v1.PodScheduled,
 			Status:  v1.ConditionFalse,
 			Reason:  v1.PodReasonUnschedulable,

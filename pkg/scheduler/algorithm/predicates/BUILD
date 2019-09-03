@@ -24,6 +24,7 @@ go_library(
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/api:go_default_library",
+        "//pkg/scheduler/internal/podinfo:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",

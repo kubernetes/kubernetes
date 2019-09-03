@@ -36,10 +36,11 @@ import (
 	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
-	podinfo "k8s.io/kubernetes/pkg/api/pod"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	podinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -155,8 +156,8 @@ func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
 func activeQComp(podInfo1, podInfo2 interface{}) bool {
 	pInfo1 := podInfo1.(*framework.PodInfo)
 	pInfo2 := podInfo2.(*framework.PodInfo)
-	prio1 := podinfo.GetPodPriority(pInfo1.Pod)
-	prio2 := podinfo.GetPodPriority(pInfo2.Pod)
+	prio1 := podutil.GetPodPriority(pInfo1.Pod)
+	prio2 := podutil.GetPodPriority(pInfo2.Pod)
 	return (prio1 > prio2) || (prio1 == prio2 && pInfo1.Timestamp.Before(pInfo2.Timestamp))
 }
 
@@ -729,7 +730,7 @@ func (u *UnschedulablePodsMap) clear() {
 func newUnschedulablePodsMap(metricRecorder metrics.MetricRecorder) *UnschedulablePodsMap {
 	return &UnschedulablePodsMap{
 		podInfoMap:     make(map[string]*framework.PodInfo),
-		keyFunc:        util.GetPodFullName,
+		keyFunc:        podinfo.GetPodFullName,
 		metricRecorder: metricRecorder,
 	}
 }

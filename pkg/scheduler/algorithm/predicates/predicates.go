@@ -45,11 +45,10 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	podinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
-	podinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
-
 )
 
 const (

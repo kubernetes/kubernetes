@@ -36,17 +36,17 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/workqueue"
-	podinfo "k8s.io/kubernetes/pkg/api/pod"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	podinfo "k8s.io/kubernetes/pkg/scheduler/internal/podinfo"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	"k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	utiltrace "k8s.io/utils/trace"
 )
@@ -428,9 +428,9 @@ func (g *genericScheduler) getLowerPriorityNominatedPods(pod *v1.Pod, nodeName s
 	}
 
 	var lowerPriorityPods []*v1.Pod
-	podPriority := podinfo.GetPodPriority(pod)
+	podPriority := podutil.GetPodPriority(pod)
 	for _, p := range pods {
-		if podinfo.GetPodPriority(p) < podPriority {
+		if podutil.GetPodPriority(p) < podPriority {
 			lowerPriorityPods = append(lowerPriorityPods, p)
 		}
 	}
@@ -593,7 +593,7 @@ func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
 	nodeInfoOut := nodeInfo.Clone()
 	podsAdded := false
 	for _, p := range nominatedPods {
-		if podinfo.GetPodPriority(p) >= podinfo.GetPodPriority(pod) && p.UID != pod.UID {
+		if podutil.GetPodPriority(p) >= podutil.GetPodPriority(pod) && p.UID != pod.UID {
 			nodeInfoOut.AddPod(p)
 			if metaOut != nil {
 				metaOut.AddPod(p, nodeInfoOut)
@@ -770,7 +770,7 @@ func PrioritizeNodes(
 			}
 			if klog.V(10) {
 				for _, hostPriority := range results[index] {
-					klog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), hostPriority.Host, priorityConfigs[index].Name, hostPriority.Score)
+					klog.Infof("%v -> %v: %v, Score: (%d)", podinfo.GetPodFullName(pod), hostPriority.Host, priorityConfigs[index].Name, hostPriority.Score)
 				}
 			}
 		}(i)
@@ -819,7 +819,7 @@ func PrioritizeNodes(
 				for i := range *prioritizedList {
 					host, score := (*prioritizedList)[i].Host, (*prioritizedList)[i].Score
 					if klog.V(10) {
-						klog.Infof("%v -> %v: %v, Score: (%d)", util.GetPodFullName(pod), host, extenders[extIndex].Name(), score)
+						klog.Infof("%v -> %v: %v, Score: (%d)", podinfo.GetPodFullName(pod), host, extenders[extIndex].Name(), score)
 					}
 					combinedScores[host] += score * weight
 				}
@@ -903,7 +903,7 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 		node := minNodes1[i]
 		victims := nodesToVictims[node]
 		// highestPodPriority is the highest priority among the victims on this node.
-		highestPodPriority := podinfo.GetPodPriority(victims.Pods[0])
+		highestPodPriority := podutil.GetPodPriority(victims.Pods[0])
 		if highestPodPriority < minHighestPriority {
 			minHighestPriority = highestPodPriority
 			lenNodes2 = 0
@@ -929,7 +929,7 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 			// needed so that a node with a few pods with negative priority is not
 			// picked over a node with a smaller number of pods with the same negative
 			// priority (and similar scenarios).
-			sumPriorities += int64(podinfo.GetPodPriority(pod)) + int64(math.MaxInt32+1)
+			sumPriorities += int64(podutil.GetPodPriority(pod)) + int64(math.MaxInt32+1)
 		}
 		if sumPriorities < minSumPriorities {
 			minSumPriorities = sumPriorities
@@ -966,7 +966,7 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 
 	// There are a few nodes with same number of pods.
 	// Find the node that satisfies latest(earliestStartTime(all highest-priority pods on node))
-	latestStartTime := util.GetEarliestPodStartTime(nodesToVictims[minNodes2[0]])
+	latestStartTime := podinfo.GetEarliestPodStartTime(nodesToVictims[minNodes2[0]])
 	if latestStartTime == nil {
 		// If the earliest start time of all pods on the 1st node is nil, just return it,
 		// which is not expected to happen.
@@ -977,7 +977,7 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 	for i := 1; i < lenNodes2; i++ {
 		node := minNodes2[i]
 		// Get earliest start time of all pods on the current node.
-		earliestStartTimeOnNode := util.GetEarliestPodStartTime(nodesToVictims[node])
+		earliestStartTimeOnNode := podinfo.GetEarliestPodStartTime(nodesToVictims[node])
 		if earliestStartTimeOnNode == nil {
 			klog.Errorf("earliestStartTime is nil for node %s. Should not reach here.", node)
 			continue
@@ -1092,7 +1092,7 @@ func selectVictimsOnNode(
 	if nodeInfo == nil {
 		return nil, 0, false
 	}
-	potentialVictims := util.SortableList{CompFunc: util.MoreImportantPod}
+	potentialVictims := podinfo.SortableList{CompFunc: podinfo.MoreImportantPod}
 	nodeInfoCopy := nodeInfo.Clone()
 
 	removePod := func(rp *v1.Pod) {
@@ -1109,9 +1109,9 @@ func selectVictimsOnNode(
 	}
 	// As the first step, remove all the lower priority pods from the node and
 	// check if the given pod can be scheduled.
-	podPriority := podinfo.GetPodPriority(pod)
+	podPriority := podutil.GetPodPriority(pod)
 	for _, p := range nodeInfoCopy.Pods() {
-		if podinfo.GetPodPriority(p) < podPriority {
+		if podutil.GetPodPriority(p) < podPriority {
 			potentialVictims.Items = append(potentialVictims.Items, p)
 			removePod(p)
 		}
@@ -1200,9 +1200,9 @@ func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedule
 	nomNodeName := pod.Status.NominatedNodeName
 	if len(nomNodeName) > 0 {
 		if nodeInfo, found := nodeNameToInfo[nomNodeName]; found {
-			podPriority := podinfo.GetPodPriority(pod)
+			podPriority := podutil.GetPodPriority(pod)
 			for _, p := range nodeInfo.Pods() {
-				if p.DeletionTimestamp != nil && podinfo.GetPodPriority(p) < podPriority {
+				if p.DeletionTimestamp != nil && podutil.GetPodPriority(p) < podPriority {
 					// There is a terminating pod on the nominated node.
 					return false
 				}

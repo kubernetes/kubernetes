@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
+	podutil "k8s.io/kubernetes/pkg/api/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
@@ -54,8 +55,8 @@ func TestGetPodPriority(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if GetPodPriority(test.pod) != test.expectedPriority {
-			t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
+		if podutil.GetPodPriority(test.pod) != test.expectedPriority {
+			t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, podutil.GetPodPriority(test.pod))
 		}
 
 	}
@@ -65,7 +66,7 @@ func TestGetPodPriority(t *testing.T) {
 // them by their priority.
 func TestSortableList(t *testing.T) {
 	higherPriority := func(pod1, pod2 interface{}) bool {
-		return GetPodPriority(pod1.(*v1.Pod)) > GetPodPriority(pod2.(*v1.Pod))
+		return podutil.GetPodPriority(pod1.(*v1.Pod)) > podutil.GetPodPriority(pod2.(*v1.Pod))
 	}
 	podList := SortableList{CompFunc: higherPriority}
 	// Add a few Pods with different priorities from lowest to highest priority.
