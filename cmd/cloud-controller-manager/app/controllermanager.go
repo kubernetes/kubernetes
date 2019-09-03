@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	genericapiserver "k8s.io/apiserver/pkg/server"
 )
 
 const (
@@ -76,7 +77,7 @@ the cloud specific control loops shipped with Kubernetes.`,
 				os.Exit(1)
 			}
 
-			if err := Run(c.Complete(), wait.NeverStop); err != nil {
+			if err := Run(c.Complete(), genericapiserver.SetupSignalHandler()); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
