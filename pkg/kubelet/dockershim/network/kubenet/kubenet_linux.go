@@ -63,7 +63,7 @@ const (
 
 	// ebtables Chain to store dedup rules
 	dedupChain = utilebtables.Chain("KUBE-DEDUP")
-	
+
 	zeroCIDRv6 = "::/0"
 	zeroCIDRv4 = "0.0.0.0/0"
 

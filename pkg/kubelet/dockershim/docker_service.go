@@ -55,7 +55,7 @@ const (
 	// networking). Must match the value returned by docker inspect -f
 	// '{{.HostConfig.NetworkMode}}'.
 	namespaceModeHost = "host"
-	
+
 	// Internal docker labels used to identify whether a container is a sandbox
 	// or a regular container.
 	// TODO: This is not backward compatible with older containers. We will

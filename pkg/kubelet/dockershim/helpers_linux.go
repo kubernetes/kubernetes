@@ -34,15 +34,9 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
-var(
+var defaultSeccompOpt = []dockerOpt{{"seccomp", "unconfined", ""}}
+const dockerNetNSFmt = "/proc/%v/ns/net"
 
-	defaultSeccompOpt = []dockerOpt{{"seccomp", "unconfined", ""}}
-)
-const(
-
-	dockerNetNSFmt = "/proc/%v/ns/net"
-
-)
 func DefaultMemorySwap() int64 {
 	return 0
 }

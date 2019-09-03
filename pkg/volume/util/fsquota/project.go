@@ -97,13 +97,13 @@ func openAndLockProjectFiles() (*os.File, *os.File, error) {
 					return fProjects, fProjid, nil
 				}
 				// Nothing useful we can do if we get an error here
-				err = fmt.Errorf("unable to lock %s: %v", projidFile, err)
 				unlockFile(fProjects)
+				return nil, nil, fmt.Errorf("unable to lock %s: %v", projidFile, err)
 			} else {
-				err = fmt.Errorf("unable to lock %s: %v", projectsFile, err)
+				return nil, nil, fmt.Errorf("unable to lock %s: %v", projectsFile, err)
 			}
 		} else {
-			err = fmt.Errorf("system project files failed re-verification: %v", err)
+			return nil, nil, fmt.Errorf("system project files failed re-verification: %v", err)
 		}
 		fProjid.Close()
 	} else {
@@ -165,7 +165,7 @@ func readProjectFiles(projects *os.File, projid *os.File) projectsList {
 
 func findAvailableQuota(path string, idMap map[common.QuotaID]bool) (common.QuotaID, error) {
 	unusedQuotasSearched := 0
-	for id := common.FirstQuota; id == id; id++ {
+	for id := common.FirstQuota; id != common.BadQuotaID; id++ {
 		if _, ok := idMap[id]; !ok {
 			isInUse, err := getApplier(path).QuotaIDIsInUse(id)
 			if err != nil {

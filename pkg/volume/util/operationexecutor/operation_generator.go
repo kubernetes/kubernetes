@@ -750,7 +750,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		//	- Volume does not support DeviceMounter interface.
 		//	- In case of CSI the volume does not have node stage_unstage capability.
 		if !resizeDone {
-			resizeDone, resizeError = og.nodeExpandVolume(volumeToMount, resizeOptions)
+			_, resizeError = og.nodeExpandVolume(volumeToMount, resizeOptions)
 
 			if resizeError != nil {
 				klog.Errorf("MountVolume.NodeExpandVolume failed with %v", resizeError)

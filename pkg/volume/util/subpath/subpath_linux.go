@@ -231,7 +231,7 @@ func doCleanSubPaths(mounter mount.Interface, podDir string, volumeName string) 
 
 		// scan /var/lib/kubelet/pods/<uid>/volume-subpaths/<volume>/<container name>/*
 		fullContainerDirPath := filepath.Join(subPathDir, containerDir.Name())
-		err = filepath.Walk(fullContainerDirPath, func(path string, info os.FileInfo, err error) error {
+		err := filepath.Walk(fullContainerDirPath, func(path string, info os.FileInfo, err error) error {
 			if path == fullContainerDirPath {
 				// Skip top level directory
 				return nil

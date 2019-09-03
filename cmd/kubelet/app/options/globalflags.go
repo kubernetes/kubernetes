@@ -51,8 +51,8 @@ func normalize(s string) string {
 	return strings.Replace(s, "_", "-", -1)
 }
 
-// Register adds a flag to local that targets the Value associated with the Flag named globalName in global
-func Register(global *flag.FlagSet, local *pflag.FlagSet, globalName string) {
+// register adds a flag to local that targets the Value associated with the Flag named globalName in global
+func register(global *flag.FlagSet, local *pflag.FlagSet, globalName string) {
 	if f := global.Lookup(globalName); f != nil {
 		pflagFlag := pflag.PFlagFromGoFlag(f)
 		pflagFlag.Name = normalize(pflagFlag.Name)
@@ -72,9 +72,9 @@ func pflagRegister(global, local *pflag.FlagSet, globalName string) {
 	}
 }
 
-// RegisterDeprecated registers the flag with register, and then marks it deprecated
-func RegisterDeprecated(global *flag.FlagSet, local *pflag.FlagSet, globalName, deprecated string) {
-	Register(global, local, globalName)
+// registerDeprecated registers the flag with register, and then marks it deprecated
+func registerDeprecated(global *flag.FlagSet, local *pflag.FlagSet, globalName, deprecated string) {
+	register(global, local, globalName)
 	local.Lookup(normalize(globalName)).Deprecated = deprecated
 }
 

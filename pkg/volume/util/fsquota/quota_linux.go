@@ -412,10 +412,10 @@ func ClearQuota(m mount.Interface, path string) error {
 		return fmt.Errorf("ClearQuota: No quota available for %s", path)
 	}
 	var err error
-	projid, err  := getQuotaOnDir(m, path)
+	projid, err := getQuotaOnDir(m, path)
 	if err == nil && projid != dirQuotaMap[path] {
 		return fmt.Errorf("Expected quota ID %v on dir %s does not match actual %v", dirQuotaMap[path], path, projid)
-	} 
+	}
 	count, ok := podDirCountMap[poduid]
 	if count <= 1 || !ok {
 		err = clearQuotaOnDir(m, path)

@@ -76,7 +76,6 @@ func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, 
 	f, err = os.Create(pluginExec)
 	require.NoError(t, err)
 
-
 	const execScriptTempl = `#!/usr/bin/env bash
 cat > {{.InputFile}}
 env > {{.OutputEnv}}
