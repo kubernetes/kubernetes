@@ -45,6 +45,15 @@ var (
 		# !!!Important Note!!!
 		# Requires that the 'tar' binary is present in your container
 		# image.  If 'tar' is not present, 'kubectl cp' will fail.
+		#
+		# For advanced use cases, such as symlinks, wildcard expansion or
+		# file mode preservation consider using 'kubectl exec'.
+
+		# Copy /tmp/foo local file to /tmp/bar in a remote pod in namespace <some-namespace>
+		tar cf - /tmp/foo | kubectl exec -i -n <some-namespace> <some-pod> -- tar xf - -C /tmp/bar
+
+		# Copy /tmp/foo from a remote pod to /tmp/bar locally
+		kubectl exec -n <some-namespace> <some-pod> -- tar cf - /tmp/foo | tar xf - -C /tmp/bar
 
 		# Copy /tmp/foo_dir local directory to /tmp/bar_dir in a remote pod in the default namespace
 		kubectl cp /tmp/foo_dir <some-pod>:/tmp/bar_dir
@@ -71,8 +80,9 @@ type CopyOptions struct {
 	Namespace  string
 	NoPreserve bool
 
-	ClientConfig *restclient.Config
-	Clientset    kubernetes.Interface
+	ClientConfig      *restclient.Config
+	Clientset         kubernetes.Interface
+	ExecParentCmdName string
 
 	genericclioptions.IOStreams
 }
@@ -143,6 +153,10 @@ func extractFileSpec(arg string) (fileSpec, error) {
 
 // Complete completes all the required options
 func (o *CopyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
+	if cmd.Parent() != nil {
+		o.ExecParentCmdName = cmd.Parent().CommandPath()
+	}
+
 	var err error
 	o.Namespace, _, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
@@ -307,7 +321,7 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 	// remove extraneous path shortcuts - these could occur if a path contained extra "../"
 	// and attempted to navigate beyond "/" in a remote filesystem
 	prefix = stripPathShortcuts(prefix)
-	return o.untarAll(reader, dest.File, prefix)
+	return o.untarAll(src, reader, dest.File, prefix)
 }
 
 // stripPathShortcuts removes any leading or trailing "../" from a given path
@@ -412,7 +426,8 @@ func recursiveTar(srcBase, srcFile, destBase, destFile string, tw *tar.Writer) e
 	return nil
 }
 
-func (o *CopyOptions) untarAll(reader io.Reader, destDir, prefix string) error {
+func (o *CopyOptions) untarAll(src fileSpec, reader io.Reader, destDir, prefix string) error {
+	symlinkWarningPrinted := false
 	// TODO: use compression here?
 	tarReader := tar.NewReader(reader)
 	for {
@@ -453,48 +468,25 @@ func (o *CopyOptions) untarAll(reader io.Reader, destDir, prefix string) error {
 			continue
 		}
 
-		// We need to ensure that the destination file is always within boundries
-		// of the destination directory. This prevents any kind of path traversal
-		// from within tar archive.
-		evaledPath, err := filepath.EvalSymlinks(baseName)
+		if mode&os.ModeSymlink != 0 {
+			if !symlinkWarningPrinted && len(o.ExecParentCmdName) > 0 {
+				fmt.Fprintf(o.IOStreams.ErrOut, "warning: file %q is a symlink, skipping (consider using \"%s exec -n %q %q -- tar cf - %q | tar xf -\")\n", destFileName, o.ExecParentCmdName, src.PodNamespace, src.PodName, src.File)
+				symlinkWarningPrinted = true
+				continue
+			}
+			fmt.Fprintf(o.IOStreams.ErrOut, "warning: skipping symlink: %q -> %q\n", destFileName, header.Linkname)
+			continue
+		}
+		outFile, err := os.Create(destFileName)
 		if err != nil {
 			return err
 		}
-		// For scrutiny we verify both the actual destination as well as we follow
-		// all the links that might lead outside of the destination directory.
-		if !isDestRelative(destDir, filepath.Join(evaledPath, filepath.Base(destFileName))) {
-			fmt.Fprintf(o.IOStreams.ErrOut, "warning: file %q is outside target destination, skipping\n", destFileName)
-			continue
+		defer outFile.Close()
+		if _, err := io.Copy(outFile, tarReader); err != nil {
+			return err
 		}
-
-		if mode&os.ModeSymlink != 0 {
-			linkname := header.Linkname
-			// We need to ensure that the link destination is always within boundries
-			// of the destination directory. This prevents any kind of path traversal
-			// from within tar archive.
-			linkTarget := linkname
-			if !filepath.IsAbs(linkname) {
-				linkTarget = filepath.Join(evaledPath, linkname)
-			}
-			if !isDestRelative(destDir, linkTarget) {
-				fmt.Fprintf(o.IOStreams.ErrOut, "warning: link %q is pointing to %q which is outside target destination, skipping\n", destFileName, header.Linkname)
-				continue
-			}
-			if err := os.Symlink(linkname, destFileName); err != nil {
-				return err
-			}
-		} else {
-			outFile, err := os.Create(destFileName)
-			if err != nil {
-				return err
-			}
-			defer outFile.Close()
-			if _, err := io.Copy(outFile, tarReader); err != nil {
-				return err
-			}
-			if err := outFile.Close(); err != nil {
-				return err
-			}
+		if err := outFile.Close(); err != nil {
+			return err
 		}
 	}
 
