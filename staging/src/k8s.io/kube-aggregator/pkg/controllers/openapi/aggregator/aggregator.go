@@ -108,7 +108,7 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	// Build initial spec to serve.
 	klog.V(2).Infof("Building initial OpenAPI spec")
 	defer func(start time.Time) {
-		duration := time.Now().Sub(start)
+		duration := time.Since(start)
 		klog.V(2).Infof("Finished initial OpenAPI spec generation after %v", duration)
 
 		regenerationCounter.With(map[string]string{"apiservice": "*", "reason": "startup"})
@@ -222,7 +222,7 @@ func (s *specAggregator) tryUpdatingServiceSpecs(specInfo *openAPISpecInfo) erro
 	}
 	klog.V(2).Infof("Updating OpenAPI spec because %s is updated", specInfo.apiService.Name)
 	defer func(start time.Time) {
-		duration := time.Now().Sub(start)
+		duration := time.Since(start)
 		klog.V(2).Infof("Finished OpenAPI spec generation after %v", duration)
 
 		reason := "add"
@@ -254,7 +254,7 @@ func (s *specAggregator) tryDeleteServiceSpecs(apiServiceName string) error {
 	delete(s.openAPISpecs, apiServiceName)
 	klog.V(2).Infof("Updating OpenAPI spec because %s is removed", apiServiceName)
 	defer func(start time.Time) {
-		duration := time.Now().Sub(start)
+		duration := time.Since(start)
 		klog.V(2).Infof("Finished OpenAPI spec generation after %v", duration)
 
 		regenerationCounter.With(map[string]string{"apiservice": apiServiceName, "reason": "delete"})
