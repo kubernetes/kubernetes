@@ -231,7 +231,7 @@ func TestCRIListPodStats(t *testing.T) {
 	stats, err := provider.ListPodStats()
 	assert := assert.New(t)
 	assert.NoError(err)
-	assert.Equal(4, len(stats))
+	assert.Equal(3, len(stats))
 
 	podStatsMap := make(map[statsapi.PodReference]statsapi.PodStats)
 	for _, s := range stats {
@@ -296,17 +296,7 @@ func TestCRIListPodStats(t *testing.T) {
 	checkCRIPodCPUAndMemoryStats(assert, p2, infos[sandbox2Cgroup].Stats[0])
 
 	p3 := podStatsMap[statsapi.PodReference{Name: "sandbox3-name", UID: "sandbox3-uid", Namespace: "sandbox3-ns"}]
-	assert.Equal(sandbox3.CreatedAt, p3.StartTime.UnixNano())
-	assert.Equal(1, len(p3.Containers))
-
-	c5 := p3.Containers[0]
-	assert.Equal(cName5, c5.Name)
-	assert.Equal(container5.CreatedAt, c5.StartTime.UnixNano())
-	assert.NotNil(c5.CPU.Time)
-	assert.Zero(*c5.CPU.UsageCoreNanoSeconds)
-	assert.Zero(*c5.CPU.UsageNanoCores)
-	assert.NotNil(c5.Memory.Time)
-	assert.Zero(*c5.Memory.WorkingSetBytes)
+	assert.Equal(0, len(p3.Containers))
 
 	mockCadvisor.AssertExpectations(t)
 }
@@ -414,7 +404,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	stats, err := provider.ListPodCPUAndMemoryStats()
 	assert := assert.New(t)
 	assert.NoError(err)
-	assert.Equal(4, len(stats))
+	assert.Equal(3, len(stats))
 
 	podStatsMap := make(map[statsapi.PodReference]statsapi.PodStats)
 	for _, s := range stats {
@@ -484,17 +474,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 	assert.Nil(c2.UserDefinedMetrics)
 
 	p3 := podStatsMap[statsapi.PodReference{Name: "sandbox3-name", UID: "sandbox3-uid", Namespace: "sandbox3-ns"}]
-	assert.Equal(sandbox3.CreatedAt, p3.StartTime.UnixNano())
-	assert.Equal(1, len(p3.Containers))
-
-	c5 := p3.Containers[0]
-	assert.Equal(cName5, c5.Name)
-	assert.Equal(container5.CreatedAt, c5.StartTime.UnixNano())
-	assert.NotNil(c5.CPU.Time)
-	assert.Zero(*c5.CPU.UsageCoreNanoSeconds)
-	assert.Zero(*c5.CPU.UsageNanoCores)
-	assert.NotNil(c5.Memory.Time)
-	assert.Zero(*c5.Memory.WorkingSetBytes)
+	assert.Equal(0, len(p3.Containers))
 
 	mockCadvisor.AssertExpectations(t)
 }

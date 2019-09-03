@@ -715,19 +715,10 @@ func removeTerminatedPods(pods []*runtimeapi.PodSandbox) []*runtimeapi.PodSandbo
 
 	result := make([]*runtimeapi.PodSandbox, 0)
 	for _, refs := range podMap {
-		if len(refs) == 1 {
-			result = append(result, refs[0])
-			continue
-		}
-		found := false
 		for i := 0; i < len(refs); i++ {
 			if refs[i].State == runtimeapi.PodSandboxState_SANDBOX_READY {
-				found = true
 				result = append(result, refs[i])
 			}
-		}
-		if !found {
-			result = append(result, refs[len(refs)-1])
 		}
 	}
 	return result
@@ -752,19 +743,10 @@ func removeTerminatedContainers(containers []*runtimeapi.Container) []*runtimeap
 
 	result := make([]*runtimeapi.Container, 0)
 	for _, refs := range containerMap {
-		if len(refs) == 1 {
-			result = append(result, refs[0])
-			continue
-		}
-		found := false
 		for i := 0; i < len(refs); i++ {
 			if refs[i].State == runtimeapi.ContainerState_CONTAINER_RUNNING {
-				found = true
 				result = append(result, refs[i])
 			}
-		}
-		if !found {
-			result = append(result, refs[len(refs)-1])
 		}
 	}
 	return result
