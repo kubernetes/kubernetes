@@ -52,7 +52,7 @@ type authenticationInfoResolver struct {
 	cacheMisses *int32
 }
 
-func (a *authenticationInfoResolver) ClientConfigFor(server string) (*rest.Config, error) {
+func (a *authenticationInfoResolver) ClientConfigFor(hostPort string) (*rest.Config, error) {
 	atomic.AddInt32(a.cacheMisses, 1)
 	return a.restConfig, nil
 }
