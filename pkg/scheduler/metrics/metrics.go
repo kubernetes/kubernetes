@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
-	volumescheduling "k8s.io/kubernetes/pkg/controller/volume/scheduling"
+	volumeschedulingmetrics "k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics"
 )
 
 const (
@@ -251,7 +251,7 @@ func Register() {
 		for _, metric := range metricsList {
 			legacyregistry.MustRegister(metric)
 		}
-		volumescheduling.RegisterVolumeSchedulingMetrics()
+		volumeschedulingmetrics.RegisterVolumeSchedulingMetrics()
 	})
 }
 
