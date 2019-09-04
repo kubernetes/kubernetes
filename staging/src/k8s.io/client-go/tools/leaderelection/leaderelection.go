@@ -150,6 +150,7 @@ type LeaderCallbacks struct {
 
 // LeaderElector is a leader election client.
 type LeaderElector struct {
+	tries int
 	config LeaderElectionConfig
 	// internal bookkeeping
 	observedRecord rl.LeaderElectionRecord
@@ -219,7 +220,10 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 		succeeded = le.tryAcquireOrRenew()
 		le.maybeReportTransition()
 		if !succeeded {
-			klog.Infof("failed to acquire lease %v", desc)
+			le.tries = le.tries + 1
+			if le.tries % 10 == 0 {
+				klog.Infof("Attempt %v, failed to acquire lease %v", tries, desc)
+			}
 			return
 		}
 		le.config.Lock.RecordEvent("became leader")
@@ -314,7 +318,7 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 		}
 		le.observedRecord = leaderElectionRecord
 		le.observedTime = le.clock.Now()
-		klog.Info("Created a new lock, and acquired it successfully at time: %v", le.observedTime)
+		klog.Info("Successfully acquired lease at time: %v", le.observedTime)
 		return true
 	}
 
