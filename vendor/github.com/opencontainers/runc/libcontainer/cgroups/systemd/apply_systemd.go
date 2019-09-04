@@ -14,7 +14,6 @@ import (
 	"time"
 
 	systemdDbus "github.com/coreos/go-systemd/dbus"
-	systemdUtil "github.com/coreos/go-systemd/util"
 	"github.com/godbus/dbus"
 	"github.com/opencontainers/runc/libcontainer/cgroups"
 	"github.com/opencontainers/runc/libcontainer/cgroups/fs"
@@ -72,11 +71,8 @@ const (
 )
 
 var (
-	connLock                   sync.Mutex
-	theConn                    *systemdDbus.Conn
-	hasStartTransientUnit      bool
-	hasStartTransientSliceUnit bool
-	hasDelegateSlice           bool
+	connLock sync.Mutex
+	theConn  *systemdDbus.Conn
 )
 
 func newProp(name string, units interface{}) systemdDbus.Property {
@@ -86,8 +82,23 @@ func newProp(name string, units interface{}) systemdDbus.Property {
 	}
 }
 
+// NOTE: This function comes from package github.com/coreos/go-systemd/util
+// It was borrowed here to avoid a dependency on cgo.
+//
+// IsRunningSystemd checks whether the host was booted with systemd as its init
+// system. This functions similarly to systemd's `sd_booted(3)`: internally, it
+// checks whether /run/systemd/system/ exists and is a directory.
+// http://www.freedesktop.org/software/systemd/man/sd_booted.html
+func isRunningSystemd() bool {
+	fi, err := os.Lstat("/run/systemd/system")
+	if err != nil {
+		return false
+	}
+	return fi.IsDir()
+}
+
 func UseSystemd() bool {
-	if !systemdUtil.IsRunningSystemd() {
+	if !isRunningSystemd() {
 		return false
 	}
 
@@ -100,71 +111,12 @@ func UseSystemd() bool {
 		if err != nil {
 			return false
 		}
-
-		// Assume we have StartTransientUnit
-		hasStartTransientUnit = true
-
-		// But if we get UnknownMethod error we don't
-		if _, err := theConn.StartTransientUnit("test.scope", "invalid", nil, nil); err != nil {
-			if dbusError, ok := err.(dbus.Error); ok {
-				if dbusError.Name == "org.freedesktop.DBus.Error.UnknownMethod" {
-					hasStartTransientUnit = false
-					return hasStartTransientUnit
-				}
-			}
-		}
-
-		// Assume we have the ability to start a transient unit as a slice
-		// This was broken until systemd v229, but has been back-ported on RHEL environments >= 219
-		// For details, see: https://bugzilla.redhat.com/show_bug.cgi?id=1370299
-		hasStartTransientSliceUnit = true
-
-		// To ensure simple clean-up, we create a slice off the root with no hierarchy
-		slice := fmt.Sprintf("libcontainer_%d_systemd_test_default.slice", os.Getpid())
-		if _, err := theConn.StartTransientUnit(slice, "replace", nil, nil); err != nil {
-			if _, ok := err.(dbus.Error); ok {
-				hasStartTransientSliceUnit = false
-			}
-		}
-
-		for i := 0; i <= testSliceWait; i++ {
-			if _, err := theConn.StopUnit(slice, "replace", nil); err != nil {
-				if dbusError, ok := err.(dbus.Error); ok {
-					if strings.Contains(dbusError.Name, "org.freedesktop.systemd1.NoSuchUnit") {
-						hasStartTransientSliceUnit = false
-						break
-					}
-				}
-			} else {
-				break
-			}
-			time.Sleep(time.Millisecond)
-		}
-
-		// Not critical because of the stop unit logic above.
-		theConn.StopUnit(slice, "replace", nil)
-
-		// Assume StartTransientUnit on a slice allows Delegate
-		hasDelegateSlice = true
-		dlSlice := newProp("Delegate", true)
-		if _, err := theConn.StartTransientUnit(slice, "replace", []systemdDbus.Property{dlSlice}, nil); err != nil {
-			if dbusError, ok := err.(dbus.Error); ok {
-				// Starting with systemd v237, Delegate is not even a property of slices anymore,
-				// so the D-Bus call fails with "InvalidArgs" error.
-				if strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.PropertyReadOnly") || strings.Contains(dbusError.Name, "org.freedesktop.DBus.Error.InvalidArgs") {
-					hasDelegateSlice = false
-				}
-			}
-		}
-
-		// Not critical because of the stop unit logic above.
-		theConn.StopUnit(slice, "replace", nil)
 	}
-	return hasStartTransientUnit
+	return true
 }
 
 func NewSystemdCgroupsManager() (func(config *configs.Cgroup, paths map[string]string) cgroups.Manager, error) {
-	if !systemdUtil.IsRunningSystemd() {
+	if !isRunningSystemd() {
 		return nil, fmt.Errorf("systemd not running on this host, can't use systemd as a cgroups.Manager")
 	}
 	return func(config *configs.Cgroup, paths map[string]string) cgroups.Manager {
@@ -208,10 +160,6 @@ func (m *Manager) Apply(pid int) error {
 
 	// if we create a slice, the parent is defined via a Wants=
 	if strings.HasSuffix(unitName, ".slice") {
-		// This was broken until systemd v229, but has been back-ported on RHEL environments >= 219
-		if !hasStartTransientSliceUnit {
-			return fmt.Errorf("systemd version does not support ability to start a slice as transient unit")
-		}
 		properties = append(properties, systemdDbus.PropWants(slice))
 	} else {
 		// otherwise, we use Slice=
@@ -224,12 +172,7 @@ func (m *Manager) Apply(pid int) error {
 	}
 
 	// Check if we can delegate. This is only supported on systemd versions 218 and above.
-	if strings.HasSuffix(unitName, ".slice") {
-		if hasDelegateSlice {
-			// systemd 237 and above no longer allows delegation on a slice
-			properties = append(properties, newProp("Delegate", true))
-		}
-	} else {
+	if !strings.HasSuffix(unitName, ".slice") {
 		// Assume scopes always support delegation.
 		properties = append(properties, newProp("Delegate", true))
 	}

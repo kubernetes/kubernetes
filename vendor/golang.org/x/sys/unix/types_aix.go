@@ -87,8 +87,6 @@ type Mode_t C.mode_t
 
 type Timespec C.struct_timespec
 
-type StTimespec C.struct_st_timespec
-
 type Timeval C.struct_timeval
 
 type Timeval32 C.struct_timeval32
@@ -133,6 +131,8 @@ type RawSockaddrInet6 C.struct_sockaddr_in6
 
 type RawSockaddrUnix C.struct_sockaddr_un
 
+type RawSockaddrDatalink C.struct_sockaddr_dl
+
 type RawSockaddr C.struct_sockaddr
 
 type RawSockaddrAny C.struct_sockaddr_any
@@ -156,17 +156,18 @@ type Linger C.struct_linger
 type Msghdr C.struct_msghdr
 
 const (
-	SizeofSockaddrInet4 = C.sizeof_struct_sockaddr_in
-	SizeofSockaddrInet6 = C.sizeof_struct_sockaddr_in6
-	SizeofSockaddrAny   = C.sizeof_struct_sockaddr_any
-	SizeofSockaddrUnix  = C.sizeof_struct_sockaddr_un
-	SizeofLinger        = C.sizeof_struct_linger
-	SizeofIPMreq        = C.sizeof_struct_ip_mreq
-	SizeofIPv6Mreq      = C.sizeof_struct_ipv6_mreq
-	SizeofIPv6MTUInfo   = C.sizeof_struct_ip6_mtuinfo
-	SizeofMsghdr        = C.sizeof_struct_msghdr
-	SizeofCmsghdr       = C.sizeof_struct_cmsghdr
-	SizeofICMPv6Filter  = C.sizeof_struct_icmp6_filter
+	SizeofSockaddrInet4    = C.sizeof_struct_sockaddr_in
+	SizeofSockaddrInet6    = C.sizeof_struct_sockaddr_in6
+	SizeofSockaddrAny      = C.sizeof_struct_sockaddr_any
+	SizeofSockaddrUnix     = C.sizeof_struct_sockaddr_un
+	SizeofSockaddrDatalink = C.sizeof_struct_sockaddr_dl
+	SizeofLinger           = C.sizeof_struct_linger
+	SizeofIPMreq           = C.sizeof_struct_ip_mreq
+	SizeofIPv6Mreq         = C.sizeof_struct_ipv6_mreq
+	SizeofIPv6MTUInfo      = C.sizeof_struct_ip6_mtuinfo
+	SizeofMsghdr           = C.sizeof_struct_msghdr
+	SizeofCmsghdr          = C.sizeof_struct_cmsghdr
+	SizeofICMPv6Filter     = C.sizeof_struct_icmp6_filter
 )
 
 // Routing and interface messages

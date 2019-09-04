@@ -13,7 +13,6 @@ package unix
 
 import (
 	"encoding/binary"
-	"net"
 	"runtime"
 	"syscall"
 	"unsafe"
@@ -39,6 +38,20 @@ func Creat(path string, mode uint32) (fd int, err error) {
 	return Open(path, O_CREAT|O_WRONLY|O_TRUNC, mode)
 }
 
+//sys	FanotifyInit(flags uint, event_f_flags uint) (fd int, err error)
+//sys	fanotifyMark(fd int, flags uint, mask uint64, dirFd int, pathname *byte) (err error)
+
+func FanotifyMark(fd int, flags uint, mask uint64, dirFd int, pathname string) (err error) {
+	if pathname == "" {
+		return fanotifyMark(fd, flags, mask, dirFd, nil)
+	}
+	p, err := BytePtrFromString(pathname)
+	if err != nil {
+		return err
+	}
+	return fanotifyMark(fd, flags, mask, dirFd, p)
+}
+
 //sys	fchmodat(dirfd int, path string, mode uint32) (err error)
 
 func Fchmodat(dirfd int, path string, mode uint32, flags int) (err error) {
@@ -58,6 +71,17 @@ func Fchmodat(dirfd int, path string, mode uint32, flags int) (err error) {
 // ioctl itself should not be exposed directly, but additional get/set
 // functions for specific types are permissible.
 
+// IoctlRetInt performs an ioctl operation specified by req on a device
+// associated with opened file descriptor fd, and returns a non-negative
+// integer that is returned by the ioctl syscall.
+func IoctlRetInt(fd int, req uint) (int, error) {
+	ret, _, err := Syscall(SYS_IOCTL, uintptr(fd), uintptr(req), 0)
+	if err != 0 {
+		return 0, err
+	}
+	return int(ret), nil
+}
+
 // IoctlSetPointerInt performs an ioctl operation which sets an
 // integer value on fd, using the specified request number. The ioctl
 // argument is called with a pointer to the integer value, rather than
@@ -67,44 +91,16 @@ func IoctlSetPointerInt(fd int, req uint, value int) error {
 	return ioctl(fd, req, uintptr(unsafe.Pointer(&v)))
 }
 
-// IoctlSetInt performs an ioctl operation which sets an integer value
-// on fd, using the specified request number.
-func IoctlSetInt(fd int, req uint, value int) error {
-	return ioctl(fd, req, uintptr(value))
-}
-
-func ioctlSetWinsize(fd int, req uint, value *Winsize) error {
-	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
-}
-
-func ioctlSetTermios(fd int, req uint, value *Termios) error {
-	return ioctl(fd, req, uintptr(unsafe.Pointer(value)))
-}
-
 func IoctlSetRTCTime(fd int, value *RTCTime) error {
 	err := ioctl(fd, RTC_SET_TIME, uintptr(unsafe.Pointer(value)))
 	runtime.KeepAlive(value)
 	return err
 }
 
-// IoctlGetInt performs an ioctl operation which gets an integer value
-// from fd, using the specified request number.
-func IoctlGetInt(fd int, req uint) (int, error) {
-	var value int
+func IoctlGetUint32(fd int, req uint) (uint32, error) {
+	var value uint32
 	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
 	return value, err
-}
-
-func IoctlGetWinsize(fd int, req uint) (*Winsize, error) {
-	var value Winsize
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
-	return &value, err
-}
-
-func IoctlGetTermios(fd int, req uint) (*Termios, error) {
-	var value Termios
-	err := ioctl(fd, req, uintptr(unsafe.Pointer(&value)))
-	return &value, err
 }
 
 func IoctlGetRTCTime(fd int) (*RTCTime, error) {
@@ -745,7 +741,7 @@ const px_proto_oe = 0
 
 type SockaddrPPPoE struct {
 	SID    uint16
-	Remote net.HardwareAddr
+	Remote []byte
 	Dev    string
 	raw    RawSockaddrPPPoX
 }
@@ -777,6 +773,70 @@ func (sa *SockaddrPPPoE) sockaddr() (unsafe.Pointer, _Socklen, error) {
 	}
 	copy(sa.raw[14:], sa.Dev)
 	return unsafe.Pointer(&sa.raw), SizeofSockaddrPPPoX, nil
+}
+
+// SockaddrTIPC implements the Sockaddr interface for AF_TIPC type sockets.
+// For more information on TIPC, see: http://tipc.sourceforge.net/.
+type SockaddrTIPC struct {
+	// Scope is the publication scopes when binding service/service range.
+	// Should be set to TIPC_CLUSTER_SCOPE or TIPC_NODE_SCOPE.
+	Scope int
+
+	// Addr is the type of address used to manipulate a socket. Addr must be
+	// one of:
+	//  - *TIPCSocketAddr: "id" variant in the C addr union
+	//  - *TIPCServiceRange: "nameseq" variant in the C addr union
+	//  - *TIPCServiceName: "name" variant in the C addr union
+	//
+	// If nil, EINVAL will be returned when the structure is used.
+	Addr TIPCAddr
+
+	raw RawSockaddrTIPC
+}
+
+// TIPCAddr is implemented by types that can be used as an address for
+// SockaddrTIPC. It is only implemented by *TIPCSocketAddr, *TIPCServiceRange,
+// and *TIPCServiceName.
+type TIPCAddr interface {
+	tipcAddrtype() uint8
+	tipcAddr() [12]byte
+}
+
+func (sa *TIPCSocketAddr) tipcAddr() [12]byte {
+	var out [12]byte
+	copy(out[:], (*(*[unsafe.Sizeof(TIPCSocketAddr{})]byte)(unsafe.Pointer(sa)))[:])
+	return out
+}
+
+func (sa *TIPCSocketAddr) tipcAddrtype() uint8 { return TIPC_SOCKET_ADDR }
+
+func (sa *TIPCServiceRange) tipcAddr() [12]byte {
+	var out [12]byte
+	copy(out[:], (*(*[unsafe.Sizeof(TIPCServiceRange{})]byte)(unsafe.Pointer(sa)))[:])
+	return out
+}
+
+func (sa *TIPCServiceRange) tipcAddrtype() uint8 { return TIPC_SERVICE_RANGE }
+
+func (sa *TIPCServiceName) tipcAddr() [12]byte {
+	var out [12]byte
+	copy(out[:], (*(*[unsafe.Sizeof(TIPCServiceName{})]byte)(unsafe.Pointer(sa)))[:])
+	return out
+}
+
+func (sa *TIPCServiceName) tipcAddrtype() uint8 { return TIPC_SERVICE_ADDR }
+
+func (sa *SockaddrTIPC) sockaddr() (unsafe.Pointer, _Socklen, error) {
+	if sa.Addr == nil {
+		return nil, 0, EINVAL
+	}
+
+	sa.raw.Family = AF_TIPC
+	sa.raw.Scope = int8(sa.Scope)
+	sa.raw.Addrtype = sa.Addr.tipcAddrtype()
+	sa.raw.Addr = sa.Addr.tipcAddr()
+
+	return unsafe.Pointer(&sa.raw), SizeofSockaddrTIPC, nil
 }
 
 func anyToSockaddr(fd int, rsa *RawSockaddrAny) (Sockaddr, error) {
@@ -896,7 +956,7 @@ func anyToSockaddr(fd int, rsa *RawSockaddrAny) (Sockaddr, error) {
 		}
 		sa := &SockaddrPPPoE{
 			SID:    binary.BigEndian.Uint16(pp[6:8]),
-			Remote: net.HardwareAddr(pp[8:14]),
+			Remote: pp[8:14],
 		}
 		for i := 14; i < 14+IFNAMSIZ; i++ {
 			if pp[i] == 0 {
@@ -904,6 +964,27 @@ func anyToSockaddr(fd int, rsa *RawSockaddrAny) (Sockaddr, error) {
 				break
 			}
 		}
+		return sa, nil
+	case AF_TIPC:
+		pp := (*RawSockaddrTIPC)(unsafe.Pointer(rsa))
+
+		sa := &SockaddrTIPC{
+			Scope: int(pp.Scope),
+		}
+
+		// Determine which union variant is present in pp.Addr by checking
+		// pp.Addrtype.
+		switch pp.Addrtype {
+		case TIPC_SERVICE_RANGE:
+			sa.Addr = (*TIPCServiceRange)(unsafe.Pointer(&pp.Addr))
+		case TIPC_SERVICE_ADDR:
+			sa.Addr = (*TIPCServiceName)(unsafe.Pointer(&pp.Addr))
+		case TIPC_SOCKET_ADDR:
+			sa.Addr = (*TIPCSocketAddr)(unsafe.Pointer(&pp.Addr))
+		default:
+			return nil, EINVAL
+		}
+
 		return sa, nil
 	}
 	return nil, EAFNOSUPPORT
@@ -990,8 +1071,48 @@ func GetsockoptString(fd, level, opt int) (string, error) {
 	return string(buf[:vallen-1]), nil
 }
 
+func GetsockoptTpacketStats(fd, level, opt int) (*TpacketStats, error) {
+	var value TpacketStats
+	vallen := _Socklen(SizeofTpacketStats)
+	err := getsockopt(fd, level, opt, unsafe.Pointer(&value), &vallen)
+	return &value, err
+}
+
+func GetsockoptTpacketStatsV3(fd, level, opt int) (*TpacketStatsV3, error) {
+	var value TpacketStatsV3
+	vallen := _Socklen(SizeofTpacketStatsV3)
+	err := getsockopt(fd, level, opt, unsafe.Pointer(&value), &vallen)
+	return &value, err
+}
+
 func SetsockoptIPMreqn(fd, level, opt int, mreq *IPMreqn) (err error) {
 	return setsockopt(fd, level, opt, unsafe.Pointer(mreq), unsafe.Sizeof(*mreq))
+}
+
+func SetsockoptPacketMreq(fd, level, opt int, mreq *PacketMreq) error {
+	return setsockopt(fd, level, opt, unsafe.Pointer(mreq), unsafe.Sizeof(*mreq))
+}
+
+// SetsockoptSockFprog attaches a classic BPF or an extended BPF program to a
+// socket to filter incoming packets.  See 'man 7 socket' for usage information.
+func SetsockoptSockFprog(fd, level, opt int, fprog *SockFprog) error {
+	return setsockopt(fd, level, opt, unsafe.Pointer(fprog), unsafe.Sizeof(*fprog))
+}
+
+func SetsockoptCanRawFilter(fd, level, opt int, filter []CanFilter) error {
+	var p unsafe.Pointer
+	if len(filter) > 0 {
+		p = unsafe.Pointer(&filter[0])
+	}
+	return setsockopt(fd, level, opt, p, uintptr(len(filter)*SizeofCanFilter))
+}
+
+func SetsockoptTpacketReq(fd, level, opt int, tp *TpacketReq) error {
+	return setsockopt(fd, level, opt, unsafe.Pointer(tp), unsafe.Sizeof(*tp))
+}
+
+func SetsockoptTpacketReq3(fd, level, opt int, tp *TpacketReq3) error {
+	return setsockopt(fd, level, opt, unsafe.Pointer(tp), unsafe.Sizeof(*tp))
 }
 
 // Keyctl Commands (http://man7.org/linux/man-pages/man2/keyctl.2.html)
@@ -1354,8 +1475,20 @@ func Reboot(cmd int) (err error) {
 	return reboot(LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, cmd, "")
 }
 
-func ReadDirent(fd int, buf []byte) (n int, err error) {
-	return Getdents(fd, buf)
+func direntIno(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Ino), unsafe.Sizeof(Dirent{}.Ino))
+}
+
+func direntReclen(buf []byte) (uint64, bool) {
+	return readInt(buf, unsafe.Offsetof(Dirent{}.Reclen), unsafe.Sizeof(Dirent{}.Reclen))
+}
+
+func direntNamlen(buf []byte) (uint64, bool) {
+	reclen, ok := direntReclen(buf)
+	if !ok {
+		return 0, false
+	}
+	return reclen - uint64(unsafe.Offsetof(Dirent{}.Name)), true
 }
 
 //sys	mount(source string, target string, fstype string, flags uintptr, data *byte) (err error)
@@ -1390,6 +1523,8 @@ func Sendfile(outfd int, infd int, offset *int64, count int) (written int, err e
 //sys	Acct(path string) (err error)
 //sys	AddKey(keyType string, description string, payload []byte, ringid int) (id int, err error)
 //sys	Adjtimex(buf *Timex) (state int, err error)
+//sys	Capget(hdr *CapUserHeader, data *CapUserData) (err error)
+//sys	Capset(hdr *CapUserHeader, data *CapUserData) (err error)
 //sys	Chdir(path string) (err error)
 //sys	Chroot(path string) (err error)
 //sys	ClockGetres(clockid int32, res *Timespec) (err error)
@@ -1477,9 +1612,13 @@ func Setgid(uid int) (err error) {
 	return EOPNOTSUPP
 }
 
+func Signalfd(fd int, sigmask *Sigset_t, flags int) (newfd int, err error) {
+	return signalfd(fd, sigmask, _C__NSIG/8, flags)
+}
+
 //sys	Setpriority(which int, who int, prio int) (err error)
 //sys	Setxattr(path string, attr string, data []byte, flags int) (err error)
-//sys	Signalfd(fd int, mask *Sigset_t, flags int) = SYS_SIGNALFD4
+//sys	signalfd(fd int, sigmask *Sigset_t, maskSize uintptr, flags int) (newfd int, err error) = SYS_SIGNALFD4
 //sys	Statx(dirfd int, path string, flags int, mask int, stat *Statx_t) (err error)
 //sys	Sync()
 //sys	Syncfs(fd int) (err error)
@@ -1608,6 +1747,82 @@ func Faccessat(dirfd int, path string, mode uint32, flags int) (err error) {
 	return EACCES
 }
 
+//sys nameToHandleAt(dirFD int, pathname string, fh *fileHandle, mountID *_C_int, flags int) (err error) = SYS_NAME_TO_HANDLE_AT
+//sys openByHandleAt(mountFD int, fh *fileHandle, flags int) (fd int, err error) = SYS_OPEN_BY_HANDLE_AT
+
+// fileHandle is the argument to nameToHandleAt and openByHandleAt. We
+// originally tried to generate it via unix/linux/types.go with "type
+// fileHandle C.struct_file_handle" but that generated empty structs
+// for mips64 and mips64le. Instead, hard code it for now (it's the
+// same everywhere else) until the mips64 generator issue is fixed.
+type fileHandle struct {
+	Bytes uint32
+	Type  int32
+}
+
+// FileHandle represents the C struct file_handle used by
+// name_to_handle_at (see NameToHandleAt) and open_by_handle_at (see
+// OpenByHandleAt).
+type FileHandle struct {
+	*fileHandle
+}
+
+// NewFileHandle constructs a FileHandle.
+func NewFileHandle(handleType int32, handle []byte) FileHandle {
+	const hdrSize = unsafe.Sizeof(fileHandle{})
+	buf := make([]byte, hdrSize+uintptr(len(handle)))
+	copy(buf[hdrSize:], handle)
+	fh := (*fileHandle)(unsafe.Pointer(&buf[0]))
+	fh.Type = handleType
+	fh.Bytes = uint32(len(handle))
+	return FileHandle{fh}
+}
+
+func (fh *FileHandle) Size() int   { return int(fh.fileHandle.Bytes) }
+func (fh *FileHandle) Type() int32 { return fh.fileHandle.Type }
+func (fh *FileHandle) Bytes() []byte {
+	n := fh.Size()
+	if n == 0 {
+		return nil
+	}
+	return (*[1 << 30]byte)(unsafe.Pointer(uintptr(unsafe.Pointer(&fh.fileHandle.Type)) + 4))[:n:n]
+}
+
+// NameToHandleAt wraps the name_to_handle_at system call; it obtains
+// a handle for a path name.
+func NameToHandleAt(dirfd int, path string, flags int) (handle FileHandle, mountID int, err error) {
+	var mid _C_int
+	// Try first with a small buffer, assuming the handle will
+	// only be 32 bytes.
+	size := uint32(32 + unsafe.Sizeof(fileHandle{}))
+	didResize := false
+	for {
+		buf := make([]byte, size)
+		fh := (*fileHandle)(unsafe.Pointer(&buf[0]))
+		fh.Bytes = size - uint32(unsafe.Sizeof(fileHandle{}))
+		err = nameToHandleAt(dirfd, path, fh, &mid, flags)
+		if err == EOVERFLOW {
+			if didResize {
+				// We shouldn't need to resize more than once
+				return
+			}
+			didResize = true
+			size = fh.Bytes + uint32(unsafe.Sizeof(fileHandle{}))
+			continue
+		}
+		if err != nil {
+			return
+		}
+		return FileHandle{fh}, int(mid), nil
+	}
+}
+
+// OpenByHandleAt wraps the open_by_handle_at system call; it opens a
+// file via a handle as previously returned by NameToHandleAt.
+func OpenByHandleAt(mountFD int, handle FileHandle, flags int) (fd int, err error) {
+	return openByHandleAt(mountFD, handle.fileHandle, flags)
+}
+
 /*
  * Unimplemented
  */
@@ -1615,8 +1830,6 @@ func Faccessat(dirfd int, path string, mode uint32, flags int) (err error) {
 // Alarm
 // ArchPrctl
 // Brk
-// Capget
-// Capset
 // ClockNanosleep
 // ClockSettime
 // Clone

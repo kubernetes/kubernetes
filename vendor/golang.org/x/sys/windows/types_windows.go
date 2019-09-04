@@ -4,33 +4,10 @@
 
 package windows
 
-import "syscall"
-
-const (
-	// Windows errors.
-	ERROR_FILE_NOT_FOUND         syscall.Errno = 2
-	ERROR_PATH_NOT_FOUND         syscall.Errno = 3
-	ERROR_ACCESS_DENIED          syscall.Errno = 5
-	ERROR_NO_MORE_FILES          syscall.Errno = 18
-	ERROR_HANDLE_EOF             syscall.Errno = 38
-	ERROR_NETNAME_DELETED        syscall.Errno = 64
-	ERROR_FILE_EXISTS            syscall.Errno = 80
-	ERROR_BROKEN_PIPE            syscall.Errno = 109
-	ERROR_BUFFER_OVERFLOW        syscall.Errno = 111
-	ERROR_INSUFFICIENT_BUFFER    syscall.Errno = 122
-	ERROR_MOD_NOT_FOUND          syscall.Errno = 126
-	ERROR_PROC_NOT_FOUND         syscall.Errno = 127
-	ERROR_ALREADY_EXISTS         syscall.Errno = 183
-	ERROR_ENVVAR_NOT_FOUND       syscall.Errno = 203
-	ERROR_MORE_DATA              syscall.Errno = 234
-	ERROR_OPERATION_ABORTED      syscall.Errno = 995
-	ERROR_IO_PENDING             syscall.Errno = 997
-	ERROR_SERVICE_SPECIFIC_ERROR syscall.Errno = 1066
-	ERROR_NOT_FOUND              syscall.Errno = 1168
-	ERROR_PRIVILEGE_NOT_HELD     syscall.Errno = 1314
-	WSAEACCES                    syscall.Errno = 10013
-	WSAEMSGSIZE                  syscall.Errno = 10040
-	WSAECONNRESET                syscall.Errno = 10054
+import (
+	"net"
+	"syscall"
+	"unsafe"
 )
 
 const (
@@ -126,9 +103,19 @@ const (
 	OPEN_ALWAYS       = 4
 	TRUNCATE_EXISTING = 5
 
-	FILE_FLAG_OPEN_REPARSE_POINT = 0x00200000
-	FILE_FLAG_BACKUP_SEMANTICS   = 0x02000000
-	FILE_FLAG_OVERLAPPED         = 0x40000000
+	FILE_FLAG_OPEN_REQUIRING_OPLOCK = 0x00040000
+	FILE_FLAG_FIRST_PIPE_INSTANCE   = 0x00080000
+	FILE_FLAG_OPEN_NO_RECALL        = 0x00100000
+	FILE_FLAG_OPEN_REPARSE_POINT    = 0x00200000
+	FILE_FLAG_SESSION_AWARE         = 0x00800000
+	FILE_FLAG_POSIX_SEMANTICS       = 0x01000000
+	FILE_FLAG_BACKUP_SEMANTICS      = 0x02000000
+	FILE_FLAG_DELETE_ON_CLOSE       = 0x04000000
+	FILE_FLAG_SEQUENTIAL_SCAN       = 0x08000000
+	FILE_FLAG_RANDOM_ACCESS         = 0x10000000
+	FILE_FLAG_NO_BUFFERING          = 0x20000000
+	FILE_FLAG_OVERLAPPED            = 0x40000000
+	FILE_FLAG_WRITE_THROUGH         = 0x80000000
 
 	HANDLE_FLAG_INHERIT    = 0x00000001
 	STARTF_USESTDHANDLES   = 0x00000100
@@ -167,22 +154,54 @@ const (
 	IGNORE                = 0
 	INFINITE              = 0xffffffff
 
-	WAIT_TIMEOUT   = 258
 	WAIT_ABANDONED = 0x00000080
 	WAIT_OBJECT_0  = 0x00000000
 	WAIT_FAILED    = 0xFFFFFFFF
 
-	PROCESS_TERMINATE         = 1
-	PROCESS_QUERY_INFORMATION = 0x00000400
-	SYNCHRONIZE               = 0x00100000
+	// Standard access rights.
+	DELETE       = 0x00010000
+	READ_CONTROL = 0x00020000
+	SYNCHRONIZE  = 0x00100000
+	WRITE_DAC    = 0x00040000
+	WRITE_OWNER  = 0x00080000
+
+	// Access rights for process.
+	PROCESS_CREATE_PROCESS            = 0x0080
+	PROCESS_CREATE_THREAD             = 0x0002
+	PROCESS_DUP_HANDLE                = 0x0040
+	PROCESS_QUERY_INFORMATION         = 0x0400
+	PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+	PROCESS_SET_INFORMATION           = 0x0200
+	PROCESS_SET_QUOTA                 = 0x0100
+	PROCESS_SUSPEND_RESUME            = 0x0800
+	PROCESS_TERMINATE                 = 0x0001
+	PROCESS_VM_OPERATION              = 0x0008
+	PROCESS_VM_READ                   = 0x0010
+	PROCESS_VM_WRITE                  = 0x0020
+
+	// Access rights for thread.
+	THREAD_DIRECT_IMPERSONATION      = 0x0200
+	THREAD_GET_CONTEXT               = 0x0008
+	THREAD_IMPERSONATE               = 0x0100
+	THREAD_QUERY_INFORMATION         = 0x0040
+	THREAD_QUERY_LIMITED_INFORMATION = 0x0800
+	THREAD_SET_CONTEXT               = 0x0010
+	THREAD_SET_INFORMATION           = 0x0020
+	THREAD_SET_LIMITED_INFORMATION   = 0x0400
+	THREAD_SET_THREAD_TOKEN          = 0x0080
+	THREAD_SUSPEND_RESUME            = 0x0002
+	THREAD_TERMINATE                 = 0x0001
 
 	FILE_MAP_COPY    = 0x01
 	FILE_MAP_WRITE   = 0x02
 	FILE_MAP_READ    = 0x04
 	FILE_MAP_EXECUTE = 0x20
 
-	CTRL_C_EVENT     = 0
-	CTRL_BREAK_EVENT = 1
+	CTRL_C_EVENT        = 0
+	CTRL_BREAK_EVENT    = 1
+	CTRL_CLOSE_EVENT    = 2
+	CTRL_LOGOFF_EVENT   = 5
+	CTRL_SHUTDOWN_EVENT = 6
 
 	// Windows reserves errors >= 1<<29 for application use.
 	APPLICATION_ERROR = 1 << 29
@@ -402,12 +421,6 @@ const (
 	CERT_CHAIN_POLICY_EV                = 8
 	CERT_CHAIN_POLICY_SSL_F12           = 9
 
-	CERT_E_EXPIRED       = 0x800B0101
-	CERT_E_ROLE          = 0x800B0103
-	CERT_E_PURPOSE       = 0x800B0106
-	CERT_E_UNTRUSTEDROOT = 0x800B0109
-	CERT_E_CN_NO_MATCH   = 0x800B010F
-
 	/* AuthType values for SSLExtraCertChainPolicyPara struct */
 	AUTHTYPE_CLIENT = 1
 	AUTHTYPE_SERVER = 2
@@ -418,6 +431,26 @@ const (
 	SECURITY_FLAG_IGNORE_WRONG_USAGE       = 0x00000200
 	SECURITY_FLAG_IGNORE_CERT_CN_INVALID   = 0x00001000
 	SECURITY_FLAG_IGNORE_CERT_DATE_INVALID = 0x00002000
+)
+
+const (
+	// flags for SetErrorMode
+	SEM_FAILCRITICALERRORS     = 0x0001
+	SEM_NOALIGNMENTFAULTEXCEPT = 0x0004
+	SEM_NOGPFAULTERRORBOX      = 0x0002
+	SEM_NOOPENFILEERRORBOX     = 0x8000
+)
+
+const (
+	// Priority class.
+	ABOVE_NORMAL_PRIORITY_CLASS   = 0x00008000
+	BELOW_NORMAL_PRIORITY_CLASS   = 0x00004000
+	HIGH_PRIORITY_CLASS           = 0x00000080
+	IDLE_PRIORITY_CLASS           = 0x00000040
+	NORMAL_PRIORITY_CLASS         = 0x00000020
+	PROCESS_MODE_BACKGROUND_BEGIN = 0x00100000
+	PROCESS_MODE_BACKGROUND_END   = 0x00200000
+	REALTIME_PRIORITY_CLASS       = 0x00000100
 )
 
 var (
@@ -627,6 +660,16 @@ type ProcessEntry32 struct {
 	PriClassBase    int32
 	Flags           uint32
 	ExeFile         [MAX_PATH]uint16
+}
+
+type ThreadEntry32 struct {
+	Size           uint32
+	Usage          uint32
+	ThreadID       uint32
+	OwnerProcessID uint32
+	BasePri        int32
+	DeltaPri       int32
+	Flags          uint32
 }
 
 type Systemtime struct {
@@ -847,10 +890,6 @@ const (
 	DNS_TYPE_WINS    = 0xff01
 	DNS_TYPE_WINSR   = 0xff02
 	DNS_TYPE_NBSTAT  = 0xff01
-)
-
-const (
-	DNS_INFO_NO_RECORDS = 0x251D
 )
 
 const (
@@ -1151,6 +1190,28 @@ const (
 	REG_QWORD = REG_QWORD_LITTLE_ENDIAN
 )
 
+const (
+	EVENT_MODIFY_STATE = 0x0002
+	EVENT_ALL_ACCESS   = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0x3
+
+	MUTANT_QUERY_STATE = 0x0001
+	MUTANT_ALL_ACCESS  = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | MUTANT_QUERY_STATE
+
+	SEMAPHORE_MODIFY_STATE = 0x0002
+	SEMAPHORE_ALL_ACCESS   = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0x3
+
+	TIMER_QUERY_STATE  = 0x0001
+	TIMER_MODIFY_STATE = 0x0002
+	TIMER_ALL_ACCESS   = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | TIMER_QUERY_STATE | TIMER_MODIFY_STATE
+
+	MUTEX_MODIFY_STATE = MUTANT_QUERY_STATE
+	MUTEX_ALL_ACCESS   = MUTANT_ALL_ACCESS
+
+	CREATE_EVENT_MANUAL_RESET  = 0x1
+	CREATE_EVENT_INITIAL_SET   = 0x2
+	CREATE_MUTEX_INITIAL_OWNER = 0x1
+)
+
 type AddrinfoW struct {
 	Flags     int32
 	Family    int32
@@ -1314,6 +1375,41 @@ const (
 	ComputerNameMax                       = 8
 )
 
+// For MessageBox()
+const (
+	MB_OK                   = 0x00000000
+	MB_OKCANCEL             = 0x00000001
+	MB_ABORTRETRYIGNORE     = 0x00000002
+	MB_YESNOCANCEL          = 0x00000003
+	MB_YESNO                = 0x00000004
+	MB_RETRYCANCEL          = 0x00000005
+	MB_CANCELTRYCONTINUE    = 0x00000006
+	MB_ICONHAND             = 0x00000010
+	MB_ICONQUESTION         = 0x00000020
+	MB_ICONEXCLAMATION      = 0x00000030
+	MB_ICONASTERISK         = 0x00000040
+	MB_USERICON             = 0x00000080
+	MB_ICONWARNING          = MB_ICONEXCLAMATION
+	MB_ICONERROR            = MB_ICONHAND
+	MB_ICONINFORMATION      = MB_ICONASTERISK
+	MB_ICONSTOP             = MB_ICONHAND
+	MB_DEFBUTTON1           = 0x00000000
+	MB_DEFBUTTON2           = 0x00000100
+	MB_DEFBUTTON3           = 0x00000200
+	MB_DEFBUTTON4           = 0x00000300
+	MB_APPLMODAL            = 0x00000000
+	MB_SYSTEMMODAL          = 0x00001000
+	MB_TASKMODAL            = 0x00002000
+	MB_HELP                 = 0x00004000
+	MB_NOFOCUS              = 0x00008000
+	MB_SETFOREGROUND        = 0x00010000
+	MB_DEFAULT_DESKTOP_ONLY = 0x00020000
+	MB_TOPMOST              = 0x00040000
+	MB_RIGHT                = 0x00080000
+	MB_RTLREADING           = 0x00100000
+	MB_SERVICE_NOTIFICATION = 0x00200000
+)
+
 const (
 	MOVEFILE_REPLACE_EXISTING      = 0x1
 	MOVEFILE_COPY_ALLOWED          = 0x2
@@ -1340,6 +1436,16 @@ const (
 type SocketAddress struct {
 	Sockaddr       *syscall.RawSockaddrAny
 	SockaddrLength int32
+}
+
+// IP returns an IPv4 or IPv6 address, or nil if the underlying SocketAddress is neither.
+func (addr *SocketAddress) IP() net.IP {
+	if uintptr(addr.SockaddrLength) >= unsafe.Sizeof(RawSockaddrInet4{}) && addr.Sockaddr.Addr.Family == AF_INET {
+		return (*RawSockaddrInet4)(unsafe.Pointer(addr.Sockaddr)).Addr[:]
+	} else if uintptr(addr.SockaddrLength) >= unsafe.Sizeof(RawSockaddrInet6{}) && addr.Sockaddr.Addr.Family == AF_INET6 {
+		return (*RawSockaddrInet6)(unsafe.Pointer(addr.Sockaddr)).Addr[:]
+	}
+	return nil
 }
 
 type IpAdapterUnicastAddress struct {
@@ -1467,3 +1573,118 @@ type ConsoleScreenBufferInfo struct {
 }
 
 const UNIX_PATH_MAX = 108 // defined in afunix.h
+
+const (
+	// flags for JOBOBJECT_BASIC_LIMIT_INFORMATION.LimitFlags
+	JOB_OBJECT_LIMIT_ACTIVE_PROCESS             = 0x00000008
+	JOB_OBJECT_LIMIT_AFFINITY                   = 0x00000010
+	JOB_OBJECT_LIMIT_BREAKAWAY_OK               = 0x00000800
+	JOB_OBJECT_LIMIT_DIE_ON_UNHANDLED_EXCEPTION = 0x00000400
+	JOB_OBJECT_LIMIT_JOB_MEMORY                 = 0x00000200
+	JOB_OBJECT_LIMIT_JOB_TIME                   = 0x00000004
+	JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE          = 0x00002000
+	JOB_OBJECT_LIMIT_PRESERVE_JOB_TIME          = 0x00000040
+	JOB_OBJECT_LIMIT_PRIORITY_CLASS             = 0x00000020
+	JOB_OBJECT_LIMIT_PROCESS_MEMORY             = 0x00000100
+	JOB_OBJECT_LIMIT_PROCESS_TIME               = 0x00000002
+	JOB_OBJECT_LIMIT_SCHEDULING_CLASS           = 0x00000080
+	JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK        = 0x00001000
+	JOB_OBJECT_LIMIT_SUBSET_AFFINITY            = 0x00004000
+	JOB_OBJECT_LIMIT_WORKINGSET                 = 0x00000001
+)
+
+type JOBOBJECT_BASIC_LIMIT_INFORMATION struct {
+	PerProcessUserTimeLimit int64
+	PerJobUserTimeLimit     int64
+	LimitFlags              uint32
+	MinimumWorkingSetSize   uintptr
+	MaximumWorkingSetSize   uintptr
+	ActiveProcessLimit      uint32
+	Affinity                uintptr
+	PriorityClass           uint32
+	SchedulingClass         uint32
+}
+
+type IO_COUNTERS struct {
+	ReadOperationCount  uint64
+	WriteOperationCount uint64
+	OtherOperationCount uint64
+	ReadTransferCount   uint64
+	WriteTransferCount  uint64
+	OtherTransferCount  uint64
+}
+
+type JOBOBJECT_EXTENDED_LIMIT_INFORMATION struct {
+	BasicLimitInformation JOBOBJECT_BASIC_LIMIT_INFORMATION
+	IoInfo                IO_COUNTERS
+	ProcessMemoryLimit    uintptr
+	JobMemoryLimit        uintptr
+	PeakProcessMemoryUsed uintptr
+	PeakJobMemoryUsed     uintptr
+}
+
+const (
+	// UIRestrictionsClass
+	JOB_OBJECT_UILIMIT_DESKTOP          = 0x00000040
+	JOB_OBJECT_UILIMIT_DISPLAYSETTINGS  = 0x00000010
+	JOB_OBJECT_UILIMIT_EXITWINDOWS      = 0x00000080
+	JOB_OBJECT_UILIMIT_GLOBALATOMS      = 0x00000020
+	JOB_OBJECT_UILIMIT_HANDLES          = 0x00000001
+	JOB_OBJECT_UILIMIT_READCLIPBOARD    = 0x00000002
+	JOB_OBJECT_UILIMIT_SYSTEMPARAMETERS = 0x00000008
+	JOB_OBJECT_UILIMIT_WRITECLIPBOARD   = 0x00000004
+)
+
+type JOBOBJECT_BASIC_UI_RESTRICTIONS struct {
+	UIRestrictionsClass uint32
+}
+
+const (
+	// JobObjectInformationClass
+	JobObjectAssociateCompletionPortInformation = 7
+	JobObjectBasicLimitInformation              = 2
+	JobObjectBasicUIRestrictions                = 4
+	JobObjectCpuRateControlInformation          = 15
+	JobObjectEndOfJobTimeInformation            = 6
+	JobObjectExtendedLimitInformation           = 9
+	JobObjectGroupInformation                   = 11
+	JobObjectGroupInformationEx                 = 14
+	JobObjectLimitViolationInformation2         = 35
+	JobObjectNetRateControlInformation          = 32
+	JobObjectNotificationLimitInformation       = 12
+	JobObjectNotificationLimitInformation2      = 34
+	JobObjectSecurityLimitInformation           = 5
+)
+
+const (
+	KF_FLAG_DEFAULT                          = 0x00000000
+	KF_FLAG_FORCE_APP_DATA_REDIRECTION       = 0x00080000
+	KF_FLAG_RETURN_FILTER_REDIRECTION_TARGET = 0x00040000
+	KF_FLAG_FORCE_PACKAGE_REDIRECTION        = 0x00020000
+	KF_FLAG_NO_PACKAGE_REDIRECTION           = 0x00010000
+	KF_FLAG_FORCE_APPCONTAINER_REDIRECTION   = 0x00020000
+	KF_FLAG_NO_APPCONTAINER_REDIRECTION      = 0x00010000
+	KF_FLAG_CREATE                           = 0x00008000
+	KF_FLAG_DONT_VERIFY                      = 0x00004000
+	KF_FLAG_DONT_UNEXPAND                    = 0x00002000
+	KF_FLAG_NO_ALIAS                         = 0x00001000
+	KF_FLAG_INIT                             = 0x00000800
+	KF_FLAG_DEFAULT_PATH                     = 0x00000400
+	KF_FLAG_NOT_PARENT_RELATIVE              = 0x00000200
+	KF_FLAG_SIMPLE_IDLIST                    = 0x00000100
+	KF_FLAG_ALIAS_ONLY                       = 0x80000000
+)
+
+type OsVersionInfoEx struct {
+	osVersionInfoSize uint32
+	MajorVersion      uint32
+	MinorVersion      uint32
+	BuildNumber       uint32
+	PlatformId        uint32
+	CsdVersion        [128]uint16
+	ServicePackMajor  uint16
+	ServicePackMinor  uint16
+	SuiteMask         uint16
+	ProductType       byte
+	_                 byte
+}

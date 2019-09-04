@@ -241,6 +241,7 @@ type Winsize C.struct_winsize
 
 const (
 	AT_FDCWD            = C.AT_FDCWD
+	AT_SYMLINK_FOLLOW   = C.AT_SYMLINK_FOLLOW
 	AT_SYMLINK_NOFOLLOW = C.AT_SYMLINK_NOFOLLOW
 )
 
@@ -274,3 +275,9 @@ type Utsname C.struct_utsname
 const SizeofUvmexp = C.sizeof_struct_uvmexp
 
 type Uvmexp C.struct_uvmexp
+
+// Clockinfo
+
+const SizeofClockinfo = C.sizeof_struct_clockinfo
+
+type Clockinfo C.struct_clockinfo

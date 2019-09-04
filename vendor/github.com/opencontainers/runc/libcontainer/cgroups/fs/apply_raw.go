@@ -226,9 +226,13 @@ func (m *Manager) GetStats() (*cgroups.Stats, error) {
 }
 
 func (m *Manager) Set(container *configs.Config) error {
+	if container.Cgroups == nil {
+		return nil
+	}
+
 	// If Paths are set, then we are just joining cgroups paths
 	// and there is no need to set any values.
-	if m.Cgroups.Paths != nil {
+	if m.Cgroups != nil && m.Cgroups.Paths != nil {
 		return nil
 	}
 
@@ -262,6 +266,10 @@ func (m *Manager) Set(container *configs.Config) error {
 // Freeze toggles the container's freezer cgroup depending on the state
 // provided
 func (m *Manager) Freeze(state configs.FreezerState) error {
+	if m.Cgroups == nil {
+		return errors.New("cannot toggle freezer: cgroups not configured for container")
+	}
+
 	paths := m.GetPaths()
 	dir := paths["freezer"]
 	prevState := m.Cgroups.Resources.Freezer

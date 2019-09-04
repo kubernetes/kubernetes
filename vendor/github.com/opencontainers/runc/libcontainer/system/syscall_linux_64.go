@@ -1,5 +1,5 @@
 // +build linux
-// +build arm64 amd64 mips mipsle mips64 mips64le ppc ppc64 ppc64le s390x
+// +build arm64 amd64 mips mipsle mips64 mips64le ppc ppc64 ppc64le riscv64 s390x
 
 package system
 

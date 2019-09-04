@@ -153,6 +153,11 @@ func main() {
 			}
 			funct, inps, outps, sysname := f[2], f[3], f[4], f[5]
 
+			// ClockGettime doesn't have a syscall number on Darwin, only generate libc wrappers.
+			if goos == "darwin" && !libc && funct == "ClockGettime" {
+				continue
+			}
+
 			// Split argument lists on comma.
 			in := parseParamList(inps)
 			out := parseParamList(outps)
@@ -228,7 +233,7 @@ func main() {
 					} else {
 						args = append(args, fmt.Sprintf("uintptr(%s)", p.Name))
 					}
-				} else if p.Type == "int64" && endianness != "" {
+				} else if (p.Type == "int64" || p.Type == "uint64") && endianness != "" {
 					if len(args)%2 == 1 && *arm {
 						// arm abi specifies 64-bit argument uses
 						// (even, odd) pair
