@@ -25,6 +25,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	goruntime "runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -47,6 +48,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/util/tail"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 var (
@@ -292,7 +294,9 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 	// The reason we create and mount the log file in here (not in kubelet) is because
 	// the file's location depends on the ID of the container, and we need to create and
 	// mount the file before actually starting the container.
-	if opts.PodContainerDir != "" && len(container.TerminationMessagePath) != 0 {
+	// we can only mount individual files (e.g.: /etc/hosts, termination-log files) on Windows only if we're using Containerd.
+	supportsSingleFileMapping := m.SupportsSingleFileMapping()
+	if opts.PodContainerDir != "" && len(container.TerminationMessagePath) != 0 && supportsSingleFileMapping {
 		// Because the PodContainerDir contains pod uid and container name which is unique enough,
 		// here we just add a random id to make the path unique for different instances
 		// of the same container.
@@ -312,10 +316,13 @@ func (m *kubeGenericRuntimeManager) makeMounts(opts *kubecontainer.RunContainerO
 				utilruntime.HandleError(fmt.Errorf("unable to set termination-log file permissions %q: %v", containerLogPath, err))
 			}
 
+			// Volume Mounts fail on Windows if it is not of the form C:/
+			containerLogPath = volumeutil.MakeAbsolutePath(goruntime.GOOS, containerLogPath)
+			terminationMessagePath := volumeutil.MakeAbsolutePath(goruntime.GOOS, container.TerminationMessagePath)
 			selinuxRelabel := selinux.SELinuxEnabled()
 			volumeMounts = append(volumeMounts, &runtimeapi.Mount{
 				HostPath:       containerLogPath,
-				ContainerPath:  container.TerminationMessagePath,
+				ContainerPath:  terminationMessagePath,
 				SelinuxRelabel: selinuxRelabel,
 			})
 		}
@@ -355,6 +362,8 @@ func getTerminationMessage(status *runtimeapi.ContainerStatus, terminationMessag
 	if len(terminationMessagePath) == 0 {
 		return "", fallbackToLogs
 	}
+	// Volume Mounts fail on Windows if it is not of the form C:/
+	terminationMessagePath = volumeutil.MakeAbsolutePath(goruntime.GOOS, terminationMessagePath)
 	for _, mount := range status.Mounts {
 		if mount.ContainerPath != terminationMessagePath {
 			continue
