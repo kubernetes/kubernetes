@@ -68,7 +68,7 @@ func GetEtcdImage(cfg *kubeadmapi.ClusterConfiguration) string {
 		etcdImageRepository = cfg.Etcd.Local.ImageRepository
 	}
 	// Etcd uses an imageTag that corresponds to the etcd version matching the Kubernetes version
-	etcdImageTag := fmt.Sprintf("%s-%s", constants.DefaultEtcdVersion, constants.DefaultEtcdImageVersion)
+	etcdImageTag := constants.DefaultEtcdVersion
 	etcdVersion, err := constants.EtcdSupportedVersion(cfg.KubernetesVersion)
 	if err == nil {
 		etcdImageTag = etcdVersion.String()
