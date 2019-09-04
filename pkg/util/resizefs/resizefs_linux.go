@@ -112,8 +112,7 @@ func findBlockDeviceRescanPath(path string) (string, error) {
 	// return just the last part
 	parts := strings.Split(devicePath, "/")
 	if len(parts) == 3 && strings.HasPrefix(parts[1], "dev") {
-		blockPath := "/sys/block" + "/" + parts[2] + "/device/rescan"
-		return filepath.EvalSymlinks(blockPath)
+		return filepath.EvalSymlinks(filepath.Join("/sys/block", parts[2], "device", "rescan"))
 	}
 	return "", fmt.Errorf("Illegal path for device " + devicePath)
 }
