@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -67,6 +68,7 @@ func (p *ecrTokenGetter) GetAuthorizationToken(input *ecr.GetAuthorizationTokenI
 // lazyEcrProvider is a DockerConfigProvider that creates on demand an
 // ecrProvider for a given region and then proxies requests to it.
 type lazyEcrProvider struct {
+	mu             sync.RWMutex
 	region         string
 	regionURL      string
 	actualProvider *credentialprovider.CachingDockerConfigProvider
@@ -121,6 +123,9 @@ func (p *lazyEcrProvider) Enabled() bool {
 // by the client when attempting to pull an image and it will create the actual
 // provider only when we actually need it the first time.
 func (p *lazyEcrProvider) LazyProvide() *credentialprovider.DockerConfigEntry {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	if p.actualProvider == nil {
 		klog.V(2).Infof("Creating ecrProvider for %s", p.region)
 		p.actualProvider = &credentialprovider.CachingDockerConfigProvider{
