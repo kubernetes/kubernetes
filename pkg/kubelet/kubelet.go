@@ -144,7 +144,8 @@ const (
 	evictionMonitoringPeriod = time.Second * 10
 
 	// The path in containers' filesystems where the hosts file is mounted.
-	etcHostsPath = "/etc/hosts"
+	linuxEtcHostsPath   = "/etc/hosts"
+	windowsEtcHostsPath = "C:\\Windows\\System32\\drivers\\etc\\hosts"
 
 	// Capacity of the channel for receiving pod lifecycle events. This number
 	// is a bit arbitrary and may be adjusted in the future.
@@ -176,6 +177,15 @@ const (
 	// nodeLeaseRenewIntervalFraction is the fraction of lease duration to renew the lease
 	nodeLeaseRenewIntervalFraction = 0.25
 )
+
+var etcHostsPath = getContainerEtcHostsPath()
+
+func getContainerEtcHostsPath() string {
+	if sysruntime.GOOS == "windows" {
+		return windowsEtcHostsPath
+	}
+	return linuxEtcHostsPath
+}
 
 // SyncHandler is an interface implemented by Kubelet, for testability
 type SyncHandler interface {
