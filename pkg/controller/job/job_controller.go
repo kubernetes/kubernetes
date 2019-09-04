@@ -477,7 +477,8 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 
 	activePods := controller.FilterActivePods(pods)
 	active := int32(len(activePods))
-	succeeded, failed := getStatus(pods)
+	succeeded := job.Status.Succeeded
+	failed := job.Status.Failed
 	conditions := len(job.Status.Conditions)
 	// job first start
 	if job.Status.StartTime == nil {
@@ -578,11 +579,12 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		forget = true
 	}
 
-	// no need to update the job if the status hasn't changed since last time
-	if job.Status.Active != active || job.Status.Succeeded != succeeded || job.Status.Failed != failed || len(job.Status.Conditions) != conditions {
+	// no need to update the job if the status hasn't changed since last time.
+	// Succeed and Fialed should never decrease.
+	if job.Status.Active != active || job.Status.Succeeded < succeeded || job.Status.Failed < failed || len(job.Status.Conditions) != conditions {
 		job.Status.Active = active
-		job.Status.Succeeded = succeeded
-		job.Status.Failed = failed
+		job.Status.Succeeded = integer.Int32Max(succeeded, job.Status.Succeeded)
+		job.Status.Failed = integer.Int32Max(failed, job.Status.Failed)
 
 		if err := jm.updateHandler(&job); err != nil {
 			return forget, err
@@ -669,13 +671,6 @@ func newCondition(conditionType batch.JobConditionType, reason, message string) 
 		Reason:             reason,
 		Message:            message,
 	}
-}
-
-// getStatus returns no of succeeded and failed pods running a job
-func getStatus(pods []*v1.Pod) (succeeded, failed int32) {
-	succeeded = int32(filterPods(pods, v1.PodSucceeded))
-	failed = int32(filterPods(pods, v1.PodFailed))
-	return
 }
 
 // manageJob is the core method responsible for managing the number of running
