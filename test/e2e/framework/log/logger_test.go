@@ -138,7 +138,7 @@ func normalizeReport(report reporters.FakeReporter) suiteResults {
 }
 
 // timePrefix matches "Jul 17 08:08:25.950: " at the beginning of each line.
-var timePrefix = regexp.MustCompile(`(?m)^[[:alpha:]]{3} [[:digit:]]{1,2} [[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}.[[:digit:]]{3}: `)
+var timePrefix = regexp.MustCompile(`(?m)^[[:alpha:]]{3} +[[:digit:]]{1,2} +[[:digit:]]{2}:[[:digit:]]{2}:[[:digit:]]{2}.[[:digit:]]{3}: `)
 
 func stripTimes(in string) string {
 	return timePrefix.ReplaceAllString(in, "")

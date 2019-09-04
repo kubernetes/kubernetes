@@ -1091,12 +1091,13 @@ $STACKDRIVER_VERSION = 'v1-9'
 $STACKDRIVER_ROOT = 'C:\Program Files (x86)\Stackdriver'
 
 
-# Restart the Stackdriver logging agent
-# `Restart-Service StackdriverLogging` may fail because StackdriverLogging
-# sometimes is unstoppable, so we work around it by killing the processes.
-function Restart-StackdriverLoggingAgent {
+# Restarts the Stackdriver logging agent, or starts it if it is not currently
+# running. A standard `Restart-Service StackdriverLogging` may fail because
+# StackdriverLogging sometimes is unstoppable, so this function works around it
+# by killing the processes.
+function Restart-LoggingAgent {
   Stop-Service -NoWait -ErrorAction Ignore StackdriverLogging
- 
+
   # Wait (if necessary) for service to stop.
   $timeout = 10
   $stopped = (Get-service StackdriverLogging).Status -eq 'Stopped'
@@ -1132,13 +1133,13 @@ function Restart-StackdriverLoggingAgent {
   Start-Service StackdriverLogging
 }
 
-# Install and start the Stackdriver logging agent according to
+# Installs the Stackdriver logging agent according to
 # https://cloud.google.com/logging/docs/agent/installation.
 # TODO(yujuhong): Update to a newer Stackdriver agent once it is released to
 # support kubernetes metadata properly. The current version does not recognizes
 # the local resource key "logging.googleapis.com/local_resource_id", and fails
 # to label namespace, pod and container names on the logs.
-function InstallAndStart-LoggingAgent {
+function Install-LoggingAgent {
   # Remove the existing storage.json file if it exists. This is a workaround
   # for the bug where the logging agent cannot start up if the file is
   # corrupted.
@@ -1156,9 +1157,7 @@ function InstallAndStart-LoggingAgent {
     # well.
     Log-Output ("Skip: $STACKDRIVER_ROOT is already present, assuming that " +
                 "Stackdriver logging agent is already installed")
-    # Restart-Service restarts a running service or starts a not-running
-    # service.
-    Restart-StackdriverLoggingAgent
+    Restart-LoggingAgent
     return
   }
 
@@ -1174,25 +1173,35 @@ function InstallAndStart-LoggingAgent {
   Log-Output 'Invoking Stackdriver installer'
   Start-Process $installer_file -ArgumentList "/S" -Wait
 
+  # Install the record-reformer plugin.
   Start-Process "$STACKDRIVER_ROOT\LoggingAgent\Main\bin\fluent-gem" `
       -ArgumentList "install","fluent-plugin-record-reformer" `
       -Wait
 
-  # Create a configuration file for kubernetes containers.
-  # The config.d directory should have already been created automatically, but
-  # try creating again just in case.
-  New-Item "$STACKDRIVER_ROOT\LoggingAgent\config.d" `
-      -ItemType 'directory' `
-      -Force | Out-Null
-  $FLUENTD_CONFIG | Out-File `
-      -FilePath "$STACKDRIVER_ROOT\LoggingAgent\config.d\k8s_containers.conf" `
-      -Encoding ASCII
-
-  # Restart the service to pick up the new configurations.
-  Restart-StackdriverLoggingAgent
   Remove-Item -Force -Recurse $tmp_dir
 }
 
+# Writes the logging configuration file for Stackdriver. Restart-LoggingAgent
+# should then be called to pick up the new configuration.
+function Configure-LoggingAgent {
+  $fluentd_config_dir = "$STACKDRIVER_ROOT\LoggingAgent\config.d"
+  $fluentd_config_file = "$fluentd_config_dir\k8s_containers.conf"
+  if (-not (ShouldWrite-File $fluentd_config_file)) {
+    Log-Output ("Skip: fluentd logging config $fluentd_config_file already " +
+                "exists")
+    return
+  }
+
+  # Create a configuration file for kubernetes containers.
+  # The config.d directory should have already been created automatically, but
+  # try creating again just in case.
+  New-Item $fluentd_config_dir -ItemType 'directory' -Force | Out-Null
+  $config = $FLUENTD_CONFIG.replace('NODE_NAME', (hostname))
+  $config | Out-File -FilePath $fluentd_config_file -Encoding ASCII
+  Log-Output "Wrote fluentd logging config to $fluentd_config_file"
+}
+
+# The NODE_NAME placeholder must be replaced with the node's name (hostname).
 $FLUENTD_CONFIG = @'
 # This configuration file for Fluentd is used to watch changes to kubernetes
 # container logs in the directory /var/lib/docker/containers/ and submit the
@@ -1344,7 +1353,7 @@ $FLUENTD_CONFIG = @'
     "logging.googleapis.com/local_resource_id" ${"k8s_node.NODE_NAME"}
   </record>
 </filter>
-'@.replace('NODE_NAME', (hostname))
+'@
 
 
 # Export all public functions:

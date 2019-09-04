@@ -1565,14 +1565,9 @@ var _ = SIGDescribe("Services", func() {
 			svc.Spec.LoadBalancerSourceRanges = []string{acceptPod.Status.PodIP + "/32"}
 		})
 
-		// Clean up loadbalancer service
 		defer func() {
-			jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
-				svc.Spec.Type = v1.ServiceTypeNodePort
-				svc.Spec.LoadBalancerSourceRanges = nil
-			})
-			err := cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
-			framework.ExpectNoError(err)
+			ginkgo.By("Clean up loadbalancer service")
+			e2eservice.WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
 		}()
 
 		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, loadBalancerCreateTimeout)
@@ -1641,6 +1636,12 @@ var _ = SIGDescribe("Services", func() {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 			enableILB(svc)
 		})
+
+		defer func() {
+			ginkgo.By("Clean up loadbalancer service")
+			e2eservice.WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
+		}()
+
 		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, createTimeout)
 		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 		lbIngress := &svc.Status.LoadBalancer.Ingress[0]
@@ -1723,9 +1724,6 @@ var _ = SIGDescribe("Services", func() {
 			jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
 			framework.ExpectEqual(e2eservice.GetIngressPoint(lbIngress), internalStaticIP)
 		}
-
-		ginkgo.By("switching to ClusterIP type to destroy loadbalancer")
-		jig.ChangeServiceType(svc.Namespace, svc.Name, v1.ServiceTypeClusterIP, createTimeout)
 	})
 
 	// This test creates a load balancer, make sure its health check interval
@@ -1757,13 +1755,9 @@ var _ = SIGDescribe("Services", func() {
 			svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		})
 
-		// Clean up loadbalancer service
 		defer func() {
-			jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
-				svc.Spec.Type = v1.ServiceTypeNodePort
-			})
-			err = cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
-			framework.ExpectNoError(err)
+			ginkgo.By("Clean up loadbalancer service")
+			e2eservice.WaitForServiceDeletedWithFinalizer(cs, svc.Namespace, svc.Name)
 		}()
 
 		svc = jig.WaitForLoadBalancerOrFail(namespace, serviceName, e2eservice.LoadBalancerCreateTimeoutDefault)

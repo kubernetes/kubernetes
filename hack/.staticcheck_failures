@@ -26,7 +26,6 @@ pkg/credentialprovider
 pkg/credentialprovider/aws
 pkg/credentialprovider/azure
 pkg/kubeapiserver/admission
-pkg/kubectl/cmd/cp
 pkg/kubectl/cmd/get
 pkg/kubelet/apis/podresources
 pkg/kubelet/cm/devicemanager

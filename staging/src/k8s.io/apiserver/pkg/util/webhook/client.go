@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strconv"
 
 	"github.com/hashicorp/golang-lru"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -151,13 +152,20 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 	}
 
 	if cc.Service != nil {
-		restConfig, err := cm.authInfoResolver.ClientConfigForService(cc.Service.Name, cc.Service.Namespace)
+		port := cc.Service.Port
+		if port == 0 {
+			// Default to port 443 if no service port is specified
+			port = 443
+		}
+
+		restConfig, err := cm.authInfoResolver.ClientConfigForService(cc.Service.Name, cc.Service.Namespace, int(port))
 		if err != nil {
 			return nil, err
 		}
 		cfg := rest.CopyConfig(restConfig)
 		serverName := cc.Service.Name + "." + cc.Service.Namespace + ".svc"
-		host := serverName + ":443"
+
+		host := net.JoinHostPort(serverName, strconv.Itoa(int(port)))
 		cfg.Host = "https://" + host
 		cfg.APIPath = cc.Service.Path
 		// Set the server name if not already set
@@ -172,10 +180,6 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 		}
 		cfg.Dial = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			if addr == host {
-				port := cc.Service.Port
-				if port == 0 {
-					port = 443
-				}
 				u, err := cm.serviceResolver.ResolveEndpoint(cc.Service.Namespace, cc.Service.Name, port)
 				if err != nil {
 					return nil, err
@@ -197,7 +201,13 @@ func (cm *ClientManager) HookClient(cc ClientConfig) (*rest.RESTClient, error) {
 		return nil, &ErrCallingWebhook{WebhookName: cc.Name, Reason: fmt.Errorf("Unparsable URL: %v", err)}
 	}
 
-	restConfig, err := cm.authInfoResolver.ClientConfigFor(u.Host)
+	hostPort := u.Host
+	if len(u.Port()) == 0 {
+		// Default to port 443 if no port is specified
+		hostPort = net.JoinHostPort(hostPort, "443")
+	}
+
+	restConfig, err := cm.authInfoResolver.ClientConfigFor(hostPort)
 	if err != nil {
 		return nil, err
 	}

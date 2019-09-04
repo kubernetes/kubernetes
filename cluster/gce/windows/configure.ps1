@@ -111,7 +111,10 @@ try {
   Set-EnvironmentVars
   Create-Directories
   Download-HelperScripts
-  InstallAndStart-LoggingAgent
+
+  Install-LoggingAgent
+  Configure-LoggingAgent
+  Restart-LoggingAgent
 
   Create-DockerRegistryKey
   Configure-Dockerd
