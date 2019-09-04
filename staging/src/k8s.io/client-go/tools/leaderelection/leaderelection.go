@@ -214,12 +214,12 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 	defer cancel()
 	succeeded := false
 	desc := le.config.Lock.Describe()
-	klog.Infof("Attempting to acquire leader lease  %v.  Note that failures will be retried, and logged at level V(4)", desc)
+	klog.Infof("attempting to acquire leader lease  %v.  Note that failures will be retried, and logged at level V(4)", desc)
 	wait.JitterUntil(func() {
 		succeeded = le.tryAcquireOrRenew()
 		le.maybeReportTransition()
 		if !succeeded {
-			klog.V(4).Infof("Failed to acquire lease %v", desc)
+			klog.V(4).Infof("failed to acquire lease %v", desc)
 			return
 		}
 		le.config.Lock.RecordEvent("became leader")
@@ -279,7 +279,7 @@ func (le *LeaderElector) release() bool {
 		LeaderTransitions: le.observedRecord.LeaderTransitions,
 	}
 	if err := le.config.Lock.Update(leaderElectionRecord); err != nil {
-		klog.Errorf("Failed to release lock: %v", err)
+		klog.Errorf("failed to release lock: %v", err)
 		return false
 	}
 	le.observedRecord = leaderElectionRecord
