@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"regexp"
 	"sync"
 	"time"
 
@@ -107,6 +108,7 @@ type LogsOptions struct {
 	ContainerNameSpecified bool
 	Selector               string
 	MaxFollowConcurrency   int
+	Prefix                 bool
 
 	Object           runtime.Object
 	GetPodTimeout    time.Duration
@@ -116,6 +118,8 @@ type LogsOptions struct {
 	genericclioptions.IOStreams
 
 	TailSpecified bool
+
+	containerNameFromRefSpecRegexp *regexp.Regexp
 }
 
 func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *LogsOptions {
@@ -124,6 +128,8 @@ func NewLogsOptions(streams genericclioptions.IOStreams, allContainers bool) *Lo
 		AllContainers:        allContainers,
 		Tail:                 -1,
 		MaxFollowConcurrency: 5,
+
+		containerNameFromRefSpecRegexp: regexp.MustCompile(`spec\.(?:initContainers|containers|ephemeralContainers){(.+)}`),
 	}
 }
 
@@ -156,6 +162,7 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on.")
 	cmd.Flags().IntVar(&o.MaxFollowConcurrency, "max-log-requests", o.MaxFollowConcurrency, "Specify maximum number of concurrent logs to follow when using by a selector. Defaults to 5.")
+	cmd.Flags().BoolVar(&o.Prefix, "prefix", o.Prefix, "Prefix each log line with the log source (pod name and container name)")
 	return cmd
 }
 
@@ -314,14 +321,15 @@ func (o LogsOptions) RunLogs() error {
 	return o.sequentialConsumeRequest(requests)
 }
 
-func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) error {
+func (o LogsOptions) parallelConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
 	reader, writer := io.Pipe()
 	wg := &sync.WaitGroup{}
 	wg.Add(len(requests))
-	for _, request := range requests {
-		go func(request rest.ResponseWrapper) {
+	for objRef, request := range requests {
+		go func(objRef corev1.ObjectReference, request rest.ResponseWrapper) {
 			defer wg.Done()
-			if err := o.ConsumeRequestFn(request, writer); err != nil {
+			out := o.addPrefixIfNeeded(objRef, writer)
+			if err := o.ConsumeRequestFn(request, out); err != nil {
 				if !o.IgnoreLogErrors {
 					writer.CloseWithError(err)
 
@@ -332,7 +340,7 @@ func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) err
 				fmt.Fprintf(writer, "error: %v\n", err)
 			}
 
-		}(request)
+		}(objRef, request)
 	}
 
 	go func() {
@@ -344,14 +352,36 @@ func (o LogsOptions) parallelConsumeRequest(requests []rest.ResponseWrapper) err
 	return err
 }
 
-func (o LogsOptions) sequentialConsumeRequest(requests []rest.ResponseWrapper) error {
-	for _, request := range requests {
-		if err := o.ConsumeRequestFn(request, o.Out); err != nil {
+func (o LogsOptions) sequentialConsumeRequest(requests map[corev1.ObjectReference]rest.ResponseWrapper) error {
+	for objRef, request := range requests {
+		out := o.addPrefixIfNeeded(objRef, o.Out)
+		if err := o.ConsumeRequestFn(request, out); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (o LogsOptions) addPrefixIfNeeded(ref corev1.ObjectReference, writer io.Writer) io.Writer {
+	if !o.Prefix || ref.FieldPath == "" || ref.Name == "" {
+		return writer
+	}
+
+	// We rely on ref.FieldPath to contain a reference to a container
+	// including a container name (not an index) so we can get a container name
+	// without making an extra API request.
+	var containerName string
+	containerNameMatches := o.containerNameFromRefSpecRegexp.FindStringSubmatch(ref.FieldPath)
+	if len(containerNameMatches) == 2 {
+		containerName = containerNameMatches[1]
+	}
+
+	prefix := fmt.Sprintf("[pod/%s/%s] ", ref.Name, containerName)
+	return &prefixingWriter{
+		prefix: []byte(prefix),
+		writer: writer,
+	}
 }
 
 // DefaultConsumeRequest reads the data from request and writes into
@@ -383,4 +413,26 @@ func DefaultConsumeRequest(request rest.ResponseWrapper, out io.Writer) error {
 			return nil
 		}
 	}
+}
+
+type prefixingWriter struct {
+	prefix []byte
+	writer io.Writer
+}
+
+func (pw *prefixingWriter) Write(p []byte) (int, error) {
+	if len(p) == 0 {
+		return 0, nil
+	}
+
+	// Perform an "atomic" write of a prefix and p to make sure that it doesn't interleave
+	// sub-line when used concurrently with io.PipeWrite.
+	n, err := pw.writer.Write(append(pw.prefix, p...))
+	if n > len(p) {
+		// To comply with the io.Writer interface requirements we must
+		// return a number of bytes written from p (0 <= n <= len(p)),
+		// so we are ignoring the length of the prefix here.
+		return len(p), err
+	}
+	return n, err
 }
