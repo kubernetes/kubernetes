@@ -230,10 +230,10 @@ spec:
           requests:
             memory: 20Mi
             cpu: 10m
-          securityContext:
-            allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
-            runAsUser: 1001
-            runAsGroup: 2001
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsUser: 1001
+          runAsGroup: 2001
       dnsPolicy: Default  # Don't use cluster DNS.
       serviceAccountName: kube-dns
