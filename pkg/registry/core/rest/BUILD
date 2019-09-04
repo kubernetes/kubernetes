@@ -11,6 +11,7 @@ go_test(
     srcs = ["storage_core_test.go"],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/kubeapiserver/options:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
@@ -25,6 +26,7 @@ go_library(
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
+        "//pkg/kubeapiserver/options:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/ports:go_default_library",
         "//pkg/registry/core/componentstatus:go_default_library",

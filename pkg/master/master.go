@@ -187,6 +187,8 @@ type ExtraConfig struct {
 	ServiceAccountMaxExpiration time.Duration
 
 	VersionedInformers informers.SharedInformerFactory
+
+	CloudProvider *kubeoptions.CloudProviderOptions
 }
 
 type Config struct {
@@ -354,6 +356,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
 			ServiceAccountMaxExpiration: c.ExtraConfig.ServiceAccountMaxExpiration,
 			APIAudiences:                c.GenericConfig.Authentication.APIAudiences,
+			CloudProvider:               c.ExtraConfig.CloudProvider,
 		}
 		if err := m.InstallLegacyAPI(&c, c.GenericConfig.RESTOptionsGetter, legacyRESTStorageProvider); err != nil {
 			return nil, err

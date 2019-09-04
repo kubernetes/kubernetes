@@ -22,10 +22,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 )
 
 func TestGetServersToValidate(t *testing.T) {
-	servers := componentStatusStorage{fakeStorageFactory{}}.serversToValidate()
+	servers := componentStatusStorage{
+		fakeStorageFactory{},
+		&kubeoptions.CloudProviderOptions{},
+	}.serversToValidate()
 
 	if e, a := 3, len(servers); e != a {
 		t.Errorf("expected %v, got %v", e, a)

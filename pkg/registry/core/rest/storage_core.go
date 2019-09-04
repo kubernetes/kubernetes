@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/features"
+	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/pkg/registry/core/componentstatus"
@@ -88,6 +89,8 @@ type LegacyRESTStorageProvider struct {
 	APIAudiences authenticator.Audiences
 
 	LoopbackClientConfig *restclient.Config
+
+	CloudProvider *kubeoptions.CloudProviderOptions
 }
 
 // LegacyRESTStorage returns stateful information about particular instances of REST storage to
@@ -310,7 +313,7 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		"persistentVolumeClaims/status": persistentVolumeClaimStatusStorage,
 		"configMaps":                    configMapStorage,
 
-		"componentStatuses": componentstatus.NewStorage(componentStatusStorage{c.StorageFactory}.serversToValidate),
+		"componentStatuses": componentstatus.NewStorage(componentStatusStorage{c.StorageFactory, c.CloudProvider}.serversToValidate),
 	}
 	if legacyscheme.Scheme.IsVersionRegistered(schema.GroupVersion{Group: "autoscaling", Version: "v1"}) {
 		restStorageMap["replicationControllers/scale"] = controllerStorage.Scale
@@ -335,6 +338,7 @@ func (p LegacyRESTStorageProvider) GroupName() string {
 
 type componentStatusStorage struct {
 	storageFactory serverstorage.StorageFactory
+	cloudProvider  *kubeoptions.CloudProviderOptions
 }
 
 func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.Server {
@@ -343,30 +347,38 @@ func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.
 		"scheduler":          {Addr: "127.0.0.1", Port: ports.InsecureSchedulerPort, Path: "/healthz"},
 	}
 
+	if s.cloudProvider != nil && (len(s.cloudProvider.CloudProvider) != 0 || len(s.cloudProvider.CloudConfigFile) != 0) {
+		// gce doesn't need external cloud controller manager
+		if s.cloudProvider.CloudProvider != "gce" {
+			klog.Infof("Found cloud provider config: %v", s.cloudProvider)
+			serversToValidate["cloud-controller-manager"] = &componentstatus.Server{Addr: "127.0.0.1", Port: ports.InsecureCloudControllerManagerPort, Path: "/healthz"}
+		}
+	}
+
 	for ix, machine := range s.storageFactory.Backends() {
-		etcdUrl, err := url.Parse(machine.Server)
+		etcdURL, err := url.Parse(machine.Server)
 		if err != nil {
 			klog.Errorf("Failed to parse etcd url for validation: %v", err)
 			continue
 		}
 		var port int
 		var addr string
-		if strings.Contains(etcdUrl.Host, ":") {
+		if strings.Contains(etcdURL.Host, ":") {
 			var portString string
-			addr, portString, err = net.SplitHostPort(etcdUrl.Host)
+			addr, portString, err = net.SplitHostPort(etcdURL.Host)
 			if err != nil {
-				klog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
+				klog.Errorf("Failed to split host/port: %s (%v)", etcdURL.Host, err)
 				continue
 			}
 			port, _ = strconv.Atoi(portString)
 		} else {
-			addr = etcdUrl.Host
+			addr = etcdURL.Host
 			port = 2379
 		}
 		// TODO: etcd health checking should be abstracted in the storage tier
 		serversToValidate[fmt.Sprintf("etcd-%d", ix)] = &componentstatus.Server{
 			Addr:        addr,
-			EnableHTTPS: etcdUrl.Scheme == "https",
+			EnableHTTPS: etcdURL.Scheme == "https",
 			TLSConfig:   machine.TLSConfig,
 			Port:        port,
 			Path:        "/health",

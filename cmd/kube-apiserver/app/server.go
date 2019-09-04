@@ -367,6 +367,8 @@ func CreateKubeAPIServerConfig(
 			ServiceAccountMaxExpiration: s.ServiceAccountTokenMaxExpiration,
 
 			VersionedInformers: versionedInformers,
+
+			CloudProvider: s.ServerRunOptions.CloudProvider,
 		},
 	}
 
