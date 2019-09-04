@@ -219,7 +219,7 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 		succeeded = le.tryAcquireOrRenew()
 		le.maybeReportTransition()
 		if !succeeded {
-			klog.V(4).Infof("Attempt %v, failed to acquire lease %v", le.tries, desc)
+			klog.V(4).Infof("Failed to acquire lease %v", desc)
 			return
 		}
 		le.config.Lock.RecordEvent("became leader")
