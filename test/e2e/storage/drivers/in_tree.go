@@ -1441,10 +1441,12 @@ func (a *azureDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
+	kind := v1.AzureManagedDisk
 	volSource := v1.VolumeSource{
 		AzureDisk: &v1.AzureDiskVolumeSource{
 			DiskName:    diskName,
 			DataDiskURI: av.volumeName,
+			Kind:        &kind,
 			ReadOnly:    &readOnly,
 		},
 	}
@@ -1460,10 +1462,12 @@ func (a *azureDriver) GetPersistentVolumeSource(readOnly bool, fsType string, vo
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
+	kind := v1.AzureManagedDisk
 	pvSource := v1.PersistentVolumeSource{
 		AzureDisk: &v1.AzureDiskVolumeSource{
 			DiskName:    diskName,
 			DataDiskURI: av.volumeName,
+			Kind:        &kind,
 			ReadOnly:    &readOnly,
 		},
 	}
@@ -1499,6 +1503,13 @@ func (a *azureDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 
 func (a *azureDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	ginkgo.By("creating a test azure disk volume")
+	if volType == testpatterns.InlineVolume {
+		// Volume will be created in framework.TestContext.CloudConfig.Zone zone,
+		// so pods should be also scheduled there.
+		config.ClientNodeSelector = map[string]string{
+			v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+		}
+	}
 	volumeName, err := framework.CreatePDWithRetry()
 	framework.ExpectNoError(err)
 	return &azureVolume{
