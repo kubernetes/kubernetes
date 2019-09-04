@@ -215,15 +215,12 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 	defer cancel()
 	succeeded := false
 	desc := le.config.Lock.Describe()
-	klog.Infof("attempting to acquire leader lease  %v...", desc)
+	klog.Infof("Attempting to acquire leader lease  %v.  Note that failures will be retried, and logged at level V(4)", desc)
 	wait.JitterUntil(func() {
 		succeeded = le.tryAcquireOrRenew()
 		le.maybeReportTransition()
 		if !succeeded {
-			le.tries = le.tries + 1
-			if le.tries % 10 == 0 {
-				klog.Infof("Attempt %v, failed to acquire lease %v", le.tries, desc)
-			}
+			klog.V(4).Infof("Attempt %v, failed to acquire lease %v", le.tries, desc)
 			return
 		}
 		le.config.Lock.RecordEvent("became leader")
