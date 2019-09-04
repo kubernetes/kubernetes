@@ -873,7 +873,8 @@ function Configure-CniNetworking {
   "name":  "l2bridge",
   "type":  "win-bridge",
   "capabilities":  {
-    "portMappings":  true
+    "portMappings":  true,
+    "dns": true
   },
   "ipam":  {
     "type": "host-local",
@@ -927,6 +928,28 @@ function Configure-CniNetworking {
   replace('MGMT_SUBNET', ${mgmt_subnet})
 
   Log-Output "CNI config:`n$(Get-Content -Raw ${l2bridge_conf})"
+}
+
+# Obtain the host dns conf and save it to a file so that kubelet/CNI
+# can use it to configure dns suffix search list for pods.
+# The value of DNS server is ignored right now because the pod will
+# always only use cluster DNS service, but for consistency, we still
+# parsed them here in the same format as Linux resolv.conf.
+# This function must be called after Configure-HostNetworkingService.
+function Configure-HostDnsConf {
+  $net_adapter = Get_MgmtNetAdapter
+  $server_ips = (Get-DnsClientServerAddress `
+          -InterfaceAlias ${net_adapter}.Name).ServerAddresses
+  $search_list = (Get-DnsClient).ConnectionSpecificSuffixSearchList
+  $conf = ""
+  ForEach ($ip in $server_ips)  {
+	$conf = $conf + "nameserver $ip`r`n"
+  }
+  $conf = $conf + "search $search_list"
+  $hostdns_conf = "${env:CNI_CONFIG_DIR}\hostdns.conf"
+  New-Item -Force -ItemType file ${hostdns_conf} | Out-Null
+  Set-Content ${hostdns_conf} $conf
+  Log-Output "HOST dns conf:`n$(Get-Content -Raw ${hostdns_conf})"
 }
 
 # Fetches the kubelet config from the instance metadata and puts it at
