@@ -31,39 +31,6 @@ readonly RELEASE_IMAGES="${LOCAL_OUTPUT_ROOT}/release-images"
 KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
 KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
 
-# Validate a ci version
-#
-# Globals:
-#   None
-# Arguments:
-#   version
-# Returns:
-#   If version is a valid ci version
-# Sets:                    (e.g. for '1.2.3-alpha.4.56+abcdef12345678')
-#   VERSION_MAJOR          (e.g. '1')
-#   VERSION_MINOR          (e.g. '2')
-#   VERSION_PATCH          (e.g. '3')
-#   VERSION_PRERELEASE     (e.g. 'alpha')
-#   VERSION_PRERELEASE_REV (e.g. '4')
-#   VERSION_BUILD_INFO     (e.g. '.56+abcdef12345678')
-#   VERSION_COMMITS        (e.g. '56')
-function kube::release::parse_and_validate_ci_version() {
-  # Accept things like "v1.2.3-alpha.4.56+abcdef12345678" or "v1.2.3-beta.4"
-  local -r version_regex="^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)-([a-zA-Z0-9]+)\\.(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*)\\+[0-9a-f]{7,40})?$"
-  local -r version="${1-}"
-  [[ "${version}" =~ ${version_regex} ]] || {
-    kube::log::error "Invalid ci version: '${version}', must match regex ${version_regex}"
-    return 1
-  }
-  VERSION_MAJOR="${BASH_REMATCH[1]}"
-  VERSION_MINOR="${BASH_REMATCH[2]}"
-  VERSION_PATCH="${BASH_REMATCH[3]}"
-  VERSION_PRERELEASE="${BASH_REMATCH[4]}"
-  VERSION_PRERELEASE_REV="${BASH_REMATCH[5]}"
-  VERSION_BUILD_INFO="${BASH_REMATCH[6]}"
-  VERSION_COMMITS="${BASH_REMATCH[7]}"
-}
-
 # ---------------------------------------------------------------------------
 # Build final release artifacts
 function kube::release::clean_cruft() {
@@ -99,8 +66,9 @@ function kube::release::package_src_tarball() {
   if [[ "${KUBE_GIT_TREE_STATE-}" == "clean" ]]; then
     git archive -o "${src_tarball}" HEAD
   else
-    local source_files=(
-      $(cd "${KUBE_ROOT}" && find . -mindepth 1 -maxdepth 1 \
+    local source_files=()
+    while IFS='' read -r line; do source_files+=("$line"); done < <(cd "${KUBE_ROOT}" && \
+        find . -mindepth 1 -maxdepth 1 \
         -not \( \
           \( -path ./_\*        -o \
              -path ./.git\*     -o \
@@ -108,7 +76,6 @@ function kube::release::package_src_tarball() {
              -path ./.gsutil\*    \
           \) -prune \
         \))
-    )
     "${TAR}" czf "${src_tarball}" --transform 's|^\.|kubernetes|' -C "${KUBE_ROOT}" "${source_files[@]}"
   fi
 }
@@ -118,8 +85,10 @@ function kube::release::package_src_tarball() {
 function kube::release::package_client_tarballs() {
    # Find all of the built client binaries
   local platform platforms
-  platforms=($(cd "${LOCAL_OUTPUT_BINPATH}" ; echo */*))
+  platforms=()
+  IFS=" " read -r -a platforms <<< "$(cd "${LOCAL_OUTPUT_BINPATH}" || exit 2; echo ./*/*)"
   for platform in "${platforms[@]}"; do
+    platform="${platform:2}"  # trim leading "./"
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
     kube::log::status "Starting tarball: client $platform_tag"
 
@@ -155,7 +124,8 @@ function kube::release::package_node_tarballs() {
   local platform
   for platform in "${KUBE_NODE_PLATFORMS[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
-    local arch=$(basename "${platform}")
+    local arch
+    arch=$(basename "${platform}")
     kube::log::status "Building tarball: node $platform_tag"
 
     local release_stage="${RELEASE_STAGE}/node/${platform_tag}/kubernetes"
@@ -204,7 +174,8 @@ function kube::release::build_server_images() {
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
-    local arch=$(basename "${platform}")
+    local arch
+    arch=$(basename "${platform}")
     kube::log::status "Building images: $platform_tag"
 
     local release_stage="${RELEASE_STAGE}/server/${platform_tag}/kubernetes"
@@ -227,7 +198,8 @@ function kube::release::package_server_tarballs() {
   local platform
   for platform in "${KUBE_SERVER_PLATFORMS[@]}"; do
     local platform_tag=${platform/\//-} # Replace a "/" for a "-"
-    local arch=$(basename "${platform}")
+    local arch
+    arch=$(basename "${platform}")
     kube::log::status "Building tarball: server $platform_tag"
 
     # NOTE: this directory was setup in kube::release::build_server_images
@@ -305,7 +277,8 @@ function kube::release::create_docker_images_for_server() {
     local binary_dir="$1"
     local arch="$2"
     local binary_name
-    local binaries=($(kube::build::get_docker_wrapped_binaries "${arch}"))
+    local binaries=()
+    IFS=" " read -r -a binaries <<< "$(kube::build::get_docker_wrapped_binaries "${arch}")"
     local images_dir="${RELEASE_IMAGES}/${arch}"
     mkdir -p "${images_dir}"
 
@@ -324,12 +297,15 @@ function kube::release::create_docker_images_for_server() {
     if [[ "${KUBE_BUILD_PULL_LATEST_IMAGES}" =~ [yY] ]]; then
         DOCKER_BUILD_OPTS+=("--pull")
     fi
-    local -r docker_build_opts="${DOCKER_BUILD_OPTS[@]}"
+    local -r docker_build_opts="${DOCKER_BUILD_OPTS[*]}"
 
     for wrappable in "${binaries[@]}"; do
 
       local oldifs=$IFS
       IFS=","
+      # `wrappable` is like `kube-apiserver,k8s.io/debian-base-amd64:v1.0.0`
+      # below command set $1 and $2 used next line, so shellcheck can be suppressed
+      # shellcheck disable=SC2086
       set $wrappable
       IFS=$oldifs
 
@@ -337,7 +313,6 @@ function kube::release::create_docker_images_for_server() {
       local base_image="$2"
       local docker_build_path="${binary_dir}/${binary_name}.dockerbuild"
       local docker_file_path="${docker_build_path}/Dockerfile"
-      local binary_file_path="${binary_dir}/${binary_name}"
       local docker_image_tag="${docker_registry}/${binary_name}-${arch}:${docker_tag}"
 
       kube::log::status "Starting docker build for image: ${binary_name}-${arch}"
@@ -356,7 +331,7 @@ EOF
           echo "COPY nsswitch.conf /etc/" >> "${docker_file_path}"
         fi
 
-        "${DOCKER[@]}" build ${docker_build_opts} -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
+        "${DOCKER[@]}" build "${docker_build_opts}" -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
         # If we are building an official/alpha/beta release we want to keep
         # docker images and tag them appropriately.
         local -r release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
@@ -365,7 +340,7 @@ EOF
           "${DOCKER[@]}" rmi "${release_docker_image_tag}" 2>/dev/null || true
           "${DOCKER[@]}" tag "${docker_image_tag}" "${release_docker_image_tag}" 2>/dev/null
         fi
-        "${DOCKER[@]}" save -o "${binary_dir}/${binary_name}.tar" "${docker_image_tag}" ${release_docker_image_tag}
+        "${DOCKER[@]}" save -o "${binary_dir}/${binary_name}.tar" "${docker_image_tag}" "${release_docker_image_tag}"
         echo "${docker_tag}" > "${binary_dir}/${binary_name}.docker_tag"
         rm -rf "${docker_build_path}"
         ln "${binary_dir}/${binary_name}.tar" "${images_dir}/"
@@ -409,8 +384,10 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${src_dir}/glbc.manifest" "${dst_dir}"
   cp "${src_dir}/etcd-empty-dir-cleanup.yaml" "${dst_dir}/"
   local internal_manifest
-  for internal_manifest in $(ls "${src_dir}" | grep "^internal-*"); do
-    cp "${src_dir}/${internal_manifest}" "${dst_dir}"
+  for internal_manifest in "${src_dir}"/*; do
+    case "${internal_manifest}" in
+      "${src_dir}"/internal-*) cp "${internal_manifest}" "${dst_dir}";;
+    esac
   done
   cp "${KUBE_ROOT}/cluster/gce/gci/configure-helper.sh" "${dst_dir}/gci-configure-helper.sh"
   if [[ -e "${KUBE_ROOT}/cluster/gce/gci/gke-internal-configure-helper.sh" ]]; then
@@ -419,11 +396,15 @@ function kube::release::package_kube_manifests_tarball() {
   cp "${KUBE_ROOT}/cluster/gce/gci/health-monitor.sh" "${dst_dir}/health-monitor.sh"
   local objects
   objects=$(cd "${KUBE_ROOT}/cluster/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) | grep -v demo)
+  # word splitting by space is intentional and required so disable checkcheck for this line
+  # shellcheck disable=SC2086
   tar c -C "${KUBE_ROOT}/cluster/addons" ${objects} | tar x -C "${dst_dir}"
   # Merge GCE-specific addons with general purpose addons.
   local gce_objects
   gce_objects=$(cd "${KUBE_ROOT}/cluster/gce/addons" && find . \( -name \*.yaml -or -name \*.yaml.in -or -name \*.json \) \( -not -name \*demo\* \))
   if [[ -n "${gce_objects}" ]]; then
+    # word splitting by space is intentional and required so disable checkcheck for this line
+    # shellcheck disable=SC2086
     tar c -C "${KUBE_ROOT}/cluster/gce/addons" ${gce_objects} | tar x -C "${dst_dir}"
   fi
 
