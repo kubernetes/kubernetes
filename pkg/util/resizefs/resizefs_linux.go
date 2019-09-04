@@ -20,6 +20,9 @@ package resizefs
 
 import (
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
 
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -48,6 +51,19 @@ func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (boo
 	// by default will use whole disk anyways.
 	if format == "" {
 		return false, nil
+	}
+
+	// don't fail if resolving doesn't work
+	if blockDeviceRescanPath, err := findBlockDeviceRescanPath(devicePath); err != nil {
+		klog.V(0).Infof("ResizeFS.Resize - error resolving block device path from %q: %v", devicePath, err)
+	} else {
+		klog.V(3).Infof("ResizeFS.Resize - resolved block device path from %q to %q", devicePath, blockDeviceRescanPath)
+
+		klog.V(3).Infof("ResizeFS.Resize - polling %q block device geometry", devicePath)
+		err = ioutil.WriteFile(blockDeviceRescanPath, []byte{'1'}, 0666)
+		if err != nil {
+			klog.V(0).Infof("ResizeFS.Resize - error polling new block device geometry: %v", err)
+		}
 	}
 
 	klog.V(3).Infof("ResizeFS.Resize - Expanding mounted volume %s", devicePath)
@@ -83,4 +99,21 @@ func (resizefs *ResizeFs) xfsResize(deviceMountPath string) (bool, error) {
 
 	resizeError := fmt.Errorf("resize of device %s failed: %v. xfs_growfs output: %s", deviceMountPath, err, string(output))
 	return false, resizeError
+}
+
+// findBlockDeviceRescanPath Find the underlaying disk for a linked path such as /dev/disk/by-path/XXXX or /dev/mapper/XXXX
+// will return /sys/devices/pci0000:00/0000:00:15.0/0000:03:00.0/host0/target0:0:1/0:0:1:0/rescan
+func findBlockDeviceRescanPath(path string) (string, error) {
+	devicePath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", err
+	}
+	// if path /dev/hdX split into "", "dev", "hdX" then we will
+	// return just the last part
+	parts := strings.Split(devicePath, "/")
+	if len(parts) == 3 && strings.HasPrefix(parts[1], "dev") {
+		blockPath := "/sys/block" + "/" + parts[2] + "/device/rescan"
+		return filepath.EvalSymlinks(blockPath)
+	}
+	return "", fmt.Errorf("Illegal path for device " + devicePath)
 }
