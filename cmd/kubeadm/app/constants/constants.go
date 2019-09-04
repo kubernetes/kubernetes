@@ -262,6 +262,10 @@ const (
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
 	DefaultEtcdVersion = "3.3.15"
 
+	// DefaultEtcdImageVersion indicates the etcd image version that kubeadm uses.
+	// For example, the image version of "k8s.gcr.io/etcd:3.3.15-0" is "0".
+	DefaultEtcdImageVersion = "0"
+
 	// PauseVersion indicates the default pause image version for kubeadm
 	PauseVersion = "3.1"
 
@@ -424,8 +428,8 @@ var (
 		13: "3.2.24",
 		14: "3.3.10",
 		15: "3.3.10",
-		16: "3.3.15",
-		17: "3.3.15",
+		16: "3.3.15-0",
+		17: "3.3.15-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
