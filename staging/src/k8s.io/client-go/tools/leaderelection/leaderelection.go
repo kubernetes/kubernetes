@@ -150,7 +150,6 @@ type LeaderCallbacks struct {
 
 // LeaderElector is a leader election client.
 type LeaderElector struct {
-	tries int
 	config LeaderElectionConfig
 	// internal bookkeeping
 	observedRecord rl.LeaderElectionRecord
