@@ -222,7 +222,7 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 		if !succeeded {
 			le.tries = le.tries + 1
 			if le.tries % 10 == 0 {
-				klog.Infof("Attempt %v, failed to acquire lease %v", tries, desc)
+				klog.Infof("Attempt %v, failed to acquire lease %v", le.tries, desc)
 			}
 			return
 		}
