@@ -127,18 +127,16 @@ try {
     StartProcess-WriteSshKeys
   }
 
-  # Even if Stackdriver is already installed, the function will still [re]start the service.
-  if (IsLoggingEnabled $kube_env) {
-    InstallAndStart-LoggingAgent
-  }
-
   Set-EnvironmentVars
   Create-Directories
   Download-HelperScripts
 
-  Install-LoggingAgent
-  Configure-LoggingAgent
-  Restart-LoggingAgent
+  # Even if Stackdriver is already installed, the function will still [re]start the service.
+  if (IsLoggingEnabled $kube_env) {
+    Install-LoggingAgent
+    Configure-LoggingAgent
+    Restart-LoggingAgent
+  }
 
   Create-DockerRegistryKey
   Configure-Dockerd
