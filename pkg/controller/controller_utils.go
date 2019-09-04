@@ -1028,14 +1028,18 @@ func ComputeHash(template *v1.PodTemplateSpec, collisionCount *int32) string {
 	podTemplateSpecHasher := fnv.New32a()
 	hashutil.DeepHashObject(podTemplateSpecHasher, *template)
 
+	sum32 := podTemplateSpecHasher.Sum32()
+
 	// Add collisionCount in the hash if it exists.
 	if collisionCount != nil {
 		collisionCountBytes := make([]byte, 8)
 		binary.LittleEndian.PutUint32(collisionCountBytes, uint32(*collisionCount))
-		podTemplateSpecHasher.Write(collisionCountBytes)
+		if _, err := podTemplateSpecHasher.Write(collisionCountBytes); err == nil {
+			sum32 = podTemplateSpecHasher.Sum32()
+		}
 	}
 
-	return rand.SafeEncodeString(fmt.Sprint(podTemplateSpecHasher.Sum32()))
+	return rand.SafeEncodeString(fmt.Sprint(sum32))
 }
 
 func AddOrUpdateLabelsOnNode(kubeClient clientset.Interface, nodeName string, labelsToUpdate map[string]string) error {
