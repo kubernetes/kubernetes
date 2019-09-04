@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	kubeadnetmutil "k8s.io/kubernetes/cmd/kubeadm/app/util/network"
 )
 
 const (
@@ -530,7 +530,7 @@ func GetDNSIP(svcSubnet string) (net.IP, error) {
 	}
 
 	// Selects the 10th IP in service subnet CIDR range as dnsIP
-	dnsIP, err := ipallocator.GetIndexedIP(svcSubnetCIDR, 10)
+	dnsIP, err := kubeadnetmutil.GetIndexedIP(svcSubnetCIDR, 10)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get tenth IP address from service subnet CIDR %s", svcSubnetCIDR.String())
 	}

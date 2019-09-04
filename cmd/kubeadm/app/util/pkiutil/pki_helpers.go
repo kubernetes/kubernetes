@@ -41,7 +41,7 @@ import (
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	kubeadmnetutil "k8s.io/kubernetes/cmd/kubeadm/app/util/network"
 )
 
 const (
@@ -363,7 +363,7 @@ func GetAPIServerAltNames(cfg *kubeadmapi.InitConfiguration) (*certutil.AltNames
 		return nil, errors.Wrapf(err, "error parsing CIDR %q", cfg.Networking.ServiceSubnet)
 	}
 
-	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(svcSubnet, 1)
+	internalAPIServerVirtualIP, err := kubeadmnetutil.GetIndexedIP(svcSubnet, 1)
 	if err != nil {
 		return nil, errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", svcSubnet.String())
 	}

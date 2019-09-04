@@ -29,7 +29,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	kubeadmnetutil "k8s.io/kubernetes/cmd/kubeadm/app/util/network"
 )
 
 func TestMarkControlPlane(t *testing.T) {
@@ -108,7 +108,7 @@ func TestMarkControlPlane(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			hostname, err := kubeadmutil.GetHostname("")
+			hostname, err := kubeadmnetutil.GetHostname("")
 			if err != nil {
 				t.Fatalf("MarkControlPlane(%s): unexpected error: %v", tc.name, err)
 			}
