@@ -2152,3 +2152,51 @@ func TestDeleteWithCachedObject(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPreconditionalUpdateWithCachedObject(t *testing.T) {
+	podName := "foo"
+	pod := &example.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: podName},
+		Spec:       example.PodSpec{NodeName: "machine"},
+	}
+	ctx := genericapirequest.WithNamespace(genericapirequest.NewContext(), "test")
+	destroyFunc, registry := newTestGenericStoreRegistry(t, scheme, false)
+	defer destroyFunc()
+
+	// cached object has old UID
+	oldPod, err := registry.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	registry.Storage.Storage = &staleGuaranteedUpdateStorage{Interface: registry.Storage.Storage, cachedObj: oldPod}
+
+	// delete and re-create the same object with new UID
+	_, _, err = registry.Delete(ctx, podName, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj, err := registry.Create(ctx, pod, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newPod, ok := obj.(*example.Pod)
+	if !ok {
+		t.Fatalf("unexpected object: %#v", obj)
+	}
+
+	// update the object should not fail precondition
+	newPod.Spec.NodeName = "machine2"
+	res, _, err := registry.Update(ctx, podName, rest.DefaultUpdatedObjectInfo(newPod), rest.ValidateAllObjectFunc, rest.ValidateAllObjectUpdateFunc, false, &metav1.UpdateOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the update should have succeeded
+	r, ok := res.(*example.Pod)
+	if !ok {
+		t.Fatalf("unexpected update result: %#v", res)
+	}
+	if r.Spec.NodeName != "machine2" {
+		t.Fatalf("unexpected, update didn't take effect: %#v", r)
+	}
+}
