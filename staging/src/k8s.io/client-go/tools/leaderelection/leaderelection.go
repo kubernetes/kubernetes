@@ -305,7 +305,6 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 
 	// 1. obtain or create the ElectionRecord
 	oldLeaderElectionRecord, err := le.config.Lock.Get()
-
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
