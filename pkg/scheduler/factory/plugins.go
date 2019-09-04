@@ -409,6 +409,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 
 	if pcf == nil {
 		klog.Fatalf("Invalid configuration: Priority type not found for %s", policy.Name)
+		return ""
 	}
 
 	return RegisterPriorityConfigFactory(policy.Name, *pcf)

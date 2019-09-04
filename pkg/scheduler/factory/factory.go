@@ -334,7 +334,9 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, er
 	} else {
 		for _, priority := range policy.Priorities {
 			klog.V(2).Infof("Registering priority: %s", priority.Name)
-			priorityKeys.Insert(RegisterCustomPriorityFunction(priority))
+			if key := RegisterCustomPriorityFunction(priority); len(key) > 0 {
+				priorityKeys.Insert(key)
+			}
 		}
 	}
 
