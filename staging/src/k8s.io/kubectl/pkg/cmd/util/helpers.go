@@ -51,6 +51,11 @@ const (
 	DefaultErrorExitCode = 1
 )
 
+var (
+	errorExitCode   = 1
+	fatalErrHandler = fatal
+)
+
 type debugError interface {
 	DebugError() (msg string, args []interface{})
 }
@@ -70,8 +75,6 @@ func AddSourceToErr(verb string, source string, err error) error {
 	return err
 }
 
-var fatalErrHandler = fatal
-
 // BehaviorOnFatal allows you to override the default behavior when a fatal
 // error occurs, which is to call os.Exit(code). You can pass 'panic' as a function
 // here if you prefer the panic() over os.Exit(1).
@@ -83,6 +86,17 @@ func BehaviorOnFatal(f func(string, int)) {
 // tests.
 func DefaultBehaviorOnFatal() {
 	fatalErrHandler = fatal
+}
+
+// ErrorExitCode allows you override the default exit code used when calling
+// os.Exit().
+func ErrorExitCode(code int) {
+	errorExitCode = code
+}
+
+// ResetErrorExitCode resets the error exit code to default. Useful in tests.
+func ResetErrorExitCode() {
+	errorExitCode = DefaultErrorExitCode
 }
 
 // fatal prints the message (if provided) and then exits. If V(2) or greater,
@@ -128,7 +142,7 @@ func checkErr(err error, handleErr func(string, int)) {
 
 	switch {
 	case err == ErrExit:
-		handleErr("", DefaultErrorExitCode)
+		handleErr("", errorExitCode)
 	case kerrors.IsInvalid(err):
 		details := err.(*kerrors.StatusError).Status().Details
 		s := "The request is invalid"
@@ -141,27 +155,27 @@ func checkErr(err error, handleErr func(string, int)) {
 		}
 		if len(details.Causes) > 0 {
 			errs := statusCausesToAggrError(details.Causes)
-			handleErr(MultilineError(s+": ", errs), DefaultErrorExitCode)
+			handleErr(MultilineError(s+": ", errs), errorExitCode)
 		} else {
-			handleErr(s, DefaultErrorExitCode)
+			handleErr(s, errorExitCode)
 		}
 	case clientcmd.IsConfigurationInvalid(err):
-		handleErr(MultilineError("Error in configuration: ", err), DefaultErrorExitCode)
+		handleErr(MultilineError("Error in configuration: ", err), errorExitCode)
 	default:
 		switch err := err.(type) {
 		case *meta.NoResourceMatchError:
 			switch {
 			case len(err.PartialResource.Group) > 0 && len(err.PartialResource.Version) > 0:
-				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q and version %q", err.PartialResource.Resource, err.PartialResource.Group, err.PartialResource.Version), DefaultErrorExitCode)
+				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q and version %q", err.PartialResource.Resource, err.PartialResource.Group, err.PartialResource.Version), errorExitCode)
 			case len(err.PartialResource.Group) > 0:
-				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q", err.PartialResource.Resource, err.PartialResource.Group), DefaultErrorExitCode)
+				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in group %q", err.PartialResource.Resource, err.PartialResource.Group), errorExitCode)
 			case len(err.PartialResource.Version) > 0:
-				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in version %q", err.PartialResource.Resource, err.PartialResource.Version), DefaultErrorExitCode)
+				handleErr(fmt.Sprintf("the server doesn't have a resource type %q in version %q", err.PartialResource.Resource, err.PartialResource.Version), errorExitCode)
 			default:
-				handleErr(fmt.Sprintf("the server doesn't have a resource type %q", err.PartialResource.Resource), DefaultErrorExitCode)
+				handleErr(fmt.Sprintf("the server doesn't have a resource type %q", err.PartialResource.Resource), errorExitCode)
 			}
 		case utilerrors.Aggregate:
-			handleErr(MultipleErrors(``, err.Errors()), DefaultErrorExitCode)
+			handleErr(MultipleErrors(``, err.Errors()), errorExitCode)
 		case utilexec.ExitError:
 			handleErr(err.Error(), err.ExitStatus())
 		default: // for any other error type
@@ -172,7 +186,7 @@ func checkErr(err error, handleErr func(string, int)) {
 					msg = fmt.Sprintf("error: %s", msg)
 				}
 			}
-			handleErr(msg, DefaultErrorExitCode)
+			handleErr(msg, errorExitCode)
 		}
 	}
 }

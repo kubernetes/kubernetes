@@ -275,6 +275,23 @@ func TestCheckExitError(t *testing.T) {
 	})
 }
 
+func TestSetErrorExitCode(t *testing.T) {
+	ErrorExitCode(42)
+	defer ResetErrorExitCode()
+	testCheckError(t, []checkErrTestCase{
+		{
+			errors.NewInvalid(corev1.SchemeGroupVersion.WithKind("Invalid1").GroupKind(), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field"), "single", "details")}),
+			"The Invalid1 \"invalidation\" is invalid: field: Invalid value: \"single\": details\n",
+			42,
+		},
+		{
+			exec.CodeExitError{Err: fmt.Errorf("pod foo/bar terminated"), Code: 24},
+			"pod foo/bar terminated",
+			24,
+		},
+	})
+}
+
 func testCheckError(t *testing.T, tests []checkErrTestCase) {
 	var errReturned string
 	var codeReturned int
