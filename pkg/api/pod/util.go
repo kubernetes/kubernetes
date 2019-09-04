@@ -55,6 +55,30 @@ func VisitContainers(podSpec *api.PodSpec, visitor ContainerVisitor) bool {
 	return true
 }
 
+// visitContainersUnconditional is like VisitContainers, but it ignores feature gates for
+// new container types. This is necessary for things like detecting or dropping alpha
+// fields on an update when a feature-gated container has been added when the feature gate
+// was enabled and preserved even though the feature gate is now disabled. In this case
+// we still want to detect alpha fields within the now-feature-gated container.
+func visitContainersUnconditional(podSpec *api.PodSpec, visitor ContainerVisitor) bool {
+	for i := range podSpec.InitContainers {
+		if !visitor(&podSpec.InitContainers[i]) {
+			return false
+		}
+	}
+	for i := range podSpec.Containers {
+		if !visitor(&podSpec.Containers[i]) {
+			return false
+		}
+	}
+	for i := range podSpec.EphemeralContainers {
+		if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon)) {
+			return false
+		}
+	}
+	return true
+}
+
 // Visitor is called with each object name, and returns true if visiting should continue
 type Visitor func(name string) (shouldContinue bool)
 
@@ -362,7 +386,7 @@ func dropDisabledFields(
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) && !subpathInUse(oldPodSpec) {
 		// drop subpath from the pod if the feature is disabled and the old spec did not specify subpaths
-		VisitContainers(podSpec, func(c *api.Container) bool {
+		visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 			for i := range c.VolumeMounts {
 				c.VolumeMounts[i].SubPath = ""
 			}
@@ -375,7 +399,7 @@ func dropDisabledFields(
 
 	if (!utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) || !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion)) && !subpathExprInUse(oldPodSpec) {
 		// drop subpath env expansion from the pod if either of the subpath features is disabled and the old spec did not specify subpath env expansion
-		VisitContainers(podSpec, func(c *api.Container) bool {
+		visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 			for i := range c.VolumeMounts {
 				c.VolumeMounts[i].SubPathExpr = ""
 			}
@@ -385,7 +409,7 @@ func dropDisabledFields(
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) && !startupProbeInUse(oldPodSpec) {
 		// drop startupProbe from all containers if the feature is disabled
-		VisitContainers(podSpec, func(c *api.Container) bool {
+		visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 			c.StartupProbe = nil
 			return true
 		})
@@ -433,7 +457,7 @@ func dropDisabledRunAsGroupField(podSpec, oldPodSpec *api.PodSpec) {
 		if podSpec.SecurityContext != nil {
 			podSpec.SecurityContext.RunAsGroup = nil
 		}
-		VisitContainers(podSpec, func(c *api.Container) bool {
+		visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 			if c.SecurityContext != nil {
 				c.SecurityContext.RunAsGroup = nil
 			}
@@ -512,7 +536,7 @@ func dropDisabledRunAsUserNameFieldsFromContainers(containers []api.Container) {
 func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.ProcMountType) && !procMountInUse(oldPodSpec) {
 		defaultProcMount := api.DefaultProcMount
-		VisitContainers(podSpec, func(c *api.Container) bool {
+		visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 			if c.SecurityContext != nil && c.SecurityContext.ProcMount != nil {
 				// The ProcMount field was improperly forced to non-nil in 1.12.
 				// If the feature is disabled, and the existing object is not using any non-default values, and the ProcMount field is present in the incoming object, force to the default value.
@@ -528,7 +552,7 @@ func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
 // This should be called from PrepareForCreate/PrepareForUpdate for all resources containing a VolumeDevice
 func dropDisabledVolumeDevicesFields(podSpec, oldPodSpec *api.PodSpec) {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) && !volumeDevicesInUse(oldPodSpec) {
-		VisitContainers(podSpec, func(c *api.Container) bool {
+		visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 			c.VolumeDevices = nil
 			return true
 		})
@@ -559,7 +583,7 @@ func subpathInUse(podSpec *api.PodSpec) bool {
 	}
 
 	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
+	visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 		for i := range c.VolumeMounts {
 			if len(c.VolumeMounts[i].SubPath) > 0 {
 				inUse = true
@@ -609,7 +633,7 @@ func procMountInUse(podSpec *api.PodSpec) bool {
 	}
 
 	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
+	visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 		if c.SecurityContext == nil || c.SecurityContext.ProcMount == nil {
 			return true
 		}
@@ -703,7 +727,7 @@ func volumeDevicesInUse(podSpec *api.PodSpec) bool {
 	}
 
 	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
+	visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 		if c.VolumeDevices != nil {
 			inUse = true
 			return false
@@ -725,7 +749,7 @@ func runAsGroupInUse(podSpec *api.PodSpec) bool {
 	}
 
 	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
+	visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 		if c.SecurityContext != nil && c.SecurityContext.RunAsGroup != nil {
 			inUse = true
 			return false
@@ -814,7 +838,7 @@ func subpathExprInUse(podSpec *api.PodSpec) bool {
 	}
 
 	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
+	visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 		for i := range c.VolumeMounts {
 			if len(c.VolumeMounts[i].SubPathExpr) > 0 {
 				inUse = true
@@ -834,7 +858,7 @@ func startupProbeInUse(podSpec *api.PodSpec) bool {
 	}
 
 	var inUse bool
-	VisitContainers(podSpec, func(c *api.Container) bool {
+	visitContainersUnconditional(podSpec, func(c *api.Container) bool {
 		if c.StartupProbe != nil {
 			inUse = true
 			return false

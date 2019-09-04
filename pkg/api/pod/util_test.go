@@ -162,6 +162,55 @@ func TestVisitContainers(t *testing.T) {
 	}
 }
 
+func TestVisitContainersUnconditional(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, false)()
+
+	podSpec := &api.PodSpec{
+		Containers: []api.Container{{
+			Name:         "c1",
+			VolumeMounts: []api.VolumeMount{{SubPath: "foo"}},
+		}},
+		InitContainers: []api.Container{{
+			Name:         "i1",
+			VolumeMounts: []api.VolumeMount{{SubPath: "foo"}},
+		}},
+		EphemeralContainers: []api.EphemeralContainer{{
+			EphemeralContainerCommon: api.EphemeralContainerCommon{
+				Name:         "e1",
+				VolumeMounts: []api.VolumeMount{{SubPath: "foo"}},
+			},
+		}},
+	}
+
+	visitContainersUnconditional(podSpec, func(c *api.Container) bool {
+		for i := range c.VolumeMounts {
+			c.VolumeMounts[i].SubPath = ""
+		}
+		return true
+	})
+
+	wantPodSpec := &api.PodSpec{
+		Containers: []api.Container{{
+			Name:         "c1",
+			VolumeMounts: []api.VolumeMount{{}},
+		}},
+		InitContainers: []api.Container{{
+			Name:         "i1",
+			VolumeMounts: []api.VolumeMount{{}},
+		}},
+		EphemeralContainers: []api.EphemeralContainer{{
+			EphemeralContainerCommon: api.EphemeralContainerCommon{
+				Name:         "e1",
+				VolumeMounts: []api.VolumeMount{{}},
+			},
+		}},
+	}
+
+	if !reflect.DeepEqual(podSpec, wantPodSpec) {
+		t.Errorf("visitContainersUnconditional did not drop fields in all containers, diff: (-want, +got)\n %v", diff.ObjectReflectDiff(wantPodSpec, podSpec))
+	}
+}
+
 func TestPodSecrets(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.EphemeralContainers, true)()
 
@@ -2109,12 +2158,12 @@ func TestDropEphemeralContainers(t *testing.T) {
 		pod                    func() *api.Pod
 	}{
 		{
-			description:            "has subpaths",
+			description:            "has ephemeral containers",
 			hasEphemeralContainers: true,
 			pod:                    podWithEphemeralContainers,
 		},
 		{
-			description:            "does not have subpaths",
+			description:            "does not have ephemeral containers",
 			hasEphemeralContainers: false,
 			pod:                    podWithoutEphemeralContainers,
 		},
