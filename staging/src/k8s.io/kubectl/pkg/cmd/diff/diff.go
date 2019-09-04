@@ -82,6 +82,7 @@ type DiffOptions struct {
 	EnforceNamespace bool
 	Builder          *resource.Builder
 	Diff             *DiffProgram
+	ExitCode         int
 }
 
 func validateArgs(cmd *cobra.Command, args []string) error {
@@ -109,6 +110,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 		Long:                  diffLong,
 		Example:               diffExample,
 		Run: func(cmd *cobra.Command, args []string) {
+			cmdutil.ErrorExitCode(options.ExitCode)
 			cmdutil.CheckErr(options.Complete(f, cmd))
 			cmdutil.CheckErr(validateArgs(cmd, args))
 			cmdutil.CheckErr(options.Run())
@@ -118,6 +120,7 @@ func NewCmdDiff(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	usage := "contains the configuration to diff"
 	cmdutil.AddFilenameOptionFlags(cmd, &options.FilenameOptions, usage)
 	cmdutil.AddServerSideApplyFlags(cmd)
+	cmd.Flags().IntVar(&options.ExitCode, "exit-code", 1, "Exit status code for kubectl errors. Can be used to distinguish between diff statuses and problems communicating with the server.")
 
 	return cmd
 }
