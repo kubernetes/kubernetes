@@ -23,17 +23,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/net"
 )
 
-func TestRangeAllocatorEmpty(t *testing.T) {
-	r := &net.PortRange{}
-	r.Set("0-0")
-	defer func() {
-		if rv := recover(); rv == nil {
-			t.Fatalf("expected panic because of empty port range: %#v", r)
-		}
-	}()
-	_ = newPortRangeAllocator(*r, true)
-}
-
 func TestRangeAllocatorFullyAllocated(t *testing.T) {
 	r := &net.PortRange{}
 	r.Set("1-1")

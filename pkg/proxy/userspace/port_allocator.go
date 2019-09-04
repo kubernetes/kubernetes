@@ -76,7 +76,7 @@ type rangeAllocator struct {
 
 func newPortRangeAllocator(r net.PortRange, autoFill bool) PortAllocator {
 	if r.Base == 0 || r.Size == 0 {
-		panic("illegal argument: may not specify an empty port range")
+		return &randomAllocator{}
 	}
 	ra := &rangeAllocator{
 		PortRange: r,
