@@ -494,7 +494,7 @@ func TestSyncPod(t *testing.T) {
 			Name:            "foo1",
 			Image:           "busybox",
 			ImagePullPolicy: v1.PullIfNotPresent,
-			Lifecycle:       &v1.Lifecycle{
+			Lifecycle: &v1.Lifecycle{
 				PostStart: &v1.Handler{
 					Exec: &v1.ExecAction{
 						Command: []string{"sh", "-c", "while true; do sleep 3600; done"},
@@ -586,7 +586,7 @@ func TestSyncPodWithInitContainers(t *testing.T) {
 			Name:            "foo1",
 			Image:           "busybox",
 			ImagePullPolicy: v1.PullIfNotPresent,
-			Lifecycle:       &v1.Lifecycle{
+			Lifecycle: &v1.Lifecycle{
 				PostStart: &v1.Handler{
 					Exec: &v1.ExecAction{
 						Command: []string{"sh", "-c", "while true; do sleep 3600; done"},

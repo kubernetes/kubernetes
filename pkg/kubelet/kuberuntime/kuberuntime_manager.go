@@ -17,10 +17,10 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
@@ -35,6 +35,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	ref "k8s.io/client-go/tools/reference"
 	"k8s.io/client-go/util/flowcontrol"
+	"k8s.io/client-go/util/workqueue"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -761,8 +762,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	// Helper containing boilerplate common to starting all types of containers.
 	// typeName is a label used to describe this type of container in log messages,
 	// currently: "container", "init container" or "ephemeral container"
-	start := func(typeName string, container *v1.Container, wg *sync.WaitGroup) error {
-		defer wg.Done()
+	start := func(typeName string, container *v1.Container) error {
 		startContainerResult := kubecontainer.NewSyncResult(kubecontainer.StartContainer, container.Name)
 		result.AddSyncResult(startContainerResult)
 
@@ -794,34 +794,26 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	// These are started "prior" to init containers to allow running ephemeral containers even when there
 	// are errors starting an init container. In practice init containers will start first since ephemeral
 	// containers cannot be specified on pod creation.
-	var wg sync.WaitGroup
 	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
-		for _, idx := range podContainerChanges.EphemeralContainersToStart {
-			c := (*v1.Container)(&pod.Spec.EphemeralContainers[idx].EphemeralContainerCommon)
-			wg.Add(1)
-			go start("ephemeral container", c, &wg)
-		}
-		wg.Wait()
+		workqueue.ParallelizeUntil(context.TODO(), 8, len(podContainerChanges.EphemeralContainersToStart), func(index int) {
+			c := (*v1.Container)(&pod.Spec.EphemeralContainers[podContainerChanges.EphemeralContainersToStart[index]].EphemeralContainerCommon)
+			start("ephemeral container", c)
+		})
 	}
-
 	// Step 6: start the init container.
 	if container := podContainerChanges.NextInitContainerToStart; container != nil {
 		// Start the next init container.
-		wg.Add(1)
-		if err := start("init container", container, &wg); err != nil {
+		if err := start("init container", container); err != nil {
 			return
 		}
-		wg.Wait()
 		// Successfully started the container; clear the entry in the failure
 		klog.V(4).Infof("Completed init container %q for pod %q", container.Name, format.Pod(pod))
 	}
 
 	// Step 7: start containers in podContainerChanges.ContainersToStart.
-	for _, idx := range podContainerChanges.ContainersToStart {
-		wg.Add(1)
-		go start("container", &pod.Spec.Containers[idx], &wg)
-	}
-	wg.Wait()
+	workqueue.ParallelizeUntil(context.TODO(), 8, len(podContainerChanges.ContainersToStart), func(index int) {
+		start("container", &pod.Spec.Containers[podContainerChanges.ContainersToStart[index]])
+	})
 	return
 }
 

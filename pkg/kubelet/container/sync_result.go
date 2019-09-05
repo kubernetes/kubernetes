@@ -19,6 +19,7 @@ package container
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
@@ -90,6 +91,7 @@ func (r *SyncResult) Fail(err error, msg string) {
 
 // PodSyncResult is the summary result of SyncPod() and KillPod()
 type PodSyncResult struct {
+	mutex sync.Mutex
 	// Result of different sync actions
 	SyncResults []*SyncResult
 	// Error encountered in SyncPod() and KillPod() that is not already included in SyncResults
@@ -98,22 +100,30 @@ type PodSyncResult struct {
 
 // AddSyncResult adds multiple SyncResult to current PodSyncResult
 func (p *PodSyncResult) AddSyncResult(result ...*SyncResult) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 	p.SyncResults = append(p.SyncResults, result...)
 }
 
 // AddPodSyncResult merges a PodSyncResult to current one
 func (p *PodSyncResult) AddPodSyncResult(result PodSyncResult) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 	p.AddSyncResult(result.SyncResults...)
 	p.SyncError = result.SyncError
 }
 
 // Fail fails the PodSyncResult with an error occurred in SyncPod() and KillPod() itself
 func (p *PodSyncResult) Fail(err error) {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 	p.SyncError = err
 }
 
 // Error returns an error summarizing all the errors in PodSyncResult
 func (p *PodSyncResult) Error() error {
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 	errlist := []error{}
 	if p.SyncError != nil {
 		errlist = append(errlist, fmt.Errorf("failed to SyncPod: %v", p.SyncError))
