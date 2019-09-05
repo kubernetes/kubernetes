@@ -148,6 +148,7 @@ try {
   Set-PodCidr
   Configure-HostNetworkingService
   Configure-CniNetworking
+  Configure-HostDnsConf
   Configure-GcePdTools
   Configure-Kubelet
 
