@@ -414,8 +414,10 @@ func ValidateNetworking(c *kubeadm.ClusterConfiguration, fldPath *field.Path) fi
 	}
 	// check if dual-stack feature-gate is enabled
 	isDualStack := features.Enabled(c.FeatureGates, features.IPv6DualStack)
-	// TODO(Arvinderpal): use isDualStack flag once list of service CIDRs is supported (PR: #79386)
-	allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, false /*isDualStack*/, field.NewPath("serviceSubnet"))...)
+
+	if len(c.Networking.ServiceSubnet) != 0 {
+		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.ServiceSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("serviceSubnet"))...)
+	}
 	if len(c.Networking.PodSubnet) != 0 {
 		allErrs = append(allErrs, ValidateIPNetFromString(c.Networking.PodSubnet, constants.MinimumAddressesInServiceSubnet, isDualStack, field.NewPath("podSubnet"))...)
 	}

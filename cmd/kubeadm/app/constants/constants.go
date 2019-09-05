@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -31,6 +32,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -522,20 +524,56 @@ func CreateTimestampDirForKubeadm(kubernetesDir, dirName string) (string, error)
 }
 
 // GetDNSIP returns a dnsIP, which is 10th IP in svcSubnet CIDR range
-func GetDNSIP(svcSubnet string) (net.IP, error) {
+func GetDNSIP(svcSubnetList string, isDualStack bool) (net.IP, error) {
 	// Get the service subnet CIDR
-	_, svcSubnetCIDR, err := net.ParseCIDR(svcSubnet)
+	svcSubnetCIDR, err := GetKubernetesServiceCIDR(svcSubnetList, isDualStack)
 	if err != nil {
-		return nil, errors.Wrapf(err, "couldn't parse service subnet CIDR %q", svcSubnet)
+		return nil, errors.Wrapf(err, "unable to get internal Kubernetes Service IP from the given service CIDR (%s)", svcSubnetList)
 	}
 
 	// Selects the 10th IP in service subnet CIDR range as dnsIP
 	dnsIP, err := ipallocator.GetIndexedIP(svcSubnetCIDR, 10)
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to get tenth IP address from service subnet CIDR %s", svcSubnetCIDR.String())
+		return nil, errors.Wrap(err, "unable to get internal Kubernetes Service IP from the given service CIDR")
 	}
 
 	return dnsIP, nil
+}
+
+// GetKubernetesServiceCIDR returns the default Service CIDR for the Kubernetes internal service
+func GetKubernetesServiceCIDR(svcSubnetList string, isDualStack bool) (*net.IPNet, error) {
+	if isDualStack {
+		// The default service address family for the cluster is the address family of the first
+		// service cluster IP range configured via the `--service-cluster-ip-range` flag
+		// of the kube-controller-manager and kube-apiserver.
+		svcSubnets, err := utilnet.ParseCIDRs(strings.Split(svcSubnetList, ","))
+		if err != nil {
+			return nil, errors.Wrapf(err, "unable to parse ServiceSubnet %v", svcSubnetList)
+		}
+		if len(svcSubnets) == 0 {
+			return nil, errors.New("received empty ServiceSubnet for dual-stack")
+		}
+		return svcSubnets[0], nil
+	}
+	// internal IP address for the API server
+	_, svcSubnet, err := net.ParseCIDR(svcSubnetList)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to parse ServiceSubnet %v", svcSubnetList)
+	}
+	return svcSubnet, nil
+}
+
+// GetAPIServerVirtualIP returns the IP of the internal Kubernetes API service
+func GetAPIServerVirtualIP(svcSubnetList string, isDualStack bool) (net.IP, error) {
+	svcSubnet, err := GetKubernetesServiceCIDR(svcSubnetList, isDualStack)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to get internal Kubernetes Service IP from the given service CIDR")
+	}
+	internalAPIServerVirtualIP, err := ipallocator.GetIndexedIP(svcSubnet, 1)
+	if err != nil {
+		return nil, errors.Wrapf(err, "unable to get the first IP address from the given CIDR: %s", svcSubnet.String())
+	}
+	return internalAPIServerVirtualIP, nil
 }
 
 // GetStaticPodAuditPolicyFile returns the path to the audit policy file within a static pod
