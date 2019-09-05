@@ -558,13 +558,19 @@ func TestMakePortMappings(t *testing.T) {
 					// Duplicated, should be ignored.
 					port("foo", v1.ProtocolUDP, 888, 8888, ""),
 					// Duplicated, should be ignored.
-					port("", v1.ProtocolTCP, 80, 8888, ""),
+					port("", v1.ProtocolTCP, 80, 8888, "127.0.0.1"),
+					// Duplicated with different address family, shouldn't be ignored
+					port("", v1.ProtocolTCP, 80, 8080, "::"),
+					// No address family specified
+					port("", v1.ProtocolTCP, 1234, 5678, ""),
 				},
 			},
 			[]PortMapping{
-				portMapping("fooContainer-TCP:80", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
-				portMapping("fooContainer-TCP:443", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
+				portMapping("fooContainer-v4-TCP:80", v1.ProtocolTCP, 80, 8080, "127.0.0.1"),
+				portMapping("fooContainer-v4-TCP:443", v1.ProtocolTCP, 443, 4343, "192.168.0.1"),
 				portMapping("fooContainer-foo", v1.ProtocolUDP, 555, 5555, ""),
+				portMapping("fooContainer-v6-TCP:80", v1.ProtocolTCP, 80, 8080, "::"),
+				portMapping("fooContainer-any-TCP:1234", v1.ProtocolTCP, 1234, 5678, ""),
 			},
 		},
 	}
