@@ -165,10 +165,12 @@ function download_tarball() {
   url="${DOWNLOAD_URL_PREFIX}/${file}"
   mkdir -p "${download_path}"
   if [[ $(which curl) ]]; then
+    echo "Using culr to get files"
     # if the url belongs to GCS API we should use oauth2_token in the headers
     local curl_headers=""
     if { [[ "${KUBERNETES_PROVIDER:-gce}" == "gce" ]] || [[ "${KUBERNETES_PROVIDER}" == "gke" ]] ; } &&
        [[ "$url" =~ ^https://storage.googleapis.com.* ]] && valid-storage-scope ; then
+       echo "curl call will include authorization bearer token"
       curl_headers="Authorization: Bearer $(get-credentials)"
     fi
     curl ${curl_headers:+-H "${curl_headers}"} -fL --retry 3 --keepalive-time 2 "${url}" -o "${download_path}/${file}"
