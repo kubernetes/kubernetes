@@ -82,16 +82,26 @@ func (f UserConversionFunc) User(chain []*x509.Certificate) (*authenticator.Resp
 	return f(chain)
 }
 
+// VerifyOptionFunc is function which provides a shallow copy of the VerifyOptions to the authenticator.  This allows
+// for cases where the options (particularly the CAs) can change.
+type VerifyOptionFunc func() x509.VerifyOptions
+
 // Authenticator implements request.Authenticator by extracting user info from verified client certificates
 type Authenticator struct {
-	opts x509.VerifyOptions
-	user UserConversion
+	verifyOptionsFn VerifyOptionFunc
+	user            UserConversion
 }
 
 // New returns a request.Authenticator that verifies client certificates using the provided
 // VerifyOptions, and converts valid certificate chains into user.Info using the provided UserConversion
 func New(opts x509.VerifyOptions, user UserConversion) *Authenticator {
-	return &Authenticator{opts, user}
+	return NewDynamic(StaticVerifierFn(opts), user)
+}
+
+// NewDynamic returns a request.Authenticator that verifies client certificates using the provided
+// VerifyOptionFunc (which may be dynamic), and converts valid certificate chains into user.Info using the provided UserConversion
+func NewDynamic(verifyOptionsFn VerifyOptionFunc, user UserConversion) *Authenticator {
+	return &Authenticator{verifyOptionsFn, user}
 }
 
 // AuthenticateRequest authenticates the request using presented client certificates
@@ -101,7 +111,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 	}
 
 	// Use intermediates, if provided
-	optsCopy := a.opts
+	optsCopy := a.verifyOptionsFn()
 	if optsCopy.Intermediates == nil && len(req.TLS.PeerCertificates) > 1 {
 		optsCopy.Intermediates = x509.NewCertPool()
 		for _, intermediate := range req.TLS.PeerCertificates[1:] {
@@ -133,8 +143,8 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 
 // Verifier implements request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
 type Verifier struct {
-	opts x509.VerifyOptions
-	auth authenticator.Request
+	verifyOptionsFn VerifyOptionFunc
+	auth            authenticator.Request
 
 	// allowedCommonNames contains the common names which a verified certificate is allowed to have.
 	// If empty, all verified certificates are allowed.
@@ -143,7 +153,13 @@ type Verifier struct {
 
 // NewVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
 func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCommonNames sets.String) authenticator.Request {
-	return &Verifier{opts, auth, allowedCommonNames}
+	return NewDynamicCAVerifier(StaticVerifierFn(opts), auth, allowedCommonNames)
+}
+
+// NewDynamicCAVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
+// TODO make the allowedCommonNames dynamic
+func NewDynamicCAVerifier(verifyOptionsFn VerifyOptionFunc, auth authenticator.Request, allowedCommonNames sets.String) authenticator.Request {
+	return &Verifier{verifyOptionsFn, auth, allowedCommonNames}
 }
 
 // AuthenticateRequest verifies the presented client certificate, then delegates to the wrapped auth
@@ -153,7 +169,7 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 	}
 
 	// Use intermediates, if provided
-	optsCopy := a.opts
+	optsCopy := a.verifyOptionsFn()
 	if optsCopy.Intermediates == nil && len(req.TLS.PeerCertificates) > 1 {
 		optsCopy.Intermediates = x509.NewCertPool()
 		for _, intermediate := range req.TLS.PeerCertificates[1:] {

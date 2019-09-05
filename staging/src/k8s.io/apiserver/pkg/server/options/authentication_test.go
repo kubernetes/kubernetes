@@ -46,7 +46,7 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 		{
 			name: "test when ClientCAFile is not nil",
 			testOptions: &RequestHeaderAuthenticationOptions{
-				ClientCAFile:        "/testClientCAFile",
+				ClientCAFile:        "testdata/root.pem",
 				UsernameHeaders:     []string{"x-remote-user"},
 				GroupHeaders:        []string{"x-remote-group"},
 				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
@@ -56,7 +56,7 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 				UsernameHeaders:     []string{"x-remote-user"},
 				GroupHeaders:        []string{"x-remote-group"},
 				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
-				ClientCA:            "/testClientCAFile",
+				VerifyOptionFn:      nil, // this is nil because you can't compare functions
 				AllowedClientNames:  []string{"kube-aggregator"},
 			},
 		},
@@ -64,7 +64,17 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 
 	for _, testcase := range testCases {
 		t.Run(testcase.name, func(t *testing.T) {
-			resultConfig := testcase.testOptions.ToAuthenticationRequestHeaderConfig()
+			resultConfig, err := testcase.testOptions.ToAuthenticationRequestHeaderConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resultConfig != nil {
+				if resultConfig.VerifyOptionFn == nil {
+					t.Error("missing requestheader verify")
+				}
+				resultConfig.VerifyOptionFn = nil
+			}
+
 			if !reflect.DeepEqual(resultConfig, testcase.expectConfig) {
 				t.Errorf("got RequestHeaderConfig: %#v, expected RequestHeaderConfig: %#v", resultConfig, testcase.expectConfig)
 			}

@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	"k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/authorization/authorizerfactory"
 	clientset "k8s.io/client-go/kubernetes"
@@ -63,10 +64,15 @@ func BuildAuth(nodeName types.NodeName, client clientset.Interface, config kubel
 
 // BuildAuthn creates an authenticator compatible with the kubelet's needs
 func BuildAuthn(client authenticationclient.TokenReviewInterface, authn kubeletconfig.KubeletAuthentication) (authenticator.Request, error) {
+	clientCertVerifier, err := x509.NewStaticVerifierFromFile(authn.X509.ClientCAFile)
+	if err != nil {
+		return nil, err
+	}
+
 	authenticatorConfig := authenticatorfactory.DelegatingAuthenticatorConfig{
-		Anonymous:    authn.Anonymous.Enabled,
-		CacheTTL:     authn.Webhook.CacheTTL.Duration,
-		ClientCAFile: authn.X509.ClientCAFile,
+		Anonymous:            authn.Anonymous.Enabled,
+		CacheTTL:             authn.Webhook.CacheTTL.Duration,
+		ClientVerifyOptionFn: clientCertVerifier,
 	}
 
 	if authn.Webhook.Enabled {

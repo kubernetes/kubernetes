@@ -308,7 +308,7 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 }
 
-func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() kubeauthenticator.Config {
+func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticator.Config, error) {
 	ret := kubeauthenticator.Config{
 		TokenSuccessCacheTTL: s.TokenSuccessCacheTTL,
 		TokenFailureCacheTTL: s.TokenFailureCacheTTL,
@@ -323,7 +323,11 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() kubeauthenticato
 	}
 
 	if s.ClientCert != nil {
-		ret.ClientCAFile = s.ClientCert.ClientCA
+		var err error
+		ret.ClientVerifyOptionFn, err = s.ClientCert.GetClientVerifyOptionFn()
+		if err != nil {
+			return kubeauthenticator.Config{}, err
+		}
 	}
 
 	if s.OIDC != nil {
@@ -343,7 +347,11 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() kubeauthenticato
 	}
 
 	if s.RequestHeader != nil {
-		ret.RequestHeaderConfig = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
+		var err error
+		ret.RequestHeaderConfig, err = s.RequestHeader.ToAuthenticationRequestHeaderConfig()
+		if err != nil {
+			return kubeauthenticator.Config{}, err
+		}
 	}
 
 	ret.APIAudiences = s.APIAudiences
@@ -374,7 +382,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() kubeauthenticato
 		}
 	}
 
-	return ret
+	return ret, nil
 }
 
 func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error {
