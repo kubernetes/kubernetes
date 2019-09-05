@@ -221,13 +221,16 @@ func formatEndpointsList(endpoints []Endpoint) []string {
 // endpointSliceCacheKeys returns cache keys used for a given EndpointSlice.
 func endpointSliceCacheKeys(endpointSlice *discovery.EndpointSlice) (types.NamespacedName, string, error) {
 	var err error
+	var namespacedName types.NamespacedName
 	serviceName, ok := endpointSlice.Labels[discovery.LabelServiceName]
 	if !ok || serviceName == "" {
 		err = fmt.Errorf("No %s label set on endpoint slice: %s", discovery.LabelServiceName, endpointSlice.Name)
 	} else if endpointSlice.Namespace == "" || endpointSlice.Name == "" {
 		err = fmt.Errorf("Expected EndpointSlice name and namespace to be set: %v", endpointSlice)
+	} else {
+		namespacedName = types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}
 	}
-	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, err
+	return namespacedName, endpointSlice.Name, err
 }
 
 // byIP helps sort endpoints by IP
