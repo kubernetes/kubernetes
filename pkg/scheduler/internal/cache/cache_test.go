@@ -1393,6 +1393,7 @@ func BenchmarkUpdate1kNodes30kPods(b *testing.B) {
 		cachedNodes := schedulernodeinfo.NewSnapshot()
 		cache.UpdateNodeInfoSnapshot(cachedNodes)
 	}
+	b.StopTimer() // without this line we're taking the overhead of defer() into account
 }
 
 func BenchmarkExpirePods(b *testing.B) {
