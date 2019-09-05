@@ -200,9 +200,9 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 	ipAddressType := discovery.AddressTypeIP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("%s-%d", serviceName, sliceNum),
-			Namespace:       namespace,
-			OwnerReferences: []metav1.OwnerReference{{Kind: "Service", Name: serviceName}},
+			Name:      fmt.Sprintf("%s-%d", serviceName, sliceNum),
+			Namespace: namespace,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports:       []discovery.EndpointPort{},
 		AddressType: &ipAddressType,

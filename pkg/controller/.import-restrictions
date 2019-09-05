@@ -188,6 +188,8 @@
         "k8s.io/kubernetes/pkg/apis/core/v1",
         "k8s.io/kubernetes/pkg/apis/core/v1/helper",
         "k8s.io/kubernetes/pkg/apis/core/validation",
+        "k8s.io/kubernetes/pkg/apis/discovery",
+        "k8s.io/kubernetes/pkg/apis/discovery/validation",
         "k8s.io/kubernetes/pkg/cloudprovider",
         "k8s.io/kubernetes/pkg/cloudprovider/providers/gce",
         "k8s.io/kubernetes/pkg/controller",

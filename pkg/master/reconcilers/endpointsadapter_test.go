@@ -294,8 +294,7 @@ func generateEndpointsAndSlice(name, namespace string, ports []int, addresses []
 	addressTypeIP := discovery.AddressTypeIP
 
 	epSlice := &discovery.EndpointSlice{ObjectMeta: objectMeta, AddressType: &addressTypeIP}
-	epSlice.Labels = map[string]string{serviceNameLabel: name}
-	epSlice.OwnerReferences = []metav1.OwnerReference{{Kind: "Service", Name: name}}
+	epSlice.Labels = map[string]string{discovery.LabelServiceName: name}
 	subset := corev1.EndpointSubset{}
 
 	for i, port := range ports {
