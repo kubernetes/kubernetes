@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -52,9 +51,6 @@ import (
 
 // NodePortRange should match whatever the default/configured range is
 var NodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
-
-// PauseDeploymentLabels are unique deployment selector labels for pause pod
-var PauseDeploymentLabels = map[string]string{"deployment": "agnhost-pause"}
 
 // TestJig is a test jig to help service testing.
 type TestJig struct {
@@ -897,54 +893,4 @@ func (j *TestJig) CreateServicePods(c clientset.Interface, ns string, replica in
 	}
 	err := framework.RunRC(config)
 	framework.ExpectNoError(err, "Replica must be created")
-}
-
-// CreatePausePodDeployment creates a deployment for agnhost-pause pod running in different nodes
-func (j *TestJig) CreatePausePodDeployment(name, ns string, replica int32) *appsv1.Deployment {
-	// terminationGracePeriod is set to 0 to reduce deployment deletion time for infinitely running pause pod.
-	terminationGracePeriod := int64(0)
-	pauseDeployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: PauseDeploymentLabels,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replica,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: PauseDeploymentLabels,
-			},
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: PauseDeploymentLabels,
-				},
-				Spec: v1.PodSpec{
-					TerminationGracePeriodSeconds: &terminationGracePeriod,
-					Affinity: &v1.Affinity{
-						PodAntiAffinity: &v1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-								{
-									LabelSelector: &metav1.LabelSelector{MatchLabels: PauseDeploymentLabels},
-									TopologyKey:   "kubernetes.io/hostname",
-									Namespaces:    []string{ns},
-								},
-							},
-						},
-					},
-					Containers: []v1.Container{
-						{
-							Name:  "agnhost-pause",
-							Image: imageutils.GetE2EImage(imageutils.Agnhost),
-							Args:  []string{"pause"},
-						},
-					},
-				},
-			},
-		},
-	}
-	deployment, err := j.Client.AppsV1().Deployments(ns).Create(pauseDeployment)
-	framework.ExpectNoError(err, "Error in creating deployment for pause pod")
-	return deployment
 }

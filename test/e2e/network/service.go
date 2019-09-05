@@ -28,6 +28,7 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 
+	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -319,7 +320,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
 		ginkgo.By("Creating pause pod deployment")
-		deployment := jig.CreatePausePodDeployment("pause-pod", ns, int32(nodeCounts))
+		deployment := createPausePodDeployment(cs, "pause-pod", ns, nodeCounts)
 
 		defer func() {
 			e2elog.Logf("Deleting deployment")
@@ -2256,7 +2257,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		path := fmt.Sprintf("%s/clientip", ipPort)
 
 		ginkgo.By("Creating pause pod deployment to make sure, pausePods are in desired state")
-		deployment := jig.CreatePausePodDeployment("pause-pod-deployment", namespace, int32(1))
+		deployment := createPausePodDeployment(cs, "pause-pod-deployment", namespace, 1)
 		framework.ExpectNoError(e2edeploy.WaitForDeploymentComplete(cs, deployment), "Failed to complete pause pod deployment")
 
 		defer func() {
@@ -2547,4 +2548,30 @@ func createAndGetExternalServiceFQDN(cs clientset.Interface, ns, serviceName str
 	_, _, err := e2eservice.StartServeHostnameService(cs, getServeHostnameService(serviceName), ns, 2)
 	framework.ExpectNoError(err, "Expected Service %s to be running", serviceName)
 	return fmt.Sprintf("%s.%s.svc.%s", serviceName, ns, framework.TestContext.ClusterDNSDomain)
+}
+
+func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas int) *appsv1.Deployment {
+	labels := map[string]string{"deployment": "agnhost-pause"}
+	pauseDeployment := e2edeploy.NewDeployment(name, int32(replicas), labels, "", "", appsv1.RollingUpdateDeploymentStrategyType)
+
+	pauseDeployment.Spec.Template.Spec.Containers[0] = v1.Container{
+		Name:  "agnhost-pause",
+		Image: imageutils.GetE2EImage(imageutils.Agnhost),
+		Args:  []string{"pause"},
+	}
+	pauseDeployment.Spec.Template.Spec.Affinity = &v1.Affinity{
+		PodAntiAffinity: &v1.PodAntiAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					LabelSelector: &metav1.LabelSelector{MatchLabels: labels},
+					TopologyKey:   "kubernetes.io/hostname",
+					Namespaces:    []string{ns},
+				},
+			},
+		},
+	}
+
+	deployment, err := cs.AppsV1().Deployments(ns).Create(pauseDeployment)
+	framework.ExpectNoError(err, "Error in creating deployment for pause pod")
+	return deployment
 }
