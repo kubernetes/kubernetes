@@ -18,7 +18,6 @@ package node
 
 import (
 	"errors"
-	"regexp"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -50,7 +49,7 @@ func TestCheckReadyForTests(t *testing.T) {
 
 	tcs := []struct {
 		desc                 string
-		whitelist            *regexp.Regexp
+		nonblockingTaints    string
 		allowedNotReadyNodes int
 		nodes                []v1.Node
 		nodeListErr          error
@@ -64,8 +63,8 @@ func TestCheckReadyForTests(t *testing.T) {
 			},
 			expected: true,
 		}, {
-			desc:      "Default value for whitelist regexp tolerates master taint",
-			whitelist: regexp.MustCompile(`^node-role\.kubernetes\.io/master$`),
+			desc:              "Default value for nonblocking taints tolerates master taint",
+			nonblockingTaints: `node-role.kubernetes.io/master`,
 			nodes: []v1.Node{
 				fromVanillaNode(func(n *v1.Node) {
 					n.Spec.Taints = []v1.Taint{{Key: labelNodeRoleMaster, Effect: v1.TaintEffectNoSchedule}}
@@ -73,8 +72,8 @@ func TestCheckReadyForTests(t *testing.T) {
 			},
 			expected: true,
 		}, {
-			desc:      "Tainted node should fail if effect is TaintEffectNoExecute",
-			whitelist: regexp.MustCompile("bar"),
+			desc:              "Tainted node should fail if effect is TaintEffectNoExecute",
+			nonblockingTaints: "bar",
 			nodes: []v1.Node{
 				fromVanillaNode(func(n *v1.Node) {
 					n.Spec.Taints = []v1.Taint{{Key: "foo", Effect: v1.TaintEffectNoExecute}}
@@ -82,7 +81,7 @@ func TestCheckReadyForTests(t *testing.T) {
 			expected: false,
 		}, {
 			desc:                 "Tainted node can be allowed via allowedNotReadyNodes",
-			whitelist:            regexp.MustCompile("bar"),
+			nonblockingTaints:    "bar",
 			allowedNotReadyNodes: 1,
 			nodes: []v1.Node{
 				fromVanillaNode(func(n *v1.Node) {
@@ -116,8 +115,8 @@ func TestCheckReadyForTests(t *testing.T) {
 			},
 			expected: true,
 		}, {
-			desc:      "Multi-node, single blocking node allowed via whitelisted taint",
-			whitelist: regexp.MustCompile("foo"),
+			desc:              "Multi-node, single blocking node allowed via nonblocking taint",
+			nonblockingTaints: "foo",
 			nodes: []v1.Node{
 				fromVanillaNode(func(n *v1.Node) {}),
 				fromVanillaNode(func(n *v1.Node) {
@@ -125,6 +124,32 @@ func TestCheckReadyForTests(t *testing.T) {
 				}),
 			},
 			expected: true,
+		}, {
+			desc:              "Multi-node, both blocking nodes allowed via separate nonblocking taints",
+			nonblockingTaints: "foo,bar",
+			nodes: []v1.Node{
+				fromVanillaNode(func(n *v1.Node) {}),
+				fromVanillaNode(func(n *v1.Node) {
+					n.Spec.Taints = []v1.Taint{{Key: "foo", Effect: v1.TaintEffectNoSchedule}}
+				}),
+				fromVanillaNode(func(n *v1.Node) {
+					n.Spec.Taints = []v1.Taint{{Key: "bar", Effect: v1.TaintEffectNoSchedule}}
+				}),
+			},
+			expected: true,
+		}, {
+			desc:              "Multi-node, one blocking node allowed via nonblocking taints still blocked",
+			nonblockingTaints: "foo,notbar",
+			nodes: []v1.Node{
+				fromVanillaNode(func(n *v1.Node) {}),
+				fromVanillaNode(func(n *v1.Node) {
+					n.Spec.Taints = []v1.Taint{{Key: "foo", Effect: v1.TaintEffectNoSchedule}}
+				}),
+				fromVanillaNode(func(n *v1.Node) {
+					n.Spec.Taints = []v1.Taint{{Key: "bar", Effect: v1.TaintEffectNoSchedule}}
+				}),
+			},
+			expected: false,
 		}, {
 			desc:        "Errors from node list are reported",
 			nodeListErr: errors.New("Forced error"),
@@ -147,7 +172,7 @@ func TestCheckReadyForTests(t *testing.T) {
 				nodeList := &v1.NodeList{Items: tc.nodes}
 				return true, nodeList, tc.nodeListErr
 			})
-			checkFunc := CheckReadyForTests(c, tc.whitelist, tc.allowedNotReadyNodes, testLargeClusterThreshold)
+			checkFunc := CheckReadyForTests(c, tc.nonblockingTaints, tc.allowedNotReadyNodes, testLargeClusterThreshold)
 			out, err := checkFunc()
 			if out != tc.expected {
 				t.Errorf("Expected %v but got %v", tc.expected, out)
@@ -177,10 +202,10 @@ func TestReadyForTests(t *testing.T) {
 	}
 	_ = fromVanillaNode
 	tcs := []struct {
-		desc      string
-		node      *v1.Node
-		whitelist *regexp.Regexp
-		expected  bool
+		desc              string
+		node              *v1.Node
+		nonblockingTaints string
+		expected          bool
 	}{
 		{
 			desc: "Vanilla node should pass",
@@ -188,42 +213,38 @@ func TestReadyForTests(t *testing.T) {
 			}),
 			expected: true,
 		}, {
-			desc:      "Vanilla node should pass with non-applicable whitelist",
-			whitelist: regexp.MustCompile("foo"),
+			desc:              "Vanilla node should pass with non-applicable nonblocking taint",
+			nonblockingTaints: "foo",
 			node: fromVanillaNode(func(n *v1.Node) {
 			}),
 			expected: true,
 		}, {
-			desc:      "Tainted node should pass if effect is TaintEffectPreferNoSchedule",
-			whitelist: regexp.MustCompile("bar"),
+			desc: "Tainted node should pass if effect is TaintEffectPreferNoSchedule",
 			node: fromVanillaNode(func(n *v1.Node) {
 				n.Spec.Taints = []v1.Taint{{Key: "foo", Effect: v1.TaintEffectPreferNoSchedule}}
 			}),
 			expected: true,
 		}, {
-			desc:      "Tainted node should fail if effect is TaintEffectNoExecute",
-			whitelist: regexp.MustCompile("bar"),
+			desc: "Tainted node should fail if effect is TaintEffectNoExecute",
 			node: fromVanillaNode(func(n *v1.Node) {
 				n.Spec.Taints = []v1.Taint{{Key: "foo", Effect: v1.TaintEffectNoExecute}}
 			}),
 			expected: false,
 		}, {
-			desc:      "Tainted node should fail",
-			whitelist: regexp.MustCompile("bar"),
+			desc: "Tainted node should fail",
 			node: fromVanillaNode(func(n *v1.Node) {
 				n.Spec.Taints = []v1.Taint{{Key: "foo", Effect: v1.TaintEffectNoSchedule}}
 			}),
 			expected: false,
 		}, {
-			desc:      "Tainted node should pass if whitelisted",
-			whitelist: regexp.MustCompile("foo"),
+			desc:              "Tainted node should pass if nonblocking",
+			nonblockingTaints: "foo",
 			node: fromVanillaNode(func(n *v1.Node) {
 				n.Spec.Taints = []v1.Taint{{Key: "foo", Effect: v1.TaintEffectNoSchedule}}
 			}),
 			expected: true,
 		}, {
-			desc:      "Node with network not ready fails",
-			whitelist: regexp.MustCompile("foo"),
+			desc: "Node with network not ready fails",
 			node: fromVanillaNode(func(n *v1.Node) {
 				n.Status.Conditions = append(n.Status.Conditions,
 					v1.NodeCondition{Type: v1.NodeNetworkUnavailable, Status: v1.ConditionTrue},
@@ -231,8 +252,7 @@ func TestReadyForTests(t *testing.T) {
 			}),
 			expected: false,
 		}, {
-			desc:      "Node fails unless NodeReady status",
-			whitelist: regexp.MustCompile("foo"),
+			desc: "Node fails unless NodeReady status",
 			node: fromVanillaNode(func(n *v1.Node) {
 				n.Status.Conditions = []v1.NodeCondition{}
 			}),
@@ -242,7 +262,7 @@ func TestReadyForTests(t *testing.T) {
 
 	for _, tc := range tcs {
 		t.Run(tc.desc, func(t *testing.T) {
-			out := readyForTests(tc.node, tc.whitelist)
+			out := readyForTests(tc.node, tc.nonblockingTaints)
 			if out != tc.expected {
 				t.Errorf("Expected %v but got %v", tc.expected, out)
 			}

@@ -1914,7 +1914,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 	return wait.PollImmediate(
 		30*time.Second,
 		timeout,
-		e2enode.CheckReadyForTests(c, TestContext.WhitelistedTaintRegexp, TestContext.AllowedNotReadyNodes, largeClusterThreshold),
+		e2enode.CheckReadyForTests(c, TestContext.NonblockingTaints, TestContext.AllowedNotReadyNodes, largeClusterThreshold),
 	)
 }
 

@@ -19,7 +19,7 @@ package node
 import (
 	"fmt"
 	"net"
-	"regexp"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -384,12 +384,12 @@ func GetMasterAndWorkerNodes(c clientset.Interface) (sets.String, *v1.NodeList, 
 // IsNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
 // TODO: need to discuss wether to return bool and error type
 func IsNodeUntainted(node *v1.Node) bool {
-	return isNodeUntaintedWhitelist(node, nil)
+	return isNodeUntaintedWithNonblocking(node, "")
 }
 
-// isNodeUntaintedWhitelist tests whether a fake pod can be scheduled on "node"
-// but allows for taints matching the regexp of whitelisted values.
-func isNodeUntaintedWhitelist(node *v1.Node, ignoreTaints *regexp.Regexp) bool {
+// isNodeUntaintedWithNonblocking tests whether a fake pod can be scheduled on "node"
+// but allows for taints in the list of non-blocking taints.
+func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) bool {
 	fakePod := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
@@ -411,11 +411,19 @@ func isNodeUntaintedWhitelist(node *v1.Node, ignoreTaints *regexp.Regexp) bool {
 
 	nodeInfo := schedulernodeinfo.NewNodeInfo()
 
-	if ignoreTaints != nil {
+	// Simple lookup for nonblocking taints based on comma-delimited list.
+	nonblockingTaintsMap := map[string]struct{}{}
+	for _, t := range strings.Split(nonblockingTaints, ",") {
+		if strings.TrimSpace(t) != "" {
+			nonblockingTaintsMap[strings.TrimSpace(t)] = struct{}{}
+		}
+	}
+
+	if len(nonblockingTaintsMap) > 0 {
 		nodeCopy := node.DeepCopy()
 		nodeCopy.Spec.Taints = []v1.Taint{}
 		for _, v := range node.Spec.Taints {
-			if !ignoreTaints.MatchString(v.Key) {
+			if _, isNonblockingTaint := nonblockingTaintsMap[v.Key]; !isNonblockingTaint {
 				nodeCopy.Spec.Taints = append(nodeCopy.Spec.Taints, v)
 			}
 		}
@@ -452,17 +460,27 @@ func IsNodeReady(node *v1.Node) bool {
 	return nodeReady && networkReady
 }
 
-// hasWhitelistedTaint returns true if the node contains at least
+// hasNonblockingTaint returns true if the node contains at least
 // one taint with a key matching the regexp.
-func hasWhitelistedTaint(node *v1.Node, whitelist *regexp.Regexp) bool {
-	if whitelist == nil {
+func hasNonblockingTaint(node *v1.Node, nonblockingTaints string) bool {
+	if node == nil {
 		return false
 	}
-	for _, v := range node.Spec.Taints {
-		if whitelist.MatchString(v.Key) {
+
+	// Simple lookup for nonblocking taints based on comma-delimited list.
+	nonblockingTaintsMap := map[string]struct{}{}
+	for _, t := range strings.Split(nonblockingTaints, ",") {
+		if strings.TrimSpace(t) != "" {
+			nonblockingTaintsMap[strings.TrimSpace(t)] = struct{}{}
+		}
+	}
+
+	for _, taint := range node.Spec.Taints {
+		if _, hasNonblockingTaint := nonblockingTaintsMap[taint.Key]; hasNonblockingTaint {
 			return true
 		}
 	}
+
 	return false
 }
 

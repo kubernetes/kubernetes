@@ -209,7 +209,7 @@ func checkWaitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) 
 
 // CheckReadyForTests returns a method usable in polling methods which will check that the nodes are
 // in a testable state based on schedulability.
-func CheckReadyForTests(c clientset.Interface, whitelistedTaints *regexp.Regexp, allowedNotReadyNodes, largeClusterThreshold int) func() (bool, error) {
+func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowedNotReadyNodes, largeClusterThreshold int) func() (bool, error) {
 	attempt := 0
 	var notSchedulable []*v1.Node
 	return func() (bool, error) {
@@ -229,7 +229,7 @@ func CheckReadyForTests(c clientset.Interface, whitelistedTaints *regexp.Regexp,
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			if !readyForTests(node, whitelistedTaints) {
+			if !readyForTests(node, nonblockingTaints) {
 				notSchedulable = append(notSchedulable, node)
 			}
 		}
@@ -245,16 +245,12 @@ func CheckReadyForTests(c clientset.Interface, whitelistedTaints *regexp.Regexp,
 			if len(nodes.Items) < largeClusterThreshold || attempt%10 == 0 {
 				e2elog.Logf("Unschedulable nodes:")
 				for i := range notSchedulable {
-					whitelist := "<nil>"
-					if whitelistedTaints != nil {
-						whitelist = whitelistedTaints.String()
-					}
-					e2elog.Logf("-> %s Ready=%t Network=%t Taints=%v WhitelistedTaints:%v",
+					e2elog.Logf("-> %s Ready=%t Network=%t Taints=%v NonblockingTaints:%v",
 						notSchedulable[i].Name,
 						IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
 						IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false),
 						notSchedulable[i].Spec.Taints,
-						whitelist,
+						nonblockingTaints,
 					)
 
 				}
@@ -267,13 +263,13 @@ func CheckReadyForTests(c clientset.Interface, whitelistedTaints *regexp.Regexp,
 
 // readyForTests determines whether or not we should continue waiting for the nodes
 // to enter a testable state. By default this means it is schedulable, NodeReady, and untainted.
-// Nodes with taints matching the whitelistedTaintRegexp are permitted to have that taint and
+// Nodes with taints nonblocking taints are permitted to have that taint and
 // also have their node.Spec.Unschedulable field ignored for the purposes of this function.
-func readyForTests(node *v1.Node, whitelistedTaints *regexp.Regexp) bool {
-	if hasWhitelistedTaint(node, whitelistedTaints) {
-		// If the node has one of the whitelisted taints; just check that it is ready
+func readyForTests(node *v1.Node, nonblockingTaints string) bool {
+	if hasNonblockingTaint(node, nonblockingTaints) {
+		// If the node has one of the nonblockingTaints taints; just check that it is ready
 		// and don't require node.Spec.Unschedulable to be set either way.
-		if !IsNodeReady(node) || !isNodeUntaintedWhitelist(node, whitelistedTaints) {
+		if !IsNodeReady(node) || !isNodeUntaintedWithNonblocking(node, nonblockingTaints) {
 			return false
 		}
 	} else {
