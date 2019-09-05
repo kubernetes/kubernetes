@@ -65,6 +65,13 @@ func logsForObjectWithClient(clientset corev1client.CoreV1Interface, object, opt
 		return ret, nil
 
 	case *corev1.Pod:
+		if opts != nil && len(opts.Container) == 0 {
+			if len(t.Spec.Containers) > 1 {
+				fmt.Printf("Defaulting container name to %s.\n", t.Spec.Containers[0].Name)
+				fmt.Printf("Use 'kubectl describe pod/%s -n %s' to see all of the containers in this pod.\n", t.Name, t.Namespace)
+				opts.Container = t.Spec.Containers[0].Name
+			}
+		}
 		// if allContainers is true, then we're going to locate all containers and then iterate through them. At that point, "allContainers" is false
 		if !allContainers {
 			return []rest.ResponseWrapper{clientset.Pods(t.Namespace).GetLogs(t.Name, opts)}, nil
