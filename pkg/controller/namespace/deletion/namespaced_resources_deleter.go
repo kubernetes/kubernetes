@@ -515,16 +515,18 @@ func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, 
 		}
 	}
 
-	if len(errs) > 0 {
-		if hasChanged := conditionUpdater.Update(ns); hasChanged {
-			if _, err = d.nsClient.UpdateStatus(ns); err != nil {
-				utilruntime.HandleError(fmt.Errorf("couldn't update status condition for namespace %q: %v", namespace, err))
-			}
+	// we always want to update the conditions because if we have set a condition to "it worked" after it was previously, "it didn't work",
+	// we need to reflect that information.  Recall that additional finalizers can be set on namespaces, so this finalizer may clear itself and
+	// NOT remove the resource instance.
+	if hasChanged := conditionUpdater.Update(ns); hasChanged {
+		if _, err = d.nsClient.UpdateStatus(ns); err != nil {
+			utilruntime.HandleError(fmt.Errorf("couldn't update status condition for namespace %q: %v", namespace, err))
 		}
-		return estimate, utilerrors.NewAggregate(errs)
 	}
-	klog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v", namespace, estimate)
-	return estimate, nil
+
+	// if len(errs)==0, NewAggregate returns nil.
+	klog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v, errors: %v", namespace, estimate, utilerrors.NewAggregate(errs))
+	return estimate, utilerrors.NewAggregate(errs)
 }
 
 // estimateGrracefulTermination will estimate the graceful termination required for the specific entity in the namespace
