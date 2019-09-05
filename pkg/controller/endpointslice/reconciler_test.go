@@ -23,7 +23,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -52,7 +51,7 @@ func TestReconcileEmpty(t *testing.T) {
 	assert.Len(t, slices, 1, "Expected 1 endpoint slices")
 
 	assert.Regexp(t, "^"+svc.Name, slices[0].Name)
-	assert.Equal(t, svc.Name, slices[0].Labels[serviceNameLabel])
+	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
 }
@@ -83,7 +82,7 @@ func TestReconcile1Pod(t *testing.T) {
 	slices := fetchEndpointSlices(t, client, namespace)
 	assert.Len(t, slices, 1, "Expected 1 endpoint slices")
 	assert.Regexp(t, "^"+svc.Name, slices[0].Name)
-	assert.Equal(t, svc.Name, slices[0].Labels[serviceNameLabel])
+	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.Equal(t, slices[0].Annotations, map[string]string{
 		"endpoints.kubernetes.io/last-change-trigger-time": triggerTime.Format(time.RFC3339Nano),
 	})
@@ -125,7 +124,7 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	assert.Len(t, slices, 1, "Expected 1 endpoint slices")
 
 	assert.Regexp(t, "^"+svc.Name, slices[0].Name)
-	assert.Equal(t, svc.Name, slices[0].Labels[serviceNameLabel])
+	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
 }
@@ -362,9 +361,9 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 	// ensure that endpoints in each slice will be marked for update.
 	for i, pod := range pods {
 		if i%10 == 0 {
-			pod.Status.Conditions = []v1.PodCondition{{
-				Type:   v1.PodReady,
-				Status: v1.ConditionFalse,
+			pod.Status.Conditions = []corev1.PodCondition{{
+				Type:   corev1.PodReady,
+				Status: corev1.ConditionFalse,
 			}}
 		}
 	}
@@ -397,10 +396,10 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 
 	svc := corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "named-port-example", Namespace: namespace},
-		Spec: v1.ServiceSpec{
-			Ports: []v1.ServicePort{{
+		Spec: corev1.ServiceSpec{
+			Ports: []corev1.ServicePort{{
 				TargetPort: portNameIntStr,
-				Protocol:   v1.ProtocolTCP,
+				Protocol:   corev1.ProtocolTCP,
 			}},
 			Selector: map[string]string{"foo": "bar"},
 		},
@@ -412,10 +411,10 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 		ready := !(i%3 == 0)
 		portOffset := i % 5
 		pod := newPod(i, namespace, ready, 1)
-		pod.Spec.Containers[0].Ports = []v1.ContainerPort{{
+		pod.Spec.Containers[0].Ports = []corev1.ContainerPort{{
 			Name:          portNameIntStr.StrVal,
 			ContainerPort: int32(8080 + portOffset),
-			Protocol:      v1.ProtocolTCP,
+			Protocol:      corev1.ProtocolTCP,
 		}}
 		pods = append(pods, pod)
 	}
@@ -433,7 +432,7 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	expectUnorderedSlicesWithLengths(t, fetchedSlices, []int{60, 60, 60, 60, 60})
 
 	// generate data structures for expected slice ports and address types
-	protoTCP := v1.ProtocolTCP
+	protoTCP := corev1.ProtocolTCP
 	ipAddressType := discovery.AddressTypeIP
 	expectedSlices := []discovery.EndpointSlice{}
 	for i := range fetchedSlices {

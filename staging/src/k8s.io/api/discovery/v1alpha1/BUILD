@@ -8,6 +8,7 @@ go_library(
         "register.go",
         "types.go",
         "types_swagger_doc_generated.go",
+        "well_known_labels.go",
         "zz_generated.deepcopy.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/api/discovery/v1alpha1",

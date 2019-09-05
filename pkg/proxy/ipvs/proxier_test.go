@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
@@ -36,6 +37,7 @@ import (
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
+	"k8s.io/kubernetes/pkg/util/async"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	ipsettest "k8s.io/kubernetes/pkg/util/ipset/testing"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
@@ -134,7 +136,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 	for _, is := range ipsetInfo {
 		ipsetList[is.name] = NewIPSet(ipset, is.name, is.setType, false, is.comment)
 	}
-	return &Proxier{
+	p := &Proxier{
 		exec:                  fexec,
 		serviceMap:            make(proxy.ServiceMap),
 		serviceChanges:        proxy.NewServiceChangeTracker(newServiceInfo, nil, nil),
@@ -164,6 +166,9 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		networkInterfacer:     proxyutiltest.NewFakeNetwork(),
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
 	}
+	p.setInitialized(true)
+	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
+	return p
 }
 
 func makeNSN(namespace, name string) types.NamespacedName {
@@ -3690,9 +3695,9 @@ func TestEndpointSliceE2E(t *testing.T) {
 	ipAddressType := discovery.AddressTypeIP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("%s-1", serviceName),
-			Namespace:       namespaceName,
-			OwnerReferences: []metav1.OwnerReference{{Kind: "Service", Name: serviceName}},
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports: []discovery.EndpointPort{{
 			Name: utilpointer.StringPtr(""),

@@ -32,6 +32,7 @@ import (
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/discovery/validation"
 	"k8s.io/kubernetes/pkg/util/hash"
 )
 
@@ -158,8 +159,8 @@ func newEndpointSlice(service *corev1.Service, endpointMeta *endpointMeta) *disc
 	ownerRef := metav1.NewControllerRef(service, gvk)
 	return &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Labels:          map[string]string{serviceNameLabel: service.Name},
-			GenerateName:    fmt.Sprintf("%s.", service.Name),
+			Labels:          map[string]string{discovery.LabelServiceName: service.Name},
+			GenerateName:    getEndpointSlicePrefix(service.Name),
 			OwnerReferences: []metav1.OwnerReference{*ownerRef},
 			Namespace:       service.Namespace,
 		},
@@ -167,6 +168,16 @@ func newEndpointSlice(service *corev1.Service, endpointMeta *endpointMeta) *disc
 		AddressType: endpointMeta.AddressType,
 		Endpoints:   []discovery.Endpoint{},
 	}
+}
+
+// getEndpointSlicePrefix returns a suitable prefix for an EndpointSlice name.
+func getEndpointSlicePrefix(serviceName string) string {
+	// use the dash (if the name isn't too long) to make the pod name a bit prettier
+	prefix := fmt.Sprintf("%s-", serviceName)
+	if len(validation.ValidateEndpointSliceName(prefix, true)) != 0 {
+		prefix = serviceName
+	}
+	return prefix
 }
 
 // boolPtrChanged returns true if a set of bool pointers have different values.
