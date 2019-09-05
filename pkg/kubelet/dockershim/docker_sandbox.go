@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/libdocker"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
@@ -330,14 +331,17 @@ func (ds *dockerService) getIPsFromPlugin(sandbox *dockertypes.ContainerJSON) ([
 	if err != nil {
 		return nil, err
 	}
-	msg := fmt.Sprintf("Couldn't find network status for %s/%s through plugin", metadata.Namespace, metadata.Name)
 	cID := kubecontainer.BuildContainerID(runtimeName, sandbox.ID)
 	networkStatus, err := ds.network.GetPodNetworkStatus(metadata.Namespace, metadata.Name, cID)
 	if err != nil {
 		return nil, err
 	}
 	if networkStatus == nil {
-		return nil, fmt.Errorf("%v: invalid network status for", msg)
+		if ds.network.PluginName() == network.DefaultPluginName {
+			// When docker uses the `DefaultPlugin` for networking, `networkStatus` expected to be nil, not consider this an error
+			return nil, nil
+		}
+		return nil, fmt.Errorf("Couldn't find network status for %s/%s through plugin %s ", metadata.Namespace, metadata.Name, ds.network.PluginName())
 	}
 
 	ips := make([]string, 0)
@@ -371,16 +375,24 @@ func (ds *dockerService) getIPs(podSandboxID string, sandbox *dockertypes.Contai
 	}
 
 	ips, err := ds.getIPsFromPlugin(sandbox)
-	if err == nil {
+	if err == nil && len(ips) > 0 {
 		return ips
 	}
 
+	if err != nil {
+		// TODO: trusting the docker ip is not a great idea. However docker uses
+		// eth0 by default and so does CNI, so if we find a docker IP here, we
+		// conclude that the plugin must have failed setup, or forgotten its ip.
+		// This is not a sensible assumption for plugins across the board, but if
+		// a plugin doesn't want this behavior, it can throw an error.
+		// If error happens, warn but don't return an error, as pod status
+		// should generally not return anything except fatal errors
+		// FIXME: handle network errors by restarting the pod somehow?
+		klog.Errorf("failed to read pod IP from plugin/docker: %v", err)
+	}
+
+	//When docker uses the `DefaultPlugin` for networking, the pod will use the docker ip
 	ips = make([]string, 0)
-	// TODO: trusting the docker ip is not a great idea. However docker uses
-	// eth0 by default and so does CNI, so if we find a docker IP here, we
-	// conclude that the plugin must have failed setup, or forgotten its ip.
-	// This is not a sensible assumption for plugins across the board, but if
-	// a plugin doesn't want this behavior, it can throw an error.
 	if sandbox.NetworkSettings.IPAddress != "" {
 		ips = append(ips, sandbox.NetworkSettings.IPAddress)
 	}
@@ -388,10 +400,6 @@ func (ds *dockerService) getIPs(podSandboxID string, sandbox *dockertypes.Contai
 		ips = append(ips, sandbox.NetworkSettings.GlobalIPv6Address)
 	}
 
-	// If all else fails, warn but don't return an error, as pod status
-	// should generally not return anything except fatal errors
-	// FIXME: handle network errors by restarting the pod somehow?
-	klog.Warningf("failed to read pod IP from plugin/docker: %v", err)
 	return ips
 }
 
