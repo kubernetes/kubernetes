@@ -491,7 +491,7 @@ func hasPerVersionColumns(versions []apiextensions.CustomResourceDefinitionVersi
 // hasIdenticalPerVersionSchema returns true if a CRD sets identical non-nil values
 // to all per-version schemas
 func hasIdenticalPerVersionSchema(versions []apiextensions.CustomResourceDefinitionVersion) bool {
-	if len(versions) == 0 {
+	if len(versions) <= 1 {
 		return false
 	}
 	value := versions[0].Schema
@@ -506,7 +506,7 @@ func hasIdenticalPerVersionSchema(versions []apiextensions.CustomResourceDefinit
 // hasIdenticalPerVersionSubresources returns true if a CRD sets identical non-nil values
 // to all per-version subresources
 func hasIdenticalPerVersionSubresources(versions []apiextensions.CustomResourceDefinitionVersion) bool {
-	if len(versions) == 0 {
+	if len(versions) <= 1 {
 		return false
 	}
 	value := versions[0].Subresources
@@ -521,7 +521,7 @@ func hasIdenticalPerVersionSubresources(versions []apiextensions.CustomResourceD
 // hasIdenticalPerVersionColumns returns true if a CRD sets identical non-nil values
 // to all per-version columns
 func hasIdenticalPerVersionColumns(versions []apiextensions.CustomResourceDefinitionVersion) bool {
-	if len(versions) == 0 {
+	if len(versions) <= 1 {
 		return false
 	}
 	value := versions[0].AdditionalPrinterColumns

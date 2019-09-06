@@ -1174,6 +1174,41 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			errors:    []validationMatch{},
 		},
 		{
+			name: "per-version fields may be set to identical values if only one version exists",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+							Schema: &apiextensions.CustomResourceValidation{
+								OpenAPIV3Schema: validValidationSchema,
+							},
+							Subresources:             &apiextensions.CustomResourceSubresources{},
+							AdditionalPrinterColumns: []apiextensions.CustomResourceColumnDefinition{{Name: "Alpha", Type: "string", JSONPath: ".spec.alpha"}},
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					PreserveUnknownFields: pointer.BoolPtr(true),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
+			errors:    []validationMatch{},
+		},
+		{
 			name: "per-version fields may not all be set to identical values (top-level field should be used instead)",
 			resource: &apiextensions.CustomResourceDefinition{
 				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
