@@ -56,14 +56,14 @@ var (
 		v1.NamespaceDeletionGVParsingFailure: "All legacy kube types successfully parsed",
 		v1.NamespaceDeletionContentFailure:   "All content successfully deleted, may be waiting on finalization",
 		v1.NamespaceContentRemaining:         "All content successfully removed",
-		v1.NamespaceFinalizersRemaining:      "All content successfully removed",
+		v1.NamespaceFinalizersRemaining:      "All content-preserving finalizers finished",
 	}
 	okReasons = map[v1.NamespaceConditionType]string{
 		v1.NamespaceDeletionDiscoveryFailure: "ResourcesDiscovered",
 		v1.NamespaceDeletionGVParsingFailure: "ParsedGroupVersions",
 		v1.NamespaceDeletionContentFailure:   "ContentDeleted",
 		v1.NamespaceContentRemaining:         "ContentRemoved",
-		v1.NamespaceFinalizersRemaining:      "ContentRemoved",
+		v1.NamespaceFinalizersRemaining:      "ContentHasNoFinalizers",
 	}
 )
 
@@ -133,8 +133,8 @@ func (u *namespaceConditionUpdater) ProcessContentTotals(contentTotals allGVRDel
 			Type:               v1.NamespaceFinalizersRemaining,
 			Status:             v1.ConditionTrue,
 			LastTransitionTime: metav1.Now(),
-			Reason:             "SomeFinalizerRemain",
-			Message:            fmt.Sprintf("Some finalizers are remaining: %s", strings.Join(remainingByFinalizer, ", ")),
+			Reason:             "SomeFinalizersRemain",
+			Message:            fmt.Sprintf("Some content in the namespace has finalizers remaining: %s", strings.Join(remainingByFinalizer, ", ")),
 		})
 	}
 }

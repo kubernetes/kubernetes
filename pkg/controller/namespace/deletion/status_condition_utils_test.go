@@ -188,7 +188,7 @@ func TestProcessContentTotals(t *testing.T) {
 				},
 			},
 			expecteds: []v1.NamespaceCondition{
-				{Type: v1.NamespaceFinalizersRemaining, Status: v1.ConditionTrue, Reason: "SomeFinalizerRemain", Message: `Some finalizers are remaining: kubedb in 5 resource instances, service-catalog in 6 resource instances`},
+				{Type: v1.NamespaceFinalizersRemaining, Status: v1.ConditionTrue, Reason: "SomeFinalizersRemain", Message: `Some content in the namespace has finalizers remaining: kubedb in 5 resource instances, service-catalog in 6 resource instances`},
 			},
 		},
 		{
@@ -206,7 +206,7 @@ func TestProcessContentTotals(t *testing.T) {
 			},
 			expecteds: []v1.NamespaceCondition{
 				{Type: v1.NamespaceContentRemaining, Status: v1.ConditionTrue, Reason: "SomeResourcesRemain", Message: `Some resources are remaining: daemonsets.apps.k8s.io has 5 resource instances, deployments.apps.k8s.io has 5 resource instances`},
-				{Type: v1.NamespaceFinalizersRemaining, Status: v1.ConditionTrue, Reason: "SomeFinalizerRemain", Message: `Some finalizers are remaining: kubedb in 5 resource instances, service-catalog in 6 resource instances`},
+				{Type: v1.NamespaceFinalizersRemaining, Status: v1.ConditionTrue, Reason: "SomeFinalizersRemain", Message: `Some content in the namespace has finalizers remaining: kubedb in 5 resource instances, service-catalog in 6 resource instances`},
 			},
 		},
 	}

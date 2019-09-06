@@ -422,7 +422,8 @@ func (d *namespacedResourcesDeleter) deleteEachItem(gvr schema.GroupVersionResou
 }
 
 type gvrDeletionMetadata struct {
-	// finalizerEstimateSeconds is an estimate of how much longer to wait
+	// finalizerEstimateSeconds is an estimate of how much longer to wait.  zero means that no estimate has made and does not
+	// mean that all content has been removed.
 	finalizerEstimateSeconds int64
 	// numRemaining is how many instances of the gvr remain
 	numRemaining int

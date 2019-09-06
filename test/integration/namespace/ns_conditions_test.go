@@ -101,7 +101,7 @@ func TestNamespaceCondition(t *testing.T) {
 			if condition.Type == corev1.NamespaceContentRemaining && condition.Message == `Some resources are remaining: deployments.apps has 1 resource instances` {
 				conditionsFound++
 			}
-			if condition.Type == corev1.NamespaceFinalizersRemaining && condition.Message == `Some finalizers are remaining: custom.io/finalizer in 1 resource instances` {
+			if condition.Type == corev1.NamespaceFinalizersRemaining && condition.Message == `Some content in the namespace has finalizers remaining: custom.io/finalizer in 1 resource instances` {
 				conditionsFound++
 			}
 		}
