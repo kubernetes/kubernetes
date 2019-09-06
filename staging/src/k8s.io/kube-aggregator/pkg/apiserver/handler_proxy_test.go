@@ -541,7 +541,7 @@ func TestGetContextForNewRequest(t *testing.T) {
 		location.Path = req.URL.Path
 
 		nestedReq := req.WithContext(genericapirequest.WithRequestInfo(req.Context(), &genericapirequest.RequestInfo{Path: req.URL.Path}))
-		newReq, cancelFn := newRequestForProxy(location, nestedReq, true)
+		newReq, cancelFn := newRequestForProxy(location, nestedReq)
 		defer cancelFn()
 
 		theproxy := proxy.NewUpgradeAwareHandler(location, server.Client().Transport, true, false, &responder{w: w})
