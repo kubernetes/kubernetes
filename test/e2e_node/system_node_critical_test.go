@@ -95,6 +95,13 @@ var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptiv
 				}, time.Minute*8, time.Second*4).ShouldNot(gomega.HaveOccurred())
 			})
 			ginkgo.AfterEach(func() {
+				defer func() {
+					if framework.TestContext.PrepullImages {
+						// The test may cause the prepulled images to be evicted,
+						// prepull those images again to ensure this test not affect following tests.
+						PrePullAllImages()
+					}
+				}()
 				ginkgo.By("delete the static pod")
 				err := deleteStaticPod(podPath, staticPodName, ns)
 				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
@@ -103,6 +110,7 @@ var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptiv
 				gomega.Eventually(func() error {
 					return checkMirrorPodDisappear(f.ClientSet, mirrorPodName, ns)
 				}, time.Minute, time.Second*2).Should(gomega.BeNil())
+
 			})
 		})
 	})
