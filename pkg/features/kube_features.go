@@ -83,14 +83,6 @@ const (
 	// the API server as the certificate approaches expiration.
 	RotateKubeletClientCertificate featuregate.Feature = "RotateKubeletClientCertificate"
 
-	// owner: @msau42
-	// alpha: v1.7
-	// beta: v1.10
-	// ga: v1.14
-	//
-	// A new volume type that supports local disks on a node.
-	PersistentLocalVolumes featuregate.Feature = "PersistentLocalVolumes"
-
 	// owner: @jinxu
 	// beta: v1.10
 	//
@@ -520,7 +512,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TaintBasedEvictions:                 {Default: true, PreRelease: featuregate.Beta},
 	RotateKubeletServerCertificate:      {Default: true, PreRelease: featuregate.Beta},
 	RotateKubeletClientCertificate:      {Default: true, PreRelease: featuregate.Beta},
-	PersistentLocalVolumes:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.17
 	LocalStorageCapacityIsolation:       {Default: true, PreRelease: featuregate.Beta},
 	Sysctls:                             {Default: true, PreRelease: featuregate.Beta},
 	EphemeralContainers:                 {Default: false, PreRelease: featuregate.Alpha},
