@@ -3067,7 +3067,7 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 			sort.Sort(SortableResourceNames(resources))
 			for _, resource := range resources {
 				value := resourceList[resource]
-				w.Write(LEVEL_0, " %s:\t%s\n", resource, value.String())
+				w.Write(LEVEL_0, "  %s:\t%s\n", resource, value.String())
 			}
 		}
 
@@ -3081,16 +3081,16 @@ func describeNode(node *corev1.Node, nodeNonTerminatedPodsList *corev1.PodList, 
 		}
 
 		w.Write(LEVEL_0, "System Info:\n")
-		w.Write(LEVEL_0, " Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
-		w.Write(LEVEL_0, " System UUID:\t%s\n", node.Status.NodeInfo.SystemUUID)
-		w.Write(LEVEL_0, " Boot ID:\t%s\n", node.Status.NodeInfo.BootID)
-		w.Write(LEVEL_0, " Kernel Version:\t%s\n", node.Status.NodeInfo.KernelVersion)
-		w.Write(LEVEL_0, " OS Image:\t%s\n", node.Status.NodeInfo.OSImage)
-		w.Write(LEVEL_0, " Operating System:\t%s\n", node.Status.NodeInfo.OperatingSystem)
-		w.Write(LEVEL_0, " Architecture:\t%s\n", node.Status.NodeInfo.Architecture)
-		w.Write(LEVEL_0, " Container Runtime Version:\t%s\n", node.Status.NodeInfo.ContainerRuntimeVersion)
-		w.Write(LEVEL_0, " Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
-		w.Write(LEVEL_0, " Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
+		w.Write(LEVEL_0, "  Machine ID:\t%s\n", node.Status.NodeInfo.MachineID)
+		w.Write(LEVEL_0, "  System UUID:\t%s\n", node.Status.NodeInfo.SystemUUID)
+		w.Write(LEVEL_0, "  Boot ID:\t%s\n", node.Status.NodeInfo.BootID)
+		w.Write(LEVEL_0, "  Kernel Version:\t%s\n", node.Status.NodeInfo.KernelVersion)
+		w.Write(LEVEL_0, "  OS Image:\t%s\n", node.Status.NodeInfo.OSImage)
+		w.Write(LEVEL_0, "  Operating System:\t%s\n", node.Status.NodeInfo.OperatingSystem)
+		w.Write(LEVEL_0, "  Architecture:\t%s\n", node.Status.NodeInfo.Architecture)
+		w.Write(LEVEL_0, "  Container Runtime Version:\t%s\n", node.Status.NodeInfo.ContainerRuntimeVersion)
+		w.Write(LEVEL_0, "  Kubelet Version:\t%s\n", node.Status.NodeInfo.KubeletVersion)
+		w.Write(LEVEL_0, "  Kube-Proxy Version:\t%s\n", node.Status.NodeInfo.KubeProxyVersion)
 
 		// remove when .PodCIDR is depreciated
 		if len(node.Spec.PodCIDR) > 0 {
