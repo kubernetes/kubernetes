@@ -42,8 +42,10 @@ If you want to build Kubernetes right away there are two options:
 ##### You have a working [Go environment].
 
 ```
-go get -d k8s.io/kubernetes
-cd $GOPATH/src/k8s.io/kubernetes
+mkdir -p $GOPATH/src/k8s.io
+cd $GOPATH/src/k8s.io
+git clone https://github.com/kubernetes/kubernetes
+cd kubernetes
 make
 ```
 
