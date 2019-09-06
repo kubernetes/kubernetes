@@ -160,17 +160,31 @@ func NewOperationExecutor(
 	}
 }
 
+type MarkVolumeMountedOpts struct {
+	PodName             volumetypes.UniquePodName
+	PodUID              types.UID
+	VolumeName          v1.UniqueVolumeName
+	Mounter             volume.Mounter
+	BlockVolumeMapper   volume.BlockVolumeMapper
+	OuterVolumeSpecName string
+	VolumeGidVolume     string
+	VolumeSpec          *volume.Spec
+	VolumeMountState    VolumeMountState
+}
+
 // ActualStateOfWorldMounterUpdater defines a set of operations updating the actual
 // state of the world cache after successful mount/unmount.
 type ActualStateOfWorldMounterUpdater interface {
 	// Marks the specified volume as mounted to the specified pod
-	MarkVolumeAsMounted(podName volumetypes.UniquePodName, podUID types.UID, volumeName v1.UniqueVolumeName, mounter volume.Mounter, blockVolumeMapper volume.BlockVolumeMapper, outerVolumeSpecName string, volumeGidValue string, volumeSpec *volume.Spec) error
+	MarkVolumeAsMounted(markVolumeOpts MarkVolumeMountedOpts) error
 
 	// Marks the specified volume as unmounted from the specified pod
 	MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
 
 	// Marks the specified volume as having been globally mounted.
 	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error
+
+	MarkDeviceAsUncertain(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error
 
 	// Marks the specified volume as having its global mount unmounted.
 	MarkDeviceAsUnmounted(volumeName v1.UniqueVolumeName) error
@@ -353,6 +367,32 @@ type VolumeToMount struct {
 	// (if so implemented)
 	DesiredSizeLimit *resource.Quantity
 }
+
+// DeviceMountState represents device mount state in a global path.
+type DeviceMountState string
+
+const (
+	// DeviceGloballymounted means device has been globally mounted successfully
+	DeviceGloballyMounted DeviceMountState = "DeviceGloballyMounted"
+
+	// Uncertain means device may not be mounted but a mount operation may be
+	// in-progress which can cause device mount to succeed.
+	DeviceMountUncertain DeviceMountState = "DeviceMountUncertain"
+
+	// DeviceNotMounted means device has not been mounted globally.
+	DeviceNotMounted DeviceMountState = "DeviceNotMounted"
+)
+
+// VolumeMountState represents volume mount state in a path local to the pod.
+type VolumeMountState string
+
+const (
+	VolumeMounted VolumeMountState = "VolumeMounted"
+
+	VolumeMountUncertain VolumeMountState = "VolumeMountUncertain"
+
+	VolumeNotMounted VolumeMountState = "VolumeNotMounted"
+)
 
 // GenerateMsgDetailed returns detailed msgs for volumes to mount
 func (volume *VolumeToMount) GenerateMsgDetailed(prefixMsg, suffixMsg string) (detailedMsg string) {

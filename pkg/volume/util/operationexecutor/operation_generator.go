@@ -648,15 +648,17 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		// Update actual state of world
-		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(
-			volumeToMount.PodName,
-			volumeToMount.Pod.UID,
-			volumeToMount.VolumeName,
-			volumeMounter,
-			nil,
-			volumeToMount.OuterVolumeSpecName,
-			volumeToMount.VolumeGidValue,
-			volumeToMount.VolumeSpec)
+		markOpts := MarkVolumeMountedOpts{
+			PodName:             volumeToMount.PodName,
+			PodUID:              volumeToMount.Pod.UID,
+			VolumeName:          volumeToMount.VolumeName,
+			Mounter:             volumeMounter,
+			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
+			VolumeGidVolume:     volumeToMount.VolumeGidValue,
+			VolumeSpec:          volumeToMount.VolumeSpec,
+			VolumeMountState:    VolumeMounted,
+		}
+		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(markOpts)
 		if markVolMountedErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MountVolume.MarkVolumeAsMounted failed", markVolMountedErr)
@@ -982,16 +984,18 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			return volumeToMount.GenerateError("MapVolume.MarkVolumeAsMounted failed while expanding volume", resizeError)
 		}
 
-		// Update actual state of world
-		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(
-			volumeToMount.PodName,
-			volumeToMount.Pod.UID,
-			volumeToMount.VolumeName,
-			nil,
-			blockVolumeMapper,
-			volumeToMount.OuterVolumeSpecName,
-			volumeToMount.VolumeGidValue,
-			volumeToMount.VolumeSpec)
+		markVolumeOpts := MarkVolumeMountedOpts{
+			PodName:             volumeToMount.PodName,
+			PodUID:              volumeToMount.Pod.UID,
+			VolumeName:          volumeToMount.VolumeName,
+			BlockVolumeMapper:   blockVolumeMapper,
+			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
+			VolumeGidVolume:     volumeToMount.VolumeGidValue,
+			VolumeSpec:          volumeToMount.VolumeSpec,
+			VolumeMountState:    VolumeMounted,
+		}
+
+		markVolMountedErr := actualStateOfWorld.MarkVolumeAsMounted(markVolumeOpts)
 		if markVolMountedErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MapVolume.MarkVolumeAsMounted failed", markVolMountedErr)

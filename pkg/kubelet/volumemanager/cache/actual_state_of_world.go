@@ -59,7 +59,7 @@ type ActualStateOfWorld interface {
 	// volume, reset the pod's remountRequired value.
 	// If a volume with the name volumeName does not exist in the list of
 	// attached volumes, an error is returned.
-	AddPodToVolume(podName volumetypes.UniquePodName, podUID types.UID, volumeName v1.UniqueVolumeName, mounter volume.Mounter, blockVolumeMapper volume.BlockVolumeMapper, outerVolumeSpecName string, volumeGidValue string, volumeSpec *volume.Spec) error
+	AddPodToVolume(operationexecutor.MarkVolumeMountedOpts) error
 
 	// MarkRemountRequired marks each volume that is successfully attached and
 	// mounted for the specified pod as requiring remount (if the plugin for the
@@ -68,13 +68,13 @@ type ActualStateOfWorld interface {
 	// pod update.
 	MarkRemountRequired(podName volumetypes.UniquePodName)
 
-	// SetVolumeGloballyMounted sets the GloballyMounted value for the given
-	// volume. When set to true this value indicates that the volume is mounted
-	// to the underlying device at a global mount point. This global mount point
-	// must unmounted prior to detach.
+	// SetDeviceMountState sets device mount state for the given volume. When deviceMountState is set to DeviceGloballyMounted
+	// then device is mounted at a global mount point. When it is set to DeviceMountUncertain then also it means volume
+	// MAY be globally mounted at a global mount point. In both cases - the volume must be unmounted from
+	// global mount point prior to detach.
 	// If a volume with the name volumeName does not exist in the list of
 	// attached volumes, an error is returned.
-	SetVolumeGloballyMounted(volumeName v1.UniqueVolumeName, globallyMounted bool, devicePath, deviceMountPath string) error
+	SetDeviceMountState(volumeName v1.UniqueVolumeName, deviceMountState operationexecutor.DeviceMountState, devicePath, deviceMountPath string) error
 
 	// DeletePodFromVolume removes the given pod from the given volume in the
 	// cache indicating the volume has been successfully unmounted from the pod.
@@ -127,6 +127,10 @@ type ActualStateOfWorld interface {
 	// actual state of the world.
 	GetMountedVolumes() []MountedVolume
 
+	// GetAllMountedVolumes returns list of all mounted volumes including
+	// those that are in VolumeMounted state and VolumeMountUncertain state.
+	GetAllMountedVolumes() []MountedVolume
+
 	// GetMountedVolumesForPod generates and returns a list of volumes that are
 	// successfully attached and mounted for the specified pod based on the
 	// current actual state of the world.
@@ -165,10 +169,13 @@ type MountedVolume struct {
 type AttachedVolume struct {
 	operationexecutor.AttachedVolume
 
-	// GloballyMounted indicates that the volume is mounted to the underlying
-	// device at a global mount point. This global mount point must unmounted
-	// prior to detach.
-	GloballyMounted bool
+	// DeviceMountState indicates if device has been globally mounted or is not.
+	DeviceMountState operationexecutor.DeviceMountState
+}
+
+func (av AttachedVolume) DeviceMayBeMounted() bool {
+	return av.DeviceMountState == operationexecutor.DeviceGloballyMounted ||
+		av.DeviceMountState == operationexecutor.DeviceMountUncertain
 }
 
 // NewActualStateOfWorld returns a new instance of ActualStateOfWorld.
@@ -250,6 +257,10 @@ type attachedVolume struct {
 	// prior to detach.
 	globallyMounted bool
 
+	// deviceMountState stores information that tells us if device is mounted
+	// globally or not
+	deviceMountState operationexecutor.DeviceMountState
+
 	// devicePath contains the path on the node where the volume is attached for
 	// attachable volumes
 	devicePath string
@@ -301,6 +312,12 @@ type mountedPod struct {
 	// fsResizeRequired indicates the underlying volume has been successfully
 	// mounted to this pod but its size has been expanded after that.
 	fsResizeRequired bool
+
+	// volumeMounted stores state of volume mount for the pod. if it is:
+	//   - VolumeMounted: means volume for pod has been successfully mounted
+	//   - VolumeMountUncertain: means volume for pod may not be mounted, but it must be unmounted
+	//   - VolumeNotMounted: means volume for pod has not been mounted
+	volumeMounted operationexecutor.VolumeMountState
 }
 
 func (asw *actualStateOfWorld) MarkVolumeAsAttached(
@@ -318,24 +335,8 @@ func (asw *actualStateOfWorld) MarkVolumeAsDetached(
 	asw.DeleteVolume(volumeName)
 }
 
-func (asw *actualStateOfWorld) MarkVolumeAsMounted(
-	podName volumetypes.UniquePodName,
-	podUID types.UID,
-	volumeName v1.UniqueVolumeName,
-	mounter volume.Mounter,
-	blockVolumeMapper volume.BlockVolumeMapper,
-	outerVolumeSpecName string,
-	volumeGidValue string,
-	volumeSpec *volume.Spec) error {
-	return asw.AddPodToVolume(
-		podName,
-		podUID,
-		volumeName,
-		mounter,
-		blockVolumeMapper,
-		outerVolumeSpecName,
-		volumeGidValue,
-		volumeSpec)
+func (asw *actualStateOfWorld) MarkVolumeAsMounted(markVolumeOpts operationexecutor.MarkVolumeMountedOpts) error {
+	return asw.AddPodToVolume(markVolumeOpts)
 }
 
 func (asw *actualStateOfWorld) AddVolumeToReportAsAttached(volumeName v1.UniqueVolumeName, nodeName types.NodeName) {
@@ -354,12 +355,17 @@ func (asw *actualStateOfWorld) MarkVolumeAsUnmounted(
 
 func (asw *actualStateOfWorld) MarkDeviceAsMounted(
 	volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error {
-	return asw.SetVolumeGloballyMounted(volumeName, true /* globallyMounted */, devicePath, deviceMountPath)
+	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceGloballyMounted, devicePath, deviceMountPath)
+}
+
+func (asw *actualStateOfWorld) MarkDeviceAsUncertain(
+	volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error {
+	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceMountUncertain, devicePath, deviceMountPath)
 }
 
 func (asw *actualStateOfWorld) MarkDeviceAsUnmounted(
 	volumeName v1.UniqueVolumeName) error {
-	return asw.SetVolumeGloballyMounted(volumeName, false /* globallyMounted */, "", "")
+	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceNotMounted, "", "")
 }
 
 // addVolume adds the given volume to the cache indicating the specified
@@ -405,7 +411,7 @@ func (asw *actualStateOfWorld) addVolume(
 			mountedPods:        make(map[volumetypes.UniquePodName]mountedPod),
 			pluginName:         volumePlugin.GetPluginName(),
 			pluginIsAttachable: pluginIsAttachable,
-			globallyMounted:    false,
+			deviceMountState:   operationexecutor.DeviceNotMounted,
 			devicePath:         devicePath,
 		}
 	} else {
@@ -420,15 +426,15 @@ func (asw *actualStateOfWorld) addVolume(
 	return nil
 }
 
-func (asw *actualStateOfWorld) AddPodToVolume(
-	podName volumetypes.UniquePodName,
-	podUID types.UID,
-	volumeName v1.UniqueVolumeName,
-	mounter volume.Mounter,
-	blockVolumeMapper volume.BlockVolumeMapper,
-	outerVolumeSpecName string,
-	volumeGidValue string,
-	volumeSpec *volume.Spec) error {
+func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.MarkVolumeMountedOpts) error {
+	podName := markVolumeOpts.PodName
+	podUID := markVolumeOpts.PodUID
+	volumeName := markVolumeOpts.VolumeName
+	mounter := markVolumeOpts.Mounter
+	blockVolumeMapper := markVolumeOpts.BlockVolumeMapper
+	outerVolumeSpecName := markVolumeOpts.OuterVolumeSpecName
+	volumeGidValue := markVolumeOpts.VolumeGidVolume
+	volumeSpec := markVolumeOpts.VolumeSpec
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -449,13 +455,13 @@ func (asw *actualStateOfWorld) AddPodToVolume(
 			outerVolumeSpecName: outerVolumeSpecName,
 			volumeGidValue:      volumeGidValue,
 			volumeSpec:          volumeSpec,
+			volumeMounted:       markVolumeOpts.VolumeMountState,
 		}
 	}
 
 	// If pod exists, reset remountRequired value
 	podObj.remountRequired = false
 	asw.attachedVolumes[volumeName].mountedPods[podName] = podObj
-
 	return nil
 }
 
@@ -554,8 +560,8 @@ func (asw *actualStateOfWorld) MarkFSResizeRequired(
 	}
 }
 
-func (asw *actualStateOfWorld) SetVolumeGloballyMounted(
-	volumeName v1.UniqueVolumeName, globallyMounted bool, devicePath, deviceMountPath string) error {
+func (asw *actualStateOfWorld) SetDeviceMountState(
+	volumeName v1.UniqueVolumeName, deviceMountState operationexecutor.DeviceMountState, devicePath, deviceMountPath string) error {
 	asw.Lock()
 	defer asw.Unlock()
 
@@ -566,7 +572,7 @@ func (asw *actualStateOfWorld) SetVolumeGloballyMounted(
 			volumeName)
 	}
 
-	volumeObj.globallyMounted = globallyMounted
+	volumeObj.deviceMountState = deviceMountState
 	volumeObj.deviceMountPath = deviceMountPath
 	if devicePath != "" {
 		volumeObj.devicePath = devicePath
@@ -668,9 +674,29 @@ func (asw *actualStateOfWorld) GetMountedVolumes() []MountedVolume {
 	mountedVolume := make([]MountedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
 	for _, volumeObj := range asw.attachedVolumes {
 		for _, podObj := range volumeObj.mountedPods {
-			mountedVolume = append(
-				mountedVolume,
-				getMountedVolume(&podObj, &volumeObj))
+			if podObj.volumeMounted == operationexecutor.VolumeMounted {
+				mountedVolume = append(
+					mountedVolume,
+					getMountedVolume(&podObj, &volumeObj))
+			}
+		}
+	}
+	return mountedVolume
+}
+
+func (asw *actualStateOfWorld) GetAllMountedVolumes() []MountedVolume {
+	asw.RLock()
+	defer asw.RUnlock()
+	mountedVolume := make([]MountedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
+	for _, volumeObj := range asw.attachedVolumes {
+		for _, podObj := range volumeObj.mountedPods {
+			if podObj.volumeMounted == operationexecutor.VolumeMounted ||
+				podObj.volumeMounted == operationexecutor.VolumeMountUncertain {
+				mountedVolume = append(
+					mountedVolume,
+					getMountedVolume(&podObj, &volumeObj))
+			}
+
 		}
 	}
 
@@ -683,10 +709,12 @@ func (asw *actualStateOfWorld) GetMountedVolumesForPod(
 	defer asw.RUnlock()
 	mountedVolume := make([]MountedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
 	for _, volumeObj := range asw.attachedVolumes {
-		if podObj, podExists := volumeObj.mountedPods[podName]; podExists {
-			mountedVolume = append(
-				mountedVolume,
-				getMountedVolume(&podObj, &volumeObj))
+		for mountedPodName, podObj := range volumeObj.mountedPods {
+			if mountedPodName == podName && podObj.volumeMounted == operationexecutor.VolumeMounted {
+				mountedVolume = append(
+					mountedVolume,
+					getMountedVolume(&podObj, &volumeObj))
+			}
 		}
 	}
 
@@ -699,7 +727,7 @@ func (asw *actualStateOfWorld) GetGloballyMountedVolumes() []AttachedVolume {
 	globallyMountedVolumes := make(
 		[]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
 	for _, volumeObj := range asw.attachedVolumes {
-		if volumeObj.globallyMounted {
+		if volumeObj.deviceMountState == operationexecutor.DeviceGloballyMounted {
 			globallyMountedVolumes = append(
 				globallyMountedVolumes,
 				asw.newAttachedVolume(&volumeObj))
@@ -749,7 +777,7 @@ func (asw *actualStateOfWorld) newAttachedVolume(
 			DevicePath:         attachedVolume.devicePath,
 			DeviceMountPath:    attachedVolume.deviceMountPath,
 			PluginName:         attachedVolume.pluginName},
-		GloballyMounted: attachedVolume.globallyMounted,
+		DeviceMountState: attachedVolume.deviceMountState,
 	}
 }
 
