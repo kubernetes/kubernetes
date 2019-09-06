@@ -832,15 +832,30 @@ func (j *TestJig) GetDistinctResponseFromIngress() (sets.String, error) {
 
 // NginxIngressController manages implementation details of Ingress on Nginx.
 type NginxIngressController struct {
-	Ns         string
-	rc         *v1.ReplicationController
-	pod        *v1.Pod
-	Client     clientset.Interface
-	externalIP string
+	Ns     string
+	rc     *v1.ReplicationController
+	pod    *v1.Pod
+	Client clientset.Interface
 }
 
 // Init initializes the NginxIngressController
 func (cont *NginxIngressController) Init() {
+	// Set up a LoadBalancer service in front of nginx ingress controller and pass it via
+	// --publish-service flag (see <IngressManifestPath>/nginx/rc.yaml) to make it work in private
+	// clusters, i.e. clusters where nodes don't have public IPs.
+	e2elog.Logf("Creating load balancer service for nginx ingress controller")
+	serviceJig := framework.NewServiceTestJig(cont.Client, "nginx-ingress-lb")
+	serviceJig.CreateTCPServiceOrFail(cont.Ns, func(svc *v1.Service) {
+		svc.Spec.Type = v1.ServiceTypeLoadBalancer
+		svc.Spec.Selector = map[string]string{"k8s-app": "nginx-ingress-lb"}
+		svc.Spec.Ports = []v1.ServicePort{
+			{Name: "http", Port: 80},
+			{Name: "https", Port: 443},
+			{Name: "stats", Port: 18080}}
+	})
+	svc := serviceJig.WaitForLoadBalancerOrFail(cont.Ns, "nginx-ingress-lb", framework.LoadBalancerCreateTimeoutDefault)
+	serviceJig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+
 	read := func(file string) string {
 		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file), ginkgo.Fail))
 	}
@@ -860,9 +875,7 @@ func (cont *NginxIngressController) Init() {
 		framework.Failf("Failed to find nginx ingress controller pods with selector %v", sel)
 	}
 	cont.pod = &pods.Items[0]
-	cont.externalIP, err = framework.GetHostExternalAddress(cont.Client, cont.pod)
-	framework.ExpectNoError(err)
-	e2elog.Logf("ingress controller running in pod %v on ip %v", cont.pod.Name, cont.externalIP)
+	e2elog.Logf("ingress controller running in pod %v", cont.pod.Name)
 }
 
 func generateBacksideHTTPSIngressSpec(ns string) *networkingv1beta1.Ingress {
