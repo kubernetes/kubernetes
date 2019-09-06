@@ -179,11 +179,8 @@ func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (Stati
 		return nil, err
 	}
 
-	kustomizeDir := ""
-
 	return &fakeStaticPodPathManager{
 		kubernetesDir:     kubernetesDir,
-		kustomizeDir:      kustomizeDir,
 		realManifestDir:   realManifestDir,
 		tempManifestDir:   upgradedManifestDir,
 		backupManifestDir: backupManifestDir,
