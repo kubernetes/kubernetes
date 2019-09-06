@@ -1286,6 +1286,11 @@ EOF
 FEATURE_GATES: $(yaml-quote ${FEATURE_GATES})
 EOF
   fi
+  if [ -n "${RUN_CONTROLLERS:-}" ]; then
+    cat >>$file <<EOF
+RUN_CONTROLLERS: $(yaml-quote ${RUN_CONTROLLERS})
+EOF
+  fi
   if [ -n "${PROVIDER_VARS:-}" ]; then
     local var_name
     local var_value
