@@ -42,12 +42,35 @@ var DefaultBackoff = wait.Backoff{
 	Jitter:   0.1,
 }
 
-// OnError executes the provided function repeatedly, retrying if the server returns a specified
-// error. Callers should preserve previous executions if they wish to retry changes. It performs an
+// OnError allows the caller to retry fn in case the error returned by fn is retriable
+// according to the provided function. backoff defines the maximum retries and the wait
+// interval between two retries.
+func OnError(backoff wait.Backoff, retriable func(error) bool, fn func() error) error {
+	var lastErr error
+	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
+		err := fn()
+		switch {
+		case err == nil:
+			return true, nil
+		case retriable(err):
+			lastErr = err
+			return false, nil
+		default:
+			return false, err
+		}
+	})
+	if err == wait.ErrWaitTimeout {
+		err = lastErr
+	}
+	return err
+}
+
+// RetryOnConflict executes the function function repeatedly, retrying if the server returns a conflicting
+// write. Callers should preserve previous executions if they wish to retry changes. It performs an
 // exponential backoff.
 //
 //     var pod *api.Pod
-//     err := retry.OnError(DefaultBackoff, errors.IsConflict, func() (err error) {
+//     err := RetryOnConflict(DefaultBackoff, func() (err error) {
 //       pod, err = c.Pods("mynamespace").UpdateStatus(podStatus)
 //       return
 //     })
@@ -58,27 +81,6 @@ var DefaultBackoff = wait.Backoff{
 //     ...
 //
 // TODO: Make Backoff an interface?
-func OnError(backoff wait.Backoff, errorFunc func(error) bool, fn func() error) error {
-	var lastConflictErr error
-	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		err := fn()
-		switch {
-		case err == nil:
-			return true, nil
-		case errorFunc(err):
-			lastConflictErr = err
-			return false, nil
-		default:
-			return false, err
-		}
-	})
-	if err == wait.ErrWaitTimeout {
-		err = lastConflictErr
-	}
-	return err
-}
-
-// RetryOnConflict executes the function function repeatedly, retrying if the server returns a conflicting
 func RetryOnConflict(backoff wait.Backoff, fn func() error) error {
 	return OnError(backoff, errors.IsConflict, fn)
 }
