@@ -607,3 +607,114 @@ func verifyNumPorts(t *testing.T, b []byte, n int) {
 		t.Fatalf("expected %v ports but got %v:\n%v", expected, actual, string(b))
 	}
 }
+
+// TestApplyCRDUnhandledSchema tests that when a CRD has a schema that kube-openapi ToProtoModels cannot handle correctly,
+// apply falls back to non-schema behavior
+func TestApplyCRDUnhandledSchema(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	server, err := apiservertesting.StartTestServer(t, apiservertesting.NewDefaultTestServerOptions(), nil, framework.SharedEtcd())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.TearDownFn()
+	config := server.ClientConfig
+
+	apiExtensionClient, err := clientset.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noxuDefinition := fixtures.NewNoxuCustomResourceDefinition(apiextensionsv1beta1.ClusterScoped)
+
+	// This is a schema that kube-openapi ToProtoModels does not handle correctly.
+	// https://github.com/kubernetes/kubernetes/blob/38752f7f99869ed65fb44378360a517649dc2f83/vendor/k8s.io/kube-openapi/pkg/util/proto/document.go#L184
+	var c apiextensionsv1beta1.CustomResourceValidation
+	err = json.Unmarshal([]byte(`{
+		"openAPIV3Schema": {
+			"properties": {
+				"TypeFooBar": {
+					"type": "array"
+				}
+			}
+		}
+	}`), &c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	noxuDefinition.Spec.Validation = &c
+
+	noxuDefinition, err = fixtures.CreateNewCustomResourceDefinition(noxuDefinition, apiExtensionClient, dynamicClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	kind := noxuDefinition.Spec.Names.Kind
+	apiVersion := noxuDefinition.Spec.Group + "/" + noxuDefinition.Spec.Version
+	name := "mytest"
+
+	rest := apiExtensionClient.Discovery().RESTClient()
+	yamlBody := []byte(fmt.Sprintf(`
+apiVersion: %s
+kind: %s
+metadata:
+  name: %s
+spec:
+  replicas: 1`, apiVersion, kind, name))
+	result, err := rest.Patch(types.ApplyPatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Param("fieldManager", "apply_test").
+		Body(yamlBody).
+		DoRaw()
+	if err != nil {
+		t.Fatalf("failed to create custom resource with apply: %v:\n%v", err, string(result))
+	}
+	verifyReplicas(t, result, 1)
+
+	// Patch object to change the number of replicas
+	result, err = rest.Patch(types.MergePatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Body([]byte(`{"spec":{"replicas": 5}}`)).
+		DoRaw()
+	if err != nil {
+		t.Fatalf("failed to update number of replicas with merge patch: %v:\n%v", err, string(result))
+	}
+	verifyReplicas(t, result, 5)
+
+	// Re-apply, we should get conflicts now, since the number of replicas was changed.
+	result, err = rest.Patch(types.ApplyPatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Param("fieldManager", "apply_test").
+		Body(yamlBody).
+		DoRaw()
+	if err == nil {
+		t.Fatalf("Expecting to get conflicts when applying object after updating replicas, got no error: %s", result)
+	}
+	status, ok := err.(*errors.StatusError)
+	if !ok {
+		t.Fatalf("Expecting to get conflicts as API error")
+	}
+	if len(status.Status().Details.Causes) != 1 {
+		t.Fatalf("Expecting to get one conflict when applying object after updating replicas, got: %v", status.Status().Details.Causes)
+	}
+
+	// Re-apply with force, should work fine.
+	result, err = rest.Patch(types.ApplyPatchType).
+		AbsPath("/apis", noxuDefinition.Spec.Group, noxuDefinition.Spec.Version, noxuDefinition.Spec.Names.Plural).
+		Name(name).
+		Param("force", "true").
+		Param("fieldManager", "apply_test").
+		Body(yamlBody).
+		DoRaw()
+	if err != nil {
+		t.Fatalf("failed to apply object with force after updating replicas: %v:\n%v", err, string(result))
+	}
+	verifyReplicas(t, result, 1)
+}
