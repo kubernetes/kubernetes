@@ -168,10 +168,10 @@ var _ = framework.KubeDescribe("Kubelet", func() {
 
 			gomega.Eventually(func() error {
 				rc, err := podClient.GetLogs(podName, &v1.PodLogOptions{}).Stream()
-				defer rc.Close()
 				if err != nil {
 					return err
 				}
+				defer rc.Close()
 				buf := new(bytes.Buffer)
 				buf.ReadFrom(rc)
 				hostsFileContent := buf.String()

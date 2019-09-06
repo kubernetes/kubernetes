@@ -203,6 +203,11 @@ func getComponentConfigs(client clientset.Interface, clusterConfiguration *kubea
 			return err
 		}
 
+		// Some components may not be installed or managed by kubeadm, hence GetFromConfigMap won't return an error or an object
+		if obj == nil {
+			continue
+		}
+
 		if ok := registration.SetToInternalConfig(obj, clusterConfiguration); !ok {
 			return errors.Errorf("couldn't save componentconfig value for kind %q", string(kind))
 		}

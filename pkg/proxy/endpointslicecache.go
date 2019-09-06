@@ -59,6 +59,10 @@ type endpointInfo struct {
 	Topology  map[string]string
 }
 
+// spToEndpointMap stores groups Endpoint objects by ServicePortName and
+// EndpointSlice name.
+type spToEndpointMap map[ServicePortName]map[string]Endpoint
+
 // NewEndpointSliceCache initializes an EndpointSliceCache.
 func NewEndpointSliceCache(hostname string, isIPv6Mode *bool, recorder record.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
@@ -121,10 +125,15 @@ func (cache *EndpointSliceCache) EndpointsMap(serviceNN types.NamespacedName) En
 }
 
 // endpointInfoByServicePort groups endpoint info by service port name and address.
-func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.NamespacedName) map[ServicePortName]map[string]Endpoint {
-	endpointInfoBySP := map[ServicePortName]map[string]Endpoint{}
+func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.NamespacedName) spToEndpointMap {
+	endpointInfoBySP := spToEndpointMap{}
+	sliceInfoByName, ok := cache.sliceByServiceMap[serviceNN]
 
-	for _, sliceInfo := range cache.sliceByServiceMap[serviceNN] {
+	if !ok {
+		return endpointInfoBySP
+	}
+
+	for _, sliceInfo := range sliceInfoByName {
 		for _, port := range sliceInfo.Ports {
 			if port.Name == nil {
 				klog.Warningf("ignoring port with nil name %v", port)

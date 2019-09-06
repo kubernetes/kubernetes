@@ -247,6 +247,7 @@ RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-}"
 
 if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
   RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
+  RUN_CONTROLLERS="${RUN_CONTROLLERS:-*,endpointslice}"
 fi
 
 # Optional: set feature gates
