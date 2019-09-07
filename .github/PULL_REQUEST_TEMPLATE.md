@@ -43,6 +43,16 @@ Enter your extended release note in the block below. If the PR requires addition
 
 ```
 
+**Should this PR be associated with a deprecation notice?**
+<!--
+Indicate whether this PR implements a change that requires users to be informed of a deprecation of behaviour.
+
+If your PR does require a deprecation note, then remove the `None` from the deprecation-note block below and add your notes.
+-->
+```deprecation-note
+None
+```
+
 **Additional documentation e.g., KEPs (Kubernetes Enhancement Proposals), usage docs, etc.**:
 
 <!--
