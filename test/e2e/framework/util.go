@@ -475,9 +475,9 @@ func ProxyMode(f *Framework) (string, error) {
 			HostNetwork: true,
 			Containers: []v1.Container{
 				{
-					Name:    "detector",
-					Image:   AgnHostImage,
-					Command: []string{"pause"},
+					Name:  "detector",
+					Image: AgnHostImage,
+					Args:  []string{"pause"},
 				},
 			},
 		},
