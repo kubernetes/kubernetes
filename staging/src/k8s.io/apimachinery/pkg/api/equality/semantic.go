@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // Semantic can do semantic deep equality checks for api objects.
@@ -45,5 +46,35 @@ var Semantic = conversion.EqualitiesOrDie(
 	},
 	func(a, b fields.Selector) bool {
 		return a.String() == b.String()
+	},
+	func(a, b corev1.ResourceList) bool {
+		if len(a) != len(b) {
+			return false
+		}
+		if len(a) == 0 {
+			return true
+		}
+		for k, v := range a {
+			bVal, ok := b[k]
+			if !ok || bVal.Cmp(v) != 0 {
+				return false
+			}
+		}
+		return true
+	},
+	func(a, b corev1.EmptyDirVolumeSource) bool {
+		if a.Medium != b.Medium {
+			return false
+		}
+		if a.SizeLimit == nil {
+			if b.SizeLimit != nil {
+				return false
+			}
+			return true
+		}
+		if b.SizeLimit == nil {
+			return false
+		}
+		return a.SizeLimit.Cmp(*(b.SizeLimit)) == 0
 	},
 )
