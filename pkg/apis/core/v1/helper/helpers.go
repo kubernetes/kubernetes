@@ -27,7 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/apimachinery/pkg/util/validation"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // IsExtendedResourceName returns true if:
@@ -556,4 +558,32 @@ func ScopedResourceSelectorRequirementsAsSelector(ssr v1.ScopedResourceSelectorR
 	}
 	selector = selector.Add(*r)
 	return selector, nil
+}
+
+// ParseResourceList parses the given configuration map into an API
+// ResourceList or returns an error.
+func ParseResourceList(m map[string]string) (v1.ResourceList, error) {
+	if len(m) == 0 {
+		return nil, nil
+	}
+	rl := make(v1.ResourceList)
+	for k, v := range m {
+		switch v1.ResourceName(k) {
+		// CPU, memory, local storage, and PID resources are supported.
+		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, "pid":
+			if v1.ResourceName(k) != "pid" || utilfeature.DefaultFeatureGate.Enabled(features.SupportNodePidsLimit) {
+				q, err := resource.ParseQuantity(v)
+				if err != nil {
+					return nil, err
+				}
+				if q.Sign() == -1 {
+					return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
+				}
+				rl[v1.ResourceName(k)] = q
+			}
+		default:
+			return nil, fmt.Errorf("%q is not a valid resource name", k)
+		}
+	}
+	return rl, nil
 }

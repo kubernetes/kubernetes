@@ -18,6 +18,8 @@ package app
 
 import (
 	"testing"
+
+	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 func TestValueOfAllocatableResources(t *testing.T) {
@@ -48,8 +50,8 @@ func TestValueOfAllocatableResources(t *testing.T) {
 	}
 
 	for _, test := range testCases {
-		_, err1 := parseResourceList(test.kubeReserved)
-		_, err2 := parseResourceList(test.systemReserved)
+		_, err1 := helper.ParseResourceList(test.kubeReserved)
+		_, err2 := helper.ParseResourceList(test.systemReserved)
 		if test.errorExpected {
 			if err1 == nil && err2 == nil {
 				t.Errorf("%s: error expected", test.name)

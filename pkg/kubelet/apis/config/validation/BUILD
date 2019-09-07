@@ -15,6 +15,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/apis/config/validation",
     deps = [
+        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",
