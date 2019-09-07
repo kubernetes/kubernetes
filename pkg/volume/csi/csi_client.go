@@ -28,11 +28,14 @@ import (
 
 	csipbv1 "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	api "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 type csiClient interface {
@@ -213,6 +216,7 @@ func (c *csiDriverClient) NodePublishVolume(
 	if targetPath == "" {
 		return errors.New("missing target path")
 	}
+
 	if c.nodeV1ClientCreator == nil {
 		return errors.New("failed to call NodePublishVolume. nodeV1ClientCreator is nil")
 
@@ -255,7 +259,10 @@ func (c *csiDriverClient) NodePublishVolume(
 	}
 
 	_, err = nodeClient.NodePublishVolume(ctx, req)
-	return err
+	if err != nil && !isFinalError(err) {
+		return volumetypes.NewOperationTimedOutError(err.Error())
+	}
+	return nil
 }
 
 func (c *csiDriverClient) NodeExpandVolume(ctx context.Context, volumeID, volumePath string, newSize resource.Quantity) (resource.Quantity, error) {
@@ -374,6 +381,9 @@ func (c *csiDriverClient) NodeStageVolume(ctx context.Context,
 	}
 
 	_, err = nodeClient.NodeStageVolume(ctx, req)
+	if err != nil && !isFinalError(err) {
+		return volumetypes.NewOperationTimedOutError(err.Error())
+	}
 	return err
 }
 
@@ -612,4 +622,28 @@ func (c *csiDriverClient) NodeGetVolumeStats(ctx context.Context, volID string, 
 
 	}
 	return metrics, nil
+}
+
+func isFinalError(err error) bool {
+	// Sources:
+	// https://github.com/grpc/grpc/blob/master/doc/statuscodes.md
+	// https://github.com/container-storage-interface/spec/blob/master/spec.md
+	st, ok := status.FromError(err)
+	if !ok {
+		// This is not gRPC error. The operation must have failed before gRPC
+		// method was called, otherwise we would get gRPC error.
+		// We don't know if any previous CreateVolume is in progress, be on the safe side.
+		return false
+	}
+	switch st.Code() {
+	case codes.Canceled, // gRPC: Client Application cancelled the request
+		codes.DeadlineExceeded,  // gRPC: Timeout
+		codes.Unavailable,       // gRPC: Server shutting down, TCP connection broken - previous CreateVolume() may be still in progress.
+		codes.ResourceExhausted, // gRPC: Server temporarily out of resources - previous CreateVolume() may be still in progress.
+		codes.Aborted:           // CSI: Operation pending for volume
+		return false
+	}
+	// All other errors mean that provisioning either did not
+	// even start or failed. It is for sure not in progress.
+	return true
 }

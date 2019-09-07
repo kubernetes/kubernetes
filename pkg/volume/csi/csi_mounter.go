@@ -36,6 +36,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -254,8 +255,11 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 	)
 
 	if err != nil {
-		if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
-			klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
+		// If error is not of type time out then we can remove the mount directory
+		if volumetypes.IsOperationTimeOutError(err) {
+			if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
+				klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
+			}
 		}
 		return errors.New(log("mounter.SetupAt failed: %v", err))
 	}

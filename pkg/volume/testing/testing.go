@@ -51,6 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
@@ -66,6 +67,10 @@ const (
 	TimeoutAttachNode = "timeout-attach-node"
 	// The node is marked as multi-attach which means it is allowed to attach the volume to multiple nodes.
 	MultiAttachNode = "multi-attach-node"
+	// TimeoutOnSetupVolumeName will cause Setup call to timeout but volume will finish mounting.
+	TimeoutOnSetupVolumeName = "timeout-setup-volume"
+	// TimeoutOnMountDeviceVolumeName will cause MountDevice call to timeout but Setup will finish.
+	TimeoutOnMountDeviceVolumeName = "timeout-mount-device-volume"
 )
 
 // fakeVolumeHost is useful for testing volume plugins.
@@ -835,6 +840,9 @@ func (fv *FakeVolume) CanMount() error {
 func (fv *FakeVolume) SetUp(mounterArgs MounterArgs) error {
 	fv.Lock()
 	defer fv.Unlock()
+	if fv.VolName == TimeoutOnSetupVolumeName {
+		return volumetypes.NewOperationTimedOutError("time out on setup")
+	}
 	fv.SetUpCallCount++
 	return fv.SetUpAt(fv.getPath(), mounterArgs)
 }
@@ -1039,6 +1047,9 @@ func (fv *FakeVolume) GetDeviceMountPath(spec *Spec) (string, error) {
 func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath string) error {
 	fv.Lock()
 	defer fv.Unlock()
+	if spec.Name() == TimeoutOnMountDeviceVolumeName {
+		return volumetypes.NewOperationTimedOutError("error mounting device")
+	}
 	fv.MountDeviceCallCount++
 	return nil
 }
@@ -1047,6 +1058,12 @@ func (fv *FakeVolume) GetMountDeviceCallCount() int {
 	fv.RLock()
 	defer fv.RUnlock()
 	return fv.MountDeviceCallCount
+}
+
+func (fv *FakeVolume) GetUnmountDeviceCallCount() int {
+	fv.RLock()
+	defer fv.RUnlock()
+	return fv.UnmountDeviceCallCount
 }
 
 func (fv *FakeVolume) Detach(volumeName string, nodeName types.NodeName) error {
@@ -1302,6 +1319,19 @@ func VerifyMountDeviceCallCount(
 	return fmt.Errorf(
 		"No Attachers have expected MountDeviceCallCount. Expected: <%v>.",
 		expectedMountDeviceCallCount)
+}
+
+func VerifyUnmountDeviceCallCount(expectedCallCount int, fakeVolumePlugin *FakeVolumePlugin) error {
+	for _, attacher := range fakeVolumePlugin.GetAttachers() {
+		actualCallCount := attacher.GetUnmountDeviceCallCount()
+		if actualCallCount >= expectedCallCount {
+			return nil
+		}
+	}
+
+	return fmt.Errorf(
+		"No Attachers have expected MountunDeviceCallCount. Expected: <%v>.",
+		expectedCallCount)
 }
 
 // VerifyZeroMountDeviceCallCount ensures that all Attachers for this plugin

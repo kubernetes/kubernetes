@@ -167,7 +167,9 @@ func (rc *reconciler) reconcile() {
 	rc.unmountVolumes()
 
 	// Next we mount required volumes. This function could also trigger
-	// detach if kubelet is responsible for detaching volumes.
+	// attach if kubelet is responsible for attaching volumes.
+	// If underlying PVC was resized while in-use then this function also handles volume
+	// resizing.
 	rc.mountAttachVolumes()
 
 	// Ensure devices that should be detached/unmounted are detached/unmounted.

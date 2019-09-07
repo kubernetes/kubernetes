@@ -160,6 +160,7 @@ func NewOperationExecutor(
 	}
 }
 
+// MarkVolumeMountedOpts is an struct to pass arguments to MountVolume functions
 type MarkVolumeMountedOpts struct {
 	PodName             volumetypes.UniquePodName
 	PodUID              types.UID
@@ -181,9 +182,13 @@ type ActualStateOfWorldMounterUpdater interface {
 	// Marks the specified volume as unmounted from the specified pod
 	MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
 
+	// MarkVolumeMountAsUncertain marks state of volume mount for the pod uncertain
+	MarkVolumeMountAsUncertain(markVolumeOpts MarkVolumeMountedOpts) error
+
 	// Marks the specified volume as having been globally mounted.
 	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error
 
+	// MarkDeviceAsUncertain marks device state in global mount path as uncertain
 	MarkDeviceAsUncertain(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error
 
 	// Marks the specified volume as having its global mount unmounted.
@@ -372,10 +377,10 @@ type VolumeToMount struct {
 type DeviceMountState string
 
 const (
-	// DeviceGloballymounted means device has been globally mounted successfully
+	// DeviceGloballyMounted means device has been globally mounted successfully
 	DeviceGloballyMounted DeviceMountState = "DeviceGloballyMounted"
 
-	// Uncertain means device may not be mounted but a mount operation may be
+	// DeviceMountUncertain means device may not be mounted but a mount operation may be
 	// in-progress which can cause device mount to succeed.
 	DeviceMountUncertain DeviceMountState = "DeviceMountUncertain"
 
@@ -387,10 +392,13 @@ const (
 type VolumeMountState string
 
 const (
+	// VolumeMounted means volume has been mounted in pod's local path
 	VolumeMounted VolumeMountState = "VolumeMounted"
 
+	// VolumeMountUncertain means volume may or may not be mounted in pods' local path
 	VolumeMountUncertain VolumeMountState = "VolumeMountUncertain"
 
+	// VolumeNotMounted means volume has not been mounted in pod's local path
 	VolumeNotMounted VolumeMountState = "VolumeNotMounted"
 )
 

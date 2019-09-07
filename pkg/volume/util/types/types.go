@@ -51,6 +51,31 @@ func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
 	return o.OperationFunc()
 }
 
+// OperationTimedOutError indicates a particular volume operation has timed out.
+type OperationTimedOutError struct {
+	msg string
+}
+
+func (err *OperationTimedOutError) Error() string {
+	return err.msg
+}
+
+// NewOperationTimedOutError returns a new instance of OperationTimedOutError
+func NewOperationTimedOutError(msg string) *OperationTimedOutError {
+	return &OperationTimedOutError{
+		msg: msg,
+	}
+}
+
+// IsOperationTimeOutError returns true if volume operation could have timed out for client but possibly
+// still running or being processed by the volume plugin.
+func IsOperationTimeOutError(err error) bool {
+	if _, ok := err.(*OperationTimedOutError); ok {
+		return true
+	}
+	return false
+}
+
 const (
 	// VolumeResizerKey is key that will be used to store resizer used
 	// for resizing PVC. The generated key/value pair will be added

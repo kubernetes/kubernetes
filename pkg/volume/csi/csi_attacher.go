@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const (
@@ -265,7 +266,8 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		return err
 	}
 	defer func() {
-		if err != nil {
+		// Only for non-timedout errors remove the mount directory
+		if err != nil && !volumetypes.IsOperationTimeOutError(err) {
 			// clean up metadata
 			klog.Errorf(log("attacher.MountDevice failed: %v", err))
 			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {

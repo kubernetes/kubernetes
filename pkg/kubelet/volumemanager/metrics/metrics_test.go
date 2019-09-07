@@ -86,6 +86,7 @@ func TestMetricCollection(t *testing.T) {
 		BlockVolumeMapper:   mapper,
 		OuterVolumeSpecName: volumeSpec.Name(),
 		VolumeSpec:          volumeSpec,
+		VolumeMountState:    operationexecutor.VolumeMounted,
 	}
 	err = asw.AddPodToVolume(markVolumeOpts)
 	if err != nil {

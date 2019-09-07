@@ -580,6 +580,12 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 				devicePath,
 				deviceMountPath)
 			if err != nil {
+				if volumetypes.IsOperationTimeOutError(err) {
+					markDeviceUncertainError := actualStateOfWorld.MarkDeviceAsUncertain(volumeToMount.VolumeName, devicePath, deviceMountPath)
+					if markDeviceUncertainError != nil {
+						klog.Infof("MountVolume.MarkDeviceAsUncertain failed with %v", markDeviceUncertainError)
+					}
+				}
 				// On failure, return error. Caller will log and retry.
 				return volumeToMount.GenerateError("MountVolume.MountDevice failed", err)
 			}
@@ -621,7 +627,25 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			FsGroup:     fsGroup,
 			DesiredSize: volumeToMount.DesiredSizeLimit,
 		})
+		// Update actual state of world
+		markOpts := MarkVolumeMountedOpts{
+			PodName:             volumeToMount.PodName,
+			PodUID:              volumeToMount.Pod.UID,
+			VolumeName:          volumeToMount.VolumeName,
+			Mounter:             volumeMounter,
+			OuterVolumeSpecName: volumeToMount.OuterVolumeSpecName,
+			VolumeGidVolume:     volumeToMount.VolumeGidValue,
+			VolumeSpec:          originalSpec,
+			VolumeMountState:    VolumeMounted,
+		}
 		if mountErr != nil {
+			if volumetypes.IsOperationTimeOutError(mountErr) {
+				markOpts.VolumeMountState = VolumeMountUncertain
+				t := actualStateOfWorld.MarkVolumeMountAsUncertain(markOpts)
+				if t != nil {
+					klog.Errorf("MountVolume.MarkVolumeMountAsUncertain failed: %v", t)
+				}
+			}
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MountVolume.SetUp failed", mountErr)
 		}
