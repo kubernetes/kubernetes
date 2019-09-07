@@ -9,6 +9,21 @@ https://git.k8s.io/community/contributors/devel/sig-release/release.md#issuepr-k
 6. If the PR is unfinished, see how to mark it: https://git.k8s.io/community/contributors/guide/pull-requests.md#marking-unfinished-pull-requests
 -->
 
+**Which is the sponsoring or primary SIG associated with this PR?**
+<!--
+Label the sponsoring or primary SIG associated with this PR.
+
+For reference on available SIGs, you can find more details at:
+https://github.com/kubernetes/test-infra/blob/master/label_sync/labels.md#labels-that-apply-to-all-repos-for-both-issues-and-prs
+
+Add only ONE sig here, by adding the sig name in the primary-sig block below.
+
+Examples: cloud-provider or api-machinery
+-->
+```primary-sig
+
+```
+
 **What type of PR is this?**
 > Uncomment only one ` /kind <>` line, hit enter to put that in a new line, and remove leading whitespaces from that line:
 >
