@@ -78,9 +78,9 @@ export KUBERNETES_NODE_PLATFORM=windows
 export LOGGING_STACKDRIVER_RESOURCE_TYPES=new
 ```
 
-Now bring up a cluster using one of the following two methods:
+Now bring up a cluster using kube-up script:
 
-#### 2a. Create a regular Kubernetes cluster
+#### 2. Create a regular Kubernetes cluster
 
 ```
 # Invoke kube-up.sh with these environment variables:
@@ -94,30 +94,6 @@ To teardown the cluster run:
 ```
 PROJECT=${CLOUDSDK_CORE_PROJECT} KUBERNETES_SKIP_CONFIRM=y ./cluster/kube-down.sh
 ```
-
-#### 2b. Create a Kubernetes end-to-end (E2E) test cluster
-
-If you have built your own release binaries following step 1, run the following
-command:
-```
-PROJECT=${CLOUDSDK_CORE_PROJECT} go run ./hack/e2e.go  -- --up
-```
-
-Otherwise, you can specify what branch from which to get the release artifacts:
-```
-# Get the latest build from the stable1 branch
-PROJECT=${CLOUDSDK_CORE_PROJECT} go run ./hack/e2e.go  -- --up --extract=ci/k8s-stable1
-# Or Get the latest build from master
-PROJECT=${CLOUDSDK_CORE_PROJECT} go run ./hack/e2e.go  -- --up --extract=ci-cross/latest
-```
-
-This command, by default, tears down any existing E2E cluster and creates a new
-one. To teardown the cluster run the same command with `--down` instead of
-`--up`.
-
-No matter what type of cluster you chose to create, the result should be a
-Kubernetes cluster with one Linux master node, `NUM_NODES` Linux worker nodes
-and `NUM_WINDOWS_NODES` Windows worker nodes.
 
 ## Validating the cluster
 
