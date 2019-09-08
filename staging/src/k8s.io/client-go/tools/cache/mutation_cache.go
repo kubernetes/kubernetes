@@ -61,10 +61,11 @@ type ResourceVersionComparator interface {
 // in the underlying store. This is only safe if your use of the cache can handle mutation entries
 // remaining in the cache for up to ttl when mutations and deletes occur very closely in time.
 func NewIntegerResourceVersionMutationCache(backingCache Store, indexer Indexer, ttl time.Duration, includeAdds bool) MutationCache {
+	lruCache, _ := utilcache.NewLRUExpireCache(100)
 	return &mutationCache{
 		backingCache:  backingCache,
 		indexer:       indexer,
-		mutationCache: utilcache.NewLRUExpireCache(100),
+		mutationCache: lruCache,
 		comparator:    etcdObjectVersioner{},
 		ttl:           ttl,
 		includeAdds:   includeAdds,

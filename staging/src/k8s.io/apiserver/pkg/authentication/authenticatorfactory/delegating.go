@@ -92,7 +92,10 @@ func (c DelegatingAuthenticatorConfig) New() (authenticator.Request, *spec.Secur
 		if err != nil {
 			return nil, nil, err
 		}
-		cachingTokenAuth := cache.New(tokenAuth, false, c.CacheTTL, c.CacheTTL)
+		var cachingTokenAuth authenticator.Token
+		if cachingTokenAuth, err = cache.New(tokenAuth, false, c.CacheTTL, c.CacheTTL); err != nil {
+			return nil, nil, err
+		}
 		authenticators = append(authenticators, bearertoken.New(cachingTokenAuth), websocket.NewProtocolAuthenticator(cachingTokenAuth))
 
 		securityDefinitions["BearerToken"] = &spec.SecurityScheme{

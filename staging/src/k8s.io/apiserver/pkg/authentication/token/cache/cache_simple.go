@@ -27,8 +27,13 @@ type simpleCache struct {
 	lru *lrucache.LRUExpireCache
 }
 
-func newSimpleCache(size int, clock clock.Clock) cache {
-	return &simpleCache{lru: lrucache.NewLRUExpireCacheWithClock(size, clock)}
+func newSimpleCache(size int, clock clock.Clock) (cache, error) {
+	var lruExpireCache *lrucache.LRUExpireCache
+	var err error
+	if lruExpireCache, err = lrucache.NewLRUExpireCacheWithClock(size, clock); err != nil {
+		return nil, err
+	}
+	return &simpleCache{lru: lruExpireCache}, nil
 }
 
 func (c *simpleCache) get(key string) (*cacheRecord, bool) {

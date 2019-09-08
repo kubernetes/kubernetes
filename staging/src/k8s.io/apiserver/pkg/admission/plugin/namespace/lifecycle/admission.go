@@ -183,7 +183,11 @@ func NewLifecycle(immortalNamespaces sets.String) (*Lifecycle, error) {
 }
 
 func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock) (*Lifecycle, error) {
-	forceLiveLookupCache := utilcache.NewLRUExpireCacheWithClock(100, clock)
+	var forceLiveLookupCache *utilcache.LRUExpireCache
+	var err error
+	if forceLiveLookupCache, err = utilcache.NewLRUExpireCacheWithClock(100, clock); err != nil {
+		return nil, err
+	}
 	return &Lifecycle{
 		Handler:              admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 		immortalNamespaces:   immortalNamespaces,

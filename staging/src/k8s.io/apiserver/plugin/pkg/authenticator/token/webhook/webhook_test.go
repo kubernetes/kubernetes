@@ -205,7 +205,7 @@ func newTokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, c
 		return nil, err
 	}
 
-	return cache.New(authn, false, cacheTime, cacheTime), nil
+	return cache.New(authn, false, cacheTime, cacheTime)
 }
 
 func TestTLSConfig(t *testing.T) {

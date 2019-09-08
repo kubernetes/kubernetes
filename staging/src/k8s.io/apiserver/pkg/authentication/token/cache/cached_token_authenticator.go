@@ -52,18 +52,23 @@ type cache interface {
 }
 
 // New returns a token authenticator that caches the results of the specified authenticator. A ttl of 0 bypasses the cache.
-func New(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration) authenticator.Token {
+func New(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration) (authenticator.Token, error) {
 	return newWithClock(authenticator, cacheErrs, successTTL, failureTTL, utilclock.RealClock{})
 }
 
-func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration, clock utilclock.Clock) authenticator.Token {
+func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL, failureTTL time.Duration, clock utilclock.Clock) (authenticator.Token, error) {
+	var simpleCache cache
+	var err error
+	if simpleCache, err = newSimpleCache(128, clock); err != nil {
+		return nil, err
+	}
 	return &cachedTokenAuthenticator{
 		authenticator: authenticator,
 		cacheErrs:     cacheErrs,
 		successTTL:    successTTL,
 		failureTTL:    failureTTL,
-		cache:         newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock) }),
-	}
+		cache:         newStripedCache(32, fnvHashFunc, func() cache { return simpleCache }),
+	}, nil
 }
 
 // AuthenticateToken implements authenticator.Token

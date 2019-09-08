@@ -29,19 +29,39 @@ import (
 )
 
 func TestSimpleCache(t *testing.T) {
-	testCache(newSimpleCache(4096, clock.RealClock{}), t)
+	var simpleCache cache
+	var err error
+	if simpleCache, err = newSimpleCache(4096, clock.RealClock{}); err != nil {
+		t.Errorf("cache creation error: %v", err)
+	}
+	testCache(simpleCache, t)
 }
 
 func BenchmarkSimpleCache(b *testing.B) {
-	benchmarkCache(newSimpleCache(4096, clock.RealClock{}), b)
+	var simpleCache cache
+	var err error
+	if simpleCache, err = newSimpleCache(4096, clock.RealClock{}); err != nil {
+		b.Errorf("cache creation error: %v", err)
+	}
+	benchmarkCache(simpleCache, b)
 }
 
 func TestStripedCache(t *testing.T) {
-	testCache(newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), t)
+	var simpleCache cache
+	var err error
+	if simpleCache, err = newSimpleCache(128, clock.RealClock{}); err != nil {
+		t.Errorf("cache creation error: %v", err)
+	}
+	testCache(newStripedCache(32, fnvHashFunc, func() cache { return simpleCache }), t)
 }
 
 func BenchmarkStripedCache(b *testing.B) {
-	benchmarkCache(newStripedCache(32, fnvHashFunc, func() cache { return newSimpleCache(128, clock.RealClock{}) }), b)
+	var simpleCache cache
+	var err error
+	if simpleCache, err = newSimpleCache(128, clock.RealClock{}); err != nil {
+		b.Errorf("cache creation error: %v", err)
+	}
+	benchmarkCache(newStripedCache(32, fnvHashFunc, func() cache { return simpleCache }), b)
 }
 
 func benchmarkCache(cache cache, b *testing.B) {

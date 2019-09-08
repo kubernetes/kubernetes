@@ -89,7 +89,12 @@ func getTestWebhookTokenAuth(serverURL string) (authenticator.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	return bearertoken.New(cache.New(webhookTokenAuth, false, 2*time.Minute, 2*time.Minute)), nil
+	var token authenticator.Token
+	token, err = cache.New(webhookTokenAuth, false, 2*time.Minute, 2*time.Minute)
+	if err != nil {
+		return nil, err
+	}
+	return bearertoken.New(token), nil
 }
 
 func path(resource, namespace, name string) string {

@@ -92,9 +92,14 @@ func New(kubeConfigFile string, authorizedTTL, unauthorizedTTL time.Duration) (*
 
 // newWithBackoff allows tests to skip the sleep.
 func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewInterface, authorizedTTL, unauthorizedTTL, initialBackoff time.Duration) (*WebhookAuthorizer, error) {
+	var cache_ *cache.LRUExpireCache
+	var err error
+	if cache_, err = cache.NewLRUExpireCache(1024); err != nil {
+		return nil, err
+	}
 	return &WebhookAuthorizer{
 		subjectAccessReview: subjectAccessReview,
-		responseCache:       cache.NewLRUExpireCache(1024),
+		responseCache:       cache_,
 		authorizedTTL:       authorizedTTL,
 		unauthorizedTTL:     unauthorizedTTL,
 		initialBackoff:      initialBackoff,

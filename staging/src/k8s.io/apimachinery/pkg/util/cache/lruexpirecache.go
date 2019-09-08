@@ -44,18 +44,18 @@ type LRUExpireCache struct {
 }
 
 // NewLRUExpireCache creates an expiring cache with the given size
-func NewLRUExpireCache(maxSize int) *LRUExpireCache {
+func NewLRUExpireCache(maxSize int) (*LRUExpireCache, error) {
 	return NewLRUExpireCacheWithClock(maxSize, realClock{})
 }
 
 // NewLRUExpireCacheWithClock creates an expiring cache with the given size, using the specified clock to obtain the current time.
-func NewLRUExpireCacheWithClock(maxSize int, clock Clock) *LRUExpireCache {
+func NewLRUExpireCacheWithClock(maxSize int, clock Clock) (*LRUExpireCache, error) {
 	cache, err := lru.New(maxSize)
 	if err != nil {
 		// if called with an invalid size
-		panic(err)
+		return nil, err
 	}
-	return &LRUExpireCache{clock: clock, cache: cache}
+	return &LRUExpireCache{clock: clock, cache: cache}, nil
 }
 
 type cacheEntry struct {

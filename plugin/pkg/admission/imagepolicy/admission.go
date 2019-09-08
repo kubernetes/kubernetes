@@ -266,10 +266,14 @@ func NewImagePolicyWebhook(configFile io.Reader) (*Plugin, error) {
 	if err != nil {
 		return nil, err
 	}
+	var lruCache *cache.LRUExpireCache
+	if lruCache, err = cache.NewLRUExpireCache(1024); err != nil {
+		return nil, err
+	}
 	return &Plugin{
 		Handler:       admission.NewHandler(admission.Create, admission.Update),
 		webhook:       gw,
-		responseCache: cache.NewLRUExpireCache(1024),
+		responseCache: lruCache,
 		allowTTL:      whConfig.AllowTTL,
 		denyTTL:       whConfig.DenyTTL,
 		defaultAllow:  whConfig.DefaultAllow,

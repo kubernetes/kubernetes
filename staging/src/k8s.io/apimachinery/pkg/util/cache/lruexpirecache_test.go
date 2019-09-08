@@ -39,30 +39,39 @@ func expectNotEntry(t *testing.T, c *LRUExpireCache, key lru.Key) {
 }
 
 func TestSimpleGet(t *testing.T) {
-	c := NewLRUExpireCache(10)
-	c.Add("long-lived", "12345", 10*time.Hour)
-	expectEntry(t, c, "long-lived", "12345")
+	if c, err := NewLRUExpireCache(10); err != nil {
+		t.Errorf("cache creation error: %v", err)
+	} else {
+		c.Add("long-lived", "12345", 10*time.Hour)
+		expectEntry(t, c, "long-lived", "12345")
+	}
 }
 
 func TestExpiredGet(t *testing.T) {
 	fakeClock := clock.NewFakeClock(time.Now())
-	c := NewLRUExpireCacheWithClock(10, fakeClock)
-	c.Add("short-lived", "12345", 1*time.Millisecond)
-	// ensure the entry expired
-	fakeClock.Step(2 * time.Millisecond)
-	expectNotEntry(t, c, "short-lived")
+	if c, err := NewLRUExpireCacheWithClock(10, fakeClock); err != nil {
+		t.Errorf("cache creation error: %v", err)
+	} else {
+		c.Add("short-lived", "12345", 1*time.Millisecond)
+		// ensure the entry expired
+		fakeClock.Step(2 * time.Millisecond)
+		expectNotEntry(t, c, "short-lived")
+	}
 }
 
 func TestLRUOverflow(t *testing.T) {
-	c := NewLRUExpireCache(4)
-	c.Add("elem1", "1", 10*time.Hour)
-	c.Add("elem2", "2", 10*time.Hour)
-	c.Add("elem3", "3", 10*time.Hour)
-	c.Add("elem4", "4", 10*time.Hour)
-	c.Add("elem5", "5", 10*time.Hour)
-	expectNotEntry(t, c, "elem1")
-	expectEntry(t, c, "elem2", "2")
-	expectEntry(t, c, "elem3", "3")
-	expectEntry(t, c, "elem4", "4")
-	expectEntry(t, c, "elem5", "5")
+	if c, err := NewLRUExpireCache(4); err != nil {
+		t.Errorf("cache creation error: %v", err)
+	} else {
+		c.Add("elem1", "1", 10*time.Hour)
+		c.Add("elem2", "2", 10*time.Hour)
+		c.Add("elem3", "3", 10*time.Hour)
+		c.Add("elem4", "4", 10*time.Hour)
+		c.Add("elem5", "5", 10*time.Hour)
+		expectNotEntry(t, c, "elem1")
+		expectEntry(t, c, "elem2", "2")
+		expectEntry(t, c, "elem3", "3")
+		expectEntry(t, c, "elem4", "4")
+		expectEntry(t, c, "elem5", "5")
+	}
 }

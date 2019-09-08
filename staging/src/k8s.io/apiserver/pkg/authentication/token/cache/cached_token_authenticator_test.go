@@ -41,7 +41,11 @@ func TestCachedTokenAuthenticator(t *testing.T) {
 	})
 	fakeClock := utilclock.NewFakeClock(time.Now())
 
-	a := newWithClock(fakeAuth, true, time.Minute, 0, fakeClock)
+	var a authenticator.Token
+	var err error
+	if a, err = newWithClock(fakeAuth, true, time.Minute, 0, fakeClock); err != nil {
+		t.Errorf("token creation err: %v", err)
+	}
 
 	calledWithToken, resultUsers, resultOk, resultErr = []string{}, nil, false, nil
 	a.AuthenticateToken(context.Background(), "bad1")
@@ -113,7 +117,11 @@ func TestCachedTokenAuthenticatorWithAudiences(t *testing.T) {
 	})
 	fakeClock := utilclock.NewFakeClock(time.Now())
 
-	a := newWithClock(fakeAuth, true, time.Minute, 0, fakeClock)
+	var a authenticator.Token
+	var err error
+	if a, err = newWithClock(fakeAuth, true, time.Minute, 0, fakeClock); err != nil {
+		t.Errorf("token creation error: %v", err)
+	}
 
 	resultUsers["audAusertoken1"] = &user.DefaultInfo{Name: "user1"}
 	resultUsers["audBusertoken1"] = &user.DefaultInfo{Name: "user1-different"}
