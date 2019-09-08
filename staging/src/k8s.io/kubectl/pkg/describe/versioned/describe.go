@@ -1549,8 +1549,11 @@ func describePersistentVolumeClaim(pvc *corev1.PersistentVolumeClaim, events *co
 		}
 		if pvc.Spec.DataSource != nil {
 			w.Write(LEVEL_0, "DataSource:\n")
-			w.Write(LEVEL_1, "Name:\t%v\n", pvc.Spec.DataSource.Name)
+			if pvc.Spec.DataSource.APIGroup != nil {
+				w.Write(LEVEL_1, "APIGroup:\t%v\n", *pvc.Spec.DataSource.APIGroup)
+			}
 			w.Write(LEVEL_1, "Kind:\t%v\n", pvc.Spec.DataSource.Kind)
+			w.Write(LEVEL_1, "Name:\t%v\n", pvc.Spec.DataSource.Name)
 		}
 		printPodsMultiline(w, "Mounted By", mountPods)
 
