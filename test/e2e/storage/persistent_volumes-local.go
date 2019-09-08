@@ -39,6 +39,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
@@ -150,15 +151,8 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 	)
 
 	ginkgo.BeforeEach(func() {
-		// Get all the schedulable nodes
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gomega.Expect(len(nodes.Items)).NotTo(gomega.BeZero(), "No available nodes for scheduling")
-
-		// Cap max number of nodes
-		maxLen := len(nodes.Items)
-		if maxLen > maxNodes {
-			maxLen = maxNodes
-		}
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxNodes)
+		framework.ExpectNoError(err)
 
 		scName = fmt.Sprintf("%v-%v", testSCPrefix, f.Namespace.Name)
 		// Choose the first node
@@ -169,7 +163,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 		config = &localTestConfig{
 			ns:           f.Namespace.Name,
 			client:       f.ClientSet,
-			nodes:        nodes.Items[:maxLen],
+			nodes:        nodes.Items,
 			node0:        node0,
 			scName:       scName,
 			discoveryDir: filepath.Join(hostBase, f.Namespace.Name),

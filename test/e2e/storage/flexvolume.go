@@ -18,7 +18,6 @@ package storage
 
 import (
 	"fmt"
-	"math/rand"
 	"net"
 	"path"
 
@@ -161,7 +160,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 
 	var cs clientset.Interface
 	var ns *v1.Namespace
-	var node v1.Node
+	var node *v1.Node
 	var config volume.TestConfig
 	var suffix string
 
@@ -173,8 +172,9 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 
 		cs = f.ClientSet
 		ns = f.Namespace
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		node = nodes.Items[rand.Intn(len(nodes.Items))]
+		var err error
+		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
 		config = volume.TestConfig{
 			Namespace:      ns.Name,
 			Prefix:         "flex",
@@ -188,7 +188,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		driverInstallAs := driver + "-" + suffix
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
 
 		testFlexVolume(driverInstallAs, cs, config, f)
 
@@ -198,7 +198,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		}
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
-		uninstallFlex(cs, &node, "k8s", driverInstallAs)
+		uninstallFlex(cs, node, "k8s", driverInstallAs)
 	})
 
 	ginkgo.It("should be mountable when attachable", func() {
@@ -206,7 +206,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		driverInstallAs := driver + "-" + suffix
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
 		installFlex(cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
 
@@ -221,7 +221,7 @@ var _ = utils.SIGDescribe("Flexvolumes", func() {
 		time.Sleep(detachTimeout)
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
-		uninstallFlex(cs, &node, "k8s", driverInstallAs)
+		uninstallFlex(cs, node, "k8s", driverInstallAs)
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from master", driverInstallAs))
 		uninstallFlex(cs, nil, "k8s", driverInstallAs)
 	})
