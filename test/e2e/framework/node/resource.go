@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -345,6 +346,27 @@ func GetReadySchedulableNodes(c clientset.Interface) (nodes *v1.NodeList, err er
 	})
 	if len(nodes.Items) == 0 {
 		return nil, fmt.Errorf("there are currently no ready, schedulable nodes in the cluster")
+	}
+	return nodes, nil
+}
+
+// GetBoundedReadySchedulableNodes is like GetReadySchedulableNodes except that it returns
+// at most maxNodes nodes. Use this to keep your test case from blowing up when run on a
+// large cluster.
+func GetBoundedReadySchedulableNodes(c clientset.Interface, maxNodes int) (nodes *v1.NodeList, err error) {
+	nodes, err = GetReadySchedulableNodes(c)
+	if err != nil {
+		return nil, err
+	}
+	if len(nodes.Items) > maxNodes {
+		shuffled := make([]v1.Node, maxNodes)
+		perm := rand.Perm(len(nodes.Items))
+		for i, j := range perm {
+			if j < len(shuffled) {
+				shuffled[j] = nodes.Items[i]
+			}
+		}
+		nodes.Items = shuffled
 	}
 	return nodes, nil
 }

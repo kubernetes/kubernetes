@@ -295,7 +295,8 @@ var _ = SIGDescribe("Services", func() {
 		framework.Logf("sourceip-test cluster ip: %s", serviceIP)
 
 		ginkgo.By("Picking 2 Nodes to test whether source IP is preserved or not")
-		nodes := jig.GetNodes(2)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
+		framework.ExpectNoError(err)
 		nodeCounts := len(nodes.Items)
 		if nodeCounts < 2 {
 			framework.Skipf("The test requires at least two ready nodes on %s, but found %v", framework.TestContext.Provider, nodeCounts)
@@ -305,7 +306,7 @@ var _ = SIGDescribe("Services", func() {
 		serverPodName := "echo-sourceip"
 		pod := f.NewAgnhostPod(serverPodName, "netexec", "--http-port", strconv.Itoa(servicePort))
 		pod.Labels = jig.Labels
-		_, err := cs.CoreV1().Pods(ns).Create(pod)
+		_, err = cs.CoreV1().Pods(ns).Create(pod)
 		framework.ExpectNoError(err)
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
 		defer func() {
@@ -1986,7 +1987,8 @@ var _ = SIGDescribe("Services", func() {
 		namespace := f.Namespace.Name
 		serviceName := "no-pods"
 		jig := e2eservice.NewTestJig(cs, serviceName)
-		nodes := jig.GetNodes(e2eservice.MaxNodesForEndpointsTests)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		framework.ExpectNoError(err)
 		labels := map[string]string{
 			"nopods": "nopods",
 		}
@@ -1997,7 +1999,7 @@ var _ = SIGDescribe("Services", func() {
 		}}
 
 		ginkgo.By("creating a service with no endpoints")
-		_, err := jig.CreateServiceWithServicePort(labels, namespace, ports)
+		_, err = jig.CreateServiceWithServicePort(labels, namespace, ports)
 		if err != nil {
 			framework.Failf("ginkgo.Failed to create service: %v", err)
 		}
@@ -2169,7 +2171,8 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-nodes"
 		jig := e2eservice.NewTestJig(cs, serviceName)
-		nodes := jig.GetNodes(e2eservice.MaxNodesForEndpointsTests)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		framework.ExpectNoError(err)
 
 		svc := jig.CreateOnlyLocalLoadBalancerService(namespace, serviceName, loadBalancerCreateTimeout, false,
 			func(svc *v1.Service) {
@@ -2292,7 +2295,8 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		serviceName := "external-local-update"
 		jig := e2eservice.NewTestJig(cs, serviceName)
 
-		nodes := jig.GetNodes(e2eservice.MaxNodesForEndpointsTests)
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Failf("Need at least 2 nodes to verify source ip from a node without endpoint")
 		}

@@ -47,6 +47,7 @@ import (
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epsp "k8s.io/kubernetes/test/e2e/framework/psp"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -567,23 +568,21 @@ func (f *Framework) CreateServiceForSimpleApp(contPort, svcPort int, appName str
 
 // CreatePodsPerNodeForSimpleApp creates pods w/ labels.  Useful for tests which make a bunch of pods w/o any networking.
 func (f *Framework) CreatePodsPerNodeForSimpleApp(appName string, podSpec func(n v1.Node) v1.PodSpec, maxCount int) map[string]string {
-	nodes := GetReadySchedulableNodesOrDie(f.ClientSet)
+	nodes, err := e2enode.GetBoundedReadySchedulableNodes(f.ClientSet, maxCount)
+	ExpectNoError(err)
 	podLabels := map[string]string{
 		"app": appName + "-pod",
 	}
 	for i, node := range nodes.Items {
-		// one per node, but no more than maxCount.
-		if i <= maxCount {
-			Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
-			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&v1.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   fmt.Sprintf(appName+"-pod-%v", i),
-					Labels: podLabels,
-				},
-				Spec: podSpec(node),
-			})
-			ExpectNoError(err)
-		}
+		Logf("%v/%v : Creating container with label app=%v-pod", i, maxCount, appName)
+		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   fmt.Sprintf(appName+"-pod-%v", i),
+				Labels: podLabels,
+			},
+			Spec: podSpec(node),
+		})
+		ExpectNoError(err)
 	}
 	return podLabels
 }

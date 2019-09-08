@@ -32,7 +32,6 @@ import (
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -73,11 +72,12 @@ var _ = SIGDescribe("Firewall rule", func() {
 		framework.Logf("Got cluster ID: %v", clusterID)
 
 		jig := e2eservice.NewTestJig(cs, serviceName)
-		nodeList := jig.GetNodes(e2eservice.MaxNodesForEndpointsTests)
-		gomega.Expect(nodeList).NotTo(gomega.BeNil())
-		nodesNames := jig.GetNodesNames(e2eservice.MaxNodesForEndpointsTests)
-		if len(nodesNames) <= 0 {
-			framework.Failf("Expect at least 1 node, got: %v", nodesNames)
+		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		framework.ExpectNoError(err)
+
+		nodesNames := []string{}
+		for _, node := range nodeList.Items {
+			nodesNames = append(nodesNames, node.Name)
 		}
 		nodesSet := sets.NewString(nodesNames...)
 
