@@ -160,9 +160,12 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 	// sort the possible kubeconfig files so we always "lock" in the same order
 	// to avoid deadlock (note: this can fail w/ symlinks, but... come on).
 	sort.Strings(possibleSources)
+
+	var lockErrors map[string]error = make(map[string]error)
+
 	for _, filename := range possibleSources {
 		if err := lockFile(filename); err != nil {
-			return err
+			lockErrors[filename] = err
 		}
 		defer unlockFile(filename)
 	}
@@ -180,13 +183,13 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 	}
 
 	if startingConfig.CurrentContext != newConfig.CurrentContext {
-		if err := writeCurrentContext(configAccess, newConfig.CurrentContext); err != nil {
+		if err := writeCurrentContext(configAccess, newConfig.CurrentContext, lockErrors); err != nil {
 			return err
 		}
 	}
 
 	if !reflect.DeepEqual(startingConfig.Preferences, newConfig.Preferences) {
-		if err := writePreferences(configAccess, newConfig.Preferences); err != nil {
+		if err := writePreferences(configAccess, newConfig.Preferences, lockErrors); err != nil {
 			return err
 		}
 	}
@@ -212,6 +215,10 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				if err := RelativizeClusterLocalPaths(configToWrite.Clusters[key]); err != nil {
 					return err
 				}
+			}
+
+			if lockErrors[destinationFile] != nil {
+				return lockErrors[destinationFile]
 			}
 
 			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
@@ -369,7 +376,7 @@ func (p *persister) Persist(config map[string]string) error {
 // If newCurrentContext is the same as the startingConfig's current context, then we exit.
 // If newCurrentContext has a value, then that value is written into the default destination file.
 // If newCurrentContext is empty, then we find the config file that is setting the CurrentContext and clear the value from that file
-func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) error {
+func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string, lockErrors map[string]error) error {
 	if startingConfig, err := configAccess.GetStartingConfig(); err != nil {
 		return err
 	} else if startingConfig.CurrentContext == newCurrentContext {
@@ -383,6 +390,11 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 			return err
 		}
 		currConfig.CurrentContext = newCurrentContext
+
+		if lockErrors[file] != nil {
+			return lockErrors[file]
+		}
+
 		if err := WriteToFile(*currConfig, file); err != nil {
 			return err
 		}
@@ -397,6 +409,11 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 			return err
 		}
 		config.CurrentContext = newCurrentContext
+
+		if lockErrors[destinationFile] != nil {
+			return lockErrors[destinationFile]
+		}
+
 
 		if err := WriteToFile(*config, destinationFile); err != nil {
 			return err
@@ -415,6 +432,11 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 
 			if len(currConfig.CurrentContext) > 0 {
 				currConfig.CurrentContext = newCurrentContext
+
+				if lockErrors[file] != nil {
+					return lockErrors[file]
+				}
+
 				if err := WriteToFile(*currConfig, file); err != nil {
 					return err
 				}
@@ -427,7 +449,7 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string) er
 	return errors.New("no config found to write context")
 }
 
-func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferences) error {
+func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferences, lockErrors map[string]error) error {
 	if startingConfig, err := configAccess.GetStartingConfig(); err != nil {
 		return err
 	} else if reflect.DeepEqual(startingConfig.Preferences, newPrefs) {
@@ -456,6 +478,11 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 
 		if !reflect.DeepEqual(currConfig.Preferences, newPrefs) {
 			currConfig.Preferences = newPrefs
+
+			if lockErrors[file] != nil {
+				return lockErrors[file]
+			}
+
 			if err := WriteToFile(*currConfig, file); err != nil {
 				return err
 			}
