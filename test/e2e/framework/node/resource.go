@@ -371,6 +371,16 @@ func GetBoundedReadySchedulableNodes(c clientset.Interface, maxNodes int) (nodes
 	return nodes, nil
 }
 
+// GetRandomReadySchedulableNode gets a single randomly-selected node which is available for
+// running pods on. If there are no available nodes it will return an error.
+func GetRandomReadySchedulableNode(c clientset.Interface) (*v1.Node, error) {
+	nodes, err := GetReadySchedulableNodes(c)
+	if err != nil {
+		return nil, err
+	}
+	return &nodes.Items[rand.Intn(len(nodes.Items))], nil
+}
+
 // GetReadyNodesIncludingTainted returns all ready nodes, even those which are tainted.
 // There are cases when we care about tainted nodes
 // E.g. in tests related to nodes with gpu we care about nodes despite
