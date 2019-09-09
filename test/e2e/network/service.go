@@ -308,7 +308,7 @@ var _ = SIGDescribe("Services", func() {
 		pod.Labels = jig.Labels
 		_, err = cs.CoreV1().Pods(ns).Create(pod)
 		framework.ExpectNoError(err)
-		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
+		framework.ExpectNoError(f.WaitForPodReady(pod.Name))
 		defer func() {
 			framework.Logf("Cleaning up the echo server pod")
 			err := cs.CoreV1().Pods(ns).Delete(serverPodName, nil)
@@ -366,6 +366,7 @@ var _ = SIGDescribe("Services", func() {
 		podTemplate.Labels = jig.Labels
 		pod, err := cs.CoreV1().Pods(ns).Create(podTemplate)
 		framework.ExpectNoError(err)
+		framework.ExpectNoError(f.WaitForPodReady(pod.Name))
 
 		ginkgo.By("waiting for the service to expose an endpoint")
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{serverPodName: {servicePort}})
