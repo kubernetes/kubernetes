@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/cobra"
 
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
@@ -252,6 +253,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 
 	// Wait for all caches to sync before scheduling.
 	cc.InformerFactory.WaitForCacheSync(ctx.Done())
+	cache.WaitForCacheSync(ctx.Done(), cc.PodInformer.Informer().HasSynced)
 
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
 	if cc.LeaderElection != nil {
