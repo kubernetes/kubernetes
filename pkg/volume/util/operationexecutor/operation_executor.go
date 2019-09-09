@@ -710,9 +710,8 @@ func (oe *operationExecutor) VerifyVolumesAreAttached(
 			// If node doesn't support Bulk volume polling it is best to poll individually
 			nodeError := oe.VerifyVolumesAreAttachedPerNode(nodeAttachedVolumes, node, actualStateOfWorld)
 			if nodeError != nil {
-				klog.Errorf("BulkVerifyVolumes.VerifyVolumesAreAttached verifying volumes on node %q with %v", node, nodeError)
+				klog.Errorf("VerifyVolumesAreAttached failed for volumes %v, node %q with error %v", nodeAttachedVolumes, node, nodeError)
 			}
-			break
 		}
 	}
 
