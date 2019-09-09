@@ -84,6 +84,16 @@ func Convert_Slice_string_To_int(in *[]string, out *int, s conversion.Scope) err
 	return nil
 }
 
+// String_To_bool converts string to boolean.
+func String_To_bool(input string) bool {
+	switch strings.ToLower(input) {
+	case "false", "0":
+		return false
+	default:
+		return true
+	}
+}
+
 // Convert_Slice_string_To_bool will convert a string parameter to boolean.
 // Only the absence of a value (i.e. zero-length slice), a value of "false", or a
 // value of "0" resolve to false.

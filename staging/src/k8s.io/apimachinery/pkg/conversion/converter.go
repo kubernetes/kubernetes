@@ -19,6 +19,9 @@ package conversion
 import (
 	"fmt"
 	"reflect"
+	"runtime/debug"
+
+	"k8s.io/klog"
 )
 
 type typePair struct {
@@ -581,6 +584,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 // for the current stack frame (but conversion functions may be called for nested objects)
 func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
 	dt, st := dv.Type(), sv.Type()
+	klog.Errorf("AAA: %#v %#v\n%s", dt.String(), st.String(), string(debug.Stack()))
 
 	if !dv.CanSet() {
 		return scope.errorf("Cannot set dest. (Tried to deep copy something with unexported fields?)")
