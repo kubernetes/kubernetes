@@ -2091,7 +2091,6 @@ function start-kube-apiserver {
 #
 # Assumes vars (supplied via kube-env):
 # ENCRYPTION_PROVIDER_CONFIG
-# CLOUD_KMS_INTEGRATION
 # ENCRYPTION_PROVIDER_CONFIG_PATH (will default to /etc/srv/kubernetes/encryption-provider-config.yml)
 function setup-etcd-encryption {
   local kube_apiserver_template_path
@@ -2124,8 +2123,8 @@ function setup-etcd-encryption {
   echo "${ENCRYPTION_PROVIDER_CONFIG}" | base64 --decode > "${encryption_provider_config_path}"
   kube_api_server_params+=" --encryption-provider-config=${encryption_provider_config_path}"
 
-  default_encryption_provider_config_vol=$(echo "{ \"name\": \"encryptionconfig\", \"hostPath\": {\"path\": \"${encryption_provider_config_path}\", \"type\": \"File\"}}" | base64 | tr -d '\r\n')
-  default_encryption_provider_config_vol_mnt=$(echo "{ \"name\": \"encryptionconfig\", \"mountPath\": \"${encryption_provider_config_path}\", \"readOnly\": true}" | base64 | tr -d '\r\n')
+  default_encryption_provider_config_vol=$(echo "{ \"name\": \"encryptionconfig\", \"hostPath\": {\"path\": \"${encryption_provider_config_path}\", \"type\": \"File\"}}" | base64)
+  default_encryption_provider_config_vol_mnt=$(echo "{ \"name\": \"encryptionconfig\", \"mountPath\": \"${encryption_provider_config_path}\", \"readOnly\": true}" | base64)
 
   encryption_provider_config_vol_mnt=$(echo "${ENCRYPTION_PROVIDER_CONFIG_VOL_MNT:-"${default_encryption_provider_config_vol_mnt}"}" | base64 --decode)
   encryption_provider_config_vol=$(echo "${ENCRYPTION_PROVIDER_CONFIG_VOL:-"${default_encryption_provider_config_vol}"}" | base64 --decode)
@@ -2134,23 +2133,18 @@ function setup-etcd-encryption {
     s@{{encryption_provider_volume}}@${encryption_provider_config_vol},@
   } " "${kube_apiserver_template_path}"
 
-  if [[ -n "${CLOUD_KMS_INTEGRATION:-}" ]]; then
-    default_kms_socket_dir="/var/run/kmsplugin"
-    default_kms_socket_vol_mnt=$(echo "{ \"name\": \"kmssocket\", \"mountPath\": \"${default_kms_socket_dir}\", \"readOnly\": false}" | base64 | tr -d '\r\n')
-    default_kms_socket_vol=$(echo "{ \"name\": \"kmssocket\", \"hostPath\": {\"path\": \"${default_kms_socket_dir}\", \"type\": \"DirectoryOrCreate\"}}" | base64 | tr -d '\r\n')
 
-    kms_socket_vol_mnt=$(echo "${KMS_PLUGIN_SOCKET_VOL_MNT:-"${default_kms_socket_vol_mnt}"}" | base64 --decode)
-    kms_socket_vol=$(echo "${KMS_PLUGIN_SOCKET_VOL:-"${default_kms_socket_vol}"}" | base64 --decode)
-    sed -i -e " {
-      s@{{kms_socket_mount}}@${kms_socket_vol_mnt},@
-      s@{{kms_socket_volume}}@${kms_socket_vol},@
-    } " "${kube_apiserver_template_path}"
-  else
-    sed -i -e " {
-      s@{{kms_socket_mount}}@@
-      s@{{kms_socket_volume}}@@
-    } " "${kube_apiserver_template_path}"
-  fi
+  default_kms_socket_dir="/var/run/kmsplugin"
+  default_kms_socket_vol_mnt=$(echo "{ \"name\": \"kmssocket\", \"mountPath\": \"${default_kms_socket_dir}\", \"readOnly\": false}" | base64)
+  default_kms_socket_vol=$(echo "{ \"name\": \"kmssocket\", \"hostPath\": {\"path\": \"${default_kms_socket_dir}\", \"type\": \"DirectoryOrCreate\"}}" | base64)
+
+  kms_socket_vol_mnt=$(echo "${KMS_PLUGIN_SOCKET_VOL_MNT:-"${default_kms_socket_vol_mnt}"}" | base64 --decode)
+  kms_socket_vol=$(echo "${KMS_PLUGIN_SOCKET_VOL:-"${default_kms_socket_vol}"}" | base64 --decode)
+  sed -i -e " {
+    s@{{kms_socket_mount}}@${kms_socket_vol_mnt},@
+    s@{{kms_socket_volume}}@${kms_socket_vol},@
+  } " "${kube_apiserver_template_path}"
+
 }
 
 # Updates node labels used by addons.

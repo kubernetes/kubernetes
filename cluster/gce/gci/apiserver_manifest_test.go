@@ -27,7 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -62,9 +62,6 @@ readonly SERVICEACCOUNT_KEY_PATH=/foo/bar/baz.key
 ENCRYPTION_PROVIDER_CONFIG={{.EncryptionProviderConfig}}
 {{end}}
 ENCRYPTION_PROVIDER_CONFIG_PATH={{.EncryptionProviderConfigPath}}
-{{if .CloudKMSIntegration}}
-readonly CLOUD_KMS_INTEGRATION=true
-{{end}}
 `
 	kubeAPIServerManifestFileName = "kube-apiserver.manifest"
 	kubeAPIServerStartFuncName    = "start-kube-apiserver"
@@ -74,7 +71,6 @@ type kubeAPIServerEnv struct {
 	KubeHome                     string
 	EncryptionProviderConfigPath string
 	EncryptionProviderConfig     string
-	CloudKMSIntegration          bool
 }
 
 type kubeAPIServerManifestTestCase struct {
@@ -183,14 +179,14 @@ func TestKMSIntegration(t *testing.T) {
 		socketName  = "kmssocket"
 	)
 	testCases := []struct {
-		desc                string
-		cloudKMSIntegration bool
-		wantVolume          v1.Volume
-		wantVolMount        v1.VolumeMount
+		desc             string
+		encryptionConfig string
+		wantVolume       v1.Volume
+		wantVolMount     v1.VolumeMount
 	}{
 		{
-			desc:                "CLOUD_KMS_INTEGRATION is set",
-			cloudKMSIntegration: true,
+			desc:             "ENCRYPTION_PROVIDER_CONFIG is set",
+			encryptionConfig: base64.StdEncoding.EncodeToString([]byte("foo")),
 			wantVolume: v1.Volume{
 				Name: socketName,
 				VolumeSource: v1.VolumeSource{
@@ -206,8 +202,7 @@ func TestKMSIntegration(t *testing.T) {
 			},
 		},
 		{
-			desc:                "CLOUD_KMS_INTEGRATION is not set",
-			cloudKMSIntegration: false,
+			desc: "ENCRYPTION_PROVDER_CONFIG is not set",
 		},
 	}
 
@@ -219,8 +214,7 @@ func TestKMSIntegration(t *testing.T) {
 			var e = kubeAPIServerEnv{
 				KubeHome:                     c.kubeHome,
 				EncryptionProviderConfigPath: filepath.Join(c.kubeHome, "encryption-provider-config.yaml"),
-				EncryptionProviderConfig:     base64.StdEncoding.EncodeToString([]byte("foo")),
-				CloudKMSIntegration:          tc.cloudKMSIntegration,
+				EncryptionProviderConfig:     tc.encryptionConfig,
 			}
 
 			c.invokeTest(e, deployHelperEnv)
