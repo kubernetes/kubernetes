@@ -582,7 +582,9 @@ func (f *framework) GetWaitingPod(uid types.UID) WaitingPod {
 
 func pluginNameToConfig(args []config.PluginConfig) map[string]*runtime.Unknown {
 	pc := make(map[string]*runtime.Unknown, 0)
-	for _, p := range args {
+	for i := range args {
+		// This is needed because the type of PluginConfig.Args is not pointer type.
+		p := args[i]
 		pc[p.Name] = &p.Args
 	}
 	return pc
