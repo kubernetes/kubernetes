@@ -86,7 +86,7 @@ func (f *CustomColumnsPrintFlags) ToPrinter(templateFormat string) (printers.Res
 	if templateFormat == "custom-columns-file" {
 		file, err := os.Open(templateValue)
 		if err != nil {
-			return nil, fmt.Errorf("error reading template %s, %v\n", templateValue, err)
+			return nil, fmt.Errorf("error reading template %s, %v", templateValue, err)
 		}
 		defer file.Close()
 		p, err := NewCustomColumnsPrinterFromTemplate(file, decoder)
