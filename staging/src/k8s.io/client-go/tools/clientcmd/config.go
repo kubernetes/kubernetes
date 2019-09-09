@@ -166,8 +166,9 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 	for _, filename := range possibleSources {
 		if err := lockFile(filename); err != nil {
 			lockErrors[filename] = err
+		} else {
+		  defer unlockFile(filename)
 		}
-		defer unlockFile(filename)
 	}
 
 	startingConfig, err := configAccess.GetStartingConfig()
@@ -203,6 +204,10 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				destinationFile = configAccess.GetDefaultFilename()
 			}
 
+			if lockErrors[destinationFile] != nil {
+				return lockErrors[destinationFile]
+			}
+
 			configToWrite, err := getConfigFromFile(destinationFile)
 			if err != nil {
 				return err
@@ -215,10 +220,6 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 				if err := RelativizeClusterLocalPaths(configToWrite.Clusters[key]); err != nil {
 					return err
 				}
-			}
-
-			if lockErrors[destinationFile] != nil {
-				return lockErrors[destinationFile]
 			}
 
 			if err := WriteToFile(*configToWrite, destinationFile); err != nil {
@@ -385,15 +386,16 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string, lo
 
 	if configAccess.IsExplicitFile() {
 		file := configAccess.GetExplicitFile()
+
+		if lockErrors[file] != nil {
+			return lockErrors[file]
+		}
+
 		currConfig, err := getConfigFromFile(file)
 		if err != nil {
 			return err
 		}
 		currConfig.CurrentContext = newCurrentContext
-
-		if lockErrors[file] != nil {
-			return lockErrors[file]
-		}
 
 		if err := WriteToFile(*currConfig, file); err != nil {
 			return err
@@ -404,16 +406,16 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string, lo
 
 	if len(newCurrentContext) > 0 {
 		destinationFile := configAccess.GetDefaultFilename()
-		config, err := getConfigFromFile(destinationFile)
-		if err != nil {
-			return err
-		}
-		config.CurrentContext = newCurrentContext
 
 		if lockErrors[destinationFile] != nil {
 			return lockErrors[destinationFile]
 		}
 
+		config, err := getConfigFromFile(destinationFile)
+		if err != nil {
+			return err
+		}
+		config.CurrentContext = newCurrentContext
 
 		if err := WriteToFile(*config, destinationFile); err != nil {
 			return err
@@ -425,6 +427,10 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string, lo
 	// we're supposed to be clearing the current context.  We need to find the first spot in the chain that is setting it and clear it
 	for _, file := range configAccess.GetLoadingPrecedence() {
 		if _, err := os.Stat(file); err == nil {
+			if lockErrors[file] != nil {
+				return lockErrors[file]
+			}
+
 			currConfig, err := getConfigFromFile(file)
 			if err != nil {
 				return err
@@ -432,10 +438,6 @@ func writeCurrentContext(configAccess ConfigAccess, newCurrentContext string, lo
 
 			if len(currConfig.CurrentContext) > 0 {
 				currConfig.CurrentContext = newCurrentContext
-
-				if lockErrors[file] != nil {
-					return lockErrors[file]
-				}
 
 				if err := WriteToFile(*currConfig, file); err != nil {
 					return err
@@ -458,6 +460,11 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 
 	if configAccess.IsExplicitFile() {
 		file := configAccess.GetExplicitFile()
+
+		if lockErrors[file] != nil {
+			return lockErrors[file]
+		}
+
 		currConfig, err := getConfigFromFile(file)
 		if err != nil {
 			return err
@@ -471,6 +478,10 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 	}
 
 	for _, file := range configAccess.GetLoadingPrecedence() {
+		if lockErrors[file] != nil {
+			return lockErrors[file]
+		}
+
 		currConfig, err := getConfigFromFile(file)
 		if err != nil {
 			return err
@@ -478,10 +489,6 @@ func writePreferences(configAccess ConfigAccess, newPrefs clientcmdapi.Preferenc
 
 		if !reflect.DeepEqual(currConfig.Preferences, newPrefs) {
 			currConfig.Preferences = newPrefs
-
-			if lockErrors[file] != nil {
-				return lockErrors[file]
-			}
 
 			if err := WriteToFile(*currConfig, file); err != nil {
 				return err
