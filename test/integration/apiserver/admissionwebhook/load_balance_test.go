@@ -154,17 +154,19 @@ func TestWebhookLoadBalance(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pod := &corev1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace:    ns,
-			GenerateName: "loadbalance-",
-		},
-		Spec: corev1.PodSpec{
-			Containers: []v1.Container{{
-				Name:  "fake-name",
-				Image: "fakeimage",
-			}},
-		},
+	pod := func() *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns,
+				GenerateName: "loadbalance-",
+			},
+			Spec: corev1.PodSpec{
+				Containers: []v1.Container{{
+					Name:  "fake-name",
+					Image: "fakeimage",
+				}},
+			},
+		}
 	}
 
 	// Submit 10 parallel requests
@@ -173,7 +175,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := client.CoreV1().Pods(ns).Create(pod)
+			_, err := client.CoreV1().Pods(ns).Create(pod())
 			if err != nil {
 				t.Error(err)
 			}
@@ -192,7 +194,7 @@ func TestWebhookLoadBalance(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := client.CoreV1().Pods(ns).Create(pod)
+			_, err := client.CoreV1().Pods(ns).Create(pod())
 			if err != nil {
 				t.Error(err)
 			}
