@@ -23,6 +23,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 )
@@ -189,7 +190,7 @@ func (ss *scaleSet) newVmssVMCache() (*timedCache, error) {
 
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
-		result, err := ss.VirtualMachineScaleSetVMsClient.Get(ctx, resourceGroup, ssName, instanceID)
+		result, err := ss.VirtualMachineScaleSetVMsClient.Get(ctx, resourceGroup, ssName, instanceID, compute.InstanceView)
 		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr
@@ -198,24 +199,6 @@ func (ss *scaleSet) newVmssVMCache() (*timedCache, error) {
 		if !exists {
 			klog.V(2).Infof("Virtual machine scale set VM %q not found with message: %q", key, message)
 			return nil, nil
-		}
-
-		// Get instanceView for vmssVM.
-		if result.InstanceView == nil {
-			viewCtx, viewCancel := getContextWithCancel()
-			defer viewCancel()
-			view, err := ss.VirtualMachineScaleSetVMsClient.GetInstanceView(viewCtx, resourceGroup, ssName, instanceID)
-			// It is possible that the vmssVM gets removed just before this call. So check whether the VM exist again.
-			exists, message, realErr = checkResourceExistsFromError(err)
-			if realErr != nil {
-				return nil, realErr
-			}
-			if !exists {
-				klog.V(2).Infof("Virtual machine scale set VM %q not found with message: %q", key, message)
-				return nil, nil
-			}
-
-			result.InstanceView = &view
 		}
 
 		return &result, nil
