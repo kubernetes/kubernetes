@@ -191,14 +191,14 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	if c.SecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
-		if serverStoppedCh, err := c.SecureServing.Serve(handler, 0, ctx.Done()); err != nil {
+		serverStoppedCh, err := c.SecureServing.Serve(handler, 0, ctx.Done())
+		if err != nil {
 			return err
-		} else {
-			defer func() {
-				cancel()
-				<-serverStoppedCh
-			}()
 		}
+		defer func() {
+			cancel()
+			<-serverStoppedCh
+		}()
 	}
 	if c.InsecureServing != nil {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
@@ -258,7 +258,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	}
 
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		run(context.TODO())
+		run(ctx)
 		panic("unreachable")
 	}
 
