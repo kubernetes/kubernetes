@@ -56,6 +56,7 @@ import (
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/version/verflag"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 // Option configures a framework.Registry.
@@ -192,7 +193,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 		cc.InformerFactory.Storage().V1beta1().CSINodes(),
 		cc.Recorder,
 		cc.ComponentConfig.AlgorithmSource,
-		stopCh,
+		ctx.Done(),
 		registry,
 		cc.ComponentConfig.Plugins,
 		cc.ComponentConfig.PluginConfig,
@@ -207,7 +208,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 
 	// Prepare the event broadcaster.
 	if cc.Broadcaster != nil && cc.EventClient != nil {
-		cc.Broadcaster.StartRecordingToSink(stopCh)
+		cc.Broadcaster.StartRecordingToSink(ctx.Done())
 	}
 	if cc.LeaderElectionBroadcaster != nil && cc.CoreEventClient != nil {
 		cc.LeaderElectionBroadcaster.StartRecordingToSink(&corev1.EventSinkImpl{Interface: cc.CoreEventClient.Events("")})
@@ -222,19 +223,19 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 	if cc.InsecureServing != nil {
 		separateMetrics := cc.InsecureMetricsServing != nil
 		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, separateMetrics, checks...), nil, nil)
-		if err := cc.InsecureServing.Serve(handler, 0, stopCh); err != nil {
+		if err := cc.InsecureServing.Serve(handler, 0, ctx.Done()); err != nil {
 			return fmt.Errorf("failed to start healthz server: %v", err)
 		}
 	}
 	if cc.InsecureMetricsServing != nil {
 		handler := buildHandlerChain(newMetricsHandler(&cc.ComponentConfig), nil, nil)
-		if err := cc.InsecureMetricsServing.Serve(handler, 0, stopCh); err != nil {
+		if err := cc.InsecureMetricsServing.Serve(handler, 0, ctx.Done()); err != nil {
 			return fmt.Errorf("failed to start metrics server: %v", err)
 		}
 	}
 	if cc.SecureServing != nil {
 		handler := buildHandlerChain(newHealthzHandler(&cc.ComponentConfig, false, checks...), cc.Authentication.Authenticator, cc.Authorization.Authorizer)
-		serverStoppedCh, err := cc.SecureServing.Serve(handler, 0, stopCh)
+		serverStoppedCh, err := cc.SecureServing.Serve(handler, 0, ctx.Done())
 		if err != nil {
 			// fail early for secure handlers, removing the old error loop from above
 			return fmt.Errorf("failed to start secure server: %v", err)
@@ -246,11 +247,11 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 	}
 
 	// Start all informers.
-	go cc.PodInformer.Informer().Run(stopCh)
-	cc.InformerFactory.Start(stopCh)
+	go cc.PodInformer.Informer().Run(ctx.Done())
+	cc.InformerFactory.Start(ctx.Done())
 
 	// Wait for all caches to sync before scheduling.
-	cc.InformerFactory.WaitForCacheSync(stopCh)
+	cc.InformerFactory.WaitForCacheSync(ctx.Done())
 
 	// If leader election is enabled, runCommand via LeaderElector until done and exit.
 	if cc.LeaderElection != nil {
@@ -259,7 +260,8 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 				sched.Run()
 			},
 			OnStoppedLeading: func() {
-				klog.Fatalf("leaderelection lost")
+				cancel()
+				utilruntime.HandleError(fmt.Errorf("leaderelection lost"))
 			},
 		}
 		leaderElector, err := leaderelection.NewLeaderElector(*cc.LeaderElection)
