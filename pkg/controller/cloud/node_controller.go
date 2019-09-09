@@ -36,9 +36,24 @@ import (
 	clientretry "k8s.io/client-go/util/retry"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
-	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
+)
+
+const (
+	// annotationProvidedIPAddr is a node IP annotation set by the "external" cloud provider.
+	// When kubelet is started with the "external" cloud provider, then
+	// it sets this annotation on the node to denote an ip address set from the
+	// cmd line flag (--node-ip). This ip is verified with the cloudprovider as valid by
+	// the cloud-controller-manager
+	// originated from https://github.com/kubernetes/kubernetes/blob/35cf6b6cbc/pkg/kubelet/apis/well_known_annotations.go#L25
+	annotationProvidedIPAddr = "alpha.kubernetes.io/provided-node-ip"
+
+	// taintExternalCloudProvider sets this taint on a node to mark it as unusable,
+	// when kubelet is started with the "external" cloud provider, until a controller
+	// from the cloud-controller-manager intitializes this node, and then removes
+	// the taint
+	// originated from https://github.com/kubernetes/kubernetes/blob/35cf6b6cbc/pkg/scheduler/api/well_known_labels.go#L64
+	taintExternalCloudProvider = "node.cloudprovider.kubernetes.io/uninitialized"
 )
 
 var UpdateNodeSpecBackoff = wait.Backoff{
@@ -323,7 +338,7 @@ func (cnc *CloudNodeController) initializeNode(node *v1.Node) {
 
 func getCloudTaint(taints []v1.Taint) *v1.Taint {
 	for _, taint := range taints {
-		if taint.Key == schedulerapi.TaintExternalCloudProvider {
+		if taint.Key == taintExternalCloudProvider {
 			return &taint
 		}
 	}
@@ -333,7 +348,7 @@ func getCloudTaint(taints []v1.Taint) *v1.Taint {
 func excludeCloudTaint(taints []v1.Taint) []v1.Taint {
 	newTaints := []v1.Taint{}
 	for _, taint := range taints {
-		if taint.Key == schedulerapi.TaintExternalCloudProvider {
+		if taint.Key == taintExternalCloudProvider {
 			continue
 		}
 		newTaints = append(newTaints, taint)
@@ -397,7 +412,7 @@ func nodeAddressesChangeDetected(addressSet1, addressSet2 []v1.NodeAddress) bool
 func ensureNodeProvidedIPExists(node *v1.Node, nodeAddresses []v1.NodeAddress) (*v1.NodeAddress, bool) {
 	var nodeIP *v1.NodeAddress
 	nodeIPExists := false
-	if providedIP, ok := node.ObjectMeta.Annotations[kubeletapis.AnnotationProvidedIPAddr]; ok {
+	if providedIP, ok := node.ObjectMeta.Annotations[annotationProvidedIPAddr]; ok {
 		nodeIPExists = true
 		for i := range nodeAddresses {
 			if nodeAddresses[i].Address == providedIP {
