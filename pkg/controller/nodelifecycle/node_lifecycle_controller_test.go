@@ -3252,19 +3252,19 @@ func TestTryUpdateNodeHealth(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeController.nodeHealthMap[test.node.Name] = &nodeHealthData{
+			nodeController.nodeHealthMap.set(test.node.Name, &nodeHealthData{
 				status:                   &test.node.Status,
 				probeTimestamp:           test.node.CreationTimestamp,
 				readyTransitionTimestamp: test.node.CreationTimestamp,
-			}
+			})
 			_, _, currentReadyCondition, err := nodeController.tryUpdateNodeHealth(test.node)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			_, savedReadyCondition := nodeutil.GetNodeCondition(nodeController.nodeHealthMap[test.node.Name].status, v1.NodeReady)
+			_, savedReadyCondition := nodeutil.GetNodeCondition(nodeController.nodeHealthMap.getDeepCopy(test.node.Name).status, v1.NodeReady)
 			savedStatus := getStatus(savedReadyCondition)
 			currentStatus := getStatus(currentReadyCondition)
-			if currentStatus != savedStatus {
+			if !apiequality.Semantic.DeepEqual(currentStatus, savedStatus) {
 				t.Errorf("expected %v, got %v", savedStatus, currentStatus)
 			}
 		})
