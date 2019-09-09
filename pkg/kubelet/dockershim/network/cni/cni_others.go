@@ -74,6 +74,10 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, err
 	}
 
+	if len(ips) == 0 {
+		return nil, fmt.Errorf("cannot find pod IPs in the network namespace, skipping pod network status for container %q", id)
+	}
+
 	return &network.PodNetworkStatus{
 		IP:  ips[0],
 		IPs: ips,
