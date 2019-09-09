@@ -545,7 +545,7 @@ function detect_node_failures() {
                               --project "${PROJECT}" \
                               --zone "${ZONE}" \
                               --format='value(creationTimestamp)')
-    echo "Failures for ${group}"
+    echo "Failures for ${group} (if any):"
     gcloud logging read --order=asc \
           --format='table(timestamp,jsonPayload.resource.name,jsonPayload.event_subtype)' \
           --project "${PROJECT}" \
