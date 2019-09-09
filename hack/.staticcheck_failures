@@ -226,12 +226,10 @@ vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper
 vendor/k8s.io/kube-aggregator/pkg/controllers/autoregister
 vendor/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator
 vendor/k8s.io/kubectl/pkg/cmd/annotate
-vendor/k8s.io/kubectl/pkg/cmd/apply
 vendor/k8s.io/kubectl/pkg/cmd/certificates
 vendor/k8s.io/kubectl/pkg/cmd/config
 vendor/k8s.io/kubectl/pkg/cmd/edit
 vendor/k8s.io/kubectl/pkg/cmd/exec
-vendor/k8s.io/kubectl/pkg/cmd/label
 vendor/k8s.io/kubectl/pkg/cmd/proxy
 vendor/k8s.io/kubectl/pkg/cmd/rollingupdate
 vendor/k8s.io/kubectl/pkg/cmd/scale
