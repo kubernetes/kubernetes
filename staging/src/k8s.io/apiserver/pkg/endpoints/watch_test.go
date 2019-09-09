@@ -604,6 +604,9 @@ func TestWatchHTTPErrors(t *testing.T) {
 	req, _ := http.NewRequest("GET", dest.String(), nil)
 	client := http.Client{}
 	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	errStatus := errors.NewInternalError(fmt.Errorf("we got an error")).Status()
 	watcher.Error(&errStatus)
 	watcher.Stop()
@@ -728,6 +731,9 @@ func TestWatchHTTPTimeout(t *testing.T) {
 	req, _ := http.NewRequest("GET", dest.String(), nil)
 	client := http.Client{}
 	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
 	watcher.Add(&apitesting.Simple{TypeMeta: metav1.TypeMeta{APIVersion: newGroupVersion.String()}})
 
 	// Make sure we can actually watch an endpoint
