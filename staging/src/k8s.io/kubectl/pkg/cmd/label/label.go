@@ -182,6 +182,9 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 	o.resources = resources
 	o.newLabels, o.removeLabels, err = parseLabels(labelArgs)
+	if err != nil {
+		return err
+	}
 
 	if o.list && len(o.outputFormat) > 0 {
 		return fmt.Errorf("--list and --output may not be specified together")
