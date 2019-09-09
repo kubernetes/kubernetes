@@ -151,8 +151,13 @@ function gke-internal-master-start {
   compute-master-manifest-variables
   start_internal_cluster_autoscaler
   start_pod_autoscaler
-
   setup_master_prom_to_sd_monitor_component
+
+  if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
+    echo "setting up local admin kubeconfig"
+    create-kubeconfig "local-admin" "${KUBE_BEARER_TOKEN}"
+    echo "export KUBECONFIG=/etc/srv/kubernetes/local-admin/kubeconfig" > /etc/profile.d/kube_env.sh
+  fi
 
   echo "Internal GKE configuration done"
 }
