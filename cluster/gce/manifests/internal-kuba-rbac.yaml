@@ -138,3 +138,22 @@ subjects:
   name: vpa-recommender
   namespace: kube-system
 ---
+# VPA Recommender is the Kubernetes Unified Autoscaling Adapter
+# (Kuba). Kuba also runs an HPA controller which talks to UAS and
+# controls HPA objects in lieu of Controller Manager. So it needs
+# the same permissions as the CM HPA controller.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-uas-hpa-controller
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:controller:horizontal-pod-autoscaler
+subjects:
+- kind: User
+  name: system:vpa-recommender
+  namespace: kube-system
+---
