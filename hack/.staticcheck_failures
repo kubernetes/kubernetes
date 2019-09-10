@@ -30,16 +30,6 @@ pkg/kubectl/cmd/cp
 pkg/kubectl/cmd/get
 pkg/kubelet/apis/podresources
 pkg/kubelet/cm/devicemanager
-pkg/kubelet/config
-pkg/kubelet/container/testing
-pkg/kubelet/eviction
-pkg/kubelet/kubeletconfig/checkpoint
-pkg/kubelet/kuberuntime
-pkg/kubelet/kuberuntime/logs
-pkg/kubelet/lifecycle
-pkg/kubelet/network/dns
-pkg/kubelet/pluginmanager
-pkg/kubelet/pluginmanager/metrics
 pkg/kubelet/pluginmanager/operationexecutor
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/remote

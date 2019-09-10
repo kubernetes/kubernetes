@@ -35,6 +35,7 @@ import (
 )
 
 var defaultSeccompOpt = []dockerOpt{{"seccomp", "unconfined", ""}}
+
 const dockerNetNSFmt = "/proc/%v/ns/net"
 
 func DefaultMemorySwap() int64 {

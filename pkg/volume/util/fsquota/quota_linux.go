@@ -300,7 +300,7 @@ func SupportsQuotas(m mount.Interface, path string) (bool, error) {
 // AssignQuota chooses the quota ID based on the pod UID and path.
 // If the pod UID is identical to another one known, it may (but presently
 // doesn't) choose the same quota ID as other volumes in the pod.
-func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resource.Quantity) error {
+func AssignQuota(m mount.Interface, path string, podUID types.UID, bytes *resource.Quantity) error {
 	if bytes == nil {
 		return fmt.Errorf("Attempting to assign null quota to %s", path)
 	}
@@ -315,7 +315,7 @@ func AssignQuota(m mount.Interface, path string, poduid types.UID, bytes *resour
 	// volumes in a pod, we can simply remove this line of code.
 	// If and when we decide permanently that we're going to adop
 	// one quota per volume, we can rip all of the pod code out.
-	poduid = types.UID(uuid.NewUUID())
+	var poduid = types.UID(uuid.NewUUID())
 	if pod, ok := dirPodMap[path]; ok && pod != poduid {
 		return fmt.Errorf("Requesting quota on existing directory %s but different pod %s %s", path, pod, poduid)
 	}

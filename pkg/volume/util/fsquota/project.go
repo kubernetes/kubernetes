@@ -99,17 +99,17 @@ func openAndLockProjectFiles() (*os.File, *os.File, error) {
 				// Nothing useful we can do if we get an error here
 				unlockFile(fProjects)
 				return nil, nil, fmt.Errorf("unable to lock %s: %v", projidFile, err)
-			} else {
-				return nil, nil, fmt.Errorf("unable to lock %s: %v", projectsFile, err)
 			}
-		} else {
-			return nil, nil, fmt.Errorf("system project files failed re-verification: %v", err)
+			return nil, nil, fmt.Errorf("unable to lock %s: %v", projectsFile, err)
+
 		}
 		fProjid.Close()
-	} else {
-		err = fmt.Errorf("unable to open %s: %v", projidFile, err)
+		return nil, nil, fmt.Errorf("system project files failed re-verification: %v", err)
+
 	}
+	err = fmt.Errorf("unable to open %s: %v", projidFile, err)
 	fProjects.Close()
+
 	return nil, nil, err
 }
 

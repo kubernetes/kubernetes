@@ -557,7 +557,7 @@ func runCaseDisabled(t *testing.T, testcase quotaTestCase, seq int) bool {
 	switch testcase.op {
 	case "Supports":
 		if supports, err = fakeSupportsQuotas(testcase.path); supports {
-			t.Errorf("Case %v (%s, %v) supports quotas but shouldn't", seq, testcase.path, false, err)
+			t.Errorf("Case %v (%s, %v) supports quotas but shouldn't %v", seq, testcase.path, false, err)
 			return true
 		}
 		return false
