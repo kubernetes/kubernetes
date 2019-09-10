@@ -326,7 +326,7 @@ func getProxyMode(proxyMode string, khandle ipvs.KernelHandler, ipsetver ipvs.IP
 	case proxyModeIPVS:
 		return tryIPVSProxy(khandle, ipsetver, kcompat)
 	}
-	klog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
+	klog.Warningf("Unknown proxy mode %q, assuming iptables proxy", proxyMode)
 	return tryIPTablesProxy(kcompat)
 }
 
