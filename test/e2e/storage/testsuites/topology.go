@@ -40,8 +40,8 @@ type topologyTestSuite struct {
 }
 
 type topologyTest struct {
-	config      *PerTestConfig
-	testCleanup func()
+	config        *PerTestConfig
+	driverCleanup func()
 
 	intreeOps   opCounts
 	migratedOps opCounts
@@ -109,7 +109,7 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		l := topologyTest{}
 
 		// Now do the more expensive test initialization.
-		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.config, l.driverCleanup = driver.PrepareTest(f)
 
 		l.resource = genericVolumeTestResource{
 			driver:  driver,
@@ -151,8 +151,8 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 
 	cleanup := func(l topologyTest) {
 		t.cleanupResources(cs, &l)
-		if l.testCleanup != nil {
-			l.testCleanup()
+		if l.driverCleanup != nil {
+			l.driverCleanup()
 		}
 
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
