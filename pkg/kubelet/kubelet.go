@@ -33,7 +33,7 @@ import (
 	"time"
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -51,7 +51,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -117,11 +117,13 @@ import (
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
+	"k8s.io/kubernetes/pkg/volume/util/fsquota"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/integer"
+	utilstrings "k8s.io/utils/strings"
 )
 
 const (
@@ -1444,6 +1446,21 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 	// Start syncing RuntimeClasses if enabled.
 	if kl.runtimeClassManager != nil {
 		kl.runtimeClassManager.Start(wait.NeverStop)
+	}
+	// Start syncing local ephemeral storage(emptyDir) to /etc/projects and /etc/projectid
+	pods := kl.GetPods()
+	for _, pod := range pods {
+		volumes := pod.Spec.Volumes
+		for _, vol := range volumes {
+			// only one of the volumeSource could be set, so if "EmptyDir" volume source is not nil
+			// We can say the volumeSource is of type EmptyDir
+			if vol.Name != "" && vol.VolumeSource.EmptyDir != nil {
+				podVolumeDir := kl.getPodVolumeDir(pod.UID, utilstrings.EscapeQualifiedName("kubernetes.io/empty-dir"), pod.Spec.Hostname)
+				if podVolumeDir != "" {
+					fsquota.RecordProjectIDOnProjectFiles(podVolumeDir)
+				}
+			}
+		}
 	}
 
 	// Start the pod lifecycle event generator.

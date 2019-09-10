@@ -21,16 +21,15 @@ package fsquota
 import (
 	"bufio"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sync"
-
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume/util/fsquota/common"
+	"os"
+	"path/filepath"
+	"sync"
 )
 
 // Pod -> ID
@@ -218,6 +217,13 @@ func getQuotaOnDir(m mount.Interface, path string) (common.QuotaID, error) {
 		return common.BadQuotaID, err
 	}
 	return getApplier(path).GetQuotaOnDir(path)
+}
+
+func getQuotaIDFromDirPath(path string) (common.QuotaID, bool) {
+	if val, ok := dirQuotaMap[path]; ok {
+		return val, ok
+	}
+	return nil, false
 }
 
 func clearQuotaOnDir(m mount.Interface, path string) error {
@@ -438,4 +444,25 @@ func ClearQuota(m mount.Interface, path string) error {
 		return fmt.Errorf("Unable to clear quota for %s: %v", path, err)
 	}
 	return nil
+}
+
+// RecordProjectIDOnProjectFiles -- Records project file for the given directory-path to /etc/projects and /etc/projectid
+func RecordProjectIDOnProjectFiles(podVolumeDir string) error {
+	if id, ok := getQuotaIDFromDirPath(podVolumeDir); ok {
+		fProjects, fProjid, err := openAndLockProjectFiles()
+		if err != nil {
+			defer closeProjectFiles(fProjects, fProjid)
+			list := readProjectFiles(fProjects, fProjid)
+			writeProjid := true
+			_, writeProjid, err = addDirToProject(podVolumeDir, id, &list)
+			if err == nil {
+				if err = writeProjectFiles(fProjects, fProjid, writeProjid, list); err == nil {
+					return nil
+				}
+				return err
+			}
+		}
+		return err
+	}
+	return fmt.Errorf("unable to get QuotaID from directory path: %s", podVolumeDir)
 }
