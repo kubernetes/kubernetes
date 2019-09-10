@@ -95,6 +95,8 @@ func (s *BuiltInAuthorizationOptions) AddFlags(fs *pflag.FlagSet) {
 
 	fs.StringVar(&s.PolicyFile, "authorization-policy-file", s.PolicyFile, ""+
 		"File with authorization policy in json line by line format, used with --authorization-mode=ABAC, on the secure port.")
+	fs.MarkDeprecated("authorization-policy-file", "Authorization mode ABAC is deprecated. "+
+		"Consider using the RBAC or Webhook authorization modes instead. Will be removed in v1.20.")
 
 	fs.StringVar(&s.WebhookConfigFile, "authorization-webhook-config-file", s.WebhookConfigFile, ""+
 		"File with webhook configuration in kubeconfig format, used with --authorization-mode=Webhook. "+
