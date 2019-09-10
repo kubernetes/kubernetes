@@ -37,7 +37,7 @@ type NodeLifecycleControllerConfiguration struct {
 	// nodeStatusUpdateFrequency, where N means number of retries allowed for kubelet
 	// to post node status.
 	NodeMonitorGracePeriod metav1.Duration
-	// podEvictionTimeout is the grace period for deleting pods on failed nodes.
+	// podEvictionTimeout is the grace period for deleting pods on failed nodes. it works only if you set EnableTaintManager to false or feature-gates TaintBasedEvictions=false (default true)
 	PodEvictionTimeout metav1.Duration
 	// secondaryNodeEvictionRate is implicitly overridden to 0 for clusters smaller than or equal to largeClusterSizeThreshold
 	LargeClusterSizeThreshold int32
