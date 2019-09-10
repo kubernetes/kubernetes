@@ -29,9 +29,10 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	executils "k8s.io/utils/exec"
 )
 
-var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
+var _ = SIGDescribe("Node Authentication [Feature:NodeAuthenticator]", func() {
 
 	f := framework.NewDefaultFramework("node-authn")
 	var ns string
@@ -39,8 +40,8 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 	ginkgo.BeforeEach(func() {
 		ns = f.Namespace.Name
 
-		nodeList, err := f.ClientSet.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
-		framework.ExpectNoError(err, "failed to list nodes in namespace: %s", ns)
+		_, nodeList, err := e2enode.GetMasterAndWorkerNodes(f.ClientSet)
+		framework.ExpectNoError(err, "failed to get nodes")
 		framework.ExpectNotEqual(len(nodeList.Items), 0)
 
 		pickedNode := nodeList.Items[0]
@@ -56,15 +57,17 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 
 	})
 
+	// Test requires kubelet anonymous authentication to be disabled.
 	ginkgo.It("The kubelet's main port 10250 should reject requests with no credentials", func() {
 		pod := createNodeAuthTestPod(f)
 		for _, nodeIP := range nodeIPs {
 			// Anonymous authentication is disabled by default
-			result := framework.RunHostCmdOrDie(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%s' https://%s:%v/metrics", "%{http_code}", nodeIP, ports.KubeletPort))
-			gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet's main port 10250 should reject requests with no credentials")
+			url := fmt.Sprintf("https://%s:%v/metrics", nodeIP, ports.KubeletPort)
+			expectUnauthorizedOrFailToConnect(f, pod, url)
 		}
 	})
 
+	// Test requires kubelet webhook authentication to be enabled.
 	ginkgo.It("The kubelet can delegate ServiceAccount tokens to the API server", func() {
 		ginkgo.By("create a new ServiceAccount for authentication")
 		trueValue := true
@@ -81,13 +84,9 @@ var _ = SIGDescribe("[Feature:NodeAuthenticator]", func() {
 		pod := createNodeAuthTestPod(f)
 
 		for _, nodeIP := range nodeIPs {
-			result := framework.RunHostCmdOrDie(ns,
-				pod.Name,
-				fmt.Sprintf("curl -sIk -o /dev/null -w '%s' --header \"Authorization: Bearer `%s`\" https://%s:%v/metrics",
-					"%{http_code}",
-					"cat /var/run/secrets/kubernetes.io/serviceaccount/token",
-					nodeIP, ports.KubeletPort))
-			gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")), "the kubelet can delegate ServiceAccount tokens to the API server")
+			url := fmt.Sprintf("https://%s:%v/metrics", nodeIP, ports.KubeletPort)
+			header := `"Authorization: Bearer $(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"`
+			expectUnauthorizedOrFailToConnect(f, pod, url, header)
 		}
 	})
 })
@@ -108,4 +107,31 @@ func createNodeAuthTestPod(f *framework.Framework) *v1.Pod {
 	}
 
 	return f.PodClient().CreateSync(pod)
+}
+
+// Execute a curl request from the pod to the url with the given headers.
+// Expect the result to either fail to connect to the host, or be a Unauthorized
+// or Forbidden response code.
+func expectUnauthorizedOrFailToConnect(f *framework.Framework, pod *v1.Pod, url string, headers ...string) {
+	headerArgs := "" // FIXME - don't log this
+	for _, header := range headers {
+		headerArgs = headerArgs + "--header " + header + " "
+	}
+
+	ns := f.Namespace.Name
+	result, err := framework.RunHostCmd(ns, pod.Name, fmt.Sprintf("curl -sIk -o /dev/null -w '%%{http_code}' %s %s", headerArgs, url))
+	if err != nil {
+		// Accept failure to connect as a success condition, since it indicates the port is
+		// protected by other means (e.g. not exposed on the external interface).
+		if err, ok := err.(executils.CodeExitError); ok {
+			const statusFailedToConnect = 7 // curl exit code for failed to connect
+			framework.ExpectEqual(err.ExitStatus(), statusFailedToConnect,
+				"if curl fails, it should be a 'failed to conenct' error, but got: %s", err.Error())
+		} else {
+			framework.Failf("Unexpected `curl` error: %v", err)
+		}
+		return
+	}
+	gomega.Expect(result).To(gomega.Or(gomega.Equal("401"), gomega.Equal("403")),
+		"%s should reject requests", url)
 }

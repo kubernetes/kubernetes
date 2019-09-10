@@ -38,7 +38,8 @@ const (
 	nodeNamePrefix = "system:node:"
 )
 
-var _ = SIGDescribe("[Feature:NodeAuthorizer]", func() {
+// These tests require the NodeRestriction admission controller and node authorizer to be enabled.
+var _ = SIGDescribe("Node Restriction [Feature:NodeRestriction]", func() {
 
 	f := framework.NewDefaultFramework("node-authz")
 	// client that will impersonate a node
