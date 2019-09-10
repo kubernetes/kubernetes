@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	"k8s.io/kubernetes/cmd/kubeadm/app/version"
+	"k8s.io/component-base/version"
 )
 
 // Version provides the version information of kubeadm.

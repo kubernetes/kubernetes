@@ -148,14 +148,9 @@ func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
 	return r
 }
 
-func registerMetadataMetrics(r *kubeRegistry) {
-	RegisterBuildInfo(r)
-}
-
 // NewKubeRegistry creates a new vanilla Registry without any Collectors
 // pre-registered.
 func NewKubeRegistry() KubeRegistry {
 	r := newKubeRegistry(version.Get())
-	registerMetadataMetrics(r)
 	return r
 }

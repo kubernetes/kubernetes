@@ -12,9 +12,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/credentialprovider/aws",
     deps = [
         "//pkg/credentialprovider:go_default_library",
-        "//pkg/version:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/component-base/version:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/request:go_default_library",
         "//vendor/github.com/aws/aws-sdk-go/aws/session:go_default_library",

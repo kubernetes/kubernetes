@@ -64,7 +64,6 @@
                 "k8s.io/kubernetes/pkg/util/interrupt",
                 "k8s.io/kubernetes/pkg/util/node",
                 "k8s.io/kubernetes/pkg/util/parsers",
-                "k8s.io/kubernetes/pkg/version",
                 "k8s.io/utils/pointer"
 		],
 		"ForbiddenPrefixes": []

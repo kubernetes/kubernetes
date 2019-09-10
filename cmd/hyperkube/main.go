@@ -32,6 +32,7 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client metric registration
+	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	cloudcontrollermanager "k8s.io/kubernetes/cmd/cloud-controller-manager/app"
 	kubeapiserver "k8s.io/kubernetes/cmd/kube-apiserver/app"
 	kubecontrollermanager "k8s.io/kubernetes/cmd/kube-controller-manager/app"
@@ -39,7 +40,6 @@ import (
 	kubescheduler "k8s.io/kubernetes/cmd/kube-scheduler/app"
 	kubelet "k8s.io/kubernetes/cmd/kubelet/app"
 	kubectl "k8s.io/kubernetes/pkg/kubectl/cmd"
-	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
 )
 
 func main() {
