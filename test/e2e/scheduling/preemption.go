@@ -469,7 +469,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		}
 	})
 	// this test makes sure that Pods with a higher PriorityClass via their PriorityClassName start earlier than Pods with a lower PriorityClassName
-	ginkgo.It("should ensure Pods using a PriorityClassName which is higher begins first", func() {
+	ginkgo.It("should ensure Pods using a PriorityClassName which is higher begin first", func() {
 		podNamesSeen := []string{}
 		stopCh := make(chan struct{})
 		pods := []v1.Pod{}
