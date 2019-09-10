@@ -219,13 +219,6 @@ func getQuotaOnDir(m mount.Interface, path string) (common.QuotaID, error) {
 	return getApplier(path).GetQuotaOnDir(path)
 }
 
-func getQuotaIDFromDirPath(path string) (common.QuotaID, bool) {
-	if val, ok := dirQuotaMap[path]; ok {
-		return val, ok
-	}
-	return nil, false
-}
-
 func clearQuotaOnDir(m mount.Interface, path string) error {
 	// Since we may be called without path being in the map,
 	// we explicitly have to check in this case.
@@ -448,7 +441,8 @@ func ClearQuota(m mount.Interface, path string) error {
 
 // RecordProjectIDOnProjectFiles -- Records project file for the given directory-path to /etc/projects and /etc/projectid
 func RecordProjectIDOnProjectFiles(podVolumeDir string) error {
-	if id, ok := getQuotaIDFromDirPath(podVolumeDir); ok {
+	id, err := getApplier(podVolumeDir).GetQuotaOnDir(podVolumeDir)
+	if err == nil {
 		fProjects, fProjid, err := openAndLockProjectFiles()
 		if err != nil {
 			defer closeProjectFiles(fProjects, fProjid)
@@ -464,5 +458,5 @@ func RecordProjectIDOnProjectFiles(podVolumeDir string) error {
 		}
 		return err
 	}
-	return fmt.Errorf("unable to get QuotaID from directory path: %s", podVolumeDir)
+	return fmt.Errorf("unable to get QuotaID from directory path:%s: %v", podVolumeDir, err)
 }

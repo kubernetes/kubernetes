@@ -54,3 +54,8 @@ func GetInodes(_ string) (*resource.Quantity, error) {
 func ClearQuota(_ mount.Interface, _ string) error {
 	return errNotImplemented
 }
+
+// RecordProjectIDOnProjectFiles -- dummy implementation
+func RecordProjectIDOnProjectFiles(_ string) error {
+	return errNotImplemented
+}

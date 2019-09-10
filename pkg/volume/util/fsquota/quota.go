@@ -42,6 +42,10 @@ type Interface interface {
 	// Implementations may assume that any data covered by the
 	// quota has already been removed.
 	ClearQuota(m mount.Interface, path string) error
+
+	// Records project for the given directory-path
+	// to /etc/projects and /etc/projectid
+	RecordProjectIDOnProjectFiles(podVolumeDir string) error
 }
 
 func enabledQuotasForMonitoring() bool {
