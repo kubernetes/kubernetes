@@ -48,6 +48,7 @@ go_test(
         "fieldmanager_test.go",
         "skipnonapplied_test.go",
     ],
+    data = ["//api/openapi-spec"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -57,6 +58,8 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/util/proto/testing:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

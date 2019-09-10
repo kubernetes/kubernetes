@@ -17,12 +17,16 @@ limitations under the License.
 package fieldmanager_test
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,8 +34,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager"
+	"k8s.io/kube-openapi/pkg/util/proto"
+	prototesting "k8s.io/kube-openapi/pkg/util/proto/testing"
 	"sigs.k8s.io/yaml"
 )
+
+var fakeSchema = prototesting.Fake{
+	Path: filepath.Join(
+		strings.Repeat(".."+string(filepath.Separator), 7),
+		"api", "openapi-spec", "swagger.json"),
+}
 
 type fakeObjectConvertor struct{}
 
@@ -54,34 +66,42 @@ func (d *fakeObjectDefaulter) Default(in runtime.Object) {}
 
 type TestFieldManager struct {
 	fieldManager fieldmanager.FieldManager
+	emptyObj     runtime.Object
 	liveObj      runtime.Object
 }
 
-func NewTestFieldManager() TestFieldManager {
-	gv := schema.GroupVersion{
-		Group:   "apps",
-		Version: "v1",
+func NewTestFieldManager(gvk schema.GroupVersionKind) TestFieldManager {
+	d, err := fakeSchema.OpenAPISchema()
+	if err != nil {
+		panic(err)
+	}
+	m, err := proto.NewOpenAPIData(d)
+	if err != nil {
+		panic(err)
 	}
 
-	f, err := fieldmanager.NewCRDFieldManager(
-		nil,
+	f, err := fieldmanager.NewFieldManager(
+		m,
 		&fakeObjectConvertor{},
 		&fakeObjectDefaulter{},
-		gv,
-		gv,
-		true,
+		gvk.GroupVersion(),
+		gvk.GroupVersion(),
 	)
 	if err != nil {
 		panic(err)
 	}
+	live := &unstructured.Unstructured{}
+	live.SetKind(gvk.Kind)
+	live.SetAPIVersion(gvk.GroupVersion().String())
 	return TestFieldManager{
 		fieldManager: f,
-		liveObj:      &unstructured.Unstructured{},
+		emptyObj:     live,
+		liveObj:      live.DeepCopyObject(),
 	}
 }
 
 func (f *TestFieldManager) Reset() {
-	f.liveObj = &unstructured.Unstructured{}
+	f.liveObj = f.emptyObj.DeepCopyObject()
 }
 
 func (f *TestFieldManager) Apply(obj []byte, manager string, force bool) error {
@@ -109,9 +129,10 @@ func (f *TestFieldManager) ManagedFields() []metav1.ManagedFieldsEntry {
 	return accessor.GetManagedFields()
 }
 
-// TestUpdateApplyConflict tests that applying to an object, which wasn't created by apply, will give conflicts
+// TestUpdateApplyConflict tests that applying to an object, which
+// wasn't created by apply, will give conflicts
 func TestUpdateApplyConflict(t *testing.T) {
-	f := NewTestFieldManager()
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	patch := []byte(`{
 		"apiVersion": "apps/v1",
@@ -167,7 +188,7 @@ func TestUpdateApplyConflict(t *testing.T) {
 }
 
 func TestApplyStripsFields(t *testing.T) {
-	f := NewTestFieldManager()
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	newObj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -200,7 +221,7 @@ func TestApplyStripsFields(t *testing.T) {
 }
 
 func TestVersionCheck(t *testing.T) {
-	f := NewTestFieldManager()
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("apps/v1", "Deployment"))
 
 	// patch has 'apiVersion: apps/v1' and live version is apps/v1 -> no errors
 	err := f.Apply([]byte(`{
@@ -213,7 +234,7 @@ func TestVersionCheck(t *testing.T) {
 
 	// patch has 'apiVersion: apps/v2' but live version is apps/v1 -> error
 	err = f.Apply([]byte(`{
-		"apiVersion": "apps/v2",
+		"apiVersion": "apps/v1beta1",
 		"kind": "Deployment",
 	}`), "fieldmanager_test", false)
 	if err == nil {
@@ -231,10 +252,10 @@ func TestVersionCheck(t *testing.T) {
 }
 
 func TestApplyDoesNotStripLabels(t *testing.T) {
-	f := NewTestFieldManager()
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	err := f.Apply([]byte(`{
-		"apiVersion": "apps/v1",
+		"apiVersion": "v1",
 		"kind": "Pod",
 		"metadata": {
 			"labels": {
@@ -251,47 +272,200 @@ func TestApplyDoesNotStripLabels(t *testing.T) {
 	}
 }
 
+var podBytes = []byte(`
+{
+   "apiVersion": "v1",
+   "kind": "Pod",
+   "metadata": {
+      "labels": {
+         "app": "some-app",
+         "plugin1": "some-value",
+         "plugin2": "some-value",
+         "plugin3": "some-value",
+         "plugin4": "some-value"
+      },
+      "name": "some-name",
+      "namespace": "default",
+      "ownerReferences": [
+         {
+            "apiVersion": "apps/v1",
+            "blockOwnerDeletion": true,
+            "controller": true,
+            "kind": "ReplicaSet",
+            "name": "some-name",
+            "uid": "0a9d2b9e-779e-11e7-b422-42010a8001be"
+         }
+      ]
+   },
+   "spec": {
+      "containers": [
+         {
+            "args": [
+               "one",
+               "two",
+               "three",
+               "four",
+               "five",
+               "six",
+               "seven",
+               "eight",
+               "nine"
+            ],
+            "env": [
+               {
+                  "name": "VAR_3",
+                  "valueFrom": {
+                     "secretKeyRef": {
+                        "key": "some-other-key",
+                        "name": "some-oher-name"
+                     }
+                  }
+               },
+               {
+                  "name": "VAR_2",
+                  "valueFrom": {
+                     "secretKeyRef": {
+                        "key": "other-key",
+                        "name": "other-name"
+                     }
+                  }
+               },
+               {
+                  "name": "VAR_1",
+                  "valueFrom": {
+                     "secretKeyRef": {
+                        "key": "some-key",
+                        "name": "some-name"
+                     }
+                  }
+               }
+            ],
+            "image": "some-image-name",
+            "imagePullPolicy": "IfNotPresent",
+            "name": "some-name",
+            "resources": {
+               "requests": {
+                  "cpu": "0"
+               }
+            },
+            "terminationMessagePath": "/dev/termination-log",
+            "terminationMessagePolicy": "File",
+            "volumeMounts": [
+               {
+                  "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                  "name": "default-token-hu5jz",
+                  "readOnly": true
+               }
+            ]
+         }
+      ],
+      "dnsPolicy": "ClusterFirst",
+      "nodeName": "node-name",
+      "priority": 0,
+      "restartPolicy": "Always",
+      "schedulerName": "default-scheduler",
+      "securityContext": {},
+      "serviceAccount": "default",
+      "serviceAccountName": "default",
+      "terminationGracePeriodSeconds": 30,
+      "tolerations": [
+         {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/not-ready",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+         },
+         {
+            "effect": "NoExecute",
+            "key": "node.kubernetes.io/unreachable",
+            "operator": "Exists",
+            "tolerationSeconds": 300
+         }
+      ],
+      "volumes": [
+         {
+            "name": "default-token-hu5jz",
+            "secret": {
+               "defaultMode": 420,
+               "secretName": "default-token-hu5jz"
+            }
+         }
+      ]
+   },
+   "status": {
+      "conditions": [
+         {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2019-07-08T09:31:18Z",
+            "status": "True",
+            "type": "Initialized"
+         },
+         {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2019-07-08T09:41:59Z",
+            "status": "True",
+            "type": "Ready"
+         },
+         {
+            "lastProbeTime": null,
+            "lastTransitionTime": null,
+            "status": "True",
+            "type": "ContainersReady"
+         },
+         {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2019-07-08T09:31:18Z",
+            "status": "True",
+            "type": "PodScheduled"
+         }
+      ],
+      "containerStatuses": [
+         {
+            "containerID": "docker://885e82a1ed0b7356541bb410a0126921ac42439607c09875cd8097dd5d7b5376",
+            "image": "some-image-name",
+            "imageID": "docker-pullable://some-image-id",
+            "lastState": {
+               "terminated": {
+                  "containerID": "docker://d57290f9e00fad626b20d2dd87a3cf69bbc22edae07985374f86a8b2b4e39565",
+                  "exitCode": 255,
+                  "finishedAt": "2019-07-08T09:39:09Z",
+                  "reason": "Error",
+                  "startedAt": "2019-07-08T09:38:54Z"
+               }
+            },
+            "name": "name",
+            "ready": true,
+            "restartCount": 6,
+            "state": {
+               "running": {
+                  "startedAt": "2019-07-08T09:41:59Z"
+               }
+            }
+         }
+      ],
+      "hostIP": "10.0.0.1",
+      "phase": "Running",
+      "podIP": "10.0.0.1",
+      "qosClass": "BestEffort",
+      "startTime": "2019-07-08T09:31:18Z"
+   }
+}`)
+
+func TestApplyNewObject(t *testing.T) {
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
+
+	if err := f.Apply(podBytes, "fieldmanager_test", false); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func BenchmarkApplyNewObject(b *testing.B) {
-	f := NewTestFieldManager()
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		err := f.Apply([]byte(`{
-		"apiVersion": "apps/v1",
-		"kind": "Pod",
-		"metadata": {
-			"name": "b",
-			"namespace": "b",
-			"creationTimestamp": "2016-05-19T09:59:00Z",
-		},
-                "map": {
-                        "fieldA": 1,
-                        "fieldB": 1,
-                        "fieldC": 1,
-                        "fieldD": 1,
-                        "fieldE": 1,
-                        "fieldF": 1,
-                        "fieldG": 1,
-                        "fieldH": 1,
-                        "fieldI": 1,
-                        "fieldJ": 1,
-                        "fieldK": 1,
-                        "fieldL": 1,
-                        "fieldM": 1,
-                        "fieldN": {
-	                        "fieldN": {
-					"fieldN": {
-						"fieldN": {
-				                        "fieldN": {
-								"value": true
-							},
-						},
-					},
-				},
-			},
-                }
-	}`), "fieldmanager_test", false)
+		err := f.Apply(podBytes, "fieldmanager_test", false)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -300,48 +474,19 @@ func BenchmarkApplyNewObject(b *testing.B) {
 }
 
 func BenchmarkUpdateNewObject(b *testing.B) {
-	f := NewTestFieldManager()
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
 
-	y := `{
-		"apiVersion": "apps/v1",
-		"kind": "Deployment",
-		"metadata": {
-			"name": "b",
-			"namespace": "b",
-			"creationTimestamp": "2016-05-19T09:59:00Z",
-		},
-                "map": {
-                        "fieldA": 1,
-                        "fieldB": 1,
-                        "fieldC": 1,
-                        "fieldD": 1,
-                        "fieldE": 1,
-                        "fieldF": 1,
-                        "fieldG": 1,
-                        "fieldH": 1,
-                        "fieldI": 1,
-                        "fieldJ": 1,
-                        "fieldK": 1,
-                        "fieldL": 1,
-                        "fieldM": 1,
-                        "fieldN": {
-	                        "fieldN": {
-					"fieldN": {
-						"fieldN": {
-				                        "fieldN": {
-								"value": true
-							},
-						},
-					},
-				},
-			},
-		},
-
-	}`
 	newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
-	if err := yaml.Unmarshal([]byte(y), &newObj.Object); err != nil {
+	if err := json.Unmarshal(podBytes, &newObj.Object); err != nil {
 		b.Fatalf("Failed to parse yaml object: %v", err)
 	}
+	newObj.SetManagedFields([]metav1.ManagedFieldsEntry{
+		{
+			Manager:    "default",
+			Operation:  "Update",
+			APIVersion: "v1",
+		},
+	})
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -355,137 +500,20 @@ func BenchmarkUpdateNewObject(b *testing.B) {
 }
 
 func BenchmarkRepeatedUpdate(b *testing.B) {
-	f := NewTestFieldManager()
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
 
-	y1 := `{
-		"apiVersion": "apps/v1",
-		"kind": "Deployment",
-		"metadata": {
-			"name": "b",
-			"namespace": "b",
-			"creationTimestamp": "2016-05-19T09:59:00Z",
-		},
-                "map": {
-                        "fieldA": 1,
-                        "fieldB": 1,
-                        "fieldC": 1,
-                        "fieldD": 1,
-                        "fieldE": 1,
-                        "fieldF": 1,
-                        "fieldG": 1,
-                        "fieldH": 1,
-                        "fieldI": 1,
-                        "fieldJ": 1,
-                        "fieldK": 1,
-                        "fieldL": 1,
-                        "fieldM": 1,
-                        "fieldN": {
-	                        "fieldN": {
-					"fieldN": {
-						"fieldN": {
-				                        "fieldN": {
-								"value": true
-							},
-						},
-					},
-				},
-			},
-		},
-
-	}`
-	obj1 := &unstructured.Unstructured{Object: map[string]interface{}{}}
-	if err := yaml.Unmarshal([]byte(y1), &obj1.Object); err != nil {
+	var obj *corev1.Pod
+	if err := json.Unmarshal(podBytes, &obj); err != nil {
 		b.Fatalf("Failed to parse yaml object: %v", err)
 	}
-	y2 := `{
-		"apiVersion": "apps/v1",
-		"kind": "Deployment",
-		"metadata": {
-			"name": "b",
-			"namespace": "b",
-			"creationTimestamp": "2016-05-19T09:59:00Z",
-		},
-                "map": {
-                        "fieldA": 1,
-                        "fieldB": 1,
-                        "fieldC": 1,
-                        "fieldD": 1,
-                        "fieldE": 1,
-                        "fieldF": 1,
-                        "fieldG": 1,
-                        "fieldH": 1,
-                        "fieldI": 1,
-                        "fieldJ": 1,
-                        "fieldK": 1,
-                        "fieldL": 1,
-                        "fieldM": 1,
-                        "fieldN": {
-	                        "fieldN": {
-					"fieldN": {
-						"fieldN": {
-				                        "fieldN": {
-								"value": false
-							},
-						},
-					},
-				},
-			},
-		},
+	obj.Spec.Containers[0].Image = "nginx:latest"
+	objs := []*corev1.Pod{obj}
+	obj = obj.DeepCopy()
+	obj.Spec.Containers[0].Image = "nginx:4.3"
+	objs = append(objs, obj)
 
-	}`
-	obj2 := &unstructured.Unstructured{Object: map[string]interface{}{}}
-	if err := yaml.Unmarshal([]byte(y2), &obj2.Object); err != nil {
-		b.Fatalf("Failed to parse yaml object: %v", err)
-	}
-	y3 := `{
-		"apiVersion": "apps/v1",
-		"kind": "Deployment",
-		"metadata": {
-			"name": "b",
-			"namespace": "b",
-			"creationTimestamp": "2016-05-19T09:59:00Z",
-		},
-                "map": {
-                        "fieldA": 1,
-                        "fieldB": 1,
-                        "fieldC": 1,
-                        "fieldD": 1,
-                        "fieldE": 1,
-                        "fieldF": 1,
-                        "fieldG": 1,
-                        "fieldH": 1,
-                        "fieldI": 1,
-                        "fieldJ": 1,
-                        "fieldK": 1,
-                        "fieldL": 1,
-                        "fieldM": 1,
-                        "fieldN": {
-	                        "fieldN": {
-					"fieldN": {
-						"fieldN": {
-				                        "fieldN": {
-								"value": true
-							},
-						},
-					},
-				},
-			},
-                        "fieldO": 1,
-                        "fieldP": 1,
-                        "fieldQ": 1,
-                        "fieldR": 1,
-                        "fieldS": 1,
-		},
-
-	}`
-	obj3 := &unstructured.Unstructured{Object: map[string]interface{}{}}
-	if err := yaml.Unmarshal([]byte(y3), &obj3.Object); err != nil {
-		b.Fatalf("Failed to parse yaml object: %v", err)
-	}
-
-	objs := []*unstructured.Unstructured{obj1, obj2, obj3}
-
-	if err := f.Update(objs[0], "fieldmanager_0"); err != nil {
+	err := f.Apply(podBytes, "fieldmanager_apply", false)
+	if err != nil {
 		b.Fatal(err)
 	}
 
@@ -493,14 +521,10 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	if err := f.Update(objs[2], "fieldmanager_2"); err != nil {
-		b.Fatal(err)
-	}
-
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		err := f.Update(objs[n%3], fmt.Sprintf("fieldmanager_%d", n%3))
+		err := f.Update(objs[n%len(objs)], fmt.Sprintf("fieldmanager_%d", n%len(objs)))
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -509,10 +533,10 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 }
 
 func TestApplyFailsWithManagedFields(t *testing.T) {
-	f := NewTestFieldManager()
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	err := f.Apply([]byte(`{
-		"apiVersion": "apps/v1",
+		"apiVersion": "v1",
 		"kind": "Pod",
 		"metadata": {
 			"managedFields": [
@@ -529,10 +553,10 @@ func TestApplyFailsWithManagedFields(t *testing.T) {
 }
 
 func TestApplySuccessWithNoManagedFields(t *testing.T) {
-	f := NewTestFieldManager()
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
 
 	err := f.Apply([]byte(`{
-		"apiVersion": "apps/v1",
+		"apiVersion": "v1",
 		"kind": "Pod",
 		"metadata": {
 			"labels": {
