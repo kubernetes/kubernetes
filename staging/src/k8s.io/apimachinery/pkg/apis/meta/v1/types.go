@@ -268,8 +268,6 @@ type ObjectMeta struct {
 	// "ci-cd". The set of fields is always in the version that the
 	// workflow used when modifying the object.
 	//
-	// This field is alpha and can be changed or removed without notice.
-	//
 	// +optional
 	ManagedFields []ManagedFieldsEntry `json:"managedFields,omitempty" protobuf:"bytes,17,rep,name=managedFields"`
 }
