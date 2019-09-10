@@ -26,7 +26,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -87,7 +86,7 @@ func (s *serviceStorage) NewList() runtime.Object {
 	panic("not implemented")
 }
 
-func (s *serviceStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (s *serviceStorage) List(ctx context.Context, options *metav1.ListOptions) (runtime.Object, error) {
 	ns, _ := genericapirequest.NamespaceFrom(ctx)
 
 	// Copy metadata from internal list into result
@@ -147,11 +146,11 @@ func (s *serviceStorage) Delete(ctx context.Context, name string, deleteValidati
 	return s.Service, s.DeletedImmediately, s.Err
 }
 
-func (s *serviceStorage) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+func (s *serviceStorage) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metav1.ListOptions) (runtime.Object, error) {
 	panic("not implemented")
 }
 
-func (s *serviceStorage) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (s *serviceStorage) Watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
 	panic("not implemented")
 }
 

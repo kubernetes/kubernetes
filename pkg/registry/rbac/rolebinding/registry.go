@@ -20,7 +20,7 @@ import (
 	"context"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -29,7 +29,7 @@ import (
 
 // Registry is an interface for things that know how to store RoleBindings.
 type Registry interface {
-	ListRoleBindings(ctx context.Context, options *metainternalversion.ListOptions) (*rbacv1.RoleBindingList, error)
+	ListRoleBindings(ctx context.Context, options *metav1.ListOptions) (*rbacv1.RoleBindingList, error)
 }
 
 // storage puts strong typing around storage calls
@@ -43,7 +43,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListRoleBindings(ctx context.Context, options *metainternalversion.ListOptions) (*rbacv1.RoleBindingList, error) {
+func (s *storage) ListRoleBindings(ctx context.Context, options *metav1.ListOptions) (*rbacv1.RoleBindingList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ type AuthorizerAdapter struct {
 }
 
 func (a AuthorizerAdapter) ListRoleBindings(namespace string) ([]*rbacv1.RoleBinding, error) {
-	list, err := a.Registry.ListRoleBindings(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &metainternalversion.ListOptions{})
+	list, err := a.Registry.ListRoleBindings(genericapirequest.WithNamespace(genericapirequest.NewContext(), namespace), &metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

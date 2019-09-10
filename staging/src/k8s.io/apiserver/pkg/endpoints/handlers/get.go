@@ -190,7 +190,7 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			return
 		}
 
-		opts := metainternalversion.ListOptions{}
+		opts := metav1.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &opts); err != nil {
 			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)

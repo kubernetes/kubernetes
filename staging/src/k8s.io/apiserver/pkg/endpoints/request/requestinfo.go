@@ -207,13 +207,13 @@ func (r *RequestInfoFactory) NewRequestInfo(req *http.Request) (*RequestInfo, er
 
 	// if there's no name on the request and we thought it was a get before, then the actual verb is a list or a watch
 	if len(requestInfo.Name) == 0 && requestInfo.Verb == "get" {
-		opts := metainternalversion.ListOptions{}
+		opts := metav1.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), metav1.SchemeGroupVersion, &opts); err != nil {
 			// An error in parsing request will result in default to "list" and not setting "name" field.
 			klog.Errorf("Couldn't parse request %#v: %v", req.URL.Query(), err)
 			// Reset opts to not rely on partial results from parsing.
 			// However, if watch is set, let's report it.
-			opts = metainternalversion.ListOptions{}
+			opts = metav1.ListOptions{}
 			if values := req.URL.Query()["watch"]; len(values) > 0 {
 				switch strings.ToLower(values[0]) {
 				case "false", "0":

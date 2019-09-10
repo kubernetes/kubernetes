@@ -31,7 +31,6 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -257,7 +256,7 @@ func TestStoreListResourceVersion(t *testing.T) {
 
 	waitListCh := make(chan runtime.Object, 1)
 	go func(listRev uint64) {
-		option := &metainternalversion.ListOptions{ResourceVersion: strconv.FormatUint(listRev, 10)}
+		option := &metav1.ListOptions{ResourceVersion: strconv.FormatUint(listRev, 10)}
 		// It will wait until we create the second pod.
 		l, err := registry.List(ctx, option)
 		if err != nil {
@@ -1382,7 +1381,7 @@ func TestStoreDeleteCollection(t *testing.T) {
 	}
 
 	// Delete all pods.
-	deleted, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{})
+	deleted, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
@@ -1423,7 +1422,7 @@ func TestStoreDeleteCollectionNotFound(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{})
+				_, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metav1.ListOptions{})
 				if err != nil {
 					t.Fatalf("Unexpected error: %v", err)
 				}
@@ -1461,7 +1460,7 @@ func TestStoreDeleteCollectionWithWatch(t *testing.T) {
 	}
 	defer watcher.Stop()
 
-	if _, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metainternalversion.ListOptions{}); err != nil {
+	if _, err := registry.DeleteCollection(testContext, rest.ValidateAllObjectFunc, nil, &metav1.ListOptions{}); err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
 

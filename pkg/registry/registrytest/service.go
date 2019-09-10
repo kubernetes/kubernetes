@@ -20,7 +20,6 @@ import (
 	"context"
 	"sync"
 
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
@@ -50,7 +49,7 @@ func (r *ServiceRegistry) SetError(err error) {
 	r.Err = err
 }
 
-func (r *ServiceRegistry) ListServices(ctx context.Context, options *metainternalversion.ListOptions) (*api.ServiceList, error) {
+func (r *ServiceRegistry) ListServices(ctx context.Context, options *metav1.ListOptions) (*api.ServiceList, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -111,7 +110,7 @@ func (r *ServiceRegistry) UpdateService(ctx context.Context, svc *api.Service, c
 	return svc, r.Err
 }
 
-func (r *ServiceRegistry) WatchServices(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (r *ServiceRegistry) WatchServices(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

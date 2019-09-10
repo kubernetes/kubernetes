@@ -20,7 +20,7 @@ import (
 	"context"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/kubernetes/pkg/apis/rbac"
@@ -29,7 +29,7 @@ import (
 
 // Registry is an interface for things that know how to store ClusterRoleBindings.
 type Registry interface {
-	ListClusterRoleBindings(ctx context.Context, options *metainternalversion.ListOptions) (*rbacv1.ClusterRoleBindingList, error)
+	ListClusterRoleBindings(ctx context.Context, options *metav1.ListOptions) (*rbacv1.ClusterRoleBindingList, error)
 }
 
 // storage puts strong typing around storage calls
@@ -43,7 +43,7 @@ func NewRegistry(s rest.StandardStorage) Registry {
 	return &storage{s}
 }
 
-func (s *storage) ListClusterRoleBindings(ctx context.Context, options *metainternalversion.ListOptions) (*rbacv1.ClusterRoleBindingList, error) {
+func (s *storage) ListClusterRoleBindings(ctx context.Context, options *metav1.ListOptions) (*rbacv1.ClusterRoleBindingList, error) {
 	obj, err := s.List(ctx, options)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ type AuthorizerAdapter struct {
 }
 
 func (a AuthorizerAdapter) ListClusterRoleBindings() ([]*rbacv1.ClusterRoleBinding, error) {
-	list, err := a.Registry.ListClusterRoleBindings(genericapirequest.NewContext(), &metainternalversion.ListOptions{})
+	list, err := a.Registry.ListClusterRoleBindings(genericapirequest.NewContext(), &metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}

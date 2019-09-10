@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -100,7 +99,7 @@ func (r *REST) NewList() runtime.Object {
 	return r.store.NewList()
 }
 
-func (r *REST) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (r *REST) List(ctx context.Context, options *metav1.ListOptions) (runtime.Object, error) {
 	return r.store.List(ctx, options)
 }
 
@@ -116,7 +115,7 @@ func (r *REST) Get(ctx context.Context, name string, options *metav1.GetOptions)
 	return r.store.Get(ctx, name, options)
 }
 
-func (r *REST) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (r *REST) Watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
 	return r.store.Watch(ctx, options)
 }
 

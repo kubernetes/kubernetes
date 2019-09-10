@@ -23,7 +23,6 @@ import (
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -112,7 +111,7 @@ func newREST(resource schema.GroupResource, kind, listKind schema.GroupVersionKi
 var _ rest.CategoriesProvider = &REST{}
 
 // List returns a list of items matching labels and field according to the store's PredicateFunc.
-func (e *REST) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *REST) List(ctx context.Context, options *metav1.ListOptions) (runtime.Object, error) {
 	l, err := e.Store.List(ctx, options)
 	if err != nil {
 		return nil, err

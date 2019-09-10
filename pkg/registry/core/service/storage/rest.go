@@ -26,7 +26,6 @@ import (
 	"strconv"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -164,11 +163,11 @@ func (rs *REST) Get(ctx context.Context, name string, options *metav1.GetOptions
 	return rs.services.Get(ctx, name, options)
 }
 
-func (rs *REST) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (rs *REST) List(ctx context.Context, options *metav1.ListOptions) (runtime.Object, error) {
 	return rs.services.List(ctx, options)
 }
 
-func (rs *REST) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (rs *REST) Watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
 	return rs.services.Watch(ctx, options)
 }
 

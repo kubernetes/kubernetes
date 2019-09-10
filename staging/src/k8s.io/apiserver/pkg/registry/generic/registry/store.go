@@ -27,7 +27,6 @@ import (
 	kubeerr "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/validation/path"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -290,7 +289,7 @@ func (e *Store) GetExportStrategy() rest.RESTExportStrategy {
 
 // List returns a list of items matching labels and field according to the
 // store's PredicateFunc.
-func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *Store) List(ctx context.Context, options *metav1.ListOptions) (runtime.Object, error) {
 	label := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector
@@ -313,10 +312,10 @@ func (e *Store) List(ctx context.Context, options *metainternalversion.ListOptio
 
 // ListPredicate returns a list of all the items matching the given
 // SelectionPredicate.
-func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate, options *metav1.ListOptions) (runtime.Object, error) {
 	if options == nil {
 		// By default we should serve the request from etcd.
-		options = &metainternalversion.ListOptions{ResourceVersion: ""}
+		options = &metav1.ListOptions{ResourceVersion: ""}
 	}
 	p.Limit = options.Limit
 	p.Continue = options.Continue
@@ -977,9 +976,9 @@ func (e *Store) Delete(ctx context.Context, name string, deleteValidation rest.V
 // are removing all objects of a given type) with the current API (it's technically
 // possibly with storage API, but watch is not delivered correctly then).
 // It will be possible to fix it with v3 etcd API.
-func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *Store) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metav1.ListOptions) (runtime.Object, error) {
 	if listOptions == nil {
-		listOptions = &metainternalversion.ListOptions{}
+		listOptions = &metav1.ListOptions{}
 	} else {
 		listOptions = listOptions.DeepCopy()
 	}
@@ -1084,7 +1083,7 @@ func (e *Store) finalizeDelete(ctx context.Context, obj runtime.Object, runHooks
 // WatchPredicate. If possible, you should customize PredicateFunc to produce
 // a matcher that matches by key. SelectionPredicate does this for you
 // automatically.
-func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (e *Store) Watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
 	label := labels.Everything()
 	if options != nil && options.LabelSelector != nil {
 		label = options.LabelSelector

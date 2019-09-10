@@ -190,7 +190,7 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 			return
 		}
 
-		listOptions := metainternalversion.ListOptions{}
+		listOptions := metav1.ListOptions{}
 		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, &listOptions); err != nil {
 			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)

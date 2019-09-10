@@ -25,7 +25,6 @@ import (
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metainternal "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
@@ -259,7 +258,7 @@ func TestColumns(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	gottenList, err := storage.CustomResource.List(ctx, &metainternal.ListOptions{})
+	gottenList, err := storage.CustomResource.List(ctx, &metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

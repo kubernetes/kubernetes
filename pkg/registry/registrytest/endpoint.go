@@ -22,7 +22,6 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/errors"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -39,7 +38,7 @@ type EndpointRegistry struct {
 	lock sync.Mutex
 }
 
-func (e *EndpointRegistry) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *EndpointRegistry) List(ctx context.Context, options *metav1.ListOptions) (runtime.Object, error) {
 	// TODO: support namespaces in this mock
 	e.lock.Lock()
 	defer e.lock.Unlock()
@@ -71,7 +70,7 @@ func (e *EndpointRegistry) Get(ctx context.Context, name string, options *metav1
 	return nil, errors.NewNotFound(api.Resource("endpoints"), name)
 }
 
-func (e *EndpointRegistry) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (e *EndpointRegistry) Watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
 	return nil, fmt.Errorf("unimplemented!")
 }
 
@@ -130,6 +129,6 @@ func (e *EndpointRegistry) Delete(ctx context.Context, name string, deleteValida
 	return nil, true, nil
 }
 
-func (e *EndpointRegistry) DeleteCollection(ctx context.Context, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions, _ *metainternalversion.ListOptions) (runtime.Object, error) {
+func (e *EndpointRegistry) DeleteCollection(ctx context.Context, _ rest.ValidateObjectFunc, _ *metav1.DeleteOptions, _ *metav1.ListOptions) (runtime.Object, error) {
 	return nil, fmt.Errorf("unimplemented!")
 }

@@ -18,7 +18,6 @@ go_library(
         "//pkg/apis/core:go_default_library",
         "//pkg/probe:go_default_library",
         "//pkg/probe/http:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",

@@ -375,7 +375,7 @@ func (storage *SimpleRESTStorage) ConvertToTable(ctx context.Context, obj runtim
 	return rest.NewDefaultTableConvertor(schema.GroupResource{Resource: "simple"}).ConvertToTable(ctx, obj, tableOptions)
 }
 
-func (storage *SimpleRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorage) List(ctx context.Context, options *metav1.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	result := &genericapitesting.SimpleList{
 		ListMeta: metav1.ListMeta{
@@ -503,7 +503,7 @@ func (storage *SimpleRESTStorage) Update(ctx context.Context, name string, objIn
 }
 
 // Implement ResourceWatcher.
-func (storage *SimpleRESTStorage) Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error) {
+func (storage *SimpleRESTStorage) Watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error) {
 	storage.lock.Lock()
 	defer storage.lock.Unlock()
 	storage.checkContext(ctx)
@@ -885,7 +885,7 @@ func (OnlyGetRESTStorage) NewList() runtime.Object {
 	return &genericapitesting.SimpleList{}
 }
 
-func (OnlyGetRESTStorage) List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error) {
+func (OnlyGetRESTStorage) List(ctx context.Context, options *metav1.ListOptions) (runtime.Object, error) {
 	return nil, nil
 }
 
@@ -4383,7 +4383,7 @@ type SimpleRESTStorageWithDeleteCollection struct {
 }
 
 // Delete collection doesn't do much, but let us test this path.
-func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error) {
+func (storage *SimpleRESTStorageWithDeleteCollection) DeleteCollection(ctx context.Context, deleteValidation rest.ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metav1.ListOptions) (runtime.Object, error) {
 	storage.checkContext(ctx)
 	return nil, nil
 }

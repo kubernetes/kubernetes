@@ -22,7 +22,6 @@ import (
 	"net/http"
 	"net/url"
 
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -98,7 +97,7 @@ type Lister interface {
 	// This object must be a pointer type for use with Codec.DecodeInto([]byte, runtime.Object)
 	NewList() runtime.Object
 	// List selects resources in the storage which match to the selector. 'options' can be nil.
-	List(ctx context.Context, options *metainternalversion.ListOptions) (runtime.Object, error)
+	List(ctx context.Context, options *metav1.ListOptions) (runtime.Object, error)
 }
 
 // Exporter is an object that knows how to strip a RESTful resource for export. A store should implement this interface
@@ -169,7 +168,7 @@ type CollectionDeleter interface {
 	// invalid request error.
 	// DeleteCollection may not be atomic - i.e. it may delete some objects and still
 	// return an error after it. On success, returns a list of deleted objects.
-	DeleteCollection(ctx context.Context, deleteValidation ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metainternalversion.ListOptions) (runtime.Object, error)
+	DeleteCollection(ctx context.Context, deleteValidation ValidateObjectFunc, options *metav1.DeleteOptions, listOptions *metav1.ListOptions) (runtime.Object, error)
 }
 
 // Creater is an object that can create an instance of a RESTful object.
@@ -262,7 +261,7 @@ type Watcher interface {
 	// are supported; an error should be returned if 'field' tries to select on a field that
 	// isn't supported. 'resourceVersion' allows for continuing/starting a watch at a
 	// particular version.
-	Watch(ctx context.Context, options *metainternalversion.ListOptions) (watch.Interface, error)
+	Watch(ctx context.Context, options *metav1.ListOptions) (watch.Interface, error)
 }
 
 // StandardStorage is an interface covering the common verbs. Provided for testing whether a
