@@ -127,7 +127,7 @@ type ActualStateOfWorld interface {
 	// actual state of the world.
 	GetMountedVolumes() []MountedVolume
 
-	// GetAllMountedVolumes returns list of all mounted volumes including
+	// GetAllMountedVolumes returns list of all possibly mounted volumes including
 	// those that are in VolumeMounted state and VolumeMountUncertain state.
 	GetAllMountedVolumes() []MountedVolume
 
@@ -635,6 +635,10 @@ func (asw *actualStateOfWorld) PodExistsInVolume(
 
 	podObj, podExists := volumeObj.mountedPods[podName]
 	if podExists {
+		// if volume mount was uncertain we should keep trying to mount the volume
+		if podObj.volumeMountStateForPod == operationexecutor.VolumeMountUncertain {
+			return false, volumeObj.devicePath, nil
+		}
 		if podObj.remountRequired {
 			return true, volumeObj.devicePath, newRemountRequiredError(volumeObj.volumeName, podObj.podName)
 		}

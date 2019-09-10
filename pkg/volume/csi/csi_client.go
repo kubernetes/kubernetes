@@ -639,7 +639,7 @@ func isFinalError(err error) bool {
 	case codes.Canceled, // gRPC: Client Application cancelled the request
 		codes.DeadlineExceeded,  // gRPC: Timeout
 		codes.Unavailable,       // gRPC: Server shutting down, TCP connection broken - previous CreateVolume() may be still in progress.
-		codes.ResourceExhausted, // gRPC: Server temporarily out of resources - previous CreateVolume() may be still in progress.
+		codes.ResourceExhausted, // gRPC: Server temporarily out of resources - previous Publish operation may be still in progress.
 		codes.Aborted:           // CSI: Operation pending for volume
 		return false
 	}

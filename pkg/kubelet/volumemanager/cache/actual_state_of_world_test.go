@@ -592,7 +592,7 @@ func Test_MarkDeviceAsMounted_Positive_NewVolume(t *testing.T) {
 	verifyVolumeExistsInGloballyMountedVolumes(t, generatedVolumeName, asw)
 }
 
-func TestGetMountedVolumesForPod(t *testing.T) {
+func TestUncertainVolumeMounts(t *testing.T) {
 	// Arrange
 	volumePluginMgr, plugin := volumetesting.GetTestVolumePluginMgr(t)
 	asw := NewActualStateOfWorld("mynode" /* nodeName */, volumePluginMgr)
@@ -654,6 +654,11 @@ func TestGetMountedVolumesForPod(t *testing.T) {
 	}
 	if volumeFound {
 		t.Fatalf("expected volume %s to be not found in asw", volumeSpec1.Name())
+	}
+
+	volExists, _, _ := asw.PodExistsInVolume(podName1, generatedVolumeName1)
+	if volExists {
+		t.Fatalf("expected volume %s to not exist in asw", generatedVolumeName1)
 	}
 }
 
