@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/apis/config"
+	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	"k8s.io/kubernetes/pkg/util/async"
 )
@@ -441,6 +442,9 @@ func (em proxyEndpointsMap) unmerge(other proxyEndpointsMap, curServices proxySe
 // Proxier is an hns based proxy for connections between a localhost:lport
 // and services that provide the actual backends.
 type Proxier struct {
+	// EndpointSlice support has not been added for this proxier yet.
+	proxyconfig.NoopEndpointSliceHandler
+
 	// endpointsChanges and serviceChanges contains all changes to endpoints and
 	// services that happened since policies were synced. For a single object,
 	// changes are accumulated, i.e. previous is state from before all of them,
@@ -510,8 +514,8 @@ type closeable interface {
 	Close() error
 }
 
-// Proxier implements ProxyProvider
-var _ proxy.ProxyProvider = &Proxier{}
+// Proxier implements proxy.Provider
+var _ proxy.Provider = &Proxier{}
 
 // NewProxier returns a new Proxier
 func NewProxier(

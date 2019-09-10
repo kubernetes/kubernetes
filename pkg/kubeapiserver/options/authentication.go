@@ -259,6 +259,7 @@ func (s *BuiltInAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.StringVar(&s.PasswordFile.BasicAuthFile, "basic-auth-file", s.PasswordFile.BasicAuthFile, ""+
 			"If set, the file that will be used to admit requests to the secure port of the API server "+
 			"via http basic authentication.")
+		fs.MarkDeprecated("basic-auth-file", "Basic authentication mode is deprecated and will be removed in a future release. It is not recommended for production environments.")
 	}
 
 	if s.RequestHeader != nil {

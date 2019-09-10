@@ -48,20 +48,17 @@ const (
 	// SYS_TIME). This should only be enabled if user namespace remapping is enabled in the docker daemon.
 	ExperimentalHostUserNamespaceDefaultingGate featuregate.Feature = "ExperimentalHostUserNamespaceDefaulting"
 
-	// owner: @vishh
-	// alpha: v1.5
-	//
-	// DEPRECATED - This feature is deprecated by Pod Priority and Preemption as of Kubernetes 1.13.
-	// Ensures guaranteed scheduling of pods marked with a special pod annotation `scheduler.alpha.kubernetes.io/critical-pod`
-	// and also prevents them from being evicted from a node.
-	// Note: This feature is not supported for `BestEffort` pods.
-	ExperimentalCriticalPodAnnotation featuregate.Feature = "ExperimentalCriticalPodAnnotation"
-
 	// owner: @jiayingz
 	// beta: v1.10
 	//
 	// Enables support for Device Plugins
 	DevicePlugins featuregate.Feature = "DevicePlugins"
+
+	// owner: @dxist
+	// alpha: v1.16
+	//
+	// Enables support of HPA scaling to zero pods when an object or custom metric is configured.
+	HPAScaleToZero featuregate.Feature = "HPAScaleToZero"
 
 	// owner: @Huang-Wei
 	// beta: v1.13
@@ -112,14 +109,15 @@ const (
 
 	// owner: @gnufied
 	// alpha: v1.14
+	// beta: v1.16
 	// Ability to expand CSI volumes
 	ExpandCSIVolumes featuregate.Feature = "ExpandCSIVolumes"
 
 	// owner: @verb
-	// alpha: v1.10
+	// alpha: v1.16
 	//
-	// Allows running a "debug container" in a pod namespaces to troubleshoot a running pod.
-	DebugContainers featuregate.Feature = "DebugContainers"
+	// Allows running an ephemeral container in pod namespaces to troubleshoot a running pod.
+	EphemeralContainers featuregate.Feature = "EphemeralContainers"
 
 	// owner: @verb
 	// beta: v1.12
@@ -174,11 +172,23 @@ const (
 	// Enable pods to set sysctls on a pod
 	Sysctls featuregate.Feature = "Sysctls"
 
+	// owner @smarterclayton
+	// alpha: v1.16
+	//
+	// Enable legacy behavior to vary cluster functionality on the node-role.kubernetes.io labels. On by default (legacy), will be turned off in 1.18.
+	LegacyNodeRoleBehavior featuregate.Feature = "LegacyNodeRoleBehavior"
+
 	// owner @brendandburns
 	// alpha: v1.9
 	//
 	// Enable nodes to exclude themselves from service load balancers
 	ServiceNodeExclusion featuregate.Feature = "ServiceNodeExclusion"
+
+	// owner @smarterclayton
+	// alpha: v1.16
+	//
+	// Enable nodes to exclude themselves from network disruption checks
+	NodeDisruptionExclusion featuregate.Feature = "NodeDisruptionExclusion"
 
 	// owner: @jsafrane
 	// alpha: v1.9
@@ -319,6 +329,7 @@ const (
 
 	// owner: @vladimirvivien
 	// alpha: v1.14
+	// beta: v1.16
 	//
 	// Enables CSI Inline volumes support for pods
 	CSIInlineVolume featuregate.Feature = "CSIInlineVolume"
@@ -407,9 +418,16 @@ const (
 
 	// owner: @wk8
 	// alpha: v1.14
+	// beta: v1.16
 	//
 	// Enables GMSA support for Windows workloads.
 	WindowsGMSA featuregate.Feature = "WindowsGMSA"
+
+	// owner: @bclau
+	// alpha: v1.16
+	//
+	// Enables support for running container entrypoints as different usernames than their default ones.
+	WindowsRunAsUserName featuregate.Feature = "WindowsRunAsUserName"
 
 	// owner: @adisky
 	// alpha: v1.14
@@ -424,7 +442,7 @@ const (
 	deprecatedGCERegionalPersistentDisk featuregate.Feature = "GCERegionalPersistentDisk"
 
 	// owner: @MrHohn
-	// alpha: v1.15
+	// beta: v1.16
 	//
 	// Enables Finalizer Protection for Service LoadBalancers.
 	ServiceLoadBalancerFinalizer featuregate.Feature = "ServiceLoadBalancerFinalizer"
@@ -444,6 +462,7 @@ const (
 
 	// owner: @j-griffith
 	// alpha: v1.15
+	// beta: v1.16
 	//
 	// Enable support for specifying an existing PVC as a DataSource
 	VolumePVCDataSource featuregate.Feature = "VolumePVCDataSource"
@@ -459,6 +478,31 @@ const (
 	//
 	// Enables ipv6 dual stack
 	IPv6DualStack featuregate.Feature = "IPv6DualStack"
+
+	// owner: @robscott @freehan
+	// alpha: v1.16
+	//
+	// Enable Endpoint Slices for more scalable Service endpoints.
+	EndpointSlice featuregate.Feature = "EndpointSlice"
+
+	// owner: @Huang-Wei
+	// alpha: v1.16
+	//
+	// Schedule pods evenly across available topology domains.
+	EvenPodsSpread featuregate.Feature = "EvenPodsSpread"
+
+	// owner: @matthyx
+	// alpha: v1.16
+	//
+	// Enables the startupProbe in kubelet worker.
+	StartupProbe featuregate.Feature = "StartupProbe"
+
+	// owner @deads2k
+	// deprecated: v1.16
+	//
+	// Enable the aggregated discovery timeout to ensure client responsiveness. Note this feature is present
+	// only for backward compatibility, it will be removed in the 1.17 release.
+	EnableAggregatedDiscoveryTimeout featuregate.Feature = "EnableAggregatedDiscoveryTimeout"
 )
 
 func init() {
@@ -472,70 +516,74 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	AppArmor:             {Default: true, PreRelease: featuregate.Beta},
 	DynamicKubeletConfig: {Default: true, PreRelease: featuregate.Beta},
 	ExperimentalHostUserNamespaceDefaultingGate: {Default: false, PreRelease: featuregate.Beta},
-	ExperimentalCriticalPodAnnotation:           {Default: false, PreRelease: featuregate.Alpha},
-	DevicePlugins:                               {Default: true, PreRelease: featuregate.Beta},
-	TaintBasedEvictions:                         {Default: true, PreRelease: featuregate.Beta},
-	RotateKubeletServerCertificate:              {Default: true, PreRelease: featuregate.Beta},
-	RotateKubeletClientCertificate:              {Default: true, PreRelease: featuregate.Beta},
-	PersistentLocalVolumes:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.17
-	LocalStorageCapacityIsolation:               {Default: true, PreRelease: featuregate.Beta},
-	Sysctls:                                     {Default: true, PreRelease: featuregate.Beta},
-	DebugContainers:                             {Default: false, PreRelease: featuregate.Alpha},
-	PodShareProcessNamespace:                    {Default: true, PreRelease: featuregate.Beta},
-	PodPriority:                                 {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
-	TaintNodesByCondition:                       {Default: true, PreRelease: featuregate.Beta},
-	QOSReserved:                                 {Default: false, PreRelease: featuregate.Alpha},
-	ExpandPersistentVolumes:                     {Default: true, PreRelease: featuregate.Beta},
-	ExpandInUsePersistentVolumes:                {Default: true, PreRelease: featuregate.Beta},
-	ExpandCSIVolumes:                            {Default: false, PreRelease: featuregate.Alpha},
-	AttachVolumeLimit:                           {Default: true, PreRelease: featuregate.Beta},
-	CPUManager:                                  {Default: true, PreRelease: featuregate.Beta},
-	CPUCFSQuotaPeriod:                           {Default: false, PreRelease: featuregate.Alpha},
-	TopologyManager:                             {Default: false, PreRelease: featuregate.Alpha},
-	ServiceNodeExclusion:                        {Default: false, PreRelease: featuregate.Alpha},
-	MountContainers:                             {Default: false, PreRelease: featuregate.Alpha},
-	CSIDriverRegistry:                           {Default: true, PreRelease: featuregate.Beta},
-	CSINodeInfo:                                 {Default: true, PreRelease: featuregate.Beta},
-	BlockVolume:                                 {Default: true, PreRelease: featuregate.Beta},
-	StorageObjectInUseProtection:                {Default: true, PreRelease: featuregate.GA},
-	ResourceLimitsPriorityFunction:              {Default: false, PreRelease: featuregate.Alpha},
-	SupportIPVSProxyMode:                        {Default: true, PreRelease: featuregate.GA},
-	SupportPodPidsLimit:                         {Default: true, PreRelease: featuregate.Beta},
-	SupportNodePidsLimit:                        {Default: true, PreRelease: featuregate.Beta},
-	HyperVContainer:                             {Default: false, PreRelease: featuregate.Alpha},
-	ScheduleDaemonSetPods:                       {Default: true, PreRelease: featuregate.Beta},
-	TokenRequest:                                {Default: true, PreRelease: featuregate.Beta},
-	TokenRequestProjection:                      {Default: true, PreRelease: featuregate.Beta},
-	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: featuregate.Alpha},
-	CRIContainerLogRotation:                     {Default: true, PreRelease: featuregate.Beta},
-	deprecatedGCERegionalPersistentDisk:         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.17
-	CSIMigration:                                {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationGCE:                             {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAWS:                             {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAzureDisk:                       {Default: false, PreRelease: featuregate.Alpha},
-	CSIMigrationAzureFile:                       {Default: false, PreRelease: featuregate.Alpha},
-	RunAsGroup:                                  {Default: true, PreRelease: featuregate.Beta},
-	CSIMigrationOpenStack:                       {Default: false, PreRelease: featuregate.Alpha},
-	VolumeSubpath:                               {Default: true, PreRelease: featuregate.GA},
-	BalanceAttachedNodeVolumes:                  {Default: false, PreRelease: featuregate.Alpha},
-	VolumeSubpathEnvExpansion:                   {Default: true, PreRelease: featuregate.Beta},
-	ResourceQuotaScopeSelectors:                 {Default: true, PreRelease: featuregate.Beta},
-	CSIBlockVolume:                              {Default: true, PreRelease: featuregate.Beta},
-	CSIInlineVolume:                             {Default: false, PreRelease: featuregate.Alpha},
-	RuntimeClass:                                {Default: true, PreRelease: featuregate.Beta},
-	NodeLease:                                   {Default: true, PreRelease: featuregate.Beta},
-	SCTPSupport:                                 {Default: false, PreRelease: featuregate.Alpha},
-	VolumeSnapshotDataSource:                    {Default: false, PreRelease: featuregate.Alpha},
-	ProcMountType:                               {Default: false, PreRelease: featuregate.Alpha},
-	TTLAfterFinished:                            {Default: false, PreRelease: featuregate.Alpha},
-	KubeletPodResources:                         {Default: true, PreRelease: featuregate.Beta},
-	WindowsGMSA:                                 {Default: false, PreRelease: featuregate.Alpha},
-	ServiceLoadBalancerFinalizer:                {Default: false, PreRelease: featuregate.Alpha},
+	DevicePlugins:                       {Default: true, PreRelease: featuregate.Beta},
+	TaintBasedEvictions:                 {Default: true, PreRelease: featuregate.Beta},
+	RotateKubeletServerCertificate:      {Default: true, PreRelease: featuregate.Beta},
+	RotateKubeletClientCertificate:      {Default: true, PreRelease: featuregate.Beta},
+	PersistentLocalVolumes:              {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.17
+	LocalStorageCapacityIsolation:       {Default: true, PreRelease: featuregate.Beta},
+	Sysctls:                             {Default: true, PreRelease: featuregate.Beta},
+	EphemeralContainers:                 {Default: false, PreRelease: featuregate.Alpha},
+	PodShareProcessNamespace:            {Default: true, PreRelease: featuregate.Beta},
+	PodPriority:                         {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
+	TaintNodesByCondition:               {Default: true, PreRelease: featuregate.Beta},
+	QOSReserved:                         {Default: false, PreRelease: featuregate.Alpha},
+	ExpandPersistentVolumes:             {Default: true, PreRelease: featuregate.Beta},
+	ExpandInUsePersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
+	ExpandCSIVolumes:                    {Default: true, PreRelease: featuregate.Beta},
+	AttachVolumeLimit:                   {Default: true, PreRelease: featuregate.Beta},
+	CPUManager:                          {Default: true, PreRelease: featuregate.Beta},
+	CPUCFSQuotaPeriod:                   {Default: false, PreRelease: featuregate.Alpha},
+	TopologyManager:                     {Default: false, PreRelease: featuregate.Alpha},
+	ServiceNodeExclusion:                {Default: false, PreRelease: featuregate.Alpha},
+	NodeDisruptionExclusion:             {Default: false, PreRelease: featuregate.Alpha},
+	MountContainers:                     {Default: false, PreRelease: featuregate.Alpha},
+	CSIDriverRegistry:                   {Default: true, PreRelease: featuregate.Beta},
+	CSINodeInfo:                         {Default: true, PreRelease: featuregate.Beta},
+	BlockVolume:                         {Default: true, PreRelease: featuregate.Beta},
+	StorageObjectInUseProtection:        {Default: true, PreRelease: featuregate.GA},
+	ResourceLimitsPriorityFunction:      {Default: false, PreRelease: featuregate.Alpha},
+	SupportIPVSProxyMode:                {Default: true, PreRelease: featuregate.GA},
+	SupportPodPidsLimit:                 {Default: true, PreRelease: featuregate.Beta},
+	SupportNodePidsLimit:                {Default: true, PreRelease: featuregate.Beta},
+	HyperVContainer:                     {Default: false, PreRelease: featuregate.Alpha},
+	ScheduleDaemonSetPods:               {Default: true, PreRelease: featuregate.Beta},
+	TokenRequest:                        {Default: true, PreRelease: featuregate.Beta},
+	TokenRequestProjection:              {Default: true, PreRelease: featuregate.Beta},
+	BoundServiceAccountTokenVolume:      {Default: false, PreRelease: featuregate.Alpha},
+	CRIContainerLogRotation:             {Default: true, PreRelease: featuregate.Beta},
+	deprecatedGCERegionalPersistentDisk: {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.17
+	CSIMigration:                        {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationGCE:                     {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAWS:                     {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureDisk:               {Default: false, PreRelease: featuregate.Alpha},
+	CSIMigrationAzureFile:               {Default: false, PreRelease: featuregate.Alpha},
+	RunAsGroup:                          {Default: true, PreRelease: featuregate.Beta},
+	CSIMigrationOpenStack:               {Default: false, PreRelease: featuregate.Alpha},
+	VolumeSubpath:                       {Default: true, PreRelease: featuregate.GA},
+	BalanceAttachedNodeVolumes:          {Default: false, PreRelease: featuregate.Alpha},
+	VolumeSubpathEnvExpansion:           {Default: true, PreRelease: featuregate.Beta},
+	ResourceQuotaScopeSelectors:         {Default: true, PreRelease: featuregate.Beta},
+	CSIBlockVolume:                      {Default: true, PreRelease: featuregate.Beta},
+	CSIInlineVolume:                     {Default: true, PreRelease: featuregate.Beta},
+	RuntimeClass:                        {Default: true, PreRelease: featuregate.Beta},
+	NodeLease:                           {Default: true, PreRelease: featuregate.Beta},
+	SCTPSupport:                         {Default: false, PreRelease: featuregate.Alpha},
+	VolumeSnapshotDataSource:            {Default: false, PreRelease: featuregate.Alpha},
+	ProcMountType:                       {Default: false, PreRelease: featuregate.Alpha},
+	TTLAfterFinished:                    {Default: false, PreRelease: featuregate.Alpha},
+	KubeletPodResources:                 {Default: true, PreRelease: featuregate.Beta},
+	WindowsGMSA:                         {Default: true, PreRelease: featuregate.Beta},
+	WindowsRunAsUserName:                {Default: false, PreRelease: featuregate.Alpha},
+	ServiceLoadBalancerFinalizer:        {Default: true, PreRelease: featuregate.Beta},
 	LocalStorageCapacityIsolationFSQuotaMonitoring: {Default: false, PreRelease: featuregate.Alpha},
 	NonPreemptingPriority:                          {Default: false, PreRelease: featuregate.Alpha},
-	VolumePVCDataSource:                            {Default: false, PreRelease: featuregate.Alpha},
+	VolumePVCDataSource:                            {Default: true, PreRelease: featuregate.Beta},
 	PodOverhead:                                    {Default: false, PreRelease: featuregate.Alpha},
 	IPv6DualStack:                                  {Default: false, PreRelease: featuregate.Alpha},
+	EndpointSlice:                                  {Default: false, PreRelease: featuregate.Alpha},
+	EvenPodsSpread:                                 {Default: false, PreRelease: featuregate.Alpha},
+	StartupProbe:                                   {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
@@ -546,17 +594,21 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	genericfeatures.APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.DryRun:                  {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.ServerSideApply:         {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
 	genericfeatures.RequestManagement:       {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	apiextensionsfeatures.CustomResourceValidation:        {Default: true, PreRelease: featuregate.Beta},
-	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: featuregate.Beta},
-	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.Beta},
-	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.Beta},
-	apiextensionsfeatures.CustomResourceDefaulting:        {Default: false, PreRelease: featuregate.Alpha},
+	apiextensionsfeatures.CustomResourceValidation:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
+	apiextensionsfeatures.CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.Beta},
+
+	EnableAggregatedDiscoveryTimeout: {Default: true, PreRelease: featuregate.Deprecated},
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...
+	HPAScaleToZero:         {Default: false, PreRelease: featuregate.Alpha},
+	LegacyNodeRoleBehavior: {Default: true, PreRelease: featuregate.Alpha},
 }

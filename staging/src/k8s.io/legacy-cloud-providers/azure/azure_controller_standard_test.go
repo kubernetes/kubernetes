@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2019 The Kubernetes Authors.
 
@@ -19,7 +21,7 @@ package azure
 import (
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
 

@@ -27,8 +27,8 @@ import (
 	"sigs.k8s.io/yaml"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	"k8s.io/client-go/pkg/version"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/version"
 )
 
 // Version provides the version information of kubeadm.
@@ -62,7 +62,7 @@ func RunVersion(out io.Writer, cmd *cobra.Command) error {
 	const flag = "output"
 	of, err := cmd.Flags().GetString(flag)
 	if err != nil {
-		klog.Fatalf("error accessing flag %s for command %s: %v", flag, cmd.Name(), err)
+		return errors.Wrapf(err, "error accessing flag %s for command %s", flag, cmd.Name())
 	}
 
 	switch of {

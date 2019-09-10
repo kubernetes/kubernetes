@@ -21,6 +21,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -189,40 +190,44 @@ func TestAttacherAttach(t *testing.T) {
 
 	// attacher loop
 	for _, tc := range testCases {
-		t.Logf("test case: %s", tc.name)
-		plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("test case: %s", tc.name)
+			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
 
-		attacher, err := plug.NewAttacher()
-		if err != nil {
-			t.Fatalf("failed to create new attacher: %v", err)
-		}
+			attacher, err := plug.NewAttacher()
+			if err != nil {
+				t.Fatalf("failed to create new attacher: %v", err)
+			}
 
-		csiAttacher := attacher.(*csiAttacher)
+			csiAttacher := attacher.(*csiAttacher)
 
-		go func(spec *volume.Spec, nodename string, fail bool) {
-			attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
-			if !fail && err != nil {
-				t.Errorf("expecting no failure, but got err: %v", err)
-			}
-			if fail && err == nil {
-				t.Errorf("expecting failure, but got no err")
-			}
-			if attachID != "" {
-				t.Errorf("expecting empty attachID, got %v", attachID)
-			}
-		}(tc.spec, tc.nodeName, tc.shouldFail)
+			go func(spec *volume.Spec, nodename string, fail bool) {
+				attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
+				if !fail && err != nil {
+					t.Errorf("expecting no failure, but got err: %v", err)
+				}
+				if fail && err == nil {
+					t.Errorf("expecting failure, but got no err")
+				}
+				if attachID != "" {
+					t.Errorf("expecting empty attachID, got %v", attachID)
+				}
+			}(tc.spec, tc.nodeName, tc.shouldFail)
 
-		var status storage.VolumeAttachmentStatus
-		if tc.injectAttacherError {
-			status.Attached = false
-			status.AttachError = &storage.VolumeError{
-				Message: "attacher error",
+			var status storage.VolumeAttachmentStatus
+			if tc.injectAttacherError {
+				status.Attached = false
+				status.AttachError = &storage.VolumeError{
+					Message: "attacher error",
+				}
+				errStatus := apierrs.NewInternalError(fmt.Errorf("we got an error")).Status()
+				fakeWatcher.Error(&errStatus)
+			} else {
+				status.Attached = true
 			}
-		} else {
-			status.Attached = true
-		}
-		markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, tc.attachID, status)
+			markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, tc.attachID, status)
+		})
 	}
 }
 
@@ -269,36 +274,38 @@ func TestAttacherAttachWithInline(t *testing.T) {
 
 	// attacher loop
 	for _, tc := range testCases {
-		t.Logf("test case: %s", tc.name)
-		plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("test case: %s", tc.name)
+			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
 
-		attacher, err := plug.NewAttacher()
-		if err != nil {
-			t.Fatalf("failed to create new attacher: %v", err)
-		}
-		csiAttacher := attacher.(*csiAttacher)
+			attacher, err := plug.NewAttacher()
+			if err != nil {
+				t.Fatalf("failed to create new attacher: %v", err)
+			}
+			csiAttacher := attacher.(*csiAttacher)
 
-		go func(spec *volume.Spec, nodename string, fail bool) {
-			attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
-			if fail != (err != nil) {
-				t.Errorf("expecting no failure, but got err: %v", err)
-			}
-			if attachID != "" {
-				t.Errorf("expecting empty attachID, got %v", attachID)
-			}
-		}(tc.spec, tc.nodeName, tc.shouldFail)
+			go func(spec *volume.Spec, nodename string, fail bool) {
+				attachID, err := csiAttacher.Attach(spec, types.NodeName(nodename))
+				if fail != (err != nil) {
+					t.Errorf("expecting no failure, but got err: %v", err)
+				}
+				if attachID != "" {
+					t.Errorf("expecting empty attachID, got %v", attachID)
+				}
+			}(tc.spec, tc.nodeName, tc.shouldFail)
 
-		var status storage.VolumeAttachmentStatus
-		if tc.injectAttacherError {
-			status.Attached = false
-			status.AttachError = &storage.VolumeError{
-				Message: "attacher error",
+			var status storage.VolumeAttachmentStatus
+			if tc.injectAttacherError {
+				status.Attached = false
+				status.AttachError = &storage.VolumeError{
+					Message: "attacher error",
+				}
+			} else {
+				status.Attached = true
 			}
-		} else {
-			status.Attached = true
-		}
-		markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, tc.attachID, status)
+			markVolumeAttached(t, csiAttacher.k8s, fakeWatcher, tc.attachID, status)
+		})
 	}
 }
 
@@ -335,9 +342,9 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fakeclient.NewSimpleClientset(
-				getTestCSIDriver("not-attachable", nil, &bFalse),
-				getTestCSIDriver("attachable", nil, &bTrue),
-				getTestCSIDriver("nil", nil, nil),
+				getTestCSIDriver("not-attachable", nil, &bFalse, nil),
+				getTestCSIDriver("attachable", nil, &bTrue, nil),
+				getTestCSIDriver("nil", nil, nil, nil),
 			)
 			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -423,9 +430,9 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fakeclient.NewSimpleClientset(
-				getTestCSIDriver("not-attachable", nil, &bFalse),
-				getTestCSIDriver("attachable", nil, &bTrue),
-				getTestCSIDriver("nil", nil, nil),
+				getTestCSIDriver("not-attachable", nil, &bFalse, nil),
+				getTestCSIDriver("attachable", nil, &bTrue, nil),
+				getTestCSIDriver("nil", nil, nil, nil),
 			)
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -669,52 +676,54 @@ func TestAttacherWaitForVolumeAttachment(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
+		t.Run(tc.name, func(t *testing.T) {
+			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
 
-		attacher, err := plug.NewAttacher()
-		if err != nil {
-			t.Fatalf("failed to create new attacher: %v", err)
-		}
-		csiAttacher := attacher.(*csiAttacher)
-		t.Logf("running test: %v", tc.name)
-		pvName := fmt.Sprintf("test-pv-%d", i)
-		volID := fmt.Sprintf("test-vol-%d", i)
-		attachID := getAttachmentName(volID, testDriver, nodeName)
-		attachment := makeTestAttachment(attachID, nodeName, pvName)
-		attachment.Status.Attached = tc.initAttached
-		attachment.Status.AttachError = tc.initAttachErr
-		_, err = csiAttacher.k8s.StorageV1().VolumeAttachments().Create(attachment)
-		if err != nil {
-			t.Fatalf("failed to attach: %v", err)
-		}
-
-		trigerWatchEventTime := tc.trigerWatchEventTime
-		finalAttached := tc.finalAttached
-		finalAttachErr := tc.finalAttachErr
-		// after timeout, fakeWatcher will be closed by csiAttacher.waitForVolumeAttachment
-		if tc.trigerWatchEventTime > 0 && tc.trigerWatchEventTime < tc.timeout {
-			go func() {
-				time.Sleep(trigerWatchEventTime)
-				attachment := makeTestAttachment(attachID, nodeName, pvName)
-				attachment.Status.Attached = finalAttached
-				attachment.Status.AttachError = finalAttachErr
-				fakeWatcher.Modify(attachment)
-			}()
-		}
-
-		retID, err := csiAttacher.waitForVolumeAttachment(volID, attachID, tc.timeout)
-		if tc.shouldFail && err == nil {
-			t.Error("expecting failure, but err is nil")
-		}
-		if tc.initAttachErr != nil {
-			if tc.initAttachErr.Message != err.Error() {
-				t.Errorf("expecting error [%v], got [%v]", tc.initAttachErr.Message, err.Error())
+			attacher, err := plug.NewAttacher()
+			if err != nil {
+				t.Fatalf("failed to create new attacher: %v", err)
 			}
-		}
-		if err == nil && retID != attachID {
-			t.Errorf("attacher.WaitForAttach not returning attachment ID")
-		}
+			csiAttacher := attacher.(*csiAttacher)
+			t.Logf("running test: %v", tc.name)
+			pvName := fmt.Sprintf("test-pv-%d", i)
+			volID := fmt.Sprintf("test-vol-%d", i)
+			attachID := getAttachmentName(volID, testDriver, nodeName)
+			attachment := makeTestAttachment(attachID, nodeName, pvName)
+			attachment.Status.Attached = tc.initAttached
+			attachment.Status.AttachError = tc.initAttachErr
+			_, err = csiAttacher.k8s.StorageV1().VolumeAttachments().Create(attachment)
+			if err != nil {
+				t.Fatalf("failed to attach: %v", err)
+			}
+
+			trigerWatchEventTime := tc.trigerWatchEventTime
+			finalAttached := tc.finalAttached
+			finalAttachErr := tc.finalAttachErr
+			// after timeout, fakeWatcher will be closed by csiAttacher.waitForVolumeAttachment
+			if tc.trigerWatchEventTime > 0 && tc.trigerWatchEventTime < tc.timeout {
+				go func() {
+					time.Sleep(trigerWatchEventTime)
+					attachment := makeTestAttachment(attachID, nodeName, pvName)
+					attachment.Status.Attached = finalAttached
+					attachment.Status.AttachError = finalAttachErr
+					fakeWatcher.Modify(attachment)
+				}()
+			}
+
+			retID, err := csiAttacher.waitForVolumeAttachment(volID, attachID, tc.timeout)
+			if tc.shouldFail && err == nil {
+				t.Error("expecting failure, but err is nil")
+			}
+			if tc.initAttachErr != nil {
+				if tc.initAttachErr.Message != err.Error() {
+					t.Errorf("expecting error [%v], got [%v]", tc.initAttachErr.Message, err.Error())
+				}
+			}
+			if err == nil && retID != attachID {
+				t.Errorf("attacher.WaitForAttach not returning attachment ID")
+			}
+		})
 	}
 }
 
@@ -910,50 +919,52 @@ func TestAttacherDetach(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Logf("running test: %v", tc.name)
-		plug, fakeWatcher, tmpDir, client := newTestWatchPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
-		if tc.reactor != nil {
-			client.PrependReactor("*", "*", tc.reactor)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			t.Logf("running test: %v", tc.name)
+			plug, fakeWatcher, tmpDir, client := newTestWatchPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
+			if tc.reactor != nil {
+				client.PrependReactor("*", "*", tc.reactor)
+			}
 
-		attacher, err0 := plug.NewAttacher()
-		if err0 != nil {
-			t.Fatalf("failed to create new attacher: %v", err0)
-		}
-		csiAttacher := attacher.(*csiAttacher)
+			attacher, err0 := plug.NewAttacher()
+			if err0 != nil {
+				t.Fatalf("failed to create new attacher: %v", err0)
+			}
+			csiAttacher := attacher.(*csiAttacher)
 
-		pv := makeTestPV("test-pv", 10, testDriver, tc.volID)
-		spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
-		attachment := makeTestAttachment(tc.attachID, nodeName, "test-pv")
-		_, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Create(attachment)
-		if err != nil {
-			t.Fatalf("failed to attach: %v", err)
-		}
-		volumeName, err := plug.GetVolumeName(spec)
-		if err != nil {
-			t.Errorf("test case %s failed: %v", tc.name, err)
-		}
-		go func() {
-			fakeWatcher.Delete(attachment)
-		}()
-		err = csiAttacher.Detach(volumeName, types.NodeName(nodeName))
-		if tc.shouldFail && err == nil {
-			t.Fatal("expecting failure, but err = nil")
-		}
-		if !tc.shouldFail && err != nil {
-			t.Fatalf("unexpected err: %v", err)
-		}
-		attach, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Get(tc.attachID, meta.GetOptions{})
-		if err != nil {
-			if !apierrs.IsNotFound(err) {
+			pv := makeTestPV("test-pv", 10, testDriver, tc.volID)
+			spec := volume.NewSpecFromPersistentVolume(pv, pv.Spec.PersistentVolumeSource.CSI.ReadOnly)
+			attachment := makeTestAttachment(tc.attachID, nodeName, "test-pv")
+			_, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Create(attachment)
+			if err != nil {
+				t.Fatalf("failed to attach: %v", err)
+			}
+			volumeName, err := plug.GetVolumeName(spec)
+			if err != nil {
+				t.Errorf("test case %s failed: %v", tc.name, err)
+			}
+			go func() {
+				fakeWatcher.Delete(attachment)
+			}()
+			err = csiAttacher.Detach(volumeName, types.NodeName(nodeName))
+			if tc.shouldFail && err == nil {
+				t.Fatal("expecting failure, but err = nil")
+			}
+			if !tc.shouldFail && err != nil {
 				t.Fatalf("unexpected err: %v", err)
 			}
-		} else {
-			if attach == nil {
-				t.Errorf("expecting attachment not to be nil, but it is")
+			attach, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Get(tc.attachID, meta.GetOptions{})
+			if err != nil {
+				if !apierrs.IsNotFound(err) {
+					t.Fatalf("unexpected err: %v", err)
+				}
+			} else {
+				if attach == nil {
+					t.Errorf("expecting attachment not to be nil, but it is")
+				}
 			}
-		}
+		})
 	}
 }
 
@@ -1033,6 +1044,14 @@ func TestAttacherMountDevice(t *testing.T) {
 			spec:            volume.NewSpecFromPersistentVolume(makeTestPV(pvName, 10, testDriver, "test-vol1"), false),
 		},
 		{
+			testName:        "normal PV with mount options",
+			volName:         "test-vol1",
+			devicePath:      "path1",
+			deviceMountPath: "path2",
+			stageUnstageSet: true,
+			spec:            volume.NewSpecFromPersistentVolume(makeTestPVWithMountOptions(pvName, 10, testDriver, "test-vol1", []string{"test-op"}), false),
+		},
+		{
 			testName:        "no vol name",
 			volName:         "",
 			devicePath:      "path1",
@@ -1078,70 +1097,75 @@ func TestAttacherMountDevice(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Logf("Running test case: %s", tc.testName)
+		t.Run(tc.testName, func(t *testing.T) {
+			t.Logf("Running test case: %s", tc.testName)
 
-		// Setup
-		// Create a new attacher
-		plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
-		attacher, err0 := plug.NewAttacher()
-		if err0 != nil {
-			t.Fatalf("failed to create new attacher: %v", err0)
-		}
-		csiAttacher := attacher.(*csiAttacher)
-		csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
-
-		if tc.deviceMountPath != "" {
-			tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
-		}
-
-		nodeName := string(csiAttacher.plugin.host.GetNodeName())
-		attachID := getAttachmentName(tc.volName, testDriver, nodeName)
-
-		// Set up volume attachment
-		attachment := makeTestAttachment(attachID, nodeName, pvName)
-		_, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Create(attachment)
-		if err != nil {
-			t.Fatalf("failed to attach: %v", err)
-		}
-		go func() {
-			fakeWatcher.Delete(attachment)
-		}()
-
-		// Run
-		err = csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
-
-		// Verify
-		if err != nil {
-			if !tc.shouldFail {
-				t.Errorf("test should not fail, but error occurred: %v", err)
+			// Setup
+			// Create a new attacher
+			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
+			attacher, err0 := plug.NewAttacher()
+			if err0 != nil {
+				t.Fatalf("failed to create new attacher: %v", err0)
 			}
-			continue
-		}
-		if err == nil && tc.shouldFail {
-			t.Errorf("test should fail, but no error occurred")
-		}
+			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
 
-		// Verify call goes through all the way
-		numStaged := 1
-		if !tc.stageUnstageSet {
-			numStaged = 0
-		}
+			if tc.deviceMountPath != "" {
+				tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
+			}
 
-		cdc := csiAttacher.csiClient.(*fakeCsiDriverClient)
-		staged := cdc.nodeClient.GetNodeStagedVolumes()
-		if len(staged) != numStaged {
-			t.Errorf("got wrong number of staged volumes, expecting %v got: %v", numStaged, len(staged))
-		}
-		if tc.stageUnstageSet {
-			vol, ok := staged[tc.volName]
-			if !ok {
-				t.Errorf("could not find staged volume: %s", tc.volName)
+			nodeName := string(csiAttacher.plugin.host.GetNodeName())
+			attachID := getAttachmentName(tc.volName, testDriver, nodeName)
+
+			// Set up volume attachment
+			attachment := makeTestAttachment(attachID, nodeName, pvName)
+			_, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Create(attachment)
+			if err != nil {
+				t.Fatalf("failed to attach: %v", err)
 			}
-			if vol.Path != tc.deviceMountPath {
-				t.Errorf("expected mount path: %s. got: %s", tc.deviceMountPath, vol.Path)
+			go func() {
+				fakeWatcher.Delete(attachment)
+			}()
+
+			// Run
+			err = csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
+
+			// Verify
+			if err != nil {
+				if !tc.shouldFail {
+					t.Errorf("test should not fail, but error occurred: %v", err)
+				}
+				return
 			}
-		}
+			if err == nil && tc.shouldFail {
+				t.Errorf("test should fail, but no error occurred")
+			}
+
+			// Verify call goes through all the way
+			numStaged := 1
+			if !tc.stageUnstageSet {
+				numStaged = 0
+			}
+
+			cdc := csiAttacher.csiClient.(*fakeCsiDriverClient)
+			staged := cdc.nodeClient.GetNodeStagedVolumes()
+			if len(staged) != numStaged {
+				t.Errorf("got wrong number of staged volumes, expecting %v got: %v", numStaged, len(staged))
+			}
+			if tc.stageUnstageSet {
+				vol, ok := staged[tc.volName]
+				if !ok {
+					t.Errorf("could not find staged volume: %s", tc.volName)
+				}
+				if vol.Path != tc.deviceMountPath {
+					t.Errorf("expected mount path: %s. got: %s", tc.deviceMountPath, vol.Path)
+				}
+				if !reflect.DeepEqual(vol.MountFlags, tc.spec.PersistentVolume.Spec.MountOptions) {
+					t.Errorf("expected mount options: %v, got: %v", tc.spec.PersistentVolume.Spec.MountOptions, vol.MountFlags)
+				}
+			}
+		})
 	}
 }
 
@@ -1218,70 +1242,72 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Logf("Running test case: %s", tc.testName)
+		t.Run(tc.testName, func(t *testing.T) {
+			t.Logf("Running test case: %s", tc.testName)
 
-		// Setup
-		// Create a new attacher
-		plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
-		attacher, err0 := plug.NewAttacher()
-		if err0 != nil {
-			t.Fatalf("failed to create new attacher: %v", err0)
-		}
-		csiAttacher := attacher.(*csiAttacher)
-		csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
-
-		if tc.deviceMountPath != "" {
-			tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
-		}
-
-		nodeName := string(csiAttacher.plugin.host.GetNodeName())
-		attachID := getAttachmentName(tc.volName, testDriver, nodeName)
-
-		// Set up volume attachment
-		attachment := makeTestAttachment(attachID, nodeName, pvName)
-		_, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Create(attachment)
-		if err != nil {
-			t.Fatalf("failed to attach: %v", err)
-		}
-		go func() {
-			fakeWatcher.Delete(attachment)
-		}()
-
-		// Run
-		err = csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
-
-		// Verify
-		if err != nil {
-			if !tc.shouldFail {
-				t.Errorf("test should not fail, but error occurred: %v", err)
+			// Setup
+			// Create a new attacher
+			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
+			attacher, err0 := plug.NewAttacher()
+			if err0 != nil {
+				t.Fatalf("failed to create new attacher: %v", err0)
 			}
-			continue
-		}
-		if err == nil && tc.shouldFail {
-			t.Errorf("test should fail, but no error occurred")
-		}
+			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
 
-		// Verify call goes through all the way
-		numStaged := 1
-		if !tc.stageUnstageSet {
-			numStaged = 0
-		}
+			if tc.deviceMountPath != "" {
+				tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
+			}
 
-		cdc := csiAttacher.csiClient.(*fakeCsiDriverClient)
-		staged := cdc.nodeClient.GetNodeStagedVolumes()
-		if len(staged) != numStaged {
-			t.Errorf("got wrong number of staged volumes, expecting %v got: %v", numStaged, len(staged))
-		}
-		if tc.stageUnstageSet {
-			vol, ok := staged[tc.volName]
-			if !ok {
-				t.Errorf("could not find staged volume: %s", tc.volName)
+			nodeName := string(csiAttacher.plugin.host.GetNodeName())
+			attachID := getAttachmentName(tc.volName, testDriver, nodeName)
+
+			// Set up volume attachment
+			attachment := makeTestAttachment(attachID, nodeName, pvName)
+			_, err := csiAttacher.k8s.StorageV1().VolumeAttachments().Create(attachment)
+			if err != nil {
+				t.Fatalf("failed to attach: %v", err)
 			}
-			if vol.Path != tc.deviceMountPath {
-				t.Errorf("expected mount path: %s. got: %s", tc.deviceMountPath, vol.Path)
+			go func() {
+				fakeWatcher.Delete(attachment)
+			}()
+
+			// Run
+			err = csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
+
+			// Verify
+			if err != nil {
+				if !tc.shouldFail {
+					t.Errorf("test should not fail, but error occurred: %v", err)
+				}
+				return
 			}
-		}
+			if err == nil && tc.shouldFail {
+				t.Errorf("test should fail, but no error occurred")
+			}
+
+			// Verify call goes through all the way
+			numStaged := 1
+			if !tc.stageUnstageSet {
+				numStaged = 0
+			}
+
+			cdc := csiAttacher.csiClient.(*fakeCsiDriverClient)
+			staged := cdc.nodeClient.GetNodeStagedVolumes()
+			if len(staged) != numStaged {
+				t.Errorf("got wrong number of staged volumes, expecting %v got: %v", numStaged, len(staged))
+			}
+			if tc.stageUnstageSet {
+				vol, ok := staged[tc.volName]
+				if !ok {
+					t.Errorf("could not find staged volume: %s", tc.volName)
+				}
+				if vol.Path != tc.deviceMountPath {
+					t.Errorf("expected mount path: %s. got: %s", tc.deviceMountPath, vol.Path)
+				}
+			}
+		})
 	}
 }
 
@@ -1345,91 +1371,93 @@ func TestAttacherUnmountDevice(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Logf("Running test case: %s", tc.testName)
-		// Setup
-		// Create a new attacher
-		plug, _, tmpDir, _ := newTestWatchPlugin(t, nil)
-		defer os.RemoveAll(tmpDir)
-		attacher, err0 := plug.NewAttacher()
-		if err0 != nil {
-			t.Fatalf("failed to create new attacher: %v", err0)
-		}
-		csiAttacher := attacher.(*csiAttacher)
-		csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
-
-		if tc.deviceMountPath != "" {
-			tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
-		}
-
-		// Add the volume to NodeStagedVolumes
-		cdc := csiAttacher.csiClient.(*fakeCsiDriverClient)
-		cdc.nodeClient.AddNodeStagedVolume(tc.volID, tc.deviceMountPath, nil)
-
-		// Make JSON for this object
-		if tc.deviceMountPath != "" {
-			if err := os.MkdirAll(tc.deviceMountPath, 0755); err != nil {
-				t.Fatalf("error creating directory %s: %s", tc.deviceMountPath, err)
+		t.Run(tc.testName, func(t *testing.T) {
+			t.Logf("Running test case: %s", tc.testName)
+			// Setup
+			// Create a new attacher
+			plug, _, tmpDir, _ := newTestWatchPlugin(t, nil)
+			defer os.RemoveAll(tmpDir)
+			attacher, err0 := plug.NewAttacher()
+			if err0 != nil {
+				t.Fatalf("failed to create new attacher: %v", err0)
 			}
-		}
-		dir := filepath.Dir(tc.deviceMountPath)
-		if tc.jsonFile != "" {
-			dataPath := filepath.Join(dir, volDataFileName)
-			if err := ioutil.WriteFile(dataPath, []byte(tc.jsonFile), 0644); err != nil {
-				t.Fatalf("error creating %s: %s", dataPath, err)
+			csiAttacher := attacher.(*csiAttacher)
+			csiAttacher.csiClient = setupClient(t, tc.stageUnstageSet)
+
+			if tc.deviceMountPath != "" {
+				tc.deviceMountPath = filepath.Join(tmpDir, tc.deviceMountPath)
 			}
-		}
-		if tc.createPV {
-			// Make the PV for this object
-			pvName := filepath.Base(dir)
-			pv := makeTestPV(pvName, 5, "csi", tc.volID)
-			_, err := csiAttacher.k8s.CoreV1().PersistentVolumes().Create(pv)
-			if err != nil && !tc.shouldFail {
-				t.Fatalf("Failed to create PV: %v", err)
-			}
-		}
 
-		// Run
-		err := csiAttacher.UnmountDevice(tc.deviceMountPath)
-		// Verify
-		if err != nil {
-			if !tc.shouldFail {
-				t.Errorf("test should not fail, but error occurred: %v", err)
-			}
-			continue
-		}
-		if err == nil && tc.shouldFail {
-			t.Errorf("test should fail, but no error occurred")
-		}
+			// Add the volume to NodeStagedVolumes
+			cdc := csiAttacher.csiClient.(*fakeCsiDriverClient)
+			cdc.nodeClient.AddNodeStagedVolume(tc.volID, tc.deviceMountPath, nil)
 
-		// Verify call goes through all the way
-		expectedSet := 0
-		if !tc.stageUnstageSet {
-			expectedSet = 1
-		}
-		staged := cdc.nodeClient.GetNodeStagedVolumes()
-		if len(staged) != expectedSet {
-			t.Errorf("got wrong number of staged volumes, expecting %v got: %v", expectedSet, len(staged))
-		}
-
-		_, ok := staged[tc.volID]
-		if ok && tc.stageUnstageSet {
-			t.Errorf("found unexpected staged volume: %s", tc.volID)
-		} else if !ok && !tc.stageUnstageSet {
-			t.Errorf("could not find expected staged volume: %s", tc.volID)
-		}
-
-		if tc.jsonFile != "" && !tc.shouldFail {
-			dataPath := filepath.Join(dir, volDataFileName)
-			if _, err := os.Stat(dataPath); !os.IsNotExist(err) {
-				if err != nil {
-					t.Errorf("error checking file %s: %s", dataPath, err)
-				} else {
-					t.Errorf("json file %s should not exists, but it does", dataPath)
+			// Make JSON for this object
+			if tc.deviceMountPath != "" {
+				if err := os.MkdirAll(tc.deviceMountPath, 0755); err != nil {
+					t.Fatalf("error creating directory %s: %s", tc.deviceMountPath, err)
 				}
-			} else {
-				t.Logf("json file %s was correctly removed", dataPath)
 			}
-		}
+			dir := filepath.Dir(tc.deviceMountPath)
+			if tc.jsonFile != "" {
+				dataPath := filepath.Join(dir, volDataFileName)
+				if err := ioutil.WriteFile(dataPath, []byte(tc.jsonFile), 0644); err != nil {
+					t.Fatalf("error creating %s: %s", dataPath, err)
+				}
+			}
+			if tc.createPV {
+				// Make the PV for this object
+				pvName := filepath.Base(dir)
+				pv := makeTestPV(pvName, 5, "csi", tc.volID)
+				_, err := csiAttacher.k8s.CoreV1().PersistentVolumes().Create(pv)
+				if err != nil && !tc.shouldFail {
+					t.Fatalf("Failed to create PV: %v", err)
+				}
+			}
+
+			// Run
+			err := csiAttacher.UnmountDevice(tc.deviceMountPath)
+			// Verify
+			if err != nil {
+				if !tc.shouldFail {
+					t.Errorf("test should not fail, but error occurred: %v", err)
+				}
+				return
+			}
+			if err == nil && tc.shouldFail {
+				t.Errorf("test should fail, but no error occurred")
+			}
+
+			// Verify call goes through all the way
+			expectedSet := 0
+			if !tc.stageUnstageSet {
+				expectedSet = 1
+			}
+			staged := cdc.nodeClient.GetNodeStagedVolumes()
+			if len(staged) != expectedSet {
+				t.Errorf("got wrong number of staged volumes, expecting %v got: %v", expectedSet, len(staged))
+			}
+
+			_, ok := staged[tc.volID]
+			if ok && tc.stageUnstageSet {
+				t.Errorf("found unexpected staged volume: %s", tc.volID)
+			} else if !ok && !tc.stageUnstageSet {
+				t.Errorf("could not find expected staged volume: %s", tc.volID)
+			}
+
+			if tc.jsonFile != "" && !tc.shouldFail {
+				dataPath := filepath.Join(dir, volDataFileName)
+				if _, err := os.Stat(dataPath); !os.IsNotExist(err) {
+					if err != nil {
+						t.Errorf("error checking file %s: %s", dataPath, err)
+					} else {
+						t.Errorf("json file %s should not exists, but it does", dataPath)
+					}
+				} else {
+					t.Logf("json file %s was correctly removed", dataPath)
+				}
+			}
+		})
 	}
 }
 

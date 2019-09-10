@@ -71,9 +71,9 @@ var _ = framework.KubeDescribe("Probing container", func() {
 
 		// We assume the pod became ready when the container became ready. This
 		// is true for a single container pod.
-		readyTime, err := getTransitionTimeForReadyCondition(p)
+		readyTime, err := GetTransitionTimeForReadyCondition(p)
 		framework.ExpectNoError(err)
-		startedTime, err := getContainerStartedTime(p, containerName)
+		startedTime, err := GetContainerStartedTime(p, containerName)
 		framework.ExpectNoError(err)
 
 		e2elog.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
@@ -125,7 +125,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		runLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -141,7 +141,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		runLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 	})
 
 	/*
@@ -156,7 +156,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(nil, livenessProbe)
-		runLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -171,7 +171,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(nil, livenessProbe)
-		runLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 	})
 
 	/*
@@ -186,7 +186,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(nil, livenessProbe)
-		runLivenessTest(f, pod, 5, time.Minute*5)
+		RunLivenessTest(f, pod, 5, time.Minute*5)
 	})
 
 	/*
@@ -202,7 +202,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    5, // to accommodate nodes which are slow in bringing up containers.
 		}
 		pod := testWebServerPodSpec(nil, livenessProbe, "test-webserver", 80)
-		runLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 	})
 
 	/*
@@ -221,7 +221,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := busyBoxPodSpec(nil, livenessProbe, cmd)
-		runLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -236,7 +236,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(nil, livenessProbe)
-		runLivenessTest(f, pod, 1, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 1, defaultObservationTimeout)
 	})
 
 	/*
@@ -251,7 +251,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			FailureThreshold:    1,
 		}
 		pod := livenessPodSpec(nil, livenessProbe)
-		runLivenessTest(f, pod, 0, defaultObservationTimeout)
+		RunLivenessTest(f, pod, 0, defaultObservationTimeout)
 		// Expect an event of type "ProbeWarning".
 		expectedEvent := fields.Set{
 			"involvedObject.kind":      "Pod",
@@ -259,12 +259,12 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			"involvedObject.namespace": f.Namespace.Name,
 			"reason":                   events.ContainerProbeWarning,
 		}.AsSelector().String()
-		framework.ExpectNoError(e2epod.WaitTimeoutForPodEvent(
-			f.ClientSet, pod.Name, f.Namespace.Name, expectedEvent, "0.0.0.0", framework.PodEventTimeout))
+		framework.ExpectNoError(WaitTimeoutForEvent(
+			f.ClientSet, f.Namespace.Name, expectedEvent, "0.0.0.0", framework.PodEventTimeout))
 	})
 })
 
-func getContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error) {
+func GetContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error) {
 	for _, status := range p.Status.ContainerStatuses {
 		if status.Name != containerName {
 			continue
@@ -277,7 +277,7 @@ func getContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error)
 	return time.Time{}, fmt.Errorf("cannot find container named %q", containerName)
 }
 
-func getTransitionTimeForReadyCondition(p *v1.Pod) (time.Time, error) {
+func GetTransitionTimeForReadyCondition(p *v1.Pod) (time.Time, error) {
 	for _, cond := range p.Status.Conditions {
 		if cond.Type == v1.PodReady {
 			return cond.LastTransitionTime.Time, nil
@@ -404,7 +404,7 @@ func (b webserverProbeBuilder) build() *v1.Probe {
 	return probe
 }
 
-func runLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int, timeout time.Duration) {
+func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int, timeout time.Duration) {
 	podClient := f.PodClient()
 	ns := f.Namespace.Name
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())

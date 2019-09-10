@@ -20,10 +20,29 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
+	"sigs.k8s.io/yaml"
 )
 
 // PluginFactory is a function that builds a plugin.
 type PluginFactory = func(configuration *runtime.Unknown, f FrameworkHandle) (Plugin, error)
+
+// DecodeInto decodes configuration whose type is *runtime.Unknown to the interface into.
+func DecodeInto(configuration *runtime.Unknown, into interface{}) error {
+	if configuration == nil {
+		return nil
+	}
+
+	switch configuration.ContentType {
+	// If ContentType is empty, it means ContentTypeJSON by default.
+	case runtime.ContentTypeJSON, "":
+		return json.Unmarshal(configuration.Raw, into)
+	case runtime.ContentTypeYAML:
+		return yaml.Unmarshal(configuration.Raw, into)
+	default:
+		return fmt.Errorf("not supported content type %s", configuration.ContentType)
+	}
+}
 
 // Registry is a collection of all available plugins. The framework uses a
 // registry to enable and initialize configured plugins.

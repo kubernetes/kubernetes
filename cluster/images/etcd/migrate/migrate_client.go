@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,10 +26,9 @@ import (
 	"strings"
 	"time"
 
-	"context"
-
 	clientv2 "github.com/coreos/etcd/client"
 	"github.com/coreos/etcd/clientv3"
+	"google.golang.org/grpc"
 	"k8s.io/klog"
 )
 
@@ -113,7 +113,13 @@ func (e *CombinedEtcdClient) clientV2() (clientv2.KeysAPI, error) {
 }
 
 func (e *CombinedEtcdClient) clientV3() (*clientv3.Client, error) {
-	return clientv3.New(clientv3.Config{Endpoints: []string{e.endpoint()}})
+	return clientv3.New(clientv3.Config{
+		Endpoints:   []string{e.endpoint()},
+		DialTimeout: 20 * time.Second,
+		DialOptions: []grpc.DialOption{
+			grpc.WithBlock(), // block until the underlying connection is up
+		},
+	})
 }
 
 // Backup creates a backup of an etcd2 data directory at the given backupDir.
@@ -195,12 +201,12 @@ func (e *CombinedEtcdClient) AttachLease(leaseDuration time.Duration) error {
 	defer v3client.Close()
 	objectsResp, err := v3client.KV.Get(ctx, ttlKeysPrefix, clientv3.WithPrefix())
 	if err != nil {
-		return fmt.Errorf("Error while getting objects to attach to the lease")
+		return fmt.Errorf("error while getting objects to attach to the lease")
 	}
 
 	lease, err := v3client.Lease.Grant(ctx, int64(leaseDuration/time.Second))
 	if err != nil {
-		return fmt.Errorf("Error while creating lease: %v", err)
+		return fmt.Errorf("error while creating lease: %v", err)
 	}
 	klog.Infof("Lease with TTL: %v created", lease.TTL)
 

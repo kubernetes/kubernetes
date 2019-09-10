@@ -102,7 +102,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		framework.DeletePodWithWait(f, c, nfsServerPod)
+		e2epod.DeletePodWithWait(c, nfsServerPod)
 	})
 
 	ginkgo.Context("when kube-controller-manager restarts", func() {
@@ -147,13 +147,13 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv2, pvc2))
 
 			ginkgo.By("Attaching both PVC's to a single pod")
-			clientPod, err = framework.CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc1, pvc2}, true, "")
+			clientPod, err = e2epod.CreatePod(c, ns, nil, []*v1.PersistentVolumeClaim{pvc1, pvc2}, true, "")
 			framework.ExpectNoError(err)
 		})
 
 		ginkgo.AfterEach(func() {
 			// Delete client/user pod first
-			framework.ExpectNoError(framework.DeletePodWithWait(f, c, clientPod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod))
 
 			// Delete PV and PVCs
 			if errs := framework.PVPVCCleanup(c, ns, pv1, pvc1); len(errs) > 0 {
@@ -175,6 +175,8 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		})
 
 		ginkgo.It("should delete a bound PVC from a clientPod, restart the kube-control-manager, and ensure the kube-controller-manager does not crash", func() {
+			framework.SkipUnlessSSHKeyPresent()
+
 			ginkgo.By("Deleting PVC for volume 2")
 			err = framework.DeletePersistentVolumeClaim(c, pvc2.Name, ns)
 			framework.ExpectNoError(err)
@@ -254,7 +256,7 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 		}
 	}()
 	framework.ExpectNoError(err)
-	pod := framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
+	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 	pod.Spec.NodeName = nodeName
 	e2elog.Logf("Creating NFS client pod.")
 	pod, err = c.CoreV1().Pods(ns).Create(pod)
@@ -262,7 +264,7 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 	framework.ExpectNoError(err)
 	defer func() {
 		if err != nil {
-			framework.DeletePodWithWait(f, c, pod)
+			e2epod.DeletePodWithWait(c, pod)
 		}
 	}()
 	err = e2epod.WaitForPodRunningInNamespace(c, pod)
@@ -280,7 +282,7 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 // tearDownTestCase destroy resources created by initTestCase.
 func tearDownTestCase(c clientset.Interface, f *framework.Framework, ns string, client *v1.Pod, pvc *v1.PersistentVolumeClaim, pv *v1.PersistentVolume, forceDeletePV bool) {
 	// Ignore deletion errors.  Failing on them will interrupt test cleanup.
-	framework.DeletePodWithWait(f, c, client)
+	e2epod.DeletePodWithWait(c, client)
 	framework.DeletePersistentVolumeClaim(c, pvc.Name, ns)
 	if forceDeletePV && pv != nil {
 		framework.DeletePersistentVolume(c, pv.Name)

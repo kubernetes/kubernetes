@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -21,9 +23,8 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/klog"
-
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/klog"
 )
 
 var (

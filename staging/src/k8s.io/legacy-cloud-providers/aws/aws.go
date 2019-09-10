@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2014 The Kubernetes Authors.
 
@@ -53,10 +55,13 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	informercorev1 "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/pkg/version"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
@@ -509,8 +514,13 @@ type Cloud struct {
 
 	instanceCache instanceCache
 
-	clientBuilder    cloudprovider.ControllerClientBuilder
-	kubeClient       clientset.Interface
+	clientBuilder cloudprovider.ControllerClientBuilder
+	kubeClient    clientset.Interface
+
+	nodeInformer informercorev1.NodeInformer
+	// Extract the function out to make it easier to test
+	nodeInformerHasSynced cache.InformerSynced
+
 	eventBroadcaster record.EventBroadcaster
 	eventRecorder    record.EventRecorder
 
@@ -527,6 +537,11 @@ type Cloud struct {
 var _ Volumes = &Cloud{}
 
 // CloudConfig wraps the settings for the AWS cloud provider.
+// NOTE: Cloud config files should follow the same Kubernetes deprecation policy as
+// flags or CLIs. Config fields should not change behavior in incompatible ways and
+// should be deprecated for at least 2 release prior to removing.
+// See https://kubernetes.io/docs/reference/using-api/deprecation-policy/#deprecating-a-flag-or-cli
+// for more details.
 type CloudConfig struct {
 	Global struct {
 		// TODO: Is there any use for this?  We can get it from the instance metadata service
@@ -746,6 +761,14 @@ func (p *awsSDKProvider) getCrossRequestRetryDelay(regionName string) *CrossRequ
 		p.regionDelayers[regionName] = delayer
 	}
 	return delayer
+}
+
+// SetInformers implements InformerUser interface by setting up informer-fed caches for aws lib to
+// leverage Kubernetes API for caching
+func (c *Cloud) SetInformers(informerFactory informers.SharedInformerFactory) {
+	klog.Infof("Setting up informers for Cloud")
+	c.nodeInformer = informerFactory.Core().V1().Nodes()
+	c.nodeInformerHasSynced = c.nodeInformer.Informer().HasSynced
 }
 
 func (p *awsSDKProvider) Compute(regionName string) (EC2, error) {
@@ -1289,7 +1312,6 @@ func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 			return nil, err
 		}
 	}
-
 	return awsCloud, nil
 }
 
@@ -2182,13 +2204,13 @@ func wrapAttachError(err error, disk *awsDisk, instance string) error {
 					if disk.awsID != EBSVolumeID(aws.StringValue(a.VolumeId)) {
 						klog.Warningf("Expected to get attachment info of volume %q but instead got info of %q", disk.awsID, aws.StringValue(a.VolumeId))
 					} else if aws.StringValue(a.State) == "attached" {
-						return fmt.Errorf("Error attaching EBS volume %q to instance %q: %q. The volume is currently attached to instance %q", disk.awsID, instance, awsError, aws.StringValue(a.InstanceId))
+						return fmt.Errorf("error attaching EBS volume %q to instance %q: %q. The volume is currently attached to instance %q", disk.awsID, instance, awsError, aws.StringValue(a.InstanceId))
 					}
 				}
 			}
 		}
 	}
-	return fmt.Errorf("Error attaching EBS volume %q to instance %q: %q", disk.awsID, instance, err)
+	return fmt.Errorf("error attaching EBS volume %q to instance %q: %q", disk.awsID, instance, err)
 }
 
 // AttachDisk implements Volumes.AttachDisk
@@ -2780,7 +2802,7 @@ func (c *Cloud) describeLoadBalancerv2(name string) (*elbv2.LoadBalancer, error)
 				return nil, nil
 			}
 		}
-		return nil, fmt.Errorf("Error describing load balancer: %q", err)
+		return nil, fmt.Errorf("error describing load balancer: %q", err)
 	}
 
 	// AWS will not return 2 load balancers with the same name _and_ type.
@@ -2797,7 +2819,7 @@ func (c *Cloud) describeLoadBalancerv2(name string) (*elbv2.LoadBalancer, error)
 func (c *Cloud) findVPCID() (string, error) {
 	macs, err := c.metadata.GetMetadata("network/interfaces/macs/")
 	if err != nil {
-		return "", fmt.Errorf("Could not list interfaces of the instance: %q", err)
+		return "", fmt.Errorf("could not list interfaces of the instance: %q", err)
 	}
 
 	// loop over interfaces, first vpc id returned wins
@@ -2812,7 +2834,7 @@ func (c *Cloud) findVPCID() (string, error) {
 		}
 		return vpcID, nil
 	}
-	return "", fmt.Errorf("Could not find VPC ID in instance metadata")
+	return "", fmt.Errorf("could not find VPC ID in instance metadata")
 }
 
 // Retrieves the specified security group from the AWS API, or returns nil if not found
@@ -3357,7 +3379,7 @@ func isSubnetPublic(rt []*ec2.RouteTable, subnetID string) (bool, error) {
 	}
 
 	if subnetTable == nil {
-		return false, fmt.Errorf("Could not locate routing table for subnet %s", subnetID)
+		return false, fmt.Errorf("could not locate routing table for subnet %s", subnetID)
 	}
 
 	for _, route := range subnetTable.Routes {
@@ -4037,7 +4059,7 @@ func (c *Cloud) updateInstanceSecurityGroupsForLoadBalancer(lb *elb.LoadBalancer
 		loadBalancerSecurityGroupID = *securityGroup
 	}
 	if loadBalancerSecurityGroupID == "" {
-		return fmt.Errorf("Could not determine security group for load balancer: %s", aws.StringValue(lb.LoadBalancerName))
+		return fmt.Errorf("could not determine security group for load balancer: %s", aws.StringValue(lb.LoadBalancerName))
 	}
 
 	// Get the actual list of groups that allow ingress from the load-balancer
@@ -4179,14 +4201,14 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 				&elbv2.DescribeTargetGroupsInput{LoadBalancerArn: lb.LoadBalancerArn},
 			)
 			if err != nil {
-				return fmt.Errorf("Error listing target groups before deleting load balancer: %q", err)
+				return fmt.Errorf("error listing target groups before deleting load balancer: %q", err)
 			}
 
 			_, err = c.elbv2.DeleteLoadBalancer(
 				&elbv2.DeleteLoadBalancerInput{LoadBalancerArn: lb.LoadBalancerArn},
 			)
 			if err != nil {
-				return fmt.Errorf("Error deleting load balancer %q: %v", loadBalancerName, err)
+				return fmt.Errorf("error deleting load balancer %q: %v", loadBalancerName, err)
 			}
 
 			for _, group := range targetGroups.TargetGroups {
@@ -4194,7 +4216,7 @@ func (c *Cloud) EnsureLoadBalancerDeleted(ctx context.Context, clusterName strin
 					&elbv2.DeleteTargetGroupInput{TargetGroupArn: group.TargetGroupArn},
 				)
 				if err != nil {
-					return fmt.Errorf("Error deleting target groups after deleting load balancer: %q", err)
+					return fmt.Errorf("error deleting target groups after deleting load balancer: %q", err)
 				}
 			}
 		}
@@ -4520,7 +4542,18 @@ func (c *Cloud) findInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, 
 // Returns the instance with the specified node name
 // Like findInstanceByNodeName, but returns error if node not found
 func (c *Cloud) getInstanceByNodeName(nodeName types.NodeName) (*ec2.Instance, error) {
-	instance, err := c.findInstanceByNodeName(nodeName)
+	var instance *ec2.Instance
+
+	// we leverage node cache to try to retrieve node's provider id first, as
+	// get instance by provider id is way more efficient than by filters in
+	// aws context
+	awsID, err := c.nodeNameToProviderID(nodeName)
+	if err != nil {
+		klog.V(3).Infof("Unable to convert node name %q to aws instanceID, fall back to findInstanceByNodeName: %v", nodeName, err)
+		instance, err = c.findInstanceByNodeName(nodeName)
+	} else {
+		instance, err = c.getInstanceByID(string(awsID))
+	}
 	if err == nil && instance == nil {
 		return nil, cloudprovider.InstanceNotFound
 	}
@@ -4538,6 +4571,26 @@ func (c *Cloud) getFullInstance(nodeName types.NodeName) (*awsInstance, *ec2.Ins
 	}
 	awsInstance := newAWSInstance(c.ec2, instance)
 	return awsInstance, instance, err
+}
+
+func (c *Cloud) nodeNameToProviderID(nodeName types.NodeName) (InstanceID, error) {
+	if len(nodeName) == 0 {
+		return "", fmt.Errorf("no nodeName provided")
+	}
+
+	if c.nodeInformerHasSynced == nil || !c.nodeInformerHasSynced() {
+		return "", fmt.Errorf("node informer has not synced yet")
+	}
+
+	node, err := c.nodeInformer.Lister().Get(string(nodeName))
+	if err != nil {
+		return "", err
+	}
+	if len(node.Spec.ProviderID) == 0 {
+		return "", fmt.Errorf("node has no providerID")
+	}
+
+	return KubernetesInstanceID(node.Spec.ProviderID).MapToAWSInstanceID()
 }
 
 func setNodeDisk(

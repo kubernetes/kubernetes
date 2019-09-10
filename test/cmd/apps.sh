@@ -640,7 +640,7 @@ run_rs_tests() {
   # Post-condition: no replica set exists
   kube::test::get_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" ''
 
-  if kube::test::if_supports_resource "${horizontalpodautoscalers:?}" ; then
+  if kube::test::if_supports_resource "horizontalpodautoscalers" ; then
     ### Auto scale replica set
     # Pre-condition: no replica set exists
     kube::test::get_object_assert rs "{{range.items}}{{${id_field:?}}}:{{end}}" ''

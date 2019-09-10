@@ -20,7 +20,6 @@ package cni
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -34,6 +33,7 @@ import (
 
 	types020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	utiltesting "k8s.io/client-go/util/testing"
@@ -73,15 +73,20 @@ func installPluginUnderTest(t *testing.T, testBinDir, testConfDir, testDataDir, 
 
 	pluginExec := path.Join(testBinDir, binName)
 	f, err = os.Create(pluginExec)
+	require.NoError(t, err)
 
+	// TODO: use mock instead of fake shell script plugin
 	const execScriptTempl = `#!/usr/bin/env bash
+echo -n "{ \"cniVersion\": \"{{.CNIVersion}}\", \"ip4\": { \"ip\": \"{{.PodIP}}/24\" } }"
+if [ "$CNI_COMMAND" = "VERSION" ]; then
+	exit
+fi
 cat > {{.InputFile}}
 env > {{.OutputEnv}}
 echo "%@" >> {{.OutputEnv}}
 export $(echo ${CNI_ARGS} | sed 's/;/ /g') &> /dev/null
 mkdir -p {{.OutputDir}} &> /dev/null
-echo -n "$CNI_COMMAND $CNI_NETNS $K8S_POD_NAMESPACE $K8S_POD_NAME $K8S_POD_INFRA_CONTAINER_ID" >& {{.OutputFile}}
-echo -n "{ \"cniVersion\": \"{{.CNIVersion}}\", \"ip4\": { \"ip\": \"{{.PodIP}}/24\" } }"`
+echo -n "$CNI_COMMAND $CNI_NETNS $K8S_POD_NAMESPACE $K8S_POD_NAME $K8S_POD_INFRA_CONTAINER_ID" >& {{.OutputFile}}`
 
 	inputFile := path.Join(testDataDir, binName+".in")
 	outputFile := path.Join(testDataDir, binName+".out")
@@ -223,7 +228,8 @@ func TestCNIPlugin(t *testing.T) {
 	cniPlugin.execer = fexec
 	cniPlugin.loNetwork.CNIConfig = mockLoCNI
 
-	mockLoCNI.On("AddNetworkList", context.TODO(), cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(&types020.Result{IP4: &types020.IPConfig{IP: net.IPNet{IP: []byte{127, 0, 0, 1}}}}, nil)
+	mockLoCNI.On("AddNetworkList", mock.AnythingOfType("*context.emptyCtx"), cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(&types020.Result{IP4: &types020.IPConfig{IP: net.IPNet{IP: []byte{127, 0, 0, 1}}}}, nil)
+	mockLoCNI.On("DelNetworkList", mock.AnythingOfType("*context.emptyCtx"), cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 
 	// Check that status returns an error
 	if err := cniPlugin.Status(); err == nil {
@@ -329,6 +335,7 @@ func TestCNIPlugin(t *testing.T) {
 		t.Errorf("Expected nil: %v", err)
 	}
 	output, err = ioutil.ReadFile(outputFile)
+	require.NoError(t, err)
 	expectedOutput = "DEL /proc/12345/ns/net podNamespace podName test_infra_container"
 	if string(output) != expectedOutput {
 		t.Errorf("Mismatch in expected output for setup hook. Expected '%s', got '%s'", expectedOutput, string(output))

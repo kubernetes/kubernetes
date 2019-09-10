@@ -31,9 +31,9 @@ import (
 // TypeConverter allows you to convert from runtime.Object to
 // typed.TypedValue and the other way around.
 type TypeConverter interface {
-	ObjectToTyped(runtime.Object) (typed.TypedValue, error)
-	YAMLToTyped([]byte) (typed.TypedValue, error)
-	TypedToObject(typed.TypedValue) (runtime.Object, error)
+	ObjectToTyped(runtime.Object) (*typed.TypedValue, error)
+	YAMLToTyped([]byte) (*typed.TypedValue, error)
+	TypedToObject(*typed.TypedValue) (runtime.Object, error)
 }
 
 // DeducedTypeConverter is a TypeConverter for CRDs that don't have a
@@ -50,22 +50,22 @@ type DeducedTypeConverter struct{}
 var _ TypeConverter = DeducedTypeConverter{}
 
 // ObjectToTyped converts an object into a TypedValue with a "deduced type".
-func (DeducedTypeConverter) ObjectToTyped(obj runtime.Object) (typed.TypedValue, error) {
+func (DeducedTypeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
 		return nil, err
 	}
-	return typed.DeducedParseableType{}.FromUnstructured(u)
+	return typed.DeducedParseableType.FromUnstructured(u)
 }
 
 // YAMLToTyped parses a yaml object into a TypedValue with a "deduced type".
-func (DeducedTypeConverter) YAMLToTyped(from []byte) (typed.TypedValue, error) {
-	return typed.DeducedParseableType{}.FromYAML(typed.YAMLObject(from))
+func (DeducedTypeConverter) YAMLToTyped(from []byte) (*typed.TypedValue, error) {
+	return typed.DeducedParseableType.FromYAML(typed.YAMLObject(from))
 }
 
 // TypedToObject transforms the typed value into a runtime.Object. That
 // is not specific to deduced type.
-func (DeducedTypeConverter) TypedToObject(value typed.TypedValue) (runtime.Object, error) {
+func (DeducedTypeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, error) {
 	return valueToObject(value.AsValue())
 }
 
@@ -78,15 +78,15 @@ var _ TypeConverter = &typeConverter{}
 // NewTypeConverter builds a TypeConverter from a proto.Models. This
 // will automatically find the proper version of the object, and the
 // corresponding schema information.
-func NewTypeConverter(models proto.Models) (TypeConverter, error) {
-	parser, err := newGVKParser(models)
+func NewTypeConverter(models proto.Models, preserveUnknownFields bool) (TypeConverter, error) {
+	parser, err := newGVKParser(models, preserveUnknownFields)
 	if err != nil {
 		return nil, err
 	}
 	return &typeConverter{parser: parser}, nil
 }
 
-func (c *typeConverter) ObjectToTyped(obj runtime.Object) (typed.TypedValue, error) {
+func (c *typeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, error) {
 	u, err := runtime.DefaultUnstructuredConverter.ToUnstructured(obj)
 	if err != nil {
 		return nil, err
@@ -99,7 +99,7 @@ func (c *typeConverter) ObjectToTyped(obj runtime.Object) (typed.TypedValue, err
 	return t.FromUnstructured(u)
 }
 
-func (c *typeConverter) YAMLToTyped(from []byte) (typed.TypedValue, error) {
+func (c *typeConverter) YAMLToTyped(from []byte) (*typed.TypedValue, error) {
 	unstructured := &unstructured.Unstructured{Object: map[string]interface{}{}}
 
 	if err := yaml.Unmarshal(from, &unstructured.Object); err != nil {
@@ -114,7 +114,7 @@ func (c *typeConverter) YAMLToTyped(from []byte) (typed.TypedValue, error) {
 	return t.FromYAML(typed.YAMLObject(string(from)))
 }
 
-func (c *typeConverter) TypedToObject(value typed.TypedValue) (runtime.Object, error) {
+func (c *typeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, error) {
 	return valueToObject(value.AsValue())
 }
 

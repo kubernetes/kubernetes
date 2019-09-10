@@ -62,20 +62,20 @@ type kmsPluginProbe struct {
 	l            *sync.Mutex
 }
 
-func (h *kmsPluginProbe) toHealthzCheck(idx int) healthz.HealthzChecker {
+func (h *kmsPluginProbe) toHealthzCheck(idx int) healthz.HealthChecker {
 	return healthz.NamedCheck(fmt.Sprintf("kms-provider-%d", idx), func(r *http.Request) error {
 		return h.Check()
 	})
 }
 
 // GetKMSPluginHealthzCheckers extracts KMSPluginProbes from the EncryptionConfig.
-func GetKMSPluginHealthzCheckers(filepath string) ([]healthz.HealthzChecker, error) {
+func GetKMSPluginHealthzCheckers(filepath string) ([]healthz.HealthChecker, error) {
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening encryption provider configuration file %q: %v", filepath, err)
 	}
 	defer f.Close()
-	var result []healthz.HealthzChecker
+	var result []healthz.HealthChecker
 	probes, err := getKMSPluginProbes(f)
 	if err != nil {
 		return nil, err

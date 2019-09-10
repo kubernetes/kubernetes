@@ -14,9 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
-    fields:
-      "18":
-        "19": null
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -28,15 +26,15 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "16964250748386560239"
+  resourceVersion: "11042405498087606203"
   selfLink: "5"
-  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+  uid: "7"
 roleRef:
-  apiGroup: "28"
-  kind: "29"
-  name: "30"
-subjects:
-- apiGroup: "25"
+  apiGroup: "23"
   kind: "24"
-  name: "26"
-  namespace: "27"
+  name: "25"
+subjects:
+- apiGroup: "20"
+  kind: "19"
+  name: "21"
+  namespace: "22"

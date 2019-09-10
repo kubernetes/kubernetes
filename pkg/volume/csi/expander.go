@@ -18,6 +18,7 @@ package csi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	api "k8s.io/api/core/v1"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	"k8s.io/kubernetes/pkg/volume/util"
 )
 
 var _ volume.NodeExpandableVolumePlugin = &csiPlugin{}
@@ -44,22 +46,26 @@ func (c *csiPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (bool, er
 	klog.V(4).Infof(log("Expander.NodeExpand(%s)", resizeOptions.DeviceMountPath))
 	csiSource, err := getCSISourceFromSpec(resizeOptions.VolumeSpec)
 	if err != nil {
-		klog.Error(log("Expander.NodeExpand failed to get CSI persistent source: %v", err))
-		return false, err
+		return false, errors.New(log("Expander.NodeExpand failed to get CSI persistent source: %v", err))
 	}
 
 	csClient, err := newCsiDriverClient(csiDriverName(csiSource.Driver))
 	if err != nil {
 		return false, err
 	}
+	fsVolume, err := util.CheckVolumeModeFilesystem(resizeOptions.VolumeSpec)
+	if err != nil {
+		return false, errors.New(log("Expander.NodeExpand failed to check VolumeMode of source: %v", err))
+	}
 
-	return c.nodeExpandWithClient(resizeOptions, csiSource, csClient)
+	return c.nodeExpandWithClient(resizeOptions, csiSource, csClient, fsVolume)
 }
 
 func (c *csiPlugin) nodeExpandWithClient(
 	resizeOptions volume.NodeResizeOptions,
 	csiSource *api.CSIPersistentVolumeSource,
-	csClient csiClient) (bool, error) {
+	csClient csiClient,
+	fsVolume bool) (bool, error) {
 	driverName := csiSource.Driver
 
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)
@@ -88,7 +94,12 @@ func (c *csiPlugin) nodeExpandWithClient(
 		return false, nil
 	}
 
-	_, err = csClient.NodeExpandVolume(ctx, csiSource.VolumeHandle, resizeOptions.DeviceMountPath, resizeOptions.NewSize)
+	volumeTargetPath := resizeOptions.DeviceMountPath
+	if !fsVolume {
+		volumeTargetPath = resizeOptions.DevicePath
+	}
+
+	_, err = csClient.NodeExpandVolume(ctx, csiSource.VolumeHandle, volumeTargetPath, resizeOptions.NewSize)
 	if err != nil {
 		return false, fmt.Errorf("Expander.NodeExpand failed to expand the volume : %v", err)
 	}

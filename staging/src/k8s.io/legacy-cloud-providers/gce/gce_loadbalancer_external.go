@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -36,6 +38,10 @@ import (
 	"k8s.io/klog"
 )
 
+const (
+	errStrLbNoHosts = "cannot EnsureLoadBalancer() with no hosts"
+)
+
 // ensureExternalLoadBalancer is the external implementation of LoadBalancer.EnsureLoadBalancer.
 // Our load balancers in GCE consist of four separate GCE resources - a static
 // IP address, a firewall rule, a target pool, and a forwarding rule. This
@@ -46,7 +52,7 @@ import (
 // each is needed.
 func (g *Cloud) ensureExternalLoadBalancer(clusterName string, clusterID string, apiService *v1.Service, existingFwdRule *compute.ForwardingRule, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	if len(nodes) == 0 {
-		return nil, fmt.Errorf("Cannot EnsureLoadBalancer() with no hosts")
+		return nil, fmt.Errorf(errStrLbNoHosts)
 	}
 
 	hostNames := nodeNames(nodes)
@@ -508,7 +514,7 @@ func (g *Cloud) ensureTargetPoolAndHealthCheck(tpExists, tpNeedsRecreation bool,
 		klog.Infof("ensureTargetPoolAndHealthCheck(%s): Updated target pool (with %d hosts).", lbRefStr, len(hosts))
 		if hcToCreate != nil {
 			if hc, err := g.ensureHTTPHealthCheck(hcToCreate.Name, hcToCreate.RequestPath, int32(hcToCreate.Port)); err != nil || hc == nil {
-				return fmt.Errorf("Failed to ensure health check for %v port %d path %v: %v", loadBalancerName, hcToCreate.Port, hcToCreate.RequestPath, err)
+				return fmt.Errorf("failed to ensure health check for %v port %d path %v: %v", loadBalancerName, hcToCreate.Port, hcToCreate.RequestPath, err)
 			}
 		}
 	} else {
@@ -538,7 +544,7 @@ func (g *Cloud) createTargetPoolAndHealthCheck(svc *v1.Service, name, serviceNam
 		var err error
 		hcRequestPath, hcPort := hc.RequestPath, hc.Port
 		if hc, err = g.ensureHTTPHealthCheck(hc.Name, hc.RequestPath, int32(hc.Port)); err != nil || hc == nil {
-			return fmt.Errorf("Failed to ensure health check for %v port %d path %v: %v", name, hcPort, hcRequestPath, err)
+			return fmt.Errorf("failed to ensure health check for %v port %d path %v: %v", name, hcPort, hcRequestPath, err)
 		}
 		hcLinks = append(hcLinks, hc.SelfLink)
 	}
@@ -607,7 +613,7 @@ func (g *Cloud) updateTargetPool(loadBalancerName string, hosts []*gceInstance) 
 	if len(updatedPool.Instances) != len(hosts) {
 		klog.Errorf("Unexpected number of instances (%d) in target pool %s after updating (expected %d). Instances in updated pool: %s",
 			len(updatedPool.Instances), loadBalancerName, len(hosts), strings.Join(updatedPool.Instances, ","))
-		return fmt.Errorf("Unexpected number of instances (%d) in target pool %s after update (expected %d)", len(updatedPool.Instances), loadBalancerName, len(hosts))
+		return fmt.Errorf("unexpected number of instances (%d) in target pool %s after update (expected %d)", len(updatedPool.Instances), loadBalancerName, len(hosts))
 	}
 	return nil
 }
@@ -636,7 +642,7 @@ func makeHTTPHealthCheck(name, path string, port int32) *compute.HttpHealthCheck
 // The HC interval will be reconciled to 8 seconds.
 // If the existing health check is larger than the default interval,
 // the configuration will be kept.
-func mergeHTTPHealthChecks(hc, newHC *compute.HttpHealthCheck) *compute.HttpHealthCheck {
+func mergeHTTPHealthChecks(hc, newHC *compute.HttpHealthCheck) {
 	if hc.CheckIntervalSec > newHC.CheckIntervalSec {
 		newHC.CheckIntervalSec = hc.CheckIntervalSec
 	}
@@ -649,16 +655,23 @@ func mergeHTTPHealthChecks(hc, newHC *compute.HttpHealthCheck) *compute.HttpHeal
 	if hc.HealthyThreshold > newHC.HealthyThreshold {
 		newHC.HealthyThreshold = hc.HealthyThreshold
 	}
-	return newHC
 }
 
 // needToUpdateHTTPHealthChecks checks whether the http healthcheck needs to be
 // updated.
 func needToUpdateHTTPHealthChecks(hc, newHC *compute.HttpHealthCheck) bool {
-	changed := hc.Port != newHC.Port || hc.RequestPath != newHC.RequestPath || hc.Description != newHC.Description
-	changed = changed || hc.CheckIntervalSec < newHC.CheckIntervalSec || hc.TimeoutSec < newHC.TimeoutSec
-	changed = changed || hc.UnhealthyThreshold < newHC.UnhealthyThreshold || hc.HealthyThreshold < newHC.HealthyThreshold
-	return changed
+	switch {
+	case
+		hc.Port != newHC.Port,
+		hc.RequestPath != newHC.RequestPath,
+		hc.Description != newHC.Description,
+		hc.CheckIntervalSec < newHC.CheckIntervalSec,
+		hc.TimeoutSec < newHC.TimeoutSec,
+		hc.UnhealthyThreshold < newHC.UnhealthyThreshold,
+		hc.HealthyThreshold < newHC.HealthyThreshold:
+		return true
+	}
+	return false
 }
 
 func (g *Cloud) ensureHTTPHealthCheck(name, path string, port int32) (hc *compute.HttpHealthCheck, err error) {
@@ -681,7 +694,7 @@ func (g *Cloud) ensureHTTPHealthCheck(name, path string, port int32) (hc *comput
 	klog.V(4).Infof("Checking http health check params %s", name)
 	if needToUpdateHTTPHealthChecks(hc, newHC) {
 		klog.Warningf("Health check %v exists but parameters have drifted - updating...", name)
-		newHC = mergeHTTPHealthChecks(hc, newHC)
+		mergeHTTPHealthChecks(hc, newHC)
 		if err := g.UpdateHTTPHealthCheck(newHC); err != nil {
 			klog.Warningf("Failed to reconcile http health check %v parameters", name)
 			return nil, err
@@ -790,7 +803,7 @@ func loadBalancerPortRange(ports []v1.ServicePort) (string, error) {
 
 	// The service controller verified all the protocols match on the ports, just check and use the first one
 	if ports[0].Protocol != v1.ProtocolTCP && ports[0].Protocol != v1.ProtocolUDP {
-		return "", fmt.Errorf("Invalid protocol %s, only TCP and UDP are supported", string(ports[0].Protocol))
+		return "", fmt.Errorf("invalid protocol %s, only TCP and UDP are supported", string(ports[0].Protocol))
 	}
 
 	minPort := int32(65536)

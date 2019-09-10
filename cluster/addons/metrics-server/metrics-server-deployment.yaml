@@ -23,33 +23,32 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: metrics-server-v0.3.3
+  name: metrics-server-v0.3.4
   namespace: kube-system
   labels:
     k8s-app: metrics-server
     kubernetes.io/cluster-service: "true"
     addonmanager.kubernetes.io/mode: Reconcile
-    version: v0.3.3
+    version: v0.3.4
 spec:
   selector:
     matchLabels:
       k8s-app: metrics-server
-      version: v0.3.3
+      version: v0.3.4
   template:
     metadata:
       name: metrics-server
       labels:
         k8s-app: metrics-server
-        version: v0.3.3
+        version: v0.3.4
       annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
         seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
     spec:
       priorityClassName: system-cluster-critical
       serviceAccountName: metrics-server
       containers:
       - name: metrics-server
-        image: k8s.gcr.io/metrics-server-amd64:v0.3.3
+        image: k8s.gcr.io/metrics-server-amd64:v0.3.4
         command:
         - /metrics-server
         - --metric-resolution=30s
@@ -91,7 +90,7 @@ spec:
           - --memory={{ base_metrics_server_memory }}
           - --extra-memory={{ metrics_server_memory_per_node }}Mi
           - --threshold=5
-          - --deployment=metrics-server-v0.3.3
+          - --deployment=metrics-server-v0.3.4
           - --container=metrics-server
           - --poll-period=300000
           - --estimator=exponential

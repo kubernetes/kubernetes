@@ -141,7 +141,7 @@ func (f *fakeJobControl) CreateJob(namespace string, job *batchv1.Job) (*batchv1
 	if f.Err != nil {
 		return nil, f.Err
 	}
-	job.SelfLink = fmt.Sprintf("/api/batch/v1/namespaces/%s/jobs/%s", namespace, job.Name)
+	job.SelfLink = fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs/%s", namespace, job.Name)
 	f.Jobs = append(f.Jobs, *job)
 	job.UID = "test-uid"
 	return job, nil

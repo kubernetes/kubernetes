@@ -185,9 +185,10 @@ func validateClusterInfo(clusterName string, clusterInfo clientcmdapi.Cluster) [
 	}
 	if len(clusterInfo.CertificateAuthority) != 0 {
 		clientCertCA, err := os.Open(clusterInfo.CertificateAuthority)
-		defer clientCertCA.Close()
 		if err != nil {
 			validationErrors = append(validationErrors, fmt.Errorf("unable to read certificate-authority %v for %v due to %v", clusterInfo.CertificateAuthority, clusterName, err))
+		} else {
+			defer clientCertCA.Close()
 		}
 	}
 
@@ -223,16 +224,18 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 
 		if len(authInfo.ClientCertificate) != 0 {
 			clientCertFile, err := os.Open(authInfo.ClientCertificate)
-			defer clientCertFile.Close()
 			if err != nil {
 				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-cert %v for %v due to %v", authInfo.ClientCertificate, authInfoName, err))
+			} else {
+				defer clientCertFile.Close()
 			}
 		}
 		if len(authInfo.ClientKey) != 0 {
 			clientKeyFile, err := os.Open(authInfo.ClientKey)
-			defer clientKeyFile.Close()
 			if err != nil {
 				validationErrors = append(validationErrors, fmt.Errorf("unable to read client-key %v for %v due to %v", authInfo.ClientKey, authInfoName, err))
+			} else {
+				defer clientKeyFile.Close()
 			}
 		}
 	}
@@ -250,8 +253,6 @@ func validateAuthInfo(authInfoName string, authInfo clientcmdapi.AuthInfo) []err
 		for _, v := range authInfo.Exec.Env {
 			if len(v.Name) == 0 {
 				validationErrors = append(validationErrors, fmt.Errorf("env variable name must be specified for %v to use exec authentication plugin", authInfoName))
-			} else if len(v.Value) == 0 {
-				validationErrors = append(validationErrors, fmt.Errorf("env variable %s value must be specified for %v to use exec authentication plugin", v.Name, authInfoName))
 			}
 		}
 	}

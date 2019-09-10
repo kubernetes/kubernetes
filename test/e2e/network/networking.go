@@ -47,15 +47,17 @@ var _ = SIGDescribe("Networking", func() {
 	})
 
 	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv4]", func() {
-		ginkgo.By("Running container which tries to ping 8.8.8.8")
+		ginkgo.By("Running container which tries to connect to 8.8.8.8")
 		framework.ExpectNoError(
-			framework.CheckConnectivityToHost(f, "", "ping-test", "8.8.8.8", framework.IPv4PingCommand, 30))
+			framework.CheckConnectivityToHost(f, "", "connectivity-test", "8.8.8.8", 53, 30))
 	})
 
-	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv6][Experimental]", func() {
-		ginkgo.By("Running container which tries to ping 2001:4860:4860::8888")
+	ginkgo.It("should provide Internet connection for containers [Feature:Networking-IPv6][Experimental][LinuxOnly]", func() {
+		// IPv6 is not supported on Windows.
+		framework.SkipIfNodeOSDistroIs("windows")
+		ginkgo.By("Running container which tries to connect to 2001:4860:4860::8888")
 		framework.ExpectNoError(
-			framework.CheckConnectivityToHost(f, "", "ping-test", "2001:4860:4860::8888", framework.IPv6PingCommand, 30))
+			framework.CheckConnectivityToHost(f, "", "connectivity-test", "2001:4860:4860::8888", 53, 30))
 	})
 
 	// First test because it has no dependencies on variables created later on.
@@ -98,8 +100,7 @@ var _ = SIGDescribe("Networking", func() {
 		config.GetSelfURLStatusCode(ports.ProxyStatusPort, "/proxyMode", "200")
 	})
 
-	// TODO: Remove [Slow] when this has had enough bake time to prove presubmit worthiness.
-	ginkgo.Describe("Granular Checks: Services [Slow]", func() {
+	ginkgo.Describe("Granular Checks: Services", func() {
 
 		ginkgo.It("should function for pod-Service: http", func() {
 			config := framework.NewNetworkingTestConfig(f)

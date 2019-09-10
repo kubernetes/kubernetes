@@ -30,7 +30,7 @@ type REST struct {
 }
 
 // NewREST returns a RESTStorage object that will work against replication controllers.
-func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
+func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &settingsapi.PodPreset{} },
 		NewListFunc:              func() runtime.Object { return &settingsapi.PodPresetList{} },
@@ -42,8 +42,8 @@ func NewREST(optsGetter generic.RESTOptionsGetter) *REST {
 	}
 	options := &generic.StoreOptions{RESTOptions: optsGetter}
 	if err := store.CompleteWithOptions(options); err != nil {
-		panic(err) // TODO: Propagate error up
+		return nil, err
 	}
 
-	return &REST{store}
+	return &REST{store}, nil
 }

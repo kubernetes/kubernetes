@@ -18,12 +18,12 @@ package utils
 
 import (
 	"path"
-	"strconv"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -94,10 +94,6 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 				// Driver name is expected to be the same
 				// as the snapshotter here.
 				container.Args = append(container.Args, "--snapshotter="+o.NewDriverName)
-			case o.ClusterRegistrarContainerName:
-				if o.PodInfo != nil {
-					container.Args = append(container.Args, "--pod-info-mount="+strconv.FormatBool(*o.PodInfo))
-				}
 			}
 		}
 	}
@@ -124,6 +120,19 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 			// Driver name is expected to be the same
 			// as the provisioner name here.
 			object.Provisioner = o.NewDriverName
+		}
+	case *storagev1beta1.CSIDriver:
+		if o.NewDriverName != "" {
+			object.Name = o.NewDriverName
+		}
+		if o.PodInfo != nil {
+			object.Spec.PodInfoOnMount = o.PodInfo
+		}
+		if o.CanAttach != nil {
+			object.Spec.AttachRequired = o.CanAttach
+		}
+		if o.VolumeLifecycleModes != nil {
+			object.Spec.VolumeLifecycleModes = *o.VolumeLifecycleModes
 		}
 	}
 
@@ -154,12 +163,18 @@ type PatchCSIOptions struct {
 	// If non-empty, --snapshotter with new name will be appended
 	// to the argument list.
 	SnapshotterContainerName string
-	// The name of the container which has the cluster-driver-registrar
-	// binary.
-	ClusterRegistrarContainerName string
 	// If non-empty, all pods are forced to run on this node.
 	NodeName string
-	// If not nil, the argument to pass to the cluster-driver-registrar's
-	// pod-info-mount argument.
+	// If not nil, the value to use for the CSIDriver.Spec.PodInfo
+	// field *if* the driver deploys a CSIDriver object. Ignored
+	// otherwise.
 	PodInfo *bool
+	// If not nil, the value to use for the CSIDriver.Spec.CanAttach
+	// field *if* the driver deploys a CSIDriver object. Ignored
+	// otherwise.
+	CanAttach *bool
+	// If not nil, the value to use for the CSIDriver.Spec.VolumeLifecycleModes
+	// field *if* the driver deploys a CSIDriver object. Ignored
+	// otherwise.
+	VolumeLifecycleModes *[]storagev1beta1.VolumeLifecycleMode
 }

@@ -45,6 +45,13 @@ func VisitContainers(podSpec *api.PodSpec, visitor ContainerVisitor) bool {
 			return false
 		}
 	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		for i := range podSpec.EphemeralContainers {
+			if !visitor((*api.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon)) {
+				return false
+			}
+		}
+	}
 	return true
 }
 
@@ -292,7 +299,7 @@ func DropDisabledPodFields(pod, oldPod *api.Pod) {
 	dropPodStatusDisabledFields(podStatus, oldPodStatus)
 }
 
-// dropDisabledFields removes disabled fields from the pod status
+// dropPodStatusDisabledFields removes disabled fields from the pod status
 func dropPodStatusDisabledFields(podStatus *api.PodStatus, oldPodStatus *api.PodStatus) {
 	// trim PodIPs down to only one entry (non dual stack).
 	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) &&
@@ -362,6 +369,9 @@ func dropDisabledFields(
 			return true
 		})
 	}
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) && !ephemeralContainersInUse(oldPodSpec) {
+		podSpec.EphemeralContainers = nil
+	}
 
 	if (!utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpath) || !utilfeature.DefaultFeatureGate.Enabled(features.VolumeSubpathEnvExpansion)) && !subpathExprInUse(oldPodSpec) {
 		// drop subpath env expansion from the pod if either of the subpath features is disabled and the old spec did not specify subpath env expansion
@@ -373,11 +383,21 @@ func dropDisabledFields(
 		})
 	}
 
+	if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) && !startupProbeInUse(oldPodSpec) {
+		// drop startupProbe from all containers if the feature is disabled
+		VisitContainers(podSpec, func(c *api.Container) bool {
+			c.StartupProbe = nil
+			return true
+		})
+	}
+
 	dropDisabledVolumeDevicesFields(podSpec, oldPodSpec)
 
 	dropDisabledRunAsGroupField(podSpec, oldPodSpec)
 
 	dropDisabledGMSAFields(podSpec, oldPodSpec)
+
+	dropDisabledRunAsUserNameFields(podSpec, oldPodSpec)
 
 	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && !runtimeClassInUse(oldPodSpec) {
 		// Set RuntimeClassName to nil only if feature is disabled and it is not used
@@ -398,6 +418,11 @@ func dropDisabledFields(
 		// Set to nil pod's PreemptionPolicy fields if the feature is disabled and the old pod
 		// does not specify any values for these fields.
 		podSpec.PreemptionPolicy = nil
+	}
+
+	if !utilfeature.DefaultFeatureGate.Enabled(features.EvenPodsSpread) && !topologySpreadConstraintsInUse(oldPodSpec) {
+		// Set TopologySpreadConstraints to nil only if feature is disabled and it is not used
+		podSpec.TopologySpreadConstraints = nil
 	}
 }
 
@@ -450,6 +475,38 @@ func dropDisabledGMSAFieldsFromContainers(containers []api.Container) {
 	}
 }
 
+// dropDisabledRunAsUserNameFields removes disabled fields related to WindowsOptions.RunAsUserName
+// from the given PodSpec.
+func dropDisabledRunAsUserNameFields(podSpec, oldPodSpec *api.PodSpec) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.WindowsRunAsUserName) ||
+		runAsUserNameFieldsInUse(oldPodSpec) {
+		return
+	}
+
+	if podSpec.SecurityContext != nil {
+		dropDisabledRunAsUserNameFieldsFromWindowsSecurityOptions(podSpec.SecurityContext.WindowsOptions)
+	}
+	dropDisabledRunAsUserNameFieldsFromContainers(podSpec.Containers)
+	dropDisabledRunAsUserNameFieldsFromContainers(podSpec.InitContainers)
+}
+
+// dropDisabledRunAsUserNameFieldsFromWindowsSecurityOptions removes disabled fields
+// related to RunAsUserName from the given WindowsSecurityContextOptions.
+func dropDisabledRunAsUserNameFieldsFromWindowsSecurityOptions(windowsOptions *api.WindowsSecurityContextOptions) {
+	if windowsOptions != nil {
+		windowsOptions.RunAsUserName = nil
+	}
+}
+
+// dropDisabledRunAsUserNameFieldsFromContainers removes disabled fields
+func dropDisabledRunAsUserNameFieldsFromContainers(containers []api.Container) {
+	for i := range containers {
+		if containers[i].SecurityContext != nil {
+			dropDisabledRunAsUserNameFieldsFromWindowsSecurityOptions(containers[i].SecurityContext.WindowsOptions)
+		}
+	}
+}
+
 // dropDisabledProcMountField removes disabled fields from PodSpec related
 // to ProcMount only if it is not already used by the old spec
 func dropDisabledProcMountField(podSpec, oldPodSpec *api.PodSpec) {
@@ -486,6 +543,13 @@ func dropDisabledCSIVolumeSourceAlphaFields(podSpec, oldPodSpec *api.PodSpec) {
 			podSpec.Volumes[i].CSI = nil
 		}
 	}
+}
+
+func ephemeralContainersInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	return len(podSpec.EphemeralContainers) > 0
 }
 
 // subpathInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPath feature
@@ -528,7 +592,14 @@ func overheadInUse(podSpec *api.PodSpec) bool {
 		return true
 	}
 	return false
+}
 
+// topologySpreadConstraintsInUse returns true if the pod spec is non-nil and has a TopologySpreadConstraints slice
+func topologySpreadConstraintsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+	return len(podSpec.TopologySpreadConstraints) > 0
 }
 
 // procMountInUse returns true if the pod spec is non-nil and has a SecurityContext's ProcMount field set to a non-default value
@@ -703,6 +774,39 @@ func gMSAFieldsInUseInAnyContainer(containers []api.Container) bool {
 	return false
 }
 
+// runAsUserNameFieldsInUse returns true if the pod spec is non-nil and has the RunAsUserName
+// field set in the PodSecurityContext or any container's SecurityContext.
+func runAsUserNameFieldsInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	if podSpec.SecurityContext != nil && runAsUserNameFieldsInUseInWindowsSecurityOptions(podSpec.SecurityContext.WindowsOptions) {
+		return true
+	}
+
+	return runAsUserNameFieldsInUseInAnyContainer(podSpec.Containers) ||
+		runAsUserNameFieldsInUseInAnyContainer(podSpec.InitContainers)
+}
+
+// runAsUserNameFieldsInUseInWindowsSecurityOptions returns true if the given WindowsSecurityContextOptions is
+// non-nil and its RunAsUserName field is set.
+func runAsUserNameFieldsInUseInWindowsSecurityOptions(windowsOptions *api.WindowsSecurityContextOptions) bool {
+	return windowsOptions != nil && windowsOptions.RunAsUserName != nil
+}
+
+// runAsUserNameFieldsInUseInAnyContainer returns true if any of the given Containers has its
+// SecurityContext's RunAsUserName field set.
+func runAsUserNameFieldsInUseInAnyContainer(containers []api.Container) bool {
+	for _, container := range containers {
+		if container.SecurityContext != nil && runAsUserNameFieldsInUseInWindowsSecurityOptions(container.SecurityContext.WindowsOptions) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // subpathExprInUse returns true if the pod spec is non-nil and has a volume mount that makes use of the subPathExpr feature
 func subpathExprInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
@@ -716,6 +820,24 @@ func subpathExprInUse(podSpec *api.PodSpec) bool {
 				inUse = true
 				return false
 			}
+		}
+		return true
+	})
+
+	return inUse
+}
+
+// startupProbeInUse returns true if the pod spec is non-nil and has a container that has a startupProbe defined
+func startupProbeInUse(podSpec *api.PodSpec) bool {
+	if podSpec == nil {
+		return false
+	}
+
+	var inUse bool
+	VisitContainers(podSpec, func(c *api.Container) bool {
+		if c.StartupProbe != nil {
+			inUse = true
+			return false
 		}
 		return true
 	})

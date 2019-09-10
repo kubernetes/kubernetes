@@ -665,11 +665,7 @@ func (b *volumeBinder) findMatchingVolumes(pod *v1.Pod, claimsToBind []*v1.Persi
 
 	for _, pvc := range claimsToBind {
 		// Get storage class name from each PVC
-		storageClassName := ""
-		storageClass := pvc.Spec.StorageClassName
-		if storageClass != nil {
-			storageClassName = *storageClass
-		}
+		storageClassName := v1helper.GetPersistentVolumeClaimClass(pvc)
 		allPVs := b.pvCache.ListPVs(storageClassName)
 		pvcName := getPVCName(pvc)
 

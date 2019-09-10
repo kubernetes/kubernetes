@@ -87,7 +87,7 @@ func (asw *actualStateOfWorld) AddPlugin(pluginInfo PluginInfo) error {
 	defer asw.Unlock()
 
 	if pluginInfo.SocketPath == "" {
-		return fmt.Errorf("Socket path is empty")
+		return fmt.Errorf("socket path is empty")
 	}
 	if _, ok := asw.socketFileToInfo[pluginInfo.SocketPath]; ok {
 		klog.V(2).Infof("Plugin (Path %s) exists in actual state cache", pluginInfo.SocketPath)

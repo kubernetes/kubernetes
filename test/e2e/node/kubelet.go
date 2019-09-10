@@ -29,14 +29,15 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -53,7 +54,7 @@ const (
 func getPodMatches(c clientset.Interface, nodeName string, podNamePrefix string, namespace string) sets.String {
 	matches := sets.NewString()
 	e2elog.Logf("Checking pods on node %v via /runningpods endpoint", nodeName)
-	runningPods, err := framework.GetKubeletPods(c, nodeName)
+	runningPods, err := e2ekubelet.GetKubeletPods(c, nodeName)
 	if err != nil {
 		e2elog.Logf("Error checking running pods on %v: %v", nodeName, err)
 		return matches
@@ -254,7 +255,7 @@ var _ = SIGDescribe("kubelet", func() {
 			numNodes        int
 			nodeNames       sets.String
 			nodeLabels      map[string]string
-			resourceMonitor *framework.ResourceMonitor
+			resourceMonitor *e2ekubelet.ResourceMonitor
 		)
 		type DeleteTest struct {
 			podsPerNode int
@@ -272,7 +273,7 @@ var _ = SIGDescribe("kubelet", func() {
 			nodeLabels["kubelet_cleanup"] = "true"
 			nodes := framework.GetReadySchedulableNodesOrDie(c)
 			numNodes = len(nodes.Items)
-			gomega.Expect(numNodes).NotTo(gomega.BeZero())
+			framework.ExpectNotEqual(numNodes, 0)
 			nodeNames = sets.NewString()
 			// If there are a lot of nodes, we don't want to use all of them
 			// (if there are 1000 nodes in the cluster, starting 10 pods/node
@@ -292,7 +293,7 @@ var _ = SIGDescribe("kubelet", func() {
 
 			// Start resourceMonitor only in small clusters.
 			if len(nodes.Items) <= maxNodesToCheck {
-				resourceMonitor = framework.NewResourceMonitor(f.ClientSet, framework.TargetContainers(), containerStatsPollingInterval)
+				resourceMonitor = e2ekubelet.NewResourceMonitor(f.ClientSet, e2ekubelet.TargetContainers(), containerStatsPollingInterval)
 				resourceMonitor.Start()
 			}
 		})
@@ -396,9 +397,9 @@ var _ = SIGDescribe("kubelet", func() {
 			})
 
 			ginkgo.AfterEach(func() {
-				err := framework.DeletePodWithWait(f, c, pod)
+				err := e2epod.DeletePodWithWait(c, pod)
 				framework.ExpectNoError(err, "AfterEach: Failed to delete client pod ", pod.Name)
-				err = framework.DeletePodWithWait(f, c, nfsServerPod)
+				err = e2epod.DeletePodWithWait(c, nfsServerPod)
 				framework.ExpectNoError(err, "AfterEach: Failed to delete server pod ", nfsServerPod.Name)
 			})
 
@@ -411,7 +412,7 @@ var _ = SIGDescribe("kubelet", func() {
 					stopNfsServer(nfsServerPod)
 
 					ginkgo.By("Delete the pod mounted to the NFS volume -- expect failure")
-					err := framework.DeletePodWithWait(f, c, pod)
+					err := e2epod.DeletePodWithWait(c, pod)
 					framework.ExpectError(err)
 					// pod object is now stale, but is intentionally not nil
 

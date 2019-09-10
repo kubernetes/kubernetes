@@ -11,6 +11,8 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/proxy/winkernel",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
@@ -18,6 +20,7 @@ go_library(
             "//pkg/apis/core/v1/helper:go_default_library",
             "//pkg/proxy:go_default_library",
             "//pkg/proxy/apis/config:go_default_library",
+            "//pkg/proxy/config:go_default_library",
             "//pkg/proxy/healthcheck:go_default_library",
             "//pkg/util/async:go_default_library",
             "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -61,6 +64,7 @@ go_test(
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/proxy:go_default_library",
             "//staging/src/k8s.io/api/core/v1:go_default_library",
+            "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
             "//vendor/github.com/Microsoft/hcsshim/hcn:go_default_library",

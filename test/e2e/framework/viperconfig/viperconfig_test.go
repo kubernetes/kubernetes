@@ -44,7 +44,7 @@ func TestViperConfig(t *testing.T) {
 		config.AddOptionsToSet(flags, &context, "")
 	})
 
-	config := `
+	viperConfig := `
 bool: false
 duration: 1s
 float64: -1.23456789
@@ -57,7 +57,7 @@ uint64: 9123456789012345678
 	tmpfile, err := ioutil.TempFile("", "viperconfig-*.yaml")
 	require.NoError(t, err, "temp file")
 	defer os.Remove(tmpfile.Name())
-	if _, err := tmpfile.Write([]byte(config)); err != nil {
+	if _, err := tmpfile.Write([]byte(viperConfig)); err != nil {
 		require.NoError(t, err, "write config")
 	}
 	require.NoError(t, tmpfile.Close(), "close temp file")

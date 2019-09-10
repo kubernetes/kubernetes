@@ -24,8 +24,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -59,18 +59,18 @@ var _ = KubeadmDescribe("kubeadm-certs [copy-certs]", func() {
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	It("should exist and be properly configured", func() {
+	ginkgo.It("should exist and be properly configured", func() {
 		s := GetSecret(f.ClientSet, kubeSystemNamespace, kubeadmCertsSecretName)
 
 		// Checks the kubeadm-certs is ownen by a time lived token
-		Expect(s.OwnerReferences).To(HaveLen(1), "%s should have one owner reference", kubeadmCertsSecretName)
+		gomega.Expect(s.OwnerReferences).To(gomega.HaveLen(1), "%s should have one owner reference", kubeadmCertsSecretName)
 		ownRef := s.OwnerReferences[0]
-		Expect(ownRef.Kind).To(Equal("Secret"), "%s should be owned by a secret", kubeadmCertsSecretName)
-		Expect(*ownRef.BlockOwnerDeletion).To(BeTrue(), "%s should be deleted on owner deletion", kubeadmCertsSecretName)
+		framework.ExpectEqual(ownRef.Kind, "Secret", "%s should be owned by a secret", kubeadmCertsSecretName)
+		gomega.Expect(*ownRef.BlockOwnerDeletion).To(gomega.BeTrue(), "%s should be deleted on owner deletion", kubeadmCertsSecretName)
 
 		o := GetSecret(f.ClientSet, kubeSystemNamespace, ownRef.Name)
-		Expect(o.Type).To(Equal(corev1.SecretTypeBootstrapToken), "%s should have an owner reference that refers to a bootstrap-token", kubeadmCertsSecretName)
-		Expect(o.Data).To(HaveKey("expiration"), "%s should have an owner reference with an expiration", kubeadmCertsSecretName)
+		framework.ExpectEqual(o.Type, corev1.SecretTypeBootstrapToken, "%s should have an owner reference that refers to a bootstrap-token", kubeadmCertsSecretName)
+		gomega.Expect(o.Data).To(gomega.HaveKey("expiration"), "%s should have an owner reference with an expiration", kubeadmCertsSecretName)
 
 		// gets the ClusterConfiguration from the kubeadm kubeadm-config ConfigMap as a untyped map
 		m := getClusterConfiguration(f.ClientSet)
@@ -85,29 +85,29 @@ var _ = KubeadmDescribe("kubeadm-certs [copy-certs]", func() {
 		}
 
 		// check if all the expected key exists
-		Expect(s.Data).To(HaveKey("ca.crt"))
-		Expect(s.Data).To(HaveKey("ca.key"))
-		Expect(s.Data).To(HaveKey("front-proxy-ca.crt"))
-		Expect(s.Data).To(HaveKey("front-proxy-ca.key"))
-		Expect(s.Data).To(HaveKey("sa.pub"))
-		Expect(s.Data).To(HaveKey("sa.key"))
+		gomega.Expect(s.Data).To(gomega.HaveKey("ca.crt"))
+		gomega.Expect(s.Data).To(gomega.HaveKey("ca.key"))
+		gomega.Expect(s.Data).To(gomega.HaveKey("front-proxy-ca.crt"))
+		gomega.Expect(s.Data).To(gomega.HaveKey("front-proxy-ca.key"))
+		gomega.Expect(s.Data).To(gomega.HaveKey("sa.pub"))
+		gomega.Expect(s.Data).To(gomega.HaveKey("sa.key"))
 
 		if etcdType == "local" {
-			Expect(s.Data).To(HaveKey("etcd-ca.crt"))
-			Expect(s.Data).To(HaveKey("etcd-ca.key"))
+			gomega.Expect(s.Data).To(gomega.HaveKey("etcd-ca.crt"))
+			gomega.Expect(s.Data).To(gomega.HaveKey("etcd-ca.key"))
 		} else {
-			Expect(s.Data).To(HaveKey("external-etcd-ca.crt"))
-			Expect(s.Data).To(HaveKey("external-etcd.crt"))
-			Expect(s.Data).To(HaveKey("external-etcd.key"))
+			gomega.Expect(s.Data).To(gomega.HaveKey("external-etcd-ca.crt"))
+			gomega.Expect(s.Data).To(gomega.HaveKey("external-etcd.crt"))
+			gomega.Expect(s.Data).To(gomega.HaveKey("external-etcd.key"))
 		}
 	})
 
-	It("should have related Role and RoleBinding", func() {
+	ginkgo.It("should have related Role and RoleBinding", func() {
 		ExpectRole(f.ClientSet, kubeSystemNamespace, kubeadmCertsRoleName)
 		ExpectRoleBinding(f.ClientSet, kubeSystemNamespace, kubeadmCertsRoleBindingName)
 	})
 
-	It("should be accessible for bootstrap tokens", func() {
+	ginkgo.It("should be accessible for bootstrap tokens", func() {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, bootstrapTokensGroup,
 			kubeadmCertsSecretResource,

@@ -45,7 +45,12 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/client-go/metadata/fake:all-srcs",
+        "//staging/src/k8s.io/client-go/metadata/metadatainformer:all-srcs",
+        "//staging/src/k8s.io/client-go/metadata/metadatalister:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

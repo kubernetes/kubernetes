@@ -104,6 +104,56 @@ var _ = ginkgo.Describe("[sig-node] Downward API", func() {
 		testDownwardAPI(f, podName, env, expectations)
 	})
 
+	ginkgo.It("should provide host IP and pod IP as an env var if pod uses host network [LinuxOnly]", func() {
+		podName := "downward-api-" + string(uuid.NewUUID())
+		env := []v1.EnvVar{
+			{
+				Name: "HOST_IP",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.hostIP",
+					},
+				},
+			},
+			{
+				Name: "POD_IP",
+				ValueFrom: &v1.EnvVarSource{
+					FieldRef: &v1.ObjectFieldSelector{
+						APIVersion: "v1",
+						FieldPath:  "status.podIP",
+					},
+				},
+			},
+		}
+
+		expectations := []string{
+			fmt.Sprintf("OK"),
+		}
+
+		pod := &v1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:   podName,
+				Labels: map[string]string{"name": podName},
+			},
+			Spec: v1.PodSpec{
+				Containers: []v1.Container{
+					{
+						Name:    "dapi-container",
+						Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+						Command: []string{"sh", "-c", `[[ "${HOST_IP:?}" == "${POD_IP:?}" ]] && echo 'OK' || echo "HOST_IP: '${HOST_IP}' != POD_IP: '${POD_IP}'"`},
+						Env:     env,
+					},
+				},
+				HostNetwork:   true,
+				RestartPolicy: v1.RestartPolicyNever,
+			},
+		}
+
+		testDownwardAPIUsingPod(f, pod, env, expectations)
+
+	})
+
 	/*
 	   Release : v1.9
 	   Testname: DownwardAPI, environment for CPU and memory limits and requests

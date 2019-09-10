@@ -24,16 +24,17 @@ import (
 	"github.com/pkg/errors"
 
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
 
@@ -79,7 +80,7 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 	for _, fileName := range files {
 		data, err := testfiles.Read(fileName)
 		if err != nil {
-			e2elog.Failf("reading manifest file: %v", err)
+			Failf("reading manifest file: %v", err)
 		}
 
 		// Split at the "---" separator before working on
@@ -115,7 +116,7 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 func (f *Framework) PatchItems(items ...interface{}) error {
 	for _, item := range items {
 		// Uncomment when debugging the loading and patching of items.
-		// e2elog.Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
+		// Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
 		if err := f.patchItemRecursively(item); err != nil {
 			return err
 		}
@@ -154,7 +155,7 @@ func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
 		// to non-namespaced items.
 		for _, destructor := range destructors {
 			if err := destructor(); err != nil && !apierrs.IsNotFound(err) {
-				e2elog.Logf("deleting failed: %s", err)
+				Logf("deleting failed: %s", err)
 			}
 		}
 	}
@@ -167,12 +168,12 @@ func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
 		description := DescribeItem(item)
 		// Uncomment this line to get a full dump of the entire item.
 		// description = fmt.Sprintf("%s:\n%s", description, PrettyPrint(item))
-		e2elog.Logf("creating %s", description)
+		Logf("creating %s", description)
 		for _, factory := range factories {
 			destructor, err := factory.Create(f, item)
 			if destructor != nil {
 				destructors = append(destructors, func() error {
-					e2elog.Logf("deleting %s", description)
+					Logf("deleting %s", description)
 					return destructor()
 				})
 			}
@@ -278,6 +279,7 @@ var errorItemNotSupported = errors.New("not supported")
 var factories = map[What]ItemFactory{
 	{"ClusterRole"}:        &clusterRoleFactory{},
 	{"ClusterRoleBinding"}: &clusterRoleBindingFactory{},
+	{"CSIDriver"}:          &csiDriverFactory{},
 	{"DaemonSet"}:          &daemonSetFactory{},
 	{"Role"}:               &roleFactory{},
 	{"RoleBinding"}:        &roleBindingFactory{},
@@ -327,6 +329,8 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		f.PatchName(&item.Name)
 	case *storagev1.StorageClass:
 		f.PatchName(&item.Name)
+	case *storagev1beta1.CSIDriver:
+		f.PatchName(&item.Name)
 	case *v1.ServiceAccount:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
 	case *v1.Secret:
@@ -355,8 +359,20 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
 	case *appsv1.StatefulSet:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+			return err
+		}
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+			return err
+		}
 	case *appsv1.DaemonSet:
 		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
+			return err
+		}
+		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.InitContainers); err != nil {
+			return err
+		}
 	default:
 		return errors.Errorf("missing support for patching item of type %T", item)
 	}
@@ -400,7 +416,7 @@ func (*clusterRoleFactory) Create(f *Framework, i interface{}) (func() error, er
 		return nil, errorItemNotSupported
 	}
 
-	e2elog.Logf("Define cluster role %v", item.GetName())
+	Logf("Define cluster role %v", item.GetName())
 	client := f.ClientSet.RbacV1().ClusterRoles()
 	if _, err := client.Create(item); err != nil {
 		return nil, errors.Wrap(err, "create ClusterRole")
@@ -551,6 +567,27 @@ func (*storageClassFactory) Create(f *Framework, i interface{}) (func() error, e
 	client := f.ClientSet.StorageV1().StorageClasses()
 	if _, err := client.Create(item); err != nil {
 		return nil, errors.Wrap(err, "create StorageClass")
+	}
+	return func() error {
+		return client.Delete(item.GetName(), &metav1.DeleteOptions{})
+	}, nil
+}
+
+type csiDriverFactory struct{}
+
+func (f *csiDriverFactory) New() runtime.Object {
+	return &storagev1beta1.CSIDriver{}
+}
+
+func (*csiDriverFactory) Create(f *Framework, i interface{}) (func() error, error) {
+	item, ok := i.(*storagev1beta1.CSIDriver)
+	if !ok {
+		return nil, errorItemNotSupported
+	}
+
+	client := f.ClientSet.StorageV1beta1().CSIDrivers()
+	if _, err := client.Create(item); err != nil {
+		return nil, errors.Wrap(err, "create CSIDriver")
 	}
 	return func() error {
 		return client.Delete(item.GetName(), &metav1.DeleteOptions{})

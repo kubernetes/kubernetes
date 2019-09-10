@@ -6,8 +6,8 @@
     "generateName": "3",
     "namespace": "4",
     "selfLink": "5",
-    "uid": "ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e",
-    "resourceVersion": "16964250748386560239",
+    "uid": "7",
+    "resourceVersion": "11042405498087606203",
     "generation": 8071137005907523419,
     "creationTimestamp": null,
     "deletionGracePeriodSeconds": -4955867275792137171,
@@ -36,24 +36,24 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fields": {"18":{"19":null}}
+        "fieldsType": "18"
       }
     ]
   },
   "spec": {
     "scaleTargetRef": {
-      "kind": "24",
-      "name": "25",
-      "apiVersion": "26"
+      "kind": "19",
+      "name": "20",
+      "apiVersion": "21"
     },
-    "minReplicas": -1978186127,
-    "maxReplicas": 2114329341,
-    "targetCPUUtilizationPercentage": -439697596
+    "minReplicas": 896585016,
+    "maxReplicas": -1971381490,
+    "targetCPUUtilizationPercentage": -1300313567
   },
   "status": {
-    "observedGeneration": -918288109031280833,
-    "currentReplicas": 73350537,
-    "desiredReplicas": -799278564,
-    "currentCPUUtilizationPercentage": 1804227960
+    "observedGeneration": -5238012362384355226,
+    "currentReplicas": -738053939,
+    "desiredReplicas": -1258077201,
+    "currentCPUUtilizationPercentage": 757808475
   }
 }

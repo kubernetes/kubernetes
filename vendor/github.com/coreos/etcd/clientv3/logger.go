@@ -18,28 +18,14 @@ import (
 	"io/ioutil"
 	"sync"
 
+	"github.com/coreos/etcd/pkg/logutil"
+
 	"google.golang.org/grpc/grpclog"
 )
 
-// Logger is the logger used by client library.
-// It implements grpclog.LoggerV2 interface.
-type Logger interface {
-	grpclog.LoggerV2
-
-	// Lvl returns logger if logger's verbosity level >= "lvl".
-	// Otherwise, logger that discards all logs.
-	Lvl(lvl int) Logger
-
-	// to satisfy capnslog
-
-	Print(args ...interface{})
-	Printf(format string, args ...interface{})
-	Println(args ...interface{})
-}
-
 var (
-	loggerMu sync.RWMutex
-	logger   Logger
+	lgMu sync.RWMutex
+	lg   logutil.Logger
 )
 
 type settableLogger struct {
@@ -49,29 +35,29 @@ type settableLogger struct {
 
 func init() {
 	// disable client side logs by default
-	logger = &settableLogger{}
+	lg = &settableLogger{}
 	SetLogger(grpclog.NewLoggerV2(ioutil.Discard, ioutil.Discard, ioutil.Discard))
 }
 
 // SetLogger sets client-side Logger.
 func SetLogger(l grpclog.LoggerV2) {
-	loggerMu.Lock()
-	logger = NewLogger(l)
+	lgMu.Lock()
+	lg = logutil.NewLogger(l)
 	// override grpclog so that any changes happen with locking
-	grpclog.SetLoggerV2(logger)
-	loggerMu.Unlock()
+	grpclog.SetLoggerV2(lg)
+	lgMu.Unlock()
 }
 
-// GetLogger returns the current logger.
-func GetLogger() Logger {
-	loggerMu.RLock()
-	l := logger
-	loggerMu.RUnlock()
+// GetLogger returns the current logutil.Logger.
+func GetLogger() logutil.Logger {
+	lgMu.RLock()
+	l := lg
+	lgMu.RUnlock()
 	return l
 }
 
-// NewLogger returns a new Logger with grpclog.LoggerV2.
-func NewLogger(gl grpclog.LoggerV2) Logger {
+// NewLogger returns a new Logger with logutil.Logger.
+func NewLogger(gl grpclog.LoggerV2) logutil.Logger {
 	return &settableLogger{l: gl}
 }
 
@@ -104,32 +90,12 @@ func (s *settableLogger) Print(args ...interface{})                 { s.get().In
 func (s *settableLogger) Printf(format string, args ...interface{}) { s.get().Infof(format, args...) }
 func (s *settableLogger) Println(args ...interface{})               { s.get().Infoln(args...) }
 func (s *settableLogger) V(l int) bool                              { return s.get().V(l) }
-func (s *settableLogger) Lvl(lvl int) Logger {
+func (s *settableLogger) Lvl(lvl int) grpclog.LoggerV2 {
 	s.mu.RLock()
 	l := s.l
 	s.mu.RUnlock()
 	if l.V(lvl) {
 		return s
 	}
-	return &noLogger{}
+	return logutil.NewDiscardLogger()
 }
-
-type noLogger struct{}
-
-func (*noLogger) Info(args ...interface{})                    {}
-func (*noLogger) Infof(format string, args ...interface{})    {}
-func (*noLogger) Infoln(args ...interface{})                  {}
-func (*noLogger) Warning(args ...interface{})                 {}
-func (*noLogger) Warningf(format string, args ...interface{}) {}
-func (*noLogger) Warningln(args ...interface{})               {}
-func (*noLogger) Error(args ...interface{})                   {}
-func (*noLogger) Errorf(format string, args ...interface{})   {}
-func (*noLogger) Errorln(args ...interface{})                 {}
-func (*noLogger) Fatal(args ...interface{})                   {}
-func (*noLogger) Fatalf(format string, args ...interface{})   {}
-func (*noLogger) Fatalln(args ...interface{})                 {}
-func (*noLogger) Print(args ...interface{})                   {}
-func (*noLogger) Printf(format string, args ...interface{})   {}
-func (*noLogger) Println(args ...interface{})                 {}
-func (*noLogger) V(l int) bool                                { return false }
-func (ng *noLogger) Lvl(lvl int) Logger                       { return ng }

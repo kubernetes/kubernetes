@@ -48,7 +48,7 @@ func TestTypeConverter(t *testing.T) {
 		t.Fatalf("Failed to build OpenAPI models: %v", err)
 	}
 
-	tc, err := internal.NewTypeConverter(m)
+	tc, err := internal.NewTypeConverter(m, false)
 	if err != nil {
 		t.Fatalf("Failed to build TypeConverter: %v", err)
 	}
@@ -214,7 +214,7 @@ spec:
 		b.Fatalf("Failed to build OpenAPI models: %v", err)
 	}
 
-	tc, err := internal.NewTypeConverter(m)
+	tc, err := internal.NewTypeConverter(m, false)
 	if err != nil {
 		b.Fatalf("Failed to build TypeConverter: %v", err)
 	}
@@ -222,7 +222,7 @@ spec:
 	b.ResetTimer()
 	b.ReportAllocs()
 
-	var r typed.TypedValue
+	var r *typed.TypedValue
 	for i := 0; i < b.N; i++ {
 		var err error
 		r, err = tc.ObjectToTyped(obj)
@@ -230,5 +230,5 @@ spec:
 			b.Fatalf("Failed to convert object to typed: %v", err)
 		}
 	}
-	result = r
+	result = *r
 }

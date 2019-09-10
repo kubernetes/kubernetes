@@ -145,6 +145,7 @@ func (w *fakeWaiter) WaitForKubeletAndFunc(f func() error) error {
 
 type fakeStaticPodPathManager struct {
 	kubernetesDir     string
+	kustomizeDir      string
 	realManifestDir   string
 	tempManifestDir   string
 	backupManifestDir string
@@ -178,8 +179,11 @@ func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (Stati
 		return nil, err
 	}
 
+	kustomizeDir := ""
+
 	return &fakeStaticPodPathManager{
 		kubernetesDir:     kubernetesDir,
+		kustomizeDir:      kustomizeDir,
 		realManifestDir:   realManifestDir,
 		tempManifestDir:   upgradedManifestDir,
 		backupManifestDir: backupManifestDir,
@@ -194,6 +198,10 @@ func (spm *fakeStaticPodPathManager) MoveFile(oldPath, newPath string) error {
 
 func (spm *fakeStaticPodPathManager) KubernetesDir() string {
 	return spm.kubernetesDir
+}
+
+func (spm *fakeStaticPodPathManager) KustomizeDir() string {
+	return spm.kustomizeDir
 }
 
 func (spm *fakeStaticPodPathManager) RealManifestPath(component string) string {
@@ -496,8 +504,6 @@ func TestStaticPodControlPlane(t *testing.T) {
 				t.Fatalf("couldn't get create cert tree: %v", err)
 			}
 
-			t.Logf("Wrote certs to %s\n", oldcfg.CertificatesDir)
-
 			for _, kubeConfig := range []string{
 				kubeadmconstants.AdminKubeConfigFileName,
 				kubeadmconstants.SchedulerKubeConfigFileName,
@@ -512,11 +518,11 @@ func TestStaticPodControlPlane(t *testing.T) {
 			}
 
 			// Initialize the directory with v1.7 manifests; should then be upgraded to v1.8 using the method
-			err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), oldcfg)
+			err = controlplanephase.CreateInitStaticPodManifestFiles(pathMgr.RealManifestDir(), pathMgr.KustomizeDir(), oldcfg)
 			if err != nil {
 				t.Fatalf("couldn't run CreateInitStaticPodManifestFiles: %v", err)
 			}
-			err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), oldcfg.NodeRegistration.Name, &oldcfg.ClusterConfiguration, &oldcfg.LocalAPIEndpoint)
+			err = etcdphase.CreateLocalEtcdStaticPodManifestFile(pathMgr.RealManifestDir(), pathMgr.KustomizeDir(), oldcfg.NodeRegistration.Name, &oldcfg.ClusterConfiguration, &oldcfg.LocalAPIEndpoint)
 			if err != nil {
 				t.Fatalf("couldn't run CreateLocalEtcdStaticPodManifestFile: %v", err)
 			}
@@ -652,7 +658,7 @@ func TestCleanupDirs(t *testing.T) {
 			backupEtcdDir, cleanup := getTempDir(t, "backupEtcdDir")
 			defer cleanup()
 
-			mgr := NewKubeStaticPodPathManager(realKubernetesDir, tempManifestDir, backupManifestDir, backupEtcdDir, test.keepManifest, test.keepEtcd)
+			mgr := NewKubeStaticPodPathManager(realKubernetesDir, "", tempManifestDir, backupManifestDir, backupEtcdDir, test.keepManifest, test.keepEtcd)
 			err := mgr.CleanupDirs()
 			if err != nil {
 				t.Errorf("unexpected error cleaning up: %v", err)
@@ -687,7 +693,7 @@ func TestCleanupDirs(t *testing.T) {
 }
 
 func TestRenewCertsByComponent(t *testing.T) {
-	caCert, caKey := certstestutil.SetupCertificateAuthorithy(t)
+	caCert, caKey := certstestutil.SetupCertificateAuthority(t)
 
 	tests := []struct {
 		name                  string
@@ -961,7 +967,7 @@ func TestGetPathManagerForUpgrade(t *testing.T) {
 				os.RemoveAll(tmpdir)
 			}()
 
-			pathmgr, err := GetPathManagerForUpgrade(tmpdir, test.cfg, test.etcdUpgrade)
+			pathmgr, err := GetPathManagerForUpgrade(tmpdir, "", test.cfg, test.etcdUpgrade)
 			if err != nil {
 				t.Fatalf("unexpected error creating path manager: %v", err)
 			}

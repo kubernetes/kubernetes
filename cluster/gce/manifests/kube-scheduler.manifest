@@ -5,7 +5,6 @@
   "name":"kube-scheduler",
   "namespace": "kube-system",
   "annotations": {
-    "scheduler.alpha.kubernetes.io/critical-pod": "",
     "seccomp.security.alpha.kubernetes.io/pod": "docker/default"
   },
   "labels": {
@@ -14,11 +13,12 @@
   }
 },
 "spec":{
+"priorityClass": "system-node-critical",
 "hostNetwork": true,
 "containers":[
     {
     "name": "kube-scheduler",
-    "image": "{{pillar['kube_docker_registry']}}/kube-scheduler:{{pillar['kube-scheduler_docker_tag']}}",
+    "image": "{{pillar['kube_docker_registry']}}/kube-scheduler-amd64:{{pillar['kube-scheduler_docker_tag']}}",
     "resources": {
       "requests": {
         "cpu": "{{cpurequest}}"

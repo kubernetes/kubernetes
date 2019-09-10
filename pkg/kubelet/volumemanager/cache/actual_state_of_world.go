@@ -145,11 +145,6 @@ type ActualStateOfWorld interface {
 	// no longer referenced and may be globally unmounted and detached.
 	GetUnmountedVolumes() []AttachedVolume
 
-	// GetPods generates and returns a map of pods in which map is indexed
-	// with pod's unique name. This map can be used to determine which pod is currently
-	// in actual state of world.
-	GetPods() map[volumetypes.UniquePodName]bool
-
 	// MarkFSResizeRequired marks each volume that is successfully attached and
 	// mounted for the specified pod as requiring file system resize (if the plugin for the
 	// volume indicates it requires file system resize).
@@ -398,7 +393,7 @@ func (asw *actualStateOfWorld) addVolume(
 	}
 
 	pluginIsAttachable := false
-	if _, ok := volumePlugin.(volume.AttachableVolumePlugin); ok {
+	if attachablePlugin, err := asw.volumePluginMgr.FindAttachablePluginBySpec(volumeSpec); err == nil && attachablePlugin != nil {
 		pluginIsAttachable = true
 	}
 
@@ -747,21 +742,6 @@ func (asw *actualStateOfWorld) GetUnmountedVolumes() []AttachedVolume {
 	}
 
 	return unmountedVolumes
-}
-
-func (asw *actualStateOfWorld) GetPods() map[volumetypes.UniquePodName]bool {
-	asw.RLock()
-	defer asw.RUnlock()
-
-	podList := make(map[volumetypes.UniquePodName]bool)
-	for _, volumeObj := range asw.attachedVolumes {
-		for podName := range volumeObj.mountedPods {
-			if !podList[podName] {
-				podList[podName] = true
-			}
-		}
-	}
-	return podList
 }
 
 func (asw *actualStateOfWorld) newAttachedVolume(

@@ -19,7 +19,6 @@ package metrics
 import (
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/klog"
 )
 
 // Histogram is our internal representation for our wrapping struct around prometheus
@@ -55,7 +54,7 @@ func (h *Histogram) setPrometheusHistogram(histogram prometheus.Histogram) {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (h *Histogram) DeprecatedVersion() *semver.Version {
-	return h.HistogramOpts.DeprecatedVersion
+	return parseSemver(h.HistogramOpts.DeprecatedVersion)
 }
 
 // initializeMetric invokes the actual prometheus.Histogram object instantiation
@@ -87,11 +86,9 @@ type HistogramVec struct {
 // anything unless the collector is first registered, since the metric is lazily instantiated.
 func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 	// todo: handle defaulting better
-	klog.Errorf("---%v---\n", opts)
 	if opts.StabilityLevel == "" {
 		opts.StabilityLevel = ALPHA
 	}
-	klog.Errorf("---%v---\n", opts)
 	v := &HistogramVec{
 		HistogramVec:   noopHistogramVec,
 		HistogramOpts:  opts,
@@ -104,7 +101,7 @@ func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
 
 // DeprecatedVersion returns a pointer to the Version or nil
 func (v *HistogramVec) DeprecatedVersion() *semver.Version {
-	return v.HistogramOpts.DeprecatedVersion
+	return parseSemver(v.HistogramOpts.DeprecatedVersion)
 }
 
 func (v *HistogramVec) initializeMetric() {
@@ -145,4 +142,18 @@ func (v *HistogramVec) With(labels prometheus.Labels) ObserverMetric {
 		return noop
 	}
 	return v.HistogramVec.With(labels)
+}
+
+// Delete deletes the metric where the variable labels are the same as those
+// passed in as labels. It returns true if a metric was deleted.
+//
+// It is not an error if the number and names of the Labels are inconsistent
+// with those of the VariableLabels in Desc. However, such inconsistent Labels
+// can never match an actual metric, so the method will always return false in
+// that case.
+func (v *HistogramVec) Delete(labels prometheus.Labels) bool {
+	if !v.IsCreated() {
+		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
+	}
+	return v.HistogramVec.Delete(labels)
 }

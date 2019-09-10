@@ -930,7 +930,6 @@ type PodSecurityPolicySpec struct {
 	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
 	// AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
 	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
-	// This is an alpha field, and is only honored if the API server enables the CSIInlineVolume feature gate.
 	// +optional
 	AllowedCSIDrivers []AllowedCSIDriver `json:"allowedCSIDrivers,omitempty" protobuf:"bytes,23,rep,name=allowedCSIDrivers"`
 	// allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
@@ -1297,7 +1296,7 @@ type NetworkPolicyIngressRule struct {
 	// List of sources which should be able to access the pods selected for this rule.
 	// Items in this list are combined using a logical OR operation.
 	// If this field is empty or missing, this rule matches all sources (traffic not restricted by source).
-	// If this field is present and contains at least on item, this rule allows traffic only if the
+	// If this field is present and contains at least one item, this rule allows traffic only if the
 	// traffic matches at least one item in the from list.
 	// +optional
 	From []NetworkPolicyPeer `json:"from,omitempty" protobuf:"bytes,2,rep,name=from"`

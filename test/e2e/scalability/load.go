@@ -59,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -108,6 +109,10 @@ var _ = SIGDescribe("Load capacity", func() {
 	var testPhaseDurations *timer.TestPhaseTimer
 	var profileGathererStopCh chan struct{}
 
+	ginkgo.BeforeEach(func() {
+		framework.SkipUnlessSSHKeyPresent()
+	})
+
 	// Gathers metrics before teardown
 	// TODO add flag that allows to skip cleanup on failure
 	ginkgo.AfterEach(func() {
@@ -119,7 +124,7 @@ var _ = SIGDescribe("Load capacity", func() {
 		wg.Wait()
 
 		// Verify latency metrics
-		highLatencyRequests, metrics, err := framework.HighLatencyRequests(clientset, nodeCount)
+		highLatencyRequests, metrics, err := e2emetrics.HighLatencyRequests(clientset, nodeCount)
 		framework.ExpectNoError(err)
 		if err == nil {
 			summaries := make([]framework.TestDataSummary, 0, 2)
@@ -164,7 +169,7 @@ var _ = SIGDescribe("Load capacity", func() {
 		err := framework.CheckTestingNSDeletedExcept(clientset, ns)
 		framework.ExpectNoError(err)
 
-		framework.ExpectNoError(framework.ResetMetrics(clientset))
+		framework.ExpectNoError(e2emetrics.ResetMetrics(clientset))
 
 		// Start apiserver CPU profile gatherer with frequency based on cluster size.
 		profileGatheringDelay := time.Duration(5+nodeCount/100) * time.Minute
@@ -686,7 +691,7 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 		newSize,
 		true,
 		config.GetKind(),
-		config.GetGroupResource(),
+		config.GetGroupVersionResource(),
 	),
 		fmt.Sprintf("scaling %v %v", config.GetKind(), config.GetName()))
 

@@ -17,9 +17,8 @@
  */
 
 // Package naming defines the naming API and related data structures for gRPC.
-// The interface is EXPERIMENTAL and may be suject to change.
 //
-// Deprecated: please use package resolver.
+// This package is deprecated: please use package resolver instead.
 package naming
 
 // Operation defines the corresponding operations for a name resolution change.

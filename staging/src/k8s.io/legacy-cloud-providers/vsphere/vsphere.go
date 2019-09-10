@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -123,6 +125,11 @@ type VirtualCenterConfig struct {
 // Structure that represents the content of vsphere.conf file.
 // Users specify the configuration of one or more Virtual Centers in vsphere.conf where
 // the Kubernetes master and worker nodes are running.
+// NOTE: Cloud config files should follow the same Kubernetes deprecation policy as
+// flags or CLIs. Config fields should not change behavior in incompatible ways and
+// should be deprecated for at least 2 release prior to removing.
+// See https://kubernetes.io/docs/reference/using-api/deprecation-policy/#deprecating-a-flag-or-cli
+// for more details.
 type VSphereConfig struct {
 	Global struct {
 		// vCenter username.
@@ -650,7 +657,7 @@ func (vs *VSphere) NodeAddresses(ctx context.Context, nodeName k8stypes.NodeName
 	// Below logic can be executed only on master as VC details are present.
 	addrs := []v1.NodeAddress{}
 	// Create context
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	vsi, err := vs.getVSphereInstance(nodeName)
 	if err != nil {
@@ -773,7 +780,7 @@ func (vs *VSphere) InstanceID(ctx context.Context, nodeName k8stypes.NodeName) (
 
 		// Below logic can be performed only on master node where VC details are preset.
 		if vs.cfg == nil {
-			return "", fmt.Errorf("The current node can't detremine InstanceID for %q", convertToString(nodeName))
+			return "", fmt.Errorf("The current node can't determine InstanceID for %q", convertToString(nodeName))
 		}
 
 		// Create context
@@ -1193,12 +1200,37 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 		}
 
 		var vmOptions *vclib.VMOptions
+		var zonesToSearch []string
+
+		if volumeOptions.SelectedNode != nil {
+			if len(volumeOptions.Zone) > 1 {
+				// In waitForFirstConsumer mode, if more than one allowedTopologies is specified, the volume should satisfy all these.
+				zonesToSearch = volumeOptions.Zone
+			} else {
+				// Pick the selectedNode's zone, if available.
+				nodeInfo, err := vs.nodeManager.GetNodeInfoWithNodeObject(volumeOptions.SelectedNode)
+				if err != nil {
+					klog.Errorf("Unable to get node information for %s. err: %+v", volumeOptions.SelectedNode.Name, err)
+					return "", err
+				}
+				klog.V(4).Infof("selectedNode info : %s", nodeInfo)
+				if nodeInfo.zone != nil && nodeInfo.zone.FailureDomain != "" {
+					zonesToSearch = append(zonesToSearch, nodeInfo.zone.FailureDomain)
+				}
+			}
+		} else {
+			// If no selectedNode, pick allowedTopologies, if provided.
+			zonesToSearch = volumeOptions.Zone
+		}
+		klog.V(1).Infof("Volume topology : %s", zonesToSearch)
+
 		if volumeOptions.VSANStorageProfileData != "" || volumeOptions.StoragePolicyName != "" {
 			// If datastore and zone are specified, first validate if the datastore is in the provided zone.
-			if len(volumeOptions.Zone) != 0 && volumeOptions.Datastore != "" {
-				klog.V(4).Infof("Specified zone : %s, datastore : %s", volumeOptions.Zone, volumeOptions.Datastore)
-				dsList, err = getDatastoresForZone(ctx, vs.nodeManager, volumeOptions.Zone)
+			if len(zonesToSearch) != 0 && volumeOptions.Datastore != "" {
+				klog.V(4).Infof("Specified zone : %s, datastore : %s", zonesToSearch, volumeOptions.Datastore)
+				dsList, err = getDatastoresForZone(ctx, vs.nodeManager, zonesToSearch)
 				if err != nil {
+					klog.Errorf("Failed to find a shared datastore matching zone %s. err: %+v", zonesToSearch, err)
 					return "", err
 				}
 
@@ -1210,7 +1242,7 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 					}
 				}
 				if !found {
-					err := fmt.Errorf("The specified datastore %s does not match the provided zones : %s", volumeOptions.Datastore, volumeOptions.Zone)
+					err := fmt.Errorf("The specified datastore %s does not match the provided zones : %s", volumeOptions.Datastore, zonesToSearch)
 					klog.Error(err)
 					return "", err
 				}
@@ -1229,25 +1261,19 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 			cleanUpRoutineInitLock.Unlock()
 		}
 		if volumeOptions.StoragePolicyName != "" && volumeOptions.Datastore == "" {
-			if len(volumeOptions.Zone) == 0 {
+			if len(zonesToSearch) == 0 {
 				klog.V(4).Infof("Selecting a shared datastore as per the storage policy %s", volumeOptions.StoragePolicyName)
 				datastoreInfo, err = getPbmCompatibleDatastore(ctx, vsi.conn.Client, volumeOptions.StoragePolicyName, vs.nodeManager)
 			} else {
 				// If zone is specified, first get the datastores in the zone.
-				dsList, err = getDatastoresForZone(ctx, vs.nodeManager, volumeOptions.Zone)
+				dsList, err = getDatastoresForZone(ctx, vs.nodeManager, zonesToSearch)
 
 				if err != nil {
-					klog.Errorf("Failed to find a shared datastore matching zone %s. err: %+v", volumeOptions.Zone, err)
-					return "", err
-				}
-				// If unable to get any datastore, fail the operation.
-				if len(dsList) == 0 {
-					err := fmt.Errorf("Failed to find a shared datastore matching zone %s", volumeOptions.Zone)
-					klog.Error(err)
+					klog.Errorf("Failed to find a shared datastore matching zone %s. err: %+v", zonesToSearch, err)
 					return "", err
 				}
 
-				klog.V(4).Infof("Specified zone : %s. Picking a datastore as per the storage policy %s among the zoned datastores : %s", volumeOptions.Zone,
+				klog.V(4).Infof("Specified zone : %s. Picking a datastore as per the storage policy %s among the zoned datastores : %s", zonesToSearch,
 					volumeOptions.StoragePolicyName, dsList)
 				// Among the compatible datastores, select the one based on the maximum free space.
 				datastoreInfo, err = getPbmCompatibleZonedDatastore(ctx, vsi.conn.Client, volumeOptions.StoragePolicyName, dsList)
@@ -1259,17 +1285,17 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 			klog.V(1).Infof("Datastore selected as per policy : %s", datastoreInfo.Info.Name)
 		} else {
 			// If zone is specified, pick the datastore in the zone with maximum free space within the zone.
-			if volumeOptions.Datastore == "" && len(volumeOptions.Zone) != 0 {
-				klog.V(4).Infof("Specified zone : %s", volumeOptions.Zone)
-				dsList, err = getDatastoresForZone(ctx, vs.nodeManager, volumeOptions.Zone)
+			if volumeOptions.Datastore == "" && len(zonesToSearch) != 0 {
+				klog.V(4).Infof("Specified zone : %s", zonesToSearch)
+				dsList, err = getDatastoresForZone(ctx, vs.nodeManager, zonesToSearch)
 
 				if err != nil {
-					klog.Errorf("Failed to find a shared datastore matching zone %s. err: %+v", volumeOptions.Zone, err)
+					klog.Errorf("Failed to find a shared datastore matching zone %s. err: %+v", zonesToSearch, err)
 					return "", err
 				}
 				// If unable to get any datastore, fail the operation
 				if len(dsList) == 0 {
-					err := fmt.Errorf("Failed to find a shared datastore matching zone %s", volumeOptions.Zone)
+					err := fmt.Errorf("Failed to find a shared datastore matching zone %s", zonesToSearch)
 					klog.Error(err)
 					return "", err
 				}
@@ -1279,11 +1305,11 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 					klog.Errorf("Failed to get shared datastore: %+v", err)
 					return "", err
 				}
-				klog.V(1).Infof("Specified zone : %s. Selected datastore : %s", volumeOptions.Zone, datastoreInfo.Info.Name)
+				klog.V(1).Infof("Specified zone : %s. Selected datastore : %s", zonesToSearch, datastoreInfo.Info.Name)
 			} else {
 				var sharedDsList []*vclib.DatastoreInfo
 				var err error
-				if len(volumeOptions.Zone) == 0 {
+				if len(zonesToSearch) == 0 {
 					// If zone is not provided, get the shared datastore across all node VMs.
 					klog.V(4).Infof("Validating if datastore %s is shared across all node VMs", datastoreName)
 					sharedDsList, err = getSharedDatastoresInK8SCluster(ctx, vs.nodeManager)
@@ -1295,14 +1321,14 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 					err = fmt.Errorf("The specified datastore %s is not a shared datastore across node VMs", datastoreName)
 				} else {
 					// If zone is provided, get the shared datastores in that zone.
-					klog.V(4).Infof("Validating if datastore %s is in zone %s ", datastoreName, volumeOptions.Zone)
-					sharedDsList, err = getDatastoresForZone(ctx, vs.nodeManager, volumeOptions.Zone)
+					klog.V(4).Infof("Validating if datastore %s is in zone %s ", datastoreName, zonesToSearch)
+					sharedDsList, err = getDatastoresForZone(ctx, vs.nodeManager, zonesToSearch)
 					if err != nil {
-						klog.Errorf("Failed to find a shared datastore matching zone %s. err: %+v", volumeOptions.Zone, err)
+						klog.Errorf("Failed to find a shared datastore matching zone %s. err: %+v", zonesToSearch, err)
 						return "", err
 					}
 					// Prepare error msg to be used later, if required.
-					err = fmt.Errorf("The specified datastore %s does not match the provided zones : %s", datastoreName, volumeOptions.Zone)
+					err = fmt.Errorf("The specified datastore %s does not match the provided zones : %s", datastoreName, zonesToSearch)
 				}
 				found := false
 				// Check if the selected datastore belongs to the list of shared datastores computed.
@@ -1322,14 +1348,14 @@ func (vs *VSphere) CreateVolume(volumeOptions *vclib.VolumeOptions) (canonicalVo
 
 		// if datastoreInfo is still not determined, it is an error condition
 		if datastoreInfo == nil {
-			klog.Errorf("Ambigous datastore name %s, cannot be found among: %v", datastoreName, candidateDatastoreInfos)
-			return "", fmt.Errorf("Ambigous datastore name %s", datastoreName)
+			klog.Errorf("ambiguous datastore name %s, cannot be found among: %v", datastoreName, candidateDatastoreInfos)
+			return "", fmt.Errorf("ambiguous datastore name %s", datastoreName)
 		}
 		ds := datastoreInfo.Datastore
 		volumeOptions.Datastore = datastoreInfo.Info.Name
 		vmOptions, err = vs.setVMOptions(ctx, vsi.conn, ds)
 		if err != nil {
-			klog.Errorf("Failed to set VM options required to create a vsphere volume. err: %+v", err)
+			klog.Errorf("failed to set VM options required to create a vsphere volume. err: %+v", err)
 			return "", err
 		}
 		kubeVolsPath := filepath.Clean(ds.Path(VolDir)) + "/"
@@ -1474,12 +1500,12 @@ func (vs *VSphere) GetZone(ctx context.Context) (cloudprovider.Zone, error) {
 	zone := cloudprovider.Zone{}
 	vsi, err := vs.getVSphereInstanceForServer(vs.cfg.Workspace.VCenterIP, ctx)
 	if err != nil {
-		klog.Errorf("Cannot connent to vsphere. Get zone for node %s error", nodeName)
+		klog.Errorf("Cannot connect to vsphere. Get zone for node %s error", nodeName)
 		return cloudprovider.Zone{}, err
 	}
 	dc, err := vclib.GetDatacenter(ctx, vsi.conn, vs.cfg.Workspace.Datacenter)
 	if err != nil {
-		klog.Errorf("Cannot connent to datacenter. Get zone for node %s error", nodeName)
+		klog.Errorf("Cannot connect to datacenter. Get zone for node %s error", nodeName)
 		return cloudprovider.Zone{}, err
 	}
 	vmHost, err := dc.GetHostByVMUUID(ctx, vs.vmUUID)
@@ -1605,7 +1631,7 @@ func (vs *VSphere) GetVolumeLabels(volumePath string) (map[string]string, error)
 	}
 	if datastore == nil {
 		klog.Errorf("Could not find %s among %v", volumePath, dsInfos)
-		return nil, fmt.Errorf("Could not find the datastore for volume: %s", volumePath)
+		return nil, fmt.Errorf("could not find the datastore for volume: %s", volumePath)
 	}
 
 	dsZones, err := vs.GetZonesForDatastore(ctx, datastore)
@@ -1614,6 +1640,10 @@ func (vs *VSphere) GetVolumeLabels(volumePath string) (map[string]string, error)
 		return nil, err
 	}
 	dsZones, err = vs.collapseZonesInRegion(ctx, dsZones)
+	if err != nil {
+		klog.Errorf("Failed to collapse zones. %v", err)
+		return nil, err
+	}
 	// FIXME: For now, pick the first zone of datastore as the zone of volume
 	labels := make(map[string]string)
 	if len(dsZones) > 0 {

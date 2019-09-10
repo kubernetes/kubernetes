@@ -30,7 +30,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
 	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/slice"
@@ -82,7 +81,7 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting PV protection controller")
 	defer klog.Infof("Shutting down PV protection controller")
 
-	if !controller.WaitForCacheSync("PV protection", stopCh, c.pvListerSynced) {
+	if !cache.WaitForNamedCacheSync("PV protection", stopCh, c.pvListerSynced) {
 		return
 	}
 

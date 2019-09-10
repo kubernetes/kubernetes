@@ -17,6 +17,7 @@ limitations under the License.
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"time"
@@ -43,7 +44,7 @@ import (
 func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		// For performance tracking purposes.
-		trace := utiltrace.New("Delete " + req.URL.Path)
+		trace := utiltrace.New("Delete", utiltrace.Field{"url", req.URL.Path})
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
@@ -59,7 +60,8 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 			scope.err(err, w, req)
 			return
 		}
-		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 		ae := request.AuditEventFrom(ctx)
 		admit = admission.WithAudit(admit, ae)
@@ -160,7 +162,7 @@ func DeleteResource(r rest.GracefulDeleter, allowsOptions bool, scope *RequestSc
 // DeleteCollection returns a function that will handle a collection deletion
 func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestScope, admit admission.Interface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		trace := utiltrace.New("Delete " + req.URL.Path)
+		trace := utiltrace.New("Delete", utiltrace.Field{"url", req.URL.Path})
 		defer trace.LogIfLong(500 * time.Millisecond)
 
 		if isDryRun(req.URL) && !utilfeature.DefaultFeatureGate.Enabled(features.DryRun) {
@@ -177,7 +179,8 @@ func DeleteCollection(r rest.CollectionDeleter, checkBody bool, scope *RequestSc
 			return
 		}
 
-		ctx := req.Context()
+		ctx, cancel := context.WithTimeout(req.Context(), timeout)
+		defer cancel()
 		ctx = request.WithNamespace(ctx, namespace)
 		ae := request.AuditEventFrom(ctx)
 

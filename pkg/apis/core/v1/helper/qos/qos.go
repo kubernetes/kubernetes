@@ -51,12 +51,12 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 				continue
 			}
 			if quantity.Cmp(zeroQuantity) == 1 {
-				delta := quantity.Copy()
+				delta := quantity.DeepCopy()
 				if _, exists := requests[name]; !exists {
-					requests[name] = *delta
+					requests[name] = delta
 				} else {
 					delta.Add(requests[name])
-					requests[name] = *delta
+					requests[name] = delta
 				}
 			}
 		}
@@ -68,12 +68,12 @@ func GetPodQOS(pod *v1.Pod) v1.PodQOSClass {
 			}
 			if quantity.Cmp(zeroQuantity) == 1 {
 				qosLimitsFound.Insert(string(name))
-				delta := quantity.Copy()
+				delta := quantity.DeepCopy()
 				if _, exists := limits[name]; !exists {
-					limits[name] = *delta
+					limits[name] = delta
 				} else {
 					delta.Add(limits[name])
-					limits[name] = *delta
+					limits[name] = delta
 				}
 			}
 		}

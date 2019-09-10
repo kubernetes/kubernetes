@@ -28,15 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
-	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	registerapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/pluginwatcher"
-)
-
-const (
-	testHostname = "test-hostname"
 )
 
 var (
@@ -44,13 +38,6 @@ var (
 	deprecatedSocketDir string
 	supportedVersions   = []string{"v1beta1", "v1beta2"}
 )
-
-// fake cache.PluginHandler
-type PluginHandler interface {
-	ValidatePlugin(pluginName string, endpoint string, versions []string, foundInDeprecatedDir bool) error
-	RegisterPlugin(pluginName, endpoint string, versions []string) error
-	DeRegisterPlugin(pluginName string)
-}
 
 type fakePluginHandler struct {
 	validatePluginCalled   bool
@@ -88,7 +75,6 @@ func (f *fakePluginHandler) DeRegisterPlugin(pluginName string) {
 	f.Lock()
 	defer f.Unlock()
 	f.deregisterPluginCalled = true
-	return
 }
 
 func init() {
@@ -111,20 +97,6 @@ func cleanup(t *testing.T) {
 	require.NoError(t, os.RemoveAll(deprecatedSocketDir))
 	os.MkdirAll(socketDir, 0755)
 	os.MkdirAll(deprecatedSocketDir, 0755)
-}
-
-func newWatcher(
-	t *testing.T, testDeprecatedDir bool,
-	desiredStateOfWorldCache cache.DesiredStateOfWorld) *pluginwatcher.Watcher {
-
-	depSocketDir := ""
-	if testDeprecatedDir {
-		depSocketDir = deprecatedSocketDir
-	}
-	w := pluginwatcher.NewWatcher(socketDir, depSocketDir, desiredStateOfWorldCache)
-	require.NoError(t, w.Start(wait.NeverStop))
-
-	return w
 }
 
 func waitForRegistration(t *testing.T, fakePluginHandler *fakePluginHandler) {
@@ -169,7 +141,7 @@ func TestPluginRegistration(t *testing.T) {
 
 	// Add handler for device plugin
 	fakeHandler := newFakePluginHandler()
-	pluginManager.AddHandler(pluginwatcherapi.DevicePlugin, fakeHandler)
+	pluginManager.AddHandler(registerapi.DevicePlugin, fakeHandler)
 
 	// Add a new plugin
 	socketPath := fmt.Sprintf("%s/plugin.sock", socketDir)

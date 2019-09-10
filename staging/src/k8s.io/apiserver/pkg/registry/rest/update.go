@@ -255,9 +255,9 @@ func (i *wrappedUpdatedObjectInfo) UpdatedObject(ctx context.Context, oldObj run
 func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttributes admission.Attributes, o admission.ObjectInterfaces) ValidateObjectUpdateFunc {
 	validatingAdmission, ok := admit.(admission.ValidationInterface)
 	if !ok {
-		return func(obj, old runtime.Object) error { return nil }
+		return func(ctx context.Context, obj, old runtime.Object) error { return nil }
 	}
-	return func(obj, old runtime.Object) error {
+	return func(ctx context.Context, obj, old runtime.Object) error {
 		finalAttributes := admission.NewAttributesRecord(
 			obj,
 			old,
@@ -274,6 +274,6 @@ func AdmissionToValidateObjectUpdateFunc(admit admission.Interface, staticAttrib
 		if !validatingAdmission.Handles(finalAttributes.GetOperation()) {
 			return nil
 		}
-		return validatingAdmission.Validate(finalAttributes, o)
+		return validatingAdmission.Validate(ctx, finalAttributes, o)
 	}
 }

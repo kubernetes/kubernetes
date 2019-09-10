@@ -28,7 +28,6 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	awscloud "k8s.io/legacy-cloud-providers/aws"
 )
 
@@ -50,13 +49,21 @@ type Provider struct {
 
 // ResizeGroup resizes an instance group
 func (p *Provider) ResizeGroup(group string, size int32) error {
-	client := autoscaling.New(session.New())
+	awsSession, err := session.NewSession()
+	if err != nil {
+		return err
+	}
+	client := autoscaling.New(awsSession)
 	return awscloud.ResizeInstanceGroup(client, group, int(size))
 }
 
 // GroupSize returns the size of an instance group
 func (p *Provider) GroupSize(group string) (int, error) {
-	client := autoscaling.New(session.New())
+	awsSession, err := session.NewSession()
+	if err != nil {
+		return -1, err
+	}
+	client := autoscaling.New(awsSession)
 	instanceGroup, err := awscloud.DescribeInstanceGroup(client, group)
 	if err != nil {
 		return -1, fmt.Errorf("error describing instance group: %v", err)
@@ -115,7 +122,7 @@ func (p *Provider) DeletePD(pdName string) error {
 	_, err := client.DeleteVolume(request)
 	if err != nil {
 		if awsError, ok := err.(awserr.Error); ok && awsError.Code() == "InvalidVolume.NotFound" {
-			e2elog.Logf("volume deletion implicitly succeeded because volume %q does not exist.", pdName)
+			framework.Logf("volume deletion implicitly succeeded because volume %q does not exist.", pdName)
 		} else {
 			return fmt.Errorf("error deleting EBS volumes: %v", err)
 		}
@@ -145,11 +152,15 @@ func newAWSClient(zone string) *ec2.EC2 {
 		zone = framework.TestContext.CloudConfig.Zone
 	}
 	if zone == "" {
-		e2elog.Logf("Warning: No AWS zone configured!")
+		framework.Logf("Warning: No AWS zone configured!")
 		cfg = nil
 	} else {
 		region := zone[:len(zone)-1]
 		cfg = &aws.Config{Region: aws.String(region)}
 	}
-	return ec2.New(session.New(), cfg)
+	session, err := session.NewSession()
+	if err != nil {
+		framework.Logf("Warning: failed to create aws session")
+	}
+	return ec2.New(session, cfg)
 }

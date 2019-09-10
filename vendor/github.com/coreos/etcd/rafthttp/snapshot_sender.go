@@ -76,6 +76,10 @@ func (s *snapshotSender) send(merged snap.Message) {
 	req := createPostRequest(u, RaftSnapshotPrefix, body, "application/octet-stream", s.tr.URLs, s.from, s.cid)
 
 	plog.Infof("start to send database snapshot [index: %d, to %s]...", m.Snapshot.Metadata.Index, types.ID(m.To))
+	snapshotSendInflights.WithLabelValues(to).Inc()
+	defer func() {
+		snapshotSendInflights.WithLabelValues(to).Dec()
+	}()
 
 	err := s.post(req)
 	defer merged.CloseWithError(err)

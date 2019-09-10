@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -31,8 +33,11 @@ type LoadBalancerType string
 const (
 	// ServiceAnnotationLoadBalancerType is annotated on a service with type LoadBalancer
 	// dictates what specific kind of GCP LB should be assembled.
-	// Currently, only "internal" is supported.
-	ServiceAnnotationLoadBalancerType = "cloud.google.com/load-balancer-type"
+	// Currently, only "Internal" is supported.
+	ServiceAnnotationLoadBalancerType = "networking.gke.io/load-balancer-type"
+
+	// Deprecating the old-style naming of LoadBalancerType annotation
+	deprecatedServiceAnnotationLoadBalancerType = "cloud.google.com/load-balancer-type"
 
 	// LBTypeInternal is the constant for the official internal type.
 	LBTypeInternal LoadBalancerType = "Internal"
@@ -48,6 +53,11 @@ const (
 	// This annotation did not correctly specify "alpha", so both annotations will be checked.
 	deprecatedServiceAnnotationILBBackendShare = "cloud.google.com/load-balancer-backend-share"
 
+	// ServiceAnnotationILBAllowGlobalAccess is annotated on a service with "true" when users
+	// want to access the Internal LoadBalancer globally, and not restricted to the region it is
+	// created in.
+	ServiceAnnotationILBAllowGlobalAccess = "networking.gke.io/internal-load-balancer-allow-global-access"
+
 	// NetworkTierAnnotationKey is annotated on a Service object to indicate which
 	// network tier a GCP LB should use. The valid values are "Standard" and
 	// "Premium" (default).
@@ -61,23 +71,23 @@ const (
 )
 
 // GetLoadBalancerAnnotationType returns the type of GCP load balancer which should be assembled.
-func GetLoadBalancerAnnotationType(service *v1.Service) (LoadBalancerType, bool) {
-	v := LoadBalancerType("")
-	if service.Spec.Type != v1.ServiceTypeLoadBalancer {
-		return v, false
+func GetLoadBalancerAnnotationType(service *v1.Service) LoadBalancerType {
+	var lbType LoadBalancerType
+	for _, ann := range []string{
+		ServiceAnnotationLoadBalancerType,
+		deprecatedServiceAnnotationLoadBalancerType,
+	} {
+		if v, ok := service.Annotations[ann]; ok {
+			lbType = LoadBalancerType(v)
+			break
+		}
 	}
 
-	l, ok := service.Annotations[ServiceAnnotationLoadBalancerType]
-	v = LoadBalancerType(l)
-	if !ok {
-		return v, false
-	}
-
-	switch v {
+	switch lbType {
 	case LBTypeInternal, deprecatedTypeInternalLowerCase:
-		return LBTypeInternal, true
+		return LBTypeInternal
 	default:
-		return v, false
+		return lbType
 	}
 }
 
@@ -115,4 +125,17 @@ func GetServiceNetworkTier(service *v1.Service) (cloud.NetworkTier, error) {
 	default:
 		return cloud.NetworkTierDefault, fmt.Errorf("unsupported network tier: %q", v)
 	}
+}
+
+// ILBOptions represents the extra options specified when creating a
+// load balancer.
+type ILBOptions struct {
+	// AllowGlobalAccess Indicates whether global access is allowed for the LoadBalancer
+	AllowGlobalAccess bool
+}
+
+// GetLoadBalancerAnnotationAllowGlobalAccess returns if global access is enabled
+// for the given loadbalancer service.
+func GetLoadBalancerAnnotationAllowGlobalAccess(service *v1.Service) bool {
+	return service.Annotations[ServiceAnnotationILBAllowGlobalAccess] == "true"
 }

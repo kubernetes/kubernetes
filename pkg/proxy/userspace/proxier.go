@@ -26,7 +26,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -35,6 +35,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/config"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	"k8s.io/kubernetes/pkg/util/async"
 	"k8s.io/kubernetes/pkg/util/conntrack"
@@ -109,6 +110,9 @@ type asyncRunnerInterface interface {
 // Proxier is a simple proxy for TCP connections between a localhost:lport
 // and services that provide the actual implementations.
 type Proxier struct {
+	// EndpointSlice support has not been added for this proxier yet.
+	config.NoopEndpointSliceHandler
+
 	loadBalancer    LoadBalancer
 	mu              sync.Mutex // protects serviceMap
 	serviceMap      map[proxy.ServicePortName]*ServiceInfo
@@ -138,8 +142,8 @@ type Proxier struct {
 	stopChan chan struct{}
 }
 
-// assert Proxier is a ProxyProvider
-var _ proxy.ProxyProvider = &Proxier{}
+// assert Proxier is a proxy.Provider
+var _ proxy.Provider = &Proxier{}
 
 // A key for the portMap.  The ip has to be a string because slices can't be map
 // keys.

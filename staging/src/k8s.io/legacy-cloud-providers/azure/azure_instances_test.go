@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -24,10 +26,10 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/go-autorest/autorest/to"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -81,6 +83,7 @@ func setTestVirtualMachines(c *Cloud, vmList map[string]string, isDataDisksFull 
 
 func TestInstanceID(t *testing.T) {
 	cloud := getTestCloud()
+	cloud.Config.UseInstanceMetadata = true
 
 	testcases := []struct {
 		name         string
@@ -120,7 +123,7 @@ func TestInstanceID(t *testing.T) {
 
 		mux := http.NewServeMux()
 		mux.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"name":"%s"}}`, test.metadataName))
+			fmt.Fprintf(w, fmt.Sprintf(`{"compute":{"name":"%s","subscriptionId":"subscription","resourceGroupName":"rg"}}`, test.metadataName))
 		}))
 		go func() {
 			http.Serve(listener, mux)
@@ -204,17 +207,17 @@ func TestInstanceShutdownByProviderID(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:        "InstanceShutdownByProviderID should report error if VM doesn't exist",
-			vmList:      map[string]string{"vm1": "PowerState/running"},
-			nodeName:    "vm8",
-			expectError: true,
+			name:     "InstanceShutdownByProviderID should return false if VM doesn't exist",
+			vmList:   map[string]string{"vm1": "PowerState/running"},
+			nodeName: "vm8",
+			expected: false,
 		},
 	}
 
 	for _, test := range testcases {
 		cloud := getTestCloud()
 		setTestVirtualMachines(cloud, test.vmList, false)
-		providerID := "azure://" + cloud.getStandardMachineID("rg", test.nodeName)
+		providerID := "azure://" + cloud.getStandardMachineID("subscription", "rg", test.nodeName)
 		hasShutdown, err := cloud.InstanceShutdownByProviderID(context.Background(), providerID)
 		if test.expectError {
 			if err == nil {

@@ -18,7 +18,10 @@ spec:
     spec:
       containers:
       - name: slave
-        image: {{.GBRedisSlaveImage}}
+        image: {{.RedisImage}}
+        # We are only implementing the dns option of:
+        # https://github.com/kubernetes/examples/blob/97c7ed0eb6555a4b667d2877f965d392e00abc45/guestbook/redis-slave/run.sh
+        command: [ "redis-server", "--slaveof", "redis-master", "6379" ]
         resources:
           requests:
             cpu: 100m

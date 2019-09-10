@@ -280,7 +280,7 @@ func TestProbe(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		for _, probeType := range [...]probeType{liveness, readiness} {
+		for _, probeType := range [...]probeType{liveness, readiness, startup} {
 			prober := &prober{
 				refManager: kubecontainer.NewRefManager(),
 				recorder:   &record.FakeRecorder{},
@@ -292,6 +292,8 @@ func TestProbe(t *testing.T) {
 				testContainer.LivenessProbe = test.probe
 			case readiness:
 				testContainer.ReadinessProbe = test.probe
+			case startup:
+				testContainer.StartupProbe = test.probe
 			}
 			if test.execError {
 				prober.exec = fakeExecProber{test.execResult, errors.New("exec error")}

@@ -43,7 +43,7 @@ type fakeIPTables struct {
 
 func NewFakeIPTables() *fakeIPTables {
 	return &fakeIPTables{
-		tables: make(map[string]*fakeTable, 0),
+		tables: make(map[string]*fakeTable),
 		builtinChains: map[string]sets.String{
 			string(utiliptables.TableFilter): sets.NewString("INPUT", "FORWARD", "OUTPUT"),
 			string(utiliptables.TableNAT):    sets.NewString("PREROUTING", "INPUT", "OUTPUT", "POSTROUTING"),
@@ -52,14 +52,10 @@ func NewFakeIPTables() *fakeIPTables {
 	}
 }
 
-func (f *fakeIPTables) GetVersion() (string, error) {
-	return "1.4.21", nil
-}
-
 func (f *fakeIPTables) getTable(tableName utiliptables.Table) (*fakeTable, error) {
 	table, ok := f.tables[string(tableName)]
 	if !ok {
-		return nil, fmt.Errorf("Table %s does not exist", tableName)
+		return nil, fmt.Errorf("table %s does not exist", tableName)
 	}
 	return table, nil
 }
@@ -72,7 +68,7 @@ func (f *fakeIPTables) getChain(tableName utiliptables.Table, chainName utilipta
 
 	chain, ok := table.chains[string(chainName)]
 	if !ok {
-		return table, nil, fmt.Errorf("Chain %s/%s does not exist", tableName, chainName)
+		return table, nil, fmt.Errorf("chain %s/%s does not exist", tableName, chainName)
 	}
 
 	return table, chain, nil
@@ -152,7 +148,7 @@ func (f *fakeIPTables) ensureRule(position utiliptables.RulePosition, tableName 
 	} else if position == utiliptables.Append {
 		chain.rules = append(chain.rules, rule)
 	} else {
-		return false, fmt.Errorf("Unknown position argument %q", position)
+		return false, fmt.Errorf("unknown position argument %q", position)
 	}
 
 	return false, nil
@@ -171,7 +167,7 @@ func normalizeRule(rule string) (string, error) {
 		if remaining[0] == '"' {
 			end = strings.Index(remaining[1:], "\"")
 			if end < 0 {
-				return "", fmt.Errorf("Invalid rule syntax: mismatched quotes")
+				return "", fmt.Errorf("invalid rule syntax: mismatched quotes")
 			}
 			end += 2
 		} else {
@@ -203,7 +199,7 @@ func (f *fakeIPTables) EnsureRule(position utiliptables.RulePosition, tableName 
 	ruleArgs := make([]string, 0)
 	for _, arg := range args {
 		// quote args with internal spaces (like comments)
-		if strings.Index(arg, " ") >= 0 {
+		if strings.Contains(arg, " ") {
 			arg = fmt.Sprintf("\"%s\"", arg)
 		}
 		ruleArgs = append(ruleArgs, arg)
@@ -292,7 +288,7 @@ func (f *fakeIPTables) restore(restoreTableName utiliptables.Table, data []byte,
 			} else if strings.HasPrefix(line, "-A") {
 				parts := strings.Split(line, " ")
 				if len(parts) < 3 {
-					return fmt.Errorf("Invalid iptables rule '%s'", line)
+					return fmt.Errorf("invalid iptables rule '%s'", line)
 				}
 				chainName := utiliptables.Chain(parts[1])
 				rule := strings.TrimPrefix(line, fmt.Sprintf("-A %s ", chainName))
@@ -303,7 +299,7 @@ func (f *fakeIPTables) restore(restoreTableName utiliptables.Table, data []byte,
 			} else if strings.HasPrefix(line, "-I") {
 				parts := strings.Split(line, " ")
 				if len(parts) < 3 {
-					return fmt.Errorf("Invalid iptables rule '%s'", line)
+					return fmt.Errorf("invalid iptables rule '%s'", line)
 				}
 				chainName := utiliptables.Chain(parts[1])
 				rule := strings.TrimPrefix(line, fmt.Sprintf("-I %s ", chainName))
@@ -314,7 +310,7 @@ func (f *fakeIPTables) restore(restoreTableName utiliptables.Table, data []byte,
 			} else if strings.HasPrefix(line, "-X") {
 				parts := strings.Split(line, " ")
 				if len(parts) < 2 {
-					return fmt.Errorf("Invalid iptables rule '%s'", line)
+					return fmt.Errorf("invalid iptables rule '%s'", line)
 				}
 				if err := f.DeleteChain(tableName, utiliptables.Chain(parts[1])); err != nil {
 					return err
@@ -349,5 +345,9 @@ func (f *fakeIPTables) isBuiltinChain(tableName utiliptables.Table, chainName ut
 	if builtinChains, ok := f.builtinChains[string(tableName)]; ok && builtinChains.Has(string(chainName)) {
 		return true
 	}
+	return false
+}
+
+func (f *fakeIPTables) HasRandomFully() bool {
 	return false
 }

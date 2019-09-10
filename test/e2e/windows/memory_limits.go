@@ -88,7 +88,7 @@ func checkNodeAllocatableTest(f *framework.Framework) {
 	e2elog.Logf("nodeMem says: %+v", nodeMem)
 
 	// calculate the allocatable mem based on capacity - reserved amounts
-	calculatedNodeAlloc := nodeMem.capacity.Copy()
+	calculatedNodeAlloc := nodeMem.capacity.DeepCopy()
 	calculatedNodeAlloc.Sub(nodeMem.systemReserve)
 	calculatedNodeAlloc.Sub(nodeMem.kubeReserve)
 	calculatedNodeAlloc.Sub(nodeMem.softEviction)
@@ -187,7 +187,7 @@ func getNodeMemory(f *framework.Framework) nodeMemory {
 
 	// Assuming that agent nodes have the same config
 	// Make sure there is >0 agent nodes, then use the first one for info
-	gomega.Expect(nodeList.Size()).NotTo(gomega.Equal(0))
+	framework.ExpectNotEqual(nodeList.Size(), 0)
 
 	ginkgo.By("Getting memory details from node status and kubelet config")
 

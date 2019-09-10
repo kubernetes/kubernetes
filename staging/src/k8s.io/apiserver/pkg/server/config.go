@@ -55,6 +55,7 @@ import (
 	apiopenapi "k8s.io/apiserver/pkg/endpoints/openapi"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/routes"
@@ -94,6 +95,11 @@ type Config struct {
 	// This is required for proper functioning of the PostStartHooks on a GenericAPIServer
 	// TODO: move into SecureServing(WithLoopback) as soon as insecure serving is gone
 	LoopbackClientConfig *restclient.Config
+
+	// EgressSelector provides a lookup mechanism for dialing outbound connections.
+	// It does so based on a EgressSelectorConfiguration which was read at startup.
+	EgressSelector *egressselector.EgressSelector
+
 	// RuleResolver is required to get the list of rules that apply to a given user
 	// in a given namespace
 	RuleResolver authorizer.RuleResolver
@@ -132,10 +138,12 @@ type Config struct {
 	// DiscoveryAddresses is used to build the IPs pass to discovery. If nil, the ExternalAddress is
 	// always reported
 	DiscoveryAddresses discovery.Addresses
-	// The default set of healthz checks. There might be more added via AddHealthzChecks dynamically.
-	HealthzChecks []healthz.HealthzChecker
+	// The default set of healthz checks. There might be more added via AddHealthChecks dynamically.
+	HealthzChecks []healthz.HealthChecker
+	// The default set of livez checks. There might be more added via AddHealthChecks dynamically.
+	LivezChecks []healthz.HealthChecker
 	// The default set of readyz-only checks. There might be more added via AddReadyzChecks dynamically.
-	ReadyzChecks []healthz.HealthzChecker
+	ReadyzChecks []healthz.HealthChecker
 	// LegacyAPIGroupPrefixes is used to set up URL parsing for authorization and for validating requests
 	// to InstallLegacyAPIGroup. New API servers don't generally have legacy groups at all.
 	LegacyAPIGroupPrefixes sets.String
@@ -160,9 +168,14 @@ type Config struct {
 
 	// This represents the maximum amount of time it should take for apiserver to complete its startup
 	// sequence and become healthy. From apiserver's start time to when this amount of time has
-	// elapsed, /healthz will assume that unfinished post-start hooks will complete successfully and
+	// elapsed, /livez will assume that unfinished post-start hooks will complete successfully and
 	// therefore return true.
-	MaxStartupSequenceDuration time.Duration
+	LivezGracePeriod time.Duration
+	// ShutdownDelayDuration allows to block shutdown for some time, e.g. until endpoints pointing to this API server
+	// have converged on all node. During this time, the API server keeps serving, /healthz will return 200,
+	// but /readyz will return failure.
+	ShutdownDelayDuration time.Duration
+
 	// The limit on the total size increase all "copy" operations in a json
 	// patch may cause.
 	// This affects all places that applies json patch in the binary.
@@ -237,6 +250,9 @@ type SecureServingInfo struct {
 	// HTTP2MaxStreamsPerConnection is the limit that the api server imposes on each client.
 	// A value of zero means to use the default provided by golang's HTTP/2 support.
 	HTTP2MaxStreamsPerConnection int
+
+	// DisableHTTP2 indicates that http2 should not be enabled.
+	DisableHTTP2 bool
 }
 
 type AuthenticationInfo struct {
@@ -259,15 +275,16 @@ type AuthorizationInfo struct {
 
 // NewConfig returns a Config struct with the default values
 func NewConfig(codecs serializer.CodecFactory) *Config {
-	defaultHealthChecks := []healthz.HealthzChecker{healthz.PingHealthz, healthz.LogHealthz}
+	defaultHealthChecks := []healthz.HealthChecker{healthz.PingHealthz, healthz.LogHealthz}
 	return &Config{
 		Serializer:                  codecs,
 		BuildHandlerChainFunc:       DefaultBuildHandlerChain,
 		HandlerChainWaitGroup:       new(utilwaitgroup.SafeWaitGroup),
 		LegacyAPIGroupPrefixes:      sets.NewString(DefaultLegacyAPIPrefix),
 		DisabledPostStartHooks:      sets.NewString(),
-		HealthzChecks:               append([]healthz.HealthzChecker{}, defaultHealthChecks...),
-		ReadyzChecks:                append([]healthz.HealthzChecker{}, defaultHealthChecks...),
+		HealthzChecks:               append([]healthz.HealthChecker{}, defaultHealthChecks...),
+		ReadyzChecks:                append([]healthz.HealthChecker{}, defaultHealthChecks...),
+		LivezChecks:                 append([]healthz.HealthChecker{}, defaultHealthChecks...),
 		EnableIndex:                 true,
 		EnableDiscovery:             true,
 		EnableProfiling:             true,
@@ -276,7 +293,8 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		MaxMutatingRequestsInFlight: 200,
 		RequestTimeout:              time.Duration(60) * time.Second,
 		MinRequestTimeout:           1800,
-		MaxStartupSequenceDuration:  time.Duration(0),
+		LivezGracePeriod:            time.Duration(0),
+		ShutdownDelayDuration:       time.Duration(0),
 		// 10MB is the recommended maximum client request size in bytes
 		// the etcd server should accept. See
 		// https://github.com/etcd-io/etcd/blob/release-3.3/etcdserver/server.go#L90.
@@ -482,10 +500,11 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		EquivalentResourceRegistry: c.EquivalentResourceRegistry,
 		HandlerChainWaitGroup:      c.HandlerChainWaitGroup,
 
-		minRequestTimeout: time.Duration(c.MinRequestTimeout) * time.Second,
-		ShutdownTimeout:   c.RequestTimeout,
-		SecureServingInfo: c.SecureServing,
-		ExternalAddress:   c.ExternalAddress,
+		minRequestTimeout:     time.Duration(c.MinRequestTimeout) * time.Second,
+		ShutdownTimeout:       c.RequestTimeout,
+		ShutdownDelayDuration: c.ShutdownDelayDuration,
+		SecureServingInfo:     c.SecureServing,
+		ExternalAddress:       c.ExternalAddress,
 
 		Handler: apiServerHandler,
 
@@ -497,15 +516,16 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		preShutdownHooks:       map[string]preShutdownHookEntry{},
 		disabledPostStartHooks: c.DisabledPostStartHooks,
 
-		healthzChecks:              c.HealthzChecks,
-		readyzChecks:               c.ReadyzChecks,
-		readinessStopCh:            make(chan struct{}),
-		maxStartupSequenceDuration: c.MaxStartupSequenceDuration,
+		healthzChecks:    c.HealthzChecks,
+		livezChecks:      c.LivezChecks,
+		readyzChecks:     c.ReadyzChecks,
+		readinessStopCh:  make(chan struct{}),
+		livezGracePeriod: c.LivezGracePeriod,
 
 		DiscoveryGroupManager: discovery.NewRootAPIsHandler(c.DiscoveryAddresses, c.Serializer),
 
 		maxRequestBodyBytes: c.MaxRequestBodyBytes,
-		healthzClock:        clock.RealClock{},
+		livezClock:          clock.RealClock{},
 	}
 
 	for {
@@ -551,9 +571,7 @@ func (c completedConfig) New(name string, delegationTarget DelegationTarget) (*G
 		if skip {
 			continue
 		}
-
-		s.healthzChecks = append(s.healthzChecks, delegateCheck)
-		s.readyzChecks = append(s.readyzChecks, delegateCheck)
+		s.AddHealthChecks(delegateCheck)
 	}
 
 	s.listedPathProvider = routes.ListedPathProviders{s.listedPathProvider, delegationTarget}
@@ -584,6 +602,7 @@ func DefaultBuildHandlerChain(apiHandler http.Handler, c *Config) http.Handler {
 	handler = genericfilters.WithTimeoutForNonLongRunningRequests(handler, c.LongRunningFunc, c.RequestTimeout)
 	handler = genericfilters.WithWaitGroup(handler, c.LongRunningFunc, c.HandlerChainWaitGroup)
 	handler = genericapifilters.WithRequestInfo(handler, c.RequestInfoResolver)
+	handler = genericapifilters.WithCacheControl(handler)
 	handler = genericfilters.WithPanicRecovery(handler)
 	return handler
 }

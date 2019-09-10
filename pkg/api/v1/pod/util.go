@@ -23,6 +23,8 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // FindPort locates the container port for the given pod and portName.  If the
@@ -65,6 +67,13 @@ func VisitContainers(podSpec *v1.PodSpec, visitor ContainerVisitor) bool {
 	for i := range podSpec.Containers {
 		if !visitor(&podSpec.Containers[i]) {
 			return false
+		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EphemeralContainers) {
+		for i := range podSpec.EphemeralContainers {
+			if !visitor((*v1.Container)(&podSpec.EphemeralContainers[i].EphemeralContainerCommon)) {
+				return false
+			}
 		}
 	}
 	return true

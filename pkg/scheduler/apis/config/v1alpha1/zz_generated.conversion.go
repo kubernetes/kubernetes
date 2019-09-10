@@ -25,7 +25,7 @@ import (
 
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	configv1alpha1 "k8s.io/component-base/config/v1alpha1"
+	componentbaseconfigv1alpha1 "k8s.io/component-base/config/v1alpha1"
 	v1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
 	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
@@ -137,6 +137,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*config.KubeSchedulerLeaderElectionConfiguration)(nil), (*v1alpha1.KubeSchedulerLeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(a.(*config.KubeSchedulerLeaderElectionConfiguration), b.(*v1alpha1.KubeSchedulerLeaderElectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*v1alpha1.KubeSchedulerLeaderElectionConfiguration)(nil), (*config.KubeSchedulerLeaderElectionConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(a.(*v1alpha1.KubeSchedulerLeaderElectionConfiguration), b.(*config.KubeSchedulerLeaderElectionConfiguration), scope)
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -149,12 +159,12 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConf
 	if err := Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
-	if err := configv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_v1alpha1_ClientConnectionConfiguration_To_config_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
-	if err := configv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
 		return err
 	}
 	out.DisablePreemption = in.DisablePreemption
@@ -179,12 +189,12 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConf
 	if err := Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
-	if err := configv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnectionConfiguration(&in.ClientConnection, &out.ClientConnection, s); err != nil {
 		return err
 	}
 	out.HealthzBindAddress = in.HealthzBindAddress
 	out.MetricsBindAddress = in.MetricsBindAddress
-	if err := configv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(&in.DebuggingConfiguration, &out.DebuggingConfiguration, s); err != nil {
 		return err
 	}
 	out.DisablePreemption = in.DisablePreemption
@@ -201,31 +211,19 @@ func Convert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConfigur
 }
 
 func autoConvert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(in *v1alpha1.KubeSchedulerLeaderElectionConfiguration, out *config.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
-	if err := configv1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_v1alpha1_LeaderElectionConfiguration_To_config_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
 		return err
 	}
-	out.LockObjectNamespace = in.LockObjectNamespace
-	out.LockObjectName = in.LockObjectName
+	// WARNING: in.LockObjectNamespace requires manual conversion: does not exist in peer-type
+	// WARNING: in.LockObjectName requires manual conversion: does not exist in peer-type
 	return nil
-}
-
-// Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration is an autogenerated conversion function.
-func Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(in *v1alpha1.KubeSchedulerLeaderElectionConfiguration, out *config.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
-	return autoConvert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(in, out, s)
 }
 
 func autoConvert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(in *config.KubeSchedulerLeaderElectionConfiguration, out *v1alpha1.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
-	if err := configv1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
+	if err := componentbaseconfigv1alpha1.Convert_config_LeaderElectionConfiguration_To_v1alpha1_LeaderElectionConfiguration(&in.LeaderElectionConfiguration, &out.LeaderElectionConfiguration, s); err != nil {
 		return err
 	}
-	out.LockObjectNamespace = in.LockObjectNamespace
-	out.LockObjectName = in.LockObjectName
 	return nil
-}
-
-// Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration is an autogenerated conversion function.
-func Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(in *config.KubeSchedulerLeaderElectionConfiguration, out *v1alpha1.KubeSchedulerLeaderElectionConfiguration, s conversion.Scope) error {
-	return autoConvert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(in, out, s)
 }
 
 func autoConvert_v1alpha1_Plugin_To_config_Plugin(in *v1alpha1.Plugin, out *config.Plugin, s conversion.Scope) error {
@@ -300,7 +298,6 @@ func autoConvert_v1alpha1_Plugins_To_config_Plugins(in *v1alpha1.Plugins, out *c
 	out.Filter = (*config.PluginSet)(unsafe.Pointer(in.Filter))
 	out.PostFilter = (*config.PluginSet)(unsafe.Pointer(in.PostFilter))
 	out.Score = (*config.PluginSet)(unsafe.Pointer(in.Score))
-	out.NormalizeScore = (*config.PluginSet)(unsafe.Pointer(in.NormalizeScore))
 	out.Reserve = (*config.PluginSet)(unsafe.Pointer(in.Reserve))
 	out.Permit = (*config.PluginSet)(unsafe.Pointer(in.Permit))
 	out.PreBind = (*config.PluginSet)(unsafe.Pointer(in.PreBind))
@@ -321,7 +318,6 @@ func autoConvert_config_Plugins_To_v1alpha1_Plugins(in *config.Plugins, out *v1a
 	out.Filter = (*v1alpha1.PluginSet)(unsafe.Pointer(in.Filter))
 	out.PostFilter = (*v1alpha1.PluginSet)(unsafe.Pointer(in.PostFilter))
 	out.Score = (*v1alpha1.PluginSet)(unsafe.Pointer(in.Score))
-	out.NormalizeScore = (*v1alpha1.PluginSet)(unsafe.Pointer(in.NormalizeScore))
 	out.Reserve = (*v1alpha1.PluginSet)(unsafe.Pointer(in.Reserve))
 	out.Permit = (*v1alpha1.PluginSet)(unsafe.Pointer(in.Permit))
 	out.PreBind = (*v1alpha1.PluginSet)(unsafe.Pointer(in.PreBind))

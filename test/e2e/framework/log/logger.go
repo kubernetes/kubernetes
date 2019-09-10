@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package log should be removed after switching to use core framework log.
 package log
 
 import (
@@ -47,6 +48,17 @@ func Failf(format string, args ...interface{}) {
 // (for example, for call chain f -> g -> FailfWithOffset(1, ...) error would be logged for "f").
 func FailfWithOffset(offset int, format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	log("INFO", msg)
+	log("FAIL", msg)
 	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
+}
+
+// Fail is a replacement for ginkgo.Fail which logs the problem as it occurs
+// and then calls ginkgowrapper.Fail.
+func Fail(msg string, callerSkip ...int) {
+	skip := 1
+	if len(callerSkip) > 0 {
+		skip += callerSkip[0]
+	}
+	log("FAIL", msg)
+	ginkgowrapper.Fail(nowStamp()+": "+msg, skip)
 }

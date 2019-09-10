@@ -64,12 +64,15 @@ type lazyMetric struct {
 	isDeprecated        bool
 	isHidden            bool
 	isCreated           bool
+	createLock          sync.RWMutex
 	markDeprecationOnce sync.Once
 	createOnce          sync.Once
 	self                kubeCollector
 }
 
 func (r *lazyMetric) IsCreated() bool {
+	r.createLock.RLock()
+	defer r.createLock.RUnlock()
 	return r.isCreated
 }
 
@@ -125,6 +128,8 @@ func (r *lazyMetric) Create(version *semver.Version) bool {
 		return false
 	}
 	r.createOnce.Do(func() {
+		r.createLock.Lock()
+		defer r.createLock.Unlock()
 		r.isCreated = true
 		if r.IsDeprecated() {
 			r.self.initializeDeprecatedMetric()

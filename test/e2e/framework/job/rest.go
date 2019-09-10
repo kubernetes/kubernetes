@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // GetJob uses c to get the Job in namespace ns named name. If the returned error is nil, the returned Job is valid.
@@ -64,7 +63,7 @@ func UpdateJobWithRetries(c clientset.Interface, namespace, name string, applyUp
 		// Apply the update, then attempt to push it to the apiserver.
 		applyUpdate(job)
 		if job, err = jobs.Update(job); err == nil {
-			e2elog.Logf("Updating job %s", name)
+			framework.Logf("Updating job %s", name)
 			return true, nil
 		}
 		updateErr = err

@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2016 The Kubernetes Authors.
 
@@ -23,9 +25,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest"
+
 	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
@@ -233,7 +236,7 @@ func (az *Cloud) newLBCache() (*timedCache, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		lb, err := az.LoadBalancerClient.Get(ctx, az.ResourceGroup, key, "")
+		lb, err := az.LoadBalancerClient.Get(ctx, az.getLoadBalancerResourceGroup(), key, "")
 		exists, message, realErr := checkResourceExistsFromError(err)
 		if realErr != nil {
 			return nil, realErr

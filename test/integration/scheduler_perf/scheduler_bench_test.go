@@ -25,7 +25,6 @@ import (
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/csi-translation-lib/plugins"
@@ -359,9 +358,9 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	if b.N < minPods {
 		b.N = minPods
 	}
-	schedulerConfigFactory, finalFunc := mustSetupScheduler()
+	schedulerConfigArgs, finalFunc := mustSetupScheduler()
 	defer finalFunc()
-	c := schedulerConfigFactory.GetClient()
+	c := schedulerConfigArgs.Client
 
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
 		c,
@@ -378,8 +377,9 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	podCreator := testutils.NewTestPodCreator(c, config)
 	podCreator.CreatePods()
 
+	podLister := schedulerConfigArgs.PodInformer.Lister()
 	for {
-		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
+		scheduled, err := getScheduledPods(podLister)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
@@ -397,7 +397,7 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	for {
 		// This can potentially affect performance of scheduler, since List() is done under mutex.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled, err := schedulerConfigFactory.GetScheduledPodLister().List(labels.Everything())
+		scheduled, err := getScheduledPods(podLister)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}

@@ -19,6 +19,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"path"
 	"strings"
 	"testing"
@@ -106,19 +107,23 @@ func TestValidConvenientForUserVersion(t *testing.T) {
 
 func TestVersionFromNetwork(t *testing.T) {
 	type T struct {
-		Content       string
-		Expected      string
-		ErrorExpected bool
+		Content              string
+		Expected             string
+		FetcherErrorExpected bool
+		ErrorExpected        bool
 	}
+
+	currentVersion := normalizedBuildVersion(constants.CurrentKubernetesVersion.String())
+
 	cases := map[string]T{
-		"stable":     {"stable-1", "v1.4.6", false}, // recursive pointer to stable-1
-		"stable-1":   {"v1.4.6", "v1.4.6", false},
-		"stable-1.3": {"v1.3.10", "v1.3.10", false},
-		"latest":     {"v1.6.0-alpha.0", "v1.6.0-alpha.0", false},
-		"latest-1.3": {"v1.3.11-beta.0", "v1.3.11-beta.0", false},
-		"empty":      {"", "", true},
-		"garbage":    {"<?xml version='1.0'?><Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>", "", true},
-		"unknown":    {"The requested URL was not found on this server.", "", true},
+		"stable":     {"stable-1", "v1.4.6", false, false}, // recursive pointer to stable-1
+		"stable-1":   {"v1.4.6", "v1.4.6", false, false},
+		"stable-1.3": {"v1.3.10", "v1.3.10", false, false},
+		"latest":     {"v1.6.0-alpha.0", "v1.6.0-alpha.0", false, false},
+		"latest-1.3": {"v1.3.11-beta.0", "v1.3.11-beta.0", false, false},
+		"empty":      {"", currentVersion, true, false},
+		"garbage":    {"<?xml version='1.0'?><Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>", currentVersion, true, false},
+		"unknown":    {"The requested URL was not found on this server.", currentVersion, true, false},
 	}
 
 	for k, v := range cases {
@@ -128,7 +133,7 @@ func TestVersionFromNetwork(t *testing.T) {
 				key := strings.TrimSuffix(path.Base(url), ".txt")
 				res, found := cases[key]
 				if found {
-					if v.ErrorExpected {
+					if v.FetcherErrorExpected {
 						return "error", errors.New("expected error")
 					}
 					return res.Content, nil

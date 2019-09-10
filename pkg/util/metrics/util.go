@@ -21,8 +21,8 @@ import (
 	"sync"
 
 	"k8s.io/client-go/util/flowcontrol"
-
-	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var (
@@ -31,7 +31,7 @@ var (
 )
 
 type rateLimiterMetric struct {
-	metric prometheus.Gauge
+	metric metrics.GaugeMetric
 	stopCh chan struct{}
 }
 
@@ -43,12 +43,13 @@ func registerRateLimiterMetric(ownerName string) error {
 		// only register once in Prometheus. We happen to see an ownerName reused in parallel integration tests.
 		return nil
 	}
-	metric := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name:      "rate_limiter_use",
-		Subsystem: ownerName,
-		Help:      fmt.Sprintf("A metric measuring the saturation of the rate limiter for %v", ownerName),
+	metric := metrics.NewGauge(&metrics.GaugeOpts{
+		Name:           "rate_limiter_use",
+		Subsystem:      ownerName,
+		Help:           fmt.Sprintf("A metric measuring the saturation of the rate limiter for %v", ownerName),
+		StabilityLevel: metrics.ALPHA,
 	})
-	if err := prometheus.Register(metric); err != nil {
+	if err := legacyregistry.Register(metric); err != nil {
 		return fmt.Errorf("error registering rate limiter usage metric: %v", err)
 	}
 	stopCh := make(chan struct{})

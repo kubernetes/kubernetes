@@ -80,6 +80,7 @@ func RoleEscalationAuthorized(ctx context.Context, a authorizer.Authorizer) bool
 		User:            user,
 		Verb:            "escalate",
 		APIGroup:        requestInfo.APIGroup,
+		APIVersion:      "*",
 		Resource:        requestInfo.Resource,
 		Name:            requestInfo.Name,
 		Namespace:       requestInfo.Namespace,
@@ -122,10 +123,12 @@ func BindingAuthorized(ctx context.Context, roleRef rbac.RoleRef, bindingNamespa
 	switch roleRef.Kind {
 	case "ClusterRole":
 		attrs.APIGroup = roleRef.APIGroup
+		attrs.APIVersion = "*"
 		attrs.Resource = "clusterroles"
 		attrs.Name = roleRef.Name
 	case "Role":
 		attrs.APIGroup = roleRef.APIGroup
+		attrs.APIVersion = "*"
 		attrs.Resource = "roles"
 		attrs.Name = roleRef.Name
 	default:

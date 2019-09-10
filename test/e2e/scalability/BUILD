@@ -39,6 +39,8 @@ go_library(
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/log:go_default_library",
+        "//test/e2e/framework/metrics:go_default_library",
+        "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/timer:go_default_library",
         "//test/utils:go_default_library",

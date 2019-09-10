@@ -28,7 +28,9 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	"github.com/stretchr/testify/assert"
+	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -250,7 +252,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 	}
 
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 	fp.exec = &fexec
 
 	for _, tc := range testCases {
@@ -363,7 +365,7 @@ func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedNa
 
 const testHostname = "test-hostname"
 
-func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
+func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Proxier {
 	// TODO: Call NewProxier after refactoring out the goroutine
 	// invocation into a Run() method.
 	p := &Proxier{
@@ -371,7 +373,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		serviceMap:               make(proxy.ServiceMap),
 		serviceChanges:           proxy.NewServiceChangeTracker(newServiceInfo, nil, nil),
 		endpointsMap:             make(proxy.EndpointsMap),
-		endpointsChanges:         proxy.NewEndpointChangeTracker(testHostname, newEndpointInfo, nil, nil),
+		endpointsChanges:         proxy.NewEndpointChangeTracker(testHostname, newEndpointInfo, nil, nil, endpointSlicesEnabled),
 		iptables:                 ipt,
 		clusterCIDR:              "10.0.0.0/24",
 		hostname:                 testHostname,
@@ -388,6 +390,7 @@ func NewFakeProxier(ipt utiliptables.Interface) *Proxier {
 		nodePortAddresses:        make([]string, 0),
 		networkInterfacer:        utilproxytest.NewFakeNetwork(),
 	}
+	p.setInitialized(true)
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
 	return p
 }
@@ -433,6 +436,15 @@ func hasSrcType(rules []iptablestest.Rule, srcType string) bool {
 		return true
 	}
 
+	return false
+}
+
+func hasMasqRandomFully(rules []iptablestest.Rule) bool {
+	for _, r := range rules {
+		if r[iptablestest.Masquerade] == "--random-fully" {
+			return true
+		}
+	}
 	return false
 }
 
@@ -575,7 +587,7 @@ func errorf(msg string, rules []iptablestest.Rule, t *testing.T) {
 
 func TestClusterIPReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcPortName := proxy.ServicePortName{
@@ -609,7 +621,7 @@ func TestClusterIPReject(t *testing.T) {
 
 func TestClusterIPEndpointsJump(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcPortName := proxy.ServicePortName{
@@ -666,7 +678,7 @@ func TestClusterIPEndpointsJump(t *testing.T) {
 
 func TestLoadBalancer(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -726,7 +738,7 @@ func TestLoadBalancer(t *testing.T) {
 
 func TestNodePort(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -782,9 +794,28 @@ func TestNodePort(t *testing.T) {
 	}
 }
 
+func TestMasqueradeRule(t *testing.T) {
+	for _, testcase := range []bool{false, true} {
+		ipt := iptablestest.NewFake().SetHasRandomFully(testcase)
+		fp := NewFakeProxier(ipt, false)
+		makeServiceMap(fp)
+		makeEndpointsMap(fp)
+		fp.syncProxyRules()
+
+		postRoutingRules := ipt.GetRules(string(kubePostroutingChain))
+		if !hasJump(postRoutingRules, "MASQUERADE", "", 0) {
+			errorf(fmt.Sprintf("Failed to find -j MASQUERADE in %s chain", kubePostroutingChain), postRoutingRules, t)
+		}
+		if hasMasqRandomFully(postRoutingRules) != testcase {
+			probs := map[bool]string{false: "found", true: "did not find"}
+			errorf(fmt.Sprintf("%s --random-fully in -j MASQUERADE rule in %s chain when HasRandomFully()==%v", probs[testcase], kubePostroutingChain, testcase), postRoutingRules, t)
+		}
+	}
+}
+
 func TestExternalIPsReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcExternalIPs := "50.60.70.81"
@@ -818,7 +849,7 @@ func TestExternalIPsReject(t *testing.T) {
 
 func TestNodePortReject(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -851,7 +882,7 @@ func TestNodePortReject(t *testing.T) {
 
 func TestOnlyLocalLoadBalancing(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 	svcIP := "10.20.30.41"
 	svcPort := 80
 	svcNodePort := 3001
@@ -941,7 +972,7 @@ func TestOnlyLocalLoadBalancing(t *testing.T) {
 
 func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 	// set cluster CIDR to empty before test
 	fp.clusterCIDR = ""
 	onlyLocalNodePorts(t, fp, ipt)
@@ -949,7 +980,7 @@ func TestOnlyLocalNodePortsNoClusterCIDR(t *testing.T) {
 
 func TestOnlyLocalNodePorts(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 	onlyLocalNodePorts(t, fp, ipt)
 }
 
@@ -1064,7 +1095,7 @@ func addTestPort(array []v1.ServicePort, name string, protocol v1.Protocol, port
 
 func TestBuildServiceMapAddRemove(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 
 	services := []*v1.Service{
 		makeTestService("somewhere-else", "cluster-ip", func(svc *v1.Service) {
@@ -1170,7 +1201,7 @@ func TestBuildServiceMapAddRemove(t *testing.T) {
 
 func TestBuildServiceMapServiceHeadless(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "headless", func(svc *v1.Service) {
@@ -1202,7 +1233,7 @@ func TestBuildServiceMapServiceHeadless(t *testing.T) {
 
 func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 
 	makeServiceMap(fp,
 		makeTestService("somewhere-else", "external-name", func(svc *v1.Service) {
@@ -1228,7 +1259,7 @@ func TestBuildServiceMapServiceTypeExternalName(t *testing.T) {
 
 func TestBuildServiceMapServiceUpdate(t *testing.T) {
 	ipt := iptablestest.NewFake()
-	fp := NewFakeProxier(ipt)
+	fp := NewFakeProxier(ipt, false)
 
 	servicev1 := makeTestService("somewhere", "some-service", func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeClusterIP
@@ -2182,7 +2213,7 @@ func Test_updateEndpointsMap(t *testing.T) {
 
 	for tci, tc := range testCases {
 		ipt := iptablestest.NewFake()
-		fp := NewFakeProxier(ipt)
+		fp := NewFakeProxier(ipt, false)
 		fp.hostname = nodeName
 
 		// First check that after adding all previous versions of endpoints,
@@ -2248,6 +2279,122 @@ func Test_updateEndpointsMap(t *testing.T) {
 			t.Errorf("[%d] expected healthchecks %v, got %v", tci, tc.expectedHealthchecks, result.HCEndpointsLocalIPSize)
 		}
 	}
+}
+
+// The majority of EndpointSlice specific tests are not iptables specific and focus on
+// the shared EndpointChangeTracker and EndpointSliceCache. This test ensures that the
+// iptables proxier supports translating EndpointSlices to iptables output.
+func TestEndpointSliceE2E(t *testing.T) {
+	expectedIPTablesWithoutSlice := `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+-A KUBE-SERVICES -m comment --comment "ns1/svc1: has no endpoints" -m  -p  -d 172.20.1.1/32 --dport 0 -j REJECT
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark  -j ACCEPT
+-A KUBE-FORWARD -s 10.0.0.0/24 -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -d 10.0.0.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-3WUAALNGPYZZAWAD - [0:0]
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -m mark --mark  -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --set-xmark 
+-X KUBE-SVC-3WUAALNGPYZZAWAD
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`
+
+	expectedIPTablesWithSlice := `*filter
+:KUBE-SERVICES - [0:0]
+:KUBE-EXTERNAL-SERVICES - [0:0]
+:KUBE-FORWARD - [0:0]
+-A KUBE-FORWARD -m conntrack --ctstate INVALID -j DROP
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding rules" -m mark --mark  -j ACCEPT
+-A KUBE-FORWARD -s 10.0.0.0/24 -m comment --comment "kubernetes forwarding conntrack pod source rule" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+-A KUBE-FORWARD -m comment --comment "kubernetes forwarding conntrack pod destination rule" -d 10.0.0.0/24 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+COMMIT
+*nat
+:KUBE-SERVICES - [0:0]
+:KUBE-NODEPORTS - [0:0]
+:KUBE-POSTROUTING - [0:0]
+:KUBE-MARK-MASQ - [0:0]
+:KUBE-SVC-3WUAALNGPYZZAWAD - [0:0]
+: - [0:0]
+: - [0:0]
+: - [0:0]
+-A KUBE-POSTROUTING -m comment --comment "kubernetes service traffic requiring SNAT" -m mark --mark  -j MASQUERADE
+-A KUBE-MARK-MASQ -j MARK --set-xmark 
+-A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m  -p  -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m  -p  -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-3WUAALNGPYZZAWAD
+-A KUBE-SVC-3WUAALNGPYZZAWAD -m statistic --mode random --probability 0.33333 -j 
+-A  -s 10.0.1.1/32 -j KUBE-MARK-MASQ
+-A  -m  -p  -j DNAT --to-destination 10.0.1.1:80
+-A KUBE-SVC-3WUAALNGPYZZAWAD -m statistic --mode random --probability 0.50000 -j 
+-A  -s 10.0.1.2/32 -j KUBE-MARK-MASQ
+-A  -m  -p  -j DNAT --to-destination 10.0.1.2:80
+-A KUBE-SVC-3WUAALNGPYZZAWAD -j 
+-A  -s 10.0.1.3/32 -j KUBE-MARK-MASQ
+-A  -m  -p  -j DNAT --to-destination 10.0.1.3:80
+-A KUBE-SERVICES -m comment --comment "kubernetes service nodeports; NOTE: this must be the last rule in this chain" -m addrtype --dst-type LOCAL -j KUBE-NODEPORTS
+COMMIT
+`
+
+	ipt := iptablestest.NewFake()
+	fp := NewFakeProxier(ipt, true)
+	fp.OnServiceSynced()
+	fp.OnEndpointsSynced()
+	fp.OnEndpointSlicesSynced()
+
+	serviceName := "svc1"
+	namespaceName := "ns1"
+
+	fp.OnServiceAdd(&v1.Service{
+		ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespaceName},
+		Spec: v1.ServiceSpec{
+			ClusterIP: "172.20.1.1",
+			Selector:  map[string]string{"foo": "bar"},
+			Ports:     []v1.ServicePort{{Name: "", TargetPort: intstr.FromInt(80)}},
+		},
+	})
+
+	ipAddressType := discovery.AddressTypeIP
+	endpointSlice := &discovery.EndpointSlice{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
+		},
+		Ports: []discovery.EndpointPort{{
+			Name: utilpointer.StringPtr(""),
+			Port: utilpointer.Int32Ptr(80),
+		}},
+		AddressType: &ipAddressType,
+		Endpoints: []discovery.Endpoint{{
+			Addresses:  []string{"10.0.1.1"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:   map[string]string{"kubernetes.io/hostname": testHostname},
+		}, {
+			Addresses:  []string{"10.0.1.2"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:   map[string]string{"kubernetes.io/hostname": "node2"},
+		}, {
+			Addresses:  []string{"10.0.1.3"},
+			Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+			Topology:   map[string]string{"kubernetes.io/hostname": "node3"},
+		}},
+	}
+
+	fp.OnEndpointSliceAdd(endpointSlice)
+	fp.syncProxyRules()
+	assert.Equal(t, expectedIPTablesWithSlice, fp.iptablesData.String())
+
+	fp.OnEndpointSliceDelete(endpointSlice)
+	fp.syncProxyRules()
+	assert.Equal(t, expectedIPTablesWithoutSlice, fp.iptablesData.String())
 }
 
 // TODO(thockin): add *more* tests for syncProxyRules() or break it down further and test the pieces.

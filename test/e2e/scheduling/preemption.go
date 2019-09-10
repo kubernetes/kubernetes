@@ -41,6 +41,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
+
 	// ensure libs have a chance to initialize
 	_ "github.com/stretchr/testify/assert"
 )
@@ -76,15 +77,21 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 		cs = f.ClientSet
 		ns = f.Namespace.Name
 		nodeList = &v1.NodeList{}
+		var err error
 		for _, pair := range priorityPairs {
 			_, err := f.ClientSet.SchedulingV1().PriorityClasses().Create(&schedulingv1.PriorityClass{ObjectMeta: metav1.ObjectMeta{Name: pair.name}, Value: pair.value})
 			framework.ExpectEqual(err == nil || errors.IsAlreadyExists(err), true)
 		}
 
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
-		masterNodes, nodeList = framework.GetMasterAndWorkerNodesOrDie(cs)
+		masterNodes, nodeList, err = e2enode.GetMasterAndWorkerNodes(cs)
+		if err != nil {
+			e2elog.Logf("Unexpected error occurred: %v", err)
+		}
+		// TODO: write a wrapper for ExpectNoErrorWithOffset()
+		framework.ExpectNoErrorWithOffset(0, err)
 
-		err := framework.CheckTestingNSDeletedExcept(cs, ns)
+		err = framework.CheckTestingNSDeletedExcept(cs, ns)
 		framework.ExpectNoError(err)
 	})
 
@@ -207,131 +214,6 @@ var _ = SIGDescribe("SchedulerPreemption [Serial]", func() {
 			(err == nil && preemptedPod.DeletionTimestamp != nil)
 		gomega.Expect(podDeleted).To(gomega.BeTrue())
 		// Other pods (mid priority ones) should be present.
-		for i := 1; i < len(pods); i++ {
-			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(pods[i].Name, metav1.GetOptions{})
-			framework.ExpectNoError(err)
-			gomega.Expect(livePod.DeletionTimestamp).To(gomega.BeNil())
-		}
-	})
-
-	// This test verifies that when a high priority pod is pending and its
-	// scheduling violates a medium priority pod anti-affinity, the medium priority
-	// pod is preempted to allow the higher priority pod schedule.
-	// It also verifies that existing low priority pods are not preempted as their
-	// preemption wouldn't help.
-	ginkgo.It("validates pod anti-affinity works in preemption", func() {
-		var podRes v1.ResourceList
-		// Create a few pods that uses a small amount of resources.
-		ginkgo.By("Create pods that use 10% of node resources.")
-		numPods := 4
-		if len(nodeList.Items) < numPods {
-			numPods = len(nodeList.Items)
-		}
-		pods := make([]*v1.Pod, numPods)
-		for i := 0; i < numPods; i++ {
-			node := nodeList.Items[i]
-			cpuAllocatable, found := node.Status.Allocatable["cpu"]
-			gomega.Expect(found).To(gomega.BeTrue())
-			milliCPU := cpuAllocatable.MilliValue() * 10 / 100
-			memAllocatable, found := node.Status.Allocatable["memory"]
-			gomega.Expect(found).To(gomega.BeTrue())
-			memory := memAllocatable.Value() * 10 / 100
-			podRes = v1.ResourceList{}
-			podRes[v1.ResourceCPU] = *resource.NewMilliQuantity(int64(milliCPU), resource.DecimalSI)
-			podRes[v1.ResourceMemory] = *resource.NewQuantity(int64(memory), resource.BinarySI)
-
-			// Apply node label to each node
-			framework.AddOrUpdateLabelOnNode(cs, node.Name, "node", node.Name)
-			framework.ExpectNodeHasLabel(cs, node.Name, "node", node.Name)
-
-			// make the first pod medium priority and the rest low priority.
-			priorityName := lowPriorityClassName
-			if i == 0 {
-				priorityName = mediumPriorityClassName
-			}
-			pods[i] = createPausePod(f, pausePodConfig{
-				Name:              fmt.Sprintf("pod%d-%v", i, priorityName),
-				PriorityClassName: priorityName,
-				Resources: &v1.ResourceRequirements{
-					Requests: podRes,
-				},
-				Affinity: &v1.Affinity{
-					PodAntiAffinity: &v1.PodAntiAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-							{
-								LabelSelector: &metav1.LabelSelector{
-									MatchExpressions: []metav1.LabelSelectorRequirement{
-										{
-											Key:      "service",
-											Operator: metav1.LabelSelectorOpIn,
-											Values:   []string{"blah", "foo"},
-										},
-									},
-								},
-								TopologyKey: "node",
-							},
-						},
-					},
-					NodeAffinity: &v1.NodeAffinity{
-						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-							NodeSelectorTerms: []v1.NodeSelectorTerm{
-								{
-									MatchExpressions: []v1.NodeSelectorRequirement{
-										{
-											Key:      "node",
-											Operator: v1.NodeSelectorOpIn,
-											Values:   []string{node.Name},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			})
-			e2elog.Logf("Created pod: %v", pods[i].Name)
-		}
-		defer func() { // Remove added labels
-			for i := 0; i < numPods; i++ {
-				framework.RemoveLabelOffNode(cs, nodeList.Items[i].Name, "node")
-			}
-		}()
-
-		ginkgo.By("Wait for pods to be scheduled.")
-		for _, pod := range pods {
-			framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(cs, pod))
-		}
-
-		ginkgo.By("Run a high priority pod with node affinity to the first node.")
-		// Create a high priority pod and make sure it is scheduled.
-		runPausePod(f, pausePodConfig{
-			Name:              "preemptor-pod",
-			PriorityClassName: highPriorityClassName,
-			Labels:            map[string]string{"service": "blah"},
-			Affinity: &v1.Affinity{
-				NodeAffinity: &v1.NodeAffinity{
-					RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
-						NodeSelectorTerms: []v1.NodeSelectorTerm{
-							{
-								MatchExpressions: []v1.NodeSelectorRequirement{
-									{
-										Key:      "node",
-										Operator: v1.NodeSelectorOpIn,
-										Values:   []string{nodeList.Items[0].Name},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		})
-		// Make sure that the medium priority pod on the first node is preempted.
-		preemptedPod, err := cs.CoreV1().Pods(pods[0].Namespace).Get(pods[0].Name, metav1.GetOptions{})
-		podDeleted := (err != nil && errors.IsNotFound(err)) ||
-			(err == nil && preemptedPod.DeletionTimestamp != nil)
-		gomega.Expect(podDeleted).To(gomega.BeTrue())
-		// Other pods (low priority ones) should be present.
 		for i := 1; i < len(pods); i++ {
 			livePod, err := cs.CoreV1().Pods(pods[i].Namespace).Get(pods[i].Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)

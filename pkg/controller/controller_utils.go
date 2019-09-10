@@ -35,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/rand"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -1020,21 +1019,6 @@ func PatchNodeTaints(c clientset.Interface, nodeName string, oldNode *v1.Node, n
 
 	_, err = c.CoreV1().Nodes().Patch(nodeName, types.StrategicMergePatchType, patchBytes)
 	return err
-}
-
-// WaitForCacheSync is a wrapper around cache.WaitForCacheSync that generates log messages
-// indicating that the controller identified by controllerName is waiting for syncs, followed by
-// either a successful or failed sync.
-func WaitForCacheSync(controllerName string, stopCh <-chan struct{}, cacheSyncs ...cache.InformerSynced) bool {
-	klog.Infof("Waiting for caches to sync for %s controller", controllerName)
-
-	if !cache.WaitForCacheSync(stopCh, cacheSyncs...) {
-		utilruntime.HandleError(fmt.Errorf("unable to sync caches for %s controller", controllerName))
-		return false
-	}
-
-	klog.Infof("Caches are synced for %s controller", controllerName)
-	return true
 }
 
 // ComputeHash returns a hash value calculated from pod template and

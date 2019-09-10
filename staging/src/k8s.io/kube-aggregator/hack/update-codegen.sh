@@ -23,7 +23,7 @@ CODEGEN_PKG=${CODEGEN_PKG:-$(cd "${SCRIPT_ROOT}"; ls -d -1 ./vendor/k8s.io/code-
 
 CLIENTSET_NAME_VERSIONED=clientset \
 CLIENTSET_PKG_NAME=clientset_generated \
-"${CODEGEN_PKG}/generate-groups.sh" deepcopy,client,lister,informer \
+bash "${CODEGEN_PKG}/generate-groups.sh" deepcopy,client,lister,informer \
   k8s.io/kube-aggregator/pkg/client k8s.io/kube-aggregator/pkg/apis \
   "apiregistration:v1beta1,v1" \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \
@@ -32,7 +32,7 @@ CLIENTSET_PKG_NAME=clientset_generated \
 CLIENTSET_NAME_VERSIONED=clientset \
 CLIENTSET_PKG_NAME=clientset_generated \
 CLIENTSET_NAME_INTERNAL=internalclientset \
-"${CODEGEN_PKG}/generate-internal-groups.sh" deepcopy,client,lister,informer,conversion \
+bash "${CODEGEN_PKG}/generate-internal-groups.sh" deepcopy,conversion \
   k8s.io/kube-aggregator/pkg/client k8s.io/kube-aggregator/pkg/apis k8s.io/kube-aggregator/pkg/apis \
   "apiregistration:v1beta1,v1" \
   --output-base "$(dirname "${BASH_SOURCE[0]}")/../../.." \

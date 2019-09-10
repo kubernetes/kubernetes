@@ -28,7 +28,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	schedulingv1 "k8s.io/api/scheduling/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -574,8 +574,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 			framework.AddOrUpdateLabelOnNode(c, node, labelKey, labelValue)
 		}
 
-		scheduling.CreateNodeSelectorPods(f, "node-selector", minSize+1, map[string]string{labelKey: labelValue}, false)
-
+		err = scheduling.CreateNodeSelectorPods(f, "node-selector", minSize+1, map[string]string{labelKey: labelValue}, false)
+		framework.ExpectNoError(err)
 		ginkgo.By("Waiting for new node to appear and annotating it")
 		framework.WaitForGroupSize(minMig, int32(minSize+1))
 		// Verify that cluster size is increased
@@ -685,6 +685,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 
 	ginkgo.It("should correctly scale down after a node is not needed and one node is broken [Feature:ClusterSizeAutoscalingScaleDown]",
 		func() {
+			framework.SkipUnlessSSHKeyPresent()
 			framework.TestUnderTemporaryNetworkFailure(c, "default", getAnyNode(c), func() { simpleScaleDownTest(1) })
 		})
 
@@ -876,6 +877,8 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 	})
 
 	ginkgo.It("Shouldn't perform scale up operation and should list unhealthy status if most of the cluster is broken[Feature:ClusterSizeAutoscalingScaleUp]", func() {
+		framework.SkipUnlessSSHKeyPresent()
+
 		clusterSize := nodeCount
 		for clusterSize < unhealthyClusterThreshold+1 {
 			clusterSize = manuallyIncreaseClusterSize(f, originalSizes)
@@ -1226,7 +1229,12 @@ func deleteNodePool(name string) {
 
 func getPoolNodes(f *framework.Framework, poolName string) []*v1.Node {
 	nodes := make([]*v1.Node, 0, 1)
-	nodeList := framework.GetReadyNodesIncludingTaintedOrDie(f.ClientSet)
+	nodeList, err := e2enode.GetReadyNodesIncludingTainted(f.ClientSet)
+	if err != nil {
+		e2elog.Logf("Unexpected error occurred: %v", err)
+	}
+	// TODO: write a wrapper for ExpectNoErrorWithOffset()
+	framework.ExpectNoErrorWithOffset(0, err)
 	for _, node := range nodeList.Items {
 		if node.Labels[gkeNodepoolNameKey] == poolName {
 			nodes = append(nodes, &node)

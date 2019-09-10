@@ -3,7 +3,7 @@
 {% endpanel %}
 
 {% panel style="info", title="TL;DR" %}
-- Set Labels for all Resources declared within a Project with `commonLables`
+- Set Labels for all Resources declared within a Project with `commonLabels`
 - Set Annotations for all Resources declared within a Project with `commonAnnotations`
 {% endpanel %}
 

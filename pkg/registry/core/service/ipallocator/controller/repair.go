@@ -34,6 +34,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
+	netutil "k8s.io/utils/net"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/kubernetes/pkg/features"
 )
 
 // Repair is a controller loop that periodically examines all service ClusterIP allocations
@@ -54,10 +58,14 @@ import (
 type Repair struct {
 	interval      time.Duration
 	serviceClient corev1client.ServicesGetter
-	network       *net.IPNet
-	alloc         rangeallocation.RangeRegistry
-	leaks         map[string]int // counter per leaked IP
-	recorder      record.EventRecorder
+
+	network          *net.IPNet
+	alloc            rangeallocation.RangeRegistry
+	secondaryNetwork *net.IPNet
+	secondaryAlloc   rangeallocation.RangeRegistry
+
+	leaks    map[string]int // counter per leaked IP
+	recorder record.EventRecorder
 }
 
 // How many times we need to detect a leak before we clean up.  This is to
@@ -66,7 +74,7 @@ const numRepairsBeforeLeakCleanup = 3
 
 // NewRepair creates a controller that periodically ensures that all clusterIPs are uniquely allocated across the cluster
 // and generates informational warnings for a cluster that is not in sync.
-func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter, eventClient corev1client.EventsGetter, network *net.IPNet, alloc rangeallocation.RangeRegistry) *Repair {
+func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter, eventClient corev1client.EventsGetter, network *net.IPNet, alloc rangeallocation.RangeRegistry, secondaryNetwork *net.IPNet, secondaryAlloc rangeallocation.RangeRegistry) *Repair {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartRecordingToSink(&corev1client.EventSinkImpl{Interface: eventClient.Events("")})
 	recorder := eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: "ipallocator-repair-controller"})
@@ -74,10 +82,14 @@ func NewRepair(interval time.Duration, serviceClient corev1client.ServicesGetter
 	return &Repair{
 		interval:      interval,
 		serviceClient: serviceClient,
-		network:       network,
-		alloc:         alloc,
-		leaks:         map[string]int{},
-		recorder:      recorder,
+
+		network:          network,
+		alloc:            alloc,
+		secondaryNetwork: secondaryNetwork,
+		secondaryAlloc:   secondaryAlloc,
+
+		leaks:    map[string]int{},
+		recorder: recorder,
 	}
 }
 
@@ -95,6 +107,29 @@ func (c *Repair) RunOnce() error {
 	return retry.RetryOnConflict(retry.DefaultBackoff, c.runOnce)
 }
 
+// selectAllocForIP returns an allocator for an IP based weather it belongs to the primary or the secondary allocator
+func (c *Repair) selectAllocForIP(ip net.IP, primary ipallocator.Interface, secondary ipallocator.Interface) ipallocator.Interface {
+	if !c.shouldWorkOnSecondary() {
+		return primary
+	}
+
+	cidr := secondary.CIDR()
+	if netutil.IsIPv6CIDR(&cidr) && netutil.IsIPv6(ip) {
+		return secondary
+	}
+
+	return primary
+}
+
+// shouldWorkOnSecondary returns true if the repairer should perform work for secondary network (dual stack)
+func (c *Repair) shouldWorkOnSecondary() bool {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+		return false
+	}
+
+	return c.secondaryNetwork != nil && c.secondaryNetwork.IP != nil
+}
+
 // runOnce verifies the state of the cluster IP allocations and returns an error if an unrecoverable problem occurs.
 func (c *Repair) runOnce() error {
 	// TODO: (per smarterclayton) if Get() or ListServices() is a weak consistency read,
@@ -107,10 +142,26 @@ func (c *Repair) runOnce() error {
 	// If etcd server is not running we should wait for some time and fail only then. This is particularly
 	// important when we start apiserver and etcd at the same time.
 	var snapshot *api.RangeAllocation
-	err := wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
+	var secondarySnapshot *api.RangeAllocation
+
+	var stored, secondaryStored ipallocator.Interface
+	var err, secondaryErr error
+
+	err = wait.PollImmediate(time.Second, 10*time.Second, func() (bool, error) {
 		var err error
 		snapshot, err = c.alloc.Get()
-		return err == nil, err
+		if err != nil {
+			return false, err
+		}
+
+		if c.shouldWorkOnSecondary() {
+			secondarySnapshot, err = c.secondaryAlloc.Get()
+			if err != nil {
+				return false, err
+			}
+		}
+
+		return true, nil
 	})
 	if err != nil {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
@@ -119,10 +170,19 @@ func (c *Repair) runOnce() error {
 	if snapshot.Range == "" {
 		snapshot.Range = c.network.String()
 	}
+
+	if c.shouldWorkOnSecondary() && secondarySnapshot.Range == "" {
+		secondarySnapshot.Range = c.secondaryNetwork.String()
+	}
 	// Create an allocator because it is easy to use.
-	stored, err := ipallocator.NewFromSnapshot(snapshot)
-	if err != nil {
-		return fmt.Errorf("unable to rebuild allocator from snapshot: %v", err)
+
+	stored, err = ipallocator.NewFromSnapshot(snapshot)
+	if c.shouldWorkOnSecondary() {
+		secondaryStored, secondaryErr = ipallocator.NewFromSnapshot(secondarySnapshot)
+	}
+
+	if err != nil || secondaryErr != nil {
+		return fmt.Errorf("unable to rebuild allocator from snapshots: %v", err)
 	}
 
 	// We explicitly send no resource version, since the resource version
@@ -135,7 +195,20 @@ func (c *Repair) runOnce() error {
 		return fmt.Errorf("unable to refresh the service IP block: %v", err)
 	}
 
-	rebuilt := ipallocator.NewCIDRRange(c.network)
+	var rebuilt, secondaryRebuilt *ipallocator.Range
+	rebuilt, err = ipallocator.NewCIDRRange(c.network)
+	if err != nil {
+		return fmt.Errorf("unable to create CIDR range: %v", err)
+	}
+
+	if c.shouldWorkOnSecondary() {
+		secondaryRebuilt, err = ipallocator.NewCIDRRange(c.secondaryNetwork)
+	}
+
+	if err != nil {
+		return fmt.Errorf("unable to create CIDR range: %v", err)
+	}
+
 	// Check every Service's ClusterIP, and rebuild the state as we think it should be.
 	for _, svc := range list.Items {
 		if !helper.IsServiceIPSet(&svc) {
@@ -149,12 +222,15 @@ func (c *Repair) runOnce() error {
 			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not a valid IP; please recreate", svc.Spec.ClusterIP, svc.Name, svc.Namespace))
 			continue
 		}
+
 		// mark it as in-use
-		switch err := rebuilt.Allocate(ip); err {
+		actualAlloc := c.selectAllocForIP(ip, rebuilt, secondaryRebuilt)
+		switch err := actualAlloc.Allocate(ip); err {
 		case nil:
-			if stored.Has(ip) {
+			actualStored := c.selectAllocForIP(ip, stored, secondaryStored)
+			if actualStored.Has(ip) {
 				// remove it from the old set, so we can find leaks
-				stored.Release(ip)
+				actualStored.Release(ip)
 			} else {
 				// cluster IP doesn't seem to be allocated
 				c.recorder.Eventf(&svc, v1.EventTypeWarning, "ClusterIPNotAllocated", "Cluster IP %s is not allocated; repairing", ip)
@@ -171,14 +247,50 @@ func (c *Repair) runOnce() error {
 			runtime.HandleError(fmt.Errorf("the cluster IP %s for service %s/%s is not within the service CIDR %s; please recreate", ip, svc.Name, svc.Namespace, c.network))
 		case ipallocator.ErrFull:
 			// somehow we are out of IPs
-			c.recorder.Eventf(&svc, v1.EventTypeWarning, "ServiceCIDRFull", "Service CIDR %s is full; you must widen the CIDR in order to create new services", c.network)
-			return fmt.Errorf("the service CIDR %s is full; you must widen the CIDR in order to create new services", c.network)
+			cidr := actualAlloc.CIDR()
+			c.recorder.Eventf(&svc, v1.EventTypeWarning, "ServiceCIDRFull", "Service CIDR %v is full; you must widen the CIDR in order to create new services", cidr)
+			return fmt.Errorf("the service CIDR %v is full; you must widen the CIDR in order to create new services", cidr)
 		default:
 			c.recorder.Eventf(&svc, v1.EventTypeWarning, "UnknownError", "Unable to allocate cluster IP %s due to an unknown error", ip)
 			return fmt.Errorf("unable to allocate cluster IP %s for service %s/%s due to an unknown error, exiting: %v", ip, svc.Name, svc.Namespace, err)
 		}
 	}
 
+	c.checkLeaked(stored, rebuilt)
+	if c.shouldWorkOnSecondary() {
+		c.checkLeaked(secondaryStored, secondaryRebuilt)
+	}
+
+	// Blast the rebuilt state into storage.
+	err = c.saveSnapShot(rebuilt, c.alloc, snapshot)
+	if err != nil {
+		return err
+	}
+
+	if c.shouldWorkOnSecondary() {
+		err := c.saveSnapShot(secondaryRebuilt, c.secondaryAlloc, secondarySnapshot)
+		if err != nil {
+			return nil
+		}
+	}
+	return nil
+}
+
+func (c *Repair) saveSnapShot(rebuilt *ipallocator.Range, alloc rangeallocation.RangeRegistry, snapshot *api.RangeAllocation) error {
+	if err := rebuilt.Snapshot(snapshot); err != nil {
+		return fmt.Errorf("unable to snapshot the updated service IP allocations: %v", err)
+	}
+	if err := alloc.CreateOrUpdate(snapshot); err != nil {
+		if errors.IsConflict(err) {
+			return err
+		}
+		return fmt.Errorf("unable to persist the updated service IP allocations: %v", err)
+	}
+
+	return nil
+}
+
+func (c *Repair) checkLeaked(stored ipallocator.Interface, rebuilt *ipallocator.Range) {
 	// Check for IPs that are left in the old set.  They appear to have been leaked.
 	stored.ForEach(func(ip net.IP) {
 		count, found := c.leaks[ip.String()]
@@ -200,15 +312,4 @@ func (c *Repair) runOnce() error {
 		}
 	})
 
-	// Blast the rebuilt state into storage.
-	if err := rebuilt.Snapshot(snapshot); err != nil {
-		return fmt.Errorf("unable to snapshot the updated service IP allocations: %v", err)
-	}
-	if err := c.alloc.CreateOrUpdate(snapshot); err != nil {
-		if errors.IsConflict(err) {
-			return err
-		}
-		return fmt.Errorf("unable to persist the updated service IP allocations: %v", err)
-	}
-	return nil
 }

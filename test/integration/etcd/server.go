@@ -76,7 +76,7 @@ func StartRealMasterOrDie(t *testing.T, configFuncs ...func(*options.ServerRunOp
 	kubeAPIServerOptions.SecureServing.ServerCert.CertDirectory = certDir
 	kubeAPIServerOptions.Etcd.StorageConfig.Transport.ServerList = []string{framework.GetEtcdURL()}
 	kubeAPIServerOptions.Etcd.DefaultStorageMediaType = runtime.ContentTypeJSON // force json we can easily interpret the result in etcd
-	kubeAPIServerOptions.ServiceClusterIPRange = *defaultServiceClusterIPRange
+	kubeAPIServerOptions.ServiceClusterIPRanges = defaultServiceClusterIPRange.String()
 	kubeAPIServerOptions.Authorization.Modes = []string{"RBAC"}
 	kubeAPIServerOptions.Admission.GenericAdmission.DisablePlugins = []string{"ServiceAccount"}
 	kubeAPIServerOptions.APIEnablement.RuntimeConfig["api/all"] = "true"

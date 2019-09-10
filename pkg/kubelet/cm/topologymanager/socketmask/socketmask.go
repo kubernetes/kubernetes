@@ -18,9 +18,10 @@ package socketmask
 
 import (
 	"fmt"
+	"math/bits"
 )
 
-//SocketMask interface allows hint providers to create SocketMasks for TopologyHints
+// SocketMask interface allows hint providers to create SocketMasks for TopologyHints
 type SocketMask interface {
 	Add(sockets ...int) error
 	Remove(sockets ...int) error
@@ -39,7 +40,13 @@ type SocketMask interface {
 
 type socketMask uint64
 
-//NewSocketMask creates a new SocketMask
+// NewEmptySocketMask creates a new, empty SocketMask
+func NewEmptySocketMask() SocketMask {
+	s := socketMask(0)
+	return &s
+}
+
+// NewSocketMask creates a new SocketMask
 func NewSocketMask(sockets ...int) (SocketMask, error) {
 	s := socketMask(0)
 	err := (&s).Add(sockets...)
@@ -49,7 +56,7 @@ func NewSocketMask(sockets ...int) (SocketMask, error) {
 	return &s, nil
 }
 
-//Add adds the sockets with topology affinity to the SocketMask
+// Add adds the sockets with topology affinity to the SocketMask
 func (s *socketMask) Add(sockets ...int) error {
 	mask := *s
 	for _, i := range sockets {
@@ -62,7 +69,7 @@ func (s *socketMask) Add(sockets ...int) error {
 	return nil
 }
 
-//Remove removes specified sockets from SocketMask
+// Remove removes specified sockets from SocketMask
 func (s *socketMask) Remove(sockets ...int) error {
 	mask := *s
 	for _, i := range sockets {
@@ -75,36 +82,36 @@ func (s *socketMask) Remove(sockets ...int) error {
 	return nil
 }
 
-//And performs and operation on all bits in masks
+// And performs and operation on all bits in masks
 func (s *socketMask) And(masks ...SocketMask) {
 	for _, m := range masks {
 		*s &= *m.(*socketMask)
 	}
 }
 
-//Or performs or operation on all bits in masks
+// Or performs or operation on all bits in masks
 func (s *socketMask) Or(masks ...SocketMask) {
 	for _, m := range masks {
 		*s |= *m.(*socketMask)
 	}
 }
 
-//Clear resets all bits in mask to zero
+// Clear resets all bits in mask to zero
 func (s *socketMask) Clear() {
 	*s = 0
 }
 
-//Fill sets all bits in mask to one
+// Fill sets all bits in mask to one
 func (s *socketMask) Fill() {
 	*s = socketMask(^uint64(0))
 }
 
-//IsEmpty checks mask to see if all bits are zero
+// IsEmpty checks mask to see if all bits are zero
 func (s *socketMask) IsEmpty() bool {
 	return *s == 0
 }
 
-//IsSet checks socket in mask to see if bit is set to one
+// IsSet checks socket in mask to see if bit is set to one
 func (s *socketMask) IsSet(socket int) bool {
 	if socket < 0 || socket >= 64 {
 		return false
@@ -112,7 +119,7 @@ func (s *socketMask) IsSet(socket int) bool {
 	return (*s & (1 << uint64(socket))) > 0
 }
 
-//IsEqual checks if masks are equal
+// IsEqual checks if masks are equal
 func (s *socketMask) IsEqual(mask SocketMask) bool {
 	return *s == *mask.(*socketMask)
 }
@@ -131,31 +138,17 @@ func (s *socketMask) IsNarrowerThan(mask SocketMask) bool {
 	return s.Count() < mask.Count()
 }
 
-//String converts mask to string
+// String converts mask to string
 func (s *socketMask) String() string {
-	str := ""
-	for i := uint64(0); i < 64; i++ {
-		if (*s & (1 << i)) > 0 {
-			str += "1"
-		} else {
-			str += "0"
-		}
-	}
-	return str
+	return fmt.Sprintf("%064b", *s)
 }
 
-//Count counts number of bits in mask set to one
+// Count counts number of bits in mask set to one
 func (s *socketMask) Count() int {
-	count := 0
-	for i := uint64(0); i < 64; i++ {
-		if (*s & (1 << i)) > 0 {
-			count++
-		}
-	}
-	return count
+	return bits.OnesCount64(uint64(*s))
 }
 
-//GetSockets returns each socket number with bits set to one
+// GetSockets returns each socket number with bits set to one
 func (s *socketMask) GetSockets() []int {
 	var sockets []int
 	for i := uint64(0); i < 64; i++ {
@@ -164,4 +157,38 @@ func (s *socketMask) GetSockets() []int {
 		}
 	}
 	return sockets
+}
+
+// And is a package level implementation of 'and' between first and masks
+func And(first SocketMask, masks ...SocketMask) SocketMask {
+	s := *first.(*socketMask)
+	s.And(masks...)
+	return &s
+}
+
+// Or is a package level implementation of 'or' between first and masks
+func Or(first SocketMask, masks ...SocketMask) SocketMask {
+	s := *first.(*socketMask)
+	s.Or(masks...)
+	return &s
+}
+
+// IterateSocketMasks iterates all possible masks from a list of sockets,
+// issuing a callback on each mask.
+func IterateSocketMasks(sockets []int, callback func(SocketMask)) {
+	var iterate func(sockets, accum []int, size int)
+	iterate = func(sockets, accum []int, size int) {
+		if len(accum) == size {
+			mask, _ := NewSocketMask(accum...)
+			callback(mask)
+			return
+		}
+		for i := range sockets {
+			iterate(sockets[i+1:], append(accum, sockets[i]), size)
+		}
+	}
+
+	for i := 1; i <= len(sockets); i++ {
+		iterate(sockets, []int{}, i)
+	}
 }

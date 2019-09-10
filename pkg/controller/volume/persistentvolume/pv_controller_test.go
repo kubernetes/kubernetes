@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/watch"
@@ -260,12 +260,14 @@ func TestControllerSync(t *testing.T) {
 
 		reactor := newVolumeReactor(client, ctrl, fakeVolumeWatch, fakeClaimWatch, test.errors)
 		for _, claim := range test.initialClaims {
+			claim = claim.DeepCopy()
 			reactor.AddClaim(claim)
 			go func(claim *v1.PersistentVolumeClaim) {
 				fakeClaimWatch.Add(claim)
 			}(claim)
 		}
 		for _, volume := range test.initialVolumes {
+			volume = volume.DeepCopy()
 			reactor.AddVolume(volume)
 			go func(volume *v1.PersistentVolume) {
 				fakeVolumeWatch.Add(volume)
@@ -374,7 +376,7 @@ func TestControllerCacheParsingError(t *testing.T) {
 	}
 }
 
-func makePVCClass(scName *string, hasSelectNodeAnno bool) *v1.PersistentVolumeClaim {
+func makePVCClass(scName *string) *v1.PersistentVolumeClaim {
 	claim := &v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Annotations: map[string]string{},
@@ -382,10 +384,6 @@ func makePVCClass(scName *string, hasSelectNodeAnno bool) *v1.PersistentVolumeCl
 		Spec: v1.PersistentVolumeClaimSpec{
 			StorageClassName: scName,
 		},
-	}
-
-	if hasSelectNodeAnno {
-		claim.Annotations[pvutil.AnnSelectedNode] = "node-name"
 	}
 
 	return claim
@@ -400,36 +398,32 @@ func makeStorageClass(scName string, mode *storagev1.VolumeBindingMode) *storage
 	}
 }
 
-func TestDelayBinding(t *testing.T) {
+func TestDelayBindingMode(t *testing.T) {
 	tests := map[string]struct {
 		pvc         *v1.PersistentVolumeClaim
 		shouldDelay bool
 		shouldFail  bool
 	}{
 		"nil-class": {
-			pvc:         makePVCClass(nil, false),
+			pvc:         makePVCClass(nil),
 			shouldDelay: false,
 		},
 		"class-not-found": {
-			pvc:         makePVCClass(&classNotHere, false),
+			pvc:         makePVCClass(&classNotHere),
 			shouldDelay: false,
 		},
 		"no-mode-class": {
-			pvc:         makePVCClass(&classNoMode, false),
+			pvc:         makePVCClass(&classNoMode),
 			shouldDelay: false,
 			shouldFail:  true,
 		},
 		"immediate-mode-class": {
-			pvc:         makePVCClass(&classImmediateMode, false),
+			pvc:         makePVCClass(&classImmediateMode),
 			shouldDelay: false,
 		},
 		"wait-mode-class": {
-			pvc:         makePVCClass(&classWaitMode, false),
+			pvc:         makePVCClass(&classWaitMode),
 			shouldDelay: true,
-		},
-		"wait-mode-class-with-selectedNode": {
-			pvc:         makePVCClass(&classWaitMode, true),
-			shouldDelay: false,
 		},
 	}
 
@@ -453,7 +447,7 @@ func TestDelayBinding(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		shouldDelay, err := ctrl.shouldDelayBinding(test.pvc)
+		shouldDelay, err := pvutil.IsDelayBindingMode(test.pvc, ctrl.classLister)
 		if err != nil && !test.shouldFail {
 			t.Errorf("Test %q returned error: %v", name, err)
 		}

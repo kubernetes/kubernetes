@@ -18,6 +18,7 @@ package value
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -31,6 +32,90 @@ type Value struct {
 	ListValue    *List
 	MapValue     *Map
 	Null         bool // represents an explicit `"foo" = null`
+}
+
+// Equals returns true iff the two values are equal.
+func (v Value) Equals(rhs Value) bool {
+	return !v.Less(rhs) && !rhs.Less(v)
+}
+
+// Less provides a total ordering for Value (so that they can be sorted, even
+// if they are of different types).
+func (v Value) Less(rhs Value) bool {
+	if v.FloatValue != nil {
+		if rhs.FloatValue == nil {
+			// Extra: compare floats and ints numerically.
+			if rhs.IntValue != nil {
+				return float64(*v.FloatValue) < float64(*rhs.IntValue)
+			}
+			return true
+		}
+		return *v.FloatValue < *rhs.FloatValue
+	} else if rhs.FloatValue != nil {
+		// Extra: compare floats and ints numerically.
+		if v.IntValue != nil {
+			return float64(*v.IntValue) < float64(*rhs.FloatValue)
+		}
+		return false
+	}
+
+	if v.IntValue != nil {
+		if rhs.IntValue == nil {
+			return true
+		}
+		return *v.IntValue < *rhs.IntValue
+	} else if rhs.IntValue != nil {
+		return false
+	}
+
+	if v.StringValue != nil {
+		if rhs.StringValue == nil {
+			return true
+		}
+		return *v.StringValue < *rhs.StringValue
+	} else if rhs.StringValue != nil {
+		return false
+	}
+
+	if v.BooleanValue != nil {
+		if rhs.BooleanValue == nil {
+			return true
+		}
+		if *v.BooleanValue == *rhs.BooleanValue {
+			return false
+		}
+		return *v.BooleanValue == false
+	} else if rhs.BooleanValue != nil {
+		return false
+	}
+
+	if v.ListValue != nil {
+		if rhs.ListValue == nil {
+			return true
+		}
+		return v.ListValue.Less(rhs.ListValue)
+	} else if rhs.ListValue != nil {
+		return false
+	}
+	if v.MapValue != nil {
+		if rhs.MapValue == nil {
+			return true
+		}
+		return v.MapValue.Less(rhs.MapValue)
+	} else if rhs.MapValue != nil {
+		return false
+	}
+	if v.Null {
+		if !rhs.Null {
+			return true
+		}
+		return false
+	} else if rhs.Null {
+		return false
+	}
+
+	// Invalid Value-- nothing is set.
+	return false
 }
 
 type Int int64
@@ -49,6 +134,35 @@ type List struct {
 	Items []Value
 }
 
+// Less compares two lists lexically.
+func (l *List) Less(rhs *List) bool {
+	i := 0
+	for {
+		if i >= len(l.Items) && i >= len(rhs.Items) {
+			// Lists are the same length and all items are equal.
+			return false
+		}
+		if i >= len(l.Items) {
+			// LHS is shorter.
+			return true
+		}
+		if i >= len(rhs.Items) {
+			// RHS is shorter.
+			return false
+		}
+		if l.Items[i].Less(rhs.Items[i]) {
+			// LHS is less; return
+			return true
+		}
+		if rhs.Items[i].Less(l.Items[i]) {
+			// RHS is less; return
+			return false
+		}
+		// The items are equal; continue.
+		i++
+	}
+}
+
 // Map is a map of key-value pairs. It represents both structs and maps. We use
 // a list and a go-language map to preserve order.
 //
@@ -58,20 +172,113 @@ type Map struct {
 
 	// may be nil; lazily constructed.
 	// TODO: Direct modifications to Items above will cause serious problems.
-	index map[string]*Field
+	index map[string]int
+	// may be empty; lazily constructed.
+	// TODO: Direct modifications to Items above will cause serious problems.
+	order []int
+}
+
+func (m *Map) computeOrder() []int {
+	if len(m.order) != len(m.Items) {
+		m.order = make([]int, len(m.Items))
+		for i := range m.order {
+			m.order[i] = i
+		}
+		sort.SliceStable(m.order, func(i, j int) bool {
+			return m.Items[m.order[i]].Name < m.Items[m.order[j]].Name
+		})
+	}
+	return m.order
+}
+
+// Less compares two maps lexically.
+func (m *Map) Less(rhs *Map) bool {
+	var noAllocL, noAllocR [2]int
+	var morder, rorder []int
+
+	// For very short maps (<2 elements) this permits us to avoid
+	// allocating the order array. We could make this accomodate larger
+	// maps, but 2 items should be enough to cover most path element
+	// comparisons, and at some point there will be diminishing returns.
+	// This has a large effect on the path element deserialization test,
+	// because everything is sorted / compared, but only once.
+	switch len(m.Items) {
+	case 0:
+		morder = noAllocL[0:0]
+	case 1:
+		morder = noAllocL[0:1]
+	case 2:
+		morder = noAllocL[0:2]
+		if m.Items[0].Name > m.Items[1].Name {
+			morder[0] = 1
+		} else {
+			morder[1] = 1
+		}
+	default:
+		morder = m.computeOrder()
+	}
+
+	switch len(rhs.Items) {
+	case 0:
+		rorder = noAllocR[0:0]
+	case 1:
+		rorder = noAllocR[0:1]
+	case 2:
+		rorder = noAllocR[0:2]
+		if rhs.Items[0].Name > rhs.Items[1].Name {
+			rorder[0] = 1
+		} else {
+			rorder[1] = 1
+		}
+	default:
+		rorder = rhs.computeOrder()
+	}
+
+	i := 0
+	for {
+		if i >= len(morder) && i >= len(rorder) {
+			// Maps are the same length and all items are equal.
+			return false
+		}
+		if i >= len(morder) {
+			// LHS is shorter.
+			return true
+		}
+		if i >= len(rorder) {
+			// RHS is shorter.
+			return false
+		}
+		fa, fb := &m.Items[morder[i]], &rhs.Items[rorder[i]]
+		if fa.Name != fb.Name {
+			// the map having the field name that sorts lexically less is "less"
+			return fa.Name < fb.Name
+		}
+		if fa.Value.Less(fb.Value) {
+			// LHS is less; return
+			return true
+		}
+		if fb.Value.Less(fa.Value) {
+			// RHS is less; return
+			return false
+		}
+		// The items are equal; continue.
+		i++
+	}
 }
 
 // Get returns the (Field, true) or (nil, false) if it is not present
 func (m *Map) Get(key string) (*Field, bool) {
 	if m.index == nil {
-		m.index = map[string]*Field{}
+		m.index = map[string]int{}
 		for i := range m.Items {
-			f := &m.Items[i]
-			m.index[f.Name] = f
+			m.index[m.Items[i].Name] = i
 		}
 	}
 	f, ok := m.index[key]
-	return f, ok
+	if !ok {
+		return nil, false
+	}
+	return &m.Items[f], true
 }
 
 // Set inserts or updates the given item.
@@ -81,7 +288,22 @@ func (m *Map) Set(key string, value Value) {
 		return
 	}
 	m.Items = append(m.Items, Field{Name: key, Value: value})
-	m.index = nil // Since the append might have reallocated
+	i := len(m.Items) - 1
+	m.index[key] = i
+	m.order = nil
+}
+
+// Delete removes the key from the set.
+func (m *Map) Delete(key string) {
+	items := []Field{}
+	for i := range m.Items {
+		if m.Items[i].Name != key {
+			items = append(items, m.Items[i])
+		}
+	}
+	m.Items = items
+	m.index = nil // Since the list has changed
+	m.order = nil
 }
 
 // StringValue returns s as a scalar string Value.

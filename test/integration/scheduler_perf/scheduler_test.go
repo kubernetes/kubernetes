@@ -18,17 +18,19 @@ package benchmark
 
 import (
 	"fmt"
-	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
-	testutils "k8s.io/kubernetes/test/utils"
 	"math"
 	"strconv"
 	"testing"
 	"time"
+
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	listers "k8s.io/client-go/listers/core/v1"
+	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/scheduler/factory"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const (
@@ -101,22 +103,22 @@ func TestSchedule100Node3KPods(t *testing.T) {
 
 // testConfig contains the some input parameters needed for running test-suite
 type testConfig struct {
-	numPods                   int
-	numNodes                  int
-	mutatedNodeTemplate       *v1.Node
-	mutatedPodTemplate        *v1.Pod
-	schedulerSupportFunctions factory.Configurator
-	destroyFunc               func()
+	numPods             int
+	numNodes            int
+	mutatedNodeTemplate *v1.Node
+	mutatedPodTemplate  *v1.Pod
+	schedulerSupport    *factory.ConfigFactoryArgs
+	destroyFunc         func()
 }
 
 // getBaseConfig returns baseConfig after initializing number of nodes and pods.
 func getBaseConfig(nodes int, pods int) *testConfig {
-	schedulerConfigFactory, destroyFunc := mustSetupScheduler()
+	schedulerConfigArgs, destroyFunc := mustSetupScheduler()
 	return &testConfig{
-		schedulerSupportFunctions: schedulerConfigFactory,
-		destroyFunc:               destroyFunc,
-		numNodes:                  nodes,
-		numPods:                   pods,
+		schedulerSupport: schedulerConfigArgs,
+		destroyFunc:      destroyFunc,
+		numNodes:         nodes,
+		numPods:          pods,
 	}
 }
 
@@ -132,10 +134,11 @@ func schedulePods(config *testConfig) int32 {
 	// We are interested in low scheduling rates (i.e. qps=2),
 	minQPS := int32(math.MaxInt32)
 	start := time.Now()
+	podLister := config.schedulerSupport.PodInformer.Lister()
 	// Bake in time for the first pod scheduling event.
 	for {
 		time.Sleep(50 * time.Millisecond)
-		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
+		scheduled, err := getScheduledPods(podLister)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
@@ -153,7 +156,7 @@ func schedulePods(config *testConfig) int32 {
 		// This can potentially affect performance of scheduler, since List() is done under mutex.
 		// Listing 10000 pods is an expensive operation, so running it frequently may impact scheduler.
 		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled, err := config.schedulerSupportFunctions.GetScheduledPodLister().List(labels.Everything())
+		scheduled, err := getScheduledPods(podLister)
 		if err != nil {
 			klog.Fatalf("%v", err)
 		}
@@ -181,6 +184,20 @@ func schedulePods(config *testConfig) int32 {
 		prev = len(scheduled)
 		time.Sleep(1 * time.Second)
 	}
+}
+
+func getScheduledPods(lister listers.PodLister) ([]*v1.Pod, error) {
+	all, err := lister.List(labels.Everything())
+	if err != nil {
+		return nil, err
+	}
+	scheduled := make([]*v1.Pod, 0, len(all))
+	for _, pod := range all {
+		if len(pod.Spec.NodeName) > 0 {
+			scheduled = append(scheduled, pod)
+		}
+	}
+	return scheduled, nil
 }
 
 // mutateNodeTemplate returns the modified node needed for creation of nodes.
@@ -220,19 +237,17 @@ func (na nodeAffinity) mutatePodTemplate(pod *v1.Pod) {
 // generateNodes generates nodes to be used for scheduling.
 func (inputConfig *schedulerPerfConfig) generateNodes(config *testConfig) {
 	for i := 0; i < inputConfig.NodeCount; i++ {
-		config.schedulerSupportFunctions.GetClient().CoreV1().Nodes().Create(config.mutatedNodeTemplate)
-
+		config.schedulerSupport.Client.CoreV1().Nodes().Create(config.mutatedNodeTemplate)
 	}
 	for i := 0; i < config.numNodes-inputConfig.NodeCount; i++ {
-		config.schedulerSupportFunctions.GetClient().CoreV1().Nodes().Create(baseNodeTemplate)
-
+		config.schedulerSupport.Client.CoreV1().Nodes().Create(baseNodeTemplate)
 	}
 }
 
 // generatePods generates pods to be used for scheduling.
 func (inputConfig *schedulerPerfConfig) generatePods(config *testConfig) {
-	testutils.CreatePod(config.schedulerSupportFunctions.GetClient(), "sample", inputConfig.PodCount, config.mutatedPodTemplate)
-	testutils.CreatePod(config.schedulerSupportFunctions.GetClient(), "sample", config.numPods-inputConfig.PodCount, basePodTemplate)
+	testutils.CreatePod(config.schedulerSupport.Client, "sample", inputConfig.PodCount, config.mutatedPodTemplate)
+	testutils.CreatePod(config.schedulerSupport.Client, "sample", config.numPods-inputConfig.PodCount, basePodTemplate)
 }
 
 // generatePodAndNodeTopology is the wrapper function for modifying both pods and node objects.

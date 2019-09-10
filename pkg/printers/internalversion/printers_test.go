@@ -49,12 +49,14 @@ import (
 	"k8s.io/kubernetes/pkg/apis/batch"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/printers"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 var testData = TestStruct{
@@ -286,30 +288,32 @@ func TestFormatResourceName(t *testing.T) {
 	}
 }
 
-func PrintCustomType(obj *TestPrintType, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
-	data := obj.Data
-	kind := options.Kind
-	if options.WithKind {
-		data = kind.String() + "/" + data
-	}
-	return []metav1beta1.TableRow{{Cells: []interface{}{data}}}, nil
+func PrintCustomType(obj *TestPrintType, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
+	return []metav1beta1.TableRow{{Cells: []interface{}{obj.Data}}}, nil
 }
 
-func ErrorPrintHandler(obj *TestPrintType, options printers.PrintOptions) ([]metav1beta1.TableRow, error) {
+func ErrorPrintHandler(obj *TestPrintType, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
 	return nil, fmt.Errorf("ErrorPrintHandler error")
 }
 
 func TestCustomTypePrinting(t *testing.T) {
 	columns := []metav1beta1.TableColumnDefinition{{Name: "Data"}}
-	printer := printers.NewTablePrinter(printers.PrintOptions{})
-	printer.TableHandler(columns, PrintCustomType)
+	generator := printers.NewTableGenerator()
+	generator.TableHandler(columns, PrintCustomType)
 
 	obj := TestPrintType{"test object"}
-	buffer := &bytes.Buffer{}
-	err := printer.PrintObj(&obj, buffer)
+	table, err := generator.GenerateTable(&obj, printers.GenerateOptions{})
 	if err != nil {
-		t.Fatalf("An error occurred printing the custom type: %#v", err)
+		t.Fatalf("An error occurred generating the table for custom type: %#v", err)
 	}
+
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
+	buffer := &bytes.Buffer{}
+	err = printer.PrintObj(table, buffer)
+	if err != nil {
+		t.Fatalf("An error occurred printing the Table: %#v", err)
+	}
+
 	expectedOutput := "DATA\ntest object\n"
 	if buffer.String() != expectedOutput {
 		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
@@ -318,11 +322,10 @@ func TestCustomTypePrinting(t *testing.T) {
 
 func TestPrintHandlerError(t *testing.T) {
 	columns := []metav1beta1.TableColumnDefinition{{Name: "Data"}}
-	printer := printers.NewTablePrinter(printers.PrintOptions{})
-	printer.TableHandler(columns, ErrorPrintHandler)
+	generator := printers.NewTableGenerator()
+	generator.TableHandler(columns, ErrorPrintHandler)
 	obj := TestPrintType{"test object"}
-	buffer := &bytes.Buffer{}
-	err := printer.PrintObj(&obj, buffer)
+	_, err := generator.GenerateTable(&obj, printers.GenerateOptions{})
 	if err == nil || err.Error() != "ErrorPrintHandler error" {
 		t.Errorf("Did not get the expected error: %#v", err)
 	}
@@ -587,34 +590,9 @@ func TestPrinters(t *testing.T) {
 			}
 		}
 	}
-
-	// a humanreadable printer deals with internal-versioned objects
-	humanReadablePrinter := map[string]printers.ResourcePrinter{
-		"humanReadable": printers.NewTablePrinter(printers.PrintOptions{
-			NoHeaders: true,
-		}),
-		"humanReadableHeaders": printers.NewTablePrinter(printers.PrintOptions{}),
-	}
-	AddHandlers((humanReadablePrinter["humanReadable"]).(*printers.HumanReadablePrinter))
-	AddHandlers((humanReadablePrinter["humanReadableHeaders"]).(*printers.HumanReadablePrinter))
-	for pName, p := range humanReadablePrinter {
-		for oName, obj := range objects {
-			b := &bytes.Buffer{}
-			if err := p.PrintObj(obj, b); err != nil {
-				if set, found := expectedErrors[pName]; found && set.Has(oName) {
-					// expected error
-					continue
-				}
-				t.Errorf("printer '%v', object '%v'; error: '%v'", pName, oName, err)
-			}
-		}
-	}
 }
 
 func TestPrintEventsResultSorted(t *testing.T) {
-	// Arrange
-	printer := printers.NewTablePrinter(printers.PrintOptions{})
-	AddHandlers(printer)
 
 	obj := api.EventList{
 		Items: []api.Event{
@@ -644,22 +622,26 @@ func TestPrintEventsResultSorted(t *testing.T) {
 			},
 		},
 	}
-	buffer := &bytes.Buffer{}
 
 	// Act
-	err := printer.PrintObj(&obj, buffer)
+	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&obj, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("An error occurred generating the Table: %#v", err)
+	}
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
+	buffer := &bytes.Buffer{}
+	err = printer.PrintObj(table, buffer)
 
 	// Assert
 	if err != nil {
-		t.Fatalf("An error occurred printing the EventList: %#v", err)
+		t.Fatalf("An error occurred printing the Table: %#v", err)
 	}
 	out := buffer.String()
 	VerifyDatesInOrder(out, "\n" /* rowDelimiter */, "  " /* columnDelimiter */, t)
 }
 
 func TestPrintNodeStatus(t *testing.T) {
-	printer := printers.NewTablePrinter(printers.PrintOptions{})
-	AddHandlers(printer)
+
 	table := []struct {
 		node   api.Node
 		status string
@@ -735,9 +717,15 @@ func TestPrintNodeStatus(t *testing.T) {
 		},
 	}
 
+	generator := printers.NewTableGenerator().With(AddHandlers)
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
 	for _, test := range table {
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatalf("An error occurred printing Node: %#v", err)
+		}
 		buffer := &bytes.Buffer{}
-		err := printer.PrintObj(&test.node, buffer)
+		err = printer.PrintObj(table, buffer)
 		if err != nil {
 			t.Fatalf("An error occurred printing Node: %#v", err)
 		}
@@ -748,8 +736,7 @@ func TestPrintNodeStatus(t *testing.T) {
 }
 
 func TestPrintNodeRole(t *testing.T) {
-	printer := printers.NewTablePrinter(printers.PrintOptions{})
-	AddHandlers(printer)
+
 	table := []struct {
 		node     api.Node
 		expected string
@@ -780,9 +767,15 @@ func TestPrintNodeRole(t *testing.T) {
 		},
 	}
 
+	generator := printers.NewTableGenerator().With(AddHandlers)
+	printer := printers.NewTablePrinter(printers.PrintOptions{})
 	for _, test := range table {
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatalf("An error occurred generating table for Node: %#v", err)
+		}
 		buffer := &bytes.Buffer{}
-		err := printer.PrintObj(&test.node, buffer)
+		err = printer.PrintObj(table, buffer)
 		if err != nil {
 			t.Fatalf("An error occurred printing Node: %#v", err)
 		}
@@ -793,11 +786,6 @@ func TestPrintNodeRole(t *testing.T) {
 }
 
 func TestPrintNodeOSImage(t *testing.T) {
-	printer := printers.NewTablePrinter(printers.PrintOptions{
-		ColumnLabels: []string{},
-		Wide:         true,
-	})
-	AddHandlers(printer)
 
 	table := []struct {
 		node    api.Node
@@ -825,9 +813,15 @@ func TestPrintNodeOSImage(t *testing.T) {
 		},
 	}
 
+	generator := printers.NewTableGenerator().With(AddHandlers)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
+		if err != nil {
+			t.Fatalf("An error occurred generating table for Node: %#v", err)
+		}
 		buffer := &bytes.Buffer{}
-		err := printer.PrintObj(&test.node, buffer)
+		err = printer.PrintObj(table, buffer)
 		if err != nil {
 			t.Fatalf("An error occurred printing Node: %#v", err)
 		}
@@ -838,11 +832,6 @@ func TestPrintNodeOSImage(t *testing.T) {
 }
 
 func TestPrintNodeKernelVersion(t *testing.T) {
-	printer := printers.NewTablePrinter(printers.PrintOptions{
-		ColumnLabels: []string{},
-		Wide:         true,
-	})
-	AddHandlers(printer)
 
 	table := []struct {
 		node          api.Node
@@ -870,9 +859,15 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 		},
 	}
 
+	generator := printers.NewTableGenerator().With(AddHandlers)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
+		if err != nil {
+			t.Fatalf("An error occurred generating table for Node: %#v", err)
+		}
 		buffer := &bytes.Buffer{}
-		err := printer.PrintObj(&test.node, buffer)
+		err = printer.PrintObj(table, buffer)
 		if err != nil {
 			t.Fatalf("An error occurred printing Node: %#v", err)
 		}
@@ -883,11 +878,6 @@ func TestPrintNodeKernelVersion(t *testing.T) {
 }
 
 func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
-	printer := printers.NewTablePrinter(printers.PrintOptions{
-		ColumnLabels: []string{},
-		Wide:         true,
-	})
-	AddHandlers(printer)
 
 	table := []struct {
 		node                    api.Node
@@ -915,9 +905,15 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 		},
 	}
 
+	generator := printers.NewTableGenerator().With(AddHandlers)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
+		if err != nil {
+			t.Fatalf("An error occurred generating table for Node: %#v", err)
+		}
 		buffer := &bytes.Buffer{}
-		err := printer.PrintObj(&test.node, buffer)
+		err = printer.PrintObj(table, buffer)
 		if err != nil {
 			t.Fatalf("An error occurred printing Node: %#v", err)
 		}
@@ -928,10 +924,7 @@ func TestPrintNodeContainerRuntimeVersion(t *testing.T) {
 }
 
 func TestPrintNodeName(t *testing.T) {
-	printer := printers.NewTablePrinter(printers.PrintOptions{
-		Wide: true,
-	})
-	AddHandlers(printer)
+
 	table := []struct {
 		node api.Node
 		Name string
@@ -952,9 +945,15 @@ func TestPrintNodeName(t *testing.T) {
 		},
 	}
 
+	generator := printers.NewTableGenerator().With(AddHandlers)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
+		if err != nil {
+			t.Fatalf("An error occurred generating table for Node: %#v", err)
+		}
 		buffer := &bytes.Buffer{}
-		err := printer.PrintObj(&test.node, buffer)
+		err = printer.PrintObj(table, buffer)
 		if err != nil {
 			t.Fatalf("An error occurred printing Node: %#v", err)
 		}
@@ -965,10 +964,7 @@ func TestPrintNodeName(t *testing.T) {
 }
 
 func TestPrintNodeExternalIP(t *testing.T) {
-	printer := printers.NewTablePrinter(printers.PrintOptions{
-		Wide: true,
-	})
-	AddHandlers(printer)
+
 	table := []struct {
 		node       api.Node
 		externalIP string
@@ -1000,9 +996,15 @@ func TestPrintNodeExternalIP(t *testing.T) {
 		},
 	}
 
+	generator := printers.NewTableGenerator().With(AddHandlers)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
+		if err != nil {
+			t.Fatalf("An error occurred generating table for Node: %#v", err)
+		}
 		buffer := &bytes.Buffer{}
-		err := printer.PrintObj(&test.node, buffer)
+		err = printer.PrintObj(table, buffer)
 		if err != nil {
 			t.Fatalf("An error occurred printing Node: %#v", err)
 		}
@@ -1013,10 +1015,7 @@ func TestPrintNodeExternalIP(t *testing.T) {
 }
 
 func TestPrintNodeInternalIP(t *testing.T) {
-	printer := printers.NewTablePrinter(printers.PrintOptions{
-		Wide: true,
-	})
-	AddHandlers(printer)
+
 	table := []struct {
 		node       api.Node
 		internalIP string
@@ -1048,9 +1047,15 @@ func TestPrintNodeInternalIP(t *testing.T) {
 		},
 	}
 
+	generator := printers.NewTableGenerator().With(AddHandlers)
+	printer := printers.NewTablePrinter(printers.PrintOptions{Wide: true})
 	for _, test := range table {
+		table, err := generator.GenerateTable(&test.node, printers.GenerateOptions{Wide: true})
+		if err != nil {
+			t.Fatalf("An error occurred generating table for Node: %#v", err)
+		}
 		buffer := &bytes.Buffer{}
-		err := printer.PrintObj(&test.node, buffer)
+		err = printer.PrintObj(table, buffer)
 		if err != nil {
 			t.Fatalf("An error occurred printing Node: %#v", err)
 		}
@@ -1096,12 +1101,12 @@ func TestPrintHunmanReadableIngressWithColumnLabels(t *testing.T) {
 		},
 	}
 	buff := bytes.NewBuffer([]byte{})
-	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&ingress, printers.PrintOptions{ColumnLabels: []string{"app_name"}})
+	table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&ingress, printers.GenerateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	verifyTable(t, table)
-	printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+	printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true, ColumnLabels: []string{"app_name"}})
 	if err := printer.PrintObj(table, buff); err != nil {
 		t.Fatal(err)
 	}
@@ -1231,7 +1236,7 @@ func TestPrintHumanReadableService(t *testing.T) {
 	for _, svc := range tests {
 		for _, wide := range []bool{false, true} {
 			buff := bytes.NewBuffer([]byte{})
-			table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&svc, printers.PrintOptions{Wide: wide})
+			table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&svc, printers.GenerateOptions{Wide: wide})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1400,12 +1405,6 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			isNamespaced: true,
 		},
 		{
-			obj: &api.LimitRange{
-				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
-			},
-			isNamespaced: true,
-		},
-		{
 			obj: &api.ResourceQuota{
 				ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespaceName},
 			},
@@ -1419,36 +1418,22 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 			},
 			isNamespaced: false,
 		},
-		{
-			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"kind":       "Foo",
-					"apiVersion": "example.com/v1",
-					"metadata":   map[string]interface{}{"name": "test", "namespace": namespaceName},
-				},
-			},
-			isNamespaced: true,
-		},
-		{
-			obj: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"kind":       "Foo",
-					"apiVersion": "example.com/v1",
-					"metadata":   map[string]interface{}{"name": "test"},
-				},
-			},
-			isNamespaced: false,
-		},
 	}
 
+	//*******//
+	options := printers.PrintOptions{
+		WithNamespace: true,
+		NoHeaders:     true,
+	}
+	generator := printers.NewTableGenerator().With(AddHandlers)
+	printer := printers.NewTablePrinter(options)
 	for i, test := range table {
-		printer := printers.NewTablePrinter(printers.PrintOptions{
-			WithNamespace: true,
-			NoHeaders:     true,
-		})
-		AddHandlers(printer)
+		table, err := generator.GenerateTable(test.obj, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatalf("An error occurred generating table for object: %#v", err)
+		}
 		buffer := &bytes.Buffer{}
-		err := printer.PrintObj(test.obj, buffer)
+		err = printer.PrintObj(table, buffer)
 		if err != nil {
 			t.Fatalf("An error occurred printing object: %#v", err)
 		}
@@ -1488,66 +1473,60 @@ func TestPrintPodTable(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		obj          runtime.Object
-		opts         printers.PrintOptions
-		expect       string
-		ignoreLegacy bool
+		obj    runtime.Object
+		opts   printers.PrintOptions
+		expect string
 	}{
 		{
-			obj: runningPod, opts: printers.PrintOptions{},
+			obj:    runningPod,
+			opts:   printers.PrintOptions{},
 			expect: "NAME    READY   STATUS    RESTARTS   AGE\ntest1   1/2     Running   6          <unknown>\n",
 		},
 		{
-			obj: runningPod, opts: printers.PrintOptions{WithKind: true, Kind: schema.GroupKind{Kind: "Pod"}},
+			obj:    runningPod,
+			opts:   printers.PrintOptions{WithKind: true, Kind: schema.GroupKind{Kind: "Pod"}},
 			expect: "NAME        READY   STATUS    RESTARTS   AGE\npod/test1   1/2     Running   6          <unknown>\n",
 		},
 		{
-			obj: runningPod, opts: printers.PrintOptions{ShowLabels: true},
+			obj:    runningPod,
+			opts:   printers.PrintOptions{ShowLabels: true},
 			expect: "NAME    READY   STATUS    RESTARTS   AGE         LABELS\ntest1   1/2     Running   6          <unknown>   a=1,b=2\n",
 		},
 		{
-			obj: &api.PodList{Items: []api.Pod{*runningPod, *failedPod}}, opts: printers.PrintOptions{ColumnLabels: []string{"a"}},
+			obj:    &api.PodList{Items: []api.Pod{*runningPod, *failedPod}},
+			opts:   printers.PrintOptions{ColumnLabels: []string{"a"}},
 			expect: "NAME    READY   STATUS    RESTARTS   AGE         A\ntest1   1/2     Running   6          <unknown>   1\ntest2   1/2     Failed    6          <unknown>   \n",
 		},
 		{
-			obj: runningPod, opts: printers.PrintOptions{NoHeaders: true},
+			obj:    runningPod,
+			opts:   printers.PrintOptions{NoHeaders: true},
 			expect: "test1   1/2   Running   6     <unknown>\n",
 		},
 		{
-			obj: failedPod, opts: printers.PrintOptions{},
-			expect:       "NAME    READY   STATUS   RESTARTS   AGE\ntest2   1/2     Failed   6          <unknown>\n",
-			ignoreLegacy: true, // filtering is not done by the printer in the legacy path
+			obj:    failedPod,
+			opts:   printers.PrintOptions{},
+			expect: "NAME    READY   STATUS   RESTARTS   AGE\ntest2   1/2     Failed   6          <unknown>\n",
 		},
 		{
-			obj: failedPod, opts: printers.PrintOptions{},
+			obj:    failedPod,
+			opts:   printers.PrintOptions{},
 			expect: "NAME    READY   STATUS   RESTARTS   AGE\ntest2   1/2     Failed   6          <unknown>\n",
 		},
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(test.obj, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(test.obj, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
 		verifyTable(t, table)
 		buf := &bytes.Buffer{}
-		p := printers.NewTablePrinter(test.opts).With(AddHandlers)
+		p := printers.NewTablePrinter(test.opts)
 		if err := p.PrintObj(table, buf); err != nil {
 			t.Fatal(err)
 		}
 		if test.expect != buf.String() {
 			t.Errorf("%d mismatch:\n%s\n%s", i, strconv.Quote(test.expect), strconv.Quote(buf.String()))
-		}
-		if test.ignoreLegacy {
-			continue
-		}
-
-		buf.Reset()
-		if err := p.PrintObj(test.obj, buf); err != nil {
-			t.Fatal(err)
-		}
-		if test.expect != buf.String() {
-			t.Errorf("%d legacy mismatch:\n%s\n%s", i, strconv.Quote(test.expect), strconv.Quote(buf.String()))
 		}
 	}
 }
@@ -1652,7 +1631,7 @@ func TestPrintPod(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		rows, err := printPod(&test.pod, printers.PrintOptions{})
+		rows, err := printPod(&test.pod, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1776,7 +1755,7 @@ func TestPrintPodwide(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		rows, err := printPod(&test.pod, printers.PrintOptions{Wide: true})
+		rows, err := printPod(&test.pod, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1826,7 +1805,7 @@ func TestPrintPodList(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		rows, err := printPodList(&test.pods, printers.PrintOptions{})
+		rows, err := printPodList(&test.pods, printers.GenerateOptions{})
 
 		if err != nil {
 			t.Fatal(err)
@@ -1923,7 +1902,7 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1940,9 +1919,10 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 
 func TestPrintPodWithLabels(t *testing.T) {
 	tests := []struct {
-		pod          api.Pod
-		labelColumns []string
-		expect       []metav1beta1.TableRow
+		pod                 api.Pod
+		labelColumns        []string
+		expectedLabelValues []string
+		labelsPrinted       bool
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -1961,7 +1941,8 @@ func TestPrintPodWithLabels(t *testing.T) {
 				},
 			},
 			[]string{"col1", "COL2"},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "asd", "zxc"}}},
+			[]string{"asd", "zxc"},
+			true,
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -1979,23 +1960,51 @@ func TestPrintPodWithLabels(t *testing.T) {
 					},
 				},
 			},
-			[]string{},
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
+			[]string{"col1", "COL2"},
+			[]string{"asd", "zxc"},
+			false,
 		},
 	}
 
-	for i, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{ColumnLabels: test.labelColumns})
+	for _, test := range tests {
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		verifyTable(t, table)
-		rows := table.Rows
-		for i := range rows {
-			rows[i].Object.Object = nil
+		buf := bytes.NewBuffer([]byte{})
+		options := printers.PrintOptions{}
+		if test.labelsPrinted {
+			options = printers.PrintOptions{ColumnLabels: test.labelColumns}
 		}
-		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+		printer := printers.NewTablePrinter(options)
+		if err := printer.PrintObj(table, buf); err != nil {
+			t.Errorf("Error printing table: %v", err)
+		}
+
+		if test.labelsPrinted {
+			// Labels columns should be printed.
+			for _, columnName := range test.labelColumns {
+				if !strings.Contains(buf.String(), strings.ToUpper(columnName)) {
+					t.Errorf("Error printing table: expected column %s not printed", columnName)
+				}
+			}
+			for _, labelValue := range test.expectedLabelValues {
+				if !strings.Contains(buf.String(), labelValue) {
+					t.Errorf("Error printing table: expected column value %s not printed", labelValue)
+				}
+			}
+		} else {
+			// Lable columns should not be printed.
+			for _, columnName := range test.labelColumns {
+				if strings.Contains(buf.String(), strings.ToUpper(columnName)) {
+					t.Errorf("Error printing table: expected column %s not printed", columnName)
+				}
+			}
+			for _, labelValue := range test.expectedLabelValues {
+				if strings.Contains(buf.String(), labelValue) {
+					t.Errorf("Error printing table: expected column value %s not printed", labelValue)
+				}
+			}
 		}
 	}
 }
@@ -2094,7 +2103,7 @@ func TestPrintDeployment(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2107,7 +2116,7 @@ func TestPrintDeployment(t *testing.T) {
 			t.Fatalf("Expected: %s, got: %s", test.expect, buf.String())
 		}
 		buf.Reset()
-		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.PrintOptions{Wide: true})
+		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.deployment, printers.GenerateOptions{Wide: true})
 		verifyTable(t, table)
 		// print deployment with '-o wide' option
 		printer = printers.NewTablePrinter(printers.PrintOptions{Wide: true, NoHeaders: true})
@@ -2151,7 +2160,7 @@ func TestPrintDaemonSet(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.ds, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.ds, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2241,7 +2250,7 @@ func TestPrintJob(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.job, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.job, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2849,7 +2858,7 @@ func TestPrintHPA(t *testing.T) {
 
 	buff := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.hpa, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.hpa, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2868,9 +2877,9 @@ func TestPrintHPA(t *testing.T) {
 
 func TestPrintPodShowLabels(t *testing.T) {
 	tests := []struct {
-		pod        api.Pod
-		showLabels bool
-		expect     []metav1beta1.TableRow
+		pod          api.Pod
+		showLabels   bool
+		expectLabels []string
 	}{
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -2889,7 +2898,7 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			true,
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>", "COL2=zxc,col1=asd"}}},
+			[]string{"col1=asd", "COL2=zxc"},
 		},
 		{
 			// Test name, num of containers, restarts, container ready status
@@ -2908,22 +2917,38 @@ func TestPrintPodShowLabels(t *testing.T) {
 				},
 			},
 			false,
-			[]metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "podPhase", int64(6), "<unknown>"}}},
+			[]string{},
 		},
 	}
 
-	for i, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.PrintOptions{ShowLabels: test.showLabels})
+	for _, test := range tests {
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		verifyTable(t, table)
-		rows := table.Rows
-		for i := range rows {
-			rows[i].Object.Object = nil
+
+		buf := bytes.NewBuffer([]byte{})
+		printer := printers.NewTablePrinter(printers.PrintOptions{ShowLabels: test.showLabels})
+		if err := printer.PrintObj(table, buf); err != nil {
+			t.Errorf("Error printing table: %v", err)
 		}
-		if !reflect.DeepEqual(test.expect, rows) {
-			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+
+		if test.showLabels {
+			// LABELS column header should be present.
+			if !strings.Contains(buf.String(), "LABELS") {
+				t.Errorf("Error Printing Table: missing LABELS column heading: (%s)", buf.String())
+			}
+			// Validate that each of the expected labels is present.
+			for _, label := range test.expectLabels {
+				if !strings.Contains(buf.String(), label) {
+					t.Errorf("Error Printing Table: missing LABEL column value: (%s) from (%s)", label, buf.String())
+				}
+			}
+		} else {
+			// LABELS column header should not be present.
+			if strings.Contains(buf.String(), "LABELS") {
+				t.Errorf("Error Printing Table: unexpected LABEL column heading: (%s)", buf.String())
+			}
 		}
 	}
 }
@@ -3080,7 +3105,7 @@ func TestPrintService(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.service, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.service, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3139,7 +3164,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pdb, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pdb, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3221,7 +3246,7 @@ func TestPrintControllerRevision(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.history, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.history, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3283,7 +3308,7 @@ func TestPrintReplicaSet(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.replicaSet, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.replicaSet, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3297,7 +3322,7 @@ func TestPrintReplicaSet(t *testing.T) {
 		}
 		buf.Reset()
 
-		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.replicaSet, printers.PrintOptions{Wide: true})
+		table, err = printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.replicaSet, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3444,7 +3469,7 @@ func TestPrintPersistentVolume(t *testing.T) {
 	}
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pv, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pv, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3570,7 +3595,7 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 	}
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pvc, printers.PrintOptions{Wide: true})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pvc, printers.GenerateOptions{Wide: true})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3642,7 +3667,7 @@ func TestPrintCronJob(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.cronjob, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.cronjob, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3687,7 +3712,7 @@ func TestPrintStorageClass(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3738,7 +3763,7 @@ func TestPrintLease(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.sc, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3783,7 +3808,7 @@ func TestPrintPriorityClass(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pc, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pc, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3828,7 +3853,107 @@ func TestPrintRuntimeClass(t *testing.T) {
 
 	buf := bytes.NewBuffer([]byte{})
 	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.rc, printers.PrintOptions{})
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.rc, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		verifyTable(t, table)
+		printer := printers.NewTablePrinter(printers.PrintOptions{NoHeaders: true})
+		if err := printer.PrintObj(table, buf); err != nil {
+			t.Fatal(err)
+		}
+		if buf.String() != test.expect {
+			t.Errorf("Expected: %s, got: %s", test.expect, buf.String())
+		}
+		buf.Reset()
+	}
+}
+
+func TestPrintEndpointSlice(t *testing.T) {
+	ipAddressType := discovery.AddressTypeIP
+	tcpProtocol := api.ProtocolTCP
+
+	tests := []struct {
+		endpointSlice discovery.EndpointSlice
+		expect        string
+	}{
+		{
+			discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "abcslice.123",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				AddressType: &ipAddressType,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.3", "2001:db8::1234:5678"},
+				}},
+			},
+			"abcslice.123   IP    80    10.1.2.3,2001:db8::1234:5678   0s\n",
+		}, {
+			discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "longerslicename.123",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				AddressType: &ipAddressType,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}, {
+					Name:     utilpointer.StringPtr("https"),
+					Port:     utilpointer.Int32Ptr(443),
+					Protocol: &tcpProtocol,
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.3", "2001:db8::1234:5678"},
+				}, {
+					Addresses: []string{"10.2.3.4", "2001:db8::2345:6789"},
+				}},
+			},
+			"longerslicename.123   IP    80,443   10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...   5m\n",
+		}, {
+			discovery.EndpointSlice{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "multiportslice.123",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				AddressType: &ipAddressType,
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Port:     utilpointer.Int32Ptr(80),
+					Protocol: &tcpProtocol,
+				}, {
+					Name:     utilpointer.StringPtr("https"),
+					Port:     utilpointer.Int32Ptr(443),
+					Protocol: &tcpProtocol,
+				}, {
+					Name:     utilpointer.StringPtr("extra1"),
+					Port:     utilpointer.Int32Ptr(3000),
+					Protocol: &tcpProtocol,
+				}, {
+					Name:     utilpointer.StringPtr("extra2"),
+					Port:     utilpointer.Int32Ptr(3001),
+					Protocol: &tcpProtocol,
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"10.1.2.3", "2001:db8::1234:5678"},
+				}, {
+					Addresses: []string{"10.2.3.4", "2001:db8::2345:6789"},
+				}},
+			},
+			"multiportslice.123   IP    80,443,3000 + 1 more...   10.1.2.3,2001:db8::1234:5678,10.2.3.4 + 1 more...   5m\n",
+		},
+	}
+
+	buf := bytes.NewBuffer([]byte{})
+	for _, test := range tests {
+		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.endpointSlice, printers.GenerateOptions{})
 		if err != nil {
 			t.Fatal(err)
 		}

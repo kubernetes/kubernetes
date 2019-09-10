@@ -82,7 +82,7 @@ func TestTaintNodeByCondition(t *testing.T) {
 	admission.SetExternalKubeInformerFactory(externalInformers)
 
 	// Apply feature gates to enable TaintNodesByCondition
-	algorithmprovider.ApplyFeatureGates()
+	defer algorithmprovider.ApplyFeatureGates()()
 
 	context = initTestScheduler(t, context, false, nil)
 	cs := context.clientSet

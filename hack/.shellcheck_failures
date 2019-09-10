@@ -13,12 +13,6 @@
 ./cluster/gce/util.sh
 ./cluster/log-dump/log-dump.sh
 ./cluster/pre-existing/util.sh
-./cluster/test-e2e.sh
 ./cluster/validate-cluster.sh
 ./hack/lib/test.sh
-./hack/test-integration.sh
-./hack/verify-test-featuregates.sh
-./test/cmd/diff.sh
-./test/cmd/discovery.sh
-./test/cmd/legacy-script.sh
 ./test/images/image-util.sh

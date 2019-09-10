@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/ingress"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 
 	"github.com/onsi/ginkgo"
 )
@@ -170,7 +171,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			}, map[string]string{})
 
 			ginkgo.By(fmt.Sprintf("waiting for Ingress %s to get instance group annotation", name))
-			pollErr := wait.Poll(2*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+			pollErr := wait.Poll(2*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
 				ing, err := f.ClientSet.NetworkingV1beta1().Ingresses(ns).Get(name, metav1.GetOptions{})
 				framework.ExpectNoError(err)
 				annotations := ing.Annotations
@@ -218,7 +219,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				e2elog.Failf("unexpected target http proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
 			}
 			if len(gceController.ListTargetHTTPSProxies()) != 0 {
-				e2elog.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHTTPProxies())
+				e2elog.Failf("unexpected target https proxies, expected none, got: %v", gceController.ListTargetHTTPSProxies())
 			}
 			if len(gceController.ListSslCertificates()) != 0 {
 				e2elog.Failf("unexpected ssl certificates, expected none, got: %v", gceController.ListSslCertificates())
@@ -301,7 +302,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				framework.ExpectNoError(err)
 			}
-			err = wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+			err = wait.Poll(5*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
 				if err := gceController.BackendServiceUsingIG(jig.GetServicePorts(false)); err != nil {
 					e2elog.Logf("ginkgo.Failed to verify IG backend service: %v", err)
 					return false, nil
@@ -319,7 +320,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 				_, err = f.ClientSet.CoreV1().Services(ns).Update(&svc)
 				framework.ExpectNoError(err)
 			}
-			err = wait.Poll(5*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+			err = wait.Poll(5*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
 				if err := gceController.BackendServiceUsingNEG(jig.GetServicePorts(false)); err != nil {
 					e2elog.Logf("ginkgo.Failed to verify NEG backend service: %v", err)
 					return false, nil
@@ -404,7 +405,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			_, err = f.ClientSet.AppsV1().Deployments(ns).UpdateScale(name, scale)
 			framework.ExpectNoError(err)
 
-			err = wait.Poll(10*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+			err = wait.Poll(10*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
 				if err != nil {
 					return false, nil
@@ -421,7 +422,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			deploy.Spec.Template.Spec.TerminationGracePeriodSeconds = &gracePeriod
 			_, err = f.ClientSet.AppsV1().Deployments(ns).Update(deploy)
 			framework.ExpectNoError(err)
-			err = wait.Poll(10*time.Second, framework.LoadBalancerPollTimeout, func() (bool, error) {
+			err = wait.Poll(10*time.Second, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
 				res, err := jig.GetDistinctResponseFromIngress()
 				framework.ExpectNoError(err)
 				deploy, err := f.ClientSet.AppsV1().Deployments(ns).Get(name, metav1.GetOptions{})
@@ -787,7 +788,7 @@ func executePresharedCertTest(f *framework.Framework, jig *ingress.TestJig, stat
 			jig.TryDeleteIngress()
 		}
 		ginkgo.By(fmt.Sprintf("Deleting ssl certificate %q on GCE", preSharedCertName))
-		err := wait.Poll(framework.LoadBalancerPollInterval, framework.LoadBalancerCleanupTimeout, func() (bool, error) {
+		err := wait.Poll(e2eservice.LoadBalancerPollInterval, e2eservice.LoadBalancerCleanupTimeout, func() (bool, error) {
 			if err := gceCloud.DeleteSslCertificate(preSharedCertName); err != nil && !errors.IsNotFound(err) {
 				e2elog.Logf("ginkgo.Failed to delete ssl certificate %q: %v. Retrying...", preSharedCertName, err)
 				return false, nil
@@ -830,10 +831,10 @@ func executeStaticIPHttpsOnlyTest(f *framework.Framework, jig *ingress.TestJig, 
 
 	ginkgo.By("waiting for Ingress to come up with ip: " + ip)
 	httpClient := ingress.BuildInsecureClient(ingress.IngressReqTimeout)
-	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%s/", ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
+	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
 
 	ginkgo.By("should reject HTTP traffic")
-	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%s/", ip), "", framework.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
+	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
 }
 
 func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJig, staticIPName string) {
@@ -848,12 +849,12 @@ func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJ
 	framework.ExpectNoError(err, "ginkgo.Failed to create re-encryption ingress")
 
 	ginkgo.By(fmt.Sprintf("Waiting for ingress %s to come up", ingCreated.Name))
-	ingIP, err := jig.WaitForIngressAddress(f.ClientSet, f.Namespace.Name, ingCreated.Name, framework.LoadBalancerPollTimeout)
+	ingIP, err := jig.WaitForIngressAddress(f.ClientSet, f.Namespace.Name, ingCreated.Name, e2eservice.LoadBalancerPollTimeout)
 	framework.ExpectNoError(err, "ginkgo.Failed to wait for ingress IP")
 
 	ginkgo.By(fmt.Sprintf("Polling on address %s and verify the backend is serving HTTPS", ingIP))
 	timeoutClient := &http.Client{Timeout: ingress.IngressReqTimeout}
-	err = wait.PollImmediate(framework.LoadBalancerPollInterval, framework.LoadBalancerPollTimeout, func() (bool, error) {
+	err = wait.PollImmediate(e2eservice.LoadBalancerPollInterval, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
 		resp, err := framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
 		if err != nil {
 			e2elog.Logf("SimpleGET failed: %v", err)

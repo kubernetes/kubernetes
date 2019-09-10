@@ -21,8 +21,8 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -56,12 +56,12 @@ var _ = KubeadmDescribe("proxy addon", func() {
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	Context("kube-proxy ServiceAccount", func() {
-		It("should exist", func() {
+	ginkgo.Context("kube-proxy ServiceAccount", func() {
+		ginkgo.It("should exist", func() {
 			ExpectServiceAccount(f.ClientSet, kubeSystemNamespace, kubeProxyServiceAccountName)
 		})
 
-		It("should be binded to the system:node-proxier cluster role", func() {
+		ginkgo.It("should be binded to the system:node-proxier cluster role", func() {
 			ExpectClusterRoleBindingWithSubjectAndRole(f.ClientSet,
 				kubeProxyClusterRoleBindingName,
 				rbacv1.ServiceAccountKind, kubeProxyServiceAccountName,
@@ -70,19 +70,19 @@ var _ = KubeadmDescribe("proxy addon", func() {
 		})
 	})
 
-	Context("kube-proxy ConfigMap", func() {
-		It("should exist and be properly configured", func() {
+	ginkgo.Context("kube-proxy ConfigMap", func() {
+		ginkgo.It("should exist and be properly configured", func() {
 			cm := GetConfigMap(f.ClientSet, kubeSystemNamespace, kubeProxyConfigMap)
 
-			Expect(cm.Data).To(HaveKey(kubeProxyConfigMapKey))
+			gomega.Expect(cm.Data).To(gomega.HaveKey(kubeProxyConfigMapKey))
 		})
 
-		It("should have related Role and RoleBinding", func() {
+		ginkgo.It("should have related Role and RoleBinding", func() {
 			ExpectRole(f.ClientSet, kubeSystemNamespace, kubeProxyRoleName)
 			ExpectRoleBinding(f.ClientSet, kubeSystemNamespace, kubeProxyRoleBindingName)
 		})
 
-		It("should be accessible by bootstrap tokens", func() {
+		ginkgo.It("should be accessible by bootstrap tokens", func() {
 			ExpectSubjectHasAccessToResource(f.ClientSet,
 				rbacv1.GroupKind, bootstrapTokensGroup,
 				kubeProxyConfigMapResource,
@@ -90,11 +90,11 @@ var _ = KubeadmDescribe("proxy addon", func() {
 		})
 	})
 
-	Context("kube-proxy DaemonSet", func() {
-		It("should exist and be properly configured", func() {
+	ginkgo.Context("kube-proxy DaemonSet", func() {
+		ginkgo.It("should exist and be properly configured", func() {
 			ds := GetDaemonSet(f.ClientSet, kubeSystemNamespace, kubeProxyDaemonSetName)
 
-			Expect(ds.Spec.Template.Spec.ServiceAccountName).To(Equal(kubeProxyServiceAccountName))
+			framework.ExpectEqual(ds.Spec.Template.Spec.ServiceAccountName, kubeProxyServiceAccountName)
 		})
 	})
 })

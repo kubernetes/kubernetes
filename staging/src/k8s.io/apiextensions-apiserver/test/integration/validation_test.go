@@ -321,9 +321,9 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 		ns := "not-the-default"
 
 		tests := []struct {
-			name          string
-			instanceFn    func() *unstructured.Unstructured
-			expectedError string
+			name           string
+			instanceFn     func() *unstructured.Unstructured
+			expectedErrors []string
 		}{
 			{
 				name: "bad alpha",
@@ -332,7 +332,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 					instance.Object["alpha"] = "foo_123!"
 					return instance
 				},
-				expectedError: "alpha in body should match '^[a-zA-Z0-9_]*$'",
+				expectedErrors: []string{"alpha in body should match '^[a-zA-Z0-9_]*$'"},
 			},
 			{
 				name: "bad beta",
@@ -341,7 +341,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 					instance.Object["beta"] = 5
 					return instance
 				},
-				expectedError: "beta in body should be greater than or equal to 10",
+				expectedErrors: []string{"beta in body should be greater than or equal to 10"},
 			},
 			{
 				name: "bad gamma",
@@ -350,7 +350,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 					instance.Object["gamma"] = "qux"
 					return instance
 				},
-				expectedError: "gamma in body should be one of [foo bar baz]",
+				expectedErrors: []string{`gamma: Unsupported value: "qux": supported values: "foo", "bar", "baz"`},
 			},
 			{
 				name: "bad delta",
@@ -359,7 +359,10 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 					instance.Object["delta"] = "foobarbaz"
 					return instance
 				},
-				expectedError: "must validate at least one schema (anyOf)\ndelta in body should be at most 5 chars long",
+				expectedErrors: []string{
+					"must validate at least one schema (anyOf)",
+					"delta in body should be at most 5 chars long",
+				},
 			},
 			{
 				name: "absent alpha and beta",
@@ -377,7 +380,7 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 					}
 					return instance
 				},
-				expectedError: ".alpha in body is required\n.beta in body is required",
+				expectedErrors: []string{"alpha: Required value", "beta: Required value"},
 			},
 		}
 
@@ -388,13 +391,14 @@ func TestCustomResourceValidationErrors(t *testing.T) {
 				instanceToCreate.Object["apiVersion"] = fmt.Sprintf("%s/%s", noxuDefinition.Spec.Group, v.Name)
 				_, err := noxuResourceClient.Create(instanceToCreate, metav1.CreateOptions{})
 				if err == nil {
-					t.Errorf("%v: expected %v", tc.name, tc.expectedError)
+					t.Errorf("%v: expected %v", tc.name, tc.expectedErrors)
 					continue
 				}
 				// this only works when status errors contain the expect kind and version, so this effectively tests serializations too
-				if !strings.Contains(err.Error(), tc.expectedError) {
-					t.Errorf("%v: expected %v, got %v", tc.name, tc.expectedError, err)
-					continue
+				for _, expectedError := range tc.expectedErrors {
+					if !strings.Contains(err.Error(), expectedError) {
+						t.Errorf("%v: expected %v, got %v", tc.name, expectedError, err)
+					}
 				}
 			}
 		}
@@ -544,9 +548,9 @@ func TestNonStructuralSchemaConditionUpdate(t *testing.T) {
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: foos.tests.apiextensions.k8s.io
+  name: foos.tests.example.com
 spec:
-  group: tests.apiextensions.k8s.io
+  group: tests.example.com
   version: v1beta1
   names:
     plural: foos

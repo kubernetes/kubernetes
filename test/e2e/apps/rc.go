@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller/replication"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -136,7 +135,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 
 	// Wait for the pods to enter the running state. Waiting loops until the pods
 	// are running so non-running pods cause a timeout for this test.
-	e2elog.Logf("Ensuring all pods for ReplicationController %q are running", name)
+	framework.Logf("Ensuring all pods for ReplicationController %q are running", name)
 	running := int32(0)
 	for _, pod := range pods.Items {
 		if pod.DeletionTimestamp != nil {
@@ -152,7 +151,7 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 			}
 		}
 		framework.ExpectNoError(err)
-		e2elog.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
+		framework.Logf("Pod %q is running (conditions: %+v)", pod.Name, pod.Status.Conditions)
 		running++
 	}
 
@@ -162,13 +161,13 @@ func TestReplicationControllerServeImageOrFail(f *framework.Framework, test stri
 	}
 
 	// Verify that something is listening.
-	e2elog.Logf("Trying to dial the pod")
+	framework.Logf("Trying to dial the pod")
 	retryTimeout := 2 * time.Minute
 	retryInterval := 5 * time.Second
 	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
 	err = wait.Poll(retryInterval, retryTimeout, e2epod.NewProxyResponseChecker(f.ClientSet, f.Namespace.Name, label, name, true, pods).CheckAllResponses)
 	if err != nil {
-		e2elog.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
+		framework.Failf("Did not get expected responses within the timeout period of %.2f seconds.", retryTimeout.Seconds())
 	}
 }
 
@@ -181,7 +180,7 @@ func testReplicationControllerConditionCheck(f *framework.Framework) {
 	namespace := f.Namespace.Name
 	name := "condition-test"
 
-	e2elog.Logf("Creating quota %q that allows only two pods to run in the current namespace", name)
+	framework.Logf("Creating quota %q that allows only two pods to run in the current namespace", name)
 	quota := newPodQuota(name, "2")
 	_, err := c.CoreV1().ResourceQuotas(namespace).Create(quota)
 	framework.ExpectNoError(err)

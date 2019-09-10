@@ -17,8 +17,10 @@ limitations under the License.
 package mutating
 
 import (
+	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -29,7 +31,79 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	webhooktesting "k8s.io/apiserver/pkg/admission/plugin/webhook/testing"
+	auditinternal "k8s.io/apiserver/pkg/apis/audit"
 )
+
+// BenchmarkAdmit tests the performance cost of invoking a mutating webhook
+func BenchmarkAdmit(b *testing.B) {
+	testServerURL := os.Getenv("WEBHOOK_TEST_SERVER_URL")
+	if len(testServerURL) == 0 {
+		b.Log("warning, WEBHOOK_TEST_SERVER_URL not set, starting in-process server, benchmarks will include webhook cost.")
+		b.Log("to run a standalone server, run:")
+		b.Log("go run ./vendor/k8s.io/apiserver/pkg/admission/plugin/webhook/testing/main/main.go")
+		testServer := webhooktesting.NewTestServer(b)
+		testServer.StartTLS()
+		defer testServer.Close()
+		testServerURL = testServer.URL
+	}
+
+	serverURL, err := url.ParseRequestURI(testServerURL)
+	if err != nil {
+		b.Fatalf("this should never happen? %v", err)
+	}
+
+	objectInterfaces := webhooktesting.NewObjectInterfacesForTest()
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	testCases := append(webhooktesting.NewMutatingTestCases(serverURL, "test-webhooks"),
+		webhooktesting.ConvertToMutatingTestCases(webhooktesting.NewNonMutatingTestCases(serverURL), "test-webhooks")...)
+
+	for _, tt := range testCases {
+		// For now, skip failure cases or tests that explicitly skip benchmarking
+		if !tt.ExpectAllow || tt.SkipBenchmark {
+			continue
+		}
+		b.Run(tt.Name, func(b *testing.B) {
+			wh, err := NewMutatingWebhook(nil)
+			if err != nil {
+				b.Errorf("failed to create mutating webhook: %v", err)
+				return
+			}
+
+			ns := "webhook-test"
+			client, informer := webhooktesting.NewFakeMutatingDataSource(ns, tt.Webhooks, stopCh)
+
+			wh.SetAuthenticationInfoResolverWrapper(webhooktesting.Wrapper(webhooktesting.NewAuthenticationInfoResolver(new(int32))))
+			wh.SetServiceResolver(webhooktesting.NewServiceResolver(*serverURL))
+			wh.SetExternalKubeClientSet(client)
+			wh.SetExternalKubeInformerFactory(informer)
+
+			informer.Start(stopCh)
+			informer.WaitForCacheSync(stopCh)
+
+			if err = wh.ValidateInitialization(); err != nil {
+				b.Errorf("failed to validate initialization: %v", err)
+				return
+			}
+
+			var attr admission.Attributes
+			if tt.IsCRD {
+				attr = webhooktesting.NewAttributeUnstructured(ns, tt.AdditionalLabels, tt.IsDryRun)
+			} else {
+				attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels, tt.IsDryRun)
+			}
+
+			b.ResetTimer()
+			b.RunParallel(func(pb *testing.PB) {
+				for pb.Next() {
+					wh.Admit(context.TODO(), attr, objectInterfaces)
+				}
+			})
+		})
+	}
+}
 
 // TestAdmit tests that MutatingWebhook#Admit works as expected
 func TestAdmit(t *testing.T) {
@@ -46,8 +120,8 @@ func TestAdmit(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	testCases := append(webhooktesting.NewMutatingTestCases(serverURL),
-		webhooktesting.ConvertToMutatingTestCases(webhooktesting.NewNonMutatingTestCases(serverURL))...)
+	testCases := append(webhooktesting.NewMutatingTestCases(serverURL, "test-webhooks"),
+		webhooktesting.ConvertToMutatingTestCases(webhooktesting.NewNonMutatingTestCases(serverURL), "test-webhooks")...)
 
 	for _, tt := range testCases {
 		t.Run(tt.Name, func(t *testing.T) {
@@ -80,7 +154,7 @@ func TestAdmit(t *testing.T) {
 				attr = webhooktesting.NewAttribute(ns, tt.AdditionalLabels, tt.IsDryRun)
 			}
 
-			err = wh.Admit(attr, objectInterfaces)
+			err = wh.Admit(context.TODO(), attr, objectInterfaces)
 			if tt.ExpectAllow != (err == nil) {
 				t.Errorf("expected allowed=%v, but got err=%v", tt.ExpectAllow, err)
 			}
@@ -108,9 +182,9 @@ func TestAdmit(t *testing.T) {
 				return
 			}
 			if len(tt.ExpectAnnotations) == 0 {
-				assert.Empty(t, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+				assert.Empty(t, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
 			} else {
-				assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(), tt.Name+": annotations not set as expected.")
+				assert.Equal(t, tt.ExpectAnnotations, fakeAttr.GetAnnotations(auditinternal.LevelMetadata), tt.Name+": annotations not set as expected.")
 			}
 			reinvocationCtx := fakeAttr.Attributes.GetReinvocationContext()
 			reinvocationCtx.SetIsReinvoke()
@@ -163,7 +237,7 @@ func TestAdmitCachedClient(t *testing.T) {
 			continue
 		}
 
-		err = wh.Admit(webhooktesting.NewAttribute(ns, nil, false), objectInterfaces)
+		err = wh.Admit(context.TODO(), webhooktesting.NewAttribute(ns, nil, false), objectInterfaces)
 		if tt.ExpectAllow != (err == nil) {
 			t.Errorf("%s: expected allowed=%v, but got err=%v", tt.Name, tt.ExpectAllow, err)
 		}

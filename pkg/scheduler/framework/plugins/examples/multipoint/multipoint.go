@@ -17,7 +17,7 @@ limitations under the License.
 package multipoint
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -27,7 +27,7 @@ import (
 type CommunicatingPlugin struct{}
 
 var _ = framework.ReservePlugin(CommunicatingPlugin{})
-var _ = framework.PrebindPlugin(CommunicatingPlugin{})
+var _ = framework.PreBindPlugin(CommunicatingPlugin{})
 
 // Name is the name of the plug used in Registry and configurations.
 const Name = "multipoint-communicating-plugin"
@@ -50,8 +50,8 @@ func (mc CommunicatingPlugin) Reserve(pc *framework.PluginContext, pod *v1.Pod, 
 	return nil
 }
 
-// Prebind is the functions invoked by the framework at "prebind" extension point.
-func (mc CommunicatingPlugin) Prebind(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+// PreBind is the functions invoked by the framework at "prebind" extension point.
+func (mc CommunicatingPlugin) PreBind(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
 		return framework.NewStatus(framework.Error, "pod cannot be nil")
 	}

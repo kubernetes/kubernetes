@@ -22,8 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -46,7 +46,7 @@ var _ = KubeadmDescribe("bootstrap token", func() {
 	// so we are disabling the creation of a namespace in order to get a faster execution
 	f.SkipNamespaceCreation = true
 
-	It("should exist and be properly configured", func() {
+	ginkgo.It("should exist and be properly configured", func() {
 		secrets, err := f.ClientSet.CoreV1().
 			Secrets(kubeSystemNamespace).
 			List(metav1.ListOptions{})
@@ -59,10 +59,10 @@ var _ = KubeadmDescribe("bootstrap token", func() {
 				tokenNum++
 			}
 		}
-		Expect(tokenNum).Should(BeNumerically(">", 0), "At least one bootstrap token should exist")
+		gomega.Expect(tokenNum).Should(gomega.BeNumerically(">", 0), "At least one bootstrap token should exist")
 	})
 
-	It("should be allowed to post CSR for kubelet certificates on joining nodes", func() {
+	ginkgo.It("should be allowed to post CSR for kubelet certificates on joining nodes", func() {
 		ExpectClusterRoleBindingWithSubjectAndRole(f.ClientSet,
 			bootstrapTokensAllowPostCSRClusterRoleBinding,
 			rbacv1.GroupKind, bootstrapTokensGroup,
@@ -71,7 +71,7 @@ var _ = KubeadmDescribe("bootstrap token", func() {
 		//TODO: check if possible to verify "allowed to post CSR" using subject asses review as well
 	})
 
-	It("should be allowed to auto approve CSR for kubelet certificates on joining nodes", func() {
+	ginkgo.It("should be allowed to auto approve CSR for kubelet certificates on joining nodes", func() {
 		ExpectClusterRoleBindingWithSubjectAndRole(f.ClientSet,
 			bootstrapTokensCSRAutoApprovalClusterRoleBinding,
 			rbacv1.GroupKind, bootstrapTokensGroup,

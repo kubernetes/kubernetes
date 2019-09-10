@@ -1,5 +1,6 @@
 ## Development release:
 
+- [CHANGELOG-1.16.md](https://github.com/kubernetes/kubernetes/blob/master/CHANGELOG-1.16.md)
 
 ## Current release:
 

@@ -1,3 +1,4 @@
+// +build !providerless
 // +build windows
 
 /*
@@ -70,7 +71,7 @@ func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error
 					continue
 				}
 
-				klog.V(4).Infof("found a disk, locatin: %q, lun: %q", location, arr[arrLen-1])
+				klog.V(4).Infof("found a disk, location: %q, lun: %q", location, arr[arrLen-1])
 				//last element of location field is LUN number, e.g.
 				//		"location":  "Integrated : Adapter 3 : Port 0 : Target 0 : LUN 1"
 				l, err := strconv.Atoi(arr[arrLen-1])
@@ -80,7 +81,7 @@ func findDiskByLun(lun int, iohandler ioHandler, exec mount.Exec) (string, error
 				}
 
 				if l == lun {
-					klog.V(4).Infof("found a disk and lun, locatin: %q, lun: %d", location, lun)
+					klog.V(4).Infof("found a disk and lun, location: %q, lun: %d", location, lun)
 					if d, ok := v["number"]; ok {
 						if diskNum, ok := d.(float64); ok {
 							klog.V(2).Infof("azureDisk Mount: got disk number(%d) by LUN(%d)", int(diskNum), lun)

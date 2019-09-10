@@ -69,6 +69,16 @@ const (
 	AnnStorageProvisioner = "volume.beta.kubernetes.io/storage-provisioner"
 )
 
+// IsDelayBindingProvisioning checks if claim provisioning with selected-node annotation
+func IsDelayBindingProvisioning(claim *v1.PersistentVolumeClaim) bool {
+	// When feature VolumeScheduling enabled,
+	// Scheduler signal to the PV controller to start dynamic
+	// provisioning by setting the "AnnSelectedNode" annotation
+	// in the PVC
+	_, ok := claim.Annotations[AnnSelectedNode]
+	return ok
+}
+
 // IsDelayBindingMode checks if claim is in delay binding mode.
 func IsDelayBindingMode(claim *v1.PersistentVolumeClaim, classLister storagelisters.StorageClassLister) (bool, error) {
 	className := v1helper.GetPersistentVolumeClaimClass(claim)

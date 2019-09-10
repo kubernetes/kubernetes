@@ -25,7 +25,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -45,12 +45,21 @@ const (
 // CreateLocalEtcdStaticPodManifestFile will write local etcd static pod manifest file.
 // This function is used by init - when the etcd cluster is empty - or by kubeadm
 // upgrade - when the etcd cluster is already up and running (and the --initial-cluster flag have no impact)
-func CreateLocalEtcdStaticPodManifestFile(manifestDir string, nodeName string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) error {
+func CreateLocalEtcdStaticPodManifestFile(manifestDir, kustomizeDir string, nodeName string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) error {
 	if cfg.Etcd.External != nil {
 		return errors.New("etcd static pod manifest cannot be generated for cluster using external etcd")
 	}
 	// gets etcd StaticPodSpec
 	spec := GetEtcdPodSpec(cfg, endpoint, nodeName, []etcdutil.Member{})
+
+	// if kustomizeDir is defined, customize the static pod manifest
+	if kustomizeDir != "" {
+		kustomizedSpec, err := staticpodutil.KustomizeStaticPod(&spec, kustomizeDir)
+		if err != nil {
+			return errors.Wrapf(err, "failed to kustomize static pod manifest file for %q", kubeadmconstants.Etcd)
+		}
+		spec = *kustomizedSpec
+	}
 
 	// writes etcd StaticPod to disk
 	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
@@ -113,7 +122,7 @@ func RemoveStackedEtcdMemberFromCluster(client clientset.Interface, cfg *kubeadm
 // CreateStackedEtcdStaticPodManifestFile will write local etcd static pod manifest file
 // for an additional etcd member that is joining an existing local/stacked etcd cluster.
 // Other members of the etcd cluster will be notified of the joining node in beforehand as well.
-func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifestDir string, nodeName string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) error {
+func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifestDir, kustomizeDir string, nodeName string, cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.APIEndpoint) error {
 	// creates an etcd client that connects to all the local/stacked etcd members
 	klog.V(1).Info("creating etcd client that connects to etcd pods")
 	etcdClient, err := etcdutil.NewFromCluster(client, cfg.CertificatesDir)
@@ -132,15 +141,24 @@ func CreateStackedEtcdStaticPodManifestFile(client clientset.Interface, manifest
 	fmt.Println("[etcd] Announced new etcd member joining to the existing etcd cluster")
 	klog.V(1).Infof("Updated etcd member list: %v", initialCluster)
 
-	klog.V(1).Info("Creating local etcd static pod manifest file")
+	fmt.Printf("[etcd] Creating static Pod manifest for %q\n", kubeadmconstants.Etcd)
+
 	// gets etcd StaticPodSpec, actualized for the current InitConfiguration and the new list of etcd members
 	spec := GetEtcdPodSpec(cfg, endpoint, nodeName, initialCluster)
+
+	// if kustomizeDir is defined, customize the static pod manifest
+	if kustomizeDir != "" {
+		kustomizedSpec, err := staticpodutil.KustomizeStaticPod(&spec, kustomizeDir)
+		if err != nil {
+			return errors.Wrapf(err, "failed to kustomize static pod manifest file for %q", kubeadmconstants.Etcd)
+		}
+		spec = *kustomizedSpec
+	}
+
 	// writes etcd StaticPod to disk
 	if err := staticpodutil.WriteStaticPodToDisk(kubeadmconstants.Etcd, manifestDir, spec); err != nil {
 		return err
 	}
-
-	fmt.Printf("[etcd] Wrote Static Pod manifest for a local etcd member to %q\n", kubeadmconstants.GetStaticPodFilepath(kubeadmconstants.Etcd, manifestDir))
 
 	fmt.Printf("[etcd] Waiting for the new etcd member to join the cluster. This can take up to %v\n", etcdHealthyCheckInterval*etcdHealthyCheckRetries)
 	if _, err := etcdClient.WaitForClusterAvailable(etcdHealthyCheckRetries, etcdHealthyCheckInterval); err != nil {
@@ -158,6 +176,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		etcdVolumeName:  staticpodutil.NewVolume(etcdVolumeName, cfg.Etcd.Local.DataDir, &pathType),
 		certsVolumeName: staticpodutil.NewVolume(certsVolumeName, cfg.CertificatesDir+"/etcd", &pathType),
 	}
+	probeHostname, probePort, probeScheme := staticpodutil.GetEtcdProbeEndpoint(&cfg.Etcd)
 	return staticpodutil.ComponentPod(v1.Container{
 		Name:            kubeadmconstants.Etcd,
 		Command:         getEtcdCommand(cfg, endpoint, nodeName, initialCluster),
@@ -168,10 +187,7 @@ func GetEtcdPodSpec(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 			staticpodutil.NewVolumeMount(etcdVolumeName, cfg.Etcd.Local.DataDir, false),
 			staticpodutil.NewVolumeMount(certsVolumeName, cfg.CertificatesDir+"/etcd", false),
 		},
-		LivenessProbe: staticpodutil.EtcdProbe(
-			&cfg.Etcd, kubeadmconstants.EtcdListenClientPort, cfg.CertificatesDir,
-			kubeadmconstants.EtcdCACertName, kubeadmconstants.EtcdHealthcheckClientCertName, kubeadmconstants.EtcdHealthcheckClientKeyName,
-		),
+		LivenessProbe: staticpodutil.LivenessProbe(probeHostname, "/health", probePort, probeScheme),
 	}, etcdMounts)
 }
 
@@ -193,6 +209,7 @@ func getEtcdCommand(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmapi.A
 		"peer-trusted-ca-file":        filepath.Join(cfg.CertificatesDir, kubeadmconstants.EtcdCACertName),
 		"peer-client-cert-auth":       "true",
 		"snapshot-count":              "10000",
+		"listen-metrics-urls":         fmt.Sprintf("http://127.0.0.1:%d", kubeadmconstants.EtcdMetricsPort),
 	}
 
 	if len(initialCluster) == 0 {

@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -111,7 +112,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			framework.ExpectNoError(framework.WaitOnPVandPVC(c, ns, pv, pvc))
 
 			ginkgo.By("Creating the Pod")
-			pod, err := framework.CreateClientPod(c, ns, pvc)
+			pod, err := e2epod.CreateClientPod(c, ns, pvc)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Deleting the Claim")
@@ -134,7 +135,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			e2elog.Logf("Verified that Volume is accessible in the POD after deleting PV claim")
 
 			ginkgo.By("Deleting the Pod")
-			framework.ExpectNoError(framework.DeletePodWithWait(f, c, pod), "Failed to delete pod ", pod.Name)
+			framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod), "Failed to delete pod ", pod.Name)
 
 			ginkgo.By("Verify PV is detached from the node after Pod is deleted")
 			err = waitForVSphereDiskToDetach(pv.Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)

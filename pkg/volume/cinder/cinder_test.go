@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2015 The Kubernetes Authors.
 
@@ -26,11 +28,11 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/cloudprovider/providers/openstack"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/legacy-cloud-providers/openstack"
 )
 
 func TestCanSupport(t *testing.T) {

@@ -20,6 +20,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 
 	"github.com/onsi/ginkgo"
 )
@@ -28,7 +29,7 @@ import (
 // after a cluster upgrade. During a master-only upgrade, it will test
 // that a service remains available during the upgrade.
 type ServiceUpgradeTest struct {
-	jig          *framework.ServiceTestJig
+	jig          *e2eservice.TestJig
 	tcpService   *v1.Service
 	tcpIngressIP string
 	svcPort      int
@@ -42,7 +43,7 @@ func shouldTestPDBs() bool { return framework.ProviderIs("gce", "gke") }
 // Setup creates a service with a load balancer and makes sure it's reachable.
 func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 	serviceName := "service-test"
-	jig := framework.NewServiceTestJig(f.ClientSet, serviceName)
+	jig := e2eservice.NewTestJig(f.ClientSet, serviceName)
 
 	ns := f.Namespace
 
@@ -50,11 +51,11 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 	tcpService := jig.CreateTCPServiceOrFail(ns.Name, func(s *v1.Service) {
 		s.Spec.Type = v1.ServiceTypeLoadBalancer
 	})
-	tcpService = jig.WaitForLoadBalancerOrFail(ns.Name, tcpService.Name, framework.LoadBalancerCreateTimeoutDefault)
+	tcpService = jig.WaitForLoadBalancerOrFail(ns.Name, tcpService.Name, e2eservice.LoadBalancerCreateTimeoutDefault)
 	jig.SanityCheckService(tcpService, v1.ServiceTypeLoadBalancer)
 
 	// Get info to hit it with
-	tcpIngressIP := framework.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
+	tcpIngressIP := e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
 	svcPort := int(tcpService.Spec.Ports[0].Port)
 
 	ginkgo.By("creating pod to be part of service " + serviceName)
@@ -67,9 +68,9 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 
 	// Hit it once before considering ourselves ready
 	ginkgo.By("hitting the pod through the service's LoadBalancer")
-	timeout := framework.LoadBalancerLagTimeoutDefault
+	timeout := e2eservice.LoadBalancerLagTimeoutDefault
 	if framework.ProviderIs("aws") {
-		timeout = framework.LoadBalancerLagTimeoutAWS
+		timeout = e2eservice.LoadBalancerLagTimeoutAWS
 	}
 	jig.TestReachableHTTP(tcpIngressIP, svcPort, timeout)
 
@@ -83,12 +84,12 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 func (t *ServiceUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upgrade UpgradeType) {
 	switch upgrade {
 	case MasterUpgrade, ClusterUpgrade:
-		t.test(f, done, true)
+		t.test(f, done, true, true)
 	case NodeUpgrade:
 		// Node upgrades should test during disruption only on GCE/GKE for now.
-		t.test(f, done, shouldTestPDBs())
+		t.test(f, done, shouldTestPDBs(), false)
 	default:
-		t.test(f, done, false)
+		t.test(f, done, false, false)
 	}
 }
 
@@ -97,12 +98,12 @@ func (t *ServiceUpgradeTest) Teardown(f *framework.Framework) {
 	// rely on the namespace deletion to clean up everything
 }
 
-func (t *ServiceUpgradeTest) test(f *framework.Framework, done <-chan struct{}, testDuringDisruption bool) {
+func (t *ServiceUpgradeTest) test(f *framework.Framework, done <-chan struct{}, testDuringDisruption, testFinalizer bool) {
 	if testDuringDisruption {
 		// Continuous validation
 		ginkgo.By("continuously hitting the pod through the service's LoadBalancer")
 		wait.Until(func() {
-			t.jig.TestReachableHTTP(t.tcpIngressIP, t.svcPort, framework.LoadBalancerLagTimeoutDefault)
+			t.jig.TestReachableHTTP(t.tcpIngressIP, t.svcPort, e2eservice.LoadBalancerLagTimeoutDefault)
 		}, framework.Poll, done)
 	} else {
 		// Block until upgrade is done
@@ -112,6 +113,15 @@ func (t *ServiceUpgradeTest) test(f *framework.Framework, done <-chan struct{}, 
 
 	// Sanity check and hit it once more
 	ginkgo.By("hitting the pod through the service's LoadBalancer")
-	t.jig.TestReachableHTTP(t.tcpIngressIP, t.svcPort, framework.LoadBalancerLagTimeoutDefault)
+	t.jig.TestReachableHTTP(t.tcpIngressIP, t.svcPort, e2eservice.LoadBalancerLagTimeoutDefault)
 	t.jig.SanityCheckService(t.tcpService, v1.ServiceTypeLoadBalancer)
+
+	if testFinalizer {
+		defer func() {
+			ginkgo.By("Check that service can be deleted with finalizer")
+			e2eservice.WaitForServiceDeletedWithFinalizer(t.jig.Client, t.tcpService.Namespace, t.tcpService.Name)
+		}()
+		ginkgo.By("Check that finalizer is present on loadBalancer type service")
+		e2eservice.WaitForServiceUpdatedWithFinalizer(t.jig.Client, t.tcpService.Namespace, t.tcpService.Name, true)
+	}
 }

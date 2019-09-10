@@ -275,7 +275,7 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 		go rq.quotaMonitor.Run(stopCh)
 	}
 
-	if !controller.WaitForCacheSync("resource quota", stopCh, rq.informerSyncedFuncs...) {
+	if !cache.WaitForNamedCacheSync("resource quota", stopCh, rq.informerSyncedFuncs...) {
 		return
 	}
 
@@ -442,7 +442,7 @@ func (rq *ResourceQuotaController) Sync(discoveryFunc NamespacedResourcesFunc, p
 		// this protects us from deadlocks where available resources changed and one of our informer caches will never fill.
 		// informers keep attempting to sync in the background, so retrying doesn't interrupt them.
 		// the call to resyncMonitors on the reattempt will no-op for resources that still exist.
-		if rq.quotaMonitor != nil && !controller.WaitForCacheSync("resource quota", waitForStopOrTimeout(stopCh, period), rq.quotaMonitor.IsSynced) {
+		if rq.quotaMonitor != nil && !cache.WaitForNamedCacheSync("resource quota", waitForStopOrTimeout(stopCh, period), rq.quotaMonitor.IsSynced) {
 			utilruntime.HandleError(fmt.Errorf("timed out waiting for quota monitor sync"))
 			return
 		}

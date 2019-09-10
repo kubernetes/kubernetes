@@ -31,11 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
-	clientv1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -238,8 +237,9 @@ priorities: []
 		policyConfigMap.APIVersion = "v1"
 		clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
 
-		eventBroadcaster := record.NewBroadcaster()
-		eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
+		eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet.EventsV1beta1().Events("")})
+		stopCh := make(chan struct{})
+		eventBroadcaster.StartRecordingToSink(stopCh)
 
 		defaultBindTimeout := int64(30)
 
@@ -255,7 +255,7 @@ priorities: []
 			informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 			informerFactory.Storage().V1().StorageClasses(),
 			informerFactory.Storage().V1beta1().CSINodes(),
-			eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
+			eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
 			kubeschedulerconfig.SchedulerAlgorithmSource{
 				Policy: &kubeschedulerconfig.SchedulerPolicySource{
 					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
@@ -276,15 +276,13 @@ priorities: []
 			t.Fatalf("couldn't make scheduler config: %v", err)
 		}
 
-		config := sched.Config()
-
 		// Verify that the config is applied correctly.
 		schedPredicates := sets.NewString()
-		for k := range config.Algorithm.Predicates() {
+		for k := range sched.Algorithm.Predicates() {
 			schedPredicates.Insert(k)
 		}
 		schedPrioritizers := sets.NewString()
-		for _, p := range config.Algorithm.Prioritizers() {
+		for _, p := range sched.Algorithm.Prioritizers() {
 			schedPrioritizers.Insert(p.Name)
 		}
 		if !schedPredicates.Equal(test.expectedPredicates) {
@@ -310,8 +308,9 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet.EventsV1beta1().Events("")})
+	stopCh := make(chan struct{})
+	eventBroadcaster.StartRecordingToSink(stopCh)
 
 	defaultBindTimeout := int64(30)
 
@@ -327,7 +326,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
 		informerFactory.Storage().V1().StorageClasses(),
 		informerFactory.Storage().V1beta1().CSINodes(),
-		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: v1.DefaultSchedulerName}),
+		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
 		kubeschedulerconfig.SchedulerAlgorithmSource{
 			Policy: &kubeschedulerconfig.SchedulerPolicySource{
 				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
@@ -353,7 +352,7 @@ func TestUnschedulableNodes(t *testing.T) {
 	context := initTest(t, "unschedulable-nodes")
 	defer cleanupTest(t, context)
 
-	nodeLister := context.schedulerConfigFactory.GetNodeLister()
+	nodeLister := context.schedulerConfigArgs.NodeInformer.Lister()
 	// NOTE: This test cannot run in parallel, because it is creating and deleting
 	// non-namespaced objects (Nodes).
 	defer context.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
@@ -604,15 +603,15 @@ func TestMultiScheduler(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	schedulerConfigFactory2 := createConfiguratorWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, schedulerframework.NewRegistry(),
-		nil, []kubeschedulerconfig.PluginConfig{}, stopCh)
+	schedulerConfigFactory2 := factory.NewConfigFactory(createConfiguratorArgsWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, schedulerframework.NewRegistry(),
+		nil, []kubeschedulerconfig.PluginConfig{}, stopCh))
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
 	if err != nil {
 		t.Errorf("Couldn't create scheduler config: %v", err)
 	}
-	eventBroadcaster2 := record.NewBroadcaster()
-	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(legacyscheme.Scheme, v1.EventSource{Component: fooScheduler})
-	eventBroadcaster2.StartRecordingToSink(&clientv1core.EventSinkImpl{Interface: clientSet2.CoreV1().Events("")})
+	eventBroadcaster2 := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet2.EventsV1beta1().Events("")})
+	schedulerConfig2.Recorder = eventBroadcaster2.NewRecorder(legacyscheme.Scheme, "k8s.io/"+fooScheduler)
+	eventBroadcaster2.StartRecordingToSink(stopCh)
 
 	sched2 := scheduler.NewFromConfig(schedulerConfig2)
 	scheduler.AddAllEventHandlers(sched2,

@@ -230,16 +230,6 @@ func LogAnnotation(ae *auditinternal.Event, key, value string) {
 	ae.Annotations[key] = value
 }
 
-// LogAnnotations fills in the Annotations according to the annotations map.
-func LogAnnotations(ae *auditinternal.Event, annotations map[string]string) {
-	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
-		return
-	}
-	for key, value := range annotations {
-		LogAnnotation(ae, key, value)
-	}
-}
-
 // truncate User-Agent if too long, otherwise return it directly.
 func maybeTruncateUserAgent(req *http.Request) string {
 	ua := req.UserAgent()

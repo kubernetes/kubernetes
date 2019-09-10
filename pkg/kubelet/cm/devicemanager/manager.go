@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -38,7 +39,10 @@ import (
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/errors"
+	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/devicemanager/checkpoint"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -79,6 +83,9 @@ type ManagerImpl struct {
 	// e.g. a new device is advertised, two old devices are deleted and a running device fails.
 	callback monitorCallback
 
+	// allDevices is a map by resource name of all the devices currently registered to the device manager
+	allDevices map[string]map[string]pluginapi.Device
+
 	// healthyDevices contains all of the registered healthy resourceNames and their exported device IDs.
 	healthyDevices map[string]sets.String
 
@@ -91,6 +98,12 @@ type ManagerImpl struct {
 	// podDevices contains pod to allocated device mapping.
 	podDevices        podDevices
 	checkpointManager checkpointmanager.CheckpointManager
+
+	// List of NUMA Nodes available on the underlying machine
+	numaNodes []int
+
+	// Store of Topology Affinties that the Device Manager can query.
+	topologyAffinityStore topologymanager.Store
 }
 
 type endpointInfo struct {
@@ -104,27 +117,35 @@ func (s *sourcesReadyStub) AddSource(source string) {}
 func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManagerImpl creates a new manager.
-func NewManagerImpl() (*ManagerImpl, error) {
-	return newManagerImpl(pluginapi.KubeletSocket)
+func NewManagerImpl(numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
+	return newManagerImpl(pluginapi.KubeletSocket, numaNodeInfo, topologyAffinityStore)
 }
 
-func newManagerImpl(socketPath string) (*ManagerImpl, error) {
+func newManagerImpl(socketPath string, numaNodeInfo cputopology.NUMANodeInfo, topologyAffinityStore topologymanager.Store) (*ManagerImpl, error) {
 	klog.V(2).Infof("Creating Device Plugin manager at %s", socketPath)
 
 	if socketPath == "" || !filepath.IsAbs(socketPath) {
 		return nil, fmt.Errorf(errBadSocket+" %s", socketPath)
 	}
 
+	var numaNodes []int
+	for node := range numaNodeInfo {
+		numaNodes = append(numaNodes, node)
+	}
+
 	dir, file := filepath.Split(socketPath)
 	manager := &ManagerImpl{
 		endpoints: make(map[string]endpointInfo),
 
-		socketname:       file,
-		socketdir:        dir,
-		healthyDevices:   make(map[string]sets.String),
-		unhealthyDevices: make(map[string]sets.String),
-		allocatedDevices: make(map[string]sets.String),
-		podDevices:       make(podDevices),
+		socketname:            file,
+		socketdir:             dir,
+		allDevices:            make(map[string]map[string]pluginapi.Device),
+		healthyDevices:        make(map[string]sets.String),
+		unhealthyDevices:      make(map[string]sets.String),
+		allocatedDevices:      make(map[string]sets.String),
+		podDevices:            make(podDevices),
+		numaNodes:             numaNodes,
+		topologyAffinityStore: topologyAffinityStore,
 	}
 	manager.callback = manager.genericDeviceUpdateCallback
 
@@ -145,7 +166,9 @@ func (m *ManagerImpl) genericDeviceUpdateCallback(resourceName string, devices [
 	m.mutex.Lock()
 	m.healthyDevices[resourceName] = sets.NewString()
 	m.unhealthyDevices[resourceName] = sets.NewString()
+	m.allDevices[resourceName] = make(map[string]pluginapi.Device)
 	for _, dev := range devices {
+		m.allDevices[resourceName][dev.ID] = dev
 		if dev.Health == pluginapi.Healthy {
 			m.healthyDevices[resourceName].Insert(dev.ID)
 		} else {
@@ -276,12 +299,12 @@ func (m *ManagerImpl) RegisterPlugin(pluginName string, endpoint string, version
 
 	e, err := newEndpointImpl(endpoint, pluginName, m.callback)
 	if err != nil {
-		return fmt.Errorf("Failed to dial device plugin with socketPath %s: %v", endpoint, err)
+		return fmt.Errorf("failed to dial device plugin with socketPath %s: %v", endpoint, err)
 	}
 
 	options, err := e.client.GetDevicePluginOptions(context.Background(), &pluginapi.Empty{})
 	if err != nil {
-		return fmt.Errorf("Failed to get device plugin options: %v", err)
+		return fmt.Errorf("failed to get device plugin options: %v", err)
 	}
 
 	m.registerEndpoint(pluginName, options, e)
@@ -633,7 +656,14 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 	if available.Len() < needed {
 		return nil, fmt.Errorf("requested number of devices unavailable for %s. Requested: %d, Available: %d", resource, needed, available.Len())
 	}
+	// By default, pull devices from the unsorted list of available devices.
 	allocated := available.UnsortedList()[:needed]
+	// If topology alignment is desired, update allocated to the set of devices
+	// with the best alignment.
+	hint := m.topologyAffinityStore.GetAffinity(podUID, contName)
+	if m.deviceHasTopologyAlignment(resource) && hint.NUMANodeAffinity != nil {
+		allocated = m.takeByTopology(resource, available, hint.NUMANodeAffinity, needed)
+	}
 	// Updates m.allocatedDevices with allocated devices to prevent them
 	// from being allocated to other pods/containers, given that we are
 	// not holding lock during the rpc call.
@@ -642,6 +672,74 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 		devices.Insert(device)
 	}
 	return devices, nil
+}
+
+func (m *ManagerImpl) takeByTopology(resource string, available sets.String, affinity socketmask.SocketMask, request int) []string {
+	// Build a map of of NUMA Nodes to the devices associated with them. A
+	// device may be associated to multiple NUMA nodes at the same time. If an
+	// available device does not have any NUMA Nodes associated with it, add it
+	// to a list of NUMA Nodes for the fake NUMANode -1.
+	perNodeDevices := make(map[int]sets.String)
+	for d := range available {
+		var nodes []int
+		if m.allDevices[resource][d].Topology != nil {
+			for _, node := range m.allDevices[resource][d].Topology.Nodes {
+				nodes = append(nodes, int(node.ID))
+			}
+		}
+		if len(nodes) == 0 {
+			nodes = []int{-1}
+		}
+		for _, node := range nodes {
+			if _, ok := perNodeDevices[node]; !ok {
+				perNodeDevices[node] = sets.NewString()
+			}
+			perNodeDevices[node].Insert(d)
+		}
+	}
+
+	// Get a flat list of all of the nodes associated with available devices.
+	var nodes []int
+	for node := range perNodeDevices {
+		nodes = append(nodes, node)
+	}
+
+	// Sort the list of nodes by how many devices they contain.
+	sort.Slice(nodes, func(i, j int) bool {
+		return perNodeDevices[i].Len() < perNodeDevices[j].Len()
+	})
+
+	// Generate three sorted lists of devices. Devices in the first list come
+	// from valid NUMA Nodes contained in the affinity mask. Devices in the
+	// second list come from valid NUMA Nodes not in the affinity mask. Devices
+	// in the third list come from devices with no NUMA Node association (i.e.
+	// those mapped to the fake NUMA Node -1). Because we loop through the
+	// sorted list of NUMA nodes in order, within each list, devices are sorted
+	// by their connection to NUMA Nodes with more devices on them.
+	var fromAffinity []string
+	var notFromAffinity []string
+	var withoutTopology []string
+	for d := range available {
+		// Since the same device may be associated with multiple NUMA Nodes. We
+		// need to be careful not to add each device to multiple lists. The
+		// logic below ensures this by breaking after the first NUMA node that
+		// has the device is encountered.
+		for _, n := range nodes {
+			if perNodeDevices[n].Has(d) {
+				if n == -1 {
+					withoutTopology = append(withoutTopology, d)
+				} else if affinity.IsSet(n) {
+					fromAffinity = append(fromAffinity, d)
+				} else {
+					notFromAffinity = append(notFromAffinity, d)
+				}
+				break
+			}
+		}
+	}
+
+	// Concatenate the lists above return the first 'request' devices from it..
+	return append(append(fromAffinity, notFromAffinity...), withoutTopology...)[:request]
 }
 
 // allocateContainerResources attempts to allocate all of required device
@@ -697,7 +795,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 			m.mutex.Lock()
 			m.allocatedDevices = m.podDevices.devices()
 			m.mutex.Unlock()
-			return fmt.Errorf("Unknown Device Plugin %s", resource)
+			return fmt.Errorf("unknown Device Plugin %s", resource)
 		}
 
 		devs := allocDevices.UnsortedList()
@@ -717,7 +815,7 @@ func (m *ManagerImpl) allocateContainerResources(pod *v1.Pod, container *v1.Cont
 		}
 
 		if len(resp.ContainerResponses) == 0 {
-			return fmt.Errorf("No containers return in allocation response %v", resp)
+			return fmt.Errorf("no containers return in allocation response %v", resp)
 		}
 
 		// Update internal cached podDevices state.

@@ -112,7 +112,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			ClaimSize:    repdMinSize,
 			ExpectedSize: repdMinSize,
 			PvCheck: func(claim *v1.PersistentVolumeClaim) {
-				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 				gomega.Expect(volume).NotTo(gomega.BeNil())
 
 				err := checkGCEPD(volume, "pd-standard")
@@ -133,7 +133,7 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 			ClaimSize:    repdMinSize,
 			ExpectedSize: repdMinSize,
 			PvCheck: func(claim *v1.PersistentVolumeClaim) {
-				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, framework.NodeSelection{})
+				volume := testsuites.PVWriteReadSingleNodeCheck(c, claim, e2epod.NodeSelection{})
 				gomega.Expect(volume).NotTo(gomega.BeNil())
 
 				err := checkGCEPD(volume, "pd-standard")
@@ -149,8 +149,11 @@ func testVolumeProvisioning(c clientset.Interface, ns string) {
 	for _, test := range tests {
 		test.Client = c
 		test.Class = newStorageClass(test, ns, "" /* suffix */)
-		test.Claim = newClaim(test, ns, "" /* suffix */)
-		test.Claim.Spec.StorageClassName = &test.Class.Name
+		test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			ClaimSize:        test.ClaimSize,
+			StorageClassName: &(test.Class.Name),
+			VolumeMode:       &test.VolumeMode,
+		}, ns)
 		test.TestDynamicProvisioning()
 	}
 }
@@ -170,9 +173,12 @@ func testZonalFailover(c clientset.Interface, ns string) {
 		ExpectedSize: repdMinSize,
 	}
 	class := newStorageClass(testSpec, ns, "" /* suffix */)
-	claimTemplate := newClaim(testSpec, ns, "" /* suffix */)
-	claimTemplate.Name = pvcName
-	claimTemplate.Spec.StorageClassName = &class.Name
+	claimTemplate := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		NamePrefix:       pvcName,
+		ClaimSize:        testSpec.ClaimSize,
+		StorageClassName: &(class.Name),
+		VolumeMode:       &testSpec.VolumeMode,
+	}, ns)
 	statefulSet, service, regionalPDLabels := newStatefulSet(claimTemplate, ns)
 
 	ginkgo.By("creating a StorageClass " + class.Name)
@@ -332,8 +338,11 @@ func testRegionalDelayedBinding(c clientset.Interface, ns string, pvcCount int) 
 	test.Class = newStorageClass(test, ns, suffix)
 	var claims []*v1.PersistentVolumeClaim
 	for i := 0; i < pvcCount; i++ {
-		claim := newClaim(test, ns, suffix)
-		claim.Spec.StorageClassName = &test.Class.Name
+		claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			ClaimSize:        test.ClaimSize,
+			StorageClassName: &(test.Class.Name),
+			VolumeMode:       &test.VolumeMode,
+		}, ns)
 		claims = append(claims, claim)
 	}
 	pvs, node := test.TestBindingWaitForFirstConsumerMultiPVC(claims, nil /* node selector */, false /* expect unschedulable */)
@@ -366,8 +375,12 @@ func testRegionalAllowedTopologies(c clientset.Interface, ns string) {
 	test.Class = newStorageClass(test, ns, suffix)
 	zones := getTwoRandomZones(c)
 	addAllowedTopologiesToStorageClass(c, test.Class, zones)
-	test.Claim = newClaim(test, ns, suffix)
-	test.Claim.Spec.StorageClassName = &test.Class.Name
+	test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		NamePrefix:       pvcName,
+		ClaimSize:        test.ClaimSize,
+		StorageClassName: &(test.Class.Name),
+		VolumeMode:       &test.VolumeMode,
+	}, ns)
 
 	pv := test.TestDynamicProvisioning()
 	checkZonesFromLabelAndAffinity(pv, sets.NewString(zones...), true)
@@ -392,8 +405,11 @@ func testRegionalAllowedTopologiesWithDelayedBinding(c clientset.Interface, ns s
 	addAllowedTopologiesToStorageClass(c, test.Class, topoZones)
 	var claims []*v1.PersistentVolumeClaim
 	for i := 0; i < pvcCount; i++ {
-		claim := newClaim(test, ns, suffix)
-		claim.Spec.StorageClassName = &test.Class.Name
+		claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			ClaimSize:        test.ClaimSize,
+			StorageClassName: &(test.Class.Name),
+			VolumeMode:       &test.VolumeMode,
+		}, ns)
 		claims = append(claims, claim)
 	}
 	pvs, node := test.TestBindingWaitForFirstConsumerMultiPVC(claims, nil /* node selector */, false /* expect unschedulable */)

@@ -30,8 +30,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptive] [NodeFeature:SystemNodeCriticalPod]", func() {
@@ -39,7 +39,7 @@ var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptiv
 	// this test only manipulates pods in kube-system
 	f.SkipNamespaceCreation = true
 
-	Context("when create a system-node-critical pod", func() {
+	ginkgo.Context("when create a system-node-critical pod", func() {
 		tempSetCurrentKubeletConfig(f, func(initialConfig *kubeletconfig.KubeletConfiguration) {
 			diskConsumed := resource.MustParse("200Mi")
 			summary := eventuallyGetSummary()
@@ -49,12 +49,12 @@ var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptiv
 		})
 
 		// Place the remainder of the test within a context so that the kubelet config is set before and after the test.
-		Context("", func() {
+		ginkgo.Context("", func() {
 			var staticPodName, mirrorPodName, podPath string
 			ns := kubeapi.NamespaceSystem
 
-			BeforeEach(func() {
-				By("create a static system-node-critical pod")
+			ginkgo.BeforeEach(func() {
+				ginkgo.By("create a static system-node-critical pod")
 				staticPodName = "static-disk-hog-" + string(uuid.NewUUID())
 				mirrorPodName = staticPodName + "-" + framework.TestContext.NodeName
 				podPath = framework.TestContext.KubeletConfig.StaticPodPath
@@ -64,27 +64,27 @@ var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptiv
 					podPath, staticPodName, ns, busyboxImage, v1.RestartPolicyNever, 1024,
 					"dd if=/dev/urandom of=file${i} bs=10485760 count=1 2>/dev/null; sleep .1;",
 				)
-				Expect(err).ShouldNot(HaveOccurred())
+				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-				By("wait for the mirror pod to be running")
-				Eventually(func() error {
+				ginkgo.By("wait for the mirror pod to be running")
+				gomega.Eventually(func() error {
 					return checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
-				}, time.Minute, time.Second*2).Should(BeNil())
+				}, time.Minute, time.Second*2).Should(gomega.BeNil())
 			})
 
-			It("should not be evicted upon DiskPressure", func() {
-				By("wait for the node to have DiskPressure condition")
-				Eventually(func() error {
+			ginkgo.It("should not be evicted upon DiskPressure", func() {
+				ginkgo.By("wait for the node to have DiskPressure condition")
+				gomega.Eventually(func() error {
 					if hasNodeCondition(f, v1.NodeDiskPressure) {
 						return nil
 					}
 					msg := fmt.Sprintf("NodeCondition: %s not encountered yet", v1.NodeDiskPressure)
 					e2elog.Logf(msg)
 					return fmt.Errorf(msg)
-				}, time.Minute*2, time.Second*4).Should(BeNil())
+				}, time.Minute*2, time.Second*4).Should(gomega.BeNil())
 
-				By("check if it's running all the time")
-				Consistently(func() error {
+				ginkgo.By("check if it's running all the time")
+				gomega.Consistently(func() error {
 					err := checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
 					if err == nil {
 						e2elog.Logf("mirror pod %q is running", mirrorPodName)
@@ -92,17 +92,25 @@ var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptiv
 						e2elog.Logf(err.Error())
 					}
 					return err
-				}, time.Minute*8, time.Second*4).ShouldNot(HaveOccurred())
+				}, time.Minute*8, time.Second*4).ShouldNot(gomega.HaveOccurred())
 			})
-			AfterEach(func() {
-				By("delete the static pod")
+			ginkgo.AfterEach(func() {
+				defer func() {
+					if framework.TestContext.PrepullImages {
+						// The test may cause the prepulled images to be evicted,
+						// prepull those images again to ensure this test not affect following tests.
+						PrePullAllImages()
+					}
+				}()
+				ginkgo.By("delete the static pod")
 				err := deleteStaticPod(podPath, staticPodName, ns)
-				Expect(err).ShouldNot(HaveOccurred())
+				gomega.Expect(err).ShouldNot(gomega.HaveOccurred())
 
-				By("wait for the mirror pod to disappear")
-				Eventually(func() error {
+				ginkgo.By("wait for the mirror pod to disappear")
+				gomega.Eventually(func() error {
 					return checkMirrorPodDisappear(f.ClientSet, mirrorPodName, ns)
-				}, time.Minute, time.Second*2).Should(BeNil())
+				}, time.Minute, time.Second*2).Should(gomega.BeNil())
+
 			})
 		})
 	})

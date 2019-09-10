@@ -31,7 +31,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -46,8 +45,6 @@ type TearDownFunc func()
 type TestServerInstanceOptions struct {
 	// DisableStorageCleanup Disable the automatic storage cleanup
 	DisableStorageCleanup bool
-	// Injected health
-	InjectedHealthzChecker healthz.HealthzChecker
 }
 
 // TestServer return values supplied by kube-test-ApiServer
@@ -133,8 +130,7 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	}
 	s.SecureServing.ServerCert.FixtureDirectory = path.Join(path.Dir(thisFile), "testdata")
 
-	s.ServiceClusterIPRange.IP = net.IPv4(10, 0, 0, 0)
-	s.ServiceClusterIPRange.Mask = net.CIDRMask(16, 32)
+	s.ServiceClusterIPRanges = "10.0.0.0/16"
 	s.Etcd.StorageConfig = *storageConfig
 	s.APIEnablement.RuntimeConfig.Set("api/all=true")
 
@@ -149,13 +145,6 @@ func StartTestServer(t Logger, instanceOptions *TestServerInstanceOptions, custo
 	server, err := app.CreateServerChain(completedOptions, stopCh)
 	if err != nil {
 		return result, fmt.Errorf("failed to create server chain: %v", err)
-	}
-
-	if instanceOptions.InjectedHealthzChecker != nil {
-		t.Logf("Adding health check with delay %v %v", s.GenericServerRunOptions.MaxStartupSequenceDuration, instanceOptions.InjectedHealthzChecker.Name())
-		if err := server.GenericAPIServer.AddDelayedHealthzChecks(s.GenericServerRunOptions.MaxStartupSequenceDuration, instanceOptions.InjectedHealthzChecker); err != nil {
-			return result, err
-		}
 	}
 
 	errCh := make(chan error)

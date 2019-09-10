@@ -37,7 +37,7 @@ func TestMutatingWebhookAccessor(t *testing.T) {
 			orig.ReinvocationPolicy = nil
 
 			uid := fmt.Sprintf("test.configuration.admission/%s/0", orig.Name)
-			accessor := NewMutatingWebhookAccessor(uid, orig)
+			accessor := NewMutatingWebhookAccessor(uid, "test.configuration.admission", orig)
 			if uid != accessor.GetUID() {
 				t.Errorf("expected GetUID to return %s, but got %s", accessor.GetUID(), uid)
 			}
@@ -77,7 +77,7 @@ func TestValidatingWebhookAccessor(t *testing.T) {
 			orig := &v1beta1.ValidatingWebhook{}
 			f.Fuzz(orig)
 			uid := fmt.Sprintf("test.configuration.admission/%s/0", orig.Name)
-			accessor := NewValidatingWebhookAccessor(uid, orig)
+			accessor := NewValidatingWebhookAccessor(uid, "test.configuration.admission", orig)
 			if uid != accessor.GetUID() {
 				t.Errorf("expected GetUID to return %s, but got %s", accessor.GetUID(), uid)
 			}

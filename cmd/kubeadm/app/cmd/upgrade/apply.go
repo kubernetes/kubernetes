@@ -51,6 +51,7 @@ type applyFlags struct {
 	renewCerts         bool
 	criSocket          string
 	imagePullTimeout   time.Duration
+	kustomizeDir       string
 }
 
 // sessionIsInteractive returns true if the session is of an interactive type (the default, can be opted out of with -y, -f or --dry-run)
@@ -90,6 +91,7 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 	cmd.Flags().BoolVar(&flags.etcdUpgrade, "etcd-upgrade", flags.etcdUpgrade, "Perform the upgrade of etcd.")
 	cmd.Flags().BoolVar(&flags.renewCerts, "certificate-renewal", flags.renewCerts, "Perform the renewal of certificates used by component changed during upgrades.")
 	cmd.Flags().DurationVar(&flags.imagePullTimeout, "image-pull-timeout", flags.imagePullTimeout, "The maximum amount of time to wait for the control plane pods to be downloaded.")
+	options.AddKustomizePodsFlag(cmd.Flags(), &flags.kustomizeDir)
 
 	// The CRI socket flag is deprecated here, since it should be taken from the NodeRegistrationOptions for the current
 	// node instead of the command line. This prevents errors by the users (such as attempts to use wrong CRI during upgrade).
@@ -226,9 +228,9 @@ func PerformControlPlaneUpgrade(flags *applyFlags, client clientset.Interface, w
 	fmt.Printf("[upgrade/apply] Upgrading your Static Pod-hosted control plane to version %q...\n", internalcfg.KubernetesVersion)
 
 	if flags.dryRun {
-		return upgrade.DryRunStaticPodUpgrade(internalcfg)
+		return upgrade.DryRunStaticPodUpgrade(flags.kustomizeDir, internalcfg)
 	}
 
 	// Don't save etcd backup directory if etcd is HA, as this could cause corruption
-	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts)
+	return upgrade.PerformStaticPodUpgrade(client, waiter, internalcfg, flags.etcdUpgrade, flags.renewCerts, flags.kustomizeDir)
 }

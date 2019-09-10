@@ -84,7 +84,7 @@ func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 // Validate validates a new pod.
 func (podStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	pod := obj.(*api.Pod)
-	allErrs := validation.ValidatePod(pod)
+	allErrs := validation.ValidatePodCreate(pod)
 	allErrs = append(allErrs, validation.ValidateConditionalPod(pod, nil, field.NewPath(""))...)
 	return allErrs
 }
@@ -174,6 +174,16 @@ func (podStatusStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Ob
 	return validation.ValidatePodStatusUpdate(obj.(*api.Pod), old.(*api.Pod))
 }
 
+type podEphemeralContainersStrategy struct {
+	podStrategy
+}
+
+var EphemeralContainersStrategy = podEphemeralContainersStrategy{Strategy}
+
+func (podEphemeralContainersStrategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
+	return validation.ValidatePodEphemeralContainersUpdate(obj.(*api.Pod), old.(*api.Pod))
+}
+
 // GetAttrs returns labels and fields of a given object for filtering purposes.
 func GetAttrs(obj runtime.Object) (labels.Set, fields.Set, error) {
 	pod, ok := obj.(*api.Pod)
@@ -193,10 +203,9 @@ func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPre
 	}
 }
 
-func NodeNameTriggerFunc(obj runtime.Object) []storage.MatchValue {
-	pod := obj.(*api.Pod)
-	result := storage.MatchValue{IndexName: "spec.nodeName", Value: pod.Spec.NodeName}
-	return []storage.MatchValue{result}
+// NodeNameTriggerFunc returns value spec.nodename of given object.
+func NodeNameTriggerFunc(obj runtime.Object) string {
+	return obj.(*api.Pod).Spec.NodeName
 }
 
 // PodToSelectableFields returns a field set that represents the object
@@ -239,6 +248,18 @@ func getPod(getter ResourceGetter, ctx context.Context, name string) (*api.Pod, 
 	return pod, nil
 }
 
+// returns primary IP for a Pod
+func getPodIP(pod *api.Pod) string {
+	if pod == nil {
+		return ""
+	}
+	if len(pod.Status.PodIPs) > 0 {
+		return pod.Status.PodIPs[0].IP
+	}
+
+	return ""
+}
+
 // ResourceLocation returns a URL to which one can send traffic for the specified pod.
 func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.Context, id string) (*url.URL, http.RoundTripper, error) {
 	// Allow ID as "podname" or "podname:port" or "scheme:podname:port".
@@ -262,8 +283,8 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 			}
 		}
 	}
-
-	if err := proxyutil.IsProxyableIP(pod.Status.PodIPs[0].IP); err != nil {
+	podIP := getPodIP(pod)
+	if err := proxyutil.IsProxyableIP(podIP); err != nil {
 		return nil, nil, errors.NewBadRequest(err.Error())
 	}
 
@@ -271,9 +292,9 @@ func ResourceLocation(getter ResourceGetter, rt http.RoundTripper, ctx context.C
 		Scheme: scheme,
 	}
 	if port == "" {
-		loc.Host = pod.Status.PodIPs[0].IP
+		loc.Host = podIP
 	} else {
-		loc.Host = net.JoinHostPort(pod.Status.PodIPs[0].IP, port)
+		loc.Host = net.JoinHostPort(podIP, port)
 	}
 	return loc, rt, nil
 }

@@ -510,6 +510,36 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1.EphemeralContainer)(nil), (*core.EphemeralContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_EphemeralContainer_To_core_EphemeralContainer(a.(*v1.EphemeralContainer), b.(*core.EphemeralContainer), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.EphemeralContainer)(nil), (*v1.EphemeralContainer)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_EphemeralContainer_To_v1_EphemeralContainer(a.(*core.EphemeralContainer), b.(*v1.EphemeralContainer), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.EphemeralContainerCommon)(nil), (*core.EphemeralContainerCommon)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_EphemeralContainerCommon_To_core_EphemeralContainerCommon(a.(*v1.EphemeralContainerCommon), b.(*core.EphemeralContainerCommon), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.EphemeralContainerCommon)(nil), (*v1.EphemeralContainerCommon)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_EphemeralContainerCommon_To_v1_EphemeralContainerCommon(a.(*core.EphemeralContainerCommon), b.(*v1.EphemeralContainerCommon), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.EphemeralContainers)(nil), (*core.EphemeralContainers)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_EphemeralContainers_To_core_EphemeralContainers(a.(*v1.EphemeralContainers), b.(*core.EphemeralContainers), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.EphemeralContainers)(nil), (*v1.EphemeralContainers)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_EphemeralContainers_To_v1_EphemeralContainers(a.(*core.EphemeralContainers), b.(*v1.EphemeralContainers), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1.Event)(nil), (*core.Event)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_Event_To_core_Event(a.(*v1.Event), b.(*core.Event), scope)
 	}); err != nil {
@@ -837,6 +867,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*core.Namespace)(nil), (*v1.Namespace)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_Namespace_To_v1_Namespace(a.(*core.Namespace), b.(*v1.Namespace), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*v1.NamespaceCondition)(nil), (*core.NamespaceCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_NamespaceCondition_To_core_NamespaceCondition(a.(*v1.NamespaceCondition), b.(*core.NamespaceCondition), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.NamespaceCondition)(nil), (*v1.NamespaceCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_NamespaceCondition_To_v1_NamespaceCondition(a.(*core.NamespaceCondition), b.(*v1.NamespaceCondition), scope)
 	}); err != nil {
 		return err
 	}
@@ -1930,6 +1970,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*v1.TopologySpreadConstraint)(nil), (*core.TopologySpreadConstraint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1_TopologySpreadConstraint_To_core_TopologySpreadConstraint(a.(*v1.TopologySpreadConstraint), b.(*core.TopologySpreadConstraint), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*core.TopologySpreadConstraint)(nil), (*v1.TopologySpreadConstraint)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_core_TopologySpreadConstraint_To_v1_TopologySpreadConstraint(a.(*core.TopologySpreadConstraint), b.(*v1.TopologySpreadConstraint), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddGeneratedConversionFunc((*v1.TypedLocalObjectReference)(nil), (*core.TypedLocalObjectReference)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_TypedLocalObjectReference_To_core_TypedLocalObjectReference(a.(*v1.TypedLocalObjectReference), b.(*core.TypedLocalObjectReference), scope)
 	}); err != nil {
@@ -2831,6 +2881,7 @@ func autoConvert_v1_Container_To_core_Container(in *v1.Container, out *core.Cont
 	out.VolumeDevices = *(*[]core.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
 	out.LivenessProbe = (*core.Probe)(unsafe.Pointer(in.LivenessProbe))
 	out.ReadinessProbe = (*core.Probe)(unsafe.Pointer(in.ReadinessProbe))
+	out.StartupProbe = (*core.Probe)(unsafe.Pointer(in.StartupProbe))
 	out.Lifecycle = (*core.Lifecycle)(unsafe.Pointer(in.Lifecycle))
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = core.TerminationMessagePolicy(in.TerminationMessagePolicy)
@@ -2863,6 +2914,7 @@ func autoConvert_core_Container_To_v1_Container(in *core.Container, out *v1.Cont
 	out.VolumeDevices = *(*[]v1.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
 	out.LivenessProbe = (*v1.Probe)(unsafe.Pointer(in.LivenessProbe))
 	out.ReadinessProbe = (*v1.Probe)(unsafe.Pointer(in.ReadinessProbe))
+	out.StartupProbe = (*v1.Probe)(unsafe.Pointer(in.StartupProbe))
 	out.Lifecycle = (*v1.Lifecycle)(unsafe.Pointer(in.Lifecycle))
 	out.TerminationMessagePath = in.TerminationMessagePath
 	out.TerminationMessagePolicy = v1.TerminationMessagePolicy(in.TerminationMessagePolicy)
@@ -3040,6 +3092,7 @@ func autoConvert_v1_ContainerStatus_To_core_ContainerStatus(in *v1.ContainerStat
 	out.Image = in.Image
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
+	out.Started = (*bool)(unsafe.Pointer(in.Started))
 	return nil
 }
 
@@ -3061,6 +3114,7 @@ func autoConvert_core_ContainerStatus_To_v1_ContainerStatus(in *core.ContainerSt
 	out.Image = in.Image
 	out.ImageID = in.ImageID
 	out.ContainerID = in.ContainerID
+	out.Started = (*bool)(unsafe.Pointer(in.Started))
 	return nil
 }
 
@@ -3369,6 +3423,120 @@ func autoConvert_core_EnvVarSource_To_v1_EnvVarSource(in *core.EnvVarSource, out
 // Convert_core_EnvVarSource_To_v1_EnvVarSource is an autogenerated conversion function.
 func Convert_core_EnvVarSource_To_v1_EnvVarSource(in *core.EnvVarSource, out *v1.EnvVarSource, s conversion.Scope) error {
 	return autoConvert_core_EnvVarSource_To_v1_EnvVarSource(in, out, s)
+}
+
+func autoConvert_v1_EphemeralContainer_To_core_EphemeralContainer(in *v1.EphemeralContainer, out *core.EphemeralContainer, s conversion.Scope) error {
+	if err := Convert_v1_EphemeralContainerCommon_To_core_EphemeralContainerCommon(&in.EphemeralContainerCommon, &out.EphemeralContainerCommon, s); err != nil {
+		return err
+	}
+	out.TargetContainerName = in.TargetContainerName
+	return nil
+}
+
+// Convert_v1_EphemeralContainer_To_core_EphemeralContainer is an autogenerated conversion function.
+func Convert_v1_EphemeralContainer_To_core_EphemeralContainer(in *v1.EphemeralContainer, out *core.EphemeralContainer, s conversion.Scope) error {
+	return autoConvert_v1_EphemeralContainer_To_core_EphemeralContainer(in, out, s)
+}
+
+func autoConvert_core_EphemeralContainer_To_v1_EphemeralContainer(in *core.EphemeralContainer, out *v1.EphemeralContainer, s conversion.Scope) error {
+	if err := Convert_core_EphemeralContainerCommon_To_v1_EphemeralContainerCommon(&in.EphemeralContainerCommon, &out.EphemeralContainerCommon, s); err != nil {
+		return err
+	}
+	out.TargetContainerName = in.TargetContainerName
+	return nil
+}
+
+// Convert_core_EphemeralContainer_To_v1_EphemeralContainer is an autogenerated conversion function.
+func Convert_core_EphemeralContainer_To_v1_EphemeralContainer(in *core.EphemeralContainer, out *v1.EphemeralContainer, s conversion.Scope) error {
+	return autoConvert_core_EphemeralContainer_To_v1_EphemeralContainer(in, out, s)
+}
+
+func autoConvert_v1_EphemeralContainerCommon_To_core_EphemeralContainerCommon(in *v1.EphemeralContainerCommon, out *core.EphemeralContainerCommon, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Image = in.Image
+	out.Command = *(*[]string)(unsafe.Pointer(&in.Command))
+	out.Args = *(*[]string)(unsafe.Pointer(&in.Args))
+	out.WorkingDir = in.WorkingDir
+	out.Ports = *(*[]core.ContainerPort)(unsafe.Pointer(&in.Ports))
+	out.EnvFrom = *(*[]core.EnvFromSource)(unsafe.Pointer(&in.EnvFrom))
+	out.Env = *(*[]core.EnvVar)(unsafe.Pointer(&in.Env))
+	if err := Convert_v1_ResourceRequirements_To_core_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
+		return err
+	}
+	out.VolumeMounts = *(*[]core.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
+	out.VolumeDevices = *(*[]core.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
+	out.LivenessProbe = (*core.Probe)(unsafe.Pointer(in.LivenessProbe))
+	out.ReadinessProbe = (*core.Probe)(unsafe.Pointer(in.ReadinessProbe))
+	out.StartupProbe = (*core.Probe)(unsafe.Pointer(in.StartupProbe))
+	out.Lifecycle = (*core.Lifecycle)(unsafe.Pointer(in.Lifecycle))
+	out.TerminationMessagePath = in.TerminationMessagePath
+	out.TerminationMessagePolicy = core.TerminationMessagePolicy(in.TerminationMessagePolicy)
+	out.ImagePullPolicy = core.PullPolicy(in.ImagePullPolicy)
+	out.SecurityContext = (*core.SecurityContext)(unsafe.Pointer(in.SecurityContext))
+	out.Stdin = in.Stdin
+	out.StdinOnce = in.StdinOnce
+	out.TTY = in.TTY
+	return nil
+}
+
+// Convert_v1_EphemeralContainerCommon_To_core_EphemeralContainerCommon is an autogenerated conversion function.
+func Convert_v1_EphemeralContainerCommon_To_core_EphemeralContainerCommon(in *v1.EphemeralContainerCommon, out *core.EphemeralContainerCommon, s conversion.Scope) error {
+	return autoConvert_v1_EphemeralContainerCommon_To_core_EphemeralContainerCommon(in, out, s)
+}
+
+func autoConvert_core_EphemeralContainerCommon_To_v1_EphemeralContainerCommon(in *core.EphemeralContainerCommon, out *v1.EphemeralContainerCommon, s conversion.Scope) error {
+	out.Name = in.Name
+	out.Image = in.Image
+	out.Command = *(*[]string)(unsafe.Pointer(&in.Command))
+	out.Args = *(*[]string)(unsafe.Pointer(&in.Args))
+	out.WorkingDir = in.WorkingDir
+	out.Ports = *(*[]v1.ContainerPort)(unsafe.Pointer(&in.Ports))
+	out.EnvFrom = *(*[]v1.EnvFromSource)(unsafe.Pointer(&in.EnvFrom))
+	out.Env = *(*[]v1.EnvVar)(unsafe.Pointer(&in.Env))
+	if err := Convert_core_ResourceRequirements_To_v1_ResourceRequirements(&in.Resources, &out.Resources, s); err != nil {
+		return err
+	}
+	out.VolumeMounts = *(*[]v1.VolumeMount)(unsafe.Pointer(&in.VolumeMounts))
+	out.VolumeDevices = *(*[]v1.VolumeDevice)(unsafe.Pointer(&in.VolumeDevices))
+	out.LivenessProbe = (*v1.Probe)(unsafe.Pointer(in.LivenessProbe))
+	out.ReadinessProbe = (*v1.Probe)(unsafe.Pointer(in.ReadinessProbe))
+	out.StartupProbe = (*v1.Probe)(unsafe.Pointer(in.StartupProbe))
+	out.Lifecycle = (*v1.Lifecycle)(unsafe.Pointer(in.Lifecycle))
+	out.TerminationMessagePath = in.TerminationMessagePath
+	out.TerminationMessagePolicy = v1.TerminationMessagePolicy(in.TerminationMessagePolicy)
+	out.ImagePullPolicy = v1.PullPolicy(in.ImagePullPolicy)
+	out.SecurityContext = (*v1.SecurityContext)(unsafe.Pointer(in.SecurityContext))
+	out.Stdin = in.Stdin
+	out.StdinOnce = in.StdinOnce
+	out.TTY = in.TTY
+	return nil
+}
+
+// Convert_core_EphemeralContainerCommon_To_v1_EphemeralContainerCommon is an autogenerated conversion function.
+func Convert_core_EphemeralContainerCommon_To_v1_EphemeralContainerCommon(in *core.EphemeralContainerCommon, out *v1.EphemeralContainerCommon, s conversion.Scope) error {
+	return autoConvert_core_EphemeralContainerCommon_To_v1_EphemeralContainerCommon(in, out, s)
+}
+
+func autoConvert_v1_EphemeralContainers_To_core_EphemeralContainers(in *v1.EphemeralContainers, out *core.EphemeralContainers, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.EphemeralContainers = *(*[]core.EphemeralContainer)(unsafe.Pointer(&in.EphemeralContainers))
+	return nil
+}
+
+// Convert_v1_EphemeralContainers_To_core_EphemeralContainers is an autogenerated conversion function.
+func Convert_v1_EphemeralContainers_To_core_EphemeralContainers(in *v1.EphemeralContainers, out *core.EphemeralContainers, s conversion.Scope) error {
+	return autoConvert_v1_EphemeralContainers_To_core_EphemeralContainers(in, out, s)
+}
+
+func autoConvert_core_EphemeralContainers_To_v1_EphemeralContainers(in *core.EphemeralContainers, out *v1.EphemeralContainers, s conversion.Scope) error {
+	out.ObjectMeta = in.ObjectMeta
+	out.EphemeralContainers = *(*[]v1.EphemeralContainer)(unsafe.Pointer(&in.EphemeralContainers))
+	return nil
+}
+
+// Convert_core_EphemeralContainers_To_v1_EphemeralContainers is an autogenerated conversion function.
+func Convert_core_EphemeralContainers_To_v1_EphemeralContainers(in *core.EphemeralContainers, out *v1.EphemeralContainers, s conversion.Scope) error {
+	return autoConvert_core_EphemeralContainers_To_v1_EphemeralContainers(in, out, s)
 }
 
 func autoConvert_v1_Event_To_core_Event(in *v1.Event, out *core.Event, s conversion.Scope) error {
@@ -4245,6 +4413,34 @@ func Convert_core_Namespace_To_v1_Namespace(in *core.Namespace, out *v1.Namespac
 	return autoConvert_core_Namespace_To_v1_Namespace(in, out, s)
 }
 
+func autoConvert_v1_NamespaceCondition_To_core_NamespaceCondition(in *v1.NamespaceCondition, out *core.NamespaceCondition, s conversion.Scope) error {
+	out.Type = core.NamespaceConditionType(in.Type)
+	out.Status = core.ConditionStatus(in.Status)
+	out.LastTransitionTime = in.LastTransitionTime
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+// Convert_v1_NamespaceCondition_To_core_NamespaceCondition is an autogenerated conversion function.
+func Convert_v1_NamespaceCondition_To_core_NamespaceCondition(in *v1.NamespaceCondition, out *core.NamespaceCondition, s conversion.Scope) error {
+	return autoConvert_v1_NamespaceCondition_To_core_NamespaceCondition(in, out, s)
+}
+
+func autoConvert_core_NamespaceCondition_To_v1_NamespaceCondition(in *core.NamespaceCondition, out *v1.NamespaceCondition, s conversion.Scope) error {
+	out.Type = v1.NamespaceConditionType(in.Type)
+	out.Status = v1.ConditionStatus(in.Status)
+	out.LastTransitionTime = in.LastTransitionTime
+	out.Reason = in.Reason
+	out.Message = in.Message
+	return nil
+}
+
+// Convert_core_NamespaceCondition_To_v1_NamespaceCondition is an autogenerated conversion function.
+func Convert_core_NamespaceCondition_To_v1_NamespaceCondition(in *core.NamespaceCondition, out *v1.NamespaceCondition, s conversion.Scope) error {
+	return autoConvert_core_NamespaceCondition_To_v1_NamespaceCondition(in, out, s)
+}
+
 func autoConvert_v1_NamespaceList_To_core_NamespaceList(in *v1.NamespaceList, out *core.NamespaceList, s conversion.Scope) error {
 	out.ListMeta = in.ListMeta
 	out.Items = *(*[]core.Namespace)(unsafe.Pointer(&in.Items))
@@ -4289,6 +4485,7 @@ func Convert_core_NamespaceSpec_To_v1_NamespaceSpec(in *core.NamespaceSpec, out 
 
 func autoConvert_v1_NamespaceStatus_To_core_NamespaceStatus(in *v1.NamespaceStatus, out *core.NamespaceStatus, s conversion.Scope) error {
 	out.Phase = core.NamespacePhase(in.Phase)
+	out.Conditions = *(*[]core.NamespaceCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
@@ -4299,6 +4496,7 @@ func Convert_v1_NamespaceStatus_To_core_NamespaceStatus(in *v1.NamespaceStatus, 
 
 func autoConvert_core_NamespaceStatus_To_v1_NamespaceStatus(in *core.NamespaceStatus, out *v1.NamespaceStatus, s conversion.Scope) error {
 	out.Phase = v1.NamespacePhase(in.Phase)
+	out.Conditions = *(*[]v1.NamespaceCondition)(unsafe.Pointer(&in.Conditions))
 	return nil
 }
 
@@ -5624,6 +5822,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s
 	}
 	out.InitContainers = *(*[]core.Container)(unsafe.Pointer(&in.InitContainers))
 	out.Containers = *(*[]core.Container)(unsafe.Pointer(&in.Containers))
+	out.EphemeralContainers = *(*[]core.EphemeralContainer)(unsafe.Pointer(&in.EphemeralContainers))
 	out.RestartPolicy = core.RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
@@ -5661,6 +5860,7 @@ func autoConvert_v1_PodSpec_To_core_PodSpec(in *v1.PodSpec, out *core.PodSpec, s
 	out.EnableServiceLinks = (*bool)(unsafe.Pointer(in.EnableServiceLinks))
 	out.PreemptionPolicy = (*core.PreemptionPolicy)(unsafe.Pointer(in.PreemptionPolicy))
 	out.Overhead = *(*core.ResourceList)(unsafe.Pointer(&in.Overhead))
+	out.TopologySpreadConstraints = *(*[]core.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
 	return nil
 }
 
@@ -5678,6 +5878,7 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s
 	}
 	out.InitContainers = *(*[]v1.Container)(unsafe.Pointer(&in.InitContainers))
 	out.Containers = *(*[]v1.Container)(unsafe.Pointer(&in.Containers))
+	out.EphemeralContainers = *(*[]v1.EphemeralContainer)(unsafe.Pointer(&in.EphemeralContainers))
 	out.RestartPolicy = v1.RestartPolicy(in.RestartPolicy)
 	out.TerminationGracePeriodSeconds = (*int64)(unsafe.Pointer(in.TerminationGracePeriodSeconds))
 	out.ActiveDeadlineSeconds = (*int64)(unsafe.Pointer(in.ActiveDeadlineSeconds))
@@ -5710,6 +5911,7 @@ func autoConvert_core_PodSpec_To_v1_PodSpec(in *core.PodSpec, out *v1.PodSpec, s
 	out.RuntimeClassName = (*string)(unsafe.Pointer(in.RuntimeClassName))
 	out.Overhead = *(*v1.ResourceList)(unsafe.Pointer(&in.Overhead))
 	out.EnableServiceLinks = (*bool)(unsafe.Pointer(in.EnableServiceLinks))
+	out.TopologySpreadConstraints = *(*[]v1.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
 	return nil
 }
 
@@ -5726,6 +5928,7 @@ func autoConvert_v1_PodStatus_To_core_PodStatus(in *v1.PodStatus, out *core.PodS
 	out.InitContainerStatuses = *(*[]core.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]core.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
 	out.QOSClass = core.PodQOSClass(in.QOSClass)
+	out.EphemeralContainerStatuses = *(*[]core.ContainerStatus)(unsafe.Pointer(&in.EphemeralContainerStatuses))
 	return nil
 }
 
@@ -5741,6 +5944,7 @@ func autoConvert_core_PodStatus_To_v1_PodStatus(in *core.PodStatus, out *v1.PodS
 	out.QOSClass = v1.PodQOSClass(in.QOSClass)
 	out.InitContainerStatuses = *(*[]v1.ContainerStatus)(unsafe.Pointer(&in.InitContainerStatuses))
 	out.ContainerStatuses = *(*[]v1.ContainerStatus)(unsafe.Pointer(&in.ContainerStatuses))
+	out.EphemeralContainerStatuses = *(*[]v1.ContainerStatus)(unsafe.Pointer(&in.EphemeralContainerStatuses))
 	return nil
 }
 
@@ -7078,6 +7282,7 @@ func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *cor
 	out.HealthCheckNodePort = in.HealthCheckNodePort
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	out.SessionAffinityConfig = (*core.SessionAffinityConfig)(unsafe.Pointer(in.SessionAffinityConfig))
+	out.IPFamily = (*core.IPFamily)(unsafe.Pointer(in.IPFamily))
 	return nil
 }
 
@@ -7100,6 +7305,7 @@ func autoConvert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *v
 	out.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyType(in.ExternalTrafficPolicy)
 	out.HealthCheckNodePort = in.HealthCheckNodePort
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
+	out.IPFamily = (*v1.IPFamily)(unsafe.Pointer(in.IPFamily))
 	return nil
 }
 
@@ -7346,6 +7552,32 @@ func autoConvert_core_TopologySelectorTerm_To_v1_TopologySelectorTerm(in *core.T
 // Convert_core_TopologySelectorTerm_To_v1_TopologySelectorTerm is an autogenerated conversion function.
 func Convert_core_TopologySelectorTerm_To_v1_TopologySelectorTerm(in *core.TopologySelectorTerm, out *v1.TopologySelectorTerm, s conversion.Scope) error {
 	return autoConvert_core_TopologySelectorTerm_To_v1_TopologySelectorTerm(in, out, s)
+}
+
+func autoConvert_v1_TopologySpreadConstraint_To_core_TopologySpreadConstraint(in *v1.TopologySpreadConstraint, out *core.TopologySpreadConstraint, s conversion.Scope) error {
+	out.MaxSkew = in.MaxSkew
+	out.TopologyKey = in.TopologyKey
+	out.WhenUnsatisfiable = core.UnsatisfiableConstraintAction(in.WhenUnsatisfiable)
+	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
+	return nil
+}
+
+// Convert_v1_TopologySpreadConstraint_To_core_TopologySpreadConstraint is an autogenerated conversion function.
+func Convert_v1_TopologySpreadConstraint_To_core_TopologySpreadConstraint(in *v1.TopologySpreadConstraint, out *core.TopologySpreadConstraint, s conversion.Scope) error {
+	return autoConvert_v1_TopologySpreadConstraint_To_core_TopologySpreadConstraint(in, out, s)
+}
+
+func autoConvert_core_TopologySpreadConstraint_To_v1_TopologySpreadConstraint(in *core.TopologySpreadConstraint, out *v1.TopologySpreadConstraint, s conversion.Scope) error {
+	out.MaxSkew = in.MaxSkew
+	out.TopologyKey = in.TopologyKey
+	out.WhenUnsatisfiable = v1.UnsatisfiableConstraintAction(in.WhenUnsatisfiable)
+	out.LabelSelector = (*metav1.LabelSelector)(unsafe.Pointer(in.LabelSelector))
+	return nil
+}
+
+// Convert_core_TopologySpreadConstraint_To_v1_TopologySpreadConstraint is an autogenerated conversion function.
+func Convert_core_TopologySpreadConstraint_To_v1_TopologySpreadConstraint(in *core.TopologySpreadConstraint, out *v1.TopologySpreadConstraint, s conversion.Scope) error {
+	return autoConvert_core_TopologySpreadConstraint_To_v1_TopologySpreadConstraint(in, out, s)
 }
 
 func autoConvert_v1_TypedLocalObjectReference_To_core_TypedLocalObjectReference(in *v1.TypedLocalObjectReference, out *core.TypedLocalObjectReference, s conversion.Scope) error {
@@ -7657,6 +7889,7 @@ func Convert_core_WeightedPodAffinityTerm_To_v1_WeightedPodAffinityTerm(in *core
 func autoConvert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOptions(in *v1.WindowsSecurityContextOptions, out *core.WindowsSecurityContextOptions, s conversion.Scope) error {
 	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
 	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
+	out.RunAsUserName = (*string)(unsafe.Pointer(in.RunAsUserName))
 	return nil
 }
 
@@ -7668,6 +7901,7 @@ func Convert_v1_WindowsSecurityContextOptions_To_core_WindowsSecurityContextOpti
 func autoConvert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(in *core.WindowsSecurityContextOptions, out *v1.WindowsSecurityContextOptions, s conversion.Scope) error {
 	out.GMSACredentialSpecName = (*string)(unsafe.Pointer(in.GMSACredentialSpecName))
 	out.GMSACredentialSpec = (*string)(unsafe.Pointer(in.GMSACredentialSpec))
+	out.RunAsUserName = (*string)(unsafe.Pointer(in.RunAsUserName))
 	return nil
 }
 

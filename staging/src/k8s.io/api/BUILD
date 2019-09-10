@@ -5,7 +5,9 @@ go_test(
     srcs = ["roundtrip_test.go"],
     data = glob(["testdata/**"]),
     deps = [
+        "//staging/src/k8s.io/api/admission/v1:go_default_library",
         "//staging/src/k8s.io/api/admission/v1beta1:go_default_library",
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
@@ -62,7 +64,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/api/admission/v1:all-srcs",
         "//staging/src/k8s.io/api/admission/v1beta1:all-srcs",
+        "//staging/src/k8s.io/api/admissionregistration/v1:all-srcs",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/apps/v1:all-srcs",
         "//staging/src/k8s.io/api/apps/v1beta1:all-srcs",
@@ -82,6 +86,7 @@ filegroup(
         "//staging/src/k8s.io/api/coordination/v1:all-srcs",
         "//staging/src/k8s.io/api/coordination/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/core/v1:all-srcs",
+        "//staging/src/k8s.io/api/discovery/v1alpha1:all-srcs",
         "//staging/src/k8s.io/api/events/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/extensions/v1beta1:all-srcs",
         "//staging/src/k8s.io/api/imagepolicy/v1alpha1:all-srcs",

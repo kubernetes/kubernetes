@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	proxyapp "k8s.io/kubernetes/cmd/kube-proxy/app"
 	"k8s.io/kubernetes/pkg/proxy"
+	proxyconfig "k8s.io/kubernetes/pkg/proxy/config"
 	"k8s.io/kubernetes/pkg/proxy/iptables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -41,7 +42,9 @@ type HollowProxy struct {
 	ProxyServer *proxyapp.ProxyServer
 }
 
-type FakeProxier struct{}
+type FakeProxier struct {
+	proxyconfig.NoopEndpointSliceHandler
+}
 
 func (*FakeProxier) Sync() {}
 func (*FakeProxier) SyncLoop() {
@@ -70,7 +73,7 @@ func NewHollowProxyOrDie(
 	proxierMinSyncPeriod time.Duration,
 ) (*HollowProxy, error) {
 	// Create proxier and service/endpoint handlers.
-	var proxier proxy.ProxyProvider
+	var proxier proxy.Provider
 	var err error
 
 	if useRealProxier {

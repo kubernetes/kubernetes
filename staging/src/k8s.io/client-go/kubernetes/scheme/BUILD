@@ -10,6 +10,7 @@ go_library(
     importpath = "k8s.io/client-go/kubernetes/scheme",
     visibility = ["//visibility:public"],
     deps = [
+        "//staging/src/k8s.io/api/admissionregistration/v1:go_default_library",
         "//staging/src/k8s.io/api/admissionregistration/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1beta1:go_default_library",
@@ -29,6 +30,7 @@ go_library(
         "//staging/src/k8s.io/api/coordination/v1:go_default_library",
         "//staging/src/k8s.io/api/coordination/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
         "//staging/src/k8s.io/api/events/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/networking/v1:go_default_library",

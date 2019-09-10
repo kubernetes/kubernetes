@@ -617,6 +617,7 @@ func TestUpdateNodeWithMultiplePods(t *testing.T) {
 
 func TestGetMinTolerationTime(t *testing.T) {
 	one := int64(1)
+	two := int64(2)
 	oneSec := 1 * time.Second
 
 	tests := []struct {
@@ -627,6 +628,26 @@ func TestGetMinTolerationTime(t *testing.T) {
 			tolerations: []v1.Toleration{},
 			expected:    0,
 		},
+		{
+			tolerations: []v1.Toleration{
+				{
+					TolerationSeconds: nil,
+				},
+			},
+			expected: -1,
+		},
+		{
+			tolerations: []v1.Toleration{
+				{
+					TolerationSeconds: &one,
+				},
+				{
+					TolerationSeconds: &two,
+				},
+			},
+			expected: oneSec,
+		},
+
 		{
 			tolerations: []v1.Toleration{
 				{
@@ -662,7 +683,7 @@ func TestGetMinTolerationTime(t *testing.T) {
 // TestEventualConsistency verifies if getPodsAssignedToNode returns incomplete data
 // (e.g. due to watch latency), it will reconcile the remaining pods eventually.
 // This scenario is partially covered by TestUpdatePods, but given this is an important
-// property of TaitManager, it's better to have explicit test for this.
+// property of TaintManager, it's better to have explicit test for this.
 func TestEventualConsistency(t *testing.T) {
 	testCases := []struct {
 		description  string

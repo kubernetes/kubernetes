@@ -242,6 +242,16 @@ func methodReturnsValue(mt *types.Type, pkg, name string) bool {
 	return r.Name.Name == name && r.Name.Package == pkg
 }
 
+func hasOpenAPIV3DefinitionMethod(t *types.Type) bool {
+	for mn, mt := range t.Methods {
+		if mn != "OpenAPIV3Definition" {
+			continue
+		}
+		return methodReturnsValue(mt, openAPICommonPackagePath, "OpenAPIDefinition")
+	}
+	return false
+}
+
 func hasOpenAPIDefinitionMethod(t *types.Type) bool {
 	for mn, mt := range t.Methods {
 		if mn != "OpenAPIDefinition" {
@@ -304,9 +314,21 @@ func (g openAPITypeWriter) generateCall(t *types.Type) error {
 	case types.Struct:
 		args := argsFromType(t)
 		g.Do("\"$.$\": ", t.Name)
-		if hasOpenAPIDefinitionMethod(t) {
+
+		hasV2Definition := hasOpenAPIDefinitionMethod(t)
+		hasV2DefinitionTypeAndFormat := hasOpenAPIDefinitionMethods(t)
+		hasV3Definition := hasOpenAPIV3DefinitionMethod(t)
+
+		switch {
+		case hasV2DefinitionTypeAndFormat:
+			g.Do(nameTmpl+"(ref),\n", args)
+		case hasV2Definition && hasV3Definition:
+			g.Do("common.EmbedOpenAPIDefinitionIntoV2Extension($.type|raw${}.OpenAPIV3Definition(), $.type|raw${}.OpenAPIDefinition()),\n", args)
+		case hasV2Definition:
 			g.Do("$.type|raw${}.OpenAPIDefinition(),\n", args)
-		} else {
+		case hasV3Definition:
+			g.Do("$.type|raw${}.OpenAPIV3Definition(),\n", args)
+		default:
 			g.Do(nameTmpl+"(ref),\n", args)
 		}
 	}
@@ -317,14 +339,30 @@ func (g openAPITypeWriter) generate(t *types.Type) error {
 	// Only generate for struct type and ignore the rest
 	switch t.Kind {
 	case types.Struct:
-		if hasOpenAPIDefinitionMethod(t) {
+		hasV2Definition := hasOpenAPIDefinitionMethod(t)
+		hasV2DefinitionTypeAndFormat := hasOpenAPIDefinitionMethods(t)
+		hasV3Definition := hasOpenAPIV3DefinitionMethod(t)
+
+		if hasV2Definition || (hasV3Definition && !hasV2DefinitionTypeAndFormat) {
 			// already invoked directly
 			return nil
 		}
 
 		args := argsFromType(t)
 		g.Do("func "+nameTmpl+"(ref $.ReferenceCallback|raw$) $.OpenAPIDefinition|raw$ {\n", args)
-		if hasOpenAPIDefinitionMethods(t) {
+		switch {
+		case hasV2DefinitionTypeAndFormat && hasV3Definition:
+			g.Do("return common.EmbedOpenAPIDefinitionIntoV2Extension($.type|raw${}.OpenAPIV3Definition(), $.OpenAPIDefinition|raw${\n"+
+				"Schema: spec.Schema{\n"+
+				"SchemaProps: spec.SchemaProps{\n", args)
+			g.generateDescription(t.CommentLines)
+			g.Do("Type:$.type|raw${}.OpenAPISchemaType(),\n"+
+				"Format:$.type|raw${}.OpenAPISchemaFormat(),\n"+
+				"},\n"+
+				"},\n"+
+				"})\n}\n\n", args)
+			return nil
+		case hasV2DefinitionTypeAndFormat:
 			g.Do("return $.OpenAPIDefinition|raw${\n"+
 				"Schema: spec.Schema{\n"+
 				"SchemaProps: spec.SchemaProps{\n", args)
@@ -397,11 +435,18 @@ func (g openAPITypeWriter) generateStructExtensions(t *types.Type) error {
 	// Initially, we will only log struct extension errors.
 	if len(errors) > 0 {
 		for _, e := range errors {
-			klog.V(2).Infof("[%s]: %s\n", t.String(), e)
+			klog.Errorf("[%s]: %s\n", t.String(), e)
 		}
 	}
+	unions, errors := parseUnions(t)
+	if len(errors) > 0 {
+		for _, e := range errors {
+			klog.Errorf("[%s]: %s\n", t.String(), e)
+		}
+	}
+
 	// TODO(seans3): Validate struct extensions here.
-	g.emitExtensions(extensions)
+	g.emitExtensions(extensions, unions)
 	return nil
 }
 
@@ -416,13 +461,13 @@ func (g openAPITypeWriter) generateMemberExtensions(m *types.Member, parent *typ
 			klog.V(2).Infof("%s %s\n", errorPrefix, e)
 		}
 	}
-	g.emitExtensions(extensions)
+	g.emitExtensions(extensions, nil)
 	return nil
 }
 
-func (g openAPITypeWriter) emitExtensions(extensions []extension) {
+func (g openAPITypeWriter) emitExtensions(extensions []extension, unions []union) {
 	// If any extensions exist, then emit code to create them.
-	if len(extensions) == 0 {
+	if len(extensions) == 0 && len(unions) == 0 {
 		return
 	}
 	g.Do("VendorExtensible: spec.VendorExtensible{\nExtensions: spec.Extensions{\n", nil)
@@ -437,6 +482,13 @@ func (g openAPITypeWriter) emitExtensions(extensions []extension) {
 		if extension.hasMultipleValues() {
 			g.Do("},\n", nil)
 		}
+	}
+	if len(unions) > 0 {
+		g.Do("\"x-kubernetes-unions\": []interface{}{\n", nil)
+		for _, u := range unions {
+			u.emit(g)
+		}
+		g.Do("},\n", nil)
 	}
 	g.Do("},\n},\n", nil)
 }

@@ -77,6 +77,12 @@ func (t *volumeIOTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
+func (t *volumeIOTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
+	skipVolTypePatterns(pattern, driver, testpatterns.NewVolTypeMap(
+		testpatterns.PreprovisionedPV,
+		testpatterns.InlineVolume))
+}
+
 func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
 		config      *PerTestConfig
@@ -310,7 +316,7 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config volume.
 	defer func() {
 		deleteFile(clientPod, ddInput)
 		ginkgo.By(fmt.Sprintf("deleting client pod %q...", clientPod.Name))
-		e := framework.DeletePodWithWait(f, cs, clientPod)
+		e := e2epod.DeletePodWithWait(cs, clientPod)
 		if e != nil {
 			e2elog.Logf("client pod failed to delete: %v", e)
 			if err == nil { // delete err is returned if err is not set

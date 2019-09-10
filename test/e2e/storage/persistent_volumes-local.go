@@ -289,7 +289,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 					ginkgo.By("Create first pod and check fsGroup is set")
 					pod1 := createPodWithFsGroupTest(config, testVol, fsGroup1, fsGroup1)
 					ginkgo.By("Deleting first pod")
-					err := framework.DeletePodWithWait(f, config.client, pod1)
+					err := e2epod.DeletePodWithWait(config.client, pod1)
 					framework.ExpectNoError(err, "while deleting first pod")
 					ginkgo.By("Create second pod and check fsGroup is the new one")
 					pod2 := createPodWithFsGroupTest(config, testVol, fsGroup2, fsGroup2)
@@ -555,7 +555,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 						pvcs = append(pvcs, pvc)
 					}
 
-					pod := framework.MakeSecPod(config.ns, pvcs, false, "sleep 1", false, false, selinuxLabel, nil)
+					pod := e2epod.MakeSecPod(config.ns, pvcs, nil, false, "sleep 1", false, false, selinuxLabel, nil)
 					pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
 					framework.ExpectNoError(err)
 					pods[pod.Name] = pod
@@ -648,7 +648,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 			framework.ExpectNoError(err)
 			ginkgo.By(fmt.Sprintf("Create %d pods to use this PVC", count))
 			for i := 0; i < count; i++ {
-				pod := framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{pvc}, false, "", false, false, selinuxLabel, nil)
+				pod := e2epod.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{pvc}, nil, false, "", false, false, selinuxLabel, nil)
 				pod, err := config.client.CoreV1().Pods(config.ns).Create(pod)
 				framework.ExpectNoError(err)
 				pods[pod.Name] = pod
@@ -939,7 +939,7 @@ func createLocalPVCsPVs(config *localTestConfig, volumes []*localTestVolume, mod
 }
 
 func makeLocalPodWithNodeAffinity(config *localTestConfig, volume *localTestVolume, nodeName string) (pod *v1.Pod) {
-	pod = framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", false, false, selinuxLabel, nil)
+	pod = e2epod.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, nil, false, "", false, false, selinuxLabel, nil)
 	if pod == nil {
 		return
 	}
@@ -965,7 +965,7 @@ func makeLocalPodWithNodeAffinity(config *localTestConfig, volume *localTestVolu
 }
 
 func makeLocalPodWithNodeSelector(config *localTestConfig, volume *localTestVolume, nodeName string) (pod *v1.Pod) {
-	pod = framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", false, false, selinuxLabel, nil)
+	pod = e2epod.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, nil, false, "", false, false, selinuxLabel, nil)
 	if pod == nil {
 		return
 	}
@@ -977,7 +977,7 @@ func makeLocalPodWithNodeSelector(config *localTestConfig, volume *localTestVolu
 }
 
 func makeLocalPodWithNodeName(config *localTestConfig, volume *localTestVolume, nodeName string) (pod *v1.Pod) {
-	pod = framework.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", false, false, selinuxLabel, nil)
+	pod = e2epod.MakeSecPod(config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, nil, false, "", false, false, selinuxLabel, nil)
 	if pod == nil {
 		return
 	}
@@ -987,7 +987,7 @@ func makeLocalPodWithNodeName(config *localTestConfig, volume *localTestVolume, 
 
 func createLocalPod(config *localTestConfig, volume *localTestVolume, fsGroup *int64) (*v1.Pod, error) {
 	ginkgo.By("Creating a pod")
-	return framework.CreateSecPod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, false, "", false, false, selinuxLabel, fsGroup, framework.PodStartShortTimeout)
+	return e2epod.CreateSecPod(config.client, config.ns, []*v1.PersistentVolumeClaim{volume.pvc}, nil, false, "", false, false, selinuxLabel, fsGroup, framework.PodStartShortTimeout)
 }
 
 func createWriteCmd(testDir string, testFile string, writeTestFileContent string, volumeType localVolumeType) string {

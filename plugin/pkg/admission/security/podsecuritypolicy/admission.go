@@ -17,6 +17,7 @@ limitations under the License.
 package podsecuritypolicy
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sort"
@@ -109,7 +110,7 @@ func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactor
 // 3.  Try to generate and validate a PSP with providers.  If we find one then admit the pod
 //     with the validated PSP.  If we don't find any reject the pod and give all errors from the
 //     failed attempts.
-func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if ignore, err := shouldIgnore(a); err != nil {
 		return err
 	} else if ignore {
@@ -150,7 +151,7 @@ func (p *Plugin) Admit(a admission.Attributes, o admission.ObjectInterfaces) err
 }
 
 // Validate verifies attributes against the PodSecurityPolicy
-func (p *Plugin) Validate(a admission.Attributes, o admission.ObjectInterfaces) error {
+func (p *Plugin) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) error {
 	if ignore, err := shouldIgnore(a); err != nil {
 		return err
 	} else if ignore {
@@ -373,6 +374,7 @@ func buildAttributes(info user.Info, namespace, policyName, apiGroupName string)
 		Namespace:       namespace,
 		Name:            policyName,
 		APIGroup:        apiGroupName,
+		APIVersion:      "*",
 		Resource:        "podsecuritypolicies",
 		ResourceRequest: true,
 	}

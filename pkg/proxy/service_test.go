@@ -396,7 +396,7 @@ func newFakeProxier() *FakeProxier {
 		serviceMap:       make(ServiceMap),
 		serviceChanges:   NewServiceChangeTracker(nil, nil, nil),
 		endpointsMap:     make(EndpointsMap),
-		endpointsChanges: NewEndpointChangeTracker(testHostname, nil, nil, nil),
+		endpointsChanges: NewEndpointChangeTracker(testHostname, nil, nil, nil, false),
 	}
 }
 

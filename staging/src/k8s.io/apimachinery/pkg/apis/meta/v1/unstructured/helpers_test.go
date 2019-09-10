@@ -67,6 +67,11 @@ func TestNestedFieldNoCopy(t *testing.T) {
 			"b": target,
 			"c": nil,
 			"d": []interface{}{"foo"},
+			"e": []interface{}{
+				map[string]interface{}{
+					"f": "bar",
+				},
+			},
 		},
 	}
 
@@ -91,13 +96,13 @@ func TestNestedFieldNoCopy(t *testing.T) {
 	assert.Nil(t, res)
 
 	// case 4: field does not exist
-	res, exists, err = NestedFieldNoCopy(obj, "a", "e")
+	res, exists, err = NestedFieldNoCopy(obj, "a", "g")
 	assert.False(t, exists)
 	assert.Nil(t, err)
 	assert.Nil(t, res)
 
 	// case 5: intermediate field does not exist
-	res, exists, err = NestedFieldNoCopy(obj, "a", "e", "f")
+	res, exists, err = NestedFieldNoCopy(obj, "a", "g", "f")
 	assert.False(t, exists)
 	assert.Nil(t, err)
 	assert.Nil(t, res)
@@ -105,6 +110,13 @@ func TestNestedFieldNoCopy(t *testing.T) {
 	// case 6: intermediate field is null
 	//         (background: happens easily in YAML)
 	res, exists, err = NestedFieldNoCopy(obj, "a", "c", "f")
+	assert.False(t, exists)
+	assert.Nil(t, err)
+	assert.Nil(t, res)
+
+	// case 7: array/slice syntax is not supported
+	//         (background: users may expect this to be supported)
+	res, exists, err = NestedFieldNoCopy(obj, "a", "e[0]")
 	assert.False(t, exists)
 	assert.Nil(t, err)
 	assert.Nil(t, res)

@@ -14,12 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Reads the pod configuration from file or a directory of files.
 package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -33,6 +31,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
+	utilio "k8s.io/utils/io"
 )
 
 type podEventType int
@@ -60,6 +59,7 @@ type sourceFile struct {
 	watchEvents    chan *watchEvent
 }
 
+// NewSourceFile watches a config file for changes.
 func NewSourceFile(path string, nodeName types.NodeName, period time.Duration, updates chan<- interface{}) {
 	// "github.com/sigma/go-inotify" requires a path without trailing "/"
 	path = strings.TrimRight(path, string(os.PathSeparator))
@@ -196,6 +196,7 @@ func (s *sourceFile) extractFromDir(name string) ([]*v1.Pod, error) {
 	return pods, nil
 }
 
+// extractFromFile parses a file for Pod configuration information.
 func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 	klog.V(3).Infof("Reading config file %q", filename)
 	defer func() {
@@ -215,7 +216,7 @@ func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 	}
 	defer file.Close()
 
-	data, err := ioutil.ReadAll(file)
+	data, err := utilio.ReadAtMost(file, maxConfigLength)
 	if err != nil {
 		return pod, err
 	}
@@ -232,7 +233,7 @@ func (s *sourceFile) extractFromFile(filename string) (pod *v1.Pod, err error) {
 		return pod, nil
 	}
 
-	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check config file.\n", filename, podErr)
+	return pod, fmt.Errorf("%v: couldn't parse as pod(%v), please check config file", filename, podErr)
 }
 
 func (s *sourceFile) replaceStore(pods ...*v1.Pod) (err error) {

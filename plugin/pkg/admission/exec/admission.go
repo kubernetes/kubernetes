@@ -17,6 +17,7 @@ limitations under the License.
 package exec
 
 import (
+	"context"
 	"fmt"
 	"io"
 
@@ -112,7 +113,7 @@ func (d *DenyExec) ValidateInitialization() error {
 }
 
 // Validate makes an admission decision based on the request attributes
-func (d *DenyExec) Validate(a admission.Attributes, o admission.ObjectInterfaces) (err error) {
+func (d *DenyExec) Validate(ctx context.Context, a admission.Attributes, o admission.ObjectInterfaces) (err error) {
 	path := a.GetResource().Resource
 	if subresource := a.GetSubresource(); subresource != "" {
 		path = path + "/" + subresource

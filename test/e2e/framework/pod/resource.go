@@ -41,11 +41,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var (
-	// BusyBoxImage is the image URI of BusyBox.
-	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-)
-
 // TODO: Move to its own subpkg.
 // expectNoErrorWithRetries to their own subpackages within framework.
 // expectNoError checks if "err" is set, and if so, fails assertion while logging the error.
@@ -61,20 +56,6 @@ func expectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
 		e2elog.Logf("Unexpected error occurred: %v", err)
 	}
 	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
-}
-
-// TODO: Move to its own subpkg.
-// expectNoErrorWithRetries checks if an error occurs with the given retry count.
-func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interface{}) {
-	var err error
-	for i := 0; i < maxRetries; i++ {
-		err = fn()
-		if err == nil {
-			return
-		}
-		e2elog.Logf("(Attempt %d of %d) Unexpected error occurred: %v", i+1, maxRetries, err)
-	}
-	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
 func isElementOf(podUID types.UID, pods *v1.PodList) bool {
@@ -516,19 +497,18 @@ func newExecPodSpec(ns, generateName string) *v1.Pod {
 	return pod
 }
 
-// CreateExecPodOrFail creates a simple busybox pod in a sleep loop used as a
-// vessel for kubectl exec commands.
-// Returns the name of the created pod.
-func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tweak func(*v1.Pod)) string {
+// CreateExecPodOrFail creates a agnhost pause pod used as a vessel for kubectl exec commands.
+// Pod name is uniquely generated.
+func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tweak func(*v1.Pod)) *v1.Pod {
 	e2elog.Logf("Creating new exec pod")
-	execPod := newExecPodSpec(ns, generateName)
+	pod := newExecPodSpec(ns, generateName)
 	if tweak != nil {
-		tweak(execPod)
+		tweak(pod)
 	}
-	created, err := client.CoreV1().Pods(ns).Create(execPod)
+	execPod, err := client.CoreV1().Pods(ns).Create(pod)
 	expectNoError(err, "failed to create new exec pod in namespace: %s", ns)
 	err = wait.PollImmediate(poll, 5*time.Minute, func() (bool, error) {
-		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(created.Name, metav1.GetOptions{})
+		retrievedPod, err := client.CoreV1().Pods(execPod.Namespace).Get(execPod.Name, metav1.GetOptions{})
 		if err != nil {
 			if testutils.IsRetryableAPIError(err) {
 				return false, nil
@@ -538,7 +518,7 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 		return retrievedPod.Status.Phase == v1.PodRunning, nil
 	})
 	expectNoError(err)
-	return created.Name
+	return execPod
 }
 
 // CreatePodOrFail creates a pod with the specified containerPorts.
@@ -565,13 +545,6 @@ func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]s
 	}
 	_, err := c.CoreV1().Pods(ns).Create(pod)
 	expectNoError(err, "failed to create pod %s in namespace %s", name, ns)
-}
-
-// DeletePodOrFail deletes the pod of the specified namespace and name.
-func DeletePodOrFail(c clientset.Interface, ns, name string) {
-	ginkgo.By(fmt.Sprintf("Deleting pod %s in namespace %s", name, ns))
-	err := c.CoreV1().Pods(ns).Delete(name, nil)
-	expectNoError(err, "failed to delete pod %s in namespace %s", name, ns)
 }
 
 // CheckPodsRunningReady returns whether all pods whose names are listed in
@@ -687,4 +660,18 @@ func GetPodsScheduled(masterNodes sets.String, pods *v1.PodList) (scheduledPods,
 		}
 	}
 	return
+}
+
+// PatchContainerImages replaces the specified Container Registry with a custom
+// one provided via the KUBE_TEST_REPO_LIST env variable
+func PatchContainerImages(containers []v1.Container) error {
+	var err error
+	for _, c := range containers {
+		c.Image, err = imageutils.ReplaceRegistryInImageURL(c.Image)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

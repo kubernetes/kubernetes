@@ -81,7 +81,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 			break
 		}
 	}
-	gomega.Expect(extraZone).NotTo(gomega.Equal(""), fmt.Sprintf("No extra zones available in region %s", region))
+	framework.ExpectNotEqual(extraZone, "", fmt.Sprintf("No extra zones available in region %s", region))
 
 	ginkgo.By(fmt.Sprintf("starting a compute instance in unused zone: %v\n", extraZone))
 	project := framework.TestContext.CloudConfig.ProjectID
@@ -234,7 +234,7 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 
 	ginkgo.By("Creating pods for each static PV")
 	for _, config := range configs {
-		podConfig := framework.MakePod(ns, nil, []*v1.PersistentVolumeClaim{config.pvc}, false, "")
+		podConfig := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{config.pvc}, false, "")
 		config.pod, err = c.CoreV1().Pods(ns).Create(podConfig)
 		framework.ExpectNoError(err)
 	}

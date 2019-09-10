@@ -23,7 +23,6 @@ go_library(
         "pvc_protection.go",
         "regional_pd.go",
         "subpath.go",
-        "volume_expand.go",
         "volume_limits.go",
         "volume_metrics.go",
         "volume_provisioning.go",

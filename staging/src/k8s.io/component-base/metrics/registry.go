@@ -25,6 +25,7 @@ import (
 	dto "github.com/prometheus/client_model/go"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
+	"k8s.io/component-base/version"
 )
 
 var (
@@ -57,6 +58,10 @@ type Registerable interface {
 // KubeRegistry is an interface which implements a subset of prometheus.Registerer and
 // prometheus.Gatherer interfaces
 type KubeRegistry interface {
+	// Deprecated
+	RawRegister(prometheus.Collector) error
+	// Deprecated
+	RawMustRegister(...prometheus.Collector)
 	Register(Registerable) error
 	MustRegister(...Registerable)
 	Unregister(Registerable) bool
@@ -96,6 +101,24 @@ func (kr *kubeRegistry) MustRegister(cs ...Registerable) {
 	kr.PromRegistry.MustRegister(metrics...)
 }
 
+// RawRegister takes a native prometheus.Collector and registers the collector
+// to the registry. This bypasses metrics safety checks, so should only be used
+// to register custom prometheus collectors.
+//
+// Deprecated
+func (kr *kubeRegistry) RawRegister(c prometheus.Collector) error {
+	return kr.PromRegistry.Register(c)
+}
+
+// RawMustRegister takes a native prometheus.Collector and registers the collector
+// to the registry. This bypasses metrics safety checks, so should only be used
+// to register custom prometheus collectors.
+//
+// Deprecated
+func (kr *kubeRegistry) RawMustRegister(cs ...prometheus.Collector) {
+	kr.PromRegistry.MustRegister(cs...)
+}
+
 // Unregister unregisters the Collector that equals the Collector passed
 // in as an argument.  (Two Collectors are considered equal if their
 // Describe method yields the same set of descriptors.) The function
@@ -117,26 +140,22 @@ func (kr *kubeRegistry) Gather() ([]*dto.MetricFamily, error) {
 	return kr.PromRegistry.Gather()
 }
 
-// NewKubeRegistry creates a new vanilla Registry without any Collectors
-// pre-registered.
-func NewKubeRegistry(v apimachineryversion.Info) KubeRegistry {
-	return &kubeRegistry{
+func newKubeRegistry(v apimachineryversion.Info) *kubeRegistry {
+	r := &kubeRegistry{
 		PromRegistry: prometheus.NewRegistry(),
 		version:      parseVersion(v),
 	}
+	return r
 }
 
-// NewPreloadedKubeRegistry creates a new Registry with preloaded prometheus collectors
-// already registered. This is exposed specifically to maintain backwards
-// compatibility with the global prometheus registry.
-//
-// Deprecated
-func NewPreloadedKubeRegistry(v apimachineryversion.Info, cs ...prometheus.Collector) KubeRegistry {
-	registry := &kubeRegistry{
-		PromRegistry: prometheus.NewRegistry(),
-		version:      parseVersion(v),
-	}
+func registerMetadataMetrics(r *kubeRegistry) {
+	RegisterBuildInfo(r)
+}
 
-	registry.PromRegistry.MustRegister(cs...)
-	return registry
+// NewKubeRegistry creates a new vanilla Registry without any Collectors
+// pre-registered.
+func NewKubeRegistry() KubeRegistry {
+	r := newKubeRegistry(version.Get())
+	registerMetadataMetrics(r)
+	return r
 }

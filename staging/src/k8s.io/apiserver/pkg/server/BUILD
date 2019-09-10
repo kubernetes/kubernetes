@@ -21,6 +21,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/version:go_default_library",
@@ -97,6 +98,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/egressselector:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/filters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/mux:go_default_library",
@@ -133,6 +135,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/egressselector:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/filters:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/httplog:all-srcs",

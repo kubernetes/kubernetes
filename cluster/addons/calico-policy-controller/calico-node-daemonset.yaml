@@ -17,8 +17,6 @@ spec:
     metadata:
       labels:
         k8s-app: calico-node
-      annotations:
-        scheduler.alpha.kubernetes.io/critical-pod: ''
     spec:
       priorityClassName: system-node-critical
       nodeSelector:
@@ -28,12 +26,60 @@ spec:
       # Minimize downtime during a rolling upgrade or deletion; tell Kubernetes to do a "force
       # deletion": https://kubernetes.io/docs/concepts/workloads/pods/pod/#termination-of-pods.
       terminationGracePeriodSeconds: 0
+      initContainers:
+        - name: install-cni
+          image: gcr.io/projectcalico-org/cni:v3.7.4
+          command: ["/install-cni.sh"]
+          env:
+            - name: CNI_CONF_NAME
+              value: "10-calico.conflist"
+            - name: CNI_NETWORK_CONFIG
+              value: |-
+                {
+                  "name": "k8s-pod-network",
+                  "cniVersion": "0.3.0",
+                  "plugins": [
+                    {
+                      "type": "calico",
+                      "log_level": "info",
+                      "datastore_type": "kubernetes",
+                      "nodename": "__KUBERNETES_NODE_NAME__",
+                      "ipam": {
+                        "type": "host-local",
+                        "subnet": "usePodCidr"
+                      },
+                      "policy": {
+                        "type": "k8s"
+                      },
+                      "kubernetes": {
+                        "kubeconfig": "__KUBECONFIG_FILEPATH__"
+                      }
+                    },
+                    {
+                      "type": "portmap",
+                      "capabilities": {"portMappings": true},
+                      "snat": true
+                    }
+                  ]
+                }
+            - name: KUBERNETES_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            # Prevents the container from sleeping forever.
+            - name: SLEEP
+              value: "false"
+          volumeMounts:
+            - mountPath: /host/opt/cni/bin
+              name: cni-bin-dir
+            - mountPath: /host/etc/cni/net.d
+              name: cni-net-dir
       containers:
         # Runs calico/node container on each Kubernetes node.  This
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: gcr.io/projectcalico-org/node:v3.3.1
+          image: gcr.io/projectcalico-org/node:v3.7.4
           env:
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
@@ -57,6 +103,8 @@ spec:
               value: "0"
             - name: FELIX_TYPHAK8SSERVICENAME
               value: "calico-typha"
+            - name: USE_POD_CIDR
+              value: "true"
             - name: IP
               value: ""
             - name: NO_DEFAULT_POOLS
@@ -96,52 +144,9 @@ spec:
             - mountPath: /var/lib/calico
               name: var-lib-calico
               readOnly: false
-        # This container installs the Calico CNI binaries
-        # and CNI network config file on each node.
-        - name: install-cni
-          image: gcr.io/projectcalico-org/cni:v3.3.1
-          command: ["/install-cni.sh"]
-          env:
-            - name: CNI_CONF_NAME
-              value: "10-calico.conflist"
-            - name: CNI_NETWORK_CONFIG
-              value: |-
-                {
-                  "name": "k8s-pod-network",
-                  "cniVersion": "0.3.0",
-                  "plugins": [
-                    {
-                      "type": "calico",
-                      "log_level": "info",
-                      "datastore_type": "kubernetes",
-                      "nodename": "__KUBERNETES_NODE_NAME__",
-                      "ipam": {
-                        "type": "host-local",
-                        "subnet": "usePodCidr"
-                      },
-                      "policy": {
-                        "type": "k8s"
-                      },
-                      "kubernetes": {
-                        "kubeconfig": "__KUBECONFIG_FILEPATH__"
-                      }
-                    },
-                    {
-                      "type": "portmap",
-                      "capabilities": {"portMappings": true},
-                      "snat": true
-                    }
-                  ]
-                }
-            - name: KUBERNETES_NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-          volumeMounts:
-            - mountPath: /host/opt/cni/bin
-              name: cni-bin-dir
-            - mountPath: /host/etc/cni/net.d
-              name: cni-net-dir
+            - mountPath: /run/xtables.lock
+              name: xtables-lock
+              readOnly: false
       volumes:
         # Used to ensure proper kmods are installed.
         - name: lib-modules
@@ -165,6 +170,10 @@ spec:
         - name: var-lib-calico
           hostPath:
             path: /var/lib/calico
+        - name: xtables-lock
+          hostPath:
+            path: /run/xtables.lock
+            type: FileOrCreate
       tolerations:
         # Make sure calico/node gets scheduled on all nodes.
         - effect: NoSchedule

@@ -37,7 +37,6 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	jws "k8s.io/cluster-bootstrap/token/jws"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
@@ -159,7 +158,7 @@ func (e *Signer) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer e.syncQueue.ShutDown()
 
-	if !controller.WaitForCacheSync("bootstrap_signer", stopCh, e.configMapSynced, e.secretSynced) {
+	if !cache.WaitForNamedCacheSync("bootstrap_signer", stopCh, e.configMapSynced, e.secretSynced) {
 		return
 	}
 

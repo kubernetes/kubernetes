@@ -26,6 +26,8 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/listers/storage/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

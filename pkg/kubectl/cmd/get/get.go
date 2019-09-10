@@ -41,12 +41,12 @@ import (
 	kubernetesscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	watchtools "k8s.io/client-go/tools/watch"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/rawhttp"
+	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
 	utilprinters "k8s.io/kubectl/pkg/util/printers"
 	"k8s.io/kubectl/pkg/util/templates"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
-	"k8s.io/kubernetes/pkg/kubectl/util/i18n"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -521,8 +521,10 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 
 	// track if we write any output
 	trackingWriter := &trackingWriterWrapper{Delegate: o.Out}
+	// output an empty line separating output
+	separatorWriter := &separatorWriterWrapper{Delegate: trackingWriter}
 
-	w := utilprinters.GetNewTabWriter(trackingWriter)
+	w := utilprinters.GetNewTabWriter(separatorWriter)
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		var info *resource.Info
@@ -544,11 +546,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 			w.Flush()
 			w.SetRememberedWidths(nil)
 
-			// TODO: this doesn't belong here
-			// add linebreak between resource groups (if there is more than one)
-			// skip linebreak above first resource group
-			if lastMapping != nil && !o.NoHeaders {
-				fmt.Fprintln(o.ErrOut)
+			// add linebreaks between resource groups (if there is more than one)
+			// when it satisfies all following 3 conditions:
+			// 1) it's not the first resource group
+			// 2) it has row header
+			// 3) we've written output since the last time we started a new set of headers
+			if lastMapping != nil && !o.NoHeaders && trackingWriter.Written > 0 {
+				separatorWriter.SetReady(true)
 			}
 
 			printer, err = o.ToPrinter(mapping, nil, printWithNamespace, printWithKind)
@@ -575,7 +579,11 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	w.Flush()
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
-		fmt.Fprintln(o.ErrOut, "No resources found.")
+		if !o.AllNamespaces {
+			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found in %s namespace.", o.Namespace))
+		} else {
+			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found"))
+		}
 	}
 	return utilerrors.NewAggregate(allErrs)
 }
@@ -588,6 +596,25 @@ type trackingWriterWrapper struct {
 func (t *trackingWriterWrapper) Write(p []byte) (n int, err error) {
 	t.Written += len(p)
 	return t.Delegate.Write(p)
+}
+
+type separatorWriterWrapper struct {
+	Delegate io.Writer
+	Ready    bool
+}
+
+func (s *separatorWriterWrapper) Write(p []byte) (n int, err error) {
+	// If we're about to write non-empty bytes and `s` is ready,
+	// we prepend an empty line to `p` and reset `s.Read`.
+	if len(p) != 0 && s.Ready {
+		fmt.Fprintln(s.Delegate)
+		s.Ready = false
+	}
+	return s.Delegate.Write(p)
+}
+
+func (s *separatorWriterWrapper) SetReady(state bool) {
+	s.Ready = state
 }
 
 // watch starts a client-side watch of one or more resources.
@@ -723,8 +750,8 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 	}
 
 	var obj runtime.Object
-	if !singleItemImplied || len(infos) > 1 {
-		// we have more than one item, so coerce all items into a list.
+	if !singleItemImplied || len(infos) != 1 {
+		// we have zero or multple items, so coerce all items into a list.
 		// we don't want an *unstructured.Unstructured list yet, as we
 		// may be dealing with non-unstructured objects. Compose all items
 		// into an corev1.List, and then decode using an unstructured scheme.

@@ -24,7 +24,7 @@ import (
 	"k8s.io/klog"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -43,7 +43,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	csitranslation "k8s.io/csi-translation-lib"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -95,6 +94,7 @@ type expandController struct {
 	queue workqueue.RateLimitingInterface
 }
 
+// NewExpandController expands the pvs
 func NewExpandController(
 	kubeClient clientset.Interface,
 	pvcInformer coreinformers.PersistentVolumeClaimInformer,
@@ -300,7 +300,7 @@ func (expc *expandController) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting expand controller")
 	defer klog.Infof("Shutting down expand controller")
 
-	if !controller.WaitForCacheSync("expand", stopCh, expc.pvcsSynced, expc.pvSynced, expc.classListerSynced) {
+	if !cache.WaitForNamedCacheSync("expand", stopCh, expc.pvcsSynced, expc.pvSynced, expc.classListerSynced) {
 		return
 	}
 
@@ -373,7 +373,7 @@ func (expc *expandController) GetMounter(pluginName string) mount.Interface {
 }
 
 func (expc *expandController) GetExec(pluginName string) mount.Exec {
-	return mount.NewOsExec()
+	return mount.NewOSExec()
 }
 
 func (expc *expandController) GetHostName() string {

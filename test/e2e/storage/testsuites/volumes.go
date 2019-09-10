@@ -26,9 +26,10 @@ import (
 
 	"github.com/onsi/ginkgo"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -66,6 +67,9 @@ func InitVolumesTestSuite() TestSuite {
 				testpatterns.NtfsInlineVolume,
 				testpatterns.NtfsPreprovisionedPV,
 				testpatterns.NtfsDynamicPV,
+				// block volumes
+				testpatterns.BlockVolModePreprovisionedPV,
+				testpatterns.BlockVolModeDynamicPV,
 			},
 		},
 	}
@@ -75,20 +79,20 @@ func (t *volumesTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return t.tsInfo
 }
 
-func (t *volumesTestSuite) skipUnsupportedTest(pattern testpatterns.TestPattern, driver TestDriver) {
-}
-
-func skipPersistenceTest(driver TestDriver) {
-	dInfo := driver.GetDriverInfo()
-	if !dInfo.Capabilities[CapPersistence] {
-		framework.Skipf("Driver %q does not provide persistency - skipping", dInfo.Name)
-	}
+func (t *volumesTestSuite) skipRedundantSuite(driver TestDriver, pattern testpatterns.TestPattern) {
 }
 
 func skipExecTest(driver TestDriver) {
 	dInfo := driver.GetDriverInfo()
 	if !dInfo.Capabilities[CapExec] {
 		framework.Skipf("Driver %q does not support exec - skipping", dInfo.Name)
+	}
+}
+
+func skipBlockTest(driver TestDriver) {
+	dInfo := driver.GetDriverInfo()
+	if !dInfo.Capabilities[CapBlock] {
+		framework.Skipf("Driver %q does not provide raw block - skipping", dInfo.Name)
 	}
 }
 
@@ -139,8 +143,11 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
-	ginkgo.It("should be mountable", func() {
-		skipPersistenceTest(driver)
+	ginkgo.It("should store data", func() {
+		if pattern.VolMode == v1.PersistentVolumeBlock {
+			skipBlockTest(driver)
+		}
+
 		init()
 		defer func() {
 			volume.TestCleanup(f, convertTestConfig(l.config))
@@ -150,6 +157,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		tests := []volume.Test{
 			{
 				Volume: *l.resource.volSource,
+				Mode:   pattern.VolMode,
 				File:   "index.html",
 				// Must match content
 				ExpectedContent: fmt.Sprintf("Hello from %s from namespace %s",
@@ -166,17 +174,24 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// local), plugin skips setting fsGroup if volume is already mounted
 		// and we don't have reliable way to detect volumes are unmounted or
 		// not before starting the second pod.
-		volume.InjectHTML(f.ClientSet, config, fsGroup, tests[0].Volume, tests[0].ExpectedContent)
-		volume.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
+		volume.InjectContent(f.ClientSet, config, fsGroup, pattern.FsType, tests)
+		if driver.GetDriverInfo().Capabilities[CapPersistence] {
+			volume.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
+		} else {
+			ginkgo.By("Skipping persistence check for non-persistent volume")
+		}
 	})
 
-	ginkgo.It("should allow exec of files on the volume", func() {
-		skipExecTest(driver)
-		init()
-		defer cleanup()
+	// Exec works only on filesystem volumes
+	if pattern.VolMode != v1.PersistentVolumeBlock {
+		ginkgo.It("should allow exec of files on the volume", func() {
+			skipExecTest(driver)
+			init()
+			defer cleanup()
 
-		testScriptInPod(f, l.resource.volType, l.resource.volSource, l.config)
-	})
+			testScriptInPod(f, l.resource.volType, l.resource.volSource, l.config)
+		})
+	}
 }
 
 func testScriptInPod(
@@ -232,6 +247,6 @@ func testScriptInPod(
 	f.TestContainerOutput("exec-volume-test", pod, 0, []string{fileName})
 
 	ginkgo.By(fmt.Sprintf("Deleting pod %s", pod.Name))
-	err := framework.DeletePodWithWait(f, f.ClientSet, pod)
+	err := e2epod.DeletePodWithWait(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting pod")
 }

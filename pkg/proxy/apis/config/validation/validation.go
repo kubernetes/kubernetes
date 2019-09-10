@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	componentbaseconfig "k8s.io/component-base/config"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 )
 
@@ -67,8 +68,17 @@ func Validate(config *kubeproxyconfig.KubeProxyConfiguration) field.ErrorList {
 	allErrs = append(allErrs, validateHostPort(config.MetricsBindAddress, newPath.Child("MetricsBindAddress"))...)
 
 	if config.ClusterCIDR != "" {
-		if _, _, err := net.ParseCIDR(config.ClusterCIDR); err != nil {
-			allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid CIDR block (e.g. 10.100.0.0/16)"))
+		if config.FeatureGates[string(kubefeatures.IPv6DualStack)] {
+			cidrs := strings.Split(config.ClusterCIDR, ",")
+			for _, cidr := range cidrs {
+				if _, _, err := net.ParseCIDR(cidr); err != nil {
+					allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), cidr, "must be a valid CIDR block (e.g. 10.100.0.0/16 or FD02::0:0:0/96)"))
+				}
+			}
+		} else {
+			if _, _, err := net.ParseCIDR(config.ClusterCIDR); err != nil {
+				allErrs = append(allErrs, field.Invalid(newPath.Child("ClusterCIDR"), config.ClusterCIDR, "must be a valid CIDR block (e.g. 10.100.0.0/16 or FD02::0:0:0/96)"))
+			}
 		}
 	}
 

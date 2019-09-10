@@ -20,7 +20,6 @@ import (
 	"fmt"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -65,7 +64,7 @@ func (t *SysctlUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, u
 		framework.ExpectNoError(err)
 	}
 	if err == nil {
-		gomega.Expect(pod.Status.Phase).NotTo(gomega.Equal(v1.PodRunning))
+		framework.ExpectNotEqual(pod.Status.Phase, v1.PodRunning)
 	}
 
 	t.verifySafeSysctlWork(f)

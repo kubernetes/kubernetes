@@ -24,7 +24,7 @@ import (
 	"time"
 
 	authenticationv1 "k8s.io/api/authentication/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,7 +43,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/cache"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/metrics"
 	"k8s.io/kubernetes/pkg/controller/volume/attachdetach/populator"
@@ -343,7 +342,7 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 		synced = append(synced, adc.csiDriversSynced)
 	}
 
-	if !controller.WaitForCacheSync("attach detach", stopCh, synced...) {
+	if !kcache.WaitForNamedCacheSync("attach detach", stopCh, synced...) {
 		return
 	}
 
@@ -779,7 +778,7 @@ func (adc *attachDetachController) DeleteServiceAccountTokenFunc() func(types.UI
 }
 
 func (adc *attachDetachController) GetExec(pluginName string) mount.Exec {
-	return mount.NewOsExec()
+	return mount.NewOSExec()
 }
 
 func (adc *attachDetachController) addNodeToDswp(node *v1.Node, nodeName types.NodeName) {

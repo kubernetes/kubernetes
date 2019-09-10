@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	"github.com/onsi/ginkgo"
@@ -83,7 +84,7 @@ func ClusterLevelLoggingWithKibana(f *framework.Framework) {
 
 	ginkgo.By("Checking to make sure we get a response from the Kibana UI.")
 	err = wait.Poll(pollingInterval, pollingTimeout, func() (bool, error) {
-		req, err := framework.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
+		req, err := e2eservice.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 		if err != nil {
 			e2elog.Logf("Failed to get services proxy request: %v", err)
 			return false, nil

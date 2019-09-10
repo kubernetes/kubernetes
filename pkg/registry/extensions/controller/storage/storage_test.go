@@ -34,12 +34,19 @@ import (
 func newStorage(t *testing.T) (*ScaleREST, *etcd3testing.EtcdTestServer, storage.Interface, factory.DestroyFunc) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "controllers"}
-	s, d := generic.NewRawStorage(etcdStorage)
+	s, d, err := generic.NewRawStorage(etcdStorage)
+	if err != nil {
+		t.Fatalf("Couldn't create storage: %v", err)
+	}
 	destroyFunc := func() {
 		d()
 		server.Terminate(t)
 	}
-	return NewStorage(restOptions).Scale, server, s, destroyFunc
+	storage, err := NewStorage(restOptions)
+	if err != nil {
+		t.Fatalf("unexpected error from REST storage: %v", err)
+	}
+	return storage.Scale, server, s, destroyFunc
 }
 
 var validPodTemplate = api.PodTemplate{

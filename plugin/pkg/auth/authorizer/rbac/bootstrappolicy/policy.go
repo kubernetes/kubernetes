@@ -45,6 +45,7 @@ const (
 	autoscalingGroup    = "autoscaling"
 	batchGroup          = "batch"
 	certificatesGroup   = "certificates.k8s.io"
+	discoveryGroup      = "discovery.k8s.io"
 	extensionsGroup     = "extensions"
 	policyGroup         = "policy"
 	rbacGroup           = "rbac.authorization.k8s.io"
@@ -52,6 +53,7 @@ const (
 	resMetricsGroup     = "metrics.k8s.io"
 	customMetricsGroup  = "custom.metrics.k8s.io"
 	networkingGroup     = "networking.k8s.io"
+	eventsGroup         = "events.k8s.io"
 )
 
 func addDefaultMetadata(obj runtime.Object) {
@@ -196,7 +198,8 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:discovery"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(
-					"/readyz", "/healthz", "/version", "/version/",
+					"/livez", "/readyz", "/healthz",
+					"/version", "/version/",
 					"/openapi", "/openapi/*",
 					"/api", "/api/*",
 					"/apis", "/apis/*",
@@ -216,7 +219,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:public-info-viewer"},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").URLs(
-					"/readyz", "/healthz", "/version", "/version/",
+					"/livez", "/readyz", "/healthz", "/version", "/version/",
 				).RuleOrDie(),
 			},
 		},
@@ -299,7 +302,7 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			ObjectMeta: metav1.ObjectMeta{Name: "system:aggregate-to-view", Labels: map[string]string{"rbac.authorization.k8s.io/aggregate-to-view": "true"}},
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("pods", "replicationcontrollers", "replicationcontrollers/scale", "serviceaccounts",
-					"services", "endpoints", "persistentvolumeclaims", "configmaps").RuleOrDie(),
+					"services", "services/status", "endpoints", "persistentvolumeclaims", "persistentvolumeclaims/status", "configmaps").RuleOrDie(),
 				rbacv1helpers.NewRule(Read...).Groups(legacyGroup).Resources("limitranges", "resourcequotas", "bindings", "events",
 					"pods/status", "resourcequotas/status", "namespaces/status", "replicationcontrollers/status", "pods/log").RuleOrDie(),
 				// read access to namespaces at the namespace scope means you can read *this* namespace.  This can be used as an
@@ -308,22 +311,22 @@ func ClusterRoles() []rbacv1.ClusterRole {
 
 				rbacv1helpers.NewRule(Read...).Groups(appsGroup).Resources(
 					"controllerrevisions",
-					"statefulsets", "statefulsets/scale",
-					"daemonsets",
-					"deployments", "deployments/scale",
-					"replicasets", "replicasets/scale").RuleOrDie(),
+					"statefulsets", "statefulsets/status", "statefulsets/scale",
+					"daemonsets", "daemonsets/status",
+					"deployments", "deployments/status", "deployments/scale",
+					"replicasets", "replicasets/status", "replicasets/scale").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(autoscalingGroup).Resources("horizontalpodautoscalers", "horizontalpodautoscalers/status").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(batchGroup).Resources("jobs", "cronjobs", "cronjobs/status", "jobs/status").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "deployments", "deployments/scale",
-					"ingresses", "replicasets", "replicasets/scale", "replicationcontrollers/scale",
+				rbacv1helpers.NewRule(Read...).Groups(extensionsGroup).Resources("daemonsets", "daemonsets/status", "deployments", "deployments/scale", "deployments/status",
+					"ingresses", "ingresses/status", "replicasets", "replicasets/scale", "replicasets/status", "replicationcontrollers/scale",
 					"networkpolicies").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(policyGroup).Resources("poddisruptionbudgets", "poddisruptionbudgets/status").RuleOrDie(),
 
-				rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies", "ingresses").RuleOrDie(),
+				rbacv1helpers.NewRule(Read...).Groups(networkingGroup).Resources("networkpolicies", "ingresses", "ingresses/status").RuleOrDie(),
 			},
 		},
 		{
@@ -346,17 +349,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			Rules: []rbacv1.PolicyRule{
 				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
 				rbacv1helpers.NewRule("patch").Groups(legacyGroup).Resources("nodes/status").RuleOrDie(),
-				eventsRule(),
-			},
-		},
-		{
-			// a role to use for setting up a proxy
-			ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},
-			Rules: []rbacv1.PolicyRule{
-				// Used to build serviceLister
-				rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
-				rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-
 				eventsRule(),
 			},
 		},
@@ -469,6 +461,21 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 	}
+
+	// node-proxier role is used by kube-proxy.
+	nodeProxierRules := []rbacv1.PolicyRule{
+		rbacv1helpers.NewRule("list", "watch").Groups(legacyGroup).Resources("services", "endpoints").RuleOrDie(),
+		rbacv1helpers.NewRule("get").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
+
+		eventsRule(),
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		nodeProxierRules = append(nodeProxierRules, rbacv1helpers.NewRule("list", "watch").Groups(discoveryGroup).Resources("endpointslices").RuleOrDie())
+	}
+	roles = append(roles, rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "system:node-proxier"},
+		Rules:      nodeProxierRules,
+	})
 
 	kubeSchedulerRules := []rbacv1.PolicyRule{
 		eventsRule(),

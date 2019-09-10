@@ -21,9 +21,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
-    fields:
-      "18":
-        "19": null
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -35,7 +33,7 @@ metadata:
     kind: "12"
     name: "13"
     uid: Dz廔ȇ{sŊƏp
-  resourceVersion: "16964250748386560239"
+  resourceVersion: "11042405498087606203"
   selfLink: "5"
-  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
-revision: 1089963290653861247
+  uid: "7"
+revision: -7716837448637516924

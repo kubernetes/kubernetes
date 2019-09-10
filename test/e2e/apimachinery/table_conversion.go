@@ -100,7 +100,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 				}
 				e2elog.Logf("Got an error creating template %d: %v", i, err)
 			}
-			ginkgo.Fail("Unable to create template %d, exiting", i)
+			e2elog.Fail("Unable to create template %d, exiting", i)
 		})
 
 		pagedTable := &metav1beta1.Table{}
@@ -110,9 +110,9 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 			Do().Into(pagedTable)
 		framework.ExpectNoError(err, "failed to get pod templates in Table form in namespace: %s", ns)
 		framework.ExpectEqual(len(pagedTable.Rows), 2)
-		gomega.Expect(pagedTable.ResourceVersion).ToNot(gomega.Equal(""))
-		gomega.Expect(pagedTable.SelfLink).ToNot(gomega.Equal(""))
-		gomega.Expect(pagedTable.Continue).ToNot(gomega.Equal(""))
+		framework.ExpectNotEqual(pagedTable.ResourceVersion, "")
+		framework.ExpectNotEqual(pagedTable.SelfLink, "")
+		framework.ExpectNotEqual(pagedTable.Continue, "")
 		framework.ExpectEqual(pagedTable.Rows[0].Cells[0], "template-0000")
 		framework.ExpectEqual(pagedTable.Rows[1].Cells[0], "template-0001")
 
@@ -137,15 +137,21 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 		gomega.Expect(len(table.Rows)).To(gomega.BeNumerically(">=", 1))
 		framework.ExpectEqual(len(table.Rows[0].Cells), len(table.ColumnDefinitions))
 		framework.ExpectEqual(table.ColumnDefinitions[0].Name, "Name")
-		gomega.Expect(table.ResourceVersion).ToNot(gomega.Equal(""))
-		gomega.Expect(table.SelfLink).ToNot(gomega.Equal(""))
+		framework.ExpectNotEqual(table.ResourceVersion, "")
+		framework.ExpectNotEqual(table.SelfLink, "")
 
 		out := printTable(table)
 		gomega.Expect(out).To(gomega.MatchRegexp("^NAME\\s"))
 		e2elog.Logf("Table:\n%s", out)
 	})
 
-	ginkgo.It("should return a 406 for a backend which does not implement metadata", func() {
+	/*
+			    Release : v1.16
+				Testname: API metadata HTTP return
+				Description: Issue a HTTP request to the API.
+		        HTTP request MUST return a HTTP status code of 406.
+	*/
+	framework.ConformanceIt("should return a 406 for a backend which does not implement metadata", func() {
 		c := f.ClientSet
 
 		table := &metav1beta1.Table{}
@@ -157,7 +163,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 				},
 			},
 		}
-		err := c.AuthorizationV1().RESTClient().Post().Resource("selfsubjectaccessreviews").SetHeader("Accept", "application/json;as=Table;v=v1beta1;g=meta.k8s.io").Body(sar).Do().Into(table)
+		err := c.AuthorizationV1().RESTClient().Post().Resource("selfsubjectaccessreviews").SetHeader("Accept", "application/json;as=Table;v=v1;g=meta.k8s.io").Body(sar).Do().Into(table)
 		framework.ExpectError(err, "failed to return error when posting self subject access review: %+v, to a backend that does not implement metadata", sar)
 		framework.ExpectEqual(err.(errors.APIStatus).Status().Code, int32(406))
 	})

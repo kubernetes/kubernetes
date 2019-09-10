@@ -29,7 +29,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -62,6 +61,8 @@ type TestSuite interface {
 	// Called inside a Ginkgo context that reflects the current driver and test pattern,
 	// so the test suite can define tests directly with ginkgo.It.
 	defineTests(TestDriver, testpatterns.TestPattern)
+	// skipRedundantSuite will skip the test suite based on the given TestPattern and TestDriver
+	skipRedundantSuite(TestDriver, testpatterns.TestPattern)
 }
 
 // TestSuiteInfo represents a set of parameters for TestSuite
@@ -91,6 +92,7 @@ func DefineTestSuite(driver TestDriver, tsInits []func() TestSuite) {
 			ginkgo.Context(getTestNameStr(suite, p), func() {
 				ginkgo.BeforeEach(func() {
 					// Skip unsupported tests to avoid unnecessary resource initialization
+					suite.skipRedundantSuite(driver, p)
 					skipUnsupportedTest(driver, p)
 				})
 				suite.defineTests(driver, p)
@@ -134,6 +136,8 @@ func skipUnsupportedTest(driver TestDriver, pattern testpatterns.TestPattern) {
 			_, isSupported = driver.(PreprovisionedPVTestDriver)
 		case testpatterns.DynamicPV:
 			_, isSupported = driver.(DynamicPVTestDriver)
+		case testpatterns.CSIInlineVolume:
+			_, isSupported = driver.(EphemeralTestDriver)
 		default:
 			isSupported = false
 		}
@@ -186,25 +190,24 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 	dInfo := driver.GetDriverInfo()
 	f := config.Framework
 	cs := f.ClientSet
-	fsType := pattern.FsType
-	volType := pattern.VolType
 
 	// Create volume for pre-provisioned volume tests
-	r.volume = CreateVolume(driver, config, volType)
+	r.volume = CreateVolume(driver, config, pattern.VolType)
 
-	switch volType {
+	switch pattern.VolType {
 	case testpatterns.InlineVolume:
 		e2elog.Logf("Creating resource for inline volume")
 		if iDriver, ok := driver.(InlineVolumeTestDriver); ok {
-			r.volSource = iDriver.GetVolumeSource(false, fsType, r.volume)
+			r.volSource = iDriver.GetVolumeSource(false, pattern.FsType, r.volume)
 			r.volType = dInfo.Name
 		}
 	case testpatterns.PreprovisionedPV:
 		e2elog.Logf("Creating resource for pre-provisioned PV")
 		if pDriver, ok := driver.(PreprovisionedPVTestDriver); ok {
-			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, fsType, r.volume)
+			pvSource, volumeNodeAffinity := pDriver.GetPersistentVolumeSource(false, pattern.FsType, r.volume)
 			if pvSource != nil {
-				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, false, pattern.VolMode)
+				r.pv, r.pvc = createPVCPV(f, dInfo.Name, pvSource, volumeNodeAffinity, pattern.VolMode, dInfo.RequiredAccessModes)
+				r.volSource = createVolumeSource(r.pvc.Name, false /* readOnly */)
 			}
 			r.volType = fmt.Sprintf("%s-preprovisionedPV", dInfo.Name)
 		}
@@ -212,7 +215,14 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 		e2elog.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
 			claimSize := dDriver.GetClaimSize()
-			r.sc = dDriver.GetDynamicProvisionStorageClass(r.config, fsType)
+			r.sc = dDriver.GetDynamicProvisionStorageClass(r.config, pattern.FsType)
+
+			if pattern.BindingMode != "" {
+				r.sc.VolumeBindingMode = &pattern.BindingMode
+			}
+			if pattern.AllowExpansion != false {
+				r.sc.AllowVolumeExpansion = &pattern.AllowExpansion
+			}
 
 			ginkgo.By("creating a StorageClass " + r.sc.Name)
 			var err error
@@ -220,29 +230,39 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 			framework.ExpectNoError(err)
 
 			if r.sc != nil {
-				r.volSource, r.pv, r.pvc = createVolumeSourceWithPVCPVFromDynamicProvisionSC(
-					f, dInfo.Name, claimSize, r.sc, false, pattern.VolMode)
+				r.pv, r.pvc = createPVCPVFromDynamicProvisionSC(
+					f, dInfo.Name, claimSize, r.sc, pattern.VolMode, dInfo.RequiredAccessModes)
+				r.volSource = createVolumeSource(r.pvc.Name, false /* readOnly */)
 			}
 			r.volType = fmt.Sprintf("%s-dynamicPV", dInfo.Name)
 		}
 	default:
-		e2elog.Failf("genericVolumeTestResource doesn't support: %s", volType)
+		e2elog.Failf("genericVolumeTestResource doesn't support: %s", pattern.VolType)
 	}
 
 	if r.volSource == nil {
-		framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, volType)
+		framework.Skipf("Driver %s doesn't support %v -- skipping", dInfo.Name, pattern.VolType)
 	}
 
 	return &r
 }
 
+func createVolumeSource(pvcName string, readOnly bool) *v1.VolumeSource {
+	return &v1.VolumeSource{
+		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
+			ClaimName: pvcName,
+			ReadOnly:  readOnly,
+		},
+	}
+
+}
+
 // cleanupResource cleans up genericVolumeTestResource
 func (r *genericVolumeTestResource) cleanupResource() {
 	f := r.config.Framework
-	volType := r.pattern.VolType
 
 	if r.pvc != nil || r.pv != nil {
-		switch volType {
+		switch r.pattern.VolType {
 		case testpatterns.PreprovisionedPV:
 			ginkgo.By("Deleting pv and pvc")
 			if errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.pv, r.pvc); len(errs) != 0 {
@@ -279,23 +299,25 @@ func (r *genericVolumeTestResource) cleanupResource() {
 	}
 }
 
-func createVolumeSourceWithPVCPV(
+func createPVCPV(
 	f *framework.Framework,
 	name string,
 	pvSource *v1.PersistentVolumeSource,
 	volumeNodeAffinity *v1.VolumeNodeAffinity,
-	readOnly bool,
 	volMode v1.PersistentVolumeMode,
-) (*v1.VolumeSource, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+	accessModes []v1.PersistentVolumeAccessMode,
+) (*v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	pvConfig := framework.PersistentVolumeConfig{
 		NamePrefix:       fmt.Sprintf("%s-", name),
 		StorageClassName: f.Namespace.Name,
 		PVSource:         *pvSource,
 		NodeAffinity:     volumeNodeAffinity,
+		AccessModes:      accessModes,
 	}
 
 	pvcConfig := framework.PersistentVolumeClaimConfig{
 		StorageClassName: &f.Namespace.Name,
+		AccessModes:      accessModes,
 	}
 
 	if volMode != "" {
@@ -310,35 +332,33 @@ func createVolumeSourceWithPVCPV(
 	err = framework.WaitOnPVandPVC(f.ClientSet, f.Namespace.Name, pv, pvc)
 	framework.ExpectNoError(err, "PVC, PV failed to bind")
 
-	volSource := &v1.VolumeSource{
-		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-			ClaimName: pvc.Name,
-			ReadOnly:  readOnly,
-		},
-	}
-	return volSource, pv, pvc
+	return pv, pvc
 }
 
-func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
+func createPVCPVFromDynamicProvisionSC(
 	f *framework.Framework,
 	name string,
 	claimSize string,
 	sc *storagev1.StorageClass,
-	readOnly bool,
 	volMode v1.PersistentVolumeMode,
-) (*v1.VolumeSource, *v1.PersistentVolume, *v1.PersistentVolumeClaim) {
+	accessModes []v1.PersistentVolumeAccessMode,
+) (*v1.PersistentVolume, *v1.PersistentVolumeClaim) {
 	cs := f.ClientSet
 	ns := f.Namespace.Name
 
 	ginkgo.By("creating a claim")
-	pvc := getClaim(claimSize, ns)
-	pvc.Spec.StorageClassName = &sc.Name
-	if volMode != "" {
-		pvc.Spec.VolumeMode = &volMode
+	pvcCfg := framework.PersistentVolumeClaimConfig{
+		NamePrefix:       name,
+		ClaimSize:        claimSize,
+		StorageClassName: &(sc.Name),
+		AccessModes:      accessModes,
+		VolumeMode:       &volMode,
 	}
 
+	pvc := framework.MakePersistentVolumeClaim(pvcCfg, ns)
+
 	var err error
-	pvc, err = cs.CoreV1().PersistentVolumeClaims(ns).Create(pvc)
+	pvc, err = framework.CreatePVC(cs, ns, pvc)
 	framework.ExpectNoError(err)
 
 	if !isDelayedBinding(sc) {
@@ -355,13 +375,7 @@ func createVolumeSourceWithPVCPVFromDynamicProvisionSC(
 		framework.ExpectNoError(err)
 	}
 
-	volSource := &v1.VolumeSource{
-		PersistentVolumeClaim: &v1.PersistentVolumeClaimVolumeSource{
-			ClaimName: pvc.Name,
-			ReadOnly:  readOnly,
-		},
-	}
-	return volSource, pv, pvc
+	return pv, pvc
 }
 
 func isDelayedBinding(sc *storagev1.StorageClass) bool {
@@ -369,27 +383,6 @@ func isDelayedBinding(sc *storagev1.StorageClass) bool {
 		return *sc.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer
 	}
 	return false
-}
-
-func getClaim(claimSize string, ns string) *v1.PersistentVolumeClaim {
-	claim := v1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "pvc-",
-			Namespace:    ns,
-		},
-		Spec: v1.PersistentVolumeClaimSpec{
-			AccessModes: []v1.PersistentVolumeAccessMode{
-				v1.ReadWriteOnce,
-			},
-			Resources: v1.ResourceRequirements{
-				Requests: v1.ResourceList{
-					v1.ResourceName(v1.ResourceStorage): resource.MustParse(claimSize),
-				},
-			},
-		},
-	}
-
-	return &claim
 }
 
 // deleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"
@@ -622,5 +615,13 @@ func validateMigrationVolumeOpCounts(cs clientset.Interface, pluginName string, 
 		// and native CSI Driver metrics. This way we can check the counts for
 		// migrated version of the driver for stronger negative test case
 		// guarantees (as well as more informative metrics).
+	}
+}
+
+// Skip skipVolTypes patterns if the driver supports dynamic provisioning
+func skipVolTypePatterns(pattern testpatterns.TestPattern, driver TestDriver, skipVolTypes map[testpatterns.TestVolType]bool) {
+	_, supportsProvisioning := driver.(DynamicPVTestDriver)
+	if supportsProvisioning && skipVolTypes[pattern.VolType] {
+		framework.Skipf("Driver supports dynamic provisioning, skipping %s pattern", pattern.VolType)
 	}
 }

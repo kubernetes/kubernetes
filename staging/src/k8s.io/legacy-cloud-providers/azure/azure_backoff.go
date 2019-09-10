@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2017 The Kubernetes Authors.
 
@@ -19,12 +21,13 @@ package azure
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-03-01/compute"
-	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2018-08-01/network"
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -32,13 +35,21 @@ import (
 	"k8s.io/klog"
 )
 
-// requestBackoff if backoff is disabled in cloud provider it
+const (
+	// not active means the instance is under deleting from Azure VMSS.
+	vmssVMNotActiveErrorMessage = "not an active Virtual Machine Scale Set VM instanceId"
+
+	// operationCancledErrorMessage means the operation is canceled by another new operation.
+	operationCancledErrorMessage = "canceledandsupersededduetoanotheroperation"
+)
+
+// RequestBackoff if backoff is disabled in cloud provider it
 // returns a new Backoff object steps = 1
 // This is to make sure that the requested command executes
 // at least once
-func (az *Cloud) requestBackoff() (resourceRequestBackoff wait.Backoff) {
+func (az *Cloud) RequestBackoff() (resourceRequestBackoff wait.Backoff) {
 	if az.CloudProviderBackoff {
-		return az.resourceRequestBackoff
+		return az.ResourceRequestBackoff
 	}
 	resourceRequestBackoff = wait.Backoff{
 		Steps: 1,
@@ -57,7 +68,7 @@ func (az *Cloud) Event(obj runtime.Object, eventtype, reason, message string) {
 func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.VirtualMachine, error) {
 	var machine compute.VirtualMachine
 	var retryErr error
-	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		machine, retryErr = az.getVirtualMachine(name)
 		if retryErr == cloudprovider.InstanceNotFound {
 			return true, cloudprovider.InstanceNotFound
@@ -78,7 +89,7 @@ func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.Virtua
 // ListVirtualMachinesWithRetry invokes az.VirtualMachinesClient.List with exponential backoff retry
 func (az *Cloud) ListVirtualMachinesWithRetry(resourceGroup string) ([]compute.VirtualMachine, error) {
 	allNodes := []compute.VirtualMachine{}
-	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		var retryErr error
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
@@ -129,14 +140,18 @@ func (az *Cloud) getPrivateIPsForMachine(nodeName types.NodeName) ([]string, err
 
 func (az *Cloud) getPrivateIPsForMachineWithRetry(nodeName types.NodeName) ([]string, error) {
 	var privateIPs []string
-	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		var retryErr error
 		privateIPs, retryErr = az.vmSet.GetPrivateIPsByNodeName(string(nodeName))
 		if retryErr != nil {
+			// won't retry since the instance doesn't exist on Azure.
+			if retryErr == cloudprovider.InstanceNotFound {
+				return true, retryErr
+			}
 			klog.Errorf("GetPrivateIPsByNodeName(%s): backoff failure, will retry,err=%v", nodeName, retryErr)
 			return false, nil
 		}
-		klog.V(2).Infof("GetPrivateIPsByNodeName(%s): backoff success", nodeName)
+		klog.V(3).Infof("GetPrivateIPsByNodeName(%s): backoff success", nodeName)
 		return true, nil
 	})
 	return privateIPs, err
@@ -153,14 +168,14 @@ func (az *Cloud) getIPForMachine(nodeName types.NodeName) (string, string, error
 // GetIPForMachineWithRetry invokes az.getIPForMachine with exponential backoff retry
 func (az *Cloud) GetIPForMachineWithRetry(name types.NodeName) (string, string, error) {
 	var ip, publicIP string
-	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		var retryErr error
 		ip, publicIP, retryErr = az.vmSet.GetIPByNodeName(string(name))
 		if retryErr != nil {
 			klog.Errorf("GetIPForMachineWithRetry(%s): backoff failure, will retry,err=%v", name, retryErr)
 			return false, nil
 		}
-		klog.V(2).Infof("GetIPForMachineWithRetry(%s): backoff success", name)
+		klog.V(3).Infof("GetIPForMachineWithRetry(%s): backoff success", name)
 		return true, nil
 	})
 	return ip, publicIP, err
@@ -187,6 +202,12 @@ func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.Sec
 		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
 			az.nsgCache.Delete(*sg.Name)
 		}
+
+		// Invalidate the cache because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.nsgCache.Delete(*sg.Name)
+		}
+
 		return err
 	}
 
@@ -195,7 +216,7 @@ func (az *Cloud) CreateOrUpdateSecurityGroup(service *v1.Service, sg network.Sec
 
 // CreateOrUpdateSGWithRetry invokes az.SecurityGroupsClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) CreateOrUpdateSGWithRetry(service *v1.Service, sg network.SecurityGroup) error {
-	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
@@ -212,6 +233,13 @@ func (az *Cloud) CreateOrUpdateSGWithRetry(service *v1.Service, sg network.Secur
 			az.nsgCache.Delete(*sg.Name)
 			return true, err
 		}
+
+		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.nsgCache.Delete(*sg.Name)
+			return true, err
+		}
+
 		return done, retryError
 	})
 }
@@ -222,7 +250,8 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, az.ResourceGroup, *lb.Name, lb, to.String(lb.Etag))
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, rgName, *lb.Name, lb, to.String(lb.Etag))
 		klog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
 		if err == nil {
 			if isSuccessHTTPResponse(resp) {
@@ -237,6 +266,10 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
 			az.lbCache.Delete(*lb.Name)
 		}
+		// Invalidate the cache because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.lbCache.Delete(*lb.Name)
+		}
 		return err
 	}
 
@@ -245,11 +278,12 @@ func (az *Cloud) CreateOrUpdateLB(service *v1.Service, lb network.LoadBalancer) 
 
 // createOrUpdateLBWithRetry invokes az.LoadBalancerClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) createOrUpdateLBWithRetry(service *v1.Service, lb network.LoadBalancer) error {
-	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, az.ResourceGroup, *lb.Name, lb, to.String(lb.Etag))
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.CreateOrUpdate(ctx, rgName, *lb.Name, lb, to.String(lb.Etag))
 		klog.V(10).Infof("LoadBalancerClient.CreateOrUpdate(%s): end", *lb.Name)
 		done, retryError := az.processHTTPRetryResponse(service, "CreateOrUpdateLoadBalancer", resp, err)
 		if done && err == nil {
@@ -259,7 +293,12 @@ func (az *Cloud) createOrUpdateLBWithRetry(service *v1.Service, lb network.LoadB
 
 		// Invalidate the cache and abort backoff because ETAG precondition mismatch.
 		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
-			az.nsgCache.Delete(*lb.Name)
+			az.lbCache.Delete(*lb.Name)
+			return true, err
+		}
+		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.lbCache.Delete(*lb.Name)
 			return true, err
 		}
 		return done, retryError
@@ -272,10 +311,11 @@ func (az *Cloud) ListLB(service *v1.Service) ([]network.LoadBalancer, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		allLBs, err := az.LoadBalancerClient.List(ctx, az.ResourceGroup)
+		rgName := az.getLoadBalancerResourceGroup()
+		allLBs, err := az.LoadBalancerClient.List(ctx, rgName)
 		if err != nil {
 			az.Event(service, v1.EventTypeWarning, "ListLoadBalancers", err.Error())
-			klog.Errorf("LoadBalancerClient.List(%v) failure with err=%v", az.ResourceGroup, err)
+			klog.Errorf("LoadBalancerClient.List(%v) failure with err=%v", rgName, err)
 			return nil, err
 		}
 		klog.V(2).Infof("LoadBalancerClient.List(%v) success", az.ResourceGroup)
@@ -289,16 +329,17 @@ func (az *Cloud) ListLB(service *v1.Service) ([]network.LoadBalancer, error) {
 func (az *Cloud) listLBWithRetry(service *v1.Service) ([]network.LoadBalancer, error) {
 	var allLBs []network.LoadBalancer
 
-	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		var retryErr error
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		allLBs, retryErr = az.LoadBalancerClient.List(ctx, az.ResourceGroup)
+		rgName := az.getLoadBalancerResourceGroup()
+		allLBs, retryErr = az.LoadBalancerClient.List(ctx, rgName)
 		if retryErr != nil {
 			az.Event(service, v1.EventTypeWarning, "ListLoadBalancers", retryErr.Error())
 			klog.Errorf("LoadBalancerClient.List(%v) - backoff: failure, will retry,err=%v",
-				az.ResourceGroup,
+				rgName,
 				retryErr)
 			return false, retryErr
 		}
@@ -335,7 +376,7 @@ func (az *Cloud) ListPIP(service *v1.Service, pipResourceGroup string) ([]networ
 func (az *Cloud) listPIPWithRetry(service *v1.Service, pipResourceGroup string) ([]network.PublicIPAddress, error) {
 	var allPIPs []network.PublicIPAddress
 
-	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		var retryErr error
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
@@ -374,7 +415,7 @@ func (az *Cloud) CreateOrUpdatePIP(service *v1.Service, pipResourceGroup string,
 
 // createOrUpdatePIPWithRetry invokes az.PublicIPAddressesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) createOrUpdatePIPWithRetry(service *v1.Service, pipResourceGroup string, pip network.PublicIPAddress) error {
-	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
@@ -400,7 +441,7 @@ func (az *Cloud) CreateOrUpdateInterface(service *v1.Service, nic network.Interf
 
 // createOrUpdateInterfaceWithRetry invokes az.PublicIPAddressesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) createOrUpdateInterfaceWithRetry(service *v1.Service, nic network.Interface) error {
-	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
@@ -425,7 +466,7 @@ func (az *Cloud) DeletePublicIP(service *v1.Service, pipResourceGroup string, pi
 
 // deletePublicIPWithRetry invokes az.PublicIPAddressesClient.Delete with exponential backoff retry
 func (az *Cloud) deletePublicIPWithRetry(service *v1.Service, pipResourceGroup string, pipName string) error {
-	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
@@ -440,7 +481,8 @@ func (az *Cloud) DeleteLB(service *v1.Service, lbName string) error {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.Delete(ctx, az.ResourceGroup, lbName)
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.Delete(ctx, rgName, lbName)
 		if err == nil {
 			if isSuccessHTTPResponse(resp) {
 				// Invalidate the cache right after updating
@@ -457,11 +499,12 @@ func (az *Cloud) DeleteLB(service *v1.Service, lbName string) error {
 
 // deleteLBWithRetry invokes az.LoadBalancerClient.Delete with exponential backoff retry
 func (az *Cloud) deleteLBWithRetry(service *v1.Service, lbName string) error {
-	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
-		resp, err := az.LoadBalancerClient.Delete(ctx, az.ResourceGroup, lbName)
+		rgName := az.getLoadBalancerResourceGroup()
+		resp, err := az.LoadBalancerClient.Delete(ctx, rgName, lbName)
 		done, err := az.processHTTPRetryResponse(service, "DeleteLoadBalancer", resp, err)
 		if done && err == nil {
 			// Invalidate the cache right after deleting
@@ -481,6 +524,10 @@ func (az *Cloud) CreateOrUpdateRouteTable(routeTable network.RouteTable) error {
 		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
 			az.rtCache.Delete(*routeTable.Name)
 		}
+		// Invalidate the cache because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.rtCache.Delete(*routeTable.Name)
+		}
 		return az.processHTTPResponse(nil, "", resp, err)
 	}
 
@@ -489,7 +536,7 @@ func (az *Cloud) CreateOrUpdateRouteTable(routeTable network.RouteTable) error {
 
 // createOrUpdateRouteTableWithRetry invokes az.RouteTablesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) createOrUpdateRouteTableWithRetry(routeTable network.RouteTable) error {
-	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
@@ -502,6 +549,11 @@ func (az *Cloud) createOrUpdateRouteTableWithRetry(routeTable network.RouteTable
 
 		// Invalidate the cache and abort backoff because ETAG precondition mismatch.
 		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
+			az.rtCache.Delete(*routeTable.Name)
+			return true, err
+		}
+		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
 			az.rtCache.Delete(*routeTable.Name)
 			return true, err
 		}
@@ -520,6 +572,10 @@ func (az *Cloud) CreateOrUpdateRoute(route network.Route) error {
 		if resp != nil && resp.StatusCode == http.StatusPreconditionFailed {
 			az.rtCache.Delete(az.RouteTableName)
 		}
+		// Invalidate the cache because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.rtCache.Delete(az.RouteTableName)
+		}
 		return az.processHTTPResponse(nil, "", resp, err)
 	}
 
@@ -528,7 +584,7 @@ func (az *Cloud) CreateOrUpdateRoute(route network.Route) error {
 
 // createOrUpdateRouteWithRetry invokes az.RoutesClient.CreateOrUpdate with exponential backoff retry
 func (az *Cloud) createOrUpdateRouteWithRetry(route network.Route) error {
-	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
@@ -545,6 +601,13 @@ func (az *Cloud) createOrUpdateRouteWithRetry(route network.Route) error {
 			az.rtCache.Delete(az.RouteTableName)
 			return true, err
 		}
+
+		// Invalidate the cache and abort backoff because another new operation has canceled the current request.
+		if err != nil && strings.Contains(strings.ToLower(err.Error()), operationCancledErrorMessage) {
+			az.rtCache.Delete(az.RouteTableName)
+			return true, err
+		}
+
 		return done, retryError
 	})
 }
@@ -565,7 +628,7 @@ func (az *Cloud) DeleteRouteWithName(routeName string) error {
 
 // deleteRouteWithRetry invokes az.RoutesClient.Delete with exponential backoff retry
 func (az *Cloud) deleteRouteWithRetry(routeName string) error {
-	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
@@ -577,14 +640,66 @@ func (az *Cloud) deleteRouteWithRetry(routeName string) error {
 
 // UpdateVmssVMWithRetry invokes az.VirtualMachineScaleSetVMsClient.Update with exponential backoff retry
 func (az *Cloud) UpdateVmssVMWithRetry(resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM, source string) error {
-	return wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
+	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
 		ctx, cancel := getContextWithCancel()
 		defer cancel()
 
 		resp, err := az.VirtualMachineScaleSetVMsClient.Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters, source)
-		klog.V(10).Infof("VirtualMachinesClient.CreateOrUpdate(%s,%s): end", VMScaleSetName, instanceID)
+		klog.V(10).Infof("UpdateVmssVMWithRetry: VirtualMachineScaleSetVMsClient.Update(%s,%s): end", VMScaleSetName, instanceID)
+
+		if err != nil && strings.Contains(err.Error(), vmssVMNotActiveErrorMessage) {
+			// When instances are under deleting, updating API would report "not an active Virtual Machine Scale Set VM instanceId" error.
+			// Since they're under deleting, we shouldn't send more update requests for it.
+			klog.V(3).Infof("UpdateVmssVMWithRetry: VirtualMachineScaleSetVMsClient.Update(%s,%s) gets error message %q, abort backoff because it's probably under deleting", VMScaleSetName, instanceID, vmssVMNotActiveErrorMessage)
+			return true, nil
+		}
+
 		return az.processHTTPRetryResponse(nil, "", resp, err)
 	})
+}
+
+// CreateOrUpdateVmssWithRetry invokes az.VirtualMachineScaleSetsClient.Update with exponential backoff retry
+func (az *Cloud) CreateOrUpdateVmssWithRetry(resourceGroupName string, VMScaleSetName string, parameters compute.VirtualMachineScaleSet) error {
+	return wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+
+		// When vmss is being deleted, CreateOrUpdate API would report "the vmss is being deleted" error.
+		// Since it is being deleted, we shouldn't send more CreateOrUpdate requests for it.
+		klog.V(3).Infof("CreateOrUpdateVmssWithRetry: verify the status of the vmss being created or updated")
+		vmss, err := az.VirtualMachineScaleSetsClient.Get(ctx, resourceGroupName, VMScaleSetName)
+		if vmss.ProvisioningState != nil && strings.EqualFold(*vmss.ProvisioningState, virtualMachineScaleSetsDeallocating) {
+			klog.V(3).Infof("CreateOrUpdateVmssWithRetry: found vmss %s being deleted, skipping", VMScaleSetName)
+			return true, nil
+		}
+
+		resp, err := az.VirtualMachineScaleSetsClient.CreateOrUpdate(ctx, resourceGroupName, VMScaleSetName, parameters)
+		klog.V(10).Infof("UpdateVmssVMWithRetry: VirtualMachineScaleSetsClient.CreateOrUpdate(%s): end", VMScaleSetName)
+
+		return az.processHTTPRetryResponse(nil, "", resp, err)
+	})
+}
+
+// GetScaleSetWithRetry gets scale set with exponential backoff retry
+func (az *Cloud) GetScaleSetWithRetry(service *v1.Service, resourceGroupName, vmssName string) (compute.VirtualMachineScaleSet, error) {
+	var result compute.VirtualMachineScaleSet
+	var retryErr error
+
+	err := wait.ExponentialBackoff(az.RequestBackoff(), func() (bool, error) {
+		ctx, cancel := getContextWithCancel()
+		defer cancel()
+
+		result, retryErr = az.VirtualMachineScaleSetsClient.Get(ctx, resourceGroupName, vmssName)
+		if retryErr != nil {
+			az.Event(service, v1.EventTypeWarning, "GetVirtualMachineScaleSet", retryErr.Error())
+			klog.Errorf("backoff: failure for scale set %q, will retry,err=%v", vmssName, retryErr)
+			return false, nil
+		}
+		klog.V(4).Infof("backoff: success for scale set %q", vmssName)
+		return true, nil
+	})
+
+	return result, err
 }
 
 // isSuccessHTTPResponse determines if the response from an HTTP request suggests success

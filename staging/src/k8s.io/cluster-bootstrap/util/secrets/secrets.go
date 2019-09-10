@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cluster-bootstrap/token/api"
 	legacyutil "k8s.io/cluster-bootstrap/token/util"
@@ -46,21 +46,35 @@ func GetData(secret *v1.Secret, key string) string {
 
 // HasExpired will identify whether the secret expires
 func HasExpired(secret *v1.Secret, currentTime time.Time) bool {
+	_, expired := GetExpiration(secret, currentTime)
+
+	return expired
+}
+
+// GetExpiration checks if the secret expires
+// isExpired indicates if the secret is already expired.
+// timeRemaining indicates how long until it does expire.
+// if the secret has no expiration timestamp, returns 0, false.
+// if there is an error parsing the secret's expiration timestamp, returns 0, true.
+func GetExpiration(secret *v1.Secret, currentTime time.Time) (timeRemaining time.Duration, isExpired bool) {
 	expiration := GetData(secret, api.BootstrapTokenExpirationKey)
-	if len(expiration) > 0 {
-		expTime, err2 := time.Parse(time.RFC3339, expiration)
-		if err2 != nil {
-			klog.V(3).Infof("Unparseable expiration time (%s) in %s/%s Secret: %v. Treating as expired.",
-				expiration, secret.Namespace, secret.Name, err2)
-			return true
-		}
-		if currentTime.After(expTime) {
-			klog.V(3).Infof("Expired bootstrap token in %s/%s Secret: %v",
-				secret.Namespace, secret.Name, expiration)
-			return true
-		}
+	if len(expiration) == 0 {
+		return 0, false
 	}
-	return false
+	expTime, err := time.Parse(time.RFC3339, expiration)
+	if err != nil {
+		klog.V(3).Infof("Unparseable expiration time (%s) in %s/%s Secret: %v. Treating as expired.",
+			expiration, secret.Namespace, secret.Name, err)
+		return 0, true
+	}
+
+	timeRemaining = expTime.Sub(currentTime)
+	if timeRemaining <= 0 {
+		klog.V(3).Infof("Expired bootstrap token in %s/%s Secret: %v",
+			secret.Namespace, secret.Name, expiration)
+		return 0, true
+	}
+	return timeRemaining, false
 }
 
 // ParseName parses the name of the secret to extract the secret ID.

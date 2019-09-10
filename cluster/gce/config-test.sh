@@ -138,8 +138,13 @@ if [[ "${KUBE_FEATURE_GATES:-}" == "AllAlpha=true" ]]; then
   RUNTIME_CONFIG="${KUBE_RUNTIME_CONFIG:-api/all=true}"
 fi
 
+# If feature gates includes AllAlpha or EndpointSlice, and EndpointSlice has not been disabled, add EndpointSlice controller to list of controllers to run.
+if [[ (( "${KUBE_FEATURE_GATES:-}" == *"AllAlpha=true"* ) || ( "${KUBE_FEATURE_GATES:-}" == *"EndpointSlice=true"* )) && "${KUBE_FEATURE_GATES:-}" != *"EndpointSlice=false"* ]]; then
+  RUN_CONTROLLERS="${RUN_CONTROLLERS:-*,endpointslice}"
+fi
+
 # Optional: set feature gates
-FEATURE_GATES="${KUBE_FEATURE_GATES:-ExperimentalCriticalPodAnnotation=true}"
+FEATURE_GATES="${KUBE_FEATURE_GATES:-}"
 
 TERMINATED_POD_GC_THRESHOLD=${TERMINATED_POD_GC_THRESHOLD:-100}
 
@@ -187,7 +192,7 @@ ENABLE_METADATA_AGENT="${KUBE_ENABLE_METADATA_AGENT:-none}"
 # Useful for scheduling heapster in large clusters with nodes of small size.
 HEAPSTER_MACHINE_TYPE="${HEAPSTER_MACHINE_TYPE:-}"
 
-# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.3.10-1) if you need
+# Set etcd image (e.g. k8s.gcr.io/etcd) and version (e.g. 3.3.15-0) if you need
 # non-default version.
 ETCD_IMAGE="${TEST_ETCD_IMAGE:-}"
 ETCD_DOCKER_REPOSITORY="${TEST_ETCD_DOCKER_REPOSITORY:-}"
@@ -283,7 +288,11 @@ if [[ ${KUBE_ENABLE_INSECURE_REGISTRY:-false} == "true" ]]; then
 fi
 
 if [[ ! -z "${NODE_ACCELERATORS}" ]]; then
-    FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    if [[ -z "${FEATURE_GATES:-}" ]]; then
+        FEATURE_GATES="DevicePlugins=true"
+    else
+        FEATURE_GATES="${FEATURE_GATES},DevicePlugins=true"
+    fi
     if [[ "${NODE_ACCELERATORS}" =~ .*type=([a-zA-Z0-9-]+).* ]]; then
         NON_MASTER_NODE_LABELS="${NON_MASTER_NODE_LABELS},cloud.google.com/gke-accelerator=${BASH_REMATCH[1]}"
     fi
@@ -383,7 +392,7 @@ fi
 CUSTOM_INGRESS_YAML="${CUSTOM_INGRESS_YAML:-}"
 
 if [[ -z "${KUBE_ADMISSION_CONTROL:-}" ]]; then
-  ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,PersistentVolumeClaimResize"
+  ADMISSION_CONTROL="NamespaceLifecycle,LimitRanger,ServiceAccount,PersistentVolumeLabel,PodPreset,DefaultStorageClass,DefaultTolerationSeconds,NodeRestriction,Priority,StorageObjectInUseProtection,PersistentVolumeClaimResize,RuntimeClass"
   if [[ "${ENABLE_POD_SECURITY_POLICY:-}" == "true" ]]; then
     ADMISSION_CONTROL="${ADMISSION_CONTROL},PodSecurityPolicy"
   fi

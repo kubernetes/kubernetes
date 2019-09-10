@@ -36,7 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/probe"
 	execprobe "k8s.io/kubernetes/pkg/probe/exec"
 	httpprobe "k8s.io/kubernetes/pkg/probe/http"
-	tcprobe "k8s.io/kubernetes/pkg/probe/tcp"
+	tcpprobe "k8s.io/kubernetes/pkg/probe/tcp"
 	"k8s.io/utils/exec"
 
 	"k8s.io/klog"
@@ -44,7 +44,7 @@ import (
 
 const maxProbeRetries = 3
 
-// Prober helps to check the liveness/readiness of a container.
+// Prober helps to check the liveness/readiness/startup of a container.
 type prober struct {
 	exec execprobe.Prober
 	// probe types needs different httprobe instances so they don't
@@ -52,7 +52,8 @@ type prober struct {
 	// same host:port and transient failures. See #49740.
 	readinessHTTP httpprobe.Prober
 	livenessHTTP  httpprobe.Prober
-	tcp           tcprobe.Prober
+	startupHTTP   httpprobe.Prober
+	tcp           tcpprobe.Prober
 	runner        kubecontainer.ContainerCommandRunner
 
 	refManager *kubecontainer.RefManager
@@ -71,7 +72,8 @@ func newProber(
 		exec:          execprobe.New(),
 		readinessHTTP: httpprobe.New(followNonLocalRedirects),
 		livenessHTTP:  httpprobe.New(followNonLocalRedirects),
-		tcp:           tcprobe.New(),
+		startupHTTP:   httpprobe.New(followNonLocalRedirects),
+		tcp:           tcpprobe.New(),
 		runner:        runner,
 		refManager:    refManager,
 		recorder:      recorder,
@@ -86,8 +88,10 @@ func (pb *prober) probe(probeType probeType, pod *v1.Pod, status v1.PodStatus, c
 		probeSpec = container.ReadinessProbe
 	case liveness:
 		probeSpec = container.LivenessProbe
+	case startup:
+		probeSpec = container.StartupProbe
 	default:
-		return results.Failure, fmt.Errorf("Unknown probe type: %q", probeType)
+		return results.Failure, fmt.Errorf("unknown probe type: %q", probeType)
 	}
 
 	ctrName := fmt.Sprintf("%s:%s", format.Pod(pod), container.Name)
@@ -174,11 +178,14 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		url := formatURL(scheme, host, port, path)
 		headers := buildHeader(p.HTTPGet.HTTPHeaders)
 		klog.V(4).Infof("HTTP-Probe Headers: %v", headers)
-		if probeType == liveness {
+		switch probeType {
+		case liveness:
 			return pb.livenessHTTP.Probe(url, headers, timeout)
+		case startup:
+			return pb.startupHTTP.Probe(url, headers, timeout)
+		default:
+			return pb.readinessHTTP.Probe(url, headers, timeout)
 		}
-		// readiness
-		return pb.readinessHTTP.Probe(url, headers, timeout)
 	}
 	if p.TCPSocket != nil {
 		port, err := extractPort(p.TCPSocket.Port, container)
@@ -193,7 +200,7 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		return pb.tcp.Probe(host, port, timeout)
 	}
 	klog.Warningf("Failed to find probe builder for container: %v", container)
-	return probe.Unknown, "", fmt.Errorf("Missing probe handler for %s:%s", format.Pod(pod), container.Name)
+	return probe.Unknown, "", fmt.Errorf("missing probe handler for %s:%s", format.Pod(pod), container.Name)
 }
 
 func extractPort(param intstr.IntOrString, container v1.Container) (int, error) {
@@ -210,7 +217,7 @@ func extractPort(param intstr.IntOrString, container v1.Container) (int, error) 
 			}
 		}
 	default:
-		return port, fmt.Errorf("IntOrString had no kind: %+v", param)
+		return port, fmt.Errorf("intOrString had no kind: %+v", param)
 	}
 	if port > 0 && port < 65536 {
 		return port, nil

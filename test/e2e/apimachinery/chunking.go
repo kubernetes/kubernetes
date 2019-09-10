@@ -71,7 +71,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				}
 				e2elog.Logf("Got an error creating template %d: %v", i, err)
 			}
-			ginkgo.Fail("Unable to create template %d, exiting", i)
+			e2elog.Fail("Unable to create template %d, exiting", i)
 		})
 	})
 
@@ -174,7 +174,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		opts.Continue = inconsistentToken
 		list, err = client.List(opts)
 		framework.ExpectNoError(err, "failed to list pod templates in namespace: %s, given inconsistent continue token %s and limit: %d", ns, opts.Continue, opts.Limit)
-		gomega.Expect(list.ResourceVersion).ToNot(gomega.Equal(firstRV))
+		framework.ExpectNotEqual(list.ResourceVersion, firstRV)
 		gomega.Expect(len(list.Items)).To(gomega.BeNumerically("==", opts.Limit))
 		found := int(oneTenth)
 

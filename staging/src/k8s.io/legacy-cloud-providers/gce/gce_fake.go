@@ -1,3 +1,5 @@
+// +build !providerless
+
 /*
 Copyright 2018 The Kubernetes Authors.
 
@@ -17,8 +19,7 @@ limitations under the License.
 package gce
 
 import (
-	"fmt"
-	"net/http"
+	"context"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	compute "google.golang.org/api/compute/v1"
@@ -48,12 +49,6 @@ func DefaultTestClusterValues() TestClusterValues {
 	}
 }
 
-type fakeRoundTripper struct{}
-
-func (*fakeRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {
-	return nil, fmt.Errorf("err: test used fake http client")
-}
-
 // Stubs ClusterID so that ClusterID.getOrInitialize() does not require calling
 // gce.Initialize()
 func fakeClusterID(clusterID string) ClusterID {
@@ -67,8 +62,7 @@ func fakeClusterID(clusterID string) ClusterID {
 
 // NewFakeGCECloud constructs a fake GCE Cloud from the cluster values.
 func NewFakeGCECloud(vals TestClusterValues) *Cloud {
-	client := &http.Client{Transport: &fakeRoundTripper{}}
-	service, _ := compute.New(client)
+	service, _ := compute.NewService(context.Background())
 	gce := &Cloud{
 		region:           vals.Region,
 		service:          service,

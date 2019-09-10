@@ -26,8 +26,10 @@ import (
 	restful "github.com/emicklei/go-restful"
 	"github.com/go-openapi/spec"
 
+	"k8s.io/klog"
+
 	"k8s.io/apiserver/pkg/server"
-	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
+	v1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	"k8s.io/kube-openapi/pkg/aggregator"
 	"k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
@@ -37,7 +39,7 @@ import (
 // SpecAggregator calls out to http handlers of APIServices and merges specs. It keeps state of the last
 // known specs including the http etag.
 type SpecAggregator interface {
-	AddUpdateAPIService(handler http.Handler, apiService *apiregistration.APIService) error
+	AddUpdateAPIService(handler http.Handler, apiService *v1.APIService) error
 	UpdateAPIServiceSpec(apiServiceName string, spec *spec.Swagger, etag string) error
 	RemoveAPIServiceSpec(apiServiceName string) error
 	GetAPIServiceInfo(apiServiceName string) (handler http.Handler, etag string, exists bool)
@@ -104,6 +106,14 @@ func BuildAndRegisterAggregator(downloader *Downloader, delegationTarget server.
 	}
 
 	// Build initial spec to serve.
+	klog.V(2).Infof("Building initial OpenAPI spec")
+	defer func(start time.Time) {
+		duration := time.Now().Sub(start)
+		klog.V(2).Infof("Finished initial OpenAPI spec generation after %v", duration)
+
+		regenerationCounter.With(map[string]string{"apiservice": "*", "reason": "startup"})
+		regenerationDurationGauge.With(map[string]string{"reason": "startup"}).Set(duration.Seconds())
+	}(time.Now())
 	specToServe, err := s.buildOpenAPISpec()
 	if err != nil {
 		return nil, err
@@ -134,7 +144,7 @@ var _ SpecAggregator = &specAggregator{}
 
 // This function is not thread safe as it only being called on startup.
 func (s *specAggregator) addLocalSpec(spec *spec.Swagger, localHandler http.Handler, name, etag string) {
-	localAPIService := apiregistration.APIService{}
+	localAPIService := v1.APIService{}
 	localAPIService.Name = name
 	s.openAPISpecs[name] = &openAPISpecInfo{
 		etag:       etag,
@@ -147,7 +157,7 @@ func (s *specAggregator) addLocalSpec(spec *spec.Swagger, localHandler http.Hand
 // openAPISpecInfo is used to store OpenAPI spec with its priority.
 // It can be used to sort specs with their priorities.
 type openAPISpecInfo struct {
-	apiService apiregistration.APIService
+	apiService v1.APIService
 
 	// Specification of this API Service. If null then the spec is not loaded yet.
 	spec    *spec.Swagger
@@ -202,6 +212,7 @@ func (s *specAggregator) tryUpdatingServiceSpecs(specInfo *openAPISpecInfo) erro
 	if specInfo == nil {
 		return fmt.Errorf("invalid input: specInfo must be non-nil")
 	}
+	_, updated := s.openAPISpecs[specInfo.apiService.Name]
 	origSpecInfo, existedBefore := s.openAPISpecs[specInfo.apiService.Name]
 	s.openAPISpecs[specInfo.apiService.Name] = specInfo
 
@@ -209,6 +220,19 @@ func (s *specAggregator) tryUpdatingServiceSpecs(specInfo *openAPISpecInfo) erro
 	if existedBefore && origSpecInfo != nil && origSpecInfo.etag == specInfo.etag {
 		return nil
 	}
+	klog.V(2).Infof("Updating OpenAPI spec because %s is updated", specInfo.apiService.Name)
+	defer func(start time.Time) {
+		duration := time.Now().Sub(start)
+		klog.V(2).Infof("Finished OpenAPI spec generation after %v", duration)
+
+		reason := "add"
+		if updated {
+			reason = "update"
+		}
+
+		regenerationCounter.With(map[string]string{"apiservice": specInfo.apiService.Name, "reason": reason})
+		regenerationDurationGauge.With(map[string]string{"reason": reason}).Set(duration.Seconds())
+	}(time.Now())
 	if err := s.updateOpenAPISpec(); err != nil {
 		if existedBefore {
 			s.openAPISpecs[specInfo.apiService.Name] = origSpecInfo
@@ -228,6 +252,14 @@ func (s *specAggregator) tryDeleteServiceSpecs(apiServiceName string) error {
 		return nil
 	}
 	delete(s.openAPISpecs, apiServiceName)
+	klog.V(2).Infof("Updating OpenAPI spec because %s is removed", apiServiceName)
+	defer func(start time.Time) {
+		duration := time.Now().Sub(start)
+		klog.V(2).Infof("Finished OpenAPI spec generation after %v", duration)
+
+		regenerationCounter.With(map[string]string{"apiservice": apiServiceName, "reason": "delete"})
+		regenerationDurationGauge.With(map[string]string{"reason": "delete"}).Set(duration.Seconds())
+	}(time.Now())
 	if err := s.updateOpenAPISpec(); err != nil {
 		s.openAPISpecs[apiServiceName] = orgSpecInfo
 		return err
@@ -260,7 +292,7 @@ func (s *specAggregator) UpdateAPIServiceSpec(apiServiceName string, spec *spec.
 }
 
 // AddUpdateAPIService adds or updates the api service. It is thread safe.
-func (s *specAggregator) AddUpdateAPIService(handler http.Handler, apiService *apiregistration.APIService) error {
+func (s *specAggregator) AddUpdateAPIService(handler http.Handler, apiService *v1.APIService) error {
 	s.rwMutex.Lock()
 	defer s.rwMutex.Unlock()
 
