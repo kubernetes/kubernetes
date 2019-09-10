@@ -32,6 +32,7 @@ import (
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/endpoints/handlers/negotiation"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
@@ -65,10 +66,37 @@ func getResourceHandler(scope *RequestScope, getter getterFunc) http.HandlerFunc
 			return
 		}
 
+		// allow the authenticator to scope the set of objects returned by this query
+		var matchingSelector labels.Selector = labels.Everything()
+		if user, ok := request.UserFrom(ctx); ok {
+			parts := user.GetExtra()["restrict.auth.k8s.io/filter"]
+			if len(parts) > 1 {
+				scope.err(errors.NewInternalError(fmt.Errorf("the authenticator returned multiple values for 'restrict.auth.k8s.io/filter'")), w, req)
+				return
+			}
+			if len(parts) == 1 {
+				selector, err := labels.Parse(parts[0])
+				if err != nil {
+					scope.err(errors.NewInternalError(fmt.Errorf("unable to construct filter query from authenticator")), w, req)
+					return
+				}
+				matchingSelector = selector
+			}
+		}
+
 		result, err := getter(ctx, name, req, trace)
 		if err != nil {
 			scope.err(err, w, req)
 			return
+		}
+
+		// TODO: add label selector to GetOptions and have storage respect it (otherwise it is very
+		// difficult to handle subresources correctly since parent lookup happens in the registry)
+		if obj, ok := result.(metav1.Object); ok {
+			if !matchingSelector.Matches(labels.Set(obj.GetLabels())) {
+				scope.err(errors.NewNotFound(scope.Resource.GroupResource(), name), w, req)
+				return
+			}
 		}
 
 		trace.Step("About to write a response")
@@ -231,6 +259,29 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 				}
 			} else {
 				opts.FieldSelector = nameSelector
+			}
+		}
+
+		// allow the authenticator to scope the set of objects returned by this query
+		if user, ok := request.UserFrom(ctx); ok {
+			parts := user.GetExtra()["restrict.auth.k8s.io/filter"]
+			if len(parts) > 1 {
+				scope.err(errors.NewInternalError(fmt.Errorf("the authenticator returned multiple values for 'restrict.auth.k8s.io/filter'")), w, req)
+				return
+			}
+			if len(parts) == 1 {
+				selector, err := labels.Parse(parts[0])
+				if err != nil {
+					scope.err(errors.NewInternalError(fmt.Errorf("unable to construct filter query from authenticator")), w, req)
+					return
+				}
+				required, selectable := selector.Requirements()
+				switch {
+				case !selectable:
+					opts.LabelSelector = labels.Nothing()
+				case len(required) > 0:
+					opts.LabelSelector = opts.LabelSelector.DeepCopySelector().Add(required...)
+				}
 			}
 		}
 

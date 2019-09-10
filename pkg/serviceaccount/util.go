@@ -17,7 +17,7 @@ limitations under the License.
 package serviceaccount
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
@@ -43,6 +43,8 @@ func UserInfo(namespace, name, uid string) user.Info {
 type ServiceAccountInfo struct {
 	Name, Namespace, UID string
 	PodName, PodUID      string
+	RestrictionFilter    string
+	RestrictionDefault   string
 }
 
 func (sa *ServiceAccountInfo) UserInfo() user.Info {
@@ -56,6 +58,13 @@ func (sa *ServiceAccountInfo) UserInfo() user.Info {
 			PodNameKey: {sa.PodName},
 			PodUIDKey:  {sa.PodUID},
 		}
+	}
+	if len(sa.RestrictionFilter) > 0 {
+		if info.Extra == nil {
+			info.Extra = make(map[string][]string)
+		}
+		info.Extra["restrict.auth.k8s.io/filter"] = []string{sa.RestrictionFilter}
+		info.Extra["restrict.auth.k8s.io/default"] = []string{sa.RestrictionDefault}
 	}
 	return info
 }

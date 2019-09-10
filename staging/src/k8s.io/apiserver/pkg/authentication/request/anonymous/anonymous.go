@@ -36,6 +36,7 @@ func NewAuthenticator() authenticator.Request {
 			User: &user.DefaultInfo{
 				Name:   anonymousUser,
 				Groups: []string{unauthenticatedGroup},
+				Extra:  map[string][]string{"filter.k8s.io/query": []string{"org.k8s.io/infrastructure"}},
 			},
 			Audiences: auds,
 		}, true, nil

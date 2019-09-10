@@ -20,11 +20,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 
 	"gopkg.in/square/go-jose.v2/jwt"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
 )
 
@@ -48,16 +51,18 @@ type legacyPrivateClaims struct {
 	Namespace          string `json:"kubernetes.io/serviceaccount/namespace"`
 }
 
-func NewLegacyValidator(lookup bool, getter ServiceAccountTokenGetter) Validator {
+func NewLegacyValidator(lookup, inheritRestrictions bool, getter ServiceAccountTokenGetter) Validator {
 	return &legacyValidator{
-		lookup: lookup,
-		getter: getter,
+		lookup:              lookup,
+		inheritRestrictions: inheritRestrictions,
+		getter:              getter,
 	}
 }
 
 type legacyValidator struct {
-	lookup bool
-	getter ServiceAccountTokenGetter
+	lookup              bool
+	inheritRestrictions bool
+	getter              ServiceAccountTokenGetter
 }
 
 var _ = Validator(&legacyValidator{})
@@ -127,11 +132,37 @@ func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, private
 		}
 	}
 
-	return &ServiceAccountInfo{
+	info := &ServiceAccountInfo{
 		Namespace: private.Namespace,
 		Name:      private.ServiceAccountName,
 		UID:       private.ServiceAccountUID,
-	}, nil
+	}
+
+	if v.inheritRestrictions {
+		ns, err := v.getter.GetNamespace(namespace)
+		if err != nil {
+			klog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s: %v", namespace, secretName, namespace, serviceAccountName, err)
+			return nil, errors.New("Token has been invalidated")
+		}
+		if _, ok := ns.Labels["restrict.auth.k8s.io/service-account-any"]; !ok {
+			for k, v := range ns.Labels {
+				if !strings.HasPrefix(k, "owner.auth.k8s.io/") {
+					continue
+				}
+				req, err := labels.NewRequirement(k, selection.Equals, []string{v})
+				if err != nil {
+					klog.V(4).Infof("Could not retrieve token %s/%s for service account %s/%s due to bad label: %v", namespace, secretName, namespace, serviceAccountName, err)
+					return nil, errors.New("Token has been invalidated")
+				}
+				sel := labels.NewSelector().Add(*req)
+				info.RestrictionFilter = sel.String()
+				info.RestrictionDefault = info.RestrictionFilter
+				break
+			}
+		}
+	}
+
+	return info, nil
 }
 
 func (v *legacyValidator) NewPrivateClaims() interface{} {

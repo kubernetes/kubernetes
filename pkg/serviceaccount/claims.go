@@ -19,9 +19,12 @@ package serviceaccount
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"gopkg.in/square/go-jose.v2/jwt"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/selection"
 	"k8s.io/klog"
 
 	apiserverserviceaccount "k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -80,14 +83,16 @@ func Claims(sa core.ServiceAccount, pod *core.Pod, secret *core.Secret, expirati
 	return sc, pc
 }
 
-func NewValidator(getter ServiceAccountTokenGetter) Validator {
+func NewValidator(inheritRestrictions bool, getter ServiceAccountTokenGetter) Validator {
 	return &validator{
-		getter: getter,
+		inheritRestrictions: inheritRestrictions,
+		getter:              getter,
 	}
 }
 
 type validator struct {
-	getter ServiceAccountTokenGetter
+	inheritRestrictions bool
+	getter              ServiceAccountTokenGetter
 }
 
 var _ = Validator(&validator{})
@@ -166,13 +171,39 @@ func (v *validator) Validate(_ string, public *jwt.Claims, privateObj interface{
 		podUID = podref.UID
 	}
 
-	return &ServiceAccountInfo{
+	info := &ServiceAccountInfo{
 		Namespace: private.Kubernetes.Namespace,
 		Name:      private.Kubernetes.Svcacct.Name,
 		UID:       private.Kubernetes.Svcacct.UID,
 		PodName:   podName,
 		PodUID:    podUID,
-	}, nil
+	}
+
+	if v.inheritRestrictions {
+		ns, err := v.getter.GetNamespace(namespace)
+		if err != nil {
+			klog.V(4).Infof("Could not retrieve namespace for service account %s/%s: %v", namespace, saref.Name, err)
+			return nil, errors.New("Token has been invalidated")
+		}
+		if _, ok := ns.Labels["restrict.auth.k8s.io/service-account-any"]; !ok {
+			for k, v := range ns.Labels {
+				if !strings.HasPrefix(k, "owner.auth.k8s.io/") {
+					continue
+				}
+				req, err := labels.NewRequirement(k, selection.Equals, []string{v})
+				if err != nil {
+					klog.V(4).Infof("Could not retrieve namespace for service account %s/%s, invalid namespace labels: %v", namespace, saref.Name, err)
+					return nil, errors.New("Token has been invalidated")
+				}
+				sel := labels.NewSelector().Add(*req)
+				info.RestrictionFilter = sel.String()
+				info.RestrictionDefault = info.RestrictionFilter
+				break
+			}
+		}
+	}
+
+	return info, nil
 }
 
 func (v *validator) NewPrivateClaims() interface{} {

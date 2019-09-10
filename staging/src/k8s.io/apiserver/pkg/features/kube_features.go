@@ -77,6 +77,14 @@ const (
 	// all at once.
 	APIListChunking featuregate.Feature = "APIListChunking"
 
+	// owner: @smarterclayton
+	// alpha: v1.17
+	//
+	// Allow cluster-scoped resources to be restricted based on characteristics
+	// of the user for better subdivision of critical security resources within a
+	// single cluster.
+	ClusterResourceRestriction featuregate.Feature = "ClusterResourceRestriction"
+
 	// owner: @apelisse
 	// alpha: v1.12
 	// beta: v1.13
@@ -149,6 +157,8 @@ func init() {
 // To add a new feature, define a key for it above and add it here. The features will be
 // available throughout Kubernetes binaries.
 var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureSpec{
+	ClusterResourceRestriction: {Default: true, PreRelease: featuregate.Alpha},
+
 	StreamingProxyRedirects: {Default: true, PreRelease: featuregate.Beta},
 	ValidateProxyRedirects:  {Default: true, PreRelease: featuregate.Beta},
 	AdvancedAuditing:        {Default: true, PreRelease: featuregate.GA},

@@ -587,15 +587,16 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
-	genericfeatures.StreamingProxyRedirects: {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.ValidateProxyRedirects:  {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.AdvancedAuditing:        {Default: true, PreRelease: featuregate.GA},
-	genericfeatures.DynamicAuditing:         {Default: false, PreRelease: featuregate.Alpha},
-	genericfeatures.APIResponseCompression:  {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.APIListChunking:         {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.DryRun:                  {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.ServerSideApply:         {Default: true, PreRelease: featuregate.Beta},
-	genericfeatures.RequestManagement:       {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.ClusterResourceRestriction: {Default: true, PreRelease: featuregate.Alpha},
+	genericfeatures.StreamingProxyRedirects:    {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.ValidateProxyRedirects:     {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.AdvancedAuditing:           {Default: true, PreRelease: featuregate.GA},
+	genericfeatures.DynamicAuditing:            {Default: false, PreRelease: featuregate.Alpha},
+	genericfeatures.APIResponseCompression:     {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.APIListChunking:            {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.DryRun:                     {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.ServerSideApply:            {Default: true, PreRelease: featuregate.Beta},
+	genericfeatures.RequestManagement:          {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from apiextensions-apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	podpriority "k8s.io/kubernetes/plugin/pkg/admission/priority"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota"
+	"k8s.io/kubernetes/plugin/pkg/admission/resourcerestriction"
 	"k8s.io/kubernetes/plugin/pkg/admission/runtimeclass"
 	"k8s.io/kubernetes/plugin/pkg/admission/security/podsecuritypolicy"
 	"k8s.io/kubernetes/plugin/pkg/admission/securitycontext/scdeny"
@@ -55,6 +56,7 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -63,6 +65,7 @@ import (
 var AllOrderedPlugins = []string{
 	admit.PluginName,                        // AlwaysAdmit
 	autoprovision.PluginName,                // NamespaceAutoProvision
+	resourcerestriction.PluginName,          // ResourceRestriction
 	lifecycle.PluginName,                    // NamespaceLifecycle
 	exists.PluginName,                       // NamespaceExists
 	scdeny.PluginName,                       // SecurityContextDeny
@@ -126,6 +129,7 @@ func RegisterAllAdmissionPlugins(plugins *admission.Plugins) {
 	setdefault.Register(plugins)
 	resize.Register(plugins)
 	storageobjectinuseprotection.Register(plugins)
+	resourcerestriction.Register(plugins)
 }
 
 // DefaultOffAdmissionPlugins get admission plugins off by default for kube-apiserver.
@@ -143,6 +147,10 @@ func DefaultOffAdmissionPlugins() sets.String {
 		storageobjectinuseprotection.PluginName, //StorageObjectInUseProtection
 		podpriority.PluginName,                  //PodPriority
 	)
+
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.ClusterResourceRestriction) {
+		defaultOnPlugins.Insert(resourcerestriction.PluginName) //ResourceRestriction
+	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
 		defaultOnPlugins.Insert(nodetaint.PluginName) //TaintNodesByCondition

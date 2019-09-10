@@ -532,6 +532,7 @@ func BuildAuthenticator(s *options.ServerRunOptions, extclient clientgoclientset
 			versionedInformer.Core().V1().Secrets().Lister(),
 			versionedInformer.Core().V1().ServiceAccounts().Lister(),
 			versionedInformer.Core().V1().Pods().Lister(),
+			versionedInformer.Core().V1().Namespaces().Lister(),
 		)
 	}
 	authenticatorConfig.BootstrapTokenAuthenticator = bootstrap.NewTokenAuthenticator(
