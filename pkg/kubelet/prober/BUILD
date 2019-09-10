@@ -58,6 +58,7 @@ go_test(
         "//pkg/kubelet/prober/results:go_default_library",
         "//pkg/kubelet/status:go_default_library",
         "//pkg/kubelet/status/testing:go_default_library",
+        "//pkg/kubelet/util/ioutils:go_default_library",
         "//pkg/probe:go_default_library",
         "//pkg/probe/exec:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
