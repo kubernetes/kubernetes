@@ -38,6 +38,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/replicaset"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -465,6 +466,70 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			if got > expected {
 				e2elog.Failf("pods of ReplicaSet%d have been over-preempted: expect %v pod names, but got %d", i+1, expected, got)
 			}
+		}
+	})
+	// this test makes sure that Pods with a higher PriorityClass via their PriorityClassName start earlier than Pods with a lower PriorityClassName
+	ginkgo.It("should ensure Pods using a PriorityClassName which is higher begins first", func() {
+		podNamesSeen := []string{}
+		stopCh := make(chan struct{})
+		pods := []v1.Pod{}
+		// define Pod specs - order in from highest to lowest priority
+		ginkgo.By("Defining Pod specs")
+		for i := 4; i >= 1; i-- {
+			pods = append(pods, v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: fmt.Sprintf("priority-class-p%v", i),
+				},
+				Spec: v1.PodSpec{
+					Containers: []v1.Container{{
+						Name:    "priority-class",
+						Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+						Command: []string{"sleep", "3600"},
+					}},
+					PriorityClassName: fmt.Sprintf("p%v", i),
+					RestartPolicy:     v1.RestartPolicyNever,
+				},
+			})
+		}
+		// watch for when new pods come up
+		_, podController := cache.NewInformer(
+			&cache.ListWatch{
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					obj, err := f.ClientSet.CoreV1().Pods(ns).List(options)
+					return runtime.Object(obj), err
+				},
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return f.ClientSet.CoreV1().Pods(ns).Watch(options)
+				},
+			},
+			&v1.Pod{},
+			0,
+			cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					if pod, ok := obj.(*v1.Pod); ok {
+						fmt.Println(fmt.Sprintf("Seen Pod %v/%v: %v", len(podNamesSeen)+1, len(pods), pod.Name))
+						podNamesSeen = append(podNamesSeen, pod.Name)
+					}
+				},
+			},
+		)
+
+		go podController.Run(stopCh)
+		defer close(stopCh)
+
+		ginkgo.By("Creating Pods with priority")
+		for podNum := 0; podNum < len(pods); podNum++ {
+			podName := pods[podNum].ObjectMeta.Name
+			fmt.Println(fmt.Sprintf("Creating Pod %v/%v: %v", podNum+1, len(pods), podName))
+			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&pods[podNum])
+			framework.ExpectNoError(err, "Failed creating Pod")
+		}
+		fmt.Println(fmt.Sprintf("Pods seen so far: %v", podNamesSeen))
+		framework.ExpectEqual(len(podNamesSeen), len(pods), "PodsSeen doesn't match Pods created")
+
+		for podNum := 0; podNum < len(pods); podNum++ {
+			podName := pods[podNum].ObjectMeta.Name
+			framework.ExpectEqual(podNamesSeen[podNum], podName, "Pods preempted in incorrect order")
 		}
 	})
 })
