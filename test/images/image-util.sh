@@ -35,7 +35,7 @@ listArchs() {
 # Returns baseimage need to used in Dockerfile for any given architecture
 getBaseImage() {
   arch=$1
-  echo $(grep "${arch}=" BASEIMAGE | cut -d= -f2)
+  grep "${arch}=" BASEIMAGE | cut -d= -f2
 }
 
 # This function will build test image for all the architectures
@@ -46,7 +46,7 @@ build() {
   if [[ -f ${IMAGE}/BASEIMAGE ]]; then
     archs=$(listArchs)
   else
-    archs=${!QEMUARCHS[@]}
+    archs=${!QEMUARCHS[*]}
   fi
 
   kube::util::ensure-gnu-sed
@@ -77,7 +77,7 @@ build() {
     fi
 
     # copy the qemu-*-static binary to docker image to build the multi architecture image on x86 platform
-    if [[ $(grep "CROSS_BUILD_" Dockerfile) ]]; then
+    if grep -q "CROSS_BUILD_" Dockerfile; then
       if [[ "${arch}" == "amd64" ]]; then
         ${SED} -i "/CROSS_BUILD_/d" Dockerfile
       else
@@ -119,7 +119,7 @@ push() {
   if [[ -f ${IMAGE}/BASEIMAGE ]]; then
     archs=$(listArchs)
   else
-    archs=${!QEMUARCHS[@]}
+    archs=${!QEMUARCHS[*]}
   fi
   for arch in ${archs}; do
     docker push "${REGISTRY}/${IMAGE}-${arch}:${TAG}"
@@ -130,8 +130,8 @@ push() {
   # The manifest command is still experimental as of Docker 18.09.2
   export DOCKER_CLI_EXPERIMENTAL="enabled"
   # Make archs list into image manifest. Eg: 'amd64 ppc64le' to '${REGISTRY}/${IMAGE}-amd64:${TAG} ${REGISTRY}/${IMAGE}-ppc64le:${TAG}'
-  manifest=$(echo "$archs" | ${SED} -e "s~[^ ]*~$REGISTRY\/$IMAGE\-&:$TAG~g")
-  docker manifest create --amend "${REGISTRY}/${IMAGE}:${TAG}" ${manifest}
+  while IFS='' read -r line; do manifest+=("$line"); done < <(echo "$archs" | ${SED} -e "s~[^ ]*~$REGISTRY\/$IMAGE\-&:$TAG~g")
+  docker manifest create --amend "${REGISTRY}/${IMAGE}:${TAG}" "${manifest[@]}"
   for arch in ${archs}; do
     docker manifest annotate --arch "${arch}" "${REGISTRY}/${IMAGE}:${TAG}" "${REGISTRY}/${IMAGE}-${arch}:${TAG}"
   done
@@ -141,10 +141,10 @@ push() {
 # This function is for building the go code
 bin() {
   local arch_prefix=""
-  if [[ "${ARCH}" == "arm" ]]; then
+  if [[ "${ARCH:-}" == "arm" ]]; then
     arch_prefix="GOARM=${GOARM:-7}"
   fi
-  for SRC in $@;
+  for SRC in "$@";
   do
   docker run --rm -it -v "${TARGET}:${TARGET}:Z" -v "${KUBE_ROOT}":/go/src/k8s.io/kubernetes:Z \
         golang:"${GOLANG_VERSION}" \
