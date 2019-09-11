@@ -381,9 +381,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  rollback of updates to a DaemonSet.
 	*/
 	framework.ConformanceIt("should rollback without unnecessary restarts", func() {
-		if framework.TestContext.CloudConfig.NumNodes < 2 {
-			framework.Logf("Conformance test suite needs a cluster with at least 2 nodes.")
-		}
+		schedulableNodes := framework.GetReadySchedulableNodesOrDie(c)
+		Expect(len(schedulableNodes.Items)).To(BeNumerically(">", 1), "Conformance test suite needs a cluster with at least 2 nodes.")
 		framework.Logf("Create a RollingUpdate DaemonSet")
 		label := map[string]string{daemonsetNameLabel: dsName}
 		ds := newDaemonSet(dsName, image, label)
@@ -421,7 +420,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 				framework.Failf("unexpected pod found, image = %s", image)
 			}
 		}
-		if framework.TestContext.CloudConfig.NumNodes < 2 {
+		schedulableNodes = framework.GetReadySchedulableNodesOrDie(c)
+		if len(schedulableNodes.Items) < 2 {
 			Expect(len(existingPods)).To(Equal(0))
 		} else {
 			Expect(len(existingPods)).NotTo(Equal(0))
