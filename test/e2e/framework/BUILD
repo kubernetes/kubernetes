@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
@@ -28,6 +26,7 @@ go_library(
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
@@ -39,8 +38,6 @@ go_library(
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/master/ports:go_default_library",
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
-        "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -155,4 +152,5 @@ filegroup(
         "//test/e2e/framework/volume:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
