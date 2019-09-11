@@ -55,6 +55,8 @@ type priorityPlugin struct {
 	*admission.Handler
 	client kubernetes.Interface
 	lister schedulingv1listers.PriorityClassLister
+	// We are initializing them here because of performance impact of checking featuregates.
+	resourceQuotaFeatureGateEnabled bool
 }
 
 var _ admission.MutationInterface = &priorityPlugin{}
@@ -65,7 +67,8 @@ var _ = genericadmissioninitializers.WantsExternalKubeClientSet(&priorityPlugin{
 // NewPlugin creates a new priority admission plugin.
 func newPlugin() *priorityPlugin {
 	return &priorityPlugin{
-		Handler: admission.NewHandler(admission.Create, admission.Update, admission.Delete),
+		Handler:                         admission.NewHandler(admission.Create, admission.Update, admission.Delete),
+		resourceQuotaFeatureGateEnabled: utilfeature.DefaultFeatureGate.Enabled(features.ResourceQuotaScopeSelectors),
 	}
 }
 
@@ -176,19 +179,27 @@ func (p *priorityPlugin) admitPod(a admission.Attributes) error {
 	}
 
 	if operation == admission.Create {
-		var priority int32
-		var preemptionPolicy *apiv1.PreemptionPolicy
+		var (
+			priority         int32
+			preemptionPolicy *apiv1.PreemptionPolicy
+		)
 		if len(pod.Spec.PriorityClassName) == 0 {
-			var err error
-			var pcName string
+			var (
+				err    error
+				pcName string
+			)
+
 			pcName, priority, preemptionPolicy, err = p.getDefaultPriority()
 			if err != nil {
 				return fmt.Errorf("failed to get default priority class: %v", err)
 			}
+
 			pod.Spec.PriorityClassName = pcName
 		} else {
 			pcName := pod.Spec.PriorityClassName
-			if !priorityClassPermittedInNamespace(pcName, a.GetNamespace()) {
+			// If ResourceQuotaScopeSelectors is enabled, we should let pods with critical priorityClass to be created
+			// any namespace where administrator wants it to be created.
+			if !p.resourceQuotaFeatureGateEnabled && !priorityClassPermittedInNamespace(pcName, a.GetNamespace()) {
 				return admission.NewForbidden(a, fmt.Errorf("pods with %v priorityClass is not permitted in %v namespace", pcName, a.GetNamespace()))
 			}
 
