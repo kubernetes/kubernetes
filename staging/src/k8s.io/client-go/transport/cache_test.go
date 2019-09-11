@@ -126,6 +126,8 @@ func TestTLSConfigKey(t *testing.T) {
 				GetCert: getCert,
 			},
 		},
+		"http2, http1.1": {TLS: TLSConfig{NextProtos: []string{"h2", "http/1.1"}}},
+		"http1.1-only":   {TLS: TLSConfig{NextProtos: []string{"http/1.1"}}},
 	}
 	for nameA, valueA := range uniqueConfigurations {
 		for nameB, valueB := range uniqueConfigurations {

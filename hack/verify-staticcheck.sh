@@ -25,6 +25,7 @@ source "${KUBE_ROOT}/hack/lib/util.sh"
 kube::golang::verify_go_version
 
 FOCUS="${1:-}"
+FOCUS="${FOCUS%/}" # Remove the ending "/"
 
 # See https://staticcheck.io/docs/checks
 CHECKS=(

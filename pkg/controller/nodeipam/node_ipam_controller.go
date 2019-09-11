@@ -33,7 +33,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
@@ -54,10 +53,11 @@ const (
 type Controller struct {
 	allocatorType ipam.CIDRAllocatorType
 
-	cloud        cloudprovider.Interface
-	clusterCIDRs []*net.IPNet
-	serviceCIDR  *net.IPNet
-	kubeClient   clientset.Interface
+	cloud                cloudprovider.Interface
+	clusterCIDRs         []*net.IPNet
+	serviceCIDR          *net.IPNet
+	secondaryServiceCIDR *net.IPNet
+	kubeClient           clientset.Interface
 	// Method for easy mocking in unittest.
 	lookupIP func(host string) ([]net.IP, error)
 
@@ -80,6 +80,7 @@ func NewNodeIpamController(
 	kubeClient clientset.Interface,
 	clusterCIDRs []*net.IPNet,
 	serviceCIDR *net.IPNet,
+	secondaryServiceCIDR *net.IPNet,
 	nodeCIDRMaskSize int,
 	allocatorType ipam.CIDRAllocatorType) (*Controller, error) {
 
@@ -120,12 +121,13 @@ func NewNodeIpamController(
 	}
 
 	ic := &Controller{
-		cloud:         cloud,
-		kubeClient:    kubeClient,
-		lookupIP:      net.LookupIP,
-		clusterCIDRs:  clusterCIDRs,
-		serviceCIDR:   serviceCIDR,
-		allocatorType: allocatorType,
+		cloud:                cloud,
+		kubeClient:           kubeClient,
+		lookupIP:             net.LookupIP,
+		clusterCIDRs:         clusterCIDRs,
+		serviceCIDR:          serviceCIDR,
+		secondaryServiceCIDR: secondaryServiceCIDR,
+		allocatorType:        allocatorType,
 	}
 
 	// TODO: Abstract this check into a generic controller manager should run method.
@@ -133,7 +135,7 @@ func NewNodeIpamController(
 		startLegacyIPAM(ic, nodeInformer, cloud, kubeClient, clusterCIDRs, serviceCIDR, nodeCIDRMaskSize)
 	} else {
 		var err error
-		ic.cidrAllocator, err = ipam.New(kubeClient, cloud, nodeInformer, ic.allocatorType, clusterCIDRs, ic.serviceCIDR, nodeCIDRMaskSize)
+		ic.cidrAllocator, err = ipam.New(kubeClient, cloud, nodeInformer, ic.allocatorType, clusterCIDRs, ic.serviceCIDR, ic.secondaryServiceCIDR, nodeCIDRMaskSize)
 		if err != nil {
 			return nil, err
 		}
@@ -152,7 +154,7 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 	klog.Infof("Starting ipam controller")
 	defer klog.Infof("Shutting down ipam controller")
 
-	if !controller.WaitForCacheSync("node", stopCh, nc.nodeInformerSynced) {
+	if !cache.WaitForNamedCacheSync("node", stopCh, nc.nodeInformerSynced) {
 		return
 	}
 

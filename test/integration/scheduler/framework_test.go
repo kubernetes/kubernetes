@@ -1564,8 +1564,9 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	}
 
 	// Create two pods.
-	waitingPod, err := createPausePod(cs,
-		initPausePod(cs, &pausePodConfig{Name: "waiting-pod", Namespace: context.ns.Name, Priority: &lowPriority, Resources: &resourceRequest}))
+	waitingPod := initPausePod(cs, &pausePodConfig{Name: "waiting-pod", Namespace: context.ns.Name, Priority: &lowPriority, Resources: &resourceRequest})
+	waitingPod.Spec.TerminationGracePeriodSeconds = new(int64)
+	waitingPod, err = createPausePod(cs, waitingPod)
 	if err != nil {
 		t.Errorf("Error while creating the waiting pod: %v", err)
 	}

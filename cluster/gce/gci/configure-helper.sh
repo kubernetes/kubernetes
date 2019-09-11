@@ -1396,13 +1396,17 @@ function start-node-problem-detector {
     local -r km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor.json"
     # TODO(random-liu): Handle this for alternative container runtime.
     local -r dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor.json"
+    local -r sm_config="${KUBE_HOME}/node-problem-detector/config/systemd-monitor.json"
+    local -r ssm_config="${KUBE_HOME}/node-problem-detector/config/system-stats-monitor.json"
+
     local -r custom_km_config="${KUBE_HOME}/node-problem-detector/config/kernel-monitor-counter.json"
-    local -r custom_dm_config="${KUBE_HOME}/node-problem-detector/config/docker-monitor-counter.json"
     local -r custom_sm_config="${KUBE_HOME}/node-problem-detector/config/systemd-monitor-counter.json"
+
     flags="${NPD_TEST_LOG_LEVEL:-"--v=2"} ${NPD_TEST_ARGS:-}"
     flags+=" --logtostderr"
-    flags+=" --system-log-monitors=${km_config},${dm_config}"
-    flags+=" --custom-plugin-monitors=${custom_km_config},${custom_dm_config},${custom_sm_config}"
+    flags+=" --config.system-log-monitor=${km_config},${dm_config},${sm_config}"
+    flags+=" --config.system-stats-monitor=${ssm_config}"
+    flags+=" --config.custom-plugin-monitor=${custom_km_config},${custom_sm_config}"
     local -r npd_port=${NODE_PROBLEM_DETECTOR_PORT:-20256}
     flags+=" --port=${npd_port}"
     if [[ -n "${EXTRA_NPD_ARGS:-}" ]]; then
@@ -2544,6 +2548,7 @@ function update-daemon-set-prometheus-to-sd-parameters {
 function update-event-exporter {
     local -r stackdriver_resource_model="${LOGGING_STACKDRIVER_RESOURCE_TYPES:-old}"
     sed -i -e "s@{{ exporter_sd_resource_model }}@${stackdriver_resource_model}@g" "$1"
+    sed -i -e "s@{{ exporter_sd_endpoint }}@${STACKDRIVER_TEST_ENDPOINT:-}@g" "$1"
 }
 
 function update-dashboard-controller {

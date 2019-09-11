@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	api "k8s.io/api/core/v1"
+	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -178,7 +179,12 @@ func TestPluginGetVolumeNameWithInline(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 
-	plug, tmpDir := newTestPlugin(t, nil)
+	modes := []storagev1beta1.VolumeLifecycleMode{
+		storagev1beta1.VolumeLifecyclePersistent,
+	}
+	driver := getTestCSIDriver(testDriver, nil, nil, modes)
+	client := fakeclient.NewSimpleClientset(driver)
+	plug, tmpDir := newTestPlugin(t, client)
 	defer os.RemoveAll(tmpDir)
 	testCases := []struct {
 		name       string
@@ -225,6 +231,7 @@ func TestPluginGetVolumeNameWithInline(t *testing.T) {
 
 func TestPluginCanSupport(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, false)()
 
 	tests := []struct {
 		name       string
@@ -403,9 +410,6 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
 
-	plug, tmpDir := newTestPlugin(t, nil)
-	defer os.RemoveAll(tmpDir)
-
 	testCases := []struct {
 		name       string
 		originSpec *volume.Spec
@@ -413,6 +417,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 		volHandle  string
 		podUID     types.UID
 		shouldFail bool
+		modes      []storagev1beta1.VolumeLifecycleMode
 	}{
 		{
 			name:       "construct spec1 from persistent spec",
@@ -420,6 +425,7 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			volHandle:  "testvol-handle1",
 			originSpec: volume.NewSpecFromPersistentVolume(makeTestPV("test.vol.id", 20, testDriver, "testvol-handle1"), true),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			modes:      []storagev1beta1.VolumeLifecycleMode{storagev1beta1.VolumeLifecyclePersistent},
 		},
 		{
 			name:       "construct spec2 from persistent spec",
@@ -427,18 +433,38 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 			volHandle:  "handle2",
 			originSpec: volume.NewSpecFromPersistentVolume(makeTestPV("spec2", 20, testDriver, "handle2"), true),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			modes:      []storagev1beta1.VolumeLifecycleMode{storagev1beta1.VolumeLifecyclePersistent},
+		},
+		{
+			name:       "construct spec2 from persistent spec, missing mode",
+			specVolID:  "spec2",
+			volHandle:  "handle2",
+			originSpec: volume.NewSpecFromPersistentVolume(makeTestPV("spec2", 20, testDriver, "handle2"), true),
+			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			modes:      []storagev1beta1.VolumeLifecycleMode{},
+			shouldFail: true,
 		},
 		{
 			name:       "construct spec from volume spec",
 			specVolID:  "volspec",
 			originSpec: volume.NewSpecFromVolume(makeTestVol("volspec", testDriver)),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			modes:      []storagev1beta1.VolumeLifecycleMode{storagev1beta1.VolumeLifecycleEphemeral},
 		},
 		{
 			name:       "construct spec from volume spec2",
 			specVolID:  "volspec2",
 			originSpec: volume.NewSpecFromVolume(makeTestVol("volspec2", testDriver)),
 			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			modes:      []storagev1beta1.VolumeLifecycleMode{storagev1beta1.VolumeLifecycleEphemeral},
+		},
+		{
+			name:       "construct spec from volume spec2, missing mode",
+			specVolID:  "volspec2",
+			originSpec: volume.NewSpecFromVolume(makeTestVol("volspec2", testDriver)),
+			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			modes:      []storagev1beta1.VolumeLifecycleMode{},
+			shouldFail: true,
 		},
 		{
 			name:       "missing spec",
@@ -451,6 +477,11 @@ func TestPluginConstructVolumeSpecWithInline(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			driver := getTestCSIDriver(testDriver, nil, nil, tc.modes)
+			client := fakeclient.NewSimpleClientset(driver)
+			plug, tmpDir := newTestPlugin(t, client)
+			defer os.RemoveAll(tmpDir)
+
 			mounter, err := plug.NewMounter(
 				tc.originSpec,
 				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
@@ -520,27 +551,27 @@ func TestPluginNewMounter(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
 	tests := []struct {
-		name          string
-		spec          *volume.Spec
-		podUID        types.UID
-		namespace     string
-		csiVolumeMode csiVolumeMode
-		shouldFail    bool
+		name                string
+		spec                *volume.Spec
+		podUID              types.UID
+		namespace           string
+		volumeLifecycleMode storagev1beta1.VolumeLifecycleMode
+		shouldFail          bool
 	}{
 		{
-			name:          "mounter from persistent volume source",
-			spec:          volume.NewSpecFromPersistentVolume(makeTestPV("test-pv1", 20, testDriver, testVol), true),
-			podUID:        types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			namespace:     "test-ns1",
-			csiVolumeMode: persistentVolumeMode,
+			name:                "mounter from persistent volume source",
+			spec:                volume.NewSpecFromPersistentVolume(makeTestPV("test-pv1", 20, testDriver, testVol), true),
+			podUID:              types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			namespace:           "test-ns1",
+			volumeLifecycleMode: storagev1beta1.VolumeLifecyclePersistent,
 		},
 		{
-			name:          "mounter from volume source",
-			spec:          volume.NewSpecFromVolume(makeTestVol("test-vol1", testDriver)),
-			podUID:        types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			namespace:     "test-ns2",
-			csiVolumeMode: ephemeralVolumeMode,
-			shouldFail:    true, // csi inline not enabled
+			name:                "mounter from volume source",
+			spec:                volume.NewSpecFromVolume(makeTestVol("test-vol1", testDriver)),
+			podUID:              types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			namespace:           "test-ns2",
+			volumeLifecycleMode: storagev1beta1.VolumeLifecycleEphemeral,
+			shouldFail:          true, // csi inline not enabled
 		},
 		{
 			name:       "mounter from no spec provided",
@@ -589,8 +620,8 @@ func TestPluginNewMounter(t *testing.T) {
 			if csiClient == nil {
 				t.Error("mounter csiClient is nil")
 			}
-			if csiMounter.csiVolumeMode != test.csiVolumeMode {
-				t.Error("unexpected driver mode:", csiMounter.csiVolumeMode)
+			if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
+				t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)
 			}
 
 			// ensure data file is created
@@ -619,8 +650,8 @@ func TestPluginNewMounter(t *testing.T) {
 			if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
 				t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
 			}
-			if data[volDataKey.csiVolumeMode] != string(test.csiVolumeMode) {
-				t.Error("volume data file unexpected csiVolumeMode:", data[volDataKey.csiVolumeMode])
+			if data[volDataKey.volumeLifecycleMode] != string(test.volumeLifecycleMode) {
+				t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
 			}
 		})
 	}
@@ -629,13 +660,23 @@ func TestPluginNewMounter(t *testing.T) {
 func TestPluginNewMounterWithInline(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, true)()
+	bothModes := []storagev1beta1.VolumeLifecycleMode{
+		storagev1beta1.VolumeLifecycleEphemeral,
+		storagev1beta1.VolumeLifecyclePersistent,
+	}
+	persistentMode := []storagev1beta1.VolumeLifecycleMode{
+		storagev1beta1.VolumeLifecyclePersistent,
+	}
+	ephemeralMode := []storagev1beta1.VolumeLifecycleMode{
+		storagev1beta1.VolumeLifecycleEphemeral,
+	}
 	tests := []struct {
-		name          string
-		spec          *volume.Spec
-		podUID        types.UID
-		namespace     string
-		csiVolumeMode csiVolumeMode
-		shouldFail    bool
+		name                string
+		spec                *volume.Spec
+		podUID              types.UID
+		namespace           string
+		volumeLifecycleMode storagev1beta1.VolumeLifecycleMode
+		shouldFail          bool
 	}{
 		{
 			name:       "mounter with missing spec",
@@ -651,97 +692,119 @@ func TestPluginNewMounterWithInline(t *testing.T) {
 			shouldFail: true,
 		},
 		{
-			name:          "mounter with persistent volume source",
-			spec:          volume.NewSpecFromPersistentVolume(makeTestPV("test-pv1", 20, testDriver, testVol), true),
-			podUID:        types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			namespace:     "test-ns1",
-			csiVolumeMode: persistentVolumeMode,
+			name:                "mounter with persistent volume source",
+			spec:                volume.NewSpecFromPersistentVolume(makeTestPV("test-pv1", 20, testDriver, testVol), true),
+			podUID:              types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			namespace:           "test-ns1",
+			volumeLifecycleMode: storagev1beta1.VolumeLifecyclePersistent,
 		},
 		{
-			name:          "mounter with volume source",
-			spec:          volume.NewSpecFromVolume(makeTestVol("test-vol1", testDriver)),
-			podUID:        types.UID(fmt.Sprintf("%08X", rand.Uint64())),
-			namespace:     "test-ns2",
-			csiVolumeMode: ephemeralVolumeMode,
+			name:                "mounter with volume source",
+			spec:                volume.NewSpecFromVolume(makeTestVol("test-vol1", testDriver)),
+			podUID:              types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			namespace:           "test-ns2",
+			volumeLifecycleMode: storagev1beta1.VolumeLifecycleEphemeral,
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			plug, tmpDir := newTestPlugin(t, nil)
-			defer os.RemoveAll(tmpDir)
+	runAll := func(t *testing.T, supported []storagev1beta1.VolumeLifecycleMode) {
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				driver := getTestCSIDriver(testDriver, nil, nil, supported)
+				fakeClient := fakeclient.NewSimpleClientset(driver)
+				plug, tmpDir := newTestPlugin(t, fakeClient)
+				defer os.RemoveAll(tmpDir)
 
-			registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
-			mounter, err := plug.NewMounter(
-				test.spec,
-				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: test.podUID, Namespace: test.namespace}},
-				volume.VolumeOptions{},
-			)
-			if test.shouldFail != (err != nil) {
-				t.Fatal("Unexpected error:", err)
-			}
-			if test.shouldFail && err != nil {
-				t.Log(err)
-				return
-			}
+				registerFakePlugin(testDriver, "endpoint", []string{"1.2.0"}, t)
 
-			if mounter == nil {
-				t.Fatal("failed to create CSI mounter")
-			}
-			csiMounter := mounter.(*csiMountMgr)
+				mounter, err := plug.NewMounter(
+					test.spec,
+					&api.Pod{ObjectMeta: meta.ObjectMeta{UID: test.podUID, Namespace: test.namespace}},
+					volume.VolumeOptions{},
+				)
 
-			// validate mounter fields
-			if string(csiMounter.driverName) != testDriver {
-				t.Error("mounter driver name not set")
-			}
-			if csiMounter.volumeID == "" {
-				t.Error("mounter volume id not set")
-			}
-			if csiMounter.pod == nil {
-				t.Error("mounter pod not set")
-			}
-			if string(csiMounter.podUID) != string(test.podUID) {
-				t.Error("mounter podUID not set")
-			}
-			csiClient, err := csiMounter.csiClientGetter.Get()
-			if csiClient == nil {
-				t.Error("mounter csiClient is nil")
-			}
-			if csiMounter.csiVolumeMode != test.csiVolumeMode {
-				t.Error("unexpected driver mode:", csiMounter.csiVolumeMode)
-			}
+				// Some test cases are meant to fail because their input data is broken.
+				shouldFail := test.shouldFail
+				// Others fail if the driver does not support the volume mode.
+				if !containsVolumeMode(supported, test.volumeLifecycleMode) {
+					shouldFail = true
+				}
+				if shouldFail != (err != nil) {
+					t.Fatal("Unexpected error:", err)
+				}
+				if shouldFail && err != nil {
+					t.Log(err)
+					return
+				}
 
-			// ensure data file is created
-			dataDir := path.Dir(mounter.GetPath())
-			dataFile := filepath.Join(dataDir, volDataFileName)
-			if _, err := os.Stat(dataFile); err != nil {
-				if os.IsNotExist(err) {
-					t.Errorf("data file not created %s", dataFile)
-				} else {
+				if mounter == nil {
+					t.Fatal("failed to create CSI mounter")
+				}
+				csiMounter := mounter.(*csiMountMgr)
+
+				// validate mounter fields
+				if string(csiMounter.driverName) != testDriver {
+					t.Error("mounter driver name not set")
+				}
+				if csiMounter.volumeID == "" {
+					t.Error("mounter volume id not set")
+				}
+				if csiMounter.pod == nil {
+					t.Error("mounter pod not set")
+				}
+				if string(csiMounter.podUID) != string(test.podUID) {
+					t.Error("mounter podUID not set")
+				}
+				csiClient, err := csiMounter.csiClientGetter.Get()
+				if csiClient == nil {
+					t.Error("mounter csiClient is nil")
+				}
+				if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
+					t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)
+				}
+
+				// ensure data file is created
+				dataDir := path.Dir(mounter.GetPath())
+				dataFile := filepath.Join(dataDir, volDataFileName)
+				if _, err := os.Stat(dataFile); err != nil {
+					if os.IsNotExist(err) {
+						t.Errorf("data file not created %s", dataFile)
+					} else {
+						t.Fatal(err)
+					}
+				}
+				data, err := loadVolumeData(dataDir, volDataFileName)
+				if err != nil {
 					t.Fatal(err)
 				}
-			}
-			data, err := loadVolumeData(dataDir, volDataFileName)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if data[volDataKey.specVolID] != csiMounter.spec.Name() {
-				t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
-			}
-			if data[volDataKey.volHandle] != csiMounter.volumeID {
-				t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
-			}
-			if data[volDataKey.driverName] != string(csiMounter.driverName) {
-				t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
-			}
-			if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
-				t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
-			}
-			if data[volDataKey.csiVolumeMode] != string(csiMounter.csiVolumeMode) {
-				t.Error("volume data file unexpected csiVolumeMode:", data[volDataKey.csiVolumeMode])
-			}
-		})
+				if data[volDataKey.specVolID] != csiMounter.spec.Name() {
+					t.Error("volume data file unexpected specVolID:", data[volDataKey.specVolID])
+				}
+				if data[volDataKey.volHandle] != csiMounter.volumeID {
+					t.Error("volume data file unexpected volHandle:", data[volDataKey.volHandle])
+				}
+				if data[volDataKey.driverName] != string(csiMounter.driverName) {
+					t.Error("volume data file unexpected driverName:", data[volDataKey.driverName])
+				}
+				if data[volDataKey.nodeName] != string(csiMounter.plugin.host.GetNodeName()) {
+					t.Error("volume data file unexpected nodeName:", data[volDataKey.nodeName])
+				}
+				if data[volDataKey.volumeLifecycleMode] != string(csiMounter.volumeLifecycleMode) {
+					t.Error("volume data file unexpected volumeLifecycleMode:", data[volDataKey.volumeLifecycleMode])
+				}
+			})
+		}
 	}
+
+	t.Run("both supported", func(t *testing.T) {
+		runAll(t, bothModes)
+	})
+	t.Run("persistent supported", func(t *testing.T) {
+		runAll(t, persistentMode)
+	})
+	t.Run("ephemeral supported", func(t *testing.T) {
+		runAll(t, ephemeralMode)
+	})
 }
 
 func TestPluginNewUnmounter(t *testing.T) {
@@ -871,8 +934,8 @@ func TestPluginCanAttach(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		csiDriver := getTestCSIDriver(test.driverName, nil, &test.canAttach)
 		t.Run(test.name, func(t *testing.T) {
+			csiDriver := getTestCSIDriver(test.driverName, nil, &test.canAttach, nil)
 			fakeCSIClient := fakeclient.NewSimpleClientset(csiDriver)
 			plug, tmpDir := newTestPlugin(t, fakeCSIClient)
 			defer os.RemoveAll(tmpDir)
@@ -932,7 +995,7 @@ func TestPluginFindAttachablePlugin(t *testing.T) {
 			}
 			defer os.RemoveAll(tmpDir)
 
-			client := fakeclient.NewSimpleClientset(getTestCSIDriver(test.driverName, nil, &test.canAttach))
+			client := fakeclient.NewSimpleClientset(getTestCSIDriver(test.driverName, nil, &test.canAttach, nil))
 			factory := informers.NewSharedInformerFactory(client, CsiResyncPeriod)
 			host := volumetest.NewFakeVolumeHostWithCSINodeName(
 				tmpDir,

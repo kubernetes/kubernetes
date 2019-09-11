@@ -145,7 +145,7 @@ func (nm *NamespaceController) worker() {
 		} else {
 			// rather than wait for a full resync, re-add the namespace to the queue to be processed
 			nm.queue.AddRateLimited(key)
-			utilruntime.HandleError(err)
+			utilruntime.HandleError(fmt.Errorf("deletion of namespace %v failed: %v", key, err))
 		}
 		return false
 	}
@@ -186,7 +186,7 @@ func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting namespace controller")
 	defer klog.Infof("Shutting down namespace controller")
 
-	if !controller.WaitForCacheSync("namespace", stopCh, nm.listerSynced) {
+	if !cache.WaitForNamedCacheSync("namespace", stopCh, nm.listerSynced) {
 		return
 	}
 

@@ -27,7 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apiserver/pkg/server"
+	"k8s.io/apiserver/pkg/server/egressselector"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/transport"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -60,7 +60,7 @@ type KubeletClientConfig struct {
 	Dial utilnet.DialFunc
 
 	// Lookup will give us a dialer if the egress selector is configured for it
-	Lookup server.EgressSelectorLookup
+	Lookup egressselector.Lookup
 }
 
 // ConnectionInfo provides the information needed to connect to a kubelet
@@ -88,7 +88,7 @@ func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 	if dialer == nil && config.Lookup != nil {
 		// Assuming EgressSelector if SSHTunnel is not turned on.
 		// We will not get a dialer if egress selector is disabled.
-		networkContext := server.NetworkContext{EgressSelectionName: server.Cluster}
+		networkContext := egressselector.Cluster.AsNetworkContext()
 		dialer, err = config.Lookup(networkContext)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get context dialer for 'cluster': got %v", err)
@@ -109,12 +109,13 @@ func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
 func (c *KubeletClientConfig) transportConfig() *transport.Config {
 	cfg := &transport.Config{
 		TLS: transport.TLSConfig{
-			CAFile:   c.CAFile,
-			CAData:   c.CAData,
-			CertFile: c.CertFile,
-			CertData: c.CertData,
-			KeyFile:  c.KeyFile,
-			KeyData:  c.KeyData,
+			CAFile:     c.CAFile,
+			CAData:     c.CAData,
+			CertFile:   c.CertFile,
+			CertData:   c.CertData,
+			KeyFile:    c.KeyFile,
+			KeyData:    c.KeyData,
+			NextProtos: c.NextProtos,
 		},
 		BearerToken: c.BearerToken,
 	}

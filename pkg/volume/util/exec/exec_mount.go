@@ -47,7 +47,7 @@ var _ mount.Interface = &execMounter{}
 
 // Mount runs mount(8) using given exec interface.
 func (m *execMounter) Mount(source string, target string, fstype string, options []string) error {
-	bind, bindOpts, bindRemountOpts := mount.IsBind(options)
+	bind, bindOpts, bindRemountOpts := mount.MakeBindOpts(options)
 
 	if bind {
 		err := m.doExecMount(source, target, fstype, bindOpts)
@@ -89,10 +89,6 @@ func (m *execMounter) Unmount(target string) error {
 // List returns a list of all mounted filesystems.
 func (m *execMounter) List() ([]mount.MountPoint, error) {
 	return m.wrappedMounter.List()
-}
-
-func (m *execMounter) IsMountPointMatch(mp mount.MountPoint, dir string) bool {
-	return m.wrappedMounter.IsMountPointMatch(mp, dir)
 }
 
 // IsLikelyNotMountPoint determines whether a path is a mountpoint.

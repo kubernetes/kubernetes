@@ -14,10 +14,11 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy/config",
     deps = [
-        "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/client-go/informers/core/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/informers/discovery/v1alpha1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

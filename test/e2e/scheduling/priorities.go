@@ -94,6 +94,9 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	})
 
 	ginkgo.It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func() {
+
+		framework.SkipUnlessNodeCountIsAtLeast(2)
+
 		ginkgo.By("Trying to launch a pod with a label to get a node which can launch it.")
 		pod := runPausePod(f, pausePodConfig{
 			Name:   "pod-with-label-security-s1",
@@ -101,14 +104,33 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		})
 		nodeName := pod.Spec.NodeName
 
-		ginkgo.By("Trying to apply a label on the found node.")
-		k := fmt.Sprintf("kubernetes.io/e2e-%s", "node-topologyKey")
-		v := "topologyvalue"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
+		k := v1.LabelHostname
+		ginkgo.By("Verifying the node has a label " + k)
+		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		if _, hasLabel := node.Labels[k]; !hasLabel {
+			// If the label is not exists, label all nodes for testing.
+
+			ginkgo.By("Trying to apply a label on the found node.")
+			k = "kubernetes.io/e2e-node-topologyKey"
+			v := "topologyvalue1"
+			framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+			framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+			defer framework.RemoveLabelOffNode(cs, nodeName, k)
+
+			ginkgo.By("Trying to apply a label on other nodes.")
+			v = "topologyvalue2"
+			for _, node := range nodeList.Items {
+				if node.Name != nodeName {
+					framework.AddOrUpdateLabelOnNode(cs, node.Name, k, v)
+					framework.ExpectNodeHasLabel(cs, node.Name, k, v)
+					defer framework.RemoveLabelOffNode(cs, node.Name, k)
+				}
+			}
+		}
+
 		// make the nodes have balanced cpu,mem usage
-		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.6)
+		err = createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.6)
 		framework.ExpectNoError(err)
 		ginkgo.By("Trying to launch the pod with podAntiAffinity.")
 		labelPodName := "pod-with-pod-antiaffinity"

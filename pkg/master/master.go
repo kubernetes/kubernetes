@@ -44,6 +44,7 @@ import (
 	coordinationapiv1 "k8s.io/api/coordination/v1"
 	coordinationapiv1beta1 "k8s.io/api/coordination/v1beta1"
 	apiv1 "k8s.io/api/core/v1"
+	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
 	eventsv1beta1 "k8s.io/api/events/v1beta1"
 	extensionsapiv1beta1 "k8s.io/api/extensions/v1beta1"
 	networkingapiv1 "k8s.io/api/networking/v1"
@@ -69,9 +70,12 @@ import (
 	"k8s.io/apiserver/pkg/server/healthz"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	storagefactory "k8s.io/apiserver/pkg/storage/storagebackend/factory"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"
@@ -94,6 +98,7 @@ import (
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	coordinationrest "k8s.io/kubernetes/pkg/registry/coordination/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
+	discoveryrest "k8s.io/kubernetes/pkg/registry/discovery/rest"
 	eventsrest "k8s.io/kubernetes/pkg/registry/events/rest"
 	extensionsrest "k8s.io/kubernetes/pkg/registry/extensions/rest"
 	networkingrest "k8s.io/kubernetes/pkg/registry/networking/rest"
@@ -132,6 +137,13 @@ type ExtraConfig struct {
 	ServiceIPRange net.IPNet
 	// The IP address for the GenericAPIServer service (must be inside ServiceIPRange)
 	APIServerServiceIP net.IP
+
+	// dual stack services, the range represents an alternative IP range for service IP
+	// must be of different family than primary (ServiceIPRange)
+	SecondaryServiceIPRange net.IPNet
+	// the secondary IP address the GenericAPIServer service (must be inside SecondaryServiceIPRange)
+	SecondaryAPIServerServiceIP net.IP
+
 	// Port for the apiserver service.
 	APIServerServicePort int
 
@@ -208,7 +220,13 @@ type Master struct {
 
 func (c *Config) createMasterCountReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
-	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointClient)
+	var endpointSliceClient discoveryclient.EndpointSlicesGetter
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		endpointSliceClient = discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	}
+	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
+
+	return reconcilers.NewMasterCountEndpointReconciler(c.ExtraConfig.MasterCount, endpointsAdapter)
 }
 
 func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
@@ -217,6 +235,12 @@ func (c *Config) createNoneReconciler() reconcilers.EndpointReconciler {
 
 func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 	endpointClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	var endpointSliceClient discoveryclient.EndpointSlicesGetter
+	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
+		endpointSliceClient = discoveryclient.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
+	}
+	endpointsAdapter := reconcilers.NewEndpointsAdapter(endpointClient, endpointSliceClient)
+
 	ttl := c.ExtraConfig.MasterEndpointReconcileTTL
 	config, err := c.ExtraConfig.StorageFactory.NewConfig(api.Resource("apiServerIPInfo"))
 	if err != nil {
@@ -227,7 +251,8 @@ func (c *Config) createLeaseReconciler() reconcilers.EndpointReconciler {
 		klog.Fatalf("Error creating storage factory: %v", err)
 	}
 	masterLeases := reconcilers.NewLeases(leaseStorage, "/masterleases/", ttl)
-	return reconcilers.NewLeaseEndpointReconciler(endpointClient, masterLeases)
+
+	return reconcilers.NewLeaseEndpointReconciler(endpointsAdapter, masterLeases)
 }
 
 func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
@@ -253,7 +278,7 @@ func (cfg *Config) Complete() CompletedConfig {
 		&cfg.ExtraConfig,
 	}
 
-	serviceIPRange, apiServerServiceIP, err := DefaultServiceIPRange(c.ExtraConfig.ServiceIPRange)
+	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(c.ExtraConfig.ServiceIPRange)
 	if err != nil {
 		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
@@ -323,6 +348,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			KubeletClientConfig:         c.ExtraConfig.KubeletClientConfig,
 			EventTTL:                    c.ExtraConfig.EventTTL,
 			ServiceIPRange:              c.ExtraConfig.ServiceIPRange,
+			SecondaryServiceIPRange:     c.ExtraConfig.SecondaryServiceIPRange,
 			ServiceNodePortRange:        c.ExtraConfig.ServiceNodePortRange,
 			LoopbackClientConfig:        c.GenericConfig.LoopbackClientConfig,
 			ServiceAccountIssuer:        c.ExtraConfig.ServiceAccountIssuer,
@@ -349,6 +375,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		batchrest.RESTStorageProvider{},
 		certificatesrest.RESTStorageProvider{},
 		coordinationrest.RESTStorageProvider{},
+		discoveryrest.StorageProvider{},
 		extensionsrest.RESTStorageProvider{},
 		networkingrest.RESTStorageProvider{},
 		noderest.RESTStorageProvider{},
@@ -540,6 +567,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret.DisableVersions(
 		auditregistrationv1alpha1.SchemeGroupVersion,
 		batchapiv2alpha1.SchemeGroupVersion,
+		discoveryv1alpha1.SchemeGroupVersion,
 		nodev1alpha1.SchemeGroupVersion,
 		rbacv1alpha1.SchemeGroupVersion,
 		schedulingv1alpha1.SchemeGroupVersion,

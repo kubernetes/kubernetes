@@ -105,7 +105,7 @@ func (tc *Controller) Run(workers int, stopCh <-chan struct{}) {
 	klog.Infof("Starting TTL after finished controller")
 	defer klog.Infof("Shutting down TTL after finished controller")
 
-	if !controller.WaitForCacheSync("TTL after finished", stopCh, tc.jListerSynced) {
+	if !cache.WaitForNamedCacheSync("TTL after finished", stopCh, tc.jListerSynced) {
 		return
 	}
 

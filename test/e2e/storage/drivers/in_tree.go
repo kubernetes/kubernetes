@@ -175,7 +175,7 @@ func (n *nfsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 			Prefix:    "nfs",
 			Framework: f,
 		}, func() {
-			framework.ExpectNoError(framework.DeletePodWithWait(f, cs, n.externalProvisionerPod))
+			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, n.externalProvisionerPod))
 			clusterRoleBindingName := ns.Name + "--" + "cluster-admin"
 			cs.RbacV1().ClusterRoleBindings().Delete(clusterRoleBindingName, metav1.NewDeleteOptions(0))
 		}
@@ -324,7 +324,7 @@ func (v *glusterVolume) DeleteVolume() {
 		e2elog.Logf("Gluster endpoints %q not found, assuming deleted", name)
 	}
 	e2elog.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
-	err = framework.DeletePodWithWait(f, cs, v.serverPod)
+	err = e2epod.DeletePodWithWait(cs, v.serverPod)
 	if err != nil {
 		e2elog.Failf("Gluster server pod delete failed: %v", err)
 	}
@@ -872,7 +872,7 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err, "while waiting for hostPath init pod to succeed")
 
-	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
+	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting hostPath init pod")
 	return &hostPathSymlinkVolume{
 		sourcePath: sourcePath,
@@ -894,7 +894,7 @@ func (v *hostPathSymlinkVolume) DeleteVolume() {
 	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, pod.Name, pod.Namespace)
 	framework.ExpectNoError(err, "while waiting for hostPath teardown pod to succeed")
 
-	err = framework.DeletePodWithWait(f, f.ClientSet, pod)
+	err = e2epod.DeletePodWithWait(f.ClientSet, pod)
 	framework.ExpectNoError(err, "while deleting hostPath teardown pod")
 }
 
@@ -988,6 +988,9 @@ func InitCinderDriver() testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
+				// Cinder supports volume limits, but the test creates large
+				// number of volumes and times out test suites.
+				testsuites.CapVolumeLimits: false,
 			},
 		},
 	}
@@ -1159,6 +1162,9 @@ func InitGcePdDriver() testsuites.TestDriver {
 				testsuites.CapMultiPODs:           true,
 				testsuites.CapControllerExpansion: true,
 				testsuites.CapNodeExpansion:       true,
+				// GCE supports volume limits, but the test creates large
+				// number of volumes and times out test suites.
+				testsuites.CapVolumeLimits: false,
 			},
 		},
 	}
@@ -1413,6 +1419,9 @@ func InitAzureDriver() testsuites.TestDriver {
 				testsuites.CapBlock:       true,
 				testsuites.CapExec:        true,
 				testsuites.CapMultiPODs:   true,
+				// Azure supports volume limits, but the test creates large
+				// number of volumes and times out test suites.
+				testsuites.CapVolumeLimits: false,
 			},
 		},
 	}
@@ -1503,17 +1512,18 @@ func (v *azureVolume) DeleteVolume() {
 
 // AWS
 type awsDriver struct {
-	volumeName string
-
 	driverInfo testsuites.DriverInfo
+}
+
+type awsVolume struct {
+	volumeName string
 }
 
 var _ testsuites.TestDriver = &awsDriver{}
 
-// TODO: Fix authorization error in attach operation and uncomment below
-//var _ testsuites.PreprovisionedVolumeTestDriver = &awsDriver{}
-//var _ testsuites.InlineVolumeTestDriver = &awsDriver{}
-//var _ testsuites.PreprovisionedPVTestDriver = &awsDriver{}
+var _ testsuites.PreprovisionedVolumeTestDriver = &awsDriver{}
+var _ testsuites.InlineVolumeTestDriver = &awsDriver{}
+var _ testsuites.PreprovisionedPVTestDriver = &awsDriver{}
 var _ testsuites.DynamicPVTestDriver = &awsDriver{}
 
 // InitAwsDriver returns awsDriver that implements TestDriver interface
@@ -1525,7 +1535,10 @@ func InitAwsDriver() testsuites.TestDriver {
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
+				"ext2",
 				"ext3",
+				"ext4",
+				"xfs",
 				"ntfs",
 			),
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
@@ -1537,6 +1550,9 @@ func InitAwsDriver() testsuites.TestDriver {
 				testsuites.CapMultiPODs:           true,
 				testsuites.CapControllerExpansion: true,
 				testsuites.CapNodeExpansion:       true,
+				// AWS supports volume limits, but the test creates large
+				// number of volumes and times out test suites.
+				testsuites.CapVolumeLimits: false,
 			},
 		},
 	}
@@ -1550,12 +1566,12 @@ func (a *awsDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 	framework.SkipUnlessProviderIs("aws")
 }
 
-// TODO: Fix authorization error in attach operation and uncomment below
-/*
 func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) *v1.VolumeSource {
+	av, ok := volume.(*awsVolume)
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to AWS test volume")
 	volSource := v1.VolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-			VolumeID: a.volumeName,
+			VolumeID: av.volumeName,
 			ReadOnly: readOnly,
 		},
 	}
@@ -1566,18 +1582,19 @@ func (a *awsDriver) GetVolumeSource(readOnly bool, fsType string, volume testsui
 }
 
 func (a *awsDriver) GetPersistentVolumeSource(readOnly bool, fsType string, volume testsuites.TestVolume) (*v1.PersistentVolumeSource, *v1.VolumeNodeAffinity) {
+	av, ok := volume.(*awsVolume)
+	gomega.Expect(ok).To(gomega.BeTrue(), "Failed to cast test volume to AWS test volume")
 	pvSource := v1.PersistentVolumeSource{
 		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-			VolumeID: a.volumeName,
+			VolumeID: av.volumeName,
 			ReadOnly: readOnly,
 		},
 	}
 	if fsType != "" {
 		pvSource.AWSElasticBlockStore.FSType = fsType
 	}
-	return &pvSource
+	return &pvSource, nil
 }
-*/
 
 func (a *awsDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestConfig, fsType string) *storagev1.StorageClass {
 	provisioner := "kubernetes.io/aws-ebs"
@@ -1587,8 +1604,9 @@ func (a *awsDriver) GetDynamicProvisionStorageClass(config *testsuites.PerTestCo
 	}
 	ns := config.Framework.Namespace.Name
 	suffix := fmt.Sprintf("%s-sc", a.driverInfo.Name)
+	delayedBinding := storagev1.VolumeBindingWaitForFirstConsumer
 
-	return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
+	return testsuites.GetStorageClass(provisioner, parameters, &delayedBinding, ns, suffix)
 }
 
 func (a *awsDriver) GetClaimSize() string {
@@ -1609,19 +1627,25 @@ func (a *awsDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConf
 	return config, func() {}
 }
 
-// TODO: Fix authorization error in attach operation and uncomment below
-/*
 func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
+	if volType == testpatterns.InlineVolume {
+		// PD will be created in framework.TestContext.CloudConfig.Zone zone,
+		// so pods should be also scheduled there.
+		config.ClientNodeSelector = map[string]string{
+			v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+		}
+	}
 	ginkgo.By("creating a test aws volume")
-	var err error
-	a.volumeName, err = framework.CreatePDWithRetry()
-	framework.ExpectNoError(err))
+	vname, err := framework.CreatePDWithRetry()
+	framework.ExpectNoError(err)
+	return &awsVolume{
+		volumeName: vname,
+	}
 }
 
-DeleteVolume() {
-	framework.DeletePDWithRetry(a.volumeName)
+func (v *awsVolume) DeleteVolume() {
+	framework.DeletePDWithRetry(v.volumeName)
 }
-*/
 
 // local
 type localDriver struct {

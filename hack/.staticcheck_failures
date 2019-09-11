@@ -147,7 +147,6 @@ test/integration/ttlcontroller
 test/integration/volume
 test/integration/volumescheduling
 test/utils
-vendor/k8s.io/api/events/v1beta1
 vendor/k8s.io/apiextensions-apiserver/pkg/apiserver
 vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/conversion
 vendor/k8s.io/apiextensions-apiserver/pkg/apiserver/schema
@@ -214,14 +213,9 @@ vendor/k8s.io/client-go/metadata/fake
 vendor/k8s.io/client-go/rest
 vendor/k8s.io/client-go/rest/watch
 vendor/k8s.io/client-go/restmapper
-vendor/k8s.io/client-go/testing
 vendor/k8s.io/client-go/tools/cache
-vendor/k8s.io/client-go/tools/clientcmd
 vendor/k8s.io/client-go/tools/leaderelection
-vendor/k8s.io/client-go/tools/portforward
-vendor/k8s.io/client-go/tools/watch
 vendor/k8s.io/client-go/transport
-vendor/k8s.io/client-go/util/jsonpath
 vendor/k8s.io/cloud-provider/service/helpers
 vendor/k8s.io/code-generator/cmd/client-gen/generators/fake
 vendor/k8s.io/code-generator/cmd/client-gen/generators/util
@@ -235,7 +229,6 @@ vendor/k8s.io/kubectl/pkg/cmd/annotate
 vendor/k8s.io/kubectl/pkg/cmd/apply
 vendor/k8s.io/kubectl/pkg/cmd/certificates
 vendor/k8s.io/kubectl/pkg/cmd/config
-vendor/k8s.io/kubectl/pkg/cmd/cp
 vendor/k8s.io/kubectl/pkg/cmd/edit
 vendor/k8s.io/kubectl/pkg/cmd/exec
 vendor/k8s.io/kubectl/pkg/cmd/label
@@ -251,6 +244,5 @@ vendor/k8s.io/kubectl/pkg/describe/versioned
 vendor/k8s.io/kubectl/pkg/scale
 vendor/k8s.io/legacy-cloud-providers/aws
 vendor/k8s.io/legacy-cloud-providers/azure
-vendor/k8s.io/legacy-cloud-providers/vsphere
 vendor/k8s.io/metrics/pkg/client/custom_metrics
 vendor/k8s.io/sample-controller

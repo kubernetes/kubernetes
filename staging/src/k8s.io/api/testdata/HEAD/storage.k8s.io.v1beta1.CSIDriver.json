@@ -35,12 +35,16 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
   "spec": {
     "attachRequired": false,
-    "podInfoOnMount": false
+    "podInfoOnMount": false,
+    "volumeLifecycleModes": [
+      "r鯹)晿\u003co,c鮽ort昍řČ扷5ƗǸ"
+    ]
   }
 }

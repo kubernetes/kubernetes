@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/onsi/ginkgo"
@@ -42,7 +41,7 @@ var _ = SIGDescribe("crictl", func() {
 		ginkgo.By("Getting all nodes' SSH-able IP addresses")
 		hosts, err := e2essh.NodeSSHHosts(f.ClientSet)
 		if err != nil {
-			e2elog.Failf("Error getting node hostnames: %v", err)
+			framework.Failf("Error getting node hostnames: %v", err)
 		}
 
 		testCases := []struct {
@@ -60,15 +59,15 @@ var _ = SIGDescribe("crictl", func() {
 			result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
 			stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 			if err != nil {
-				e2elog.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)
+				framework.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)
 			}
 			// Log the stdout/stderr output.
 			// TODO: Verify the output.
 			if len(stdout) > 0 {
-				e2elog.Logf("Got stdout from %q:\n %s\n", host, strings.TrimSpace(stdout))
+				framework.Logf("Got stdout from %q:\n %s\n", host, strings.TrimSpace(stdout))
 			}
 			if len(stderr) > 0 {
-				e2elog.Logf("Got stderr from %q:\n %s\n", host, strings.TrimSpace(stderr))
+				framework.Logf("Got stderr from %q:\n %s\n", host, strings.TrimSpace(stderr))
 			}
 		}
 	})

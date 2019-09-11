@@ -17,7 +17,7 @@ limitations under the License.
 package testsuites
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -105,16 +105,23 @@ type DynamicPVTestDriver interface {
 type EphemeralTestDriver interface {
 	TestDriver
 
-	// GetVolumeAttributes returns the volume attributes for a
-	// certain inline ephemeral volume, enumerated starting with
-	// #0. Some tests might require more than one volume. They can
-	// all be the same or different, depending what the driver supports
+	// GetVolume returns the volume attributes for a certain
+	// inline ephemeral volume, enumerated starting with #0. Some
+	// tests might require more than one volume. They can all be
+	// the same or different, depending what the driver supports
 	// and/or wants to test.
-	GetVolumeAttributes(config *PerTestConfig, volumeNumber int) map[string]string
+	//
+	// For each volume, the test driver can return volume attributes,
+	// whether the resulting volume is shared between different pods (i.e.
+	// changes made in one pod are visible in another), and whether the
+	// volume can be mounted read/write or only read-only.
+	GetVolume(config *PerTestConfig, volumeNumber int) (attributes map[string]string, shared bool, readOnly bool)
 
 	// GetCSIDriverName returns the name that was used when registering with
 	// kubelet. Depending on how the driver was deployed, this can be different
-	// from DriverInfo.Name.
+	// from DriverInfo.Name. Starting with Kubernetes 1.16, there must also
+	// be a CSIDriver object under the same name with a "mode" field that enables
+	// usage of the driver for ephemeral inline volumes.
 	GetCSIDriverName(config *PerTestConfig) string
 }
 
@@ -148,6 +155,7 @@ const (
 	CapRWX                 Capability = "RWX"                 // support ReadWriteMany access modes
 	CapControllerExpansion Capability = "controllerExpansion" // support volume expansion for controller
 	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
+	CapVolumeLimits                   = "volumeLimits"        // support volume limits (can be *very* slow)
 )
 
 // DriverInfo represents static information about a TestDriver.

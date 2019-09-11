@@ -48,10 +48,20 @@ var (
 	metaPattern = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
-var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
+var _ = SIGDescribe("CustomResourcePublishOpenAPI [Privileged:ClusterAdmin]", func() {
 	f := framework.NewDefaultFramework("crd-publish-openapi")
 
-	ginkgo.It("works for CRD with validation schema", func() {
+	/*
+		Release: v1.16
+		Testname: Custom Resource OpenAPI Publish, with validation schema
+		Description: Register a custom resource definition with a validating schema consisting of objects, arrays and
+		primitives. Attempt to create and apply a change a custom resource using valid properties, via kubectl;
+		client-side validation MUST pass. Attempt both operations with unknown properties and without required
+		properties; client-side validation MUST reject the operations. Attempt kubectl explain; the output MUST
+		explain the custom resource properties. Attempt kubectl explain on custom resource properties; the output MUST
+		explain the nested custom resource properties.
+	*/
+	framework.ConformanceIt("works for CRD with validation schema", func() {
 		crd, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -119,7 +129,14 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		}
 	})
 
-	ginkgo.It("works for CRD without validation schema", func() {
+	/*
+		Release: v1.16
+		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in object
+		Description: Register a custom resource definition with x-preserve-unknown-fields in the top level object.
+		Attempt to create and apply a change a custom resource, via kubectl; client-side validation MUST accept unknown
+		properties. Attempt kubectl explain; the output MUST contain a valid DESCRIPTION stanza.
+	*/
+	framework.ConformanceIt("works for CRD without validation schema", func() {
 		crd, err := setupCRD(f, nil, "empty", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -153,7 +170,14 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		}
 	})
 
-	ginkgo.It("works for CRD preserving unknown fields at the schema root", func() {
+	/*
+		Release: v1.16
+		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields at root
+		Description: Register a custom resource definition with x-preserve-unknown-fields in the schema root.
+		Attempt to create and apply a change a custom resource, via kubectl; client-side validation MUST accept unknown
+		properties. Attempt kubectl explain; the output MUST show the custom resource KIND.
+	*/
+	framework.ConformanceIt("works for CRD preserving unknown fields at the schema root", func() {
 		crd, err := setupCRDAndVerifySchema(f, schemaPreserveRoot, nil, "unknown-at-root", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -187,7 +211,15 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		}
 	})
 
-	ginkgo.It("works for CRD preserving unknown fields in an embedded object", func() {
+	/*
+		Release: v1.16
+		Testname: Custom Resource OpenAPI Publish, with x-preserve-unknown-fields in embedded object
+		Description: Register a custom resource definition with x-preserve-unknown-fields in an embedded object.
+		Attempt to create and apply a change a custom resource, via kubectl; client-side validation MUST accept unknown
+		properties. Attempt kubectl explain; the output MUST show that x-preserve-unknown-properties is used on the
+		nested field.
+	*/
+	framework.ConformanceIt("works for CRD preserving unknown fields in an embedded object", func() {
 		crd, err := setupCRDAndVerifySchema(f, schemaPreserveNested, nil, "unknown-in-nested", "v1")
 		if err != nil {
 			framework.Failf("%v", err)
@@ -221,7 +253,13 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		}
 	})
 
-	ginkgo.It("works for multiple CRDs of different groups", func() {
+	/*
+		Release: v1.16
+		Testname: Custom Resource OpenAPI Publish, varying groups
+		Description: Register multiple custom resource definitions spanning different groups and versions;
+		OpenAPI definitions MUST be published for custom resource definitions.
+	*/
+	framework.ConformanceIt("works for multiple CRDs of different groups", func() {
 		ginkgo.By("CRs in different groups (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "foo", "v1")
 		if err != nil {
@@ -248,7 +286,13 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		}
 	})
 
-	ginkgo.It("works for multiple CRDs of same group but different versions", func() {
+	/*
+		Release: v1.16
+		Testname: Custom Resource OpenAPI Publish, varying versions
+		Description: Register a custom resource definition with multiple versions; OpenAPI definitions MUST be published
+		for custom resource definitions.
+	*/
+	framework.ConformanceIt("works for multiple CRDs of same group but different versions", func() {
 		ginkgo.By("CRs in the same group but different versions (one multiversion CRD) show up in OpenAPI documentation")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
@@ -290,7 +334,13 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		}
 	})
 
-	ginkgo.It("works for multiple CRDs of same group and version but different kinds", func() {
+	/*
+		Release: v1.16
+		Testname: Custom Resource OpenAPI Publish, varying kinds
+		Description: Register multiple custom resource definitions in the same group and version but spanning different kinds;
+		OpenAPI definitions MUST be published for custom resource definitions.
+	*/
+	framework.ConformanceIt("works for multiple CRDs of same group and version but different kinds", func() {
 		ginkgo.By("CRs in the same group and version but different kinds (two CRDs) show up in OpenAPI documentation")
 		crdFoo, err := setupCRD(f, schemaFoo, "common-group", "v6")
 		if err != nil {
@@ -317,7 +367,14 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		}
 	})
 
-	ginkgo.It("updates the published spec when one versin gets renamed", func() {
+	/*
+		Release: v1.16
+		Testname: Custom Resource OpenAPI Publish, version rename
+		Description: Register a custom resource definition with multiple versions; OpenAPI definitions MUST be published
+		for custom resource definitions. Rename one of the versions of the custom resource definition via a patch;
+		OpenAPI definitions MUST update to reflect the rename.
+	*/
+	framework.ConformanceIt("updates the published spec when one version gets renamed", func() {
 		ginkgo.By("set up a multi version CRD")
 		crdMultiVer, err := setupCRD(f, schemaFoo, "multi-ver", "v2", "v3")
 		if err != nil {
@@ -361,7 +418,14 @@ var _ = SIGDescribe("CustomResourcePublishOpenAPI", func() {
 		}
 	})
 
-	ginkgo.It("removes definition from spec when one versin gets changed to not be served", func() {
+	/*
+		Release: v1.16
+		Testname: Custom Resource OpenAPI Publish, stop serving version
+		Description: Register a custom resource definition with multiple versions. OpenAPI definitions MUST be published
+		for custom resource definitions. Update the custom resource definition to not serve one of the versions. OpenAPI
+		definitions MUST be updated to not contain the version that is no longer served.
+	*/
+	framework.ConformanceIt("removes definition from spec when one version gets changed to not be served", func() {
 		ginkgo.By("set up a multi version CRD")
 		crd, err := setupCRD(f, schemaFoo, "multi-to-single-ver", "v5", "v6alpha1")
 		if err != nil {

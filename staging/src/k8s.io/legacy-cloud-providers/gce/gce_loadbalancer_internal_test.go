@@ -21,6 +21,7 @@ package gce
 import (
 	"context"
 	"fmt"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"strings"
 	"testing"
 
@@ -29,6 +30,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/mock"
+	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -158,6 +160,48 @@ func TestEnsureInternalLoadBalancer(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, status.Ingress)
 	assertInternalLbResources(t, gce, svc, vals, nodeNames)
+}
+
+func TestEnsureInternalLoadBalancerDeprecatedAnnotation(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	nodeNames := []string{"test-node-1"}
+
+	gce, err := fakeGCECloud(vals)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+
+	svc := fakeLoadBalancerServiceDeprecatedAnnotation(string(LBTypeInternal))
+	status, err := gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	assertInternalLbResources(t, gce, svc, vals, nodeNames)
+
+	// Now add the latest annotation and change scheme to external
+	svc.Annotations[ServiceAnnotationLoadBalancerType] = ""
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, false)
+	assertExternalLbResources(t, gce, svc, vals, nodeNames)
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assertExternalLbResourcesDeleted(t, gce, svc, vals, true)
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
 }
 
 func TestEnsureInternalLoadBalancerWithExistingResources(t *testing.T) {
@@ -916,4 +960,274 @@ func TestEnsureInternalLoadBalancerDeletedSubsetting(t *testing.T) {
 	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
 	assert.NoError(t, err)
 	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
+func TestEnsureInternalLoadBalancerGlobalAccess(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+
+	// Change service to include the global access annotation
+	svc.Annotations[ServiceAnnotationILBAllowGlobalAccess] = "true"
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	betaRuleDescString := fmt.Sprintf(`{"kubernetes.io/service-name":"%s","kubernetes.io/api-version":"beta"}`, types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}.String())
+	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	if !fwdRule.AllowGlobalAccess {
+		t.Errorf("Unexpected false value for AllowGlobalAccess")
+	}
+	if fwdRule.Description != betaRuleDescString {
+		t.Errorf("Expected description %s, Got %s", betaRuleDescString, fwdRule.Description)
+	}
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	// remove the annotation
+	delete(svc.Annotations, ServiceAnnotationILBAllowGlobalAccess)
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	gaRuleDescString := fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}.String())
+	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if fwdRule.AllowGlobalAccess {
+		t.Errorf("Unexpected true value for AllowGlobalAccess")
+	}
+	if fwdRule.Description != gaRuleDescString {
+		t.Errorf("Expected description %s, Got %s", gaRuleDescString, fwdRule.Description)
+	}
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
+func TestEnsureInternalLoadBalancerDisableGlobalAccess(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	svc.Annotations[ServiceAnnotationILBAllowGlobalAccess] = "true"
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if !fwdRule.AllowGlobalAccess {
+		t.Errorf("Unexpected false value for AllowGlobalAccess")
+	}
+
+	// disable global access - setting the annotation to false or removing annotation will disable it
+	svc.Annotations[ServiceAnnotationILBAllowGlobalAccess] = "false"
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if fwdRule.AllowGlobalAccess {
+		t.Errorf("Unexpected true value for AllowGlobalAccess")
+	}
+
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
+func TestGlobalAccessChangeScheme(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	// Change service to include the global access annotation
+	svc.Annotations[ServiceAnnotationILBAllowGlobalAccess] = "true"
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if !fwdRule.AllowGlobalAccess {
+		t.Errorf("Unexpected false value for AllowGlobalAccess")
+	}
+	// change the scheme to externalLoadBalancer
+	delete(svc.Annotations, ServiceAnnotationLoadBalancerType)
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	// Firewall is deleted when the service is deleted
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, false)
+	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if fwdRule.AllowGlobalAccess {
+		t.Errorf("Unexpected true value for AllowGlobalAccess")
+	}
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assertExternalLbResourcesDeleted(t, gce, svc, vals, true)
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}
+
+func TestUnmarshalEmptyAPIVersion(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+
+	existingFwdRule := &compute.ForwardingRule{
+		Name:                lbName,
+		IPAddress:           "",
+		Ports:               []string{"123"},
+		IPProtocol:          "TCP",
+		LoadBalancingScheme: string(cloud.SchemeInternal),
+		Description:         fmt.Sprintf(`{"kubernetes.io/service-name":"%s"}`, types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace}.String()),
+	}
+	var version meta.Version
+	version, err = getFwdRuleAPIVersion(existingFwdRule)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if version != meta.VersionGA {
+		t.Errorf("Unexpected version %s", version)
+	}
+}
+
+func TestForwardingRuleCompositeEqual(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	gaRule := &compute.ForwardingRule{
+		Name:                lbName,
+		IPAddress:           "",
+		Ports:               []string{"123"},
+		IPProtocol:          "TCP",
+		LoadBalancingScheme: string(cloud.SchemeInternal),
+	}
+	betaRule := &computebeta.ForwardingRule{
+		Name:                lbName + "-beta",
+		IPAddress:           "",
+		Description:         fmt.Sprintf(`{"kubernetes.io/service-name":"%s","apiVersion":"beta"}`, svc.Name),
+		Ports:               []string{"123"},
+		IPProtocol:          "TCP",
+		LoadBalancingScheme: string(cloud.SchemeInternal),
+		AllowGlobalAccess:   false,
+	}
+	betaRuleGlobalAccess := &computebeta.ForwardingRule{
+		Name:                lbName + "-globalaccess",
+		IPAddress:           "",
+		Description:         fmt.Sprintf(`{"kubernetes.io/service-name":"%s","apiVersion":"beta"}`, svc.Name),
+		Ports:               []string{"123"},
+		IPProtocol:          "TCP",
+		LoadBalancingScheme: string(cloud.SchemeInternal),
+		AllowGlobalAccess:   true,
+	}
+	err = gce.CreateRegionForwardingRule(gaRule, gce.region)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	err = gce.CreateBetaRegionForwardingRule(betaRule, gce.region)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	err = gce.CreateBetaRegionForwardingRule(betaRuleGlobalAccess, gce.region)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	frcGA, err := toForwardingRuleComposite(gaRule)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	frcBeta, err := toForwardingRuleComposite(betaRule)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	frcBetaGlobalAccess, err := toForwardingRuleComposite(betaRuleGlobalAccess)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if !frcGA.Equal(frcBeta) {
+		t.Errorf("Expected frcGA and frcBeta rules to be equal, got false")
+	}
+	if frcBeta.Equal(frcBetaGlobalAccess) {
+		t.Errorf("Expected FrcBeta and FrcBetaGlobalAccess rules to be unequal, got true")
+	}
+	if frcGA.Equal(frcBetaGlobalAccess) {
+		t.Errorf("Expected frcGA and frcBetaGlobalAccess rules to be unequal, got true")
+	}
+	// Enabling globalAccess in FrcBeta to make equality fail with FrcGA
+	frcBeta.allowGlobalAccess = true
+	if frcGA.Equal(frcBeta) {
+		t.Errorf("Expected frcGA and frcBeta rules to be unequal, got true")
+	}
 }

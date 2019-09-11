@@ -42,6 +42,7 @@ var csiTestDrivers = []func() testsuites.TestDriver{
 
 // List of testSuites to be executed in below loop
 var csiTestSuites = []func() testsuites.TestSuite{
+	testsuites.InitEphemeralTestSuite,
 	testsuites.InitVolumesTestSuite,
 	testsuites.InitVolumeIOTestSuite,
 	testsuites.InitVolumeModeTestSuite,
@@ -50,6 +51,8 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitSnapshottableTestSuite,
 	testsuites.InitMultiVolumeTestSuite,
 	testsuites.InitDisruptiveTestSuite,
+	testsuites.InitVolumeExpandTestSuite,
+	testsuites.InitVolumeLimitsTestSuite,
 }
 
 // This executes testSuites for csi volumes.
@@ -165,7 +168,7 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 		test.PvCheck = func(claim *v1.PersistentVolumeClaim) {
 			// Ensure that a pod cannot be scheduled in an unsuitable zone.
 			pod := testsuites.StartInPodWithVolume(cs, namespace, claim.Name, "pvc-tester-unschedulable", "sleep 100000",
-				framework.NodeSelection{Selector: nodeSelector})
+				e2epod.NodeSelection{Selector: nodeSelector})
 			defer testsuites.StopPod(cs, pod)
 			framework.ExpectNoError(e2epod.WaitForPodNameUnschedulableInNamespace(cs, pod.Name, pod.Namespace), "pod should be unschedulable")
 		}

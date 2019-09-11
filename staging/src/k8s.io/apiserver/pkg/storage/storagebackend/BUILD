@@ -12,6 +12,7 @@ go_library(
     importpath = "k8s.io/apiserver/pkg/storage/storagebackend",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/egressselector:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",
     ],
 )

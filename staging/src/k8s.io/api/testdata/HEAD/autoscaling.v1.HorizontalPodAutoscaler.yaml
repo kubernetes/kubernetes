@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -32,9 +33,9 @@ spec:
   maxReplicas: -1971381490
   minReplicas: 896585016
   scaleTargetRef:
-    apiVersion: "20"
-    kind: "18"
-    name: "19"
+    apiVersion: "21"
+    kind: "19"
+    name: "20"
   targetCPUUtilizationPercentage: -1300313567
 status:
   currentCPUUtilizationPercentage: 757808475

@@ -31,7 +31,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 
 	"k8s.io/klog"
@@ -76,7 +75,7 @@ func (gcc *PodGCController) Run(stop <-chan struct{}) {
 	klog.Infof("Starting GC controller")
 	defer klog.Infof("Shutting down GC controller")
 
-	if !controller.WaitForCacheSync("GC", stop, gcc.podListerSynced) {
+	if !cache.WaitForNamedCacheSync("GC", stop, gcc.podListerSynced) {
 		return
 	}
 

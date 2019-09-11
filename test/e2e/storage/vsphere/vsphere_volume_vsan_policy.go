@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -297,14 +298,14 @@ func invokeValidPolicyTest(f *framework.Framework, client clientset.Interface, n
 
 	ginkgo.By("Creating pod to attach PV to the node")
 	// Create pod to attach Volume to Node
-	pod, err := framework.CreatePod(client, namespace, nil, pvclaims, false, "")
+	pod, err := e2epod.CreatePod(client, namespace, nil, pvclaims, false, "")
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Verify the volume is accessible and available in the pod")
 	verifyVSphereVolumesAccessible(client, pod, persistentvolumes)
 
 	ginkgo.By("Deleting pod")
-	framework.DeletePodWithWait(f, client, pod)
+	e2epod.DeletePodWithWait(client, pod)
 
 	ginkgo.By("Waiting for volumes to be detached from the node")
 	waitForVSphereDiskToDetach(persistentvolumes[0].Spec.VsphereVolume.VolumePath, pod.Spec.NodeName)

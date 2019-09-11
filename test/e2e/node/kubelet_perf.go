@@ -27,8 +27,9 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
+	"k8s.io/kubernetes/test/e2e/perftype"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -56,10 +57,10 @@ func logPodsOnNodes(c clientset.Interface, nodeNames []string) {
 	for _, n := range nodeNames {
 		podList, err := e2ekubelet.GetKubeletRunningPods(c, n)
 		if err != nil {
-			e2elog.Logf("Unable to retrieve kubelet pods for node %v", n)
+			framework.Logf("Unable to retrieve kubelet pods for node %v", n)
 			continue
 		}
-		e2elog.Logf("%d pods are running on node %v", len(podList.Items), n)
+		framework.Logf("%d pods are running on node %v", len(podList.Items), n)
 	}
 }
 
@@ -93,7 +94,7 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	deadline := time.Now().Add(monitoringTime)
 	for time.Now().Before(deadline) {
 		timeLeft := deadline.Sub(time.Now())
-		e2elog.Logf("Still running...%v left", timeLeft)
+		framework.Logf("Still running...%v left", timeLeft)
 		if timeLeft < reportingPeriod {
 			time.Sleep(timeLeft)
 		} else {
@@ -107,15 +108,15 @@ func runResourceTrackingTest(f *framework.Framework, podsPerNode int, nodeNames 
 	usageSummary, err := rm.GetLatest()
 	framework.ExpectNoError(err)
 	// TODO(random-liu): Remove the original log when we migrate to new perfdash
-	e2elog.Logf("%s", rm.FormatResourceUsage(usageSummary))
+	framework.Logf("%s", rm.FormatResourceUsage(usageSummary))
 	// Log perf result
-	e2eperf.PrintPerfData(e2eperf.ResourceUsageToPerfData(rm.GetMasterNodeLatest(usageSummary)))
+	printPerfData(e2eperf.ResourceUsageToPerfData(rm.GetMasterNodeLatest(usageSummary)))
 	verifyMemoryLimits(f.ClientSet, expectedMemory, usageSummary)
 
 	cpuSummary := rm.GetCPUSummary()
-	e2elog.Logf("%s", rm.FormatCPUSummary(cpuSummary))
+	framework.Logf("%s", rm.FormatCPUSummary(cpuSummary))
 	// Log perf result
-	e2eperf.PrintPerfData(e2eperf.CPUUsageToPerfData(rm.GetMasterNodeCPUSummary(cpuSummary)))
+	printPerfData(e2eperf.CPUUsageToPerfData(rm.GetMasterNodeCPUSummary(cpuSummary)))
 	verifyCPULimits(expectedCPU, cpuSummary)
 
 	ginkgo.By("Deleting the RC")
@@ -147,14 +148,14 @@ func verifyMemoryLimits(c clientset.Interface, expected e2ekubelet.ResourceUsage
 			errList = append(errList, fmt.Sprintf("node %v:\n %s", nodeName, strings.Join(nodeErrs, ", ")))
 			heapStats, err := e2ekubelet.GetKubeletHeapStats(c, nodeName)
 			if err != nil {
-				e2elog.Logf("Unable to get heap stats from %q", nodeName)
+				framework.Logf("Unable to get heap stats from %q", nodeName)
 			} else {
-				e2elog.Logf("Heap stats on %q\n:%v", nodeName, heapStats)
+				framework.Logf("Heap stats on %q\n:%v", nodeName, heapStats)
 			}
 		}
 	}
 	if len(errList) > 0 {
-		e2elog.Failf("Memory usage exceeding limits:\n %s", strings.Join(errList, "\n"))
+		framework.Failf("Memory usage exceeding limits:\n %s", strings.Join(errList, "\n"))
 	}
 }
 
@@ -188,7 +189,7 @@ func verifyCPULimits(expected e2ekubelet.ContainersCPUSummary, actual e2ekubelet
 		}
 	}
 	if len(errList) > 0 {
-		e2elog.Failf("CPU usage exceeding limits:\n %s", strings.Join(errList, "\n"))
+		framework.Failf("CPU usage exceeding limits:\n %s", strings.Join(errList, "\n"))
 	}
 }
 
@@ -213,7 +214,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 	ginkgo.AfterEach(func() {
 		rm.Stop()
 		result := om.GetLatestRuntimeOperationErrorRate()
-		e2elog.Logf("runtime operation error metrics:\n%s", e2ekubelet.FormatRuntimeOperationErrorRate(result))
+		framework.Logf("runtime operation error metrics:\n%s", e2ekubelet.FormatRuntimeOperationErrorRate(result))
 	})
 	SIGDescribe("regular resource usage tracking [Feature:RegularResourceUsageTracking]", func() {
 		// We assume that the scheduler will make reasonable scheduling choices
@@ -279,3 +280,12 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 		}
 	})
 })
+
+// printPerfData prints the perfdata in json format with PerfResultTag prefix.
+// If an error occurs, nothing will be printed.
+func printPerfData(p *perftype.PerfData) {
+	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
+	if str := e2emetrics.PrettyPrintJSON(p); str != "" {
+		framework.Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
+	}
+}

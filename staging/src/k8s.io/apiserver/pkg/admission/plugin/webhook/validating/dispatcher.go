@@ -32,7 +32,6 @@ import (
 	webhookerrors "k8s.io/apiserver/pkg/admission/plugin/webhook/errors"
 	"k8s.io/apiserver/pkg/admission/plugin/webhook/generic"
 	webhookrequest "k8s.io/apiserver/pkg/admission/plugin/webhook/request"
-	"k8s.io/apiserver/pkg/admission/plugin/webhook/util"
 	webhookutil "k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/klog"
 	utiltrace "k8s.io/utils/trace"
@@ -102,12 +101,28 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 			versionedAttr := versionedAttrs[invocation.Kind]
 			t := time.Now()
 			err := d.callHook(ctx, hook, invocation, versionedAttr)
-			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), err != nil, versionedAttr.Attributes, "validating", hook.Name)
+			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
+			rejected := false
+			if err != nil {
+				switch err := err.(type) {
+				case *webhookutil.ErrCallingWebhook:
+					if !ignoreClientCallFailures {
+						rejected = true
+						admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "validating", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionCallingWebhookError, 0)
+					}
+				case *webhookutil.ErrWebhookRejection:
+					rejected = true
+					admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "validating", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionNoError, int(err.Status.ErrStatus.Code))
+				default:
+					rejected = true
+					admissionmetrics.Metrics.ObserveWebhookRejection(hook.Name, "validating", string(versionedAttr.Attributes.GetOperation()), admissionmetrics.WebhookRejectionAPIServerInternalError, 0)
+				}
+			}
+			admissionmetrics.Metrics.ObserveWebhook(time.Since(t), rejected, versionedAttr.Attributes, "validating", hook.Name)
 			if err == nil {
 				return
 			}
 
-			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
 			if callErr, ok := err.(*webhookutil.ErrCallingWebhook); ok {
 				if ignoreClientCallFailures {
 					klog.Warningf("Failed calling webhook, failing open %v: %v", hook.Name, callErr)
@@ -120,6 +135,9 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 				return
 			}
 
+			if rejectionErr, ok := err.(*webhookutil.ErrWebhookRejection); ok {
+				err = rejectionErr.Status
+			}
 			klog.Warningf("rejected by webhook %q: %#v", hook.Name, err)
 			errCh <- err
 		}(relevantHooks[i])
@@ -158,7 +176,7 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Validati
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
 	// Make the webhook request
-	client, err := d.cm.HookClient(util.HookClientConfigForWebhook(invocation.Webhook))
+	client, err := invocation.Webhook.GetRESTClient(d.cm)
 	if err != nil {
 		return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: err}
 	}
@@ -212,5 +230,5 @@ func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.Validati
 	if result.Allowed {
 		return nil
 	}
-	return webhookerrors.ToStatusErr(h.Name, result.Result)
+	return &webhookutil.ErrWebhookRejection{Status: webhookerrors.ToStatusErr(h.Name, result.Result)}
 }

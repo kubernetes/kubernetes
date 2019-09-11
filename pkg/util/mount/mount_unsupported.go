@@ -53,11 +53,6 @@ func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, errUnsupported
 }
 
-// IsMountPointMatch returns true if the path in mp is the same as dir
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
-	return (mp.Path == dir)
-}
-
 // IsLikelyNotMountPoint always returns an error on unsupported platforms
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	return true, errUnsupported
@@ -74,8 +69,4 @@ func (mounter *SafeFormatAndMount) formatAndMount(source string, target string, 
 
 func (mounter *SafeFormatAndMount) diskLooksUnformatted(disk string) (bool, error) {
 	return true, errUnsupported
-}
-
-func getDeviceNameFromMount(mounter Interface, mountPath, pluginMountDir string) (string, error) {
-	return "", errUnsupported
 }

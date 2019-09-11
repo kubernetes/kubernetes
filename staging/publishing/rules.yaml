@@ -130,6 +130,10 @@ rules:
     dependencies:
     - repository: apimachinery
       branch: release-1.16
+    - repository: api
+      branch: release-1.16
+    - repository: client-go
+      branch: release-13.0
 - destination: apiserver
   library: true
   branches:
@@ -568,6 +572,10 @@ rules:
       branch: release-1.16
     - repository: component-base
       branch: release-1.16
+    - repository: api
+      branch: release-1.16
+    - repository: client-go
+      branch: release-13.0
 - destination: kubelet
   library: true
   branches:
@@ -636,6 +644,10 @@ rules:
       branch: release-1.16
     - repository: component-base
       branch: release-1.16
+    - repository: api
+      branch: release-1.16
+    - repository: client-go
+      branch: release-13.0
 - destination: kube-controller-manager
   library: true
   branches:
@@ -672,6 +684,10 @@ rules:
       branch: release-1.16
     - repository: component-base
       branch: release-1.16
+    - repository: api
+      branch: release-1.16
+    - repository: client-go
+      branch: release-13.0
 - destination: cluster-bootstrap
   library: true
   branches:

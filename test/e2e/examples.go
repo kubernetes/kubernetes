@@ -31,7 +31,6 @@ import (
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 
@@ -83,14 +82,14 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 					pod, err := c.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
 					framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", podName))
 					stat := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, podName)
-					e2elog.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
+					framework.Logf("Pod: %s, restart count:%d", stat.Name, stat.RestartCount)
 					if stat.RestartCount > 0 {
-						e2elog.Logf("Saw %v restart, succeeded...", podName)
+						framework.Logf("Saw %v restart, succeeded...", podName)
 						wg.Done()
 						return
 					}
 				}
-				e2elog.Logf("Failed waiting for %v restart! ", podName)
+				framework.Logf("Failed waiting for %v restart! ", podName)
 				passed = false
 				wg.Done()
 			}
@@ -106,7 +105,7 @@ var _ = framework.KubeDescribe("[Feature:Example]", func() {
 			}
 			wg.Wait()
 			if !passed {
-				e2elog.Failf("At least one liveness example failed.  See the logs above.")
+				framework.Failf("At least one liveness example failed.  See the logs above.")
 			}
 		})
 	})

@@ -117,6 +117,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/selinux"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/subpath"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	utilexec "k8s.io/utils/exec"
@@ -254,7 +255,7 @@ type Dependencies struct {
 	OnHeartbeatFailure      func()
 	KubeClient              clientset.Interface
 	Mounter                 mount.Interface
-	HostUtil                mount.HostUtils
+	HostUtil                hostutil.HostUtils
 	OOMAdjuster             *oom.OOMAdjuster
 	OSInterface             kubecontainer.OSInterface
 	PodConfig               *config.PodConfig
@@ -1105,7 +1106,7 @@ type Kubelet struct {
 	mounter mount.Interface
 
 	// hostutil to interact with filesystems
-	hostutil mount.HostUtils
+	hostutil hostutil.HostUtils
 
 	// subpather to execute subpath actions
 	subpather subpath.Interface

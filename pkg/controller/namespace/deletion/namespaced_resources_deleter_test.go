@@ -137,6 +137,8 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 		kubeClientActionSet     sets.String
 		metadataClientActionSet sets.String
 		gvrError                error
+		expectErrorOnDelete     error
+		expectStatus            *v1.NamespaceStatus
 	}{
 		"pending-finalize": {
 			testNamespace: testNamespacePendingFinalize,
@@ -144,6 +146,7 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 				strings.Join([]string{"get", "namespaces", ""}, "-"),
 				strings.Join([]string{"create", "namespaces", "finalize"}, "-"),
 				strings.Join([]string{"list", "pods", ""}, "-"),
+				strings.Join([]string{"update", "namespaces", "status"}, "-"),
 				strings.Join([]string{"delete", "namespaces", ""}, "-"),
 			),
 			metadataClientActionSet: metadataClientActionSet,
@@ -165,46 +168,86 @@ func testSyncNamespaceThatIsTerminating(t *testing.T, versions *metav1.APIVersio
 			metadataClientActionSet: sets.NewString(),
 			gvrError:                fmt.Errorf("test error"),
 		},
+		"groupVersionResourceErr-finalize": {
+			testNamespace: testNamespacePendingFinalize,
+			kubeClientActionSet: sets.NewString(
+				strings.Join([]string{"get", "namespaces", ""}, "-"),
+				strings.Join([]string{"list", "pods", ""}, "-"),
+				strings.Join([]string{"update", "namespaces", "status"}, "-"),
+			),
+			metadataClientActionSet: metadataClientActionSet,
+			gvrError:                fmt.Errorf("test error"),
+			expectErrorOnDelete:     fmt.Errorf("test error"),
+			expectStatus: &v1.NamespaceStatus{
+				Phase: v1.NamespaceTerminating,
+				Conditions: []v1.NamespaceCondition{
+					{Type: v1.NamespaceDeletionDiscoveryFailure},
+				},
+			},
+		},
 	}
 
 	for scenario, testInput := range scenarios {
-		testHandler := &fakeActionHandler{statusCode: 200}
-		srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
-		defer srv.Close()
+		t.Run(scenario, func(t *testing.T) {
+			testHandler := &fakeActionHandler{statusCode: 200}
+			srv, clientConfig := testServerAndClientConfig(testHandler.ServeHTTP)
+			defer srv.Close()
 
-		mockClient := fake.NewSimpleClientset(testInput.testNamespace)
-		metadataClient, err := metadata.NewForConfig(clientConfig)
-		if err != nil {
-			t.Fatal(err)
-		}
+			mockClient := fake.NewSimpleClientset(testInput.testNamespace)
+			metadataClient, err := metadata.NewForConfig(clientConfig)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		fn := func() ([]*metav1.APIResourceList, error) {
-			return resources, nil
-		}
-		d := NewNamespacedResourcesDeleter(mockClient.CoreV1().Namespaces(), metadataClient, mockClient.CoreV1(), fn, v1.FinalizerKubernetes, true)
-		if err := d.Delete(testInput.testNamespace.Name); err != nil {
-			t.Errorf("scenario %s - Unexpected error when synching namespace %v", scenario, err)
-		}
+			fn := func() ([]*metav1.APIResourceList, error) {
+				return resources, testInput.gvrError
+			}
+			d := NewNamespacedResourcesDeleter(mockClient.CoreV1().Namespaces(), metadataClient, mockClient.CoreV1(), fn, v1.FinalizerKubernetes, true)
+			if err := d.Delete(testInput.testNamespace.Name); !matchErrors(err, testInput.expectErrorOnDelete) {
+				t.Errorf("expected error %q when syncing namespace, got %q, %v", testInput.expectErrorOnDelete, err, testInput.expectErrorOnDelete == err)
+			}
 
-		// validate traffic from kube client
-		actionSet := sets.NewString()
-		for _, action := range mockClient.Actions() {
-			actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
-		}
-		if !actionSet.Equal(testInput.kubeClientActionSet) {
-			t.Errorf("scenario %s - mock client expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario,
-				testInput.kubeClientActionSet, actionSet, testInput.kubeClientActionSet.Difference(actionSet))
-		}
+			// validate traffic from kube client
+			actionSet := sets.NewString()
+			for _, action := range mockClient.Actions() {
+				actionSet.Insert(strings.Join([]string{action.GetVerb(), action.GetResource().Resource, action.GetSubresource()}, "-"))
+			}
+			if !actionSet.Equal(testInput.kubeClientActionSet) {
+				t.Errorf("mock client expected actions:\n%v\n but got:\n%v\nDifference:\n%v",
+					testInput.kubeClientActionSet, actionSet, testInput.kubeClientActionSet.Difference(actionSet))
+			}
 
-		// validate traffic from metadata client
-		actionSet = sets.NewString()
-		for _, action := range testHandler.actions {
-			actionSet.Insert(action.String())
-		}
-		if !actionSet.Equal(testInput.metadataClientActionSet) {
-			t.Errorf("scenario %s - metadata client expected actions:\n%v\n but got:\n%v\nDifference:\n%v", scenario,
-				testInput.metadataClientActionSet, actionSet, testInput.metadataClientActionSet.Difference(actionSet))
-		}
+			// validate traffic from metadata client
+			actionSet = sets.NewString()
+			for _, action := range testHandler.actions {
+				actionSet.Insert(action.String())
+			}
+			if !actionSet.Equal(testInput.metadataClientActionSet) {
+				t.Errorf(" metadata client expected actions:\n%v\n but got:\n%v\nDifference:\n%v",
+					testInput.metadataClientActionSet, actionSet, testInput.metadataClientActionSet.Difference(actionSet))
+			}
+
+			// validate status conditions
+			if testInput.expectStatus != nil {
+				obj, err := mockClient.Tracker().Get(schema.GroupVersionResource{Version: "v1", Resource: "namespaces"}, testInput.testNamespace.Namespace, testInput.testNamespace.Name)
+				if err != nil {
+					t.Fatalf("Unexpected error in getting the namespace: %v", err)
+				}
+				ns, ok := obj.(*v1.Namespace)
+				if !ok {
+					t.Fatalf("Expected a namespace but received %v", obj)
+				}
+				if ns.Status.Phase != testInput.expectStatus.Phase {
+					t.Fatalf("Expected namespace status phase %v but received %v", testInput.expectStatus.Phase, ns.Status.Phase)
+				}
+				for _, expCondition := range testInput.expectStatus.Conditions {
+					nsCondition := getCondition(ns.Status.Conditions, expCondition.Type)
+					if nsCondition == nil {
+						t.Fatalf("Missing namespace status condition %v", expCondition.Type)
+					}
+				}
+			}
+		})
 	}
 }
 
@@ -269,6 +312,17 @@ func TestSyncNamespaceThatIsActive(t *testing.T) {
 	if !action.Matches("get", "namespaces") {
 		t.Errorf("Expected get namespaces, got: %v", action)
 	}
+}
+
+// matchError returns true if errors match, false if they don't, compares by error message only for convenience which should be sufficient for these tests
+func matchErrors(e1, e2 error) bool {
+	if e1 == nil && e2 == nil {
+		return true
+	}
+	if e1 != nil && e2 != nil {
+		return e1.Error() == e2.Error()
+	}
+	return false
 }
 
 // testServerAndClientConfig returns a server that listens and a config that can reference it

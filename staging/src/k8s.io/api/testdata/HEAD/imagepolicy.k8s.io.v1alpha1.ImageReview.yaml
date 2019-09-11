@@ -14,6 +14,7 @@ metadata:
     "7": "8"
   managedFields:
   - apiVersion: "17"
+    fieldsType: "18"
     manager: "16"
     operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
   name: "2"
@@ -30,12 +31,12 @@ metadata:
   uid: "7"
 spec:
   annotations:
-    "19": "20"
+    "20": "21"
   containers:
-  - image: "18"
-  namespace: "21"
+  - image: "19"
+  namespace: "22"
 status:
   allowed: true
   auditAnnotations:
-    "23": "24"
-  reason: "22"
+    "24": "25"
+  reason: "23"

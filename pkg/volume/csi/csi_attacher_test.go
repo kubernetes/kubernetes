@@ -342,9 +342,9 @@ func TestAttacherWithCSIDriver(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fakeclient.NewSimpleClientset(
-				getTestCSIDriver("not-attachable", nil, &bFalse),
-				getTestCSIDriver("attachable", nil, &bTrue),
-				getTestCSIDriver("nil", nil, nil),
+				getTestCSIDriver("not-attachable", nil, &bFalse, nil),
+				getTestCSIDriver("attachable", nil, &bTrue, nil),
+				getTestCSIDriver("nil", nil, nil, nil),
 			)
 			plug, fakeWatcher, tmpDir, _ := newTestWatchPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -430,9 +430,9 @@ func TestAttacherWaitForVolumeAttachmentWithCSIDriver(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fakeclient.NewSimpleClientset(
-				getTestCSIDriver("not-attachable", nil, &bFalse),
-				getTestCSIDriver("attachable", nil, &bTrue),
-				getTestCSIDriver("nil", nil, nil),
+				getTestCSIDriver("not-attachable", nil, &bFalse, nil),
+				getTestCSIDriver("attachable", nil, &bTrue, nil),
+				getTestCSIDriver("nil", nil, nil, nil),
 			)
 			plug, tmpDir := newTestPlugin(t, fakeClient)
 			defer os.RemoveAll(tmpDir)
@@ -894,11 +894,12 @@ func TestAttacherDetach(t *testing.T) {
 
 	nodeName := "test-node"
 	testCases := []struct {
-		name       string
-		volID      string
-		attachID   string
-		shouldFail bool
-		reactor    func(action core.Action) (handled bool, ret runtime.Object, err error)
+		name         string
+		volID        string
+		attachID     string
+		shouldFail   bool
+		watcherError bool
+		reactor      func(action core.Action) (handled bool, ret runtime.Object, err error)
 	}{
 		{name: "normal test", volID: "vol-001", attachID: getAttachmentName("vol-001", testDriver, nodeName)},
 		{name: "normal test 2", volID: "vol-002", attachID: getAttachmentName("vol-002", testDriver, nodeName)},
@@ -912,6 +913,19 @@ func TestAttacherDetach(t *testing.T) {
 				// return Forbidden to all DELETE requests
 				if action.Matches("delete", "volumeattachments") {
 					return true, nil, apierrs.NewForbidden(action.GetResource().GroupResource(), action.GetNamespace(), fmt.Errorf("mock error"))
+				}
+				return false, nil, nil
+			},
+		},
+		{
+			name:         "API watch error happen",
+			volID:        "vol-005",
+			attachID:     getAttachmentName("vol-005", testDriver, nodeName),
+			shouldFail:   true,
+			watcherError: true,
+			reactor: func(action core.Action) (handled bool, ret runtime.Object, err error) {
+				if action.Matches("get", "volumeattachments") {
+					return true, makeTestAttachment(getAttachmentName("vol-005", testDriver, nodeName), nodeName, "vol-005"), nil
 				}
 				return false, nil, nil
 			},
@@ -944,7 +958,14 @@ func TestAttacherDetach(t *testing.T) {
 			if err != nil {
 				t.Errorf("test case %s failed: %v", tc.name, err)
 			}
+			watchError := tc.watcherError
+			csiAttacher.waitSleepTime = 100 * time.Millisecond
 			go func() {
+				if watchError {
+					errStatus := apierrs.NewInternalError(fmt.Errorf("we got an error")).Status()
+					fakeWatcher.Error(&errStatus)
+					return
+				}
 				fakeWatcher.Delete(attachment)
 			}()
 			err = csiAttacher.Detach(volumeName, types.NodeName(nodeName))

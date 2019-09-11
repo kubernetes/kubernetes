@@ -4,7 +4,10 @@ go_library(
     name = "go_default_library",
     srcs = [
         "annotations.pb.go",
+        "client.pb.go",
+        "field_behavior.pb.go",
         "http.pb.go",
+        "resource.pb.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/google.golang.org/genproto/googleapis/api/annotations",
     importpath = "google.golang.org/genproto/googleapis/api/annotations",

@@ -421,7 +421,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 func (p *applyPatcher) createNewObject() (runtime.Object, error) {
 	obj, err := p.creater.New(p.kind)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create new object: %v", obj)
+		return nil, fmt.Errorf("failed to create new object: %v", err)
 	}
 	return p.applyPatchToCurrentObject(obj)
 }

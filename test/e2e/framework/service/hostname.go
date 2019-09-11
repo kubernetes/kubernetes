@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -118,22 +117,22 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 		// verify service from node
 		func() string {
 			cmd := "set -e; " + buildCommand("wget -q --timeout=0.2 --tries=1 -O -")
-			e2elog.Logf("Executing cmd %q on host %v", cmd, host)
+			framework.Logf("Executing cmd %q on host %v", cmd, host)
 			result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
 			if err != nil || result.Code != 0 {
 				e2essh.LogResult(result)
-				e2elog.Logf("error while SSH-ing to node: %v", err)
+				framework.Logf("error while SSH-ing to node: %v", err)
 			}
 			return result.Stdout
 		},
 		// verify service from pod
 		func() string {
 			cmd := buildCommand("wget -q -T 1 -O -")
-			e2elog.Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPod.Name)
+			framework.Logf("Executing cmd %q in pod %v/%v", cmd, ns, execPod.Name)
 			// TODO: Use exec-over-http via the netexec pod instead of kubectl exec.
 			output, err := framework.RunHostCmd(ns, execPod.Name, cmd)
 			if err != nil {
-				e2elog.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPod.Name, err, output)
+				framework.Logf("error while kubectl execing %q in pod %v/%v: %v\nOutput: %v", cmd, ns, execPod.Name, err, output)
 			}
 			return output
 		},
@@ -159,12 +158,12 @@ func VerifyServeHostnameServiceUp(c clientset.Interface, ns, host string, expect
 			// and we need a better way to track how often it occurs.
 			if gotEndpoints.IsSuperset(expectedEndpoints) {
 				if !gotEndpoints.Equal(expectedEndpoints) {
-					e2elog.Logf("Ignoring unexpected output wgetting endpoints of service %s: %v", serviceIP, gotEndpoints.Difference(expectedEndpoints))
+					framework.Logf("Ignoring unexpected output wgetting endpoints of service %s: %v", serviceIP, gotEndpoints.Difference(expectedEndpoints))
 				}
 				passed = true
 				break
 			}
-			e2elog.Logf("Unable to reach the following endpoints of service %s: %v", serviceIP, expectedEndpoints.Difference(gotEndpoints))
+			framework.Logf("Unable to reach the following endpoints of service %s: %v", serviceIP, expectedEndpoints.Difference(gotEndpoints))
 		}
 		if !passed {
 			// Sort the lists so they're easier to visually diff.
@@ -191,12 +190,12 @@ func VerifyServeHostnameServiceDown(c clientset.Interface, host string, serviceI
 		result, err := e2essh.SSH(command, host, framework.TestContext.Provider)
 		if err != nil {
 			e2essh.LogResult(result)
-			e2elog.Logf("error while SSH-ing to node: %v", err)
+			framework.Logf("error while SSH-ing to node: %v", err)
 		}
 		if result.Code != 99 {
 			return nil
 		}
-		e2elog.Logf("service still alive - still waiting")
+		framework.Logf("service still alive - still waiting")
 	}
 	return fmt.Errorf("waiting for service to be down timed out")
 }

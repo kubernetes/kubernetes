@@ -1,0 +1,17 @@
+language: go
+
+go_import_path: go.opencensus.io
+
+go:
+  - 1.11.x
+
+env:
+  global:
+    GO111MODULE=on
+
+before_script:
+  - make install-tools
+
+script:
+  - make travis-ci
+  - go run internal/check/version.go # TODO move this to makefile

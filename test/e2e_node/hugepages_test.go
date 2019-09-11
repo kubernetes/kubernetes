@@ -30,7 +30,6 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -51,7 +50,7 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 
 	// this command takes the expected value and compares it against the actual value for the pod cgroup hugetlb.2MB.limit_in_bytes
 	command := fmt.Sprintf("expected=%v; actual=$(cat /tmp/hugetlb/%v/hugetlb.2MB.limit_in_bytes); if [ \"$expected\" -ne \"$actual\" ]; then exit 1; fi; ", hugePagesLimit.Value(), cgroupFsName)
-	e2elog.Logf("Pod to run command: %v", command)
+	framework.Logf("Pod to run command: %v", command)
 	pod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "pod" + string(uuid.NewUUID()),
@@ -84,9 +83,9 @@ func makePodToVerifyHugePages(baseName string, hugePagesLimit resource.Quantity)
 	return pod
 }
 
-// configureHugePages attempts to allocate 100Mi of 2Mi hugepages for testing purposes
+// configureHugePages attempts to allocate 10Mi of 2Mi hugepages for testing purposes
 func configureHugePages() error {
-	err := exec.Command("/bin/sh", "-c", "echo 50 > /proc/sys/vm/nr_hugepages").Run()
+	err := exec.Command("/bin/sh", "-c", "echo 5 > /proc/sys/vm/nr_hugepages").Run()
 	if err != nil {
 		return err
 	}
@@ -98,11 +97,11 @@ func configureHugePages() error {
 	if err != nil {
 		return err
 	}
-	e2elog.Logf("HugePages_Total is set to %v", numHugePages)
-	if numHugePages == 50 {
+	framework.Logf("HugePages_Total is set to %v", numHugePages)
+	if numHugePages == 5 {
 		return nil
 	}
-	return fmt.Errorf("expected hugepages %v, but found %v", 50, numHugePages)
+	return fmt.Errorf("expected hugepages %v, but found %v", 5, numHugePages)
 }
 
 // releaseHugePages releases all pre-allocated hugepages
@@ -124,7 +123,7 @@ func pollResourceAsString(f *framework.Framework, resourceName string) string {
 	node, err := f.ClientSet.CoreV1().Nodes().Get(framework.TestContext.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 	amount := amountOfResourceAsString(node, resourceName)
-	e2elog.Logf("amount of %v: %v", resourceName, amount)
+	framework.Logf("amount of %v: %v", resourceName, amount)
 	return amount
 }
 
@@ -154,7 +153,7 @@ func runHugePagesTests(f *framework.Framework) {
 							Limits: v1.ResourceList{
 								v1.ResourceName("cpu"):           resource.MustParse("10m"),
 								v1.ResourceName("memory"):        resource.MustParse("100Mi"),
-								v1.ResourceName("hugepages-2Mi"): resource.MustParse("50Mi"),
+								v1.ResourceName("hugepages-2Mi"): resource.MustParse("6Mi"),
 							},
 						},
 					},
@@ -163,7 +162,7 @@ func runHugePagesTests(f *framework.Framework) {
 		})
 		podUID := string(pod.UID)
 		ginkgo.By("checking if the expected hugetlb settings were applied")
-		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("50Mi"))
+		verifyPod := makePodToVerifyHugePages("pod"+podUID, resource.MustParse("6Mi"))
 		f.PodClient().Create(verifyPod)
 		err := e2epod.WaitForPodSuccessInNamespace(f.ClientSet, verifyPod.Name, f.Namespace.Name)
 		framework.ExpectNoError(err)
@@ -194,7 +193,7 @@ var _ = SIGDescribe("HugePages [Serial] [Feature:HugePages][NodeFeature:HugePage
 			ginkgo.By("by waiting for hugepages resource to become available on the local node")
 			gomega.Eventually(func() string {
 				return pollResourceAsString(f, "hugepages-2Mi")
-			}, 30*time.Second, framework.Poll).Should(gomega.Equal("100Mi"))
+			}, 30*time.Second, framework.Poll).Should(gomega.Equal("10Mi"))
 		})
 
 		runHugePagesTests(f)

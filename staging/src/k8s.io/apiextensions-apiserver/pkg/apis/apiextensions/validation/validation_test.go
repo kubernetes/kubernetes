@@ -78,11 +78,12 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		name            string
-		resource        *apiextensions.CustomResourceDefinition
-		requestGV       schema.GroupVersion
-		errors          []validationMatch
-		enabledFeatures []featuregate.Feature
+		name             string
+		resource         *apiextensions.CustomResourceDefinition
+		requestGV        schema.GroupVersion
+		errors           []validationMatch
+		enabledFeatures  []featuregate.Feature
+		disabledFeatures []featuregate.Feature
 	}{
 		{
 			name: "invalid types allowed via v1beta1",
@@ -1599,7 +1600,8 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
-			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
+			requestGV:        apiextensionsv1beta1.SchemeGroupVersion,
+			disabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 			errors: []validationMatch{
 				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "default"), // disabled feature-gate
 			},
@@ -4086,6 +4088,10 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			for _, gate := range tc.enabledFeatures {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, true)()
 			}
+			for _, gate := range tc.disabledFeatures {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, false)()
+			}
+
 			// duplicate defaulting behaviour
 			if tc.resource.Spec.Conversion != nil && tc.resource.Spec.Conversion.Strategy == apiextensions.WebhookConverter && len(tc.resource.Spec.Conversion.ConversionReviewVersions) == 0 {
 				tc.resource.Spec.Conversion.ConversionReviewVersions = []string{"v1beta1"}
@@ -4119,12 +4125,13 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 
 func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 	tests := []struct {
-		name            string
-		old             *apiextensions.CustomResourceDefinition
-		resource        *apiextensions.CustomResourceDefinition
-		requestGV       schema.GroupVersion
-		errors          []validationMatch
-		enabledFeatures []featuregate.Feature
+		name             string
+		old              *apiextensions.CustomResourceDefinition
+		resource         *apiextensions.CustomResourceDefinition
+		requestGV        schema.GroupVersion
+		errors           []validationMatch
+		enabledFeatures  []featuregate.Feature
+		disabledFeatures []featuregate.Feature
 	}{
 		{
 			name: "invalid type updates allowed via v1beta1",
@@ -5903,8 +5910,9 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
-			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
-			errors:    []validationMatch{},
+			requestGV:        apiextensionsv1beta1.SchemeGroupVersion,
+			errors:           []validationMatch{},
+			disabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
 			name: "ratcheting validation of defaults with disabled feature gate via v1",
@@ -5990,8 +5998,300 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 					StoredVersions: []string{"version"},
 				},
 			},
+			requestGV:        apiextensionsv1.SchemeGroupVersion,
+			errors:           []validationMatch{},
+			disabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+		},
+		{
+			name: "ratcheting validation of defaults with disabled feature gate via v1, non-structural, no defaults before",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"a": {},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"a": {
+									Type:    "number",
+									Default: jsonPtr(42.0),
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
 			requestGV: apiextensionsv1.SchemeGroupVersion,
-			errors:    []validationMatch{},
+			errors: []validationMatch{
+				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "default"),
+			},
+			disabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+		},
+		{
+			name: "ratcheting validation of defaults with disabled feature gate via v1, unpruned => unpruned",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"a": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {Type: "string"},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"unknown": "unknown",
+									}),
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"a": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {Type: "string"},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"unknown": "unknown",
+									}),
+								},
+								"b": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {Type: "string"},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"unknown": "unknown",
+									}),
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV:        apiextensionsv1.SchemeGroupVersion,
+			errors:           []validationMatch{},
+			disabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
+		},
+		{
+			name: "ratcheting validation of defaults with disabled feature gate via v1, pruned => unpruned",
+			old: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"a": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {Type: "string"},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"foo": "foo",
+									}),
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:            "plural.group.com",
+					ResourceVersion: "42",
+				},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "group.com",
+					Version: "version",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Scope: apiextensions.NamespaceScoped,
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"a": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {Type: "string"},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"foo": "foo",
+									}),
+								},
+								"b": {
+									Type: "object",
+									Properties: map[string]apiextensions.JSONSchemaProps{
+										"foo": {Type: "string"},
+									},
+									Default: jsonPtr(map[string]interface{}{
+										"unknown": "unknown",
+									}),
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false),
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			requestGV: apiextensionsv1.SchemeGroupVersion,
+			errors: []validationMatch{
+				invalid("spec", "validation", "openAPIV3Schema", "properties[b]", "default"),
+			},
+			disabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
 		{
 			name: "add default with enabled feature gate, structural schema, without pruning",
@@ -6066,6 +6366,9 @@ func TestValidateCustomResourceDefinitionUpdate(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, gate := range tc.enabledFeatures {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, true)()
+			}
+			for _, gate := range tc.disabledFeatures {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, gate, false)()
 			}
 
 			errs := ValidateCustomResourceDefinitionUpdate(tc.resource, tc.old, tc.requestGV)
@@ -6268,6 +6571,194 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			opts:      validationOptions{requireValidPropertyType: true, requireStructuralSchema: true},
 			wantError: true,
+		},
+		{
+			name: "invalid type with list type extension set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "object",
+					XListType: strPtr("set"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "unset type with list type extension set",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					XListType: strPtr("set"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "invalid list type extension",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("invalid"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "invalid list type extension with list map keys extension non-empty",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("set"),
+					XListMapKeys: []string{"key"},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "unset list type extension with list map keys extension non-empty",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					XListMapKeys: []string{"key"},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "empty list map keys extension with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("map"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "no items schema with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key"},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "multiple schema items with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						JSONSchemas: []apiextensions.JSONSchemaProps{
+							{
+								Type: "string",
+							}, {
+								Type: "integer",
+							},
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "non object item with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "string",
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "items with key missing from properties with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "items with non scalar key property type with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"key": {
+									Type: "object",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "duplicate map keys with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"key", "key"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"key": {
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "allowed schema with list type extension map",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:         "array",
+					XListType:    strPtr("map"),
+					XListMapKeys: []string{"keyA", "keyB"},
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"keyA": {
+									Type: "string",
+								},
+								"keyB": {
+									Type: "integer",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantError: false,
 		},
 	}
 	for _, tt := range tests {

@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/klog"
 	"k8s.io/utils/keymutex"
+	utilpath "k8s.io/utils/path"
 )
 
 // Mounter provides the default implementation of mount.Interface
@@ -68,7 +69,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	bindSource := source
 
 	// tell it's going to mount azure disk or azure file according to options
-	if bind, _, _ := IsBind(options); bind {
+	if bind, _, _ := MakeBindOpts(options); bind {
 		// mount azure disk
 		bindSource = NormalizeWindowsPath(source)
 	} else {
@@ -164,11 +165,6 @@ func (mounter *Mounter) List() ([]MountPoint, error) {
 	return []MountPoint{}, nil
 }
 
-// IsMountPointMatch determines if the mountpoint matches the dir
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
-	return mp.Path == dir
-}
-
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
 func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	stat, err := os.Lstat(file)
@@ -181,8 +177,7 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 		if err != nil {
 			return true, fmt.Errorf("readlink error: %v", err)
 		}
-		hu := NewHostUtil()
-		exists, err := hu.PathExists(target)
+		exists, err := utilpath.Exists(utilpath.CheckFollowSymlink, target)
 		if err != nil {
 			return true, err
 		}

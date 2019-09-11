@@ -88,7 +88,7 @@ var (
 
 	// Registered metadata producers
 	priorityMetadataProducer  PriorityMetadataProducerFactory
-	predicateMetadataProducer PredicateMetadataProducerFactory
+	predicateMetadataProducer predicates.PredicateMetadataProducer
 )
 
 const (
@@ -313,11 +313,11 @@ func RegisterPriorityMetadataProducerFactory(factory PriorityMetadataProducerFac
 	priorityMetadataProducer = factory
 }
 
-// RegisterPredicateMetadataProducerFactory registers a PredicateMetadataProducerFactory.
-func RegisterPredicateMetadataProducerFactory(factory PredicateMetadataProducerFactory) {
+// RegisterPredicateMetadataProducer registers a PredicateMetadataProducer.
+func RegisterPredicateMetadataProducer(producer predicates.PredicateMetadataProducer) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
-	predicateMetadataProducer = factory
+	predicateMetadataProducer = producer
 }
 
 // RegisterPriorityFunction registers a priority function with the algorithm registry. Returns the name,
@@ -390,8 +390,8 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 		} else if policy.Argument.RequestedToCapacityRatioArguments != nil {
 			pcf = &PriorityConfigFactory{
 				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-					scoringFunctionShape := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
-					p := priorities.RequestedToCapacityRatioResourceAllocationPriority(scoringFunctionShape)
+					scoringFunctionShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
+					p := priorities.RequestedToCapacityRatioResourceAllocationPriority(scoringFunctionShape, resources)
 					return p.PriorityMap, nil
 				},
 				Weight: policy.Weight,
@@ -414,7 +414,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	return RegisterPriorityConfigFactory(policy.Name, *pcf)
 }
 
-func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *schedulerapi.RequestedToCapacityRatioArguments) priorities.FunctionShape {
+func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *schedulerapi.RequestedToCapacityRatioArguments) (priorities.FunctionShape, priorities.ResourceToWeightMap) {
 	n := len(arguments.UtilizationShape)
 	points := make([]priorities.FunctionShapePoint, 0, n)
 	for _, point := range arguments.UtilizationShape {
@@ -424,7 +424,18 @@ func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *s
 	if err != nil {
 		klog.Fatalf("invalid RequestedToCapacityRatioPriority arguments: %s", err.Error())
 	}
-	return shape
+	resourceToWeightMap := make(priorities.ResourceToWeightMap, 0)
+	if len(arguments.Resources) == 0 {
+		resourceToWeightMap = priorities.DefaultRequestedRatioResources
+		return shape, resourceToWeightMap
+	}
+	for _, resource := range arguments.Resources {
+		resourceToWeightMap[resource.Name] = int64(resource.Weight)
+		if resource.Weight == 0 {
+			resourceToWeightMap[resource.Name] = 1
+		}
+	}
+	return shape, resourceToWeightMap
 }
 
 // IsPriorityFunctionRegistered is useful for testing providers.
@@ -494,14 +505,14 @@ func getPriorityMetadataProducer(args PluginFactoryArgs) (priorities.PriorityMet
 	return priorityMetadataProducer(args), nil
 }
 
-func getPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateMetadataProducer, error) {
+func getPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
 	if predicateMetadataProducer == nil {
 		return predicates.EmptyPredicateMetadataProducer, nil
 	}
-	return predicateMetadataProducer(args), nil
+	return predicateMetadataProducer, nil
 }
 
 func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]priorities.PriorityConfig, error) {

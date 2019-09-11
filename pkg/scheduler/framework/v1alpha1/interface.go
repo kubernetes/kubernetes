@@ -25,7 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // Code is the Status code/type which is returned from plugins.
@@ -53,9 +53,16 @@ const (
 	Success Code = iota
 	// Error is used for internal plugin errors, unexpected input, etc.
 	Error
-	// Unschedulable is used when a plugin finds a pod unschedulable.
+	// Unschedulable is used when a plugin finds a pod unschedulable. The scheduler might attempt to
+	// preempt other pods to get this pod scheduled. Use UnschedulableAndUnresolvable to make the
+	// scheduler skip preemption.
 	// The accompanying status message should explain why the pod is unschedulable.
 	Unschedulable
+	// UnschedulableAndUnresolvable is used when a (pre-)filter plugin finds a pod unschedulable and
+	// preemption would not change anything. Plugins should return Unschedulable if it is possible
+	// that the pod can get scheduled with preemption.
+	// The accompanying status message should explain why the pod is unschedulable.
+	UnschedulableAndUnresolvable
 	// Wait is used when a permit plugin finds a pod scheduling should wait.
 	Wait
 	// Skip is used when a bind plugin chooses to skip binding.
@@ -98,6 +105,12 @@ func (s *Status) Message() string {
 // IsSuccess returns true if and only if "Status" is nil or Code is "Success".
 func (s *Status) IsSuccess() bool {
 	return s.Code() == Success
+}
+
+// IsUnschedulable returns true if "Status" is Unschedulable (Unschedulable or UnschedulableAndUnresolvable).
+func (s *Status) IsUnschedulable() bool {
+	code := s.Code()
+	return code == Unschedulable || code == UnschedulableAndUnresolvable
 }
 
 // AsError returns an "error" object with the same message as that of the Status.
@@ -357,7 +370,7 @@ type FrameworkHandle interface {
 	// cycle(permit/pre-bind/bind/post-bind/un-reserve plugin) should not use it,
 	// otherwise a concurrent read/write error might occur, they should use scheduler
 	// cache instead.
-	NodeInfoSnapshot() *internalcache.NodeInfoSnapshot
+	NodeInfoSnapshot() *schedulernodeinfo.Snapshot
 
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
 	IterateOverWaitingPods(callback func(WaitingPod))

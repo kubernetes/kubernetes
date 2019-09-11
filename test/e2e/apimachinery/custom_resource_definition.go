@@ -34,7 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = SIGDescribe("CustomResourceDefinition resources", func() {
+var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin]", func() {
 
 	f := framework.NewDefaultFramework("custom-resource-definition")
 
@@ -42,7 +42,9 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 		/*
 			Release : v1.9
 			Testname: Custom Resource Definition, create
-			Description: Create a API extension client, define a random custom resource definition, create the custom resource. API server MUST be able to create the custom resource.
+			Description: Create a API extension client and define a random custom resource definition.
+			Create the custom resource definition and then delete it. The creation and deletion MUST
+			be successful.
 		*/
 		framework.ConformanceIt("creating/deleting custom resource definition objects works ", func() {
 
@@ -54,7 +56,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 			randomDefinition := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
 
 			// Create CRD and waits for the resource to be recognized and available.
-			randomDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(randomDefinition, apiExtensionClient, f.DynamicClient)
+			randomDefinition, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(randomDefinition, apiExtensionClient)
 			framework.ExpectNoError(err, "creating CustomResourceDefinition")
 
 			defer func() {
@@ -66,9 +68,12 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 		/*
 			Release : v1.16
 			Testname: Custom Resource Definition, list
-			Description: Create a API extension client, define 10 random custom resource definitions and list them using a label selector. API server MUST be able to list the custom resource definitions and delete them via delete collection.
+			Description: Create a API extension client, define 10 labeled custom resource definitions and list them using
+			a label selector; the list result MUST contain only the labeled custom resource definitions. Delete the labeled
+			custom resource definitions via delete collection; the delete MUST be successful and MUST delete only the
+			labeled custom resource definitions.
 		*/
-		ginkgo.It("listing custom resource definition objects works ", func() {
+		framework.ConformanceIt("listing custom resource definition objects works ", func() {
 			testListSize := 10
 			config, err := framework.LoadConfig()
 			framework.ExpectNoError(err, "loading config")
@@ -83,14 +88,14 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 			for i := 0; i < testListSize; i++ {
 				crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
 				crd.Labels = map[string]string{"e2e-list-test-uuid": testUUID}
-				crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
+				crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 				framework.ExpectNoError(err, "creating CustomResourceDefinition")
 				crds[i] = crd
 			}
 
 			// Create a crd w/o the label to ensure the label selector matching works correctly
 			crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
-			crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
+			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 			framework.ExpectNoError(err, "creating CustomResourceDefinition")
 			defer func() {
 				err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
@@ -125,9 +130,10 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 		/*
 			Release : v1.16
 			Testname: Custom Resource Definition, status sub-resource
-			Description: Create a API extension client, create a custom resource definition and then read, update and patch its status sub-resource. API server MUST be able to perform the operations against the status sub-resource.
+			Description: Create a custom resource definition. Attempt to read, update and patch its status sub-resource;
+			all mutating sub-resource operations MUST be visible to subsequent reads.
 		*/
-		ginkgo.It("getting/updating/patching custom resource definition status sub-resource works ", func() {
+		framework.ConformanceIt("getting/updating/patching custom resource definition status sub-resource works ", func() {
 			config, err := framework.LoadConfig()
 			framework.ExpectNoError(err, "loading config")
 			apiExtensionClient, err := clientset.NewForConfig(config)
@@ -139,7 +145,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 
 			// Create CRD and waits for the resource to be recognized and available.
 			crd := fixtures.NewRandomNameV1CustomResourceDefinition(v1.ClusterScoped)
-			crd, err = fixtures.CreateNewV1CustomResourceDefinition(crd, apiExtensionClient, f.DynamicClient)
+			crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 			framework.ExpectNoError(err, "creating CustomResourceDefinition")
 			defer func() {
 				err = fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
@@ -174,6 +180,77 @@ var _ = SIGDescribe("CustomResourceDefinition resources", func() {
 			expectCondition(patched.Status.Conditions, patchCondition)
 		})
 	})
+
+	/*
+		Release: v1.16
+		Testname: Custom Resource Definition, discovery
+		Description: Fetch /apis, /apis/apiextensions.k8s.io, and /apis/apiextensions.k8s.io/v1 discovery documents,
+		and ensure they indicate CustomResourceDefinition apiextensions.k8s.io/v1 resources are available.
+	*/
+	framework.ConformanceIt("should include custom resource definition resources in discovery documents", func() {
+		{
+			ginkgo.By("fetching the /apis discovery document")
+			apiGroupList := &metav1.APIGroupList{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis").Do().Into(apiGroupList)
+			framework.ExpectNoError(err, "fetching /apis")
+
+			ginkgo.By("finding the apiextensions.k8s.io API group in the /apis discovery document")
+			var group *metav1.APIGroup
+			for _, g := range apiGroupList.Groups {
+				if g.Name == v1.GroupName {
+					group = &g
+					break
+				}
+			}
+			framework.ExpectNotEqual(group, nil, "apiextensions.k8s.io API group not found in /apis discovery document")
+
+			ginkgo.By("finding the apiextensions.k8s.io/v1 API group/version in the /apis discovery document")
+			var version *metav1.GroupVersionForDiscovery
+			for _, v := range group.Versions {
+				if v.Version == v1.SchemeGroupVersion.Version {
+					version = &v
+					break
+				}
+			}
+			framework.ExpectNotEqual(version, nil, "apiextensions.k8s.io/v1 API group version not found in /apis discovery document")
+		}
+
+		{
+			ginkgo.By("fetching the /apis/apiextensions.k8s.io discovery document")
+			group := &metav1.APIGroup{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io").Do().Into(group)
+			framework.ExpectNoError(err, "fetching /apis/apiextensions.k8s.io")
+			framework.ExpectEqual(group.Name, v1.GroupName, "verifying API group name in /apis/apiextensions.k8s.io discovery document")
+
+			ginkgo.By("finding the apiextensions.k8s.io/v1 API group/version in the /apis/apiextensions.k8s.io discovery document")
+			var version *metav1.GroupVersionForDiscovery
+			for _, v := range group.Versions {
+				if v.Version == v1.SchemeGroupVersion.Version {
+					version = &v
+					break
+				}
+			}
+			framework.ExpectNotEqual(version, nil, "apiextensions.k8s.io/v1 API group version not found in /apis/apiextensions.k8s.io discovery document")
+		}
+
+		{
+			ginkgo.By("fetching the /apis/apiextensions.k8s.io/v1 discovery document")
+			apiResourceList := &metav1.APIResourceList{}
+			err := f.ClientSet.Discovery().RESTClient().Get().AbsPath("/apis/apiextensions.k8s.io/v1").Do().Into(apiResourceList)
+			framework.ExpectNoError(err, "fetching /apis/apiextensions.k8s.io/v1")
+			framework.ExpectEqual(apiResourceList.GroupVersion, v1.SchemeGroupVersion.String(), "verifying API group/version in /apis/apiextensions.k8s.io/v1 discovery document")
+
+			ginkgo.By("finding customresourcedefinitions resources in the /apis/apiextensions.k8s.io/v1 discovery document")
+			var crdResource *metav1.APIResource
+			for i := range apiResourceList.APIResources {
+				if apiResourceList.APIResources[i].Name == "customresourcedefinitions" {
+					crdResource = &apiResourceList.APIResources[i]
+				}
+			}
+			framework.ExpectNotEqual(crdResource, nil, "customresourcedefinitions resource not found in /apis/apiextensions.k8s.io/v1 discovery document")
+		}
+	})
+
 })
 
 func unstructuredToCRD(obj *unstructured.Unstructured) *v1.CustomResourceDefinition {

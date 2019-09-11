@@ -8,7 +8,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/volume/expand",
     deps = [
         "//pkg/apis/core/v1/helper:go_default_library",
-        "//pkg/controller:go_default_library",
         "//pkg/controller/volume/events:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",

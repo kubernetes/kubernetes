@@ -260,7 +260,7 @@ const (
 	MinExternalEtcdVersion = "3.2.18"
 
 	// DefaultEtcdVersion indicates the default etcd version that kubeadm uses
-	DefaultEtcdVersion = "3.3.10"
+	DefaultEtcdVersion = "3.3.15-0"
 
 	// PauseVersion indicates the default pause image version for kubeadm
 	PauseVersion = "3.1"
@@ -333,7 +333,7 @@ const (
 	KubeDNSVersion = "1.14.13"
 
 	// CoreDNSVersion is the version of CoreDNS to be deployed if it is used
-	CoreDNSVersion = "1.5.0"
+	CoreDNSVersion = "1.6.2"
 
 	// ClusterConfigurationKind is the string kind value for the ClusterConfiguration struct
 	ClusterConfigurationKind = "ClusterConfiguration"
@@ -424,8 +424,8 @@ var (
 		13: "3.2.24",
 		14: "3.3.10",
 		15: "3.3.10",
-		16: "3.3.10",
-		17: "3.3.10",
+		16: "3.3.15-0",
+		17: "3.3.15-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows

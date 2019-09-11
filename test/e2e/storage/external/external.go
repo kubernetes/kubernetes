@@ -50,6 +50,7 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitVolumesTestSuite,
 	testsuites.InitVolumeExpandTestSuite,
 	testsuites.InitDisruptiveTestSuite,
+	testsuites.InitVolumeLimitsTestSuite,
 }
 
 func init() {
@@ -179,14 +180,25 @@ type driverDefinition struct {
 		// TODO (?): load from file
 	}
 
-	// InlineVolumeAttributes defines one or more set of attributes for
-	// use as inline ephemeral volumes. At least one set of attributes
-	// has to be defined to enable testing of inline ephemeral volumes.
-	// If a test needs more volumes than defined, some of the defined
+	// InlineVolumes defines one or more volumes for use as inline
+	// ephemeral volumes. At least one such volume has to be
+	// defined to enable testing of inline ephemeral volumes.  If
+	// a test needs more volumes than defined, some of the defined
 	// volumes will be used multiple times.
 	//
 	// DriverInfo.Name is used as name of the driver in the inline volume.
-	InlineVolumeAttributes []map[string]string
+	InlineVolumes []struct {
+		// Attributes are passed as NodePublishVolumeReq.volume_context.
+		// Can be empty.
+		Attributes map[string]string
+		// Shared defines whether the resulting volume is
+		// shared between different pods (i.e.  changes made
+		// in one pod are visible in another)
+		Shared bool
+		// ReadOnly must be set to true if the driver does not
+		// support mounting as read/write.
+		ReadOnly bool
+	}
 
 	// ClaimSize defines the desired size of dynamically
 	// provisioned volumes. Default is "5GiB".
@@ -221,7 +233,7 @@ func (d *driverDefinition) SkipUnsupportedTest(pattern testpatterns.TestPattern)
 			supported = true
 		}
 	case testpatterns.CSIInlineVolume:
-		supported = len(d.InlineVolumeAttributes) != 0
+		supported = len(d.InlineVolumes) != 0
 	}
 	if !supported {
 		framework.Skipf("Driver %q does not support volume type %q - skipping", d.DriverInfo.Name, pattern.VolType)
@@ -294,11 +306,12 @@ func (d *driverDefinition) GetClaimSize() string {
 	return d.ClaimSize
 }
 
-func (d *driverDefinition) GetVolumeAttributes(config *testsuites.PerTestConfig, volumeNumber int) map[string]string {
-	if len(d.InlineVolumeAttributes) == 0 {
+func (d *driverDefinition) GetVolume(config *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
+	if len(d.InlineVolumes) == 0 {
 		framework.Skipf("%s does not have any InlineVolumeAttributes defined", d.DriverInfo.Name)
 	}
-	return d.InlineVolumeAttributes[volumeNumber%len(d.InlineVolumeAttributes)]
+	volume := d.InlineVolumes[volumeNumber%len(d.InlineVolumes)]
+	return volume.Attributes, volume.Shared, volume.ReadOnly
 }
 
 func (d *driverDefinition) GetCSIDriverName(config *testsuites.PerTestConfig) string {

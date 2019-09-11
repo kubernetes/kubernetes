@@ -73,7 +73,7 @@ func (mounter *Mounter) Mount(source string, target string, fstype string, optio
 	// Path to mounter binary if containerized mounter is needed. Otherwise, it is set to empty.
 	// All Linux distros are expected to be shipped with a mount utility that a support bind mounts.
 	mounterPath := ""
-	bind, bindOpts, bindRemountOpts := IsBind(options)
+	bind, bindOpts, bindRemountOpts := MakeBindOpts(options)
 	if bind {
 		err := mounter.doMount(mounterPath, defaultMountCommand, source, target, fstype, bindOpts)
 		if err != nil {
@@ -211,12 +211,6 @@ func (mounter *Mounter) Unmount(target string) error {
 // List returns a list of all mounted filesystems.
 func (*Mounter) List() ([]MountPoint, error) {
 	return ListProcMounts(procMountsPath)
-}
-
-// IsMountPointMatch returns true if the path in mp is the same as dir
-func (mounter *Mounter) IsMountPointMatch(mp MountPoint, dir string) bool {
-	deletedDir := fmt.Sprintf("%s\\040(deleted)", dir)
-	return ((mp.Path == dir) || (mp.Path == deletedDir))
 }
 
 // IsLikelyNotMountPoint determines if a directory is not a mountpoint.
@@ -453,7 +447,7 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 // root path and major:minor to represent mount source uniquely.
 // This implementation is shared between Linux and NsEnterMounter
 func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
-	mis, err := parseMountInfo(mountInfoPath)
+	mis, err := ParseMountInfo(mountInfoPath)
 	if err != nil {
 		return nil, err
 	}
@@ -466,11 +460,11 @@ func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 	// We need search in backward order because it's possible for later mounts
 	// to overlap earlier mounts.
 	for i := len(mis) - 1; i >= 0; i-- {
-		if hostSource == mis[i].mountPoint || PathWithinBase(hostSource, mis[i].mountPoint) {
+		if hostSource == mis[i].MountPoint || PathWithinBase(hostSource, mis[i].MountPoint) {
 			// If it's a mount point or path under a mount point.
-			mountID = mis[i].id
-			rootPath = filepath.Join(mis[i].root, strings.TrimPrefix(hostSource, mis[i].mountPoint))
-			majorMinor = mis[i].majorMinor
+			mountID = mis[i].ID
+			rootPath = filepath.Join(mis[i].Root, strings.TrimPrefix(hostSource, mis[i].MountPoint))
+			majorMinor = mis[i].MajorMinor
 			break
 		}
 	}
@@ -481,12 +475,12 @@ func SearchMountPoints(hostSource, mountInfoPath string) ([]string, error) {
 
 	var refs []string
 	for i := range mis {
-		if mis[i].id == mountID {
+		if mis[i].ID == mountID {
 			// Ignore mount entry for mount source itself.
 			continue
 		}
-		if mis[i].root == rootPath && mis[i].majorMinor == majorMinor {
-			refs = append(refs, mis[i].mountPoint)
+		if mis[i].Root == rootPath && mis[i].MajorMinor == majorMinor {
+			refs = append(refs, mis[i].MountPoint)
 		}
 	}
 

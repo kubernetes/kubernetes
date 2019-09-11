@@ -69,6 +69,12 @@ func TestAllocate(t *testing.T) {
 		if f := r.Free(); f != tc.free {
 			t.Errorf("Test %s unexpected free %d", tc.name, f)
 		}
+
+		rCIDR := r.CIDR()
+		if rCIDR.String() != tc.cidr {
+			t.Errorf("allocator returned a different cidr")
+		}
+
 		if f := r.Used(); f != 0 {
 			t.Errorf("Test %s unexpected used %d", tc.name, f)
 		}

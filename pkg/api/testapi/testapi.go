@@ -44,6 +44,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/apis/events"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/apis/imagepolicy"
@@ -67,6 +68,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/certificates/install"
 	_ "k8s.io/kubernetes/pkg/apis/coordination/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	_ "k8s.io/kubernetes/pkg/apis/discovery/install"
 	_ "k8s.io/kubernetes/pkg/apis/events/install"
 	_ "k8s.io/kubernetes/pkg/apis/extensions/install"
 	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
@@ -280,6 +282,12 @@ func init() {
 	if _, ok := Groups[auditregistration.GroupName]; !ok {
 		externalGroupVersion := schema.GroupVersion{Group: auditregistration.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(auditregistration.GroupName)[0].Version}
 		Groups[auditregistration.GroupName] = TestGroup{
+			externalGroupVersion: externalGroupVersion,
+		}
+	}
+	if _, ok := Groups[discovery.GroupName]; !ok {
+		externalGroupVersion := schema.GroupVersion{Group: discovery.GroupName, Version: legacyscheme.Scheme.PrioritizedVersionsForGroup(discovery.GroupName)[0].Version}
+		Groups[discovery.GroupName] = TestGroup{
 			externalGroupVersion: externalGroupVersion,
 		}
 	}

@@ -14,7 +14,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/route",
     deps = [
-        "//pkg/controller:go_default_library",
         "//pkg/controller/util/node:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//pkg/util/node:go_default_library",

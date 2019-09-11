@@ -533,25 +533,13 @@ var _ = SIGDescribe("Kubectl client", func() {
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
 			ginkgo.By("executing a command with run and attach with stdin")
-			runOutput := framework.NewKubectlCommand(nsFlag, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "cat && echo 'stdin closed'").
-				WithStdinData("abcd1234").
+			// We wait for a non-empty line so we know kubectl has attached
+			runOutput := framework.NewKubectlCommand(nsFlag, "run", "run-test", "--image="+busyboxImage, "--restart=OnFailure", "--attach=true", "--stdin", "--", "sh", "-c", "while [ -z \"$s\" ]; do read s; sleep 1; done; echo read:$s && cat && echo 'stdin closed'").
+				WithStdinData("value\nabcd1234").
 				ExecOrDie()
-
-			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test", 1*time.Minute, g)
-			gomega.Expect(err).To(gomega.BeNil())
-			// NOTE: we cannot guarantee our output showed up in the container logs before stdin was closed, so we have
-			// to loop test.
-			err = wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
-				if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, 1*time.Second) {
-					e2elog.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test")
-				}
-				logOutput := framework.RunKubectlOrDie(nsFlag, "logs", runTestPod.Name)
-				gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
-				gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
-				return strings.Contains(logOutput, "abcd1234"), nil
-			})
-			gomega.Expect(err).To(gomega.BeNil())
+			gomega.Expect(runOutput).To(gomega.ContainSubstring("read:value"))
+			gomega.Expect(runOutput).To(gomega.ContainSubstring("abcd1234"))
+			gomega.Expect(runOutput).To(gomega.ContainSubstring("stdin closed"))
 
 			gomega.Expect(c.BatchV1().Jobs(ns).Delete("run-test", nil)).To(gomega.BeNil())
 
@@ -568,8 +556,8 @@ var _ = SIGDescribe("Kubectl client", func() {
 				WithStdinData("abcd1234\n").
 				ExecOrDie()
 			gomega.Expect(runOutput).ToNot(gomega.ContainSubstring("stdin closed"))
-			g = func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
-			runTestPod, _, err = polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
+			g := func(pods []*v1.Pod) sort.Interface { return sort.Reverse(controller.ActivePods(pods)) }
+			runTestPod, _, err := polymorphichelpers.GetFirstPod(f.ClientSet.CoreV1(), ns, "run=run-test-3", 1*time.Minute, g)
 			gomega.Expect(err).To(gomega.BeNil())
 			if !e2epod.CheckPodsRunningReady(c, ns, []string{runTestPod.Name}, time.Minute) {
 				e2elog.Failf("Pod %q of Job %q should still be running", runTestPod.Name, "run-test-3")
@@ -1298,7 +1286,7 @@ metadata:
 			Testname: Kubectl, logs
 			Description: When a Pod is running then it MUST generate logs.
 			Starting a Pod should have a expected log line. Also log command options MUST work as expected and described below.
-				‘kubectl log -tail=1’ should generate a output of one line, the last line in the log.
+				‘kubectl logs -tail=1’ should generate a output of one line, the last line in the log.
 				‘kubectl --limit-bytes=1’ should generate a single byte output.
 				‘kubectl --tail=1 --timestamp should generate one line with timestamp in RFC3339 format
 				‘kubectl --since=1s’ should output logs that are only 1 second older from now
@@ -1321,17 +1309,17 @@ metadata:
 			framework.ExpectNoError(err)
 
 			ginkgo.By("limiting log lines")
-			out := framework.RunKubectlOrDie("log", podName, containerName, nsFlag, "--tail=1")
+			out := framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--tail=1")
 			gomega.Expect(len(out)).NotTo(gomega.BeZero())
 			framework.ExpectEqual(len(lines(out)), 1)
 
 			ginkgo.By("limiting log bytes")
-			out = framework.RunKubectlOrDie("log", podName, containerName, nsFlag, "--limit-bytes=1")
+			out = framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--limit-bytes=1")
 			framework.ExpectEqual(len(lines(out)), 1)
 			framework.ExpectEqual(len(out), 1)
 
 			ginkgo.By("exposing timestamps")
-			out = framework.RunKubectlOrDie("log", podName, containerName, nsFlag, "--tail=1", "--timestamps")
+			out = framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--tail=1", "--timestamps")
 			l := lines(out)
 			framework.ExpectEqual(len(l), 1)
 			words := strings.Split(l[0], " ")
@@ -1347,9 +1335,9 @@ metadata:
 			// because the granularity is only 1 second and
 			// it could end up rounding the wrong way.
 			time.Sleep(2500 * time.Millisecond) // ensure that startup logs on the node are seen as older than 1s
-			recentOut := framework.RunKubectlOrDie("log", podName, containerName, nsFlag, "--since=1s")
+			recentOut := framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--since=1s")
 			recent := len(strings.Split(recentOut, "\n"))
-			olderOut := framework.RunKubectlOrDie("log", podName, containerName, nsFlag, "--since=24h")
+			olderOut := framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--since=24h")
 			older := len(strings.Split(olderOut, "\n"))
 			gomega.Expect(recent).To(gomega.BeNumerically("<", older), "expected recent(%v) to be less than older(%v)\nrecent lines:\n%v\nolder lines:\n%v\n", recent, older, recentOut, olderOut)
 		})

@@ -22,9 +22,12 @@ import (
 	"net/http"
 	"testing"
 
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -57,12 +60,15 @@ func NewTestFieldManager() *fieldmanager.FieldManager {
 		Version: "v1",
 	}
 
-	return fieldmanager.NewCRDFieldManager(
+	f, _ := fieldmanager.NewCRDFieldManager(
+		nil,
 		&fakeObjectConvertor{},
 		&fakeObjectDefaulter{},
 		gv,
 		gv,
+		true,
 	)
+	return f
 }
 
 func TestFieldManagerCreation(t *testing.T) {
@@ -71,42 +77,65 @@ func TestFieldManagerCreation(t *testing.T) {
 	}
 }
 
+func TestUpdateOnlyDoesNotTrackManagedFields(t *testing.T) {
+	f := NewTestFieldManager()
+
+	liveObj := &corev1.Pod{}
+
+	updatedObj := liveObj.DeepCopy()
+	updatedObj.ObjectMeta.Labels = map[string]string{"k": "v"}
+
+	newObj, err := f.Update(liveObj, updatedObj, "fieldmanager_test")
+	if err != nil {
+		t.Fatalf("failed to update object: %v", err)
+	}
+
+	accessor, err := meta.Accessor(newObj)
+	if err != nil {
+		t.Fatalf("couldn't get accessor: %v", err)
+	}
+
+	if m := accessor.GetManagedFields(); len(m) != 0 {
+		t.Fatalf("managedFields were tracked on update only: %v", m)
+	}
+}
+
 func TestApplyStripsFields(t *testing.T) {
 	f := NewTestFieldManager()
 
 	obj := &corev1.Pod{}
+	obj.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{{}}
 
-	newObj, err := f.Apply(obj, []byte(`{
-		"apiVersion": "apps/v1",
-		"kind": "Deployment",
-		"metadata": {
-			"name": "b",
-			"namespace": "b",
-			"creationTimestamp": "2016-05-19T09:59:00Z",
-			"selfLink": "b",
-			"uid": "b",
-			"clusterName": "b",
-			"generation": 0,
-			"managedFields": [{
-					"manager": "apply",
-					"operation": "Apply",
-					"apiVersion": "apps/v1",
-					"fields": {
-						"f:metadata": {
-							"f:labels": {
-								"f:test-label": {}
-							}
-						}
-					}
-				}],
-			"resourceVersion": "b"
-		}
-	}`), "fieldmanager_test", false)
+	newObj := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "apps/v1",
+			Kind:       "Deployment",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "b",
+			Namespace:         "b",
+			CreationTimestamp: metav1.NewTime(time.Now()),
+			SelfLink:          "b",
+			UID:               "b",
+			ClusterName:       "b",
+			Generation:        0,
+			ManagedFields: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "update",
+					Operation:  metav1.ManagedFieldsOperationApply,
+					APIVersion: "apps/v1",
+				},
+			},
+			ResourceVersion: "b",
+		},
+	}
+
+	updatedObj, err := f.Update(obj, newObj, "fieldmanager_test")
 	if err != nil {
 		t.Fatalf("failed to apply object: %v", err)
 	}
 
-	accessor, err := meta.Accessor(newObj)
+	accessor, err := meta.Accessor(updatedObj)
 	if err != nil {
 		t.Fatalf("couldn't get accessor: %v", err)
 	}
@@ -153,6 +182,7 @@ func TestApplyDoesNotStripLabels(t *testing.T) {
 	f := NewTestFieldManager()
 
 	obj := &corev1.Pod{}
+	obj.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{{}}
 
 	newObj, err := f.Apply(obj, []byte(`{
 		"apiVersion": "apps/v1",
@@ -437,5 +467,43 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestApplyFailsWithManagedFields(t *testing.T) {
+	f := NewTestFieldManager()
+
+	_, err := f.Apply(&corev1.Pod{}, []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Pod",
+		"metadata": {
+			"managedFields": [
+				{
+				  "manager": "test",
+				}
+			]
+		}
+	}`), "fieldmanager_test", false)
+
+	if err == nil {
+		t.Fatalf("successfully applied with set managed fields")
+	}
+}
+
+func TestApplySuccessWithNoManagedFields(t *testing.T) {
+	f := NewTestFieldManager()
+
+	_, err := f.Apply(&corev1.Pod{}, []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Pod",
+		"metadata": {
+			"labels": {
+				"a": "b"
+			},
+		}
+	}`), "fieldmanager_test", false)
+
+	if err != nil {
+		t.Fatalf("failed to apply object: %v", err)
 	}
 }

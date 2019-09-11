@@ -30,9 +30,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/master/ports"
 	schedulermetric "k8s.io/kubernetes/pkg/scheduler/metrics"
-	"k8s.io/kubernetes/pkg/util/system"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	"k8s.io/kubernetes/test/e2e/system"
 
 	"github.com/onsi/gomega"
 
@@ -210,7 +210,7 @@ func sendRestRequestToScheduler(c clientset.Interface, op, provider, cloudMaster
 
 	var masterRegistered = false
 	for _, node := range nodes.Items {
-		if system.IsMasterNode(node.Name) {
+		if system.DeprecatedMightBeMasterNode(node.Name) {
 			masterRegistered = true
 		}
 	}

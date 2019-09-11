@@ -41,8 +41,6 @@ type Interface interface {
 	// consistent (i.e. it could change between chunked reads). This is guaranteed
 	// to be consistent.
 	List() ([]MountPoint, error)
-	// IsMountPointMatch determines if the mountpoint matches the dir.
-	IsMountPointMatch(mp MountPoint, dir string) bool
 	// IsLikelyNotMountPoint uses heuristics to determine if a directory
 	// is not a mountpoint.
 	// It should return ErrNotExist when the directory does not exist.
@@ -162,7 +160,7 @@ func GetDeviceNameFromMount(mounter Interface, mountPath string) (string, int, e
 // IsNotMountPoint detects bind mounts in linux.
 // IsNotMountPoint enumerates all the mountpoints using List() and
 // the list of mountpoints may be large, then it uses
-// IsMountPointMatch to evaluate whether the directory is a mountpoint.
+// isMountPointMatch to evaluate whether the directory is a mountpoint.
 func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	// IsLikelyNotMountPoint provides a quick check
 	// to determine whether file IS A mountpoint.
@@ -182,8 +180,7 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	}
 
 	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts.
-	hu := NewHostUtil()
-	resolvedFile, err := hu.EvalHostSymlinks(file)
+	resolvedFile, err := filepath.EvalSymlinks(file)
 	if err != nil {
 		return true, err
 	}
@@ -195,7 +192,7 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 		return notMnt, mountPointsErr
 	}
 	for _, mp := range mountPoints {
-		if mounter.IsMountPointMatch(mp, resolvedFile) {
+		if isMountPointMatch(mp, resolvedFile) {
 			notMnt = false
 			break
 		}
@@ -203,11 +200,11 @@ func IsNotMountPoint(mounter Interface, file string) (bool, error) {
 	return notMnt, nil
 }
 
-// IsBind detects whether a bind mount is being requested and makes the remount options to
+// MakeBindOpts detects whether a bind mount is being requested and makes the remount options to
 // use in case of bind mount, due to the fact that bind mount doesn't respect mount options.
 // The list equals:
 //   options - 'bind' + 'remount' (no duplicate)
-func IsBind(options []string) (bool, []string, []string) {
+func MakeBindOpts(options []string) (bool, []string, []string) {
 	// Because we have an FD opened on the subpath bind mount, the "bind" option
 	// needs to be included, otherwise the mount target will error as busy if you
 	// remount as readonly.

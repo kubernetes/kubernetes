@@ -1,5 +1,3 @@
-package(default_visibility = ["//visibility:public"])
-
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
@@ -28,21 +26,18 @@ go_library(
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework",
+    visibility = ["//visibility:public"],
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/storage/v1/util:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/controller/service:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
         "//pkg/kubelet/events:go_default_library",
         "//pkg/kubelet/sysctl:go_default_library",
         "//pkg/master/ports:go_default_library",
-        "//pkg/scheduler/algorithm/predicates:go_default_library",
-        "//pkg/scheduler/nodeinfo:go_default_library",
-        "//pkg/util/system:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -96,6 +91,7 @@ go_library(
         "//test/e2e/framework/ssh:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
         "//test/e2e/manifest:go_default_library",
+        "//test/e2e/system:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
@@ -156,4 +152,5 @@ filegroup(
         "//test/e2e/framework/volume:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
