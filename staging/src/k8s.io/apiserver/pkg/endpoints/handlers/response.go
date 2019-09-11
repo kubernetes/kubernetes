@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1beta1/validation"
@@ -63,7 +63,7 @@ func transformObject(ctx context.Context, obj runtime.Object, opts interface{}, 
 		return asTable(ctx, obj, options, scope, target.GroupVersion())
 
 	default:
-		accepted, _ := negotiation.MediaTypesForSerializer(metainternalversion.Codecs)
+		accepted, _ := negotiation.MediaTypesForSerializer(metainternalversionscheme.Codecs)
 		err := negotiation.NewNotAcceptableError(accepted)
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func targetEncodingForTransform(scope *RequestScope, mediaType negotiation.Media
 	case target == nil:
 	case (target.Kind == "PartialObjectMetadata" || target.Kind == "PartialObjectMetadataList" || target.Kind == "Table") &&
 		(target.GroupVersion() == metav1beta1.SchemeGroupVersion || target.GroupVersion() == metav1.SchemeGroupVersion):
-		return *target, metainternalversion.Codecs, true
+		return *target, metainternalversionscheme.Codecs, true
 	}
 	return scope.Kind, scope.Serializer, false
 }

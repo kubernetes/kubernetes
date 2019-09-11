@@ -45,7 +45,7 @@ go_test(
         "//staging/src/k8s.io/apiextensions-apiserver/test/integration/fixtures:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/unstructured:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1beta1:go_default_library",

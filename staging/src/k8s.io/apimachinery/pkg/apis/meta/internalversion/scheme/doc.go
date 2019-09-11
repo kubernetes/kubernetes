@@ -1,5 +1,5 @@
 /*
-Copyright 2017 The Kubernetes Authors.
+Copyright 2016 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,15 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internalversion
-
-import (
-	"testing"
-
-	"k8s.io/apimachinery/pkg/api/apitesting/roundtrip"
-	"k8s.io/apimachinery/pkg/apis/meta/fuzzer"
-)
-
-func TestRoundTrip(t *testing.T) {
-	roundtrip.RoundTripTestForScheme(t, scheme, fuzzer.Funcs)
-}
+package scheme // import "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
