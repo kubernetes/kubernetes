@@ -1310,16 +1310,19 @@ metadata:
 
 			ginkgo.By("limiting log lines")
 			out := framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--tail=1")
+			e2elog.Logf("got output %q", out)
 			gomega.Expect(len(out)).NotTo(gomega.BeZero())
 			framework.ExpectEqual(len(lines(out)), 1)
 
 			ginkgo.By("limiting log bytes")
 			out = framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--limit-bytes=1")
+			e2elog.Logf("got output %q", out)
 			framework.ExpectEqual(len(lines(out)), 1)
 			framework.ExpectEqual(len(out), 1)
 
 			ginkgo.By("exposing timestamps")
 			out = framework.RunKubectlOrDie("logs", podName, containerName, nsFlag, "--tail=1", "--timestamps")
+			e2elog.Logf("got output %q", out)
 			l := lines(out)
 			framework.ExpectEqual(len(l), 1)
 			words := strings.Split(l[0], " ")
