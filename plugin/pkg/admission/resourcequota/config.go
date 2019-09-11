@@ -21,11 +21,11 @@ import (
 	"io"
 	"io/ioutil"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	resourcequotaapi "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota"
 	"k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/install"
-	resourcequotav1beta1 "k8s.io/kubernetes/plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1"
 )
 
 var (
@@ -37,19 +37,38 @@ func init() {
 	install.Install(scheme)
 }
 
+// AddCriticalPodLimitedResources limits the number of critical pods that can be created. We're creating a default
+// resource quota in `kube-system` namespace to allow unlimited number of critical pods to be created in that
+// namespace. Making this function public for easy testing
+func AddCriticalPodLimitedResources() []resourcequotaapi.LimitedResource {
+	return []resourcequotaapi.LimitedResource{
+		{
+			Resource: "pods",
+			MatchScopes: []v1.ScopedResourceSelectorRequirement{
+				{
+					ScopeName: v1.ResourceQuotaScopePriorityClass,
+					Operator:  v1.ScopeSelectorOpIn,
+					Values:    []string{"system-cluster-critical", "system-node-critical"},
+				},
+			},
+		},
+	}
+}
+
 // LoadConfiguration loads the provided configuration.
 func LoadConfiguration(config io.Reader) (*resourcequotaapi.Configuration, error) {
-	// if no config is provided, return a default configuration
+	// if no config is provided, return a default configuration with critical pods as limited resources
 	if config == nil {
-		externalConfig := &resourcequotav1beta1.Configuration{}
-		scheme.Default(externalConfig)
-		internalConfig := &resourcequotaapi.Configuration{}
-		if err := scheme.Convert(externalConfig, internalConfig, nil); err != nil {
-			return nil, err
-		}
-		return internalConfig, nil
+		config := &resourcequotaapi.Configuration{}
+		scheme.Default(config)
+		// append pods as limited resources so that we can limit the number of critical pods to be created. We have
+		// a matching default quota in `kube-system` namespace which allows unlimited pods to be created in that
+		// namespace
+		config.LimitedResources = append(config.LimitedResources, AddCriticalPodLimitedResources()...)
+		return config, nil
 	}
-	// we have a config so parse it.
+
+	// we have a config so parse it and limit the critical pods that can be created
 	data, err := ioutil.ReadAll(config)
 	if err != nil {
 		return nil, err
@@ -63,5 +82,8 @@ func LoadConfiguration(config io.Reader) (*resourcequotaapi.Configuration, error
 	if !ok {
 		return nil, fmt.Errorf("unexpected type: %T", decodedObj)
 	}
+	// append pods as limited resources so that we can limit the number of critical pods to be created. We have
+	// a matching default quota in `kube-system` namespace which allows unlimited pods to be created in that namespace
+	resourceQuotaConfiguration.LimitedResources = append(resourceQuotaConfiguration.LimitedResources, AddCriticalPodLimitedResources()...)
 	return resourceQuotaConfiguration, nil
 }
