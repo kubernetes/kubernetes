@@ -173,7 +173,7 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 		if cache.isIPv6Mode != nil && utilnet.IsIPv6String(endpoint.Addresses[0]) != *cache.isIPv6Mode {
 			// Emit event on the corresponding service which had a different IP
 			// version than the endpoint.
-			utilproxy.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], serviceNN.Name, serviceNN.Namespace, "")
+			utilproxy.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], serviceNN.Namespace, serviceNN.Name, "")
 			continue
 		}
 
