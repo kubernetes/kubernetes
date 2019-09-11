@@ -589,7 +589,9 @@ func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
 		if util.GetPodPriority(p) >= util.GetPodPriority(pod) && p.UID != pod.UID {
 			nodeInfoOut.AddPod(p)
 			if metaOut != nil {
-				metaOut.AddPod(p, nodeInfoOut)
+				if err := metaOut.AddPod(p, nodeInfoOut); err != nil {
+					klog.Warningf("unable to add pod, nominated pod %s, incoming pod %s: %v", p.Name, pod.Name, err)
+				}
 			}
 			podsAdded = true
 		}
@@ -1098,17 +1100,25 @@ func (g *genericScheduler) selectVictimsOnNode(
 	potentialVictims := util.SortableList{CompFunc: util.MoreImportantPod}
 	nodeInfoCopy := nodeInfo.Clone()
 
-	removePod := func(rp *v1.Pod) {
-		nodeInfoCopy.RemovePod(rp)
-		if meta != nil {
-			meta.RemovePod(rp, nodeInfoCopy.Node())
+	removePod := func(rp *v1.Pod) error {
+		if err := nodeInfoCopy.RemovePod(rp); err != nil {
+			return err
 		}
+		if meta != nil {
+			if err := meta.RemovePod(rp, nodeInfoCopy.Node()); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
-	addPod := func(ap *v1.Pod) {
+	addPod := func(ap *v1.Pod) error {
 		nodeInfoCopy.AddPod(ap)
 		if meta != nil {
-			meta.AddPod(ap, nodeInfoCopy)
+			if err := meta.AddPod(ap, nodeInfoCopy); err != nil {
+				return err
+			}
 		}
+		return nil
 	}
 	// As the first step, remove all the lower priority pods from the node and
 	// check if the given pod can be scheduled.
@@ -1116,7 +1126,9 @@ func (g *genericScheduler) selectVictimsOnNode(
 	for _, p := range nodeInfoCopy.Pods() {
 		if util.GetPodPriority(p) < podPriority {
 			potentialVictims.Items = append(potentialVictims.Items, p)
-			removePod(p)
+			if err := removePod(p); err != nil {
+				return nil, 0, false
+			}
 		}
 	}
 	// If the new pod does not fit after removing all the lower priority pods,
@@ -1139,24 +1151,34 @@ func (g *genericScheduler) selectVictimsOnNode(
 	// violating victims and then other non-violating ones. In both cases, we start
 	// from the highest priority victims.
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims.Items, pdbs)
-	reprievePod := func(p *v1.Pod) bool {
-		addPod(p)
+	reprievePod := func(p *v1.Pod) (bool, error) {
+		if err := addPod(p); err != nil {
+			return false, err
+		}
 		fits, _, _, _ := g.podFitsOnNode(pluginContext, pod, meta, nodeInfoCopy, fitPredicates, queue, false)
 		if !fits {
-			removePod(p)
+			if err := removePod(p); err != nil {
+				return false, err
+			}
 			victims = append(victims, p)
 			klog.V(5).Infof("Pod %v/%v is a potential preemption victim on node %v.", p.Namespace, p.Name, nodeInfo.Node().Name)
 		}
-		return fits
+		return fits, nil
 	}
 	for _, p := range violatingVictims {
-		if !reprievePod(p) {
+		if fits, err := reprievePod(p); err != nil {
+			klog.Warningf("Failed to reprieve pod %q: %v", p.Name, err)
+			return nil, 0, false
+		} else if !fits {
 			numViolatingVictim++
 		}
 	}
 	// Now we try to reprieve non-violating victims.
 	for _, p := range nonViolatingVictims {
-		reprievePod(p)
+		if _, err := reprievePod(p); err != nil {
+			klog.Warningf("Failed to reprieve pod %q: %v", p.Name, err)
+			return nil, 0, false
+		}
 	}
 	return victims, numViolatingVictim, true
 }
