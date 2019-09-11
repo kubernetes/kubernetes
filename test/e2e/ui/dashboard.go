@@ -26,7 +26,6 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -65,7 +64,7 @@ var _ = SIGDescribe("Kubernetes Dashboard [Feature:Dashboard]", func() {
 			var status int
 			proxyRequest, errProxy := e2eservice.GetServicesProxyRequest(f.ClientSet, f.ClientSet.CoreV1().RESTClient().Get())
 			if errProxy != nil {
-				e2elog.Logf("Get services proxy request failed: %v", errProxy)
+				framework.Logf("Get services proxy request failed: %v", errProxy)
 			}
 
 			ctx, cancel := context.WithTimeout(context.Background(), framework.SingleCallTimeout)
@@ -81,12 +80,12 @@ var _ = SIGDescribe("Kubernetes Dashboard [Feature:Dashboard]", func() {
 				Error()
 			if err != nil {
 				if ctx.Err() != nil {
-					e2elog.Failf("Request to kubernetes-dashboard failed: %v", err)
+					framework.Failf("Request to kubernetes-dashboard failed: %v", err)
 					return true, err
 				}
-				e2elog.Logf("Request to kubernetes-dashboard failed: %v", err)
+				framework.Logf("Request to kubernetes-dashboard failed: %v", err)
 			} else if status != http.StatusOK {
-				e2elog.Logf("Unexpected status from kubernetes-dashboard: %v", status)
+				framework.Logf("Unexpected status from kubernetes-dashboard: %v", status)
 			}
 			// Don't return err here as it aborts polling.
 			return status == http.StatusOK, nil
