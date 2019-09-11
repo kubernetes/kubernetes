@@ -179,8 +179,6 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager 
 	if _, err := meta.Accessor(liveObj); err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
 	}
-	missingManagedFields := (len(accessor.GetManagedFields()) == 0)
-
 	managed, err := internal.DecodeObjectManagedFields(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode managed fields: %v", err)
