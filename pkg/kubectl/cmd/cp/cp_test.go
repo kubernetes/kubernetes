@@ -33,7 +33,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -305,13 +305,11 @@ func TestTarUntar(t *testing.T) {
 		{
 			name:     "tricky_relative",
 			data:     path.Join(dir3, "xyz"),
-			omitted:  true,
 			fileType: SymLink,
 		},
 		{
 			name:     "absolute_path",
 			data:     "/tmp/gakki",
-			omitted:  true,
 			fileType: SymLink,
 		},
 	}
@@ -758,6 +756,12 @@ func TestValidate(t *testing.T) {
 	}
 }
 
+type testFile struct {
+	path       string
+	linkTarget string // For link types
+	expected   string // Expect to find the file here (or not, if empty)
+}
+
 func TestUntar(t *testing.T) {
 	testdir, err := ioutil.TempDir("", "test-untar")
 	require.NoError(t, err)
@@ -766,12 +770,7 @@ func TestUntar(t *testing.T) {
 
 	basedir := filepath.Join(testdir, "base")
 
-	type file struct {
-		path       string
-		linkTarget string // For link types
-		expected   string // Expect to find the file here (or not, if empty)
-	}
-	files := []file{{
+	files := []testFile{{
 		// Absolute file within dest
 		path:     filepath.Join(basedir, "abs"),
 		expected: filepath.Join(basedir, basedir, "abs"),
@@ -804,42 +803,33 @@ func TestUntar(t *testing.T) {
 		}
 		return expected + suffix
 	}
-	mkBacklinkExpectation := func(expected, suffix string) string {
-		// "resolve" the back link relative to the expectation
-		targetDir := filepath.Dir(filepath.Dir(expected))
-		// If the "resolved" target is not nested in basedir, it is escaping.
-		if !filepath.HasPrefix(targetDir, basedir) {
-			return ""
-		}
-		return expected + suffix
-	}
-	links := []file{}
+	links := []testFile{}
 	for _, f := range files {
-		links = append(links, file{
+		links = append(links, testFile{
 			path:       f.path + "-innerlink",
 			linkTarget: "link-target",
 			expected:   mkExpectation(f.expected, "-innerlink"),
-		}, file{
+		}, testFile{
 			path:       f.path + "-innerlink-abs",
 			linkTarget: filepath.Join(basedir, "link-target"),
 			expected:   mkExpectation(f.expected, "-innerlink-abs"),
-		}, file{
+		}, testFile{
 			path:       f.path + "-backlink",
 			linkTarget: filepath.Join("..", "link-target"),
-			expected:   mkBacklinkExpectation(f.expected, "-backlink"),
-		}, file{
+			expected:   mkExpectation(f.expected, "-backlink"),
+		}, testFile{
 			path:       f.path + "-outerlink-abs",
 			linkTarget: filepath.Join(testdir, "link-target"),
-			expected:   "",
+			expected:   mkExpectation(f.expected, "-outerlink-abs"),
 		})
 
 		if f.expected != "" {
 			// outerlink is the number of backticks to escape to testdir
 			outerlink, _ := filepath.Rel(f.expected, testdir)
-			links = append(links, file{
-				path:       f.path + "outerlink",
+			links = append(links, testFile{
+				path:       f.path + "-outerlink",
 				linkTarget: filepath.Join(outerlink, "link-target"),
-				expected:   "",
+				expected:   mkExpectation(f.expected, "-outerlink"),
 			})
 		}
 	}
@@ -847,42 +837,112 @@ func TestUntar(t *testing.T) {
 
 	// Test back-tick escaping through a symlink.
 	files = append(files,
-		file{
+		testFile{
 			path:       "nested/again/back-link",
 			linkTarget: "../../nested",
 			expected:   filepath.Join(basedir, "nested/again/back-link"),
 		},
-		file{
+		testFile{
 			path:     "nested/again/back-link/../../../back-link-file",
 			expected: filepath.Join(basedir, "back-link-file"),
 		})
 
 	// Test chaining back-tick symlinks.
 	files = append(files,
-		file{
+		testFile{
 			path:       "nested/back-link-first",
 			linkTarget: "../",
 			expected:   filepath.Join(basedir, "nested/back-link-first"),
 		},
-		file{
-			path:       "nested/back-link-first/back-link-second",
-			linkTarget: "../",
-			expected:   "",
+		testFile{
+			path:       "nested/back-link-second",
+			linkTarget: "back-link-first/..",
+			expected:   filepath.Join(basedir, "nested/back-link-second"),
 		})
 
 	files = append(files,
-		file{ // Relative directory path with terminating /
+		testFile{ // Relative directory path with terminating /
 			path:     "direct/dir/",
 			expected: "",
 		})
 
-	buf := &bytes.Buffer{}
-	tw := tar.NewWriter(buf)
+	buf := makeTestTar(t, files)
+
+	// Capture warnings to stderr for debugging.
+	output := (*testWriter)(t)
+	opts := NewCopyOptions(genericclioptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
+
+	require.NoError(t, opts.untarAll(buf, filepath.Join(basedir), ""))
+
 	expectations := map[string]bool{}
 	for _, f := range files {
 		if f.expected != "" {
 			expectations[f.expected] = false
 		}
+	}
+	filepath.Walk(testdir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil // Ignore directories.
+		}
+		if _, ok := expectations[path]; !ok {
+			t.Errorf("Unexpected file at %s", path)
+		} else {
+			expectations[path] = true
+		}
+		return nil
+	})
+	for path, found := range expectations {
+		if !found {
+			t.Errorf("Missing expected file %s", path)
+		}
+	}
+}
+
+func TestUntar_NestedSymlinks(t *testing.T) {
+	testdir, err := ioutil.TempDir("", "test-untar-nested")
+	require.NoError(t, err)
+	defer os.RemoveAll(testdir)
+	t.Logf("Test base: %s", testdir)
+
+	basedir := filepath.Join(testdir, "base")
+
+	// Test chaining back-tick symlinks.
+	backLinkFirst := testFile{
+		path:       "nested/back-link-first",
+		linkTarget: "../",
+		expected:   filepath.Join(basedir, "nested/back-link-first"),
+	}
+	files := []testFile{backLinkFirst, {
+		path:       "nested/back-link-first/back-link-second",
+		linkTarget: "../",
+		expected:   "",
+	}}
+
+	buf := makeTestTar(t, files)
+
+	// Capture warnings to stderr for debugging.
+	output := (*testWriter)(t)
+	opts := NewCopyOptions(genericclioptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
+
+	// Expect untarAll to fail. The second link will trigger a directory to be created at
+	// "nested/back-link-first", which should trigger a file exists error when the back-link-first
+	// symlink is created.
+	expectedErr := os.LinkError{
+		Op:  "symlink",
+		Old: backLinkFirst.linkTarget,
+		New: backLinkFirst.expected,
+		Err: fmt.Errorf("file exists")}
+	actualErr := opts.untarAll(buf, filepath.Join(basedir), "")
+	assert.EqualError(t, actualErr, expectedErr.Error())
+}
+
+func makeTestTar(t *testing.T, files []testFile) *bytes.Buffer {
+	buf := &bytes.Buffer{}
+	tw := tar.NewWriter(buf)
+	for _, f := range files {
 		if f.linkTarget == "" {
 			hdr := &tar.Header{
 				Name: f.path,
@@ -906,31 +966,7 @@ func TestUntar(t *testing.T) {
 	}
 	tw.Close()
 
-	// Capture warnings to stderr for debugging.
-	output := (*testWriter)(t)
-	opts := NewCopyOptions(genericclioptions.IOStreams{In: &bytes.Buffer{}, Out: output, ErrOut: output})
-
-	require.NoError(t, opts.untarAll(buf, filepath.Join(basedir), ""))
-
-	filepath.Walk(testdir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil // Ignore directories.
-		}
-		if _, ok := expectations[path]; !ok {
-			t.Errorf("Unexpected file at %s", path)
-		} else {
-			expectations[path] = true
-		}
-		return nil
-	})
-	for path, found := range expectations {
-		if !found {
-			t.Errorf("Missing expected file %s", path)
-		}
-	}
+	return buf
 }
 
 func TestUntar_SingleFile(t *testing.T) {
