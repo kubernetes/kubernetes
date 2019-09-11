@@ -1923,7 +1923,7 @@ func testBlockingCustomResourceUpdateDeletion(f *framework.Framework, crd *apiex
 
 	expectedErrMsg := "the custom resource contains unwanted data"
 	if !strings.Contains(err.Error(), expectedErrMsg) {
-		e2elog.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
+		framework.Failf("expect error contains %q, got %q", expectedErrMsg, err.Error())
 	}
 
 	ginkgo.By("Deleting the custom resource should be denied")
@@ -2037,10 +2037,10 @@ func testMultiVersionCustomResourceWebhook(f *framework.Framework, testcrd *crd.
 		"mutation-stage-2": "yes",
 	}
 	if !reflect.DeepEqual(expectedCRData, mutatedCR.Object["data"]) {
-		e2elog.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
+		framework.Failf("\nexpected %#v\n, got %#v\n", expectedCRData, mutatedCR.Object["data"])
 	}
 	if !reflect.DeepEqual("test", mutatedCR.Object["dummy"]) {
-		e2elog.Failf("\nexpected %#v\n, got %#v\n", "test", mutatedCR.Object["dummy"])
+		framework.Failf("\nexpected %#v\n, got %#v\n", "test", mutatedCR.Object["dummy"])
 	}
 }
 

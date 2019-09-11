@@ -99,7 +99,7 @@ var _ = SIGDescribe("Servers with support for Table transformation", func() {
 				}
 				framework.Logf("Got an error creating template %d: %v", i, err)
 			}
-			e2elog.Fail("Unable to create template %d, exiting", i)
+			framework.Failf("Unable to create template %d, exiting", i)
 		})
 
 		pagedTable := &metav1beta1.Table{}

@@ -505,7 +505,7 @@ func waitWebhookConversionReady(f *framework.Framework, crd *apiextensionsv1.Cus
 		if err != nil {
 			// tolerate clusters that do not set --enable-aggregator-routing and have to wait for kube-proxy
 			// to program the service network, during which conversion requests return errors
-			e2elog.Logf("error waiting for conversion to succeed during setup: %v", err)
+			framework.Logf("error waiting for conversion to succeed during setup: %v", err)
 			return false, nil
 		}
 
