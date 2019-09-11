@@ -112,7 +112,11 @@ func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) st
 	if err != nil {
 		c.t.Fatalf("Failed to create envScript: %v", err)
 	}
-	defer f.Close()
+	defer func() {
+		if err = f.Close(); err != nil {
+			c.t.Fatalf("Failed to close envScript: %v", err)
+		}
+	}()
 
 	t := template.Must(template.New("env").Parse(envTemplate))
 
@@ -147,8 +151,12 @@ func (c *ManifestTestCase) mustLoadPodFromManifest() {
 	}
 }
 
-func (c *ManifestTestCase) tearDown() {
-	os.RemoveAll(c.kubeHome)
+func (c *ManifestTestCase) tearDown() (err error) {
+	err = os.RemoveAll(c.kubeHome)
+	if err != nil {
+		return err
+	}
+	return err
 }
 
 func copyFile(src, dst string) (err error) {
