@@ -37,6 +37,10 @@ type GroupVersioner interface {
 	// Scheme.New(target) and then perform a conversion between the current Go type and the destination Go type.
 	// Sophisticated implementations may use additional information about the input kinds to pick a destination kind.
 	KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (target schema.GroupVersionKind, ok bool)
+	// Identifier returns string representation of the object.
+	// Identifiers of two different encoders should be equal only if for every input
+	// kinds they return the same result.
+	Identifier() string
 }
 
 // Identifier represents an identifier.
