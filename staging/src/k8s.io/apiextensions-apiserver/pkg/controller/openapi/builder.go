@@ -26,19 +26,21 @@ import (
 	"github.com/go-openapi/spec"
 
 	v1 "k8s.io/api/autoscaling/v1"
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/endpoints/openapi"
+	"k8s.io/apiserver/pkg/features"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	openapibuilder "k8s.io/kube-openapi/pkg/builder"
 	"k8s.io/kube-openapi/pkg/common"
 	"k8s.io/kube-openapi/pkg/util"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	generatedopenapi "k8s.io/apiextensions-apiserver/pkg/generated/openapi"
 )
 
 const (
@@ -252,11 +254,17 @@ func (b *builder) buildRoute(root, path, action, verb string, sample interface{}
 
 	// Build consume media types
 	if action == "PATCH" {
-		route.Consumes("application/json-patch+json",
-			"application/merge-patch+json",
-			"application/strategic-merge-patch+json")
+		supportedTypes := []string{
+			string(types.JSONPatchType),
+			string(types.MergePatchType),
+		}
+		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+			supportedTypes = append(supportedTypes, string(types.ApplyPatchType))
+		}
+
+		route.Consumes(supportedTypes...)
 	} else {
-		route.Consumes("*/*")
+		route.Consumes(runtime.ContentTypeJSON, runtime.ContentTypeYAML)
 	}
 
 	// Build option parameters
