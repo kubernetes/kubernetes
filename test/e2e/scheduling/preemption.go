@@ -507,7 +507,7 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					if pod, ok := obj.(*v1.Pod); ok {
-						fmt.Println(fmt.Sprintf("Seen Pod %v/%v: %v", len(podNamesSeen)+1, len(pods), pod.Name))
+						e2elog.Logf("Seen Pod %v/%v: %v", len(podNamesSeen)+1, len(pods), pod.Name)
 						podNamesSeen = append(podNamesSeen, pod.Name)
 					}
 				},
@@ -520,11 +520,12 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 		ginkgo.By("Creating Pods with priority")
 		for podNum := 0; podNum < len(pods); podNum++ {
 			podName := pods[podNum].ObjectMeta.Name
-			fmt.Println(fmt.Sprintf("Creating Pod %v/%v: %v", podNum+1, len(pods), podName))
+			e2elog.Logf("Creating Pod %v/%v: %v", podNum+1, len(pods), podName)
 			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&pods[podNum])
 			framework.ExpectNoError(err, "Failed creating Pod")
 		}
-		fmt.Println(fmt.Sprintf("Pods seen so far: %v", podNamesSeen))
+		//fmt.Println(fmt.Sprintf("Pods seen so far: %v", podNamesSeen))
+		e2elog.Logf("Pods seen so far: %v", podNamesSeen)
 		framework.ExpectEqual(len(podNamesSeen), len(pods), "PodsSeen doesn't match Pods created")
 
 		for podNum := 0; podNum < len(pods); podNum++ {
