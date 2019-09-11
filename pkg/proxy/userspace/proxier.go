@@ -172,11 +172,6 @@ var (
 	ErrProxyOnLocalhost = fmt.Errorf("cannot proxy on localhost")
 )
 
-// IsProxyLocked returns true if the proxy could not acquire the lock on iptables.
-func IsProxyLocked(err error) bool {
-	return strings.Contains(err.Error(), "holding the xtables lock")
-}
-
 // NewProxier returns a new Proxier given a LoadBalancer and an address on
 // which to listen.  Because of the iptables logic, It is assumed that there
 // is only a single Proxier active on a machine. An error will be returned if
