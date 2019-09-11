@@ -447,13 +447,29 @@ func RecordProjectIDOnProjectFiles(podVolumeDir string) error {
 		if err != nil {
 			defer closeProjectFiles(fProjects, fProjid)
 			list := readProjectFiles(fProjects, fProjid)
-			writeProjid := true
-			_, writeProjid, err = addDirToProject(podVolumeDir, id, &list)
-			if err == nil {
-				if err = writeProjectFiles(fProjects, fProjid, writeProjid, list); err == nil {
-					return nil
+			projectList := list.projects
+			projectIDList := list.projid
+			foundInProjectList, foundInProjectIDList := false, false
+
+			for _, project := range projectList {
+				if project.id == id && project.data == podVolumeDir {
+					foundInProjectList = true
+					break
 				}
-				return err
+			}
+
+			for _, projectid := range projectIDList {
+				if projectid.id == id {
+					foundInProjectIDList = true
+					break
+				}
+			}
+			// write to /etc/project and /etc/projid only if the corresponding entry is not found in both project and projectid
+			// if one of them is true and other is not should it be a no-op? (does it imply corrupted /etc file)
+			if !foundInProjectIDList && !foundInProjectList {
+				if _, err = createProjectID(podVolumeDir, id); err != nil {
+					return fmt.Errorf("unable to get QuotaID from directory path:%s: %v", podVolumeDir, err)
+				}
 			}
 		}
 		return err

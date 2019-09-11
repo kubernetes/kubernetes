@@ -1457,7 +1457,11 @@ func (kl *Kubelet) Run(updates <-chan kubetypes.PodUpdate) {
 			if vol.Name != "" && vol.VolumeSource.EmptyDir != nil {
 				podVolumeDir := kl.getPodVolumeDir(pod.UID, utilstrings.EscapeQualifiedName("kubernetes.io/empty-dir"), pod.Spec.Hostname)
 				if podVolumeDir != "" {
-					fsquota.RecordProjectIDOnProjectFiles(podVolumeDir)
+					if err := fsquota.RecordProjectIDOnProjectFiles(podVolumeDir); err != nil {
+						// just log the error and continue , nothing much can be done about it
+						klog.Errorf("failed to records projects in /etc/project files on kubelet startup: %v", err)
+					}
+
 				}
 			}
 		}
