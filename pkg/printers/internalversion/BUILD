@@ -70,6 +70,7 @@ go_library(
         "//pkg/apis/core/helper:go_default_library",
         "//pkg/apis/core/install:go_default_library",
         "//pkg/apis/discovery:go_default_library",
+        "//pkg/apis/discovery/install:go_default_library",
         "//pkg/apis/events/install:go_default_library",
         "//pkg/apis/extensions/install:go_default_library",
         "//pkg/apis/networking:go_default_library",
