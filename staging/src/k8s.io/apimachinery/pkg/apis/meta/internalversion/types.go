@@ -33,6 +33,12 @@ type ListOptions struct {
 	LabelSelector labels.Selector
 	// A selector based on fields
 	FieldSelector fields.Selector
+	// A selector to restrict the set of namespaces that objects are returned from
+	// by the namespace label. Using this field with a resource that is not namespace
+	// scoped will return a bad request error. The default is to select all namespaces.
+	// +optional
+	NamespaceLabelSelector labels.Selector
+
 	// If true, watch for changes to this list
 	Watch bool
 	// allowWatchBookmarks requests watch events with type "BOOKMARK".

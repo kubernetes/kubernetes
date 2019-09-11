@@ -330,6 +330,12 @@ type ListOptions struct {
 	// +optional
 	FieldSelector string `json:"fieldSelector,omitempty" protobuf:"bytes,2,opt,name=fieldSelector"`
 
+	// A selector to restrict the set of namespaces that objects are returned from
+	// by the namespace label. Using this field with a resource that is not namespace
+	// scoped will return a bad request error. The default is to select all namespaces.
+	// +optional
+	NamespaceLabelSelector string `json:"namespaceLabelSelector,omitempty"`
+
 	// +k8s:deprecated=includeUninitialized,protobuf=6
 
 	// Watch for changes to the described resources and return them as a stream of

@@ -19,6 +19,7 @@ package generic
 import (
 	"time"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
@@ -33,6 +34,8 @@ type RESTOptions struct {
 	DeleteCollectionWorkers int
 	ResourcePrefix          string
 	CountMetricPollPeriod   time.Duration
+
+	NamespaceLabelsAccessor func(ns string) (labels.Labels, error)
 }
 
 // Implement RESTOptionsGetter so that RESTOptions can directly be used when available (i.e. tests)

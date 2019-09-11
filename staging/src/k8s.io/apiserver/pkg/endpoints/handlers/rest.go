@@ -69,9 +69,10 @@ type RequestScope struct {
 	TableConvertor rest.TableConvertor
 	FieldManager   *fieldmanager.FieldManager
 
-	Resource    schema.GroupVersionResource
-	Kind        schema.GroupVersionKind
-	Subresource string
+	Resource        schema.GroupVersionResource
+	Kind            schema.GroupVersionKind
+	Subresource     string
+	NamespaceScoped bool
 
 	MetaGroupVersion schema.GroupVersion
 

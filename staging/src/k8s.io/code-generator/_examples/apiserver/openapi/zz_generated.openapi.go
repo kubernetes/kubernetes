@@ -1045,6 +1045,13 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 							Format:      "",
 						},
 					},
+					"namespaceLabelSelector": {
+						SchemaProps: spec.SchemaProps{
+							Description: "A selector to restrict the set of namespaces that objects are returned from by the namespace label. Using this field with a resource that is not namespace scoped will return a bad request error. The default is to select all namespaces.",
+							Type:        []string{"string"},
+							Format:      "",
+						},
+					},
 					"watch": {
 						SchemaProps: spec.SchemaProps{
 							Description: "Watch for changes to the described resources and return them as a stream of add, update, and remove notifications. Specify resourceVersion.",

@@ -33,6 +33,7 @@ import (
 	"github.com/go-openapi/spec"
 	"github.com/pborman/uuid"
 
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -61,6 +62,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	serverstore "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/client-go/informers"
+	corev1listers "k8s.io/client-go/listers/core/v1"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/component-base/logs"
@@ -380,11 +382,39 @@ type CompletedConfig struct {
 	*completedConfig
 }
 
+type namespaceAccessor struct {
+	getter          genericregistry.RESTOptionsGetter
+	namespaceLister corev1listers.NamespaceLister
+}
+
+func (a namespaceAccessor) GetRESTOptions(resource schema.GroupResource) (genericregistry.RESTOptions, error) {
+	opt, err := a.getter.GetRESTOptions(resource)
+	if err != nil {
+		return opt, err
+	}
+	opt.NamespaceLabelsAccessor = func(name string) (labels.Labels, error) {
+		if len(name) == 0 {
+			return nil, fmt.Errorf("must pass a valid namespace to namespace labels lookup")
+		}
+		ns, err := a.namespaceLister.Get(name)
+		if err != nil {
+			return nil, err
+		}
+		return labels.Set(ns.Labels), nil
+	}
+	return opt, nil
+}
+
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
 	if len(c.ExternalAddress) == 0 && c.PublicAddress != nil {
 		c.ExternalAddress = c.PublicAddress.String()
+	}
+
+	c.RESTOptionsGetter = namespaceAccessor{
+		getter:          c.RESTOptionsGetter,
+		namespaceLister: informers.Core().V1().Namespaces().Lister(),
 	}
 
 	// if there is no port, and we listen on one securely, use that one

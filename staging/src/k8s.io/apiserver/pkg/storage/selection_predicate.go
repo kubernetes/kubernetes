@@ -78,6 +78,8 @@ type SelectionPredicate struct {
 	Limit               int64
 	Continue            string
 	AllowWatchBookmarks bool
+
+	NamespaceMatch func(ns string) bool
 }
 
 // Matches returns true if the given object's labels and fields (as
@@ -93,7 +95,10 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 	}
 	matched := s.Label.Matches(labels)
 	if matched && s.Field != nil {
-		matched = matched && s.Field.Matches(fields)
+		matched = s.Field.Matches(fields)
+	}
+	if matched && s.NamespaceMatch != nil {
+		matched = s.NamespaceMatch(fields.Get("metadata.namespace"))
 	}
 	return matched, nil
 }
@@ -126,5 +131,5 @@ func (s *SelectionPredicate) MatchesSingle() (string, bool) {
 
 // Empty returns true if the predicate performs no filtering.
 func (s *SelectionPredicate) Empty() bool {
-	return s.Label.Empty() && s.Field.Empty()
+	return s.Label.Empty() && s.Field.Empty() && s.NamespaceMatch == nil
 }

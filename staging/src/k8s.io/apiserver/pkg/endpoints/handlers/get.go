@@ -225,6 +225,12 @@ func ListResource(r rest.Lister, rw rest.Watcher, scope *RequestScope, forceWatc
 			return
 		}
 
+		if opts.NamespaceLabelSelector != nil && !opts.NamespaceLabelSelector.Empty() && !scope.NamespaceScoped {
+			err = errors.NewBadRequest("namespace label selection is only valid on namespace scoped resources")
+			scope.err(err, w, req)
+			return
+		}
+
 		// transform fields
 		// TODO: DecodeParametersInto should do this.
 		if opts.FieldSelector != nil {

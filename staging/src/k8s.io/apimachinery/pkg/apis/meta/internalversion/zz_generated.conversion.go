@@ -107,6 +107,9 @@ func autoConvert_internalversion_ListOptions_To_v1_ListOptions(in *ListOptions, 
 	if err := v1.Convert_fields_Selector_To_string(&in.FieldSelector, &out.FieldSelector, s); err != nil {
 		return err
 	}
+	if err := v1.Convert_labels_Selector_To_string(&in.NamespaceLabelSelector, &out.NamespaceLabelSelector, s); err != nil {
+		return err
+	}
 	out.Watch = in.Watch
 	out.AllowWatchBookmarks = in.AllowWatchBookmarks
 	out.ResourceVersion = in.ResourceVersion
@@ -126,6 +129,9 @@ func autoConvert_v1_ListOptions_To_internalversion_ListOptions(in *v1.ListOption
 		return err
 	}
 	if err := v1.Convert_string_To_fields_Selector(&in.FieldSelector, &out.FieldSelector, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_string_To_labels_Selector(&in.NamespaceLabelSelector, &out.NamespaceLabelSelector, s); err != nil {
 		return err
 	}
 	out.Watch = in.Watch

@@ -126,6 +126,11 @@ type Store struct {
 	// object matches the given field and label selectors.
 	PredicateFunc func(label labels.Selector, field fields.Selector) storage.SelectionPredicate
 
+	// NamespaceLabelsAccessor allows you to retrieve the labels for a given
+	// namespace. It returns an API error if the namespace does not exist, or
+	// a generic error if the namespace name is invalid.
+	NamespaceLabelsAccessor func(ns string) (labels.Labels, error)
+
 	// EnableGarbageCollection affects the handling of Update and Delete
 	// requests. Enabling garbage collection allows finalizers to do work to
 	// finalize this object before the store deletes it.
@@ -318,6 +323,22 @@ func (e *Store) ListPredicate(ctx context.Context, p storage.SelectionPredicate,
 		// By default we should serve the request from etcd.
 		options = &metainternalversion.ListOptions{ResourceVersion: ""}
 	}
+
+	if options.NamespaceLabelSelector != nil && !options.NamespaceLabelSelector.Empty() {
+		klog.Infof("DEBUG: namespace label selector %s", options.NamespaceLabelSelector)
+		if e.NamespaceLabelsAccessor == nil {
+			return nil, kubeerr.NewBadRequest(fmt.Sprintf("resource %s does not support namespace label selection", e.DefaultQualifiedResource.String()))
+		}
+		p.NamespaceMatch = func(ns string) bool {
+			labels, err := e.NamespaceLabelsAccessor(ns)
+			klog.Infof("DEBUG: check ns %s on query for %s: %s %v", ns, e.DefaultQualifiedResource.String(), labels, err)
+			if err != nil {
+				return false
+			}
+			return options.NamespaceLabelSelector.Matches(labels)
+		}
+	}
+
 	p.Limit = options.Limit
 	p.Continue = options.Continue
 	list := e.NewListFunc()
@@ -1095,6 +1116,22 @@ func (e *Store) Watch(ctx context.Context, options *metainternalversion.ListOpti
 	}
 	predicate := e.PredicateFunc(label, field)
 
+	if options.NamespaceLabelSelector != nil && e.NamespaceLabelsAccessor != nil {
+		// TODO: in order for this to be accurate this selector set needs to be consistent, which means
+		// at watch creation time we might need a list of namespaces within the set and time gate that
+		// match the label (which could be reasonably compressed). The namespace label change rate is
+		// low, so some windows won't even have one change. The watch cache could in theory get us recent
+		// changes and normalize them for RV, but that's questionable.
+		predicate.NamespaceMatch = func(ns string) bool {
+			labels, err := e.NamespaceLabelsAccessor(ns)
+			klog.Infof("DEBUG: check ns %s on query for %s: %v", ns, e.DefaultQualifiedResource.String(), err)
+			if err != nil {
+				return false
+			}
+			return options.NamespaceLabelSelector.Matches(labels)
+		}
+	}
+
 	resourceVersion := ""
 	if options != nil {
 		resourceVersion = options.ResourceVersion
@@ -1242,6 +1279,10 @@ func (e *Store) CompleteWithOptions(options *generic.StoreOptions) error {
 	opts, err := options.RESTOptions.GetRESTOptions(e.DefaultQualifiedResource)
 	if err != nil {
 		return err
+	}
+
+	if opts.NamespaceLabelsAccessor != nil {
+		e.NamespaceLabelsAccessor = opts.NamespaceLabelsAccessor
 	}
 
 	// ResourcePrefix must come from the underlying factory

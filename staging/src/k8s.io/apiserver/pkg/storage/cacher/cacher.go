@@ -997,7 +997,15 @@ func filterWithAttrsFunction(key string, p storage.SelectionPredicate) filterWit
 		if !hasPathPrefix(objKey, key) {
 			return false
 		}
-		return p.MatchesObjectAttributes(label, field)
+		if !p.MatchesObjectAttributes(label, field) {
+			return false
+		}
+		if p.NamespaceMatch != nil {
+			if ns := field.Get("metadata.namespace"); len(ns) > 0 && !p.NamespaceMatch(ns) {
+				return false
+			}
+		}
+		return true
 	}
 	return filterFunc
 }

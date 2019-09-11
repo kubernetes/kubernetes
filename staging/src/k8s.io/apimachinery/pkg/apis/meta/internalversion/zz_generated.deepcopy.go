@@ -69,6 +69,9 @@ func (in *ListOptions) DeepCopyInto(out *ListOptions) {
 	if in.FieldSelector != nil {
 		out.FieldSelector = in.FieldSelector.DeepCopySelector()
 	}
+	if in.NamespaceLabelSelector != nil {
+		out.NamespaceLabelSelector = in.NamespaceLabelSelector.DeepCopySelector()
+	}
 	if in.TimeoutSeconds != nil {
 		in, out := &in.TimeoutSeconds, &out.TimeoutSeconds
 		*out = new(int64)

@@ -539,6 +539,8 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		Resource:    a.group.GroupVersion.WithResource(resource),
 		Subresource: subresource,
 		Kind:        fqKindToRegister,
+		
+		NamespaceScoped: namespaceScoped,
 
 		HubGroupVersion: schema.GroupVersion{Group: fqKindToRegister.Group, Version: runtime.APIVersionInternal},
 
