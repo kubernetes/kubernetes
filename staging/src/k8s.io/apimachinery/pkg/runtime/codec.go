@@ -19,13 +19,17 @@ package runtime
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/url"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/conversion/queryparams"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog"
 )
 
 // codec binds an encoder and decoder.
@@ -238,6 +242,11 @@ var (
 	DisabledGroupVersioner GroupVersioner = disabledGroupVersioner{}
 )
 
+const (
+	internalGroupVersionerIdentifier = "internal"
+	disabledGroupVersionerIdentifier = "disabled"
+)
+
 type internalGroupVersioner struct{}
 
 // KindForGroupVersionKinds returns an internal Kind if one is found, or converts the first provided kind to the internal version.
@@ -253,11 +262,21 @@ func (internalGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersi
 	return schema.GroupVersionKind{}, false
 }
 
+// Identifier implements GroupVersioner interface.
+func (internalGroupVersioner) Identifier() string {
+	return internalGroupVersionerIdentifier
+}
+
 type disabledGroupVersioner struct{}
 
 // KindForGroupVersionKinds returns false for any input.
 func (disabledGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersionKind) (schema.GroupVersionKind, bool) {
 	return schema.GroupVersionKind{}, false
+}
+
+// Identifier implements GroupVersioner interface.
+func (disabledGroupVersioner) Identifier() string {
+	return disabledGroupVersionerIdentifier
 }
 
 // Assert that schema.GroupVersion and GroupVersions implement GroupVersioner
@@ -314,4 +333,23 @@ func (v multiGroupVersioner) KindForGroupVersionKinds(kinds []schema.GroupVersio
 		return v.target.WithKind(kinds[0].Kind), true
 	}
 	return schema.GroupVersionKind{}, false
+}
+
+// Identifier implements GroupVersioner interface.
+func (v multiGroupVersioner) Identifier() string {
+	groupKinds := make([]string, 0, len(v.acceptedGroupKinds))
+	for _, gk := range v.acceptedGroupKinds {
+		groupKinds = append(groupKinds, gk.String())
+	}
+	result := map[string]string{
+		"name":     "multi",
+		"target":   v.target.String(),
+		"accepted": strings.Join(groupKinds, ","),
+		"coerce":   strconv.FormatBool(v.coerce),
+	}
+	identifier, err := json.Marshal(result)
+	if err != nil {
+		klog.Fatalf("Failed marshaling Identifier for %#v: %v", v, err)
+	}
+	return string(identifier)
 }
