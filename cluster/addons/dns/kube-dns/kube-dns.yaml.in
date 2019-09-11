@@ -82,13 +82,12 @@ spec:
       labels:
         k8s-app: kube-dns
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        seccomp.security.alpha.kubernetes.io/pod: 'runtime/default'
         prometheus.io/port: "10054"
         prometheus.io/scrape: "true"
     spec:
       priorityClassName: system-cluster-critical
       securityContext:
-        runAsNonRoot: true
         supplementalGroups: [ 65534 ]
         fsGroup: 65534
       tolerations:
@@ -198,8 +197,6 @@ spec:
           mountPath: /etc/k8s/dns/dnsmasq-nanny
         securityContext:
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false
-          runAsNonRoot: false
           capabilities:
             drop:
               - all
