@@ -99,9 +99,9 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
 		defer client.AppsV1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
 
-		ginkgo.By("Get pod from the deployement")
+		ginkgo.By("Get pod from the deployment")
 		podList, err := e2edeploy.GetPodsForDeployment(client, deployment)
-		framework.ExpectNoError(err, fmt.Sprintf("Failed to get pod from the deployement with err: %v", err))
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to get pod from the deployment with err: %v", err))
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]
 		node1 := pod.Spec.NodeName
