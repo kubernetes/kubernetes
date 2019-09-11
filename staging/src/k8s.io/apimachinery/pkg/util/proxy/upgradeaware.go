@@ -23,12 +23,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -232,20 +230,11 @@ func (h *UpgradeAwareHandler) ServeHTTP(w http.ResponseWriter, req *http.Request
 	proxy := httputil.NewSingleHostReverseProxy(&url.URL{Scheme: h.Location.Scheme, Host: h.Location.Host})
 	proxy.Transport = h.Transport
 	proxy.FlushInterval = h.FlushInterval
-	proxy.ErrorLog = log.New(noSuppressPanicError{}, "", log.LstdFlags)
+
+	defer func() {
+		recover() // ignore panics inside of the reverse proxy on unclean disconnects
+	}()
 	proxy.ServeHTTP(w, newReq)
-}
-
-type noSuppressPanicError struct{}
-
-func (noSuppressPanicError) Write(p []byte) (n int, err error) {
-	// skip "suppressing panic for copyResponse error in test; copy error" error message
-	// that ends up in CI tests on each kube-apiserver termination as noise and
-	// everybody thinks this is fatal.
-	if strings.Contains(string(p), "suppressing panic") {
-		return len(p), nil
-	}
-	return os.Stderr.Write(p)
 }
 
 // tryUpgrade returns true if the request was handled.
