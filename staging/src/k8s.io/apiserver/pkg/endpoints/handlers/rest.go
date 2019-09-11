@@ -220,12 +220,15 @@ func finishRequest(timeout time.Duration, fn resultFunc) (result runtime.Object,
 		defer func() {
 			panicReason := recover()
 			if panicReason != nil {
-				// Same as stdlib http server code. Manually allocate stack
-				// trace buffer size to prevent excessively large logs
-				const size = 64 << 10
-				buf := make([]byte, size)
-				buf = buf[:goruntime.Stack(buf, false)]
-				panicReason = fmt.Sprintf("%v\n%s", panicReason, buf)
+				// do not wrap the sentinel ErrAbortHandler panic value
+				if panicReason != http.ErrAbortHandler {
+					// Same as stdlib http server code. Manually allocate stack
+					// trace buffer size to prevent excessively large logs
+					const size = 64 << 10
+					buf := make([]byte, size)
+					buf = buf[:goruntime.Stack(buf, false)]
+					panicReason = fmt.Sprintf("%v\n%s", panicReason, buf)
+				}
 				// Propagate to parent goroutine
 				panicCh <- panicReason
 			}
