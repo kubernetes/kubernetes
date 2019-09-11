@@ -581,6 +581,8 @@ func getIPTablesWaitFlag(version *utilversion.Version) []string {
 func getIPTablesRestoreWaitFlag(version *utilversion.Version) []string {
 	if version.AtLeast(WaitRestoreMinVersion) {
 		return []string{WaitString, WaitSecondsValue}
+	} else if version.String() == "1.4.21" { // HACK for 1.16.0; see https://github.com/kubernetes/kubernetes/issues/82587
+		return []string{WaitString}
 	} else {
 		return nil
 	}
