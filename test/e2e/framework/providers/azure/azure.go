@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -62,16 +64,24 @@ func (p *Provider) DeleteNode(node *v1.Node) error {
 // CreatePD creates a persistent volume
 func (p *Provider) CreatePD(zone string) (string, error) {
 	pdName := fmt.Sprintf("%s-%s", framework.TestContext.Prefix, string(uuid.NewUUID()))
-	_, diskURI, _, err := p.azureCloud.CreateVolume(pdName, "" /* account */, "" /* sku */, "" /* location */, 1 /* sizeGb */)
-	if err != nil {
-		return "", err
+
+	volumeOptions := &azure.ManagedDiskOptions{
+		DiskName:           pdName,
+		StorageAccountType: compute.StandardLRS,
+		ResourceGroup:      "",
+		PVCName:            pdName,
+		SizeGB:             1,
+		Tags:               nil,
+		AvailabilityZone:   zone,
+		DiskIOPSReadWrite:  "",
+		DiskMBpsReadWrite:  "",
 	}
-	return diskURI, nil
+	return p.azureCloud.CreateManagedDisk(volumeOptions)
 }
 
 // DeletePD deletes a persistent volume
 func (p *Provider) DeletePD(pdName string) error {
-	if err := p.azureCloud.DeleteVolume(pdName); err != nil {
+	if err := p.azureCloud.DeleteManagedDisk(pdName); err != nil {
 		framework.Logf("failed to delete Azure volume %q: %v", pdName, err)
 		return err
 	}
