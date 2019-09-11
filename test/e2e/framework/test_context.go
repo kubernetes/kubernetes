@@ -237,6 +237,11 @@ type CloudConfig struct {
 // TestContext should be used by all tests to access common context data.
 var TestContext TestContextType
 
+// ClusterIsIPv6 returns true if the cluster is IPv6
+func (tc TestContextType) ClusterIsIPv6() bool {
+	return tc.IPFamily == "ipv6"
+}
+
 // RegisterCommonFlags registers flags common to all e2e test suites.
 // The flag set can be flag.CommandLine (if desired) or a custom
 // flag set that then gets passed to viperconfig.ViperizeFlags.

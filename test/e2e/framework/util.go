@@ -427,11 +427,6 @@ func getDefaultClusterIPFamily(c clientset.Interface) string {
 	return "ipv4"
 }
 
-// ClusterIsIPv6 returns true if the cluster is IPv6
-func ClusterIsIPv6() bool {
-	return TestContext.IPFamily == "ipv6"
-}
-
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
