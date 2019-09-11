@@ -732,20 +732,12 @@ func TestPrebindPlugin(t *testing.T) {
 			t.Errorf("Error while creating a test pod: %v", err)
 		}
 
-		if test.fail {
+		if test.fail || test.reject {
 			if err = wait.Poll(10*time.Millisecond, 30*time.Second, podSchedulingError(cs, pod.Namespace, pod.Name)); err != nil {
 				t.Errorf("test #%v: Expected a scheduling error, but didn't get it. error: %v", i, err)
 			}
-		} else {
-			if test.reject {
-				if err = waitForPodUnschedulable(cs, pod); err != nil {
-					t.Errorf("test #%v: Didn't expected the pod to be scheduled. error: %v", i, err)
-				}
-			} else {
-				if err = waitForPodToSchedule(cs, pod); err != nil {
-					t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
-				}
-			}
+		} else if err = waitForPodToSchedule(cs, pod); err != nil {
+			t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
 		}
 
 		if preBindPlugin.numPreBindCalled == 0 {
@@ -810,30 +802,18 @@ func TestUnreservePlugin(t *testing.T) {
 	}
 
 	tests := []struct {
-		preBindFail   bool
-		preBindReject bool
+		preBindFail bool
 	}{
 		{
-			preBindFail:   false,
-			preBindReject: false,
+			preBindFail: false,
 		},
 		{
-			preBindFail:   true,
-			preBindReject: false,
-		},
-		{
-			preBindFail:   false,
-			preBindReject: true,
-		},
-		{
-			preBindFail:   true,
-			preBindReject: true,
+			preBindFail: true,
 		},
 	}
 
 	for i, test := range tests {
 		preBindPlugin.failPreBind = test.preBindFail
-		preBindPlugin.rejectPreBind = test.preBindReject
 
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
@@ -850,20 +830,11 @@ func TestUnreservePlugin(t *testing.T) {
 				t.Errorf("test #%v: Expected the unreserve plugin to be called %d times, was called %d times.", i, preBindPlugin.numPreBindCalled, unreservePlugin.numUnreserveCalled)
 			}
 		} else {
-			if test.preBindReject {
-				if err = waitForPodUnschedulable(cs, pod); err != nil {
-					t.Errorf("test #%v: Didn't expected the pod to be scheduled. error: %v", i, err)
-				}
-				if unreservePlugin.numUnreserveCalled == 0 {
-					t.Errorf("test #%v: Expected the unreserve plugin to be called %d times, was called %d times.", i, preBindPlugin.numPreBindCalled, unreservePlugin.numUnreserveCalled)
-				}
-			} else {
-				if err = waitForPodToSchedule(cs, pod); err != nil {
-					t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
-				}
-				if unreservePlugin.numUnreserveCalled > 0 {
-					t.Errorf("test #%v: Didn't expected the unreserve plugin to be called, was called %d times.", i, unreservePlugin.numUnreserveCalled)
-				}
+			if err = waitForPodToSchedule(cs, pod); err != nil {
+				t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
+			}
+			if unreservePlugin.numUnreserveCalled > 0 {
+				t.Errorf("test #%v: Didn't expected the unreserve plugin to be called, was called %d times.", i, unreservePlugin.numUnreserveCalled)
 			}
 		}
 
@@ -1122,26 +1093,15 @@ func TestPostBindPlugin(t *testing.T) {
 		preBindReject bool
 	}{
 		{
-			preBindFail:   false,
-			preBindReject: false,
+			preBindFail: false,
 		},
 		{
-			preBindFail:   true,
-			preBindReject: false,
-		},
-		{
-			preBindFail:   false,
-			preBindReject: true,
-		},
-		{
-			preBindFail:   true,
-			preBindReject: true,
+			preBindFail: true,
 		},
 	}
 
 	for i, test := range tests {
 		preBindPlugin.failPreBind = test.preBindFail
-		preBindPlugin.rejectPreBind = test.preBindReject
 
 		// Create a best effort pod.
 		pod, err := createPausePod(cs,
@@ -1158,20 +1118,11 @@ func TestPostBindPlugin(t *testing.T) {
 				t.Errorf("test #%v: Didn't expected the postbind plugin to be called %d times.", i, postBindPlugin.numPostBindCalled)
 			}
 		} else {
-			if test.preBindReject {
-				if err = waitForPodUnschedulable(cs, pod); err != nil {
-					t.Errorf("test #%v: Didn't expected the pod to be scheduled. error: %v", i, err)
-				}
-				if postBindPlugin.numPostBindCalled > 0 {
-					t.Errorf("test #%v: Didn't expected the postbind plugin to be called %d times.", i, postBindPlugin.numPostBindCalled)
-				}
-			} else {
-				if err = waitForPodToSchedule(cs, pod); err != nil {
-					t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
-				}
-				if postBindPlugin.numPostBindCalled == 0 {
-					t.Errorf("test #%v: Expected the postbind plugin to be called, was called %d times.", i, postBindPlugin.numPostBindCalled)
-				}
+			if err = waitForPodToSchedule(cs, pod); err != nil {
+				t.Errorf("test #%v: Expected the pod to be scheduled. error: %v", i, err)
+			}
+			if postBindPlugin.numPostBindCalled == 0 {
+				t.Errorf("test #%v: Expected the postbind plugin to be called, was called %d times.", i, postBindPlugin.numPostBindCalled)
 			}
 		}
 

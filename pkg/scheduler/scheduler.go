@@ -635,13 +635,8 @@ func (sched *Scheduler) scheduleOne() {
 		preBindStatus := fwk.RunPreBindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		if !preBindStatus.IsSuccess() {
 			var reason string
-			if preBindStatus.IsUnschedulable() {
-				metrics.PodScheduleFailures.Inc()
-				reason = v1.PodReasonUnschedulable
-			} else {
-				metrics.PodScheduleErrors.Inc()
-				reason = SchedulerError
-			}
+			metrics.PodScheduleErrors.Inc()
+			reason = SchedulerError
 			if forgetErr := sched.Cache().ForgetPod(assumedPod); forgetErr != nil {
 				klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
 			}
