@@ -187,7 +187,7 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	ns := f.Namespace
 
 	// NewNFSServer creates a pod for InlineVolume and PreprovisionedPV,
-	// and startExternalProvisioner creates a pods for DynamicPV.
+	// and startExternalProvisioner creates a pod for DynamicPV.
 	// Therefore, we need a different PrepareTest logic for volType.
 	switch volType {
 	case testpatterns.InlineVolume:
