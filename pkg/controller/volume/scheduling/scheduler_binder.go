@@ -33,6 +33,7 @@ import (
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
+	"k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
@@ -154,9 +155,9 @@ func (b *volumeBinder) FindPodVolumes(pod *v1.Pod, node *v1.Node) (unboundVolume
 	boundVolumesSatisfied = true
 	start := time.Now()
 	defer func() {
-		VolumeSchedulingStageLatency.WithLabelValues("predicate").Observe(time.Since(start).Seconds())
+		metrics.VolumeSchedulingStageLatency.WithLabelValues("predicate").Observe(time.Since(start).Seconds())
 		if err != nil {
-			VolumeSchedulingStageFailed.WithLabelValues("predicate").Inc()
+			metrics.VolumeSchedulingStageFailed.WithLabelValues("predicate").Inc()
 		}
 	}()
 
@@ -256,9 +257,9 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	klog.V(4).Infof("AssumePodVolumes for pod %q, node %q", podName, nodeName)
 	start := time.Now()
 	defer func() {
-		VolumeSchedulingStageLatency.WithLabelValues("assume").Observe(time.Since(start).Seconds())
+		metrics.VolumeSchedulingStageLatency.WithLabelValues("assume").Observe(time.Since(start).Seconds())
 		if err != nil {
-			VolumeSchedulingStageFailed.WithLabelValues("assume").Inc()
+			metrics.VolumeSchedulingStageFailed.WithLabelValues("assume").Inc()
 		}
 	}()
 
@@ -332,9 +333,9 @@ func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod) (err error) {
 
 	start := time.Now()
 	defer func() {
-		VolumeSchedulingStageLatency.WithLabelValues("bind").Observe(time.Since(start).Seconds())
+		metrics.VolumeSchedulingStageLatency.WithLabelValues("bind").Observe(time.Since(start).Seconds())
 		if err != nil {
-			VolumeSchedulingStageFailed.WithLabelValues("bind").Inc()
+			metrics.VolumeSchedulingStageFailed.WithLabelValues("bind").Inc()
 		}
 	}()
 
