@@ -46,9 +46,14 @@ import (
 	"k8s.io/client-go/tools/cache"
 	utiltesting "k8s.io/client-go/util/testing"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 	. "k8s.io/kubernetes/pkg/controller/testutil"
 	"k8s.io/kubernetes/pkg/securitycontext"
+)
+
+var (
+	informerSyncTimeout = 30 * time.Second
 )
 
 func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh chan struct{}, burstReplicas int) (*ReplicaSetController, informers.SharedInformerFactory) {
@@ -182,16 +187,20 @@ func processSync(rsc *ReplicaSetController, key string) error {
 	return syncErr
 }
 
-func validateSyncReplicaSet(t *testing.T, fakePodControl *controller.FakePodControl, expectedCreates, expectedDeletes, expectedPatches int) {
+func validateSyncReplicaSet(fakePodControl *controller.FakePodControl, expectedCreates, expectedDeletes, expectedPatches int) error {
 	if e, a := expectedCreates, len(fakePodControl.Templates); e != a {
-		t.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", e, a)
+		return fmt.Errorf("Unexpected number of creates.  Expected %d, saw %d\n", e, a)
 	}
+
 	if e, a := expectedDeletes, len(fakePodControl.DeletePodName); e != a {
-		t.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", e, a)
+		return fmt.Errorf("Unexpected number of deletes.  Expected %d, saw %d\n", e, a)
 	}
+
 	if e, a := expectedPatches, len(fakePodControl.Patches); e != a {
-		t.Errorf("Unexpected number of patches.  Expected %d, saw %d\n", e, a)
+		return fmt.Errorf("Unexpected number of patches.  Expected %d, saw %d\n", e, a)
 	}
+
+	return nil
 }
 
 func TestSyncReplicaSetDoesNothing(t *testing.T) {
@@ -209,7 +218,10 @@ func TestSyncReplicaSetDoesNothing(t *testing.T) {
 
 	manager.podControl = &fakePodControl
 	manager.syncReplicaSet(GetKey(rsSpec, t))
-	validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
+	err := validateSyncReplicaSet(&fakePodControl, 0, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestDeleteFinalStateUnknown(t *testing.T) {
@@ -264,7 +276,10 @@ func TestSyncReplicaSetCreateFailures(t *testing.T) {
 
 	manager.podControl = &fakePodControl
 	manager.syncReplicaSet(GetKey(rs, t))
-	validateSyncReplicaSet(t, &fakePodControl, fakePodControl.CreateLimit, 0, 0)
+	err := validateSyncReplicaSet(&fakePodControl, fakePodControl.CreateLimit, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 	expectedLimit := 0
 	for pass := uint8(0); expectedLimit <= fakePodControl.CreateLimit; pass++ {
 		expectedLimit += controller.SlowStartInitialBatchSize << pass
@@ -303,7 +318,10 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	rsSpec.Status.ReadyReplicas = 1
 	rsSpec.Status.AvailableReplicas = 1
 	manager.syncReplicaSet(GetKey(rsSpec, t))
-	validateSyncReplicaSet(t, &fakePodControl, 1, 0, 0)
+	err := validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Expectations prevents replicas but not an update on status
 	rsSpec.Status.Replicas = 0
@@ -311,7 +329,10 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	rsSpec.Status.AvailableReplicas = 0
 	fakePodControl.Clear()
 	manager.syncReplicaSet(GetKey(rsSpec, t))
-	validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
+	err = validateSyncReplicaSet(&fakePodControl, 0, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Get the key for the controller
 	rsKey, err := controller.KeyFunc(rsSpec)
@@ -329,13 +350,19 @@ func TestSyncReplicaSetDormancy(t *testing.T) {
 	fakePodControl.Err = fmt.Errorf("fake Error")
 
 	manager.syncReplicaSet(GetKey(rsSpec, t))
-	validateSyncReplicaSet(t, &fakePodControl, 1, 0, 0)
+	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// This replica should not need a Lowering of expectations, since the previous create failed
 	fakePodControl.Clear()
 	fakePodControl.Err = nil
 	manager.syncReplicaSet(GetKey(rsSpec, t))
-	validateSyncReplicaSet(t, &fakePodControl, 1, 0, 0)
+	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// 2 PUT for the ReplicaSet status during dormancy window.
 	// Note that the pod creates go through pod control so they're not recorded.
@@ -657,7 +684,7 @@ func TestControllerUpdateRequeue(t *testing.T) {
 
 	// Enqueue once. Then process it. Disable rate-limiting for this.
 	manager.queue = workqueue.NewRateLimitingQueue(workqueue.NewMaxOfRateLimiter())
-	manager.enqueueReplicaSet(rs)
+	manager.enqueueRS(rs)
 	manager.processNextWorkItem()
 	// It should have been requeued.
 	if got, want := manager.queue.Len(), 1; got != want {
@@ -752,7 +779,10 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 					expectedPods = int32(burstReplicas)
 				}
 				// This validates the ReplicaSet manager sync actually created pods
-				validateSyncReplicaSet(t, &fakePodControl, int(expectedPods), 0, 0)
+				err := validateSyncReplicaSet(&fakePodControl, int(expectedPods), 0, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				// This simulates the watch events for all but 1 of the expected pods.
 				// None of these should wake the controller because it has expectations==BurstReplicas.
@@ -773,7 +803,10 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 				if expectedPods > int32(burstReplicas) {
 					expectedPods = int32(burstReplicas)
 				}
-				validateSyncReplicaSet(t, &fakePodControl, 0, int(expectedPods), 0)
+				err := validateSyncReplicaSet(&fakePodControl, 0, int(expectedPods), 0)
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				// To accurately simulate a watch we must delete the exact pods
 				// the rs is waiting for.
@@ -812,7 +845,10 @@ func doTestControllerBurstReplicas(t *testing.T, burstReplicas, numReplicas int)
 			// Check that the ReplicaSet didn't take any action for all the above pods
 			fakePodControl.Clear()
 			manager.syncReplicaSet(GetKey(rsSpec, t))
-			validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
+			err := validateSyncReplicaSet(&fakePodControl, 0, 0, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			// Create/Delete the last pod
 			// The last add pod will decrease the expectation of the ReplicaSet to 0,
@@ -896,7 +932,10 @@ func TestRSSyncExpectations(t *testing.T) {
 		},
 	})
 	manager.syncReplicaSet(GetKey(rsSpec, t))
-	validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
+	err := validateSyncReplicaSet(&fakePodControl, 0, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestDeleteControllerAndExpectations(t *testing.T) {
@@ -913,7 +952,10 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 
 	// This should set expectations for the ReplicaSet
 	manager.syncReplicaSet(GetKey(rs, t))
-	validateSyncReplicaSet(t, &fakePodControl, 1, 0, 0)
+	err := validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 	fakePodControl.Clear()
 
 	// Get the ReplicaSet key
@@ -929,6 +971,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 		t.Errorf("No expectations found for ReplicaSet")
 	}
 	informers.Apps().V1().ReplicaSets().Informer().GetIndexer().Delete(rs)
+	manager.deleteRS(rs)
 	manager.syncReplicaSet(GetKey(rs, t))
 
 	if _, exists, err = manager.expectations.GetExpectations(rsKey); exists {
@@ -939,7 +982,157 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	podExp.Add(-1, 0)
 	informers.Core().V1().Pods().Informer().GetIndexer().Replace(make([]interface{}, 0), "0")
 	manager.syncReplicaSet(GetKey(rs, t))
-	validateSyncReplicaSet(t, &fakePodControl, 0, 0, 0)
+	err = validateSyncReplicaSet(&fakePodControl, 0, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestExpectationsOnRecreate(t *testing.T) {
+	client := fake.NewSimpleClientset()
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+
+	f := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+	manager := NewReplicaSetController(
+		f.Apps().V1().ReplicaSets(),
+		f.Core().V1().Pods(),
+		client,
+		100,
+	)
+	f.Start(stopCh)
+	fakePodControl := controller.FakePodControl{}
+	manager.podControl = &fakePodControl
+
+	if manager.queue.Len() != 0 {
+		t.Fatal("Unexpected item in the queue")
+	}
+
+	oldRS := newReplicaSet(1, map[string]string{"foo": "bar"})
+	oldRS, err := client.AppsV1().ReplicaSets(oldRS.Namespace).Create(oldRS)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
+		klog.V(8).Infof("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
+		return manager.queue.Len() == 1, nil
+	})
+	if err != nil {
+		t.Fatalf("initial RS didn't result in new item in the queue: %v", err)
+	}
+
+	ok := manager.processNextWorkItem()
+	if !ok {
+		t.Fatal("queue is shutting down")
+	}
+
+	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fakePodControl.Clear()
+
+	oldRSKey, err := controller.KeyFunc(oldRS)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rsExp, exists, err := manager.expectations.GetExpectations(oldRSKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists {
+		t.Errorf("No expectations found for ReplicaSet %q", oldRSKey)
+	}
+	if rsExp.Fulfilled() {
+		t.Errorf("There should be unfulfiled expectation for creating new pods for ReplicaSet %q", oldRSKey)
+	}
+
+	if manager.queue.Len() != 0 {
+		t.Fatal("Unexpected item in the queue")
+	}
+
+	err = client.AppsV1().ReplicaSets(oldRS.Namespace).Delete(oldRS.Name, &metav1.DeleteOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
+		klog.V(8).Infof("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
+		return manager.queue.Len() == 1, nil
+	})
+	if err != nil {
+		t.Fatalf("Deleting RS didn't result in new item in the queue: %v", err)
+	}
+
+	rsExp, exists, err = manager.expectations.GetExpectations(oldRSKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exists {
+		t.Errorf("There should be no expectations for ReplicaSet %q after it was deleted", oldRSKey)
+	}
+
+	// skip sync for the delete event so we only see the new RS in sync
+	key, quit := manager.queue.Get()
+	if quit {
+		t.Fatal("Queue is shutting down!")
+	}
+	manager.queue.Done(key)
+	if key != oldRSKey {
+		t.Fatal("Keys should be equal!")
+	}
+
+	if manager.queue.Len() != 0 {
+		t.Fatal("Unexpected item in the queue")
+	}
+
+	newRS := oldRS.DeepCopy()
+	newRS.UID = uuid.NewUUID()
+	newRS, err = client.AppsV1().ReplicaSets(newRS.Namespace).Create(newRS)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Sanity check
+	if newRS.UID == oldRS.UID {
+		t.Fatal("New RS has the same UID as the old one!")
+	}
+
+	err = wait.PollImmediate(100*time.Millisecond, informerSyncTimeout, func() (bool, error) {
+		klog.V(8).Infof("Waiting for queue to have 1 item, currently has: %d", manager.queue.Len())
+		return manager.queue.Len() == 1, nil
+	})
+	if err != nil {
+		t.Fatalf("Re-creating RS didn't result in new item in the queue: %v", err)
+	}
+
+	ok = manager.processNextWorkItem()
+	if !ok {
+		t.Fatal("Queue is shutting down!")
+	}
+
+	newRSKey, err := controller.KeyFunc(newRS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rsExp, exists, err = manager.expectations.GetExpectations(newRSKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !exists {
+		t.Errorf("No expectations found for ReplicaSet %q", oldRSKey)
+	}
+	if rsExp.Fulfilled() {
+		t.Errorf("There should be unfulfiled expectation for creating new pods for ReplicaSet %q", oldRSKey)
+	}
+
+	err = validateSyncReplicaSet(&fakePodControl, 1, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fakePodControl.Clear()
 }
 
 // shuffle returns a new shuffled list of container controllers.
@@ -1120,7 +1313,10 @@ func TestDoNotPatchPodWithOtherControlRef(t *testing.T) {
 		t.Fatal(err)
 	}
 	// because the matching pod already has a controller, so 2 pods should be created.
-	validateSyncReplicaSet(t, fakePodControl, 2, 0, 0)
+	err = validateSyncReplicaSet(fakePodControl, 2, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestPatchPodFails(t *testing.T) {
@@ -1143,7 +1339,10 @@ func TestPatchPodFails(t *testing.T) {
 		t.Errorf("expected fake Error, got %+v", err)
 	}
 	// 2 patches to take control of pod1 and pod2 (both fail).
-	validateSyncReplicaSet(t, fakePodControl, 0, 0, 2)
+	err = validateSyncReplicaSet(fakePodControl, 0, 0, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// RS should requeue itself.
 	queueRS, _ := manager.queue.Get()
 	if queueRS != rsKey {
@@ -1170,7 +1369,10 @@ func TestDoNotAdoptOrCreateIfBeingDeleted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	validateSyncReplicaSet(t, fakePodControl, 0, 0, 0)
+	err = validateSyncReplicaSet(fakePodControl, 0, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestDoNotAdoptOrCreateIfBeingDeletedRace(t *testing.T) {
@@ -1197,7 +1399,10 @@ func TestDoNotAdoptOrCreateIfBeingDeletedRace(t *testing.T) {
 		t.Error("syncReplicaSet() err = nil, expected non-nil")
 	}
 	// no patch, no create.
-	validateSyncReplicaSet(t, fakePodControl, 0, 0, 0)
+	err = validateSyncReplicaSet(fakePodControl, 0, 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 var (
