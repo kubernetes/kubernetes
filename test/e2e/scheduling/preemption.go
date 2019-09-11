@@ -524,7 +524,6 @@ var _ = SIGDescribe("PreemptionExecutionPath", func() {
 			_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(&pods[podNum])
 			framework.ExpectNoError(err, "Failed creating Pod")
 		}
-		//fmt.Println(fmt.Sprintf("Pods seen so far: %v", podNamesSeen))
 		e2elog.Logf("Pods seen so far: %v", podNamesSeen)
 		framework.ExpectEqual(len(podNamesSeen), len(pods), "PodsSeen doesn't match Pods created")
 
