@@ -1004,7 +1004,7 @@ __EOF__
   # Post-condition: Only the default kubernetes services exist
   kube::test::get_object_assert services "{{range.items}}{{$id_field}}:{{end}}" 'kubernetes:'
 
-  ### Create deployent and service
+  ### Create deployment and service
   # Pre-condition: no deployment exists
   kube::test::wait_object_assert deployment "{{range.items}}{{$id_field}}:{{end}}" ''
   # Command
