@@ -628,7 +628,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	// Use (ServiceAccountSigningKeyFile != "") as a proxy to the user enabling
 	// TokenRequest functionality. This defaulting was convenient, but messed up
 	// a lot of people when they rotated their serving cert with no idea it was
-	// connected to their service account keys. We are taking this oppurtunity to
+	// connected to their service account keys. We are taking this opportunity to
 	// remove this problematic defaulting.
 	if s.ServiceAccountSigningKeyFile == "" {
 		// Default to the private server key for service account token signing
