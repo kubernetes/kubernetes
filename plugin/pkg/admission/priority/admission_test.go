@@ -626,7 +626,7 @@ func TestPodAdmission(t *testing.T) {
 			[]*scheduling.PriorityClass{systemClusterCritical},
 			*pods[7],
 			scheduling.SystemCriticalPriority,
-			true,
+			false,
 			nil,
 		},
 		{
