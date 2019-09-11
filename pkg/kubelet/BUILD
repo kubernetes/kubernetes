@@ -112,6 +112,7 @@ go_library(
         "//pkg/volume/csi:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/exec:go_default_library",
+        "//pkg/volume/util/fsquota:go_default_library",
         "//pkg/volume/util/hostutil:go_default_library",
         "//pkg/volume/util/subpath:go_default_library",
         "//pkg/volume/util/types:go_default_library",
@@ -152,6 +153,7 @@ go_library(
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
+        "//vendor/k8s.io/utils/strings:go_default_library",
     ],
 )
 
