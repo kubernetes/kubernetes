@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -166,7 +165,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 			for _, mountName := range dirNames {
 				cmd := fmt.Sprintf("cat /mnt/test/%s/file", mountName)
 				stdout, stderr, err := f.ExecShellInPodWithFullOutput(podName, cmd)
-				e2elog.Logf("pod %s mount %s: stdout: %q, stderr: %q error: %v", podName, mountName, stdout, stderr, err)
+				framework.Logf("pod %s mount %s: stdout: %q, stderr: %q error: %v", podName, mountName, stdout, stderr, err)
 				msg := fmt.Sprintf("When checking pod %s and directory %s", podName, mountName)
 				shouldBeVisible := mounts.Has(mountName)
 				if shouldBeVisible {

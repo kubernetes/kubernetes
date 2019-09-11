@@ -27,7 +27,6 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -59,7 +58,7 @@ var _ = SIGDescribe("Resource-usage [Serial] [Slow]", func() {
 
 	ginkgo.AfterEach(func() {
 		result := om.GetLatestRuntimeOperationErrorRate()
-		e2elog.Logf("runtime operation error metrics:\n%s", e2ekubelet.FormatRuntimeOperationErrorRate(result))
+		framework.Logf("runtime operation error metrics:\n%s", e2ekubelet.FormatRuntimeOperationErrorRate(result))
 	})
 
 	// This test measures and verifies the steady resource usage of node is within limit
@@ -171,7 +170,7 @@ func runResourceUsageTest(f *framework.Framework, rc *ResourceCollector, testArg
 	deadline := time.Now().Add(monitoringTime)
 	for time.Now().Before(deadline) {
 		timeLeft := deadline.Sub(time.Now())
-		e2elog.Logf("Still running...%v left", timeLeft)
+		framework.Logf("Still running...%v left", timeLeft)
 		if timeLeft < reportingPeriod {
 			time.Sleep(timeLeft)
 		} else {
@@ -192,14 +191,14 @@ func logAndVerifyResource(f *framework.Framework, rc *ResourceCollector, cpuLimi
 	// Obtain memory PerfData
 	usagePerContainer, err := rc.GetLatest()
 	framework.ExpectNoError(err)
-	e2elog.Logf("%s", formatResourceUsageStats(usagePerContainer))
+	framework.Logf("%s", formatResourceUsageStats(usagePerContainer))
 
 	usagePerNode := make(e2ekubelet.ResourceUsagePerNode)
 	usagePerNode[nodeName] = usagePerContainer
 
 	// Obtain CPU PerfData
 	cpuSummary := rc.GetCPUSummary()
-	e2elog.Logf("%s", formatCPUSummary(cpuSummary))
+	framework.Logf("%s", formatCPUSummary(cpuSummary))
 
 	cpuSummaryPerNode := make(e2ekubelet.NodesCPUSummary)
 	cpuSummaryPerNode[nodeName] = cpuSummary
@@ -240,14 +239,14 @@ func verifyMemoryLimits(c clientset.Interface, expected e2ekubelet.ResourceUsage
 			errList = append(errList, fmt.Sprintf("node %v:\n %s", nodeName, strings.Join(nodeErrs, ", ")))
 			heapStats, err := e2ekubelet.GetKubeletHeapStats(c, nodeName)
 			if err != nil {
-				e2elog.Logf("Unable to get heap stats from %q", nodeName)
+				framework.Logf("Unable to get heap stats from %q", nodeName)
 			} else {
-				e2elog.Logf("Heap stats on %q\n:%v", nodeName, heapStats)
+				framework.Logf("Heap stats on %q\n:%v", nodeName, heapStats)
 			}
 		}
 	}
 	if len(errList) > 0 {
-		e2elog.Failf("Memory usage exceeding limits:\n %s", strings.Join(errList, "\n"))
+		framework.Failf("Memory usage exceeding limits:\n %s", strings.Join(errList, "\n"))
 	}
 }
 
@@ -281,7 +280,7 @@ func verifyCPULimits(expected e2ekubelet.ContainersCPUSummary, actual e2ekubelet
 		}
 	}
 	if len(errList) > 0 {
-		e2elog.Failf("CPU usage exceeding limits:\n %s", strings.Join(errList, "\n"))
+		framework.Failf("CPU usage exceeding limits:\n %s", strings.Join(errList, "\n"))
 	}
 }
 
@@ -289,7 +288,7 @@ func logPods(c clientset.Interface) {
 	nodeName := framework.TestContext.NodeName
 	podList, err := e2ekubelet.GetKubeletRunningPods(c, nodeName)
 	if err != nil {
-		e2elog.Logf("Unable to retrieve kubelet pods for node %v", nodeName)
+		framework.Logf("Unable to retrieve kubelet pods for node %v", nodeName)
 	}
-	e2elog.Logf("%d pods are running on node %v", len(podList.Items), nodeName)
+	framework.Logf("%d pods are running on node %v", len(podList.Items), nodeName)
 }

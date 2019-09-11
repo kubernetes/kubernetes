@@ -33,11 +33,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
 func getOOMScoreForPid(pid int) (int, error) {
@@ -162,9 +161,9 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 							},
 						})
 						framework.ExpectNoError(err)
-						e2elog.Logf("Running containers:")
+						framework.Logf("Running containers:")
 						for _, c := range containers {
-							e2elog.Logf("%+v", c)
+							framework.Logf("%+v", c)
 						}
 					}
 				})

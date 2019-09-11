@@ -36,7 +36,6 @@ import (
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -480,9 +479,9 @@ func runEvictionTest(f *framework.Framework, pressureTimeout time.Duration, expe
 			gomega.Eventually(func() error {
 				if expectedNodeCondition != noPressure {
 					if hasNodeCondition(f, expectedNodeCondition) {
-						e2elog.Logf("Node has %s", expectedNodeCondition)
+						framework.Logf("Node has %s", expectedNodeCondition)
 					} else {
-						e2elog.Logf("Node does NOT have %s", expectedNodeCondition)
+						framework.Logf("Node does NOT have %s", expectedNodeCondition)
 					}
 				}
 				logKubeletLatencyMetrics(kubeletmetrics.EvictionStatsAgeKey)
@@ -571,7 +570,7 @@ func verifyEvictionOrdering(f *framework.Framework, testSpecs []podEvictSpec) er
 	}
 	updatedPods := updatedPodList.Items
 	for _, p := range updatedPods {
-		e2elog.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
+		framework.Logf("fetching pod %s; phase= %v", p.Name, p.Status.Phase)
 	}
 
 	ginkgo.By("checking eviction ordering and ensuring important pods dont fail")
@@ -692,25 +691,25 @@ func hasNodeCondition(f *framework.Framework, expectedNodeCondition v1.NodeCondi
 func logInodeMetrics() {
 	summary, err := getNodeSummary()
 	if err != nil {
-		e2elog.Logf("Error getting summary: %v", err)
+		framework.Logf("Error getting summary: %v", err)
 		return
 	}
 	if summary.Node.Runtime != nil && summary.Node.Runtime.ImageFs != nil && summary.Node.Runtime.ImageFs.Inodes != nil && summary.Node.Runtime.ImageFs.InodesFree != nil {
-		e2elog.Logf("imageFsInfo.Inodes: %d, imageFsInfo.InodesFree: %d", *summary.Node.Runtime.ImageFs.Inodes, *summary.Node.Runtime.ImageFs.InodesFree)
+		framework.Logf("imageFsInfo.Inodes: %d, imageFsInfo.InodesFree: %d", *summary.Node.Runtime.ImageFs.Inodes, *summary.Node.Runtime.ImageFs.InodesFree)
 	}
 	if summary.Node.Fs != nil && summary.Node.Fs.Inodes != nil && summary.Node.Fs.InodesFree != nil {
-		e2elog.Logf("rootFsInfo.Inodes: %d, rootFsInfo.InodesFree: %d", *summary.Node.Fs.Inodes, *summary.Node.Fs.InodesFree)
+		framework.Logf("rootFsInfo.Inodes: %d, rootFsInfo.InodesFree: %d", *summary.Node.Fs.Inodes, *summary.Node.Fs.InodesFree)
 	}
 	for _, pod := range summary.Pods {
-		e2elog.Logf("Pod: %s", pod.PodRef.Name)
+		framework.Logf("Pod: %s", pod.PodRef.Name)
 		for _, container := range pod.Containers {
 			if container.Rootfs != nil && container.Rootfs.InodesUsed != nil {
-				e2elog.Logf("--- summary Container: %s inodeUsage: %d", container.Name, *container.Rootfs.InodesUsed)
+				framework.Logf("--- summary Container: %s inodeUsage: %d", container.Name, *container.Rootfs.InodesUsed)
 			}
 		}
 		for _, volume := range pod.VolumeStats {
 			if volume.FsStats.InodesUsed != nil {
-				e2elog.Logf("--- summary Volume: %s inodeUsage: %d", volume.Name, *volume.FsStats.InodesUsed)
+				framework.Logf("--- summary Volume: %s inodeUsage: %d", volume.Name, *volume.FsStats.InodesUsed)
 			}
 		}
 	}
@@ -719,25 +718,25 @@ func logInodeMetrics() {
 func logDiskMetrics() {
 	summary, err := getNodeSummary()
 	if err != nil {
-		e2elog.Logf("Error getting summary: %v", err)
+		framework.Logf("Error getting summary: %v", err)
 		return
 	}
 	if summary.Node.Runtime != nil && summary.Node.Runtime.ImageFs != nil && summary.Node.Runtime.ImageFs.CapacityBytes != nil && summary.Node.Runtime.ImageFs.AvailableBytes != nil {
-		e2elog.Logf("imageFsInfo.CapacityBytes: %d, imageFsInfo.AvailableBytes: %d", *summary.Node.Runtime.ImageFs.CapacityBytes, *summary.Node.Runtime.ImageFs.AvailableBytes)
+		framework.Logf("imageFsInfo.CapacityBytes: %d, imageFsInfo.AvailableBytes: %d", *summary.Node.Runtime.ImageFs.CapacityBytes, *summary.Node.Runtime.ImageFs.AvailableBytes)
 	}
 	if summary.Node.Fs != nil && summary.Node.Fs.CapacityBytes != nil && summary.Node.Fs.AvailableBytes != nil {
-		e2elog.Logf("rootFsInfo.CapacityBytes: %d, rootFsInfo.AvailableBytes: %d", *summary.Node.Fs.CapacityBytes, *summary.Node.Fs.AvailableBytes)
+		framework.Logf("rootFsInfo.CapacityBytes: %d, rootFsInfo.AvailableBytes: %d", *summary.Node.Fs.CapacityBytes, *summary.Node.Fs.AvailableBytes)
 	}
 	for _, pod := range summary.Pods {
-		e2elog.Logf("Pod: %s", pod.PodRef.Name)
+		framework.Logf("Pod: %s", pod.PodRef.Name)
 		for _, container := range pod.Containers {
 			if container.Rootfs != nil && container.Rootfs.UsedBytes != nil {
-				e2elog.Logf("--- summary Container: %s UsedBytes: %d", container.Name, *container.Rootfs.UsedBytes)
+				framework.Logf("--- summary Container: %s UsedBytes: %d", container.Name, *container.Rootfs.UsedBytes)
 			}
 		}
 		for _, volume := range pod.VolumeStats {
 			if volume.FsStats.InodesUsed != nil {
-				e2elog.Logf("--- summary Volume: %s UsedBytes: %d", volume.Name, *volume.FsStats.UsedBytes)
+				framework.Logf("--- summary Volume: %s UsedBytes: %d", volume.Name, *volume.FsStats.UsedBytes)
 			}
 		}
 	}
@@ -746,22 +745,22 @@ func logDiskMetrics() {
 func logMemoryMetrics() {
 	summary, err := getNodeSummary()
 	if err != nil {
-		e2elog.Logf("Error getting summary: %v", err)
+		framework.Logf("Error getting summary: %v", err)
 		return
 	}
 	if summary.Node.Memory != nil && summary.Node.Memory.WorkingSetBytes != nil && summary.Node.Memory.AvailableBytes != nil {
-		e2elog.Logf("Node.Memory.WorkingSetBytes: %d, Node.Memory.AvailableBytes: %d", *summary.Node.Memory.WorkingSetBytes, *summary.Node.Memory.AvailableBytes)
+		framework.Logf("Node.Memory.WorkingSetBytes: %d, Node.Memory.AvailableBytes: %d", *summary.Node.Memory.WorkingSetBytes, *summary.Node.Memory.AvailableBytes)
 	}
 	for _, sysContainer := range summary.Node.SystemContainers {
 		if sysContainer.Name == kubeletstatsv1alpha1.SystemContainerPods && sysContainer.Memory != nil && sysContainer.Memory.WorkingSetBytes != nil && sysContainer.Memory.AvailableBytes != nil {
-			e2elog.Logf("Allocatable.Memory.WorkingSetBytes: %d, Allocatable.Memory.AvailableBytes: %d", *sysContainer.Memory.WorkingSetBytes, *sysContainer.Memory.AvailableBytes)
+			framework.Logf("Allocatable.Memory.WorkingSetBytes: %d, Allocatable.Memory.AvailableBytes: %d", *sysContainer.Memory.WorkingSetBytes, *sysContainer.Memory.AvailableBytes)
 		}
 	}
 	for _, pod := range summary.Pods {
-		e2elog.Logf("Pod: %s", pod.PodRef.Name)
+		framework.Logf("Pod: %s", pod.PodRef.Name)
 		for _, container := range pod.Containers {
 			if container.Memory != nil && container.Memory.WorkingSetBytes != nil {
-				e2elog.Logf("--- summary Container: %s WorkingSetBytes: %d", container.Name, *container.Memory.WorkingSetBytes)
+				framework.Logf("--- summary Container: %s WorkingSetBytes: %d", container.Name, *container.Memory.WorkingSetBytes)
 			}
 		}
 	}
@@ -770,11 +769,11 @@ func logMemoryMetrics() {
 func logPidMetrics() {
 	summary, err := getNodeSummary()
 	if err != nil {
-		e2elog.Logf("Error getting summary: %v", err)
+		framework.Logf("Error getting summary: %v", err)
 		return
 	}
 	if summary.Node.Rlimit != nil && summary.Node.Rlimit.MaxPID != nil && summary.Node.Rlimit.NumOfRunningProcesses != nil {
-		e2elog.Logf("Node.Rlimit.MaxPID: %d, Node.Rlimit.RunningProcesses: %d", *summary.Node.Rlimit.MaxPID, *summary.Node.Rlimit.NumOfRunningProcesses)
+		framework.Logf("Node.Rlimit.MaxPID: %d, Node.Rlimit.RunningProcesses: %d", *summary.Node.Rlimit.MaxPID, *summary.Node.Rlimit.NumOfRunningProcesses)
 	}
 }
 
