@@ -501,13 +501,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		objs[ix] = infos[ix].Object
 	}
 
-	sorting, err := cmd.Flags().GetString("sort-by")
-	if err != nil {
-		return err
-	}
-
 	var positioner OriginalPositioner
 	if o.Sort {
+		sorting, err := cmd.Flags().GetString("sort-by")
+		if err != nil {
+			return err
+		}
+
 		sorter := NewRuntimeSorter(objs, sorting)
 		if err := sorter.Sort(); err != nil {
 			return err
