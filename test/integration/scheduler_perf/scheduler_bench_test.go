@@ -408,6 +408,9 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 		// Since the total amount of time is relatively large, it might not be a concern.
 		time.Sleep(100 * time.Millisecond)
 	}
+
+	// Note: without this line we're taking the overhead of defer() into account.
+	b.StopTimer()
 }
 
 // makeBasePodWithSecrets creates a Pod object to be used as a template.
