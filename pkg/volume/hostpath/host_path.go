@@ -305,6 +305,21 @@ func (r *hostPathProvisioner) Provision(selectedNode *v1.Node, allowedTopologies
 			},
 		},
 	}
+
+	var labels map[string]string
+	if r.options.PVC.Spec.Selector != nil {
+		labels = r.options.PVC.Spec.Selector.MatchLabels
+	}
+
+	if len(labels) != 0 {
+		if pv.Labels == nil {
+			pv.Labels = make(map[string]string)
+		}
+		for k, v := range labels {
+			pv.Labels[k] = v
+		}
+	}
+
 	if len(r.options.PVC.Spec.AccessModes) == 0 {
 		pv.Spec.AccessModes = r.plugin.GetAccessModes()
 	}

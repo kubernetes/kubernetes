@@ -167,6 +167,11 @@ func TestProvisioner(t *testing.T) {
 		PVC:                           volumetest.CreateTestPVC("1Gi", []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce}),
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
+
+	options.PVC.Spec.Selector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{"hostpath": "test"},
+	}
+
 	creator, err := plug.NewProvisioner(options)
 	if err != nil {
 		t.Fatalf("Failed to make a new Provisioner: %v", err)
@@ -195,6 +200,19 @@ func TestProvisioner(t *testing.T) {
 
 	if pv.Spec.PersistentVolumeReclaimPolicy != v1.PersistentVolumeReclaimDelete {
 		t.Errorf("Expected reclaim policy %+v but got %+v", v1.PersistentVolumeReclaimDelete, pv.Spec.PersistentVolumeReclaimPolicy)
+	}
+
+	if pv.Labels == nil {
+		t.Errorf("Expected label not nil, but nil")
+	}
+
+	if options.PVC.Spec.Selector != nil {
+		matchLabelMap := options.PVC.Spec.Selector.MatchLabels
+		for k, v := range matchLabelMap {
+			if v != pv.Labels[k] {
+				t.Errorf("PV has different labels with PVC")
+			}
+		}
 	}
 
 	os.RemoveAll(hostPathCreator.basePath)
