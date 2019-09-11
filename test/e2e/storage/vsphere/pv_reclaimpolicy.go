@@ -27,7 +27,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -132,7 +131,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 
 			ginkgo.By("Verify the volume is accessible and available in the pod")
 			verifyVSphereVolumesAccessible(c, pod, []*v1.PersistentVolume{pv})
-			e2elog.Logf("Verified that Volume is accessible in the POD after deleting PV claim")
+			framework.Logf("Verified that Volume is accessible in the POD after deleting PV claim")
 
 			ginkgo.By("Deleting the Pod")
 			framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod), "Failed to delete pod ", pod.Name)
@@ -179,7 +178,7 @@ var _ = utils.SIGDescribe("PersistentVolumes [Feature:ReclaimPolicy]", func() {
 			pvc = nil
 
 			ginkgo.By("Verify PV is retained")
-			e2elog.Logf("Waiting for PV %v to become Released", pv.Name)
+			framework.Logf("Waiting for PV %v to become Released", pv.Name)
 			err = framework.WaitForPersistentVolumePhase(v1.VolumeReleased, c, pv.Name, 3*time.Second, 300*time.Second)
 			framework.ExpectNoError(err)
 			framework.ExpectNoError(framework.DeletePersistentVolume(c, pv.Name), "Failed to delete PV ", pv.Name)

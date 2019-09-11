@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -113,7 +112,7 @@ var _ = utils.SIGDescribe("PersistentVolumes:vsphere", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		e2elog.Logf("AfterEach: Cleaning up test resources")
+		framework.Logf("AfterEach: Cleaning up test resources")
 		if c != nil {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod), "AfterEach: failed to delete pod ", clientPod.Name)
 

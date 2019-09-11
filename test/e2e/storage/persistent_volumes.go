@@ -29,7 +29,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -153,9 +152,9 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 		ginkgo.Context("with Single PV - PVC pairs", func() {
 			// Note: this is the only code where the pv is deleted.
 			ginkgo.AfterEach(func() {
-				e2elog.Logf("AfterEach: Cleaning up test resources.")
+				framework.Logf("AfterEach: Cleaning up test resources.")
 				if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-					e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
 			})
 
@@ -215,14 +214,14 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			var claims framework.PVCMap
 
 			ginkgo.AfterEach(func() {
-				e2elog.Logf("AfterEach: deleting %v PVCs and %v PVs...", len(claims), len(pvols))
+				framework.Logf("AfterEach: deleting %v PVCs and %v PVs...", len(claims), len(pvols))
 				errs := framework.PVPVCMapCleanup(c, ns, pvols, claims)
 				if len(errs) > 0 {
 					errmsg := []string{}
 					for _, e := range errs {
 						errmsg = append(errmsg, e.Error())
 					}
-					e2elog.Failf("AfterEach: Failed to delete 1 or more PVs/PVCs. Errors: %v", strings.Join(errmsg, "; "))
+					framework.Failf("AfterEach: Failed to delete 1 or more PVs/PVCs. Errors: %v", strings.Join(errmsg, "; "))
 				}
 			})
 
@@ -269,9 +268,9 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 			})
 
 			ginkgo.AfterEach(func() {
-				e2elog.Logf("AfterEach: Cleaning up test resources.")
+				framework.Logf("AfterEach: Cleaning up test resources.")
 				if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-					e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+					framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 				}
 			})
 
@@ -302,8 +301,9 @@ var _ = utils.SIGDescribe("PersistentVolumes", func() {
 				pod, err = c.CoreV1().Pods(ns).Create(pod)
 				framework.ExpectNoError(err)
 				framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespace(c, pod.Name, ns))
+
 				framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
-				e2elog.Logf("Pod exited without failure; the volume has been recycled.")
+				framework.Logf("Pod exited without failure; the volume has been recycled.")
 			})
 		})
 	})

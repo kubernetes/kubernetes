@@ -46,7 +46,6 @@ import (
 	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -70,28 +69,28 @@ func checkZoneFromLabelAndAffinity(pv *v1.PersistentVolume, zone string, matchZo
 func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, matchZones bool) {
 	ginkgo.By("checking PV's zone label and node affinity terms match expected zone")
 	if pv == nil {
-		e2elog.Failf("nil pv passed")
+		framework.Failf("nil pv passed")
 	}
 	pvLabel, ok := pv.Labels[v1.LabelZoneFailureDomain]
 	if !ok {
-		e2elog.Failf("label %s not found on PV", v1.LabelZoneFailureDomain)
+		framework.Failf("label %s not found on PV", v1.LabelZoneFailureDomain)
 	}
 
 	zonesFromLabel, err := volumehelpers.LabelZonesToSet(pvLabel)
 	if err != nil {
-		e2elog.Failf("unable to parse zone labels %s: %v", pvLabel, err)
+		framework.Failf("unable to parse zone labels %s: %v", pvLabel, err)
 	}
 	if matchZones && !zonesFromLabel.Equal(zones) {
-		e2elog.Failf("value[s] of %s label for PV: %v does not match expected zone[s]: %v", v1.LabelZoneFailureDomain, zonesFromLabel, zones)
+		framework.Failf("value[s] of %s label for PV: %v does not match expected zone[s]: %v", v1.LabelZoneFailureDomain, zonesFromLabel, zones)
 	}
 	if !matchZones && !zonesFromLabel.IsSuperset(zones) {
-		e2elog.Failf("value[s] of %s label for PV: %v does not contain expected zone[s]: %v", v1.LabelZoneFailureDomain, zonesFromLabel, zones)
+		framework.Failf("value[s] of %s label for PV: %v does not contain expected zone[s]: %v", v1.LabelZoneFailureDomain, zonesFromLabel, zones)
 	}
 	if pv.Spec.NodeAffinity == nil {
-		e2elog.Failf("node affinity not found in PV spec %v", pv.Spec)
+		framework.Failf("node affinity not found in PV spec %v", pv.Spec)
 	}
 	if len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-		e2elog.Failf("node selector terms not found in PV spec %v", pv.Spec)
+		framework.Failf("node selector terms not found in PV spec %v", pv.Spec)
 	}
 
 	for _, term := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
@@ -103,15 +102,15 @@ func checkZonesFromLabelAndAffinity(pv *v1.PersistentVolume, zones sets.String, 
 			keyFound = true
 			zonesFromNodeAffinity := sets.NewString(r.Values...)
 			if matchZones && !zonesFromNodeAffinity.Equal(zones) {
-				e2elog.Failf("zones from NodeAffinity of PV: %v does not equal expected zone[s]: %v", zonesFromNodeAffinity, zones)
+				framework.Failf("zones from NodeAffinity of PV: %v does not equal expected zone[s]: %v", zonesFromNodeAffinity, zones)
 			}
 			if !matchZones && !zonesFromNodeAffinity.IsSuperset(zones) {
-				e2elog.Failf("zones from NodeAffinity of PV: %v does not contain expected zone[s]: %v", zonesFromNodeAffinity, zones)
+				framework.Failf("zones from NodeAffinity of PV: %v does not contain expected zone[s]: %v", zonesFromNodeAffinity, zones)
 			}
 			break
 		}
 		if !keyFound {
-			e2elog.Failf("label %s not found in term %v", v1.LabelZoneFailureDomain, term)
+			framework.Failf("label %s not found in term %v", v1.LabelZoneFailureDomain, term)
 		}
 	}
 }
@@ -130,10 +129,10 @@ func checkAWSEBS(volume *v1.PersistentVolume, volumeType string, encrypted bool)
 	if len(zone) > 0 {
 		region := zone[:len(zone)-1]
 		cfg := aws.Config{Region: &region}
-		e2elog.Logf("using region %s", region)
+		framework.Logf("using region %s", region)
 		client = ec2.New(session.New(), &cfg)
 	} else {
-		e2elog.Logf("no region configured")
+		framework.Logf("no region configured")
 		client = ec2.New(session.New())
 	}
 
@@ -208,7 +207,7 @@ func testZonalDelayedBinding(c clientset.Interface, ns string, specifyAllowedTop
 	}
 	for _, test := range tests {
 		if !framework.ProviderIs(test.CloudProviders...) {
-			e2elog.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
+			framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
 			continue
 		}
 		action := "creating claims with class with waitForFirstConsumer"
@@ -234,14 +233,14 @@ func testZonalDelayedBinding(c clientset.Interface, ns string, specifyAllowedTop
 		}
 		pvs, node := test.TestBindingWaitForFirstConsumerMultiPVC(claims, nil /* node selector */, false /* expect unschedulable */)
 		if node == nil {
-			e2elog.Failf("unexpected nil node found")
+			framework.Failf("unexpected nil node found")
 		}
 		zone, ok := node.Labels[v1.LabelZoneFailureDomain]
 		if !ok {
-			e2elog.Failf("label %s not found on Node", v1.LabelZoneFailureDomain)
+			framework.Failf("label %s not found on Node", v1.LabelZoneFailureDomain)
 		}
 		if specifyAllowedTopology && topoZone != zone {
-			e2elog.Failf("zone specified in allowedTopologies: %s does not match zone of node where PV got provisioned: %s", topoZone, zone)
+			framework.Failf("zone specified in allowedTopologies: %s does not match zone of node where PV got provisioned: %s", topoZone, zone)
 		}
 		for _, pv := range pvs {
 			checkZoneFromLabelAndAffinity(pv, zone, true)
@@ -450,7 +449,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				test := t
 
 				if !framework.ProviderIs(test.CloudProviders...) {
-					e2elog.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
+					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
 					continue
 				}
 
@@ -590,7 +589,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, pvc.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			framework.ExpectError(err)
-			e2elog.Logf(err.Error())
+			framework.Logf(err.Error())
 		})
 
 		ginkgo.It("should test that deleting a claim before the volume is provisioned deletes the volume.", func() {
@@ -637,13 +636,13 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 
 			// Report indicators of regression
 			if len(residualPVs) > 0 {
-				e2elog.Logf("Remaining PersistentVolumes:")
+				framework.Logf("Remaining PersistentVolumes:")
 				for i, pv := range residualPVs {
-					e2elog.Logf("\t%d) %s", i+1, pv.Name)
+					framework.Logf("\t%d) %s", i+1, pv.Name)
 				}
-				e2elog.Failf("Expected 0 PersistentVolumes remaining. Found %d", len(residualPVs))
+				framework.Failf("Expected 0 PersistentVolumes remaining. Found %d", len(residualPVs))
 			}
-			e2elog.Logf("0 PersistentVolumes remain.")
+			framework.Logf("0 PersistentVolumes remain.")
 		})
 
 		ginkgo.It("deletion should be idempotent", func() {
@@ -798,7 +797,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName, scErr := framework.GetDefaultStorageClassName(c)
 			if scErr != nil {
-				e2elog.Failf(scErr.Error())
+				framework.Failf(scErr.Error())
 			}
 			test := testsuites.StorageClassTest{
 				Name:      "default",
@@ -824,7 +823,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			framework.ExpectError(err)
-			e2elog.Logf(err.Error())
+			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(claim.Status.Phase, v1.ClaimPending)
@@ -835,7 +834,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			framework.SkipUnlessProviderIs("openstack", "gce", "aws", "gke", "vsphere", "azure")
 			scName, scErr := framework.GetDefaultStorageClassName(c)
 			if scErr != nil {
-				e2elog.Failf(scErr.Error())
+				framework.Failf(scErr.Error())
 			}
 			test := testsuites.StorageClassTest{
 				Name:      "default",
@@ -861,7 +860,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			// The claim should timeout phase:Pending
 			err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, ns, claim.Name, 2*time.Second, framework.ClaimProvisionShortTimeout)
 			framework.ExpectError(err)
-			e2elog.Logf(err.Error())
+			framework.Logf(err.Error())
 			claim, err = c.CoreV1().PersistentVolumeClaims(ns).Get(claim.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(claim.Status.Phase, v1.ClaimPending)
@@ -913,7 +912,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			class, err := c.StorageV1().StorageClasses().Create(class)
 			framework.ExpectNoError(err)
 			defer func() {
-				e2elog.Logf("deleting storage class %s", class.Name)
+				framework.Logf("deleting storage class %s", class.Name)
 				framework.ExpectNoError(c.StorageV1().StorageClasses().Delete(class.Name, nil))
 			}()
 
@@ -926,10 +925,10 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			claim, err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
 			framework.ExpectNoError(err)
 			defer func() {
-				e2elog.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
+				framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 				err = c.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
 				if err != nil && !apierrs.IsNotFound(err) {
-					e2elog.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
+					framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 				}
 			}()
 
@@ -958,7 +957,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 				return false, nil
 			})
 			if err == wait.ErrWaitTimeout {
-				e2elog.Logf("The test missed event about failed provisioning, but checked that no volume was provisioned for %v", framework.ClaimProvisionTimeout)
+				framework.Logf("The test missed event about failed provisioning, but checked that no volume was provisioned for %v", framework.ClaimProvisionTimeout)
 				err = nil
 			}
 			framework.ExpectNoError(err)
@@ -990,7 +989,7 @@ var _ = utils.SIGDescribe("Dynamic Provisioning", func() {
 			}
 			for _, test := range tests {
 				if !framework.ProviderIs(test.CloudProviders...) {
-					e2elog.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
+					framework.Logf("Skipping %q: cloud providers is not %v", test.Name, test.CloudProviders)
 					continue
 				}
 				ginkgo.By("creating a claim with class with allowedTopologies set")

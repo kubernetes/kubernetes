@@ -26,7 +26,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -106,11 +105,11 @@ var _ = utils.SIGDescribe("PersistentVolumes GCEPD", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		e2elog.Logf("AfterEach: Cleaning up test resources")
+		framework.Logf("AfterEach: Cleaning up test resources")
 		if c != nil {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(c, clientPod))
 			if errs := framework.PVPVCCleanup(c, ns, pv, pvc); len(errs) > 0 {
-				e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			clientPod, pv, pvc, node = nil, nil, nil, ""
 			if diskName != "" {
