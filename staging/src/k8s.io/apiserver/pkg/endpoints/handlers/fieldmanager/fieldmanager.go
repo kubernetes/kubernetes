@@ -192,6 +192,11 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager 
 	if err := yaml.Unmarshal(patch, &patchObj.Object); err != nil {
 		return nil, fmt.Errorf("error decoding YAML: %v", err)
 	}
+
+	if patchObj.GetManagedFields() != nil {
+		return nil, fmt.Errorf("managed fields must be nil but was %v", patchObj.GetManagedFields())
+	}
+
 	if patchObj.GetAPIVersion() != f.groupVersion.String() {
 		return nil,
 			errors.NewBadRequest(
