@@ -283,7 +283,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Single Pod [Serial]", func() {
 		Description: The Pod with toleration timeout scheduled on a tainted Node MUST not be
 		evicted if the taint is removed before toleration time ends.
 	*/
-	framework.ConformanceIt("removing taint cancels eviction", func() {
+	framework.ConformanceIt("removing taint cancels eviction [Disruptive]", func() {
 		podName := "taint-eviction-4"
 		pod := createPodForTaintsTest(true, 2*additionalWaitPerDeleteSeconds, podName, podName, ns)
 		observedDeletions := make(chan string, 100)
@@ -413,7 +413,7 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		Description: In a multi-pods scenario with tolerationSeconds, the pods MUST be evicted as per
 		the toleration time limit.
 	*/
-	framework.ConformanceIt("evicts pods with minTolerationSeconds", func() {
+	framework.ConformanceIt("evicts pods with minTolerationSeconds [Disruptive]", func() {
 		podGroup := "taint-eviction-b"
 		observedDeletions := make(chan string, 100)
 		stopCh := make(chan struct{})
