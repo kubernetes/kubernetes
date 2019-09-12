@@ -70,6 +70,7 @@ go_test(
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
+        "//vendor/k8s.io/utils/pointer:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:android": [

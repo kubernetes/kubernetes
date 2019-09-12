@@ -75,6 +75,9 @@ type Options struct {
 
 	// Strip value validation.
 	StripValueValidation bool
+
+	// AllowNonStructural indicates swagger should be built for a schema that fits into the structural type but does not meet all structural invariants
+	AllowNonStructural bool
 }
 
 // BuildSwagger builds swagger for the given crd in the given version
@@ -88,17 +91,19 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, o
 	if s != nil && s.OpenAPIV3Schema != nil {
 		if !validation.SchemaHasInvalidTypes(s.OpenAPIV3Schema) {
 			if ss, err := structuralschema.NewStructural(s.OpenAPIV3Schema); err == nil {
-				// skip non-structural schemas
-				schema = ss
+				// skip non-structural schemas unless explicitly asked to produce swagger from them
+				if opts.AllowNonStructural || len(structuralschema.ValidateStructural(nil, ss)) == 0 {
+					schema = ss
 
-				if opts.StripDefaults {
-					schema = schema.StripDefaults()
-				}
-				if opts.StripValueValidation {
-					schema = schema.StripValueValidations()
-				}
+					if opts.StripDefaults {
+						schema = schema.StripDefaults()
+					}
+					if opts.StripValueValidation {
+						schema = schema.StripValueValidations()
+					}
 
-				schema = schema.Unfold()
+					schema = schema.Unfold()
+				}
 			}
 		}
 	}
@@ -334,12 +339,12 @@ func (b *builder) buildRoute(root, path, httpMethod, actionVerb, operationVerb s
 
 // buildKubeNative builds input schema with Kubernetes' native object meta, type meta and
 // extensions
-func (b *builder) buildKubeNative(schema *structuralschema.Structural, v2 bool) (ret *spec.Schema) {
+func (b *builder) buildKubeNative(schema *structuralschema.Structural, v2 bool, crdPreserveUnknownFields bool) (ret *spec.Schema) {
 	// only add properties if we have a schema. Otherwise, kubectl would (wrongly) assume additionalProperties=false
 	// and forbid anything outside of apiVersion, kind and metadata. We have to fix kubectl to stop doing this, e.g. by
 	// adding additionalProperties=true support to explicitly allow additional fields.
 	// TODO: fix kubectl to understand additionalProperties=true
-	if schema == nil || (v2 && schema.XPreserveUnknownFields) {
+	if schema == nil || (v2 && (schema.XPreserveUnknownFields || crdPreserveUnknownFields)) {
 		ret = &spec.Schema{
 			SchemaProps: spec.SchemaProps{Type: []string{"object"}},
 		}
@@ -506,7 +511,8 @@ func newBuilder(crd *apiextensions.CustomResourceDefinition, version string, sch
 	}
 
 	// Pre-build schema with Kubernetes native properties
-	b.schema = b.buildKubeNative(schema, v2)
+	preserveUnknownFields := crd.Spec.PreserveUnknownFields != nil && *crd.Spec.PreserveUnknownFields
+	b.schema = b.buildKubeNative(schema, v2, preserveUnknownFields)
 	b.listSchema = b.buildListSchema()
 
 	return b
