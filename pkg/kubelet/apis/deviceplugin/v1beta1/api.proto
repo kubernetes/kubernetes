@@ -1,4 +1,4 @@
-// To regenerate api.pb.go run hack/update-device-plugin.sh
+// To regenerate api.pb.go run hack/update-generated-device-plugin.sh
 syntax = 'proto3';
 
 package v1beta1;
@@ -120,6 +120,10 @@ message PreStartContainerResponse {
 //   the Devices requested
 message AllocateRequest {
 	repeated ContainerAllocateRequest container_requests = 1;
+	// UID, NameSpace and Name of Pod, to pass into device plugin
+	string podUID = 2;
+	string podNameSpace = 3;
+	string podName = 4;
 }
 
 message ContainerAllocateRequest {

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
@@ -35,7 +36,7 @@ import (
 type endpoint interface {
 	run()
 	stop()
-	allocate(devs []string) (*pluginapi.AllocateResponse, error)
+	allocate(pod *v1.Pod, devs []string) (*pluginapi.AllocateResponse, error)
 	preStartContainer(devs []string) (*pluginapi.PreStartContainerResponse, error)
 	callback(resourceName string, devices []pluginapi.Device)
 	isStopped() bool
@@ -139,11 +140,14 @@ func (e *endpointImpl) setStopTime(t time.Time) {
 }
 
 // allocate issues Allocate gRPC call to the device plugin.
-func (e *endpointImpl) allocate(devs []string) (*pluginapi.AllocateResponse, error) {
+func (e *endpointImpl) allocate(pod *v1.Pod, devs []string) (*pluginapi.AllocateResponse, error) {
 	if e.isStopped() {
 		return nil, fmt.Errorf(errEndpointStopped, e)
 	}
 	return e.client.Allocate(context.Background(), &pluginapi.AllocateRequest{
+		PodUID:       string(pod.UID),
+		PodNameSpace: pod.Namespace,
+		PodName:      pod.Name,
 		ContainerRequests: []*pluginapi.ContainerAllocateRequest{
 			{DevicesIDs: devs},
 		},

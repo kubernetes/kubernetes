@@ -23,6 +23,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 )
 
@@ -154,7 +157,14 @@ func TestAllocate(t *testing.T) {
 		t.FailNow()
 	}
 
-	respOut, err := e.allocate([]string{"ADeviceId"})
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       uuid.NewUUID(),
+			Namespace: "test_endpoint",
+			Name:      "test_endpoint_pod",
+		},
+	}
+	respOut, err := e.allocate(pod, []string{"ADeviceId"})
 	require.NoError(t, err)
 	require.Equal(t, resp, respOut)
 }
