@@ -17,8 +17,6 @@ limitations under the License.
 package metrics
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -43,7 +41,7 @@ var (
 			Subsystem:      VolumeSchedulerSubsystem,
 			Name:           "scheduling_duration_seconds",
 			Help:           "Volume scheduling stage latency",
-			Buckets:        prometheus.ExponentialBuckets(1000, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation"},
