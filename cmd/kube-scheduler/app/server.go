@@ -139,9 +139,6 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 	// Get the completed config
 	cc := c.Complete()
 
-	// To help debugging, immediately log version
-	klog.Infof("Version: %+v", version.Get())
-
 	// Apply algorithms based on feature gates.
 	// TODO: make configurable?
 	algorithmprovider.ApplyFeatureGates()
