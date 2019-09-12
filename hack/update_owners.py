@@ -30,7 +30,7 @@ import zlib
 
 
 BASE_DIR = pathlib.Path(__file__).resolve()
-OWNERS_PATH = str(BASE_DIR.parents[1] / 'test')
+OWNERS_PATH = str(BASE_DIR.parents[1] / 'test/test_owners.csv')
 OWNERS_JSON_PATH = OWNERS_PATH.replace('.csv', '.json')
 GCS_URL_BASE = 'https://storage.googleapis.com/kubernetes-test-history/'
 SKIP_MAINTAINERS = {
@@ -63,7 +63,7 @@ def get_test_names_from_test_history():
 
 
 def get_test_names_from_local_files():
-    tests_json = subprocess.check_output(['go', 'run', '../test/list/main.go', '-json'])
+    tests_json = subprocess.check_output(['go', 'run', str(BASE_DIR.parents[1]) + '/test/list/main.go', '-json'])
     tests = json.loads(tests_json)
     return {normalize(t['Name'] + (' ' + t['TestName'] if 'k8s.io/' not in t['Name'] else ''))
             for t in tests}
@@ -119,7 +119,7 @@ def get_maintainers():
 
 def detect_github_username():
     origin_url = subprocess.check_output(['git', 'config', 'remote.origin.url'])
-    m = re.search(r'github.com[:/](.*)/', origin_url)
+    m = re.search(r'github.com[:/](.*)/', str(origin_url))
     if m and m.group(1) != 'kubernetes':
         return m.group(1)
     raise ValueError('unable to determine GitHub user from '
@@ -131,7 +131,7 @@ def sig_prefixes(owners):
     # Precise test names aren't very interesting.
     owns = []
 
-    for test, (owner, random_assignment, sig) in owners.iteritems():
+    for test, (owner, random_assignment, sig) in owners.items():
         if 'k8s.io/' in test or not sig:
             continue
         owns.append([test, sig])
@@ -207,13 +207,13 @@ def main():
     if not options.addonly:
         print('# UNEXPECTED MAINTAINERS ')
         print('(randomly assigned, but not in kubernetes-maintainers)')
-        for name, (owner, random_assignment, _) in sorted(owners.iteritems()):
+        for name, (owner, random_assignment, _) in sorted(owners.items()):
             if random_assignment and owner not in maintainers:
                 print('%-16s %s' % (owner,name))
                 owners.pop(name)
 
     owner_counts = collections.Counter(
-        owner for name, (owner, random, sig) in owners.iteritems()
+        owner for name, (owner, random, sig) in owners.items()
         if owner in maintainers)
     for test_name in set(test_names) - set(owners):
         random_assignment = True
