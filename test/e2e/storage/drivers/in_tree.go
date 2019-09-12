@@ -702,8 +702,9 @@ func InitHostPathDriver() testsuites.TestDriver {
 				"", // Default fsType
 			),
 			Capabilities: map[testsuites.Capability]bool{
-				testsuites.CapPersistence: true,
-				testsuites.CapMultiPODs:   true,
+				testsuites.CapPersistence:      true,
+				testsuites.CapMultiPODs:        true,
+				testsuites.CapSingleNodeVolume: true,
 			},
 		},
 	}
@@ -776,8 +777,9 @@ func InitHostPathSymlinkDriver() testsuites.TestDriver {
 				"", // Default fsType
 			),
 			Capabilities: map[testsuites.Capability]bool{
-				testsuites.CapPersistence: true,
-				testsuites.CapMultiPODs:   true,
+				testsuites.CapPersistence:      true,
+				testsuites.CapMultiPODs:        true,
+				testsuites.CapSingleNodeVolume: true,
 			},
 		},
 	}
@@ -918,7 +920,8 @@ func InitEmptydirDriver() testsuites.TestDriver {
 				"", // Default fsType
 			),
 			Capabilities: map[testsuites.Capability]bool{
-				testsuites.CapExec: true,
+				testsuites.CapExec:             true,
+				testsuites.CapSingleNodeVolume: true,
 			},
 		},
 	}
@@ -1666,19 +1669,21 @@ type localVolume struct {
 var (
 	// capabilities
 	defaultLocalVolumeCapabilities = map[testsuites.Capability]bool{
-		testsuites.CapPersistence: true,
-		testsuites.CapFsGroup:     true,
-		testsuites.CapBlock:       false,
-		testsuites.CapExec:        true,
-		testsuites.CapMultiPODs:   true,
+		testsuites.CapPersistence:      true,
+		testsuites.CapFsGroup:          true,
+		testsuites.CapBlock:            false,
+		testsuites.CapExec:             true,
+		testsuites.CapMultiPODs:        true,
+		testsuites.CapSingleNodeVolume: true,
 	}
 	localVolumeCapabitilies = map[utils.LocalVolumeType]map[testsuites.Capability]bool{
 		utils.LocalVolumeBlock: {
-			testsuites.CapPersistence: true,
-			testsuites.CapFsGroup:     true,
-			testsuites.CapBlock:       true,
-			testsuites.CapExec:        true,
-			testsuites.CapMultiPODs:   true,
+			testsuites.CapPersistence:      true,
+			testsuites.CapFsGroup:          true,
+			testsuites.CapBlock:            true,
+			testsuites.CapExec:             true,
+			testsuites.CapMultiPODs:        true,
+			testsuites.CapSingleNodeVolume: true,
 		},
 	}
 	// fstype
