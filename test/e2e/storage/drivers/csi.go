@@ -86,7 +86,7 @@ var _ testsuites.SnapshottableTestDriver = &hostpathCSIDriver{}
 func InitHostPathCSIDriver() testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath",
 		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapDataSource: true,
-			testsuites.CapMultiPODs: true, testsuites.CapBlock: true},
+			testsuites.CapMultiPODs: true, testsuites.CapBlock: true, testsuites.CapSingleNodeVolume: true},
 		"test/e2e/testing-manifests/storage-csi/driver-registrar/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-attacher/rbac.yaml",
 		"test/e2e/testing-manifests/storage-csi/external-provisioner/rbac.yaml",
