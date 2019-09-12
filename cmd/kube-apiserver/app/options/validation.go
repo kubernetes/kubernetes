@@ -48,7 +48,7 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 	// Complete() expected to have set Primary* and Secondary*
 	// primary CIDR validation
 	var ones, bits = options.PrimaryServiceClusterIPRange.Mask.Size()
-	if bits-ones > 20 {
+	if bits-ones > 16 {
 		errs = append(errs, errors.New("specified --service-cluster-ip-range is too large"))
 	}
 
@@ -77,7 +77,7 @@ func validateClusterIPFlags(options *ServerRunOptions) []error {
 		// bigger cidr (specially those offered by IPv6) will add no value
 		// significantly increase snapshotting time.
 		var ones, bits = options.SecondaryServiceClusterIPRange.Mask.Size()
-		if bits-ones > 20 {
+		if bits-ones > 16 {
 			errs = append(errs, errors.New("specified --secondary-service-cluster-ip-range is too large"))
 		}
 	}
