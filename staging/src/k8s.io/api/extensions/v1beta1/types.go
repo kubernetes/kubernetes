@@ -985,7 +985,7 @@ type AllowedHostPath struct {
 // Deprecated: use FSType from policy API Group instead.
 type FSType string
 
-var (
+const (
 	AzureFile             FSType = "azureFile"
 	Flocker               FSType = "flocker"
 	FlexVolume            FSType = "flexVolume"
