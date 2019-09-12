@@ -253,7 +253,7 @@ func (r *reconciler) reconcileByPortMapping(
 
 	// 3. If there are still desired endpoints left at this point, we try to fit
 	//    the endpoints in a single existing slice. If there are no slices with
-	//    that capacity, we create new slices for the the endpoints.
+	//    that capacity, we create new slices for the endpoints.
 	slicesToCreate := []*discovery.EndpointSlice{}
 
 	for desiredSet.Len() > 0 {
