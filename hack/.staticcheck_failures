@@ -197,9 +197,7 @@ vendor/k8s.io/apiserver/pkg/storage
 vendor/k8s.io/apiserver/pkg/storage/cacher
 vendor/k8s.io/apiserver/pkg/storage/etcd3
 vendor/k8s.io/apiserver/pkg/storage/tests
-vendor/k8s.io/apiserver/pkg/storage/value/encrypt/aes
 vendor/k8s.io/apiserver/pkg/storage/value/encrypt/envelope
-vendor/k8s.io/apiserver/pkg/storage/value/encrypt/secretbox
 vendor/k8s.io/apiserver/pkg/util/webhook
 vendor/k8s.io/apiserver/pkg/util/wsstream
 vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
