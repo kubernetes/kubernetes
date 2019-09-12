@@ -156,7 +156,7 @@ function gke-internal-master-start {
   if [[ -n "${KUBE_BEARER_TOKEN:-}" ]]; then
     echo "setting up local admin kubeconfig"
     create-kubeconfig "local-admin" "${KUBE_BEARER_TOKEN}"
-    echo "export KUBECONFIG=/etc/srv/kubernetes/local-admin/kubeconfig" > /etc/profile.d/kube_env.sh
+    echo "export KUBECONFIG=/etc/srv/kubernetes/local-admin/kubeconfig" > /etc/profile.d/kubeconfig.sh
   fi
 
   echo "Internal GKE configuration done"
