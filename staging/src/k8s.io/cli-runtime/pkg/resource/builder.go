@@ -153,8 +153,9 @@ func (o *FilenameOptions) RequireFilenameOrKustomize() error {
 }
 
 type resourceTuple struct {
-	Resource string
-	Name     string
+	Namespace string
+	Resource  string
+	Name      string
 }
 
 type FakeClientFunc func(version schema.GroupVersion) (RESTClient, error)
@@ -652,14 +653,19 @@ func splitResourceTypeName(s string) (resourceTuple, bool, error) {
 		return resourceTuple{}, false, nil
 	}
 	seg := strings.Split(s, "/")
-	if len(seg) != 2 {
-		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form may not have more than one slash")
+	if len(seg) < 2 || len(seg) > 3 {
+		return resourceTuple{}, false, fmt.Errorf("arguments in namespace/resource/name form may not have more than two slashes")
 	}
-	resource, name := seg[0], seg[1]
+	var namespace, resource, name string
+	if len(seg) == 2 {
+		resource, name = seg[0], seg[1]
+	} else {
+		namespace, resource, name = seg[0], seg[1], seg[2]
+	}
 	if len(resource) == 0 || len(name) == 0 || len(SplitResourceArgument(resource)) != 1 {
 		return resourceTuple{}, false, fmt.Errorf("arguments in resource/name form must have a single resource and name")
 	}
-	return resourceTuple{Resource: resource, Name: name}, true, nil
+	return resourceTuple{Resource: resource, Name: name, Namespace: namespace}, true, nil
 }
 
 // Flatten will convert any objects with a field named "Items" that is an array of runtime.Object
@@ -946,7 +952,12 @@ func (b *Builder) visitByResource() *Result {
 			return result.withError(fmt.Errorf("could not find a client for resource %q", tuple.Resource))
 		}
 
-		selectorNamespace := b.namespace
+		var selectorNamespace string
+		if tuple.Namespace != "" {
+			selectorNamespace = tuple.Namespace
+		} else {
+			selectorNamespace = b.namespace
+		}
 		if mapping.Scope.Name() != meta.RESTScopeNameNamespace {
 			selectorNamespace = ""
 		} else {

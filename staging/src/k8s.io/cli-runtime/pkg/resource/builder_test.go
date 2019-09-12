@@ -49,7 +49,7 @@ import (
 	utiltesting "k8s.io/client-go/util/testing"
 
 	// TODO we need to remove this linkage and create our own scheme
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -867,6 +867,38 @@ func TestResourceByName(t *testing.T) {
 	}
 }
 
+func TestResourceByNameContainingNamespace(t *testing.T) {
+	pods, _ := testData()
+	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
+		"/namespaces/test/pods/foo": runtime.EncodeOrDie(corev1Codec, &pods.Items[0]),
+	})).NamespaceParam("test")
+
+	test := &testVisitor{}
+	singleItemImplied := false
+
+	if b.Do().Err() == nil {
+		t.Errorf("unexpected non-error")
+	}
+
+	b.ResourceTypeOrNameArgs(true, "test/pods/foo")
+
+	err := b.Do().IntoSingleItemImplied(&singleItemImplied).Visit(test.Handle)
+	if err != nil || !singleItemImplied || len(test.Infos) != 1 {
+		t.Fatalf("unexpected response: %v %t %#v", err, singleItemImplied, test.Infos)
+	}
+	if !apiequality.Semantic.DeepEqual(&pods.Items[0], test.Objects()[0]) {
+		t.Errorf("unexpected object: %#v", test.Objects()[0])
+	}
+
+	mapping, err := b.Do().ResourceMapping()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mapping.Resource != (schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}) {
+		t.Errorf("unexpected resource mapping: %#v", mapping)
+	}
+}
+
 func TestRestMappingErrors(t *testing.T) {
 	pods, _ := testData()
 	b := newDefaultBuilderWith(fakeClientWith("", t, map[string]string{
@@ -1205,6 +1237,10 @@ func TestResourceTuple(t *testing.T) {
 	}{
 		"valid": {
 			args:  []string{"pods/foo"},
+			errFn: expectNoErr,
+		},
+		"valid with namespace in name": {
+			args:  []string{"test/pods/foo"},
 			errFn: expectNoErr,
 		},
 		"valid multiple with name indirection": {
