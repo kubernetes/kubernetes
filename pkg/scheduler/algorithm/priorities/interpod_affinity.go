@@ -236,7 +236,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 		if maxMinDiff > 0 && pm.counts[node.Name] != nil {
 			fScore = float64(schedulerapi.MaxPriority) * (float64(*pm.counts[node.Name]-minCount) / float64(maxCount-minCount))
 		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int(fScore)})
+		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int64(fScore)})
 		if klog.V(10) {
 			klog.Infof("%v -> %v: InterPodAffinityPriority, Score: (%d)", pod.Name, node.Name, int(fScore))
 		}

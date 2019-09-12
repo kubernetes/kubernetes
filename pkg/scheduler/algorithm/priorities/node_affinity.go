@@ -69,7 +69,7 @@ func CalculateNodeAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *s
 
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
-		Score: int(count),
+		Score: int64(count),
 	}, nil
 }
 
