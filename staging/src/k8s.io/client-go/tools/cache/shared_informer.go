@@ -209,7 +209,7 @@ func WaitForNamedCacheSync(controllerName string, stopCh <-chan struct{}, cacheS
 // if the controller should shutdown
 // callers should prefer WaitForNamedCacheSync()
 func WaitForCacheSync(stopCh <-chan struct{}, cacheSyncs ...InformerSynced) bool {
-	err := wait.PollUntil(syncedPollPeriod,
+	err := wait.PollImmediateUntil(syncedPollPeriod,
 		func() (bool, error) {
 			for _, syncFunc := range cacheSyncs {
 				if !syncFunc() {
