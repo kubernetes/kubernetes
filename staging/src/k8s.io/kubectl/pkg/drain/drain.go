@@ -216,7 +216,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 	for _, pod := range pods {
 		go func(pod corev1.Pod, returnCh chan error) {
 			for {
-				fmt.Fprintf(d.Out, "evicting pod %q\n", pod.Name)
+				fmt.Fprintf(d.Out, "evicting pod %s/%s\n", pod.Namespace, pod.Name)
 				select {
 				case <-ctx.Done():
 					// return here or we'll leak a goroutine.
