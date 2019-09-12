@@ -88,9 +88,9 @@ func TestCommonDetachDisk(t *testing.T) {
 		expectedErr bool
 	}{
 		{
-			desc:        "an error shall be returned if there's no such instance corresponding to given nodeName",
+			desc:        "error should not be returned if there's no such instance corresponding to given nodeName",
 			nodeName:    "vm1",
-			expectedErr: true,
+			expectedErr: false,
 		},
 		{
 			desc:        "no error shall be returned if there's no matching disk according to given diskName",
