@@ -440,7 +440,7 @@ func TestGetAPIServerCommand(t *testing.T) {
 				"--requestheader-extra-headers-prefix=X-Remote-Extra-",
 				"--requestheader-client-ca-file=" + testCertsDir + "/front-proxy-ca.crt",
 				"--requestheader-allowed-names=front-proxy-client",
-				"--authorization-mode=Node,RBAC,ABAC",
+				"--authorization-mode=ABAC",
 				"--advertise-address=1.2.3.4",
 				fmt.Sprintf("--etcd-servers=https://127.0.0.1:%d", kubeadmconstants.EtcdListenClientPort),
 				"--etcd-cafile=" + testCertsDir + "/etcd/ca.crt",
@@ -500,7 +500,11 @@ func TestGetAPIServerCommand(t *testing.T) {
 				APIServer: kubeadmapi.APIServer{
 					ControlPlaneComponent: kubeadmapi.ControlPlaneComponent{
 						ExtraArgs: map[string]string{
-							"authorization-mode": kubeadmconstants.ModeWebhook,
+							"authorization-mode": strings.Join([]string{
+								kubeadmconstants.ModeNode,
+								kubeadmconstants.ModeRBAC,
+								kubeadmconstants.ModeWebhook,
+							}, ","),
 						},
 					},
 				},
@@ -950,54 +954,29 @@ func TestGetAuthzModes(t *testing.T) {
 			expected: "Node,RBAC",
 		},
 		{
-			name:     "add missing Node",
-			authMode: []string{kubeadmconstants.ModeRBAC},
+			name:     "default non empty",
+			authMode: []string{kubeadmconstants.ModeNode, kubeadmconstants.ModeRBAC},
 			expected: "Node,RBAC",
 		},
 		{
-			name:     "add missing RBAC",
-			authMode: []string{kubeadmconstants.ModeNode},
-			expected: "Node,RBAC",
-		},
-		{
-			name:     "add defaults to ABAC",
-			authMode: []string{kubeadmconstants.ModeABAC},
-			expected: "Node,RBAC,ABAC",
-		},
-		{
-			name:     "add defaults to RBAC+Webhook",
-			authMode: []string{kubeadmconstants.ModeRBAC, kubeadmconstants.ModeWebhook},
-			expected: "Node,RBAC,Webhook",
-		},
-		{
-			name:     "add default to Webhook",
-			authMode: []string{kubeadmconstants.ModeWebhook},
-			expected: "Node,RBAC,Webhook",
-		},
-		{
-			name:     "AlwaysAllow ignored",
-			authMode: []string{kubeadmconstants.ModeAlwaysAllow},
-			expected: "Node,RBAC",
-		},
-		{
-			name:     "AlwaysDeny ignored",
-			authMode: []string{kubeadmconstants.ModeAlwaysDeny},
-			expected: "Node,RBAC",
-		},
-		{
-			name:     "Unspecified ignored",
+			name:     "single unspecified returning default",
 			authMode: []string{"FooAuthzMode"},
 			expected: "Node,RBAC",
 		},
 		{
-			name:     "Multiple ignored",
-			authMode: []string{kubeadmconstants.ModeAlwaysAllow, kubeadmconstants.ModeAlwaysDeny, "foo"},
+			name:     "multiple ignored",
+			authMode: []string{kubeadmconstants.ModeNode, "foo", kubeadmconstants.ModeRBAC, "bar"},
 			expected: "Node,RBAC",
 		},
 		{
-			name:     "all",
-			authMode: []string{kubeadmconstants.ModeNode, kubeadmconstants.ModeRBAC, kubeadmconstants.ModeWebhook, kubeadmconstants.ModeABAC},
-			expected: "Node,RBAC,ABAC,Webhook",
+			name:     "single mode",
+			authMode: []string{kubeadmconstants.ModeAlwaysDeny},
+			expected: "AlwaysDeny",
+		},
+		{
+			name:     "multiple special order",
+			authMode: []string{kubeadmconstants.ModeNode, kubeadmconstants.ModeWebhook, kubeadmconstants.ModeRBAC, kubeadmconstants.ModeABAC},
+			expected: "Node,Webhook,RBAC,ABAC",
 		},
 	}
 
@@ -1005,7 +984,52 @@ func TestGetAuthzModes(t *testing.T) {
 		t.Run(rt.name, func(t *testing.T) {
 			actual := getAuthzModes(strings.Join(rt.authMode, ","))
 			if actual != rt.expected {
-				t.Errorf("failed getAuthzParameters:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+				t.Errorf("failed getAuthzModes:\nexpected:\n%v\nsaw:\n%v", rt.expected, actual)
+			}
+		})
+	}
+}
+
+func TestIsValidAuthzMode(t *testing.T) {
+	var tests = []struct {
+		mode  string
+		valid bool
+	}{
+		{
+			mode:  "Node",
+			valid: true,
+		},
+		{
+			mode:  "RBAC",
+			valid: true,
+		},
+		{
+			mode:  "ABAC",
+			valid: true,
+		},
+		{
+			mode:  "AlwaysAllow",
+			valid: true,
+		},
+		{
+			mode:  "Webhook",
+			valid: true,
+		},
+		{
+			mode:  "AlwaysDeny",
+			valid: true,
+		},
+		{
+			mode:  "Foo",
+			valid: false,
+		},
+	}
+
+	for _, rt := range tests {
+		t.Run(rt.mode, func(t *testing.T) {
+			isValid := isValidAuthzMode(rt.mode)
+			if isValid != rt.valid {
+				t.Errorf("failed isValidAuthzMode:\nexpected:\n%v\nsaw:\n%v", rt.valid, isValid)
 			}
 		})
 	}
