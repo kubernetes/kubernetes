@@ -55,25 +55,25 @@ import (
  * the metric stability policy.
  */
 var (
-	tunnelOpenCounter = metrics.NewCounter(
+	deprecatedTunnelOpenCounter = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Name:           "ssh_tunnel_open_count",
-			Help:           "Counter of ssh tunnel total open attempts",
+			Help:           "(Deprecated since v1.17) Counter of ssh tunnel total open attempts",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
-	tunnelOpenFailCounter = metrics.NewCounter(
+	deprecatedTunnelOpenFailCounter = metrics.NewCounter(
 		&metrics.CounterOpts{
 			Name:           "ssh_tunnel_open_fail_count",
-			Help:           "Counter of ssh tunnel failed open attempts",
+			Help:           "(Deprecated since v1.17) Counter of ssh tunnel failed open attempts",
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
 )
 
 func init() {
-	legacyregistry.MustRegister(tunnelOpenCounter)
-	legacyregistry.MustRegister(tunnelOpenFailCounter)
+	legacyregistry.MustRegister(deprecatedTunnelOpenCounter)
+	legacyregistry.MustRegister(deprecatedTunnelOpenFailCounter)
 }
 
 // TODO: Unit tests for this code, we can spin up a test SSH server with instructions here:
@@ -101,9 +101,9 @@ func makeSSHTunnel(user string, signer ssh.Signer, host string) (*sshTunnel, err
 func (s *sshTunnel) Open() error {
 	var err error
 	s.client, err = realTimeoutDialer.Dial("tcp", net.JoinHostPort(s.Host, s.SSHPort), s.Config)
-	tunnelOpenCounter.Inc()
+	deprecatedTunnelOpenCounter.Inc()
 	if err != nil {
-		tunnelOpenFailCounter.Inc()
+		deprecatedTunnelOpenFailCounter.Inc()
 	}
 	return err
 }
