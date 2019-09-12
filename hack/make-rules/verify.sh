@@ -33,7 +33,6 @@ source "${KUBE_ROOT}/third_party/forked/shell2junit/sh2ju.sh"
 EXCLUDED_PATTERNS=(
   "verify-all.sh"                # this script calls the make rule and would cause a loop
   "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
-  "verify-test-owners.sh"        # TODO(rmmh): figure out how to avoid endless conflicts
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
   "verify-import-aliases.sh"     # to be run periodically by folks working on conformance tests
   )
