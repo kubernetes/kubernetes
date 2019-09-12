@@ -135,7 +135,7 @@ func (h *kmsPluginProbe) Check() error {
 	h.l.Lock()
 	defer h.l.Unlock()
 
-	if (time.Now().Sub(h.lastResponse.received)) < kmsPluginHealthzTTL {
+	if (time.Since(h.lastResponse.received)) < kmsPluginHealthzTTL {
 		return h.lastResponse.err
 	}
 
