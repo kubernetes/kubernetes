@@ -75,6 +75,9 @@ type Options struct {
 
 	// Strip value validation.
 	StripValueValidation bool
+
+	// AllowNonStructural indicates swagger should be built for a schema that fits into the structural type but does not meet all structural invariants
+	AllowNonStructural bool
 }
 
 // BuildSwagger builds swagger for the given crd in the given version
@@ -88,17 +91,19 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, o
 	if s != nil && s.OpenAPIV3Schema != nil {
 		if !validation.SchemaHasInvalidTypes(s.OpenAPIV3Schema) {
 			if ss, err := structuralschema.NewStructural(s.OpenAPIV3Schema); err == nil {
-				// skip non-structural schemas
-				schema = ss
+				// skip non-structural schemas unless explicitly asked to produce swagger from them
+				if opts.AllowNonStructural || len(structuralschema.ValidateStructural(nil, ss)) == 0 {
+					schema = ss
 
-				if opts.StripDefaults {
-					schema = schema.StripDefaults()
-				}
-				if opts.StripValueValidation {
-					schema = schema.StripValueValidations()
-				}
+					if opts.StripDefaults {
+						schema = schema.StripDefaults()
+					}
+					if opts.StripValueValidation {
+						schema = schema.StripValueValidations()
+					}
 
-				schema = schema.Unfold()
+					schema = schema.Unfold()
+				}
 			}
 		}
 	}

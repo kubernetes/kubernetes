@@ -583,6 +583,13 @@ func TestBuildSwagger(t *testing.T) {
 			Options{V2: true, StripDefaults: true},
 		},
 		{
+			"with non-structural schema",
+			`{"type":"object","properties":{"foo":{"type":"array"}}}`,
+			nil,
+			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: true, StripDefaults: true},
+		},
+		{
 			"with spec.preseveUnknownFields=true",
 			`{"type":"object","properties":{"foo":{"type":"string"}}}`,
 			utilpointer.BoolPtr(true),
