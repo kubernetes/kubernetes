@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/selection"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/healthz"
 	"k8s.io/apiserver/pkg/server/mux"
@@ -88,6 +89,30 @@ const (
 	proxyModeIPTables    = "iptables"
 	proxyModeIPVS        = "ipvs"
 	proxyModeKernelspace = "kernelspace"
+
+	// KubeProxyConfig flag sets the location of the proxy server's configuration file.
+	KubeProxyConfig = "config"
+
+	// WriteConfigTo flag sets the path where the default configuration will be written.
+	WriteConfigTo = "write-config-to"
+
+	// MasterAPIServer flag sets the address of the Kubernetes API server.
+	MasterAPIServer = "master"
+
+	// HostNameOverride flag sets as identification instead of the actual hostname.
+	HostNameOverride = "hostname-override"
+
+	// CleanUP flag sets whether to clean iptables and ipvs rules.
+	CleanUP = "cleanup"
+
+	// CleanupIPVS flag sets whether to flush IPVS rules, in addition to normal cleanup.
+	CleanupIPVS = "cleanup-ipvs"
+
+	// HealthzPort flag sets the port for the healthz server to bind to.
+	HealthzPort = "healthz-port"
+
+	// MetricsPort flag sets the port for the metrics server to bind to.
+	MetricsPort = "metrics-port"
 )
 
 // proxyRun defines the interface to run a specified ProxyServer
@@ -287,6 +312,40 @@ func (o *Options) Validate(args []string) error {
 	return nil
 }
 
+// ValidateMixedArguments validates passed arguments.
+func (o *Options) ValidateMixedArguments(flag *pflag.FlagSet) error {
+	// If --config isn't set, we have nothing to validate
+	if !flag.Changed("config") {
+		return nil
+	}
+
+	mixedInvalidFlags := []string{}
+	flag.Visit(func(f *pflag.Flag) {
+		if isAllowedFlag(f.Name) {
+			// allowed flags can be set with --config
+			return
+		}
+		mixedInvalidFlags = append(mixedInvalidFlags, f.Name)
+	})
+
+	if len(mixedInvalidFlags) != 0 {
+		return fmt.Errorf("can not mix '--config' with arguments %v", mixedInvalidFlags)
+	}
+	return nil
+}
+
+func isAllowedFlag(flagName string) bool {
+	knownFlags := sets.NewString(KubeProxyConfig,
+		WriteConfigTo,
+		MasterAPIServer,
+		HostNameOverride,
+		CleanUP,
+		CleanupIPVS,
+		HealthzPort,
+		MetricsPort)
+	return knownFlags.Has(flagName)
+}
+
 // Run runs the specified ProxyServer.
 func (o *Options) Run() error {
 	defer close(o.errCh)
@@ -435,6 +494,9 @@ with the apiserver API to configure the proxy.`,
 
 			if err := opts.Complete(); err != nil {
 				klog.Fatalf("failed complete: %v", err)
+			}
+			if err := opts.ValidateMixedArguments(cmd.Flags()); err != nil {
+				klog.Exit(err)
 			}
 			if err := opts.Validate(args); err != nil {
 				klog.Fatalf("failed validate: %v", err)
