@@ -37,6 +37,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/test/integration/framework"
 
@@ -115,7 +116,7 @@ func initTestSchedulerWithOptions(
 
 	var err error
 	context.scheduler, err = createSchedulerWithPodInformer(
-		context.clientSet, podInformer, context.informerFactory, schedulerframework.NewRegistry(), nil,
+		context.clientSet, podInformer, context.informerFactory, schedulerplugins.NewDefaultRegistry(), nil,
 		[]schedulerconfig.PluginConfig{}, recorder, context.stopCh)
 
 	if err != nil {
