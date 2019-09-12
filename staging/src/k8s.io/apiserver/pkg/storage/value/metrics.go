@@ -20,7 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"google.golang.org/grpc/status"
 
 	"k8s.io/component-base/metrics"
@@ -49,7 +48,7 @@ var (
 			Help:      "Latencies in seconds of value transformation operations.",
 			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
 			// external KMS is involved latencies may climb into milliseconds.
-			Buckets:        prometheus.ExponentialBuckets(5e-6, 2, 14),
+			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 14),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"transformation_type"},
@@ -62,7 +61,7 @@ var (
 			Help:      "(Deprecated) Latencies in microseconds of value transformation operations.",
 			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
 			// external KMS is involved latencies may climb into milliseconds.
-			Buckets:        prometheus.ExponentialBuckets(5, 2, 14),
+			Buckets:        metrics.ExponentialBuckets(5, 2, 14),
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"transformation_type"},
@@ -106,7 +105,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "data_key_generation_duration_seconds",
 			Help:           "Latencies in seconds of data encryption key(DEK) generation operations.",
-			Buckets:        prometheus.ExponentialBuckets(5e-6, 2, 14),
+			Buckets:        metrics.ExponentialBuckets(5e-6, 2, 14),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -116,7 +115,7 @@ var (
 			Subsystem:      subsystem,
 			Name:           "data_key_generation_latencies_microseconds",
 			Help:           "(Deprecated) Latencies in microseconds of data encryption key(DEK) generation operations.",
-			Buckets:        prometheus.ExponentialBuckets(5, 2, 14),
+			Buckets:        metrics.ExponentialBuckets(5, 2, 14),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)

@@ -28,7 +28,6 @@ import (
 	"time"
 
 	restful "github.com/emicklei/go-restful"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/types"
@@ -109,7 +108,7 @@ var (
 			Name: "apiserver_request_latencies",
 			Help: "(Deprecated) Response latency distribution in microseconds for each verb, group, version, resource, subresource, scope and component.",
 			// Use buckets ranging from 125 ms to 8 seconds.
-			Buckets:        prometheus.ExponentialBuckets(125000, 2.0, 7),
+			Buckets:        compbasemetrics.ExponentialBuckets(125000, 2.0, 7),
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
@@ -130,7 +129,7 @@ var (
 			Name: "apiserver_response_sizes",
 			Help: "Response size distribution in bytes for each group, version, verb, resource, subresource, scope and component.",
 			// Use buckets ranging from 1000 bytes (1KB) to 10^9 bytes (1GB).
-			Buckets:        prometheus.ExponentialBuckets(1000, 10.0, 7),
+			Buckets:        compbasemetrics.ExponentialBuckets(1000, 10.0, 7),
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component"},
@@ -173,7 +172,7 @@ var (
 		&compbasemetrics.HistogramOpts{
 			Name:           "apiserver_watch_events_sizes",
 			Help:           "Watch event size distribution in bytes",
-			Buckets:        prometheus.ExponentialBuckets(1024, 2.0, 8), // 1K, 2K, 4K, 8K, ..., 128K.
+			Buckets:        compbasemetrics.ExponentialBuckets(1024, 2.0, 8), // 1K, 2K, 4K, 8K, ..., 128K.
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"group", "version", "kind"},
