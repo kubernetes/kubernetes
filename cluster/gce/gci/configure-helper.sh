@@ -1542,7 +1542,7 @@ function prepare-etcd-manifest {
     etcd_apiserver_creds=" --client-cert-auth --trusted-ca-file ${ETCD_APISERVER_CA_CERT_PATH} --cert-file ${ETCD_APISERVER_SERVER_CERT_PATH} --key-file ${ETCD_APISERVER_SERVER_KEY_PATH} "
     etcd_apiserver_protocol="https"
     etcd_livenessprobe_port="2382"
-    etcd_extra_args+=" --listen-metrics-urls=http://127.0.0.1:${etcd_livenessprobe_port} "
+    etcd_extra_args+=" --listen-metrics-urls=http://${ETCD_LISTEN_CLIENT_IP:-127.0.0.1}:${etcd_livenessprobe_port} "
   fi
 
   for host in $(echo "${INITIAL_ETCD_CLUSTER:-${host_name}}" | tr "," "\n"); do
