@@ -41,6 +41,7 @@ import (
 	openapiutil "k8s.io/kube-openapi/pkg/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/utils/crd"
+	utilpointer "k8s.io/utils/pointer"
 	"sigs.k8s.io/yaml"
 )
 
@@ -439,6 +440,7 @@ func setupCRDAndVerifySchema(f *framework.Framework, schema, expect []byte, grou
 
 		// set up validation when input schema isn't nil
 		if schema != nil {
+			crd.Spec.PreserveUnknownFields = utilpointer.BoolPtr(false)
 			crd.Spec.Validation = &v1beta1.CustomResourceValidation{
 				OpenAPIV3Schema: props,
 			}
