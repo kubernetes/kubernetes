@@ -32,6 +32,8 @@ import (
 	resourceclient "k8s.io/metrics/pkg/client/clientset/versioned/typed/metrics/v1beta1"
 	"k8s.io/metrics/pkg/client/custom_metrics"
 	"k8s.io/metrics/pkg/client/external_metrics"
+
+	"k8s.io/klog"
 )
 
 func startHPAController(ctx ControllerContext) (http.Handler, bool, error) {
@@ -88,7 +90,8 @@ func startHPAControllerWithMetricsClient(ctx ControllerContext, metricsClient me
 	scaleKindResolver := scale.NewDiscoveryScaleKindResolver(hpaClient.Discovery())
 	scaleClient, err := scale.NewForConfig(hpaClientConfig, ctx.RESTMapper, dynamic.LegacyAPIPathResolverFunc, scaleKindResolver)
 	if err != nil {
-		return nil, false, err
+		klog.Warningf("failed to start HPA controller: %s", err)
+		return nil, false, nil
 	}
 
 	go podautoscaler.NewHorizontalController(
