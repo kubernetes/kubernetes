@@ -163,7 +163,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 		namespacedName types.NamespacedName
 		endpointSlices []*discovery.EndpointSlice
 		hostname       string
-		expectedMap    map[ServicePortName]map[string]Endpoint
+		expectedMap    spToEndpointMap
 	}{
 		"simple use case with 3 endpoints": {
 			namespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"},
@@ -171,7 +171,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 			endpointSlices: []*discovery.EndpointSlice{
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80)}),
 			},
-			expectedMap: map[ServicePortName]map[string]Endpoint{
+			expectedMap: spToEndpointMap{
 				{NamespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"}, Port: "port-0"}: {
 					"10.0.1.1": &BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false},
 					"10.0.1.2": &BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
@@ -190,7 +190,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 
 		got := esCache.endpointInfoByServicePort(tc.namespacedName)
 		if !reflect.DeepEqual(got, tc.expectedMap) {
-			t.Errorf("[%s] endpointInfoByServicePort does not match. Want: %v, Got: %v", name, tc.expectedMap, got)
+			t.Errorf("[%s] endpointInfoByServicePort does not match. Want: %+v, Got: %+v", name, tc.expectedMap, got)
 		}
 
 	}
@@ -200,9 +200,9 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 	ipAddressType := discovery.AddressTypeIP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("%s-%d", serviceName, sliceNum),
-			Namespace:       namespace,
-			OwnerReferences: []metav1.OwnerReference{{Kind: "Service", Name: serviceName}},
+			Name:      fmt.Sprintf("%s-%d", serviceName, sliceNum),
+			Namespace: namespace,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports:       []discovery.EndpointPort{},
 		AddressType: &ipAddressType,

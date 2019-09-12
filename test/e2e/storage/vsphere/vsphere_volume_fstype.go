@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -95,7 +94,7 @@ var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 })
 
 func invokeTestForFstype(f *framework.Framework, client clientset.Interface, namespace string, fstype string, expectedContent string) {
-	e2elog.Logf("Invoking Test for fstype: %s", fstype)
+	framework.Logf("Invoking Test for fstype: %s", fstype)
 	scParameters := make(map[string]string)
 	scParameters["fstype"] = fstype
 

@@ -414,11 +414,6 @@ func AddServerSideApplyFlags(cmd *cobra.Command) {
 	cmd.Flags().String("field-manager", "kubectl", "Name of the manager used to track field ownership.")
 }
 
-func AddIncludeUninitializedFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool("include-uninitialized", false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
-	cmd.Flags().MarkDeprecated("include-uninitialized", "The Initializers feature has been removed. This flag is now a no-op, and will be removed in v1.15")
-}
-
 func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) {
 	cmd.Flags().Duration("pod-running-timeout", defaultTimeout, "The length of time (like 5s, 2m, or 3h, higher than zero) to wait until at least one pod is running")
 }

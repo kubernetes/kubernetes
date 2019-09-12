@@ -17,6 +17,7 @@ limitations under the License.
 package proxy
 
 import (
+	"fmt"
 	"sort"
 
 	"k8s.io/api/core/v1"
@@ -58,6 +59,10 @@ type endpointInfo struct {
 	Topology  map[string]string
 }
 
+// spToEndpointMap stores groups Endpoint objects by ServicePortName and
+// EndpointSlice name.
+type spToEndpointMap map[ServicePortName]map[string]Endpoint
+
 // NewEndpointSliceCache initializes an EndpointSliceCache.
 func NewEndpointSliceCache(hostname string, isIPv6Mode *bool, recorder record.EventRecorder, makeEndpointInfo makeEndpointFunc) *EndpointSliceCache {
 	if makeEndpointInfo == nil {
@@ -79,12 +84,12 @@ func standardEndpointInfo(ep *BaseEndpointInfo) Endpoint {
 
 // Update a slice in the cache.
 func (cache *EndpointSliceCache) Update(endpointSlice *discovery.EndpointSlice) {
-	serviceKey, sliceKey := endpointSliceCacheKeys(endpointSlice)
-	// This should never actually happen
-	if serviceKey.Name == "" || serviceKey.Namespace == "" || sliceKey == "" {
-		klog.Errorf("Invalid endpoint slice, name and owner reference required %v", endpointSlice)
+	serviceKey, sliceKey, err := endpointSliceCacheKeys(endpointSlice)
+	if err != nil {
+		klog.Warningf("Error getting endpoint slice cache keys: %v", err)
 		return
 	}
+
 	esInfo := &endpointSliceInfo{
 		Ports:     endpointSlice.Ports,
 		Endpoints: []*endpointInfo{},
@@ -105,7 +110,11 @@ func (cache *EndpointSliceCache) Update(endpointSlice *discovery.EndpointSlice) 
 
 // Delete a slice from the cache.
 func (cache *EndpointSliceCache) Delete(endpointSlice *discovery.EndpointSlice) {
-	serviceKey, sliceKey := endpointSliceCacheKeys(endpointSlice)
+	serviceKey, sliceKey, err := endpointSliceCacheKeys(endpointSlice)
+	if err != nil {
+		klog.Warningf("Error getting endpoint slice cache keys: %v", err)
+		return
+	}
 	delete(cache.sliceByServiceMap[serviceKey], sliceKey)
 }
 
@@ -116,10 +125,15 @@ func (cache *EndpointSliceCache) EndpointsMap(serviceNN types.NamespacedName) En
 }
 
 // endpointInfoByServicePort groups endpoint info by service port name and address.
-func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.NamespacedName) map[ServicePortName]map[string]Endpoint {
-	endpointInfoBySP := map[ServicePortName]map[string]Endpoint{}
+func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.NamespacedName) spToEndpointMap {
+	endpointInfoBySP := spToEndpointMap{}
+	sliceInfoByName, ok := cache.sliceByServiceMap[serviceNN]
 
-	for _, sliceInfo := range cache.sliceByServiceMap[serviceNN] {
+	if !ok {
+		return endpointInfoBySP
+	}
+
+	for _, sliceInfo := range sliceInfoByName {
 		for _, port := range sliceInfo.Ports {
 			if port.Name == nil {
 				klog.Warningf("ignoring port with nil name %v", port)
@@ -159,7 +173,7 @@ func (cache *EndpointSliceCache) addEndpointsByIP(serviceNN types.NamespacedName
 		if cache.isIPv6Mode != nil && utilnet.IsIPv6String(endpoint.Addresses[0]) != *cache.isIPv6Mode {
 			// Emit event on the corresponding service which had a different IP
 			// version than the endpoint.
-			utilproxy.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], serviceNN.Name, serviceNN.Namespace, "")
+			utilproxy.LogAndEmitIncorrectIPVersionEvent(cache.recorder, "endpointslice", endpoint.Addresses[0], serviceNN.Namespace, serviceNN.Name, "")
 			continue
 		}
 
@@ -214,16 +228,15 @@ func formatEndpointsList(endpoints []Endpoint) []string {
 }
 
 // endpointSliceCacheKeys returns cache keys used for a given EndpointSlice.
-func endpointSliceCacheKeys(endpointSlice *discovery.EndpointSlice) (types.NamespacedName, string) {
-	if len(endpointSlice.OwnerReferences) == 0 {
-		klog.Errorf("No owner reference set on endpoint slice: %s", endpointSlice.Name)
-		return types.NamespacedName{}, endpointSlice.Name
+func endpointSliceCacheKeys(endpointSlice *discovery.EndpointSlice) (types.NamespacedName, string, error) {
+	var err error
+	serviceName, ok := endpointSlice.Labels[discovery.LabelServiceName]
+	if !ok || serviceName == "" {
+		err = fmt.Errorf("No %s label set on endpoint slice: %s", discovery.LabelServiceName, endpointSlice.Name)
+	} else if endpointSlice.Namespace == "" || endpointSlice.Name == "" {
+		err = fmt.Errorf("Expected EndpointSlice name and namespace to be set: %v", endpointSlice)
 	}
-	if len(endpointSlice.OwnerReferences) > 1 {
-		klog.Errorf("More than 1 owner reference set on endpoint slice: %s", endpointSlice.Name)
-	}
-	ownerRef := endpointSlice.OwnerReferences[0]
-	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: ownerRef.Name}, endpointSlice.Name
+	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, err
 }
 
 // byIP helps sort endpoints by IP

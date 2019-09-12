@@ -55,7 +55,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -203,7 +202,7 @@ func (n *nfsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 	case testpatterns.DynamicPV:
 		// Do nothing
 	default:
-		e2elog.Failf("Unsupported volType:%v is specified", volType)
+		framework.Failf("Unsupported volType:%v is specified", volType)
 	}
 	return nil
 }
@@ -315,18 +314,18 @@ func (v *glusterVolume) DeleteVolume() {
 
 	name := v.prefix + "-server"
 
-	e2elog.Logf("Deleting Gluster endpoints %q...", name)
+	framework.Logf("Deleting Gluster endpoints %q...", name)
 	err := cs.CoreV1().Endpoints(ns.Name).Delete(name, nil)
 	if err != nil {
 		if !errors.IsNotFound(err) {
-			e2elog.Failf("Gluster delete endpoints failed: %v", err)
+			framework.Failf("Gluster delete endpoints failed: %v", err)
 		}
-		e2elog.Logf("Gluster endpoints %q not found, assuming deleted", name)
+		framework.Logf("Gluster endpoints %q not found, assuming deleted", name)
 	}
-	e2elog.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
+	framework.Logf("Deleting Gluster server pod %q...", v.serverPod.Name)
 	err = e2epod.DeletePodWithWait(cs, v.serverPod)
 	if err != nil {
-		e2elog.Failf("Gluster server pod delete failed: %v", err)
+		framework.Failf("Gluster server pod delete failed: %v", err)
 	}
 }
 
@@ -467,7 +466,7 @@ func InitRbdDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "rbd",
 			InTreePluginName: "kubernetes.io/rbd",
-			FeatureTag:       "[Feature:Volumes]",
+			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -596,7 +595,7 @@ func InitCephFSDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "ceph",
 			InTreePluginName: "kubernetes.io/cephfs",
-			FeatureTag:       "[Feature:Volumes]",
+			FeatureTag:       "[Feature:Volumes][Serial]",
 			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -988,6 +987,7 @@ func InitCinderDriver() testsuites.TestDriver {
 				testsuites.CapPersistence: true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
+				testsuites.CapBlock:       true,
 				// Cinder supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				testsuites.CapVolumeLimits: false,
@@ -1069,7 +1069,7 @@ func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 	ginkgo.By("creating a test Cinder volume")
 	output, err := exec.Command("cinder", "create", "--display-name="+volumeName, "1").CombinedOutput()
 	outputString := string(output[:])
-	e2elog.Logf("cinder output:\n%s", outputString)
+	framework.Logf("cinder output:\n%s", outputString)
 	framework.ExpectNoError(err)
 
 	// Parse 'id'' from stdout. Expected format:
@@ -1089,7 +1089,7 @@ func (c *cinderDriver) CreateVolume(config *testsuites.PerTestConfig, volType te
 		volumeID = fields[3]
 		break
 	}
-	e2elog.Logf("Volume ID: %s", volumeID)
+	framework.Logf("Volume ID: %s", volumeID)
 	framework.ExpectNotEqual(volumeID, "")
 	return &cinderVolume{
 		volumeName: volumeName,
@@ -1106,16 +1106,16 @@ func (v *cinderVolume) DeleteVolume() {
 	var err error
 	timeout := time.Second * 120
 
-	e2elog.Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
+	framework.Logf("Waiting up to %v for removal of cinder volume %s", timeout, name)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(5 * time.Second) {
 		output, err = exec.Command("cinder", "delete", name).CombinedOutput()
 		if err == nil {
-			e2elog.Logf("Cinder volume %s deleted", name)
+			framework.Logf("Cinder volume %s deleted", name)
 			return
 		}
-		e2elog.Logf("Failed to delete volume %s: %v", name, err)
+		framework.Logf("Failed to delete volume %s: %v", name, err)
 	}
-	e2elog.Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
+	framework.Logf("Giving up deleting volume %s: %v\n%s", name, err, string(output[:]))
 }
 
 // GCE
@@ -1441,10 +1441,12 @@ func (a *azureDriver) GetVolumeSource(readOnly bool, fsType string, volume tests
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
+	kind := v1.AzureManagedDisk
 	volSource := v1.VolumeSource{
 		AzureDisk: &v1.AzureDiskVolumeSource{
 			DiskName:    diskName,
 			DataDiskURI: av.volumeName,
+			Kind:        &kind,
 			ReadOnly:    &readOnly,
 		},
 	}
@@ -1460,10 +1462,12 @@ func (a *azureDriver) GetPersistentVolumeSource(readOnly bool, fsType string, vo
 
 	diskName := av.volumeName[(strings.LastIndex(av.volumeName, "/") + 1):]
 
+	kind := v1.AzureManagedDisk
 	pvSource := v1.PersistentVolumeSource{
 		AzureDisk: &v1.AzureDiskVolumeSource{
 			DiskName:    diskName,
 			DataDiskURI: av.volumeName,
+			Kind:        &kind,
 			ReadOnly:    &readOnly,
 		},
 	}
@@ -1499,6 +1503,13 @@ func (a *azureDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestCo
 
 func (a *azureDriver) CreateVolume(config *testsuites.PerTestConfig, volType testpatterns.TestVolType) testsuites.TestVolume {
 	ginkgo.By("creating a test azure disk volume")
+	if volType == testpatterns.InlineVolume {
+		// Volume will be created in framework.TestContext.CloudConfig.Zone zone,
+		// so pods should be also scheduled there.
+		config.ClientNodeSelector = map[string]string{
+			v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
+		}
+	}
 	volumeName, err := framework.CreatePDWithRetry()
 	framework.ExpectNoError(err)
 	return &azureVolume{
@@ -1786,7 +1797,7 @@ func (l *localDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 			ltr:    l.ltrMgr.Create(node, l.volumeType, nil),
 		}
 	default:
-		e2elog.Failf("Unsupported volType: %v is specified", volType)
+		framework.Failf("Unsupported volType: %v is specified", volType)
 	}
 	return nil
 }
@@ -1798,11 +1809,11 @@ func (v *localVolume) DeleteVolume() {
 func (l *localDriver) nodeAffinityForNode(node *v1.Node) *v1.VolumeNodeAffinity {
 	nodeKey := "kubernetes.io/hostname"
 	if node.Labels == nil {
-		e2elog.Failf("Node does not have labels")
+		framework.Failf("Node does not have labels")
 	}
 	nodeValue, found := node.Labels[nodeKey]
 	if !found {
-		e2elog.Failf("Node does not have required label %q", nodeKey)
+		framework.Failf("Node does not have required label %q", nodeKey)
 	}
 	return &v1.VolumeNodeAffinity{
 		Required: &v1.NodeSelector{

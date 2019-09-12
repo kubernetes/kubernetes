@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
@@ -146,7 +145,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			currentPvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
-			e2elog.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
+			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
 			_, err = ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
 			framework.ExpectError(err, "While updating non-expandable PVC")
 		})
@@ -173,7 +172,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			currentPvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
-			e2elog.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
+			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
 			newPVC, err := ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")
 			l.resource.pvc = newPVC
@@ -181,7 +180,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 			pvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			if pvcSize.Cmp(newSize) != 0 {
-				e2elog.Failf("error updating pvc size %q", l.resource.pvc.Name)
+				framework.Failf("error updating pvc size %q", l.resource.pvc.Name)
 			}
 
 			ginkgo.By("Waiting for cloudprovider resize to finish")
@@ -233,7 +232,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			currentPvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			newSize := currentPvcSize.DeepCopy()
 			newSize.Add(resource.MustParse("1Gi"))
-			e2elog.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
+			framework.Logf("currentPvcSize %v, newSize %v", currentPvcSize, newSize)
 			newPVC, err := ExpandPVCSize(l.resource.pvc, newSize, f.ClientSet)
 			framework.ExpectNoError(err, "While updating pvc for more size")
 			l.resource.pvc = newPVC
@@ -241,7 +240,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 			pvcSize := l.resource.pvc.Spec.Resources.Requests[v1.ResourceStorage]
 			if pvcSize.Cmp(newSize) != 0 {
-				e2elog.Failf("error updating pvc size %q", l.resource.pvc.Name)
+				framework.Failf("error updating pvc size %q", l.resource.pvc.Name)
 			}
 
 			ginkgo.By("Waiting for cloudprovider resize to finish")
@@ -276,7 +275,7 @@ func ExpandPVCSize(origPVC *v1.PersistentVolumeClaim, size resource.Quantity, c 
 		if err == nil {
 			return true, nil
 		}
-		e2elog.Logf("Error updating pvc %s with %v", pvcName, err)
+		framework.Logf("Error updating pvc %s with %v", pvcName, err)
 		return false, nil
 	})
 	return updatedPVC, waitErr

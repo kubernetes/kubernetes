@@ -33,7 +33,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -143,7 +142,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 			ClaimSize:        claimSize,
 			StorageClassName: &(l.sc.Name),
 		}, l.config.Framework.Namespace.Name)
-		e2elog.Logf("In creating storage class object and pvc objects for driver - sc: %v, pvc: %v, src-pvc: %v", l.sc, l.pvc, l.sourcePVC)
+		framework.Logf("In creating storage class object and pvc objects for driver - sc: %v, pvc: %v, src-pvc: %v", l.sc, l.pvc, l.sourcePVC)
 		l.testCase = &StorageClassTest{
 			Client:       l.config.Framework.ClientSet,
 			Claim:        l.pvc,
@@ -185,7 +184,7 @@ func (p *provisioningTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 		sDriver, ok := driver.(SnapshottableTestDriver)
 		if !ok {
-			e2elog.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
+			framework.Failf("Driver %q has CapSnapshotDataSource but does not implement SnapshottableTestDriver", dInfo.Name)
 		}
 
 		init()
@@ -245,7 +244,7 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 		class, err = client.StorageV1().StorageClasses().Get(class.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
-			e2elog.Logf("deleting storage class %s", class.Name)
+			framework.Logf("deleting storage class %s", class.Name)
 			framework.ExpectNoError(client.StorageV1().StorageClasses().Delete(class.Name, nil))
 		}()
 	}
@@ -254,11 +253,11 @@ func (t StorageClassTest) TestDynamicProvisioning() *v1.PersistentVolume {
 	claim, err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(claim)
 	framework.ExpectNoError(err)
 	defer func() {
-		e2elog.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
+		framework.Logf("deleting claim %q/%q", claim.Namespace, claim.Name)
 		// typically this claim has already been deleted
 		err = client.CoreV1().PersistentVolumeClaims(claim.Namespace).Delete(claim.Name, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
-			e2elog.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
+			framework.Failf("Error deleting claim %q. Error: %v", claim.Name, err)
 		}
 	}()
 
@@ -477,7 +476,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 		}
 		if len(errors) > 0 {
 			for claimName, err := range errors {
-				e2elog.Logf("Failed to delete PVC: %s due to error: %v", claimName, err)
+				framework.Logf("Failed to delete PVC: %s due to error: %v", claimName, err)
 			}
 		}
 	}()
@@ -511,7 +510,7 @@ func (t StorageClassTest) TestBindingWaitForFirstConsumerMultiPVC(claims []*v1.P
 	node, err := t.Client.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
 	framework.ExpectNoError(err)
 
-	ginkgo.By("re-checking the claims to see they binded")
+	ginkgo.By("re-checking the claims to see they bound")
 	var pvs []*v1.PersistentVolume
 	for _, claim := range createdClaims {
 		// Get new copy of the claim
@@ -596,9 +595,9 @@ func StopPod(c clientset.Interface, pod *v1.Pod) {
 	}
 	body, err := c.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{}).Do().Raw()
 	if err != nil {
-		e2elog.Logf("Error getting logs for pod %s: %v", pod.Name, err)
+		framework.Logf("Error getting logs for pod %s: %v", pod.Name, err)
 	} else {
-		e2elog.Logf("Pod %s has the following logs: %s", pod.Name, body)
+		framework.Logf("Pod %s has the following logs: %s", pod.Name, body)
 	}
 	e2epod.DeletePodOrFail(c, pod.Namespace, pod.Name)
 	e2epod.WaitForPodNoLongerRunningInNamespace(c, pod.Name, pod.Namespace)
@@ -667,19 +666,19 @@ func prepareSnapshotDataSourceForProvisioning(
 	}
 
 	cleanupFunc := func() {
-		e2elog.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
+		framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 		err = dynamicClient.Resource(snapshotGVR).Namespace(updatedClaim.Namespace).Delete(snapshot.GetName(), nil)
 		if err != nil && !apierrs.IsNotFound(err) {
-			e2elog.Failf("Error deleting snapshot %q. Error: %v", snapshot.GetName(), err)
+			framework.Failf("Error deleting snapshot %q. Error: %v", snapshot.GetName(), err)
 		}
 
-		e2elog.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
+		framework.Logf("deleting initClaim %q/%q", updatedClaim.Namespace, updatedClaim.Name)
 		err = client.CoreV1().PersistentVolumeClaims(updatedClaim.Namespace).Delete(updatedClaim.Name, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
-			e2elog.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
+			framework.Failf("Error deleting initClaim %q. Error: %v", updatedClaim.Name, err)
 		}
 
-		e2elog.Logf("deleting SnapshotClass %s", snapshotClass.GetName())
+		framework.Logf("deleting SnapshotClass %s", snapshotClass.GetName())
 		framework.ExpectNoError(dynamicClient.Resource(snapshotClassGVR).Delete(snapshotClass.GetName(), nil))
 	}
 
@@ -715,10 +714,10 @@ func preparePVCDataSourceForProvisioning(
 	}
 
 	cleanupFunc := func() {
-		e2elog.Logf("deleting source PVC %q/%q", sourcePVC.Namespace, sourcePVC.Name)
+		framework.Logf("deleting source PVC %q/%q", sourcePVC.Namespace, sourcePVC.Name)
 		err = client.CoreV1().PersistentVolumeClaims(sourcePVC.Namespace).Delete(sourcePVC.Name, nil)
 		if err != nil && !apierrs.IsNotFound(err) {
-			e2elog.Failf("Error deleting source PVC %q. Error: %v", sourcePVC.Name, err)
+			framework.Failf("Error deleting source PVC %q. Error: %v", sourcePVC.Name, err)
 		}
 	}
 

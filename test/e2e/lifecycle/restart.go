@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -63,7 +62,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		ginkgo.By("ensuring all nodes are ready")
 		originalNodes, err = e2enode.CheckReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
 		framework.ExpectNoError(err)
-		e2elog.Logf("Got the following nodes before restart: %v", nodeNames(originalNodes))
+		framework.Logf("Got the following nodes before restart: %v", nodeNames(originalNodes))
 
 		ginkgo.By("ensuring all pods are running and ready")
 		allPods := ps.List()
@@ -75,7 +74,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		}
 		if !e2epod.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, originalPodNames, framework.PodReadyBeforeTimeout) {
 			printStatusAndLogsForNotReadyPods(f.ClientSet, systemNamespace, originalPodNames, pods)
-			e2elog.Failf("At least one pod wasn't running and ready or succeeded at test start.")
+			framework.Failf("At least one pod wasn't running and ready or succeeded at test start.")
 		}
 	})
 
@@ -93,13 +92,13 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		ginkgo.By("ensuring all nodes are ready after the restart")
 		nodesAfter, err := e2enode.CheckReady(f.ClientSet, numNodes, framework.RestartNodeReadyAgainTimeout)
 		framework.ExpectNoError(err)
-		e2elog.Logf("Got the following nodes after restart: %v", nodeNames(nodesAfter))
+		framework.Logf("Got the following nodes after restart: %v", nodeNames(nodesAfter))
 
 		// Make sure that we have the same number of nodes. We're not checking
 		// that the names match because that's implementation specific.
 		ginkgo.By("ensuring the same number of nodes exist after the restart")
 		if len(originalNodes) != len(nodesAfter) {
-			e2elog.Failf("Had %d nodes before nodes were restarted, but now only have %d",
+			framework.Failf("Had %d nodes before nodes were restarted, but now only have %d",
 				len(originalNodes), len(nodesAfter))
 		}
 
@@ -114,7 +113,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		if !e2epod.CheckPodsRunningReadyOrSucceeded(f.ClientSet, systemNamespace, podNamesAfter, remaining) {
 			pods := ps.List()
 			printStatusAndLogsForNotReadyPods(f.ClientSet, systemNamespace, podNamesAfter, pods)
-			e2elog.Failf("At least one pod wasn't running and ready after the restart.")
+			framework.Failf("At least one pod wasn't running and ready after the restart.")
 		}
 	})
 })

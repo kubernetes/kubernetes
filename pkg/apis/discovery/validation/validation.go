@@ -36,10 +36,14 @@ var (
 	maxEndpoints           = 1000
 )
 
+// ValidateEndpointSliceName can be used to check whether the given endpoint
+// slice name is valid. Prefix indicates this name will be used as part of
+// generation, in which case trailing dashes are allowed.
+var ValidateEndpointSliceName = apimachineryvalidation.NameIsDNSSubdomain
+
 // ValidateEndpointSlice validates an EndpointSlice.
 func ValidateEndpointSlice(endpointSlice *discovery.EndpointSlice) field.ErrorList {
-	validateEndpointSliceName := apimachineryvalidation.NameIsDNSSubdomain
-	allErrs := apivalidation.ValidateObjectMeta(&endpointSlice.ObjectMeta, true, validateEndpointSliceName, field.NewPath("metadata"))
+	allErrs := apivalidation.ValidateObjectMeta(&endpointSlice.ObjectMeta, true, ValidateEndpointSliceName, field.NewPath("metadata"))
 
 	addrType := discovery.AddressType("")
 	if endpointSlice.AddressType == nil {

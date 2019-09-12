@@ -76,8 +76,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
@@ -429,11 +427,6 @@ func getDefaultClusterIPFamily(c clientset.Interface) string {
 	return "ipv4"
 }
 
-// ClusterIsIPv6 returns true if the cluster is IPv6
-func ClusterIsIPv6() bool {
-	return TestContext.IPFamily == "ipv6"
-}
-
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
@@ -475,9 +468,9 @@ func ProxyMode(f *Framework) (string, error) {
 			HostNetwork: true,
 			Containers: []v1.Container{
 				{
-					Name:    "detector",
-					Image:   AgnHostImage,
-					Command: []string{"pause"},
+					Name:  "detector",
+					Image: AgnHostImage,
+					Args:  []string{"pause"},
 				},
 			},
 		},
@@ -1893,47 +1886,6 @@ func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
 	return nodes
 }
 
-// Node is schedulable if:
-// 1) doesn't have "unschedulable" field set
-// 2) it's Ready condition is set to true
-// 3) doesn't have NetworkUnavailable condition set to true
-func isNodeSchedulable(node *v1.Node) bool {
-	nodeReady := e2enode.IsConditionSetAsExpected(node, v1.NodeReady, true)
-	networkReady := e2enode.IsConditionUnset(node, v1.NodeNetworkUnavailable) ||
-		e2enode.IsConditionSetAsExpectedSilent(node, v1.NodeNetworkUnavailable, false)
-	return !node.Spec.Unschedulable && nodeReady && networkReady
-}
-
-// Test whether a fake pod can be scheduled on "node", given its current taints.
-func isNodeUntainted(node *v1.Node) bool {
-	fakePod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "fake-not-scheduled",
-			Namespace: "fake-not-scheduled",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "fake-not-scheduled",
-					Image: "fake-not-scheduled",
-				},
-			},
-		},
-	}
-	nodeInfo := schedulernodeinfo.NewNodeInfo()
-	nodeInfo.SetNode(node)
-	fit, _, err := predicates.PodToleratesNodeTaints(fakePod, nil, nodeInfo)
-	if err != nil {
-		e2elog.Failf("Can't test predicates for node %s: %v", node.Name, err)
-		return false
-	}
-	return fit
-}
-
 // GetReadySchedulableNodesOrDie addresses the common use case of getting nodes you can do work on.
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
@@ -1944,7 +1896,7 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
 	// previous tests may have cause failures of some nodes. Let's skip
 	// 'Not Ready' nodes, just in case (there is no need to fail the test).
 	e2enode.Filter(nodes, func(node v1.Node) bool {
-		return isNodeSchedulable(&node) && isNodeUntainted(&node)
+		return e2enode.IsNodeSchedulable(&node) && e2enode.IsNodeUntainted(&node)
 	})
 	return nodes
 }
@@ -1954,58 +1906,11 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
 	e2elog.Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 
-	var notSchedulable []*v1.Node
-	attempt := 0
-	return wait.PollImmediate(30*time.Second, timeout, func() (bool, error) {
-		attempt++
-		notSchedulable = nil
-		opts := metav1.ListOptions{
-			ResourceVersion: "0",
-			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
-		}
-		nodes, err := c.CoreV1().Nodes().List(opts)
-		if err != nil {
-			e2elog.Logf("Unexpected error listing nodes: %v", err)
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		for i := range nodes.Items {
-			node := &nodes.Items[i]
-			if _, hasMasterRoleLabel := node.ObjectMeta.Labels["node-role.kubernetes.io/master"]; hasMasterRoleLabel {
-				// Kops clusters have masters with spec.unscheduable = false and
-				// node-role.kubernetes.io/master NoSchedule taint.
-				// Don't wait for them.
-				continue
-			}
-			if !isNodeSchedulable(node) || !isNodeUntainted(node) {
-				notSchedulable = append(notSchedulable, node)
-			}
-		}
-		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
-		// to make it possible e.g. for incorrect deployment of some small percentage
-		// of nodes (which we allow in cluster validation). Some nodes that are not
-		// provisioned correctly at startup will never become ready (e.g. when something
-		// won't install correctly), so we can't expect them to be ready at any point.
-		//
-		// However, we only allow non-ready nodes with some specific reasons.
-		if len(notSchedulable) > 0 {
-			// In large clusters, log them only every 10th pass.
-			if len(nodes.Items) < largeClusterThreshold || attempt%10 == 0 {
-				e2elog.Logf("Unschedulable nodes:")
-				for i := range notSchedulable {
-					e2elog.Logf("-> %s Ready=%t Network=%t Taints=%v",
-						notSchedulable[i].Name,
-						e2enode.IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
-						e2enode.IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false),
-						notSchedulable[i].Spec.Taints)
-				}
-				e2elog.Logf("================================")
-			}
-		}
-		return len(notSchedulable) <= TestContext.AllowedNotReadyNodes, nil
-	})
+	return wait.PollImmediate(
+		30*time.Second,
+		timeout,
+		e2enode.CheckReadyForTests(c, TestContext.NonblockingTaints, TestContext.AllowedNotReadyNodes, largeClusterThreshold),
+	)
 }
 
 // GetPodSecretUpdateTimeout reuturns the timeout duration for updating pod secret.

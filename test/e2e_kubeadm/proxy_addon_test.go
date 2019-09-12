@@ -61,7 +61,7 @@ var _ = KubeadmDescribe("proxy addon", func() {
 			ExpectServiceAccount(f.ClientSet, kubeSystemNamespace, kubeProxyServiceAccountName)
 		})
 
-		ginkgo.It("should be binded to the system:node-proxier cluster role", func() {
+		ginkgo.It("should be bound to the system:node-proxier cluster role", func() {
 			ExpectClusterRoleBindingWithSubjectAndRole(f.ClientSet,
 				kubeProxyClusterRoleBindingName,
 				rbacv1.ServiceAccountKind, kubeProxyServiceAccountName,

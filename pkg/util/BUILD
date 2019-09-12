@@ -40,7 +40,6 @@ filegroup(
         "//pkg/util/parsers:all-srcs",
         "//pkg/util/pod:all-srcs",
         "//pkg/util/procfs:all-srcs",
-        "//pkg/util/prometheusclientgo:all-srcs",
         "//pkg/util/removeall:all-srcs",
         "//pkg/util/resizefs:all-srcs",
         "//pkg/util/rlimit:all-srcs",
@@ -50,7 +49,6 @@ filegroup(
         "//pkg/util/tail:all-srcs",
         "//pkg/util/taints:all-srcs",
         "//pkg/util/tolerations:all-srcs",
-        "//pkg/util/workqueue/prometheus:all-srcs",
     ],
     tags = ["automanaged"],
 )

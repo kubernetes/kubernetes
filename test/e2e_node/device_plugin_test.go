@@ -28,13 +28,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
+	kubeletpodresourcesv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	dputil "k8s.io/kubernetes/test/e2e/framework/deviceplugin"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-
-	kubeletpodresourcesv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -71,7 +69,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 					dp.Spec.Containers[0].Env[i].Value = pluginSockDir
 				}
 			}
-			e2elog.Logf("env %v", dp.Spec.Containers[0].Env)
+			framework.Logf("env %v", dp.Spec.Containers[0].Env)
 			dp.Spec.NodeName = framework.TestContext.NodeName
 			ginkgo.By("Create sample device plugin pod")
 			devicePluginPod, err := f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(dp)
@@ -81,7 +79,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			gomega.Eventually(func() bool {
 				return dputil.NumberOfSampleResources(getLocalNode(f)) > 0
 			}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
-			e2elog.Logf("Successfully created device plugin pod")
+			framework.Logf("Successfully created device plugin pod")
 
 			ginkgo.By("Waiting for the resource exported by the sample device plugin to become available on the local node")
 			// TODO(vikasc): Instead of hard-coding number of devices, provide number of devices in the sample-device-plugin using configmap
@@ -103,7 +101,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 
 			podResources, err := getNodeDevices()
 			var resourcesForOurPod *kubeletpodresourcesv1alpha1.PodResources
-			e2elog.Logf("pod resources %v", podResources)
+			framework.Logf("pod resources %v", podResources)
 			gomega.Expect(err).To(gomega.BeNil())
 			framework.ExpectEqual(len(podResources.PodResources), 2)
 			for _, res := range podResources.GetPodResources() {
@@ -111,7 +109,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 					resourcesForOurPod = res
 				}
 			}
-			e2elog.Logf("resourcesForOurPod %v", resourcesForOurPod)
+			framework.Logf("resourcesForOurPod %v", resourcesForOurPod)
 			gomega.Expect(resourcesForOurPod).NotTo(gomega.BeNil())
 			framework.ExpectEqual(resourcesForOurPod.Name, pod1.Name)
 			framework.ExpectEqual(resourcesForOurPod.Namespace, pod1.Namespace)
@@ -158,7 +156,7 @@ func testDevicePlugin(f *framework.Framework, pluginSockDir string) {
 			framework.ExpectNoError(err)
 			waitForContainerRemoval(devicePluginPod.Spec.Containers[0].Name, devicePluginPod.Name, devicePluginPod.Namespace)
 			_, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Get(dp.Name, getOptions)
-			e2elog.Logf("Trying to get dp pod after deletion. err must be non-nil. err: %v", err)
+			framework.Logf("Trying to get dp pod after deletion. err must be non-nil. err: %v", err)
 			framework.ExpectError(err)
 
 			devicePluginPod, err = f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Create(dp)
@@ -266,7 +264,7 @@ func ensurePodContainerRestart(f *framework.Framework, podName string, contName 
 	var currentCount int32
 	p, err := f.PodClient().Get(podName, metav1.GetOptions{})
 	if err != nil || len(p.Status.ContainerStatuses) < 1 {
-		e2elog.Failf("ensurePodContainerRestart failed for pod %q: %v", podName, err)
+		framework.Failf("ensurePodContainerRestart failed for pod %q: %v", podName, err)
 	}
 	initialCount = p.Status.ContainerStatuses[0].RestartCount
 	gomega.Eventually(func() bool {
@@ -275,7 +273,7 @@ func ensurePodContainerRestart(f *framework.Framework, podName string, contName 
 			return false
 		}
 		currentCount = p.Status.ContainerStatuses[0].RestartCount
-		e2elog.Logf("initial %v, current %v", initialCount, currentCount)
+		framework.Logf("initial %v, current %v", initialCount, currentCount)
 		return currentCount > initialCount
 	}, 5*time.Minute, framework.Poll).Should(gomega.BeTrue())
 }
@@ -284,10 +282,10 @@ func ensurePodContainerRestart(f *framework.Framework, podName string, contName 
 func parseLog(f *framework.Framework, podName string, contName string, re string) string {
 	logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, contName)
 	if err != nil {
-		e2elog.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+		framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
 	}
 
-	e2elog.Logf("got pod logs: %v", logs)
+	framework.Logf("got pod logs: %v", logs)
 	regex := regexp.MustCompile(re)
 	matches := regex.FindStringSubmatch(logs)
 	if len(matches) < 2 {

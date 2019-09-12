@@ -50,8 +50,8 @@ var _ = SIGDescribe("DNS", func() {
 			fmt.Sprintf("kubernetes.default.svc.%s", framework.TestContext.ClusterDNSDomain),
 		}
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -72,8 +72,8 @@ var _ = SIGDescribe("DNS", func() {
 		}
 
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -94,8 +94,8 @@ var _ = SIGDescribe("DNS", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -114,8 +114,8 @@ var _ = SIGDescribe("DNS", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", dnsTestPodHostName, dnsTestServiceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostEntries := []string{hostFQDN, dnsTestPodHostName}
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
-		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostEntries, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostEntries, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -167,8 +167,8 @@ var _ = SIGDescribe("DNS", func() {
 		}
 
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -218,8 +218,8 @@ var _ = SIGDescribe("DNS", func() {
 		}
 
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, regularService.Spec.ClusterIP, "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -258,8 +258,8 @@ var _ = SIGDescribe("DNS", func() {
 		hostFQDN := fmt.Sprintf("%s.%s.%s.svc.%s", podHostname, serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		hostNames := []string{hostFQDN, podHostname}
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostNames, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
-		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostNames, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(nil, hostNames, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(nil, hostNames, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -301,8 +301,8 @@ var _ = SIGDescribe("DNS", func() {
 		subdomain := fmt.Sprintf("%s.%s.svc.%s", serviceName, f.Namespace.Name, framework.TestContext.ClusterDNSDomain)
 		namesToResolve := []string{hostFQDN, subdomain}
 		// TODO: Validate both IPv4 and IPv6 families for dual-stack
-		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
-		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.ClusterIsIPv6())
+		wheezyProbeCmd, wheezyFileNames := createProbeCommand(namesToResolve, nil, "", "wheezy", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
+		jessieProbeCmd, jessieFileNames := createProbeCommand(namesToResolve, nil, "", "jessie", f.Namespace.Name, framework.TestContext.ClusterDNSDomain, framework.TestContext.ClusterIsIPv6())
 		ginkgo.By("Running these commands on wheezy: " + wheezyProbeCmd + "\n")
 		ginkgo.By("Running these commands on jessie: " + jessieProbeCmd + "\n")
 
@@ -374,7 +374,7 @@ var _ = SIGDescribe("DNS", func() {
 		})
 		framework.ExpectNoError(err, "failed to change service type to ClusterIP for service: %s", serviceName)
 		targetRecord := "A"
-		if framework.ClusterIsIPv6() {
+		if framework.TestContext.ClusterIsIPv6() {
 			targetRecord = "AAAA"
 		}
 		// TODO: For dual stack we can run from here two createTargetedProbeCommand()

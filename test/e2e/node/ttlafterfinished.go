@@ -25,7 +25,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 )
@@ -44,7 +43,7 @@ func cleanupJob(f *framework.Framework, job *batchv1.Job) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
 
-	e2elog.Logf("Remove the Job's dummy finalizer; the Job should be deleted cascadingly")
+	framework.Logf("Remove the Job's dummy finalizer; the Job should be deleted cascadingly")
 	removeFinalizerFunc := func(j *batchv1.Job) {
 		j.ObjectMeta.Finalizers = slice.RemoveString(j.ObjectMeta.Finalizers, dummyFinalizer, nil)
 	}
@@ -70,19 +69,19 @@ func testFinishedJob(f *framework.Framework) {
 	job.ObjectMeta.Finalizers = []string{dummyFinalizer}
 	defer cleanupJob(f, job)
 
-	e2elog.Logf("Create a Job %s/%s with TTL", ns, job.Name)
+	framework.Logf("Create a Job %s/%s with TTL", ns, job.Name)
 	job, err := jobutil.CreateJob(c, ns, job)
 	framework.ExpectNoError(err)
 
-	e2elog.Logf("Wait for the Job to finish")
+	framework.Logf("Wait for the Job to finish")
 	err = jobutil.WaitForJobFinish(c, ns, job.Name)
 	framework.ExpectNoError(err)
 
-	e2elog.Logf("Wait for TTL after finished controller to delete the Job")
+	framework.Logf("Wait for TTL after finished controller to delete the Job")
 	err = jobutil.WaitForJobDeleting(c, ns, job.Name)
 	framework.ExpectNoError(err)
 
-	e2elog.Logf("Check Job's deletionTimestamp and compare with the time when the Job finished")
+	framework.Logf("Check Job's deletionTimestamp and compare with the time when the Job finished")
 	job, err = jobutil.GetJob(c, ns, job.Name)
 	framework.ExpectNoError(err)
 	finishTime := jobutil.FinishTime(job)

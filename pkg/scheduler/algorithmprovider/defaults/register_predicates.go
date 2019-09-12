@@ -23,10 +23,7 @@ import (
 
 func init() {
 	// Register functions that extract metadata used by predicates computations.
-	factory.RegisterPredicateMetadataProducerFactory(
-		func(args factory.PluginFactoryArgs) predicates.PredicateMetadataProducer {
-			return predicates.NewPredicateMetadataFactory(args.PodLister)
-		})
+	factory.RegisterPredicateMetadataProducer(predicates.GetPredicateMetadata)
 
 	// IMPORTANT NOTES for predicate developers:
 	// Registers predicates and priorities that are not enabled by default, but user can pick when creating their

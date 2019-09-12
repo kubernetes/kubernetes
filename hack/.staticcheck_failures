@@ -1,6 +1,5 @@
 cluster/images/etcd-version-monitor
 cluster/images/etcd/migrate
-cmd/controller-manager/app
 cmd/kube-controller-manager/app
 cmd/kube-proxy/app
 cmd/kube-scheduler/app
@@ -26,7 +25,6 @@ pkg/credentialprovider
 pkg/credentialprovider/aws
 pkg/credentialprovider/azure
 pkg/kubeapiserver/admission
-pkg/kubectl/cmd/cp
 pkg/kubectl/cmd/get
 pkg/kubelet/apis/podresources
 pkg/kubelet/cm/devicemanager
@@ -227,12 +225,10 @@ vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper
 vendor/k8s.io/kube-aggregator/pkg/controllers/autoregister
 vendor/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator
 vendor/k8s.io/kubectl/pkg/cmd/annotate
-vendor/k8s.io/kubectl/pkg/cmd/apply
 vendor/k8s.io/kubectl/pkg/cmd/certificates
 vendor/k8s.io/kubectl/pkg/cmd/config
 vendor/k8s.io/kubectl/pkg/cmd/edit
 vendor/k8s.io/kubectl/pkg/cmd/exec
-vendor/k8s.io/kubectl/pkg/cmd/label
 vendor/k8s.io/kubectl/pkg/cmd/proxy
 vendor/k8s.io/kubectl/pkg/cmd/rollingupdate
 vendor/k8s.io/kubectl/pkg/cmd/scale

@@ -1595,7 +1595,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				},
 				Status: corev1.PersistentVolumeClaimStatus{},
 			},
-			expectedElements: []string{"\nDataSource:\n  Name:      srcpvc\n  Kind:      PersistentVolumeClaim"},
+			expectedElements: []string{"\nDataSource:\n  Kind:      PersistentVolumeClaim\n  Name:      srcpvc"},
 		},
 		{
 			name: "snapshot-datasource",
@@ -1615,7 +1615,7 @@ func TestPersistentVolumeClaimDescriber(t *testing.T) {
 				},
 				Status: corev1.PersistentVolumeClaimStatus{},
 			},
-			expectedElements: []string{"DataSource:\n  Name:      src-snapshot\n  Kind:      VolumeSnapshot\n"},
+			expectedElements: []string{"DataSource:\n  APIGroup:  snapshot.storage.k8s.io\n  Kind:      VolumeSnapshot\n  Name:      src-snapshot\n"},
 		},
 	}
 

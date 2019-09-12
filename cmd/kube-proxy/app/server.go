@@ -252,6 +252,7 @@ func (o *Options) eventHandler(ent fsnotify.Event) {
 	if eventOpIs(fsnotify.Write) || eventOpIs(fsnotify.Rename) {
 		// error out when ConfigFile is updated
 		o.errCh <- fmt.Errorf("content of the proxy server's configuration file was updated")
+		return
 	}
 	o.errCh <- nil
 }

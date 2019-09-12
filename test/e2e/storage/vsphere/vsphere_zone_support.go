@@ -30,7 +30,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	volumeevents "k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -114,7 +113,7 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		zones = make([]string, 0)
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		if !(len(nodeList.Items) > 0) {
-			e2elog.Failf("Unable to find ready and schedulable Node")
+			framework.Failf("Unable to find ready and schedulable Node")
 		}
 	})
 
@@ -475,7 +474,7 @@ func verifyPVCCreationFails(client clientset.Interface, namespace string, scPara
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})
-	e2elog.Logf("Failure message : %+q", eventList.Items[0].Message)
+	framework.Logf("Failure message : %+q", eventList.Items[0].Message)
 	return fmt.Errorf("Failure message: %+q", eventList.Items[0].Message)
 }
 

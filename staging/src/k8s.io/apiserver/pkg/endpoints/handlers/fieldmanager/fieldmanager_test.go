@@ -22,6 +22,8 @@ import (
 	"net/http"
 	"testing"
 
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -58,12 +60,15 @@ func NewTestFieldManager() *fieldmanager.FieldManager {
 		Version: "v1",
 	}
 
-	return fieldmanager.NewCRDFieldManager(
+	f, _ := fieldmanager.NewCRDFieldManager(
+		nil,
 		&fakeObjectConvertor{},
 		&fakeObjectDefaulter{},
 		gv,
 		gv,
+		true,
 	)
+	return f
 }
 
 func TestFieldManagerCreation(t *testing.T) {
@@ -95,43 +100,103 @@ func TestUpdateOnlyDoesNotTrackManagedFields(t *testing.T) {
 	}
 }
 
+// TestUpdateApplyConflict tests that applying to an object, which wasn't created by apply, will give conflicts
+func TestUpdateApplyConflict(t *testing.T) {
+	f := NewTestFieldManager()
+
+	obj := &corev1.Pod{}
+	obj.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{{}}
+
+	patch := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+			"labels": {"app": "nginx"}
+		},
+		"spec": {
+                        "replicas": 3,
+                        "selector": {
+                                "matchLabels": {
+                                         "app": "nginx"
+                                }
+                        },
+                        "template": {
+                                "metadata": {
+                                        "labels": {
+                                                "app": "nginx"
+                                        }
+                                },
+                                "spec": {
+				        "containers": [{
+					        "name":  "nginx",
+					        "image": "nginx:latest"
+				        }]
+                                }
+                        }
+		}
+	}`)
+	newObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
+	if err := yaml.Unmarshal(patch, &newObj.Object); err != nil {
+		t.Fatalf("error decoding YAML: %v", err)
+	}
+
+	savedObject, err := f.Update(obj, newObj, "fieldmanager_test")
+	if err != nil {
+		t.Fatalf("failed to apply object: %v", err)
+	}
+
+	_, err = f.Apply(savedObject, []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+		},
+		"spec": {
+			"replicas": 101,
+		}
+	}`), "fieldmanager_conflict", false)
+	if err == nil || !apierrors.IsConflict(err) {
+		t.Fatalf("Expecting to get conflicts but got %v", err)
+	}
+}
+
 func TestApplyStripsFields(t *testing.T) {
 	f := NewTestFieldManager()
 
 	obj := &corev1.Pod{}
 	obj.ObjectMeta.ManagedFields = []metav1.ManagedFieldsEntry{{}}
 
-	newObj, err := f.Apply(obj, []byte(`{
-		"apiVersion": "apps/v1",
-		"kind": "Deployment",
-		"metadata": {
-			"name": "b",
-			"namespace": "b",
-			"creationTimestamp": "2016-05-19T09:59:00Z",
-			"selfLink": "b",
-			"uid": "b",
-			"clusterName": "b",
-			"generation": 0,
-			"managedFields": [{
-					"manager": "apply",
-					"operation": "Apply",
-					"apiVersion": "apps/v1",
-					"fields": {
-						"f:metadata": {
-							"f:labels": {
-								"f:test-label": {}
-							}
-						}
-					}
-				}],
-			"resourceVersion": "b"
-		}
-	}`), "fieldmanager_test", false)
+	newObj := &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "apps/v1",
+			Kind:       "Deployment",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:              "b",
+			Namespace:         "b",
+			CreationTimestamp: metav1.NewTime(time.Now()),
+			SelfLink:          "b",
+			UID:               "b",
+			ClusterName:       "b",
+			Generation:        0,
+			ManagedFields: []metav1.ManagedFieldsEntry{
+				{
+					Manager:    "update",
+					Operation:  metav1.ManagedFieldsOperationApply,
+					APIVersion: "apps/v1",
+				},
+			},
+			ResourceVersion: "b",
+		},
+	}
+
+	updatedObj, err := f.Update(obj, newObj, "fieldmanager_test")
 	if err != nil {
 		t.Fatalf("failed to apply object: %v", err)
 	}
 
-	accessor, err := meta.Accessor(newObj)
+	accessor, err := meta.Accessor(updatedObj)
 	if err != nil {
 		t.Fatalf("couldn't get accessor: %v", err)
 	}
@@ -463,5 +528,43 @@ func BenchmarkRepeatedUpdate(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func TestApplyFailsWithManagedFields(t *testing.T) {
+	f := NewTestFieldManager()
+
+	_, err := f.Apply(&corev1.Pod{}, []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Pod",
+		"metadata": {
+			"managedFields": [
+				{
+				  "manager": "test",
+				}
+			]
+		}
+	}`), "fieldmanager_test", false)
+
+	if err == nil {
+		t.Fatalf("successfully applied with set managed fields")
+	}
+}
+
+func TestApplySuccessWithNoManagedFields(t *testing.T) {
+	f := NewTestFieldManager()
+
+	_, err := f.Apply(&corev1.Pod{}, []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Pod",
+		"metadata": {
+			"labels": {
+				"a": "b"
+			},
+		}
+	}`), "fieldmanager_test", false)
+
+	if err != nil {
+		t.Fatalf("failed to apply object: %v", err)
 	}
 }

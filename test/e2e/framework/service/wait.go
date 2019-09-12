@@ -104,6 +104,7 @@ func WaitForServiceUpdatedWithFinalizer(cs clientset.Interface, namespace, name 
 		for _, finalizer := range svc.Finalizers {
 			if finalizer == servicehelper.LoadBalancerCleanupFinalizer {
 				foundFinalizer = true
+				break
 			}
 		}
 		if foundFinalizer != hasFinalizer {

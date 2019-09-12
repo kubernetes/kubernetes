@@ -137,7 +137,7 @@ type ScheduleAlgorithm interface {
 	// the pod by preempting lower priority pods if possible.
 	// It returns the node where preemption happened, a list of preempted pods, a
 	// list of pods whose nominated node name should be removed, and error if any.
-	Preempt(*v1.Pod, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
+	Preempt(*framework.PluginContext, *v1.Pod, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
 	// Predicates() returns a pointer to a map of predicate functions. This is
 	// exposed for testing.
 	Predicates() map[string]predicates.FitPredicate
@@ -317,7 +317,7 @@ func (g *genericScheduler) selectHost(priorityList schedulerapi.HostPriorityList
 // other pods with the same priority. The nominated pod prevents other pods from
 // using the nominated resources and the nominated pod could take a long time
 // before it is retried after many other pending pods.
-func (g *genericScheduler) Preempt(pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
+func (g *genericScheduler) Preempt(pluginContext *framework.PluginContext, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	// Scheduler may return various types of errors. Consider preemption only if
 	// the error is of type FitError.
 	fitError, ok := scheduleErr.(*FitError)
@@ -342,7 +342,7 @@ func (g *genericScheduler) Preempt(pod *v1.Pod, scheduleErr error) (*v1.Node, []
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	nodeToVictims, err := selectNodesForPreemption(pod, g.nodeInfoSnapshot.NodeInfoMap, potentialNodes, g.predicates,
+	nodeToVictims, err := g.selectNodesForPreemption(pluginContext, pod, g.nodeInfoSnapshot.NodeInfoMap, potentialNodes, g.predicates,
 		g.predicateMetaProducer, g.schedulingQueue, pdbs)
 	if err != nil {
 		return nil, nil, nil, err
@@ -489,7 +489,8 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 		checkNode := func(i int) {
 			nodeName := g.cache.NodeTree().Next()
 
-			fits, failedPredicates, err := podFitsOnNode(
+			fits, failedPredicates, status, err := g.podFitsOnNode(
+				pluginContext,
 				pod,
 				meta,
 				g.nodeInfoSnapshot.NodeInfoMap[nodeName],
@@ -504,18 +505,6 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 				return
 			}
 			if fits {
-				// Iterate each plugin to verify current node
-				status := g.framework.RunFilterPlugins(pluginContext, pod, nodeName)
-				if !status.IsSuccess() {
-					predicateResultLock.Lock()
-					filteredNodesStatuses[nodeName] = status
-					if !status.IsUnschedulable() {
-						errs[status.Message()]++
-					}
-					predicateResultLock.Unlock()
-					return
-				}
-
 				length := atomic.AddInt32(&filteredLen, 1)
 				if length > numNodesToFind {
 					cancel()
@@ -525,7 +514,12 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 				}
 			} else {
 				predicateResultLock.Lock()
-				failedPredicateMap[nodeName] = failedPredicates
+				if !status.IsSuccess() {
+					filteredNodesStatuses[nodeName] = status
+				}
+				if len(failedPredicates) != 0 {
+					failedPredicateMap[nodeName] = failedPredicates
+				}
 				predicateResultLock.Unlock()
 			}
 		}
@@ -595,7 +589,9 @@ func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
 		if util.GetPodPriority(p) >= util.GetPodPriority(pod) && p.UID != pod.UID {
 			nodeInfoOut.AddPod(p)
 			if metaOut != nil {
-				metaOut.AddPod(p, nodeInfoOut)
+				if err := metaOut.AddPod(p, nodeInfoOut); err != nil {
+					klog.Warningf("unable to add pod, nominated pod %s, incoming pod %s: %v", p.Name, pod.Name, err)
+				}
 			}
 			podsAdded = true
 		}
@@ -613,15 +609,17 @@ func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
 // When it is called from Preempt, we should remove the victims of preemption and
 // add the nominated pods. Removal of the victims is done by SelectVictimsOnNode().
 // It removes victims from meta and NodeInfo before calling this function.
-func podFitsOnNode(
+func (g *genericScheduler) podFitsOnNode(
+	pluginContext *framework.PluginContext,
 	pod *v1.Pod,
 	meta predicates.PredicateMetadata,
 	info *schedulernodeinfo.NodeInfo,
 	predicateFuncs map[string]predicates.FitPredicate,
 	queue internalqueue.SchedulingQueue,
 	alwaysCheckAllPredicates bool,
-) (bool, []predicates.PredicateFailureReason, error) {
+) (bool, []predicates.PredicateFailureReason, *framework.Status, error) {
 	var failedPredicates []predicates.PredicateFailureReason
+	var status *framework.Status
 
 	podsAdded := false
 	// We run predicates twice in some cases. If the node has greater or equal priority
@@ -660,7 +658,7 @@ func podFitsOnNode(
 			if predicate, exist := predicateFuncs[predicateKey]; exist {
 				fit, reasons, err = predicate(pod, metaToUse, nodeInfoToUse)
 				if err != nil {
-					return false, []predicates.PredicateFailureReason{}, err
+					return false, []predicates.PredicateFailureReason{}, nil, err
 				}
 
 				if !fit {
@@ -676,9 +674,14 @@ func podFitsOnNode(
 				}
 			}
 		}
+
+		status = g.framework.RunFilterPlugins(pluginContext, pod, info.Node().Name)
+		if !status.IsSuccess() && !status.IsUnschedulable() {
+			return false, failedPredicates, status, status.AsError()
+		}
 	}
 
-	return len(failedPredicates) == 0, failedPredicates, nil
+	return len(failedPredicates) == 0 && status.IsSuccess(), failedPredicates, status, nil
 }
 
 // PrioritizeNodes prioritizes the nodes by running the individual priority functions in parallel.
@@ -992,7 +995,9 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 
 // selectNodesForPreemption finds all the nodes with possible victims for
 // preemption in parallel.
-func selectNodesForPreemption(pod *v1.Pod,
+func (g *genericScheduler) selectNodesForPreemption(
+	pluginContext *framework.PluginContext,
+	pod *v1.Pod,
 	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 	potentialNodes []*v1.Node,
 	fitPredicates map[string]predicates.FitPredicate,
@@ -1011,7 +1016,7 @@ func selectNodesForPreemption(pod *v1.Pod,
 		if meta != nil {
 			metaCopy = meta.ShallowCopy()
 		}
-		pods, numPDBViolations, fits := selectVictimsOnNode(pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
+		pods, numPDBViolations, fits := g.selectVictimsOnNode(pluginContext, pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
 		if fits {
 			resultLock.Lock()
 			victims := schedulerapi.Victims{
@@ -1080,7 +1085,8 @@ func filterPodsWithPDBViolation(pods []interface{}, pdbs []*policy.PodDisruption
 // NOTE: This function assumes that it is never called if "pod" cannot be scheduled
 // due to pod affinity, node affinity, or node anti-affinity reasons. None of
 // these predicates can be satisfied by removing more pods from the node.
-func selectVictimsOnNode(
+func (g *genericScheduler) selectVictimsOnNode(
+	pluginContext *framework.PluginContext,
 	pod *v1.Pod,
 	meta predicates.PredicateMetadata,
 	nodeInfo *schedulernodeinfo.NodeInfo,
@@ -1094,17 +1100,25 @@ func selectVictimsOnNode(
 	potentialVictims := util.SortableList{CompFunc: util.MoreImportantPod}
 	nodeInfoCopy := nodeInfo.Clone()
 
-	removePod := func(rp *v1.Pod) {
-		nodeInfoCopy.RemovePod(rp)
-		if meta != nil {
-			meta.RemovePod(rp, nodeInfoCopy.Node())
+	removePod := func(rp *v1.Pod) error {
+		if err := nodeInfoCopy.RemovePod(rp); err != nil {
+			return err
 		}
+		if meta != nil {
+			if err := meta.RemovePod(rp, nodeInfoCopy.Node()); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
-	addPod := func(ap *v1.Pod) {
+	addPod := func(ap *v1.Pod) error {
 		nodeInfoCopy.AddPod(ap)
 		if meta != nil {
-			meta.AddPod(ap, nodeInfoCopy)
+			if err := meta.AddPod(ap, nodeInfoCopy); err != nil {
+				return err
+			}
 		}
+		return nil
 	}
 	// As the first step, remove all the lower priority pods from the node and
 	// check if the given pod can be scheduled.
@@ -1112,7 +1126,9 @@ func selectVictimsOnNode(
 	for _, p := range nodeInfoCopy.Pods() {
 		if util.GetPodPriority(p) < podPriority {
 			potentialVictims.Items = append(potentialVictims.Items, p)
-			removePod(p)
+			if err := removePod(p); err != nil {
+				return nil, 0, false
+			}
 		}
 	}
 	// If the new pod does not fit after removing all the lower priority pods,
@@ -1121,10 +1137,11 @@ func selectVictimsOnNode(
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
 	// priority pods is not a recommended configuration anyway.
-	if fits, _, err := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, queue, false); !fits {
+	if fits, _, _, err := g.podFitsOnNode(pluginContext, pod, meta, nodeInfoCopy, fitPredicates, queue, false); !fits {
 		if err != nil {
 			klog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
 		}
+
 		return nil, 0, false
 	}
 	var victims []*v1.Pod
@@ -1134,24 +1151,34 @@ func selectVictimsOnNode(
 	// violating victims and then other non-violating ones. In both cases, we start
 	// from the highest priority victims.
 	violatingVictims, nonViolatingVictims := filterPodsWithPDBViolation(potentialVictims.Items, pdbs)
-	reprievePod := func(p *v1.Pod) bool {
-		addPod(p)
-		fits, _, _ := podFitsOnNode(pod, meta, nodeInfoCopy, fitPredicates, queue, false)
+	reprievePod := func(p *v1.Pod) (bool, error) {
+		if err := addPod(p); err != nil {
+			return false, err
+		}
+		fits, _, _, _ := g.podFitsOnNode(pluginContext, pod, meta, nodeInfoCopy, fitPredicates, queue, false)
 		if !fits {
-			removePod(p)
+			if err := removePod(p); err != nil {
+				return false, err
+			}
 			victims = append(victims, p)
 			klog.V(5).Infof("Pod %v/%v is a potential preemption victim on node %v.", p.Namespace, p.Name, nodeInfo.Node().Name)
 		}
-		return fits
+		return fits, nil
 	}
 	for _, p := range violatingVictims {
-		if !reprievePod(p) {
+		if fits, err := reprievePod(p); err != nil {
+			klog.Warningf("Failed to reprieve pod %q: %v", p.Name, err)
+			return nil, 0, false
+		} else if !fits {
 			numViolatingVictim++
 		}
 	}
 	// Now we try to reprieve non-violating victims.
 	for _, p := range nonViolatingVictims {
-		reprievePod(p)
+		if _, err := reprievePod(p); err != nil {
+			klog.Warningf("Failed to reprieve pod %q: %v", p.Name, err)
+			return nil, 0, false
+		}
 	}
 	return victims, numViolatingVictim, true
 }

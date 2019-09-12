@@ -420,7 +420,7 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 	// Needs to create a new sandbox when readySandboxCount > 1 or the ready sandbox is not the latest one.
 	sandboxStatus := podStatus.SandboxStatuses[0]
 	if readySandboxCount > 1 {
-		klog.V(2).Infof("More than 1 sandboxes for pod %q are ready. Need to reconcile them", format.Pod(pod))
+		klog.V(2).Infof("Multiple sandboxes are ready for Pod %q. Need to reconcile them", format.Pod(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
 	}
 	if sandboxStatus.State != runtimeapi.PodSandboxState_SANDBOX_READY {
@@ -436,7 +436,7 @@ func (m *kubeGenericRuntimeManager) podSandboxChanged(pod *v1.Pod, podStatus *ku
 
 	// Needs to create a new sandbox when the sandbox does not have an IP address.
 	if !kubecontainer.IsHostNetworkPod(pod) && sandboxStatus.Network.Ip == "" {
-		klog.V(2).Infof("Sandbox for pod %q has no IP address.  Need to start a new one", format.Pod(pod))
+		klog.V(2).Infof("Sandbox for pod %q has no IP address. Need to start a new one", format.Pod(pod))
 		return true, sandboxStatus.Metadata.Attempt + 1, sandboxStatus.Id
 	}
 
@@ -712,7 +712,7 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 			if referr != nil {
 				klog.Errorf("Couldn't make a ref to pod %q: '%v'", format.Pod(pod), referr)
 			}
-			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed create pod sandbox: %v", err)
+			m.recorder.Eventf(ref, v1.EventTypeWarning, events.FailedCreatePodSandBox, "Failed to create pod sandbox: %v", err)
 			return
 		}
 		klog.V(4).Infof("Created PodSandbox %q for pod %q", podSandboxID, format.Pod(pod))

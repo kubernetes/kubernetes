@@ -112,13 +112,14 @@ func TestAddFlags(t *testing.T) {
 		"--proxy-client-key-file=/var/run/kubernetes/proxy.key",
 		"--request-timeout=2m",
 		"--storage-backend=etcd3",
+		"--service-cluster-ip-range=192.168.128.0/17",
 	}
 	fs.Parse(args)
 
 	// This is a snapshot of expected options parsed by args.
 	expected := &ServerRunOptions{
 		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
-		ServiceClusterIPRanges: kubeoptions.DefaultServiceIPCIDR.String(),
+		ServiceClusterIPRanges: (&net.IPNet{IP: net.ParseIP("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
 		MasterCount:            5,
 		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 		AllowPrivileged:        false,

@@ -179,7 +179,11 @@ func (ect *EndpointChangeTracker) EndpointSliceUpdate(endpointSlice *discovery.E
 		return false
 	}
 
-	namespacedName, _ := endpointSliceCacheKeys(endpointSlice)
+	namespacedName, _, err := endpointSliceCacheKeys(endpointSlice)
+	if err != nil {
+		klog.Warningf("Error getting endpoint slice cache keys: %v", err)
+		return false
+	}
 
 	metrics.EndpointChangesTotal.Inc()
 
@@ -323,7 +327,7 @@ func (ect *EndpointChangeTracker) endpointsToEndpointsMap(endpoints *v1.Endpoint
 				if ect.isIPv6Mode != nil && utilnet.IsIPv6String(addr.IP) != *ect.isIPv6Mode {
 					// Emit event on the corresponding service which had a different
 					// IP version than the endpoint.
-					utilproxy.LogAndEmitIncorrectIPVersionEvent(ect.recorder, "endpoints", addr.IP, endpoints.Name, endpoints.Namespace, "")
+					utilproxy.LogAndEmitIncorrectIPVersionEvent(ect.recorder, "endpoints", addr.IP, endpoints.Namespace, endpoints.Name, "")
 					continue
 				}
 				isLocal := addr.NodeName != nil && *addr.NodeName == ect.hostname

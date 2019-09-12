@@ -86,6 +86,29 @@ type JSONSchemaProps struct {
 	//      - type: string
 	//    - ... zero or more
 	XIntOrString bool
+
+	// x-kubernetes-list-map-keys annotates an array with the x-kubernetes-list-type `map` by specifying the keys used
+	// as the index of the map.
+	//
+	// This tag MUST only be used on lists that have the "x-kubernetes-list-type"
+	// extension set to "map". Also, the values specified for this attribute must
+	// be a scalar typed field of the child structure (no nesting is supported).
+	XListMapKeys []string
+
+	// x-kubernetes-list-type annotates an array to further describe its topology.
+	// This extension must only be used on lists and may have 3 possible values:
+	//
+	// 1) `atomic`: the list is treated as a single entity, like a scalar.
+	//      Atomic lists will be entirely replaced when updated. This extension
+	//      may be used on any type of list (struct, scalar, ...).
+	// 2) `set`:
+	//      Sets are lists that must not have multiple items with the same value. Each
+	//      value must be a scalar (or another atomic type).
+	// 3) `map`:
+	//      These lists are like maps in that their elements have a non-index key
+	//      used to identify them. Order is preserved upon merge. The map tag
+	//      must only be used on a list with elements of type object.
+	XListType *string
 }
 
 // JSON represents any valid JSON value.

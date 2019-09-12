@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 
@@ -47,7 +46,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 		gomega.Expect(err).To(gomega.BeNil())
 		systemPodsNo = int32(len(systemPods))
 		if strings.Index(framework.TestContext.CloudConfig.NodeInstanceGroup, ",") >= 0 {
-			e2elog.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
+			framework.Failf("Test dose not support cluster setup with more than one MIG: %s", framework.TestContext.CloudConfig.NodeInstanceGroup)
 		} else {
 			group = framework.TestContext.CloudConfig.NodeInstanceGroup
 		}
@@ -70,7 +69,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 
 			ginkgo.By("restoring the original node instance group size")
 			if err := framework.ResizeGroup(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
-				e2elog.Failf("Couldn't restore the original node instance group size: %v", err)
+				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 			// In GKE, our current tunneling setup has the potential to hold on to a broken tunnel (from a
 			// rebooted/deleted node) for up to 5 minutes before all tunnels are dropped and recreated.
@@ -85,11 +84,11 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 				time.Sleep(5 * time.Minute)
 			}
 			if err := framework.WaitForGroupSize(group, int32(framework.TestContext.CloudConfig.NumNodes)); err != nil {
-				e2elog.Failf("Couldn't restore the original node instance group size: %v", err)
+				framework.Failf("Couldn't restore the original node instance group size: %v", err)
 			}
 
 			if err := e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes, 10*time.Minute); err != nil {
-				e2elog.Failf("Couldn't restore the original cluster size: %v", err)
+				framework.Failf("Couldn't restore the original cluster size: %v", err)
 			}
 			// Many e2e tests assume that the cluster is fully healthy before they start.  Wait until
 			// the cluster is restored to health.
@@ -111,7 +110,7 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 				pass := true
 				for _, node := range originalNodes.Items {
 					if _, err := leaseClient.Get(node.ObjectMeta.Name, metav1.GetOptions{}); err != nil {
-						e2elog.Logf("Try to get lease of node %s, but got error: %v", node.ObjectMeta.Name, err)
+						framework.Logf("Try to get lease of node %s, but got error: %v", node.ObjectMeta.Name, err)
 						pass = false
 					}
 				}

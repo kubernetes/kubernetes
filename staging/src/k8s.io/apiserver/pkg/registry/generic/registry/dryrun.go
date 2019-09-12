@@ -90,6 +90,9 @@ func (s *DryRunnableStorage) GuaranteedUpdate(
 			return err
 		}
 		rev, err := s.Versioner().ObjectResourceVersion(ptrToType)
+		if err != nil {
+			return err
+		}
 		out, _, err := tryUpdate(ptrToType, storage.ResponseMeta{ResourceVersion: rev})
 		if err != nil {
 			return err

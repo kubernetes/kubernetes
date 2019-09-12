@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -44,11 +43,6 @@ type PredicateMetadata interface {
 
 // PredicateMetadataProducer is a function that computes predicate metadata for a given pod.
 type PredicateMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata
-
-// PredicateMetadataFactory defines a factory of predicate metadata.
-type PredicateMetadataFactory struct {
-	podLister algorithm.PodLister
-}
 
 // AntiAffinityTerm's topology key value used in predicate metadata
 type topologyPair struct {
@@ -190,16 +184,8 @@ func RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtende
 	})
 }
 
-// NewPredicateMetadataFactory creates a PredicateMetadataFactory.
-func NewPredicateMetadataFactory(podLister algorithm.PodLister) PredicateMetadataProducer {
-	factory := &PredicateMetadataFactory{
-		podLister,
-	}
-	return factory.GetMetadata
-}
-
-// GetMetadata returns the predicateMetadata used which will be used by various predicates.
-func (pfactory *PredicateMetadataFactory) GetMetadata(pod *v1.Pod, nodeNameToInfoMap map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata {
+// GetPredicateMetadata returns the predicateMetadata which will be used by various predicates.
+func GetPredicateMetadata(pod *v1.Pod, nodeNameToInfoMap map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil

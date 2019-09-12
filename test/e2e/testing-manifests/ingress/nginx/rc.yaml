@@ -48,3 +48,4 @@ spec:
         args:
         - /nginx-ingress-controller
         - --default-backend-service=kube-system/default-http-backend
+        - --publish-service=$(POD_NAMESPACE)/nginx-ingress-lb

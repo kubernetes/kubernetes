@@ -306,7 +306,7 @@ func CreateKubeAPIServerConfig(
 		PerConnectionBandwidthLimitBytesPerSec: s.MaxConnectionBytesPerSec,
 	})
 
-	serviceIPRange, apiServerServiceIP, lastErr := master.DefaultServiceIPRange(s.PrimaryServiceClusterIPRange)
+	serviceIPRange, apiServerServiceIP, lastErr := master.ServiceIPRange(s.PrimaryServiceClusterIPRange)
 	if lastErr != nil {
 		return
 	}
@@ -315,7 +315,7 @@ func CreateKubeAPIServerConfig(
 	var secondaryServiceIPRange net.IPNet
 	// process secondary range only if provided by user
 	if s.SecondaryServiceClusterIPRange.IP != nil {
-		secondaryServiceIPRange, _, lastErr = master.DefaultServiceIPRange(s.SecondaryServiceClusterIPRange)
+		secondaryServiceIPRange, _, lastErr = master.ServiceIPRange(s.SecondaryServiceClusterIPRange)
 		if lastErr != nil {
 			return
 		}
@@ -575,7 +575,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	// nothing provided by user, use default range (only applies to the Primary)
 	if len(serviceClusterIPRangeList) == 0 {
 		var primaryServiceClusterCIDR net.IPNet
-		serviceIPRange, apiServerServiceIP, err = master.DefaultServiceIPRange(primaryServiceClusterCIDR)
+		serviceIPRange, apiServerServiceIP, err = master.ServiceIPRange(primaryServiceClusterCIDR)
 		if err != nil {
 			return options, fmt.Errorf("error determining service IP ranges: %v", err)
 		}
@@ -588,7 +588,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 			return options, fmt.Errorf("service-cluster-ip-range[0] is not a valid cidr")
 		}
 
-		serviceIPRange, apiServerServiceIP, err = master.DefaultServiceIPRange(*(primaryServiceClusterCIDR))
+		serviceIPRange, apiServerServiceIP, err = master.ServiceIPRange(*(primaryServiceClusterCIDR))
 		if err != nil {
 			return options, fmt.Errorf("error determining service IP ranges for primary service cidr: %v", err)
 		}
@@ -628,7 +628,7 @@ func Complete(s *options.ServerRunOptions) (completedServerRunOptions, error) {
 	// Use (ServiceAccountSigningKeyFile != "") as a proxy to the user enabling
 	// TokenRequest functionality. This defaulting was convenient, but messed up
 	// a lot of people when they rotated their serving cert with no idea it was
-	// connected to their service account keys. We are taking this oppurtunity to
+	// connected to their service account keys. We are taking this opportunity to
 	// remove this problematic defaulting.
 	if s.ServiceAccountSigningKeyFile == "" {
 		// Default to the private server key for service account token signing

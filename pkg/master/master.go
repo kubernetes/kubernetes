@@ -278,7 +278,7 @@ func (cfg *Config) Complete() CompletedConfig {
 		&cfg.ExtraConfig,
 	}
 
-	serviceIPRange, apiServerServiceIP, err := DefaultServiceIPRange(c.ExtraConfig.ServiceIPRange)
+	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(c.ExtraConfig.ServiceIPRange)
 	if err != nil {
 		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}

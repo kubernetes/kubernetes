@@ -2,13 +2,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["adapters.go"],
-    importpath = "k8s.io/kubernetes/pkg/util/prometheusclientgo",
+    srcs = ["metrics.go"],
+    importpath = "k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/client/metrics/prometheus:go_default_library",
-        "//pkg/util/prometheusclientgo/leaderelection:go_default_library",
-        "//pkg/util/workqueue/prometheus:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
     ],
 )
 
@@ -21,10 +21,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/util/prometheusclientgo/leaderelection:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

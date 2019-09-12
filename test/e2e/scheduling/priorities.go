@@ -36,7 +36,6 @@ import (
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -82,7 +81,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		e2enode.WaitForTotalHealthy(cs, time.Minute)
 		_, nodeList, err = e2enode.GetMasterAndWorkerNodes(cs)
 		if err != nil {
-			e2elog.Logf("Unexpected error occurred: %v", err)
+			framework.Logf("Unexpected error occurred: %v", err)
 		}
 		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
@@ -94,6 +93,9 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 	})
 
 	ginkgo.It("Pod should be scheduled to node that don't match the PodAntiAffinity terms", func() {
+
+		framework.SkipUnlessNodeCountIsAtLeast(2)
+
 		ginkgo.By("Trying to launch a pod with a label to get a node which can launch it.")
 		pod := runPausePod(f, pausePodConfig{
 			Name:   "pod-with-label-security-s1",
@@ -101,14 +103,33 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		})
 		nodeName := pod.Spec.NodeName
 
-		ginkgo.By("Trying to apply a label on the found node.")
-		k := fmt.Sprintf("kubernetes.io/e2e-%s", "node-topologyKey")
-		v := "topologyvalue"
-		framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
-		framework.ExpectNodeHasLabel(cs, nodeName, k, v)
-		defer framework.RemoveLabelOffNode(cs, nodeName, k)
+		k := v1.LabelHostname
+		ginkgo.By("Verifying the node has a label " + k)
+		node, err := cs.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
+		if _, hasLabel := node.Labels[k]; !hasLabel {
+			// If the label is not exists, label all nodes for testing.
+
+			ginkgo.By("Trying to apply a label on the found node.")
+			k = "kubernetes.io/e2e-node-topologyKey"
+			v := "topologyvalue1"
+			framework.AddOrUpdateLabelOnNode(cs, nodeName, k, v)
+			framework.ExpectNodeHasLabel(cs, nodeName, k, v)
+			defer framework.RemoveLabelOffNode(cs, nodeName, k)
+
+			ginkgo.By("Trying to apply a label on other nodes.")
+			v = "topologyvalue2"
+			for _, node := range nodeList.Items {
+				if node.Name != nodeName {
+					framework.AddOrUpdateLabelOnNode(cs, node.Name, k, v)
+					framework.ExpectNodeHasLabel(cs, node.Name, k, v)
+					defer framework.RemoveLabelOffNode(cs, node.Name, k)
+				}
+			}
+		}
+
 		// make the nodes have balanced cpu,mem usage
-		err := createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.6)
+		err = createBalancedPodForNodes(f, cs, ns, nodeList.Items, podRequestedResource, 0.6)
 		framework.ExpectNoError(err)
 		ginkgo.By("Trying to launch the pod with podAntiAffinity.")
 		labelPodName := "pod-with-pod-antiaffinity"
@@ -165,7 +186,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 		defer func() {
 			// Resize the replication controller to zero to get rid of pods.
 			if err := framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rc.Name); err != nil {
-				e2elog.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
+				framework.Logf("Failed to cleanup replication controller %v: %v.", rc.Name, err)
 			}
 		}()
 
@@ -299,7 +320,7 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 					Requests: needCreateResource,
 				},
 				NodeName: node.Name,
-			}), true, e2elog.Logf)
+			}), true, framework.Logf)
 
 		if err != nil {
 			return err
@@ -315,16 +336,16 @@ func createBalancedPodForNodes(f *framework.Framework, cs clientset.Interface, n
 }
 
 func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.ResourceRequirements) (float64, float64) {
-	e2elog.Logf("ComputeCPUMemFraction for node: %v", node.Name)
+	framework.Logf("ComputeCPUMemFraction for node: %v", node.Name)
 	totalRequestedCPUResource := resource.Requests.Cpu().MilliValue()
 	totalRequestedMemResource := resource.Requests.Memory().Value()
 	allpods, err := cs.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
 	if err != nil {
-		e2elog.Failf("Expect error of invalid, got : %v", err)
+		framework.Failf("Expect error of invalid, got : %v", err)
 	}
 	for _, pod := range allpods.Items {
 		if pod.Spec.NodeName == node.Name {
-			e2elog.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
+			framework.Logf("Pod for on the node: %v, Cpu: %v, Mem: %v", pod.Name, getNonZeroRequests(&pod).MilliCPU, getNonZeroRequests(&pod).Memory)
 			// Ignore best effort pods while computing fractions as they won't be taken in account by scheduler.
 			if v1qos.GetPodQOS(&pod) == v1.PodQOSBestEffort {
 				continue
@@ -350,8 +371,8 @@ func computeCPUMemFraction(cs clientset.Interface, node v1.Node, resource *v1.Re
 		memFraction = floatOne
 	}
 
-	e2elog.Logf("Node: %v, totalRequestedCPUResource: %v, cpuAllocatableMil: %v, cpuFraction: %v", node.Name, totalRequestedCPUResource, cpuAllocatableMil, cpuFraction)
-	e2elog.Logf("Node: %v, totalRequestedMemResource: %v, memAllocatableVal: %v, memFraction: %v", node.Name, totalRequestedMemResource, memAllocatableVal, memFraction)
+	framework.Logf("Node: %v, totalRequestedCPUResource: %v, cpuAllocatableMil: %v, cpuFraction: %v", node.Name, totalRequestedCPUResource, cpuAllocatableMil, cpuFraction)
+	framework.Logf("Node: %v, totalRequestedMemResource: %v, memAllocatableVal: %v, memFraction: %v", node.Name, totalRequestedMemResource, memAllocatableVal, memFraction)
 
 	return cpuFraction, memFraction
 }

@@ -590,6 +590,22 @@ func TestHTTPProxyCheck(t *testing.T) {
 			}, // Expected to go via proxy, range is not in 2001:db8::/48
 			expectWarnings: true,
 		},
+		{
+			name: "IPv6 direct access, no brackets",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "2001:db8::1:15",
+			}, // Expected to be accessed directly, part of 2001:db8::/48 in NO_PROXY
+			expectWarnings: false,
+		},
+		{
+			name: "IPv6 via proxy, no brackets",
+			check: HTTPProxyCheck{
+				Proto: "https",
+				Host:  "2001:db8:1::1:15",
+			}, // Expected to go via proxy, range is not in 2001:db8::/48
+			expectWarnings: true,
+		},
 	}
 
 	// Save current content of *_proxy and *_PROXY variables.

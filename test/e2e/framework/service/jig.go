@@ -17,17 +17,14 @@ limitations under the License.
 package service
 
 import (
-	"bytes"
 	"fmt"
 	"net"
-	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo"
-	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -54,9 +51,6 @@ import (
 
 // NodePortRange should match whatever the default/configured range is
 var NodePortRange = utilnet.PortRange{Base: 30000, Size: 2768}
-
-// PauseDeploymentLabels are unique deployment selector labels for pause pod
-var PauseDeploymentLabels = map[string]string{"deployment": "agnhost-pause"}
 
 // TestJig is a test jig to help service testing.
 type TestJig struct {
@@ -884,147 +878,6 @@ func (j *TestJig) CheckServiceReachability(namespace string, svc *v1.Service, po
 	}
 }
 
-// TestReachableHTTP tests that the given host serves HTTP on the given port.
-func (j *TestJig) TestReachableHTTP(host string, port int, timeout time.Duration) {
-	j.TestReachableHTTPWithRetriableErrorCodes(host, port, []int{}, timeout)
-}
-
-// TestReachableHTTPWithRetriableErrorCodes tests that the given host serves HTTP on the given port with the given retriableErrCodes.
-func (j *TestJig) TestReachableHTTPWithRetriableErrorCodes(host string, port int, retriableErrCodes []int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
-		result := framework.PokeHTTP(host, port, "/echo?msg=hello",
-			&framework.HTTPPokeParams{
-				BodyContains:   "hello",
-				RetriableCodes: retriableErrCodes,
-			})
-		if result.Status == framework.HTTPSuccess {
-			return true, nil
-		}
-		return false, nil // caller can retry
-	}
-
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
-		if err == wait.ErrWaitTimeout {
-			framework.Failf("Could not reach HTTP service through %v:%v after %v", host, port, timeout)
-		} else {
-			framework.Failf("Failed to reach HTTP service through %v:%v: %v", host, port, err)
-		}
-	}
-}
-
-// TestNotReachableHTTP tests that a HTTP request doesn't connect to the given host and port.
-func (j *TestJig) TestNotReachableHTTP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
-		result := framework.PokeHTTP(host, port, "/", nil)
-		if result.Code == 0 {
-			return true, nil
-		}
-		return false, nil // caller can retry
-	}
-
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
-		framework.Failf("HTTP service %v:%v reachable after %v: %v", host, port, timeout, err)
-	}
-}
-
-// TestRejectedHTTP tests that the given host rejects a HTTP request on the given port.
-func (j *TestJig) TestRejectedHTTP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
-		result := framework.PokeHTTP(host, port, "/", nil)
-		if result.Status == framework.HTTPRefused {
-			return true, nil
-		}
-		return false, nil // caller can retry
-	}
-
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
-		framework.Failf("HTTP service %v:%v not rejected: %v", host, port, err)
-	}
-}
-
-// TestReachableUDP tests that the given host serves UDP on the given port.
-func (j *TestJig) TestReachableUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
-		result := framework.PokeUDP(host, port, "echo hello", &framework.UDPPokeParams{
-			Timeout:  3 * time.Second,
-			Response: "hello",
-		})
-		if result.Status == framework.UDPSuccess {
-			return true, nil
-		}
-		return false, nil // caller can retry
-	}
-
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
-		framework.Failf("Could not reach UDP service through %v:%v after %v: %v", host, port, timeout, err)
-	}
-}
-
-// TestNotReachableUDP tests that the given host doesn't serve UDP on the given port.
-func (j *TestJig) TestNotReachableUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
-		result := framework.PokeUDP(host, port, "echo hello", &framework.UDPPokeParams{Timeout: 3 * time.Second})
-		if result.Status != framework.UDPSuccess && result.Status != framework.UDPError {
-			return true, nil
-		}
-		return false, nil // caller can retry
-	}
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
-		framework.Failf("UDP service %v:%v reachable after %v: %v", host, port, timeout, err)
-	}
-}
-
-// TestRejectedUDP tests that the given host rejects a UDP request on the given port.
-func (j *TestJig) TestRejectedUDP(host string, port int, timeout time.Duration) {
-	pollfn := func() (bool, error) {
-		result := framework.PokeUDP(host, port, "echo hello", &framework.UDPPokeParams{Timeout: 3 * time.Second})
-		if result.Status == framework.UDPRefused {
-			return true, nil
-		}
-		return false, nil // caller can retry
-	}
-	if err := wait.PollImmediate(framework.Poll, timeout, pollfn); err != nil {
-		framework.Failf("UDP service %v:%v not rejected: %v", host, port, err)
-	}
-}
-
-// GetHTTPContent returns the content of the given url by HTTP.
-func (j *TestJig) GetHTTPContent(host string, port int, timeout time.Duration, url string) bytes.Buffer {
-	var body bytes.Buffer
-	if pollErr := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		result := framework.PokeHTTP(host, port, url, nil)
-		if result.Status == framework.HTTPSuccess {
-			body.Write(result.Body)
-			return true, nil
-		}
-		return false, nil
-	}); pollErr != nil {
-		framework.Failf("Could not reach HTTP service through %v:%v%v after %v: %v", host, port, url, timeout, pollErr)
-	}
-	return body
-}
-
-// TestHTTPHealthCheckNodePort tests a HTTP connection by the given request to the given host and port.
-func (j *TestJig) TestHTTPHealthCheckNodePort(host string, port int, request string, timeout time.Duration, expectSucceed bool, threshold int) error {
-	count := 0
-	condition := func() (bool, error) {
-		success, _ := testHTTPHealthCheckNodePort(host, port, request)
-		if success && expectSucceed ||
-			!success && !expectSucceed {
-			count++
-		}
-		if count >= threshold {
-			return true, nil
-		}
-		return false, nil
-	}
-
-	if err := wait.PollImmediate(time.Second, timeout, condition); err != nil {
-		return fmt.Errorf("error waiting for healthCheckNodePort: expected at least %d succeed=%v on %v%v, got %d", threshold, expectSucceed, host, port, count)
-	}
-	return nil
-}
-
 // CreateServicePods creates a replication controller with the label same as service
 func (j *TestJig) CreateServicePods(c clientset.Interface, ns string, replica int) {
 	config := testutils.RCConfig{
@@ -1040,148 +893,4 @@ func (j *TestJig) CreateServicePods(c clientset.Interface, ns string, replica in
 	}
 	err := framework.RunRC(config)
 	framework.ExpectNoError(err, "Replica must be created")
-}
-
-// CheckAffinity function tests whether the service affinity works as expected.
-// If affinity is expected, the test will return true once affinityConfirmCount
-// number of same response observed in a row. If affinity is not expected, the
-// test will keep observe until different responses observed. The function will
-// return false only in case of unexpected errors.
-func (j *TestJig) CheckAffinity(execPod *v1.Pod, targetIP string, targetPort int, shouldHold bool) bool {
-	targetIPPort := net.JoinHostPort(targetIP, strconv.Itoa(targetPort))
-	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, targetIPPort)
-	timeout := TestTimeout
-	if execPod == nil {
-		timeout = LoadBalancerPollTimeout
-	}
-	var tracker affinityTracker
-	if pollErr := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		if execPod != nil {
-			stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
-			if err != nil {
-				framework.Logf("Failed to get response from %s. Retry until timeout", targetIPPort)
-				return false, nil
-			}
-			tracker.recordHost(stdout)
-		} else {
-			rawResponse := j.GetHTTPContent(targetIP, targetPort, timeout, "")
-			tracker.recordHost(rawResponse.String())
-		}
-		trackerFulfilled, affinityHolds := tracker.checkHostTrace(AffinityConfirmCount)
-		if !shouldHold && !affinityHolds {
-			return true, nil
-		}
-		if shouldHold && trackerFulfilled && affinityHolds {
-			return true, nil
-		}
-		return false, nil
-	}); pollErr != nil {
-		trackerFulfilled, _ := tracker.checkHostTrace(AffinityConfirmCount)
-		if pollErr != wait.ErrWaitTimeout {
-			checkAffinityFailed(tracker, pollErr.Error())
-			return false
-		}
-		if !trackerFulfilled {
-			checkAffinityFailed(tracker, fmt.Sprintf("Connection to %s timed out or not enough responses.", targetIPPort))
-		}
-		if shouldHold {
-			checkAffinityFailed(tracker, "Affinity should hold but didn't.")
-		} else {
-			checkAffinityFailed(tracker, "Affinity shouldn't hold but did.")
-		}
-		return true
-	}
-	return true
-}
-
-func testHTTPHealthCheckNodePort(ip string, port int, request string) (bool, error) {
-	ipPort := net.JoinHostPort(ip, strconv.Itoa(port))
-	url := fmt.Sprintf("http://%s%s", ipPort, request)
-	if ip == "" || port == 0 {
-		framework.Failf("Got empty IP for reachability check (%s)", url)
-		return false, fmt.Errorf("invalid input ip or port")
-	}
-	framework.Logf("Testing HTTP health check on %v", url)
-	resp, err := httpGetNoConnectionPoolTimeout(url, 5*time.Second)
-	if err != nil {
-		framework.Logf("Got error testing for reachability of %s: %v", url, err)
-		return false, err
-	}
-	defer resp.Body.Close()
-	if err != nil {
-		framework.Logf("Got error reading response from %s: %v", url, err)
-		return false, err
-	}
-	// HealthCheck responder returns 503 for no local endpoints
-	if resp.StatusCode == 503 {
-		return false, nil
-	}
-	// HealthCheck responder returns 200 for non-zero local endpoints
-	if resp.StatusCode == 200 {
-		return true, nil
-	}
-	return false, fmt.Errorf("unexpected HTTP response code %s from health check responder at %s", resp.Status, url)
-}
-
-// Does an HTTP GET, but does not reuse TCP connections
-// This masks problems where the iptables rule has changed, but we don't see it
-func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Response, error) {
-	tr := utilnet.SetTransportDefaults(&http.Transport{
-		DisableKeepAlives: true,
-	})
-	client := &http.Client{
-		Transport: tr,
-		Timeout:   timeout,
-	}
-	return client.Get(url)
-}
-
-// CreatePausePodDeployment creates a deployment for agnhost-pause pod running in different nodes
-func (j *TestJig) CreatePausePodDeployment(name, ns string, replica int32) *appsv1.Deployment {
-	// terminationGracePeriod is set to 0 to reduce deployment deletion time for infinitely running pause pod.
-	terminationGracePeriod := int64(0)
-	pauseDeployment := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: PauseDeploymentLabels,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replica,
-			Selector: &metav1.LabelSelector{
-				MatchLabels: PauseDeploymentLabels,
-			},
-			Strategy: appsv1.DeploymentStrategy{
-				Type: appsv1.RollingUpdateDeploymentStrategyType,
-			},
-			Template: v1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: PauseDeploymentLabels,
-				},
-				Spec: v1.PodSpec{
-					TerminationGracePeriodSeconds: &terminationGracePeriod,
-					Affinity: &v1.Affinity{
-						PodAntiAffinity: &v1.PodAntiAffinity{
-							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-								{
-									LabelSelector: &metav1.LabelSelector{MatchLabels: PauseDeploymentLabels},
-									TopologyKey:   "kubernetes.io/hostname",
-									Namespaces:    []string{ns},
-								},
-							},
-						},
-					},
-					Containers: []v1.Container{
-						{
-							Name:  "agnhost-pause",
-							Image: imageutils.GetE2EImage(imageutils.Agnhost),
-							Args:  []string{"pause"},
-						},
-					},
-				},
-			},
-		},
-	}
-	deployment, err := j.Client.AppsV1().Deployments(ns).Create(pauseDeployment)
-	framework.ExpectNoError(err, "Error in creating deployment for pause pod")
-	return deployment
 }

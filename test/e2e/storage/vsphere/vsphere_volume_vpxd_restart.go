@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -109,7 +108,7 @@ var _ = utils.SIGDescribe("Verify Volume Attach Through vpxd Restart [Feature:vs
 				pods         []*v1.Pod
 			)
 
-			e2elog.Logf("Testing for nodes on vCenter host: %s", vcHost)
+			framework.Logf("Testing for nodes on vCenter host: %s", vcHost)
 
 			for i, node := range nodes {
 				ginkgo.By(fmt.Sprintf("Creating test vsphere volume %d", i))

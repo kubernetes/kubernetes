@@ -47,6 +47,7 @@ func NewCSRSigningController(
 		return nil, err
 	}
 	return certificates.NewCertificateController(
+		"csrsigning",
 		client,
 		csrInformer,
 		signer.handle,

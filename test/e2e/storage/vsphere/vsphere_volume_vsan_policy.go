@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -106,15 +105,15 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		namespace = f.Namespace.Name
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
 		tagPolicy = GetAndExpectStringEnvVar(SPBMTagPolicy)
-		e2elog.Logf("framework: %+v", f)
+		framework.Logf("framework: %+v", f)
 		scParameters = make(map[string]string)
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		if !(len(nodeList.Items) > 0) {
-			e2elog.Failf("Unable to find ready and schedulable Node")
+			framework.Failf("Unable to find ready and schedulable Node")
 		}
 		masternodes, _, err := e2enode.GetMasterAndWorkerNodes(client)
 		if err != nil {
-			e2elog.Logf("Unexpected error occurred: %v", err)
+			framework.Logf("Unexpected error occurred: %v", err)
 		}
 		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
@@ -127,7 +126,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy hostFailuresToTolerate: %s, cacheReservation: %s", HostFailuresToTolerateCapabilityVal, CacheReservationCapabilityVal))
 		scParameters[Policy_HostFailuresToTolerate] = HostFailuresToTolerateCapabilityVal
 		scParameters[Policy_CacheReservation] = CacheReservationCapabilityVal
-		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
@@ -136,7 +135,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy diskStripes: %s, objectSpaceReservation: %s", DiskStripesCapabilityVal, ObjectSpaceReservationCapabilityVal))
 		scParameters[Policy_DiskStripes] = "1"
 		scParameters[Policy_ObjectSpaceReservation] = "30"
-		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
@@ -146,7 +145,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[Policy_DiskStripes] = DiskStripesCapabilityVal
 		scParameters[Policy_ObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
 		scParameters[Datastore] = VsanDatastore
-		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
@@ -155,7 +154,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy objectSpaceReservation: %s, iopsLimit: %s", ObjectSpaceReservationCapabilityVal, IopsLimitCapabilityVal))
 		scParameters[Policy_ObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
 		scParameters[Policy_IopsLimit] = IopsLimitCapabilityVal
-		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
@@ -164,7 +163,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy objectSpaceReserve: %s, stripeWidth: %s", ObjectSpaceReservationCapabilityVal, StripeWidthCapabilityVal))
 		scParameters["objectSpaceReserve"] = ObjectSpaceReservationCapabilityVal
 		scParameters[Policy_DiskStripes] = StripeWidthCapabilityVal
-		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "invalid option \\\"objectSpaceReserve\\\" for volume plugin kubernetes.io/vsphere-volume"
@@ -179,7 +178,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy diskStripes: %s, cacheReservation: %s", DiskStripesCapabilityInvalidVal, CacheReservationCapabilityVal))
 		scParameters[Policy_DiskStripes] = DiskStripesCapabilityInvalidVal
 		scParameters[Policy_CacheReservation] = CacheReservationCapabilityVal
-		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "Invalid value for " + Policy_DiskStripes + "."
@@ -193,7 +192,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 	ginkgo.It("verify VSAN storage capability with invalid hostFailuresToTolerate value is not honored for dynamically provisioned pvc using storageclass", func() {
 		ginkgo.By(fmt.Sprintf("Invoking test for VSAN policy hostFailuresToTolerate: %s", HostFailuresToTolerateCapabilityInvalidVal))
 		scParameters[Policy_HostFailuresToTolerate] = HostFailuresToTolerateCapabilityInvalidVal
-		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "Invalid value for " + Policy_HostFailuresToTolerate + "."
@@ -209,7 +208,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[Policy_DiskStripes] = DiskStripesCapabilityVal
 		scParameters[Policy_ObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
 		scParameters[Datastore] = VmfsDatastore
-		e2elog.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
+		framework.Logf("Invoking test for VSAN storage capabilities: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "The specified datastore: \\\"" + VmfsDatastore + "\\\" is not a VSAN datastore. " +
@@ -223,7 +222,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		ginkgo.By(fmt.Sprintf("Invoking test for SPBM policy: %s", policyName))
 		scParameters[SpbmStoragePolicy] = policyName
 		scParameters[DiskFormat] = ThinDisk
-		e2elog.Logf("Invoking test for SPBM storage policy: %+v", scParameters)
+		framework.Logf("Invoking test for SPBM storage policy: %+v", scParameters)
 		invokeValidPolicyTest(f, client, namespace, scParameters)
 	})
 
@@ -231,7 +230,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[Policy_DiskStripes] = DiskStripesCapabilityMaxVal
 		scParameters[Policy_ObjectSpaceReservation] = ObjectSpaceReservationCapabilityVal
 		scParameters[Datastore] = VsanDatastore
-		e2elog.Logf("Invoking test for SPBM storage policy: %+v", scParameters)
+		framework.Logf("Invoking test for SPBM storage policy: %+v", scParameters)
 		kubernetesClusterName := GetAndExpectStringEnvVar(KubernetesClusterName)
 		invokeStaleDummyVMTestWithStoragePolicy(client, masterNode, namespace, kubernetesClusterName, scParameters)
 	})
@@ -241,7 +240,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		scParameters[SpbmStoragePolicy] = tagPolicy
 		scParameters[Datastore] = VsanDatastore
 		scParameters[DiskFormat] = ThinDisk
-		e2elog.Logf("Invoking test for SPBM storage policy on a non-compatible datastore: %+v", scParameters)
+		framework.Logf("Invoking test for SPBM storage policy on a non-compatible datastore: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "User specified datastore is not compatible with the storagePolicy: \\\"" + tagPolicy + "\\\""
@@ -254,7 +253,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		ginkgo.By(fmt.Sprintf("Invoking test for SPBM policy: %s", BronzeStoragePolicy))
 		scParameters[SpbmStoragePolicy] = BronzeStoragePolicy
 		scParameters[DiskFormat] = ThinDisk
-		e2elog.Logf("Invoking test for non-existing SPBM storage policy: %+v", scParameters)
+		framework.Logf("Invoking test for non-existing SPBM storage policy: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "no pbm profile found with name: \\\"" + BronzeStoragePolicy + "\\"
@@ -269,7 +268,7 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		gomega.Expect(scParameters[SpbmStoragePolicy]).NotTo(gomega.BeEmpty())
 		scParameters[Policy_DiskStripes] = DiskStripesCapabilityVal
 		scParameters[DiskFormat] = ThinDisk
-		e2elog.Logf("Invoking test for SPBM storage policy and VSAN capabilities together: %+v", scParameters)
+		framework.Logf("Invoking test for SPBM storage policy and VSAN capabilities together: %+v", scParameters)
 		err := invokeInvalidPolicyTestNeg(client, namespace, scParameters)
 		framework.ExpectError(err)
 		errorMsg := "Cannot specify storage policy capabilities along with storage policy name. Please specify only one"

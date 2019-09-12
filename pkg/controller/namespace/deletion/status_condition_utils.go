@@ -21,7 +21,7 @@ import (
 	"sort"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery"
 )
@@ -128,25 +128,18 @@ func makeDeleteContentCondition(err []error) *v1.NamespaceCondition {
 func updateConditions(status *v1.NamespaceStatus, newConditions []v1.NamespaceCondition) (hasChanged bool) {
 	for _, conditionType := range conditionTypes {
 		newCondition := getCondition(newConditions, conditionType)
-		oldCondition := getCondition(status.Conditions, conditionType)
-		if newCondition == nil && oldCondition == nil {
-			// both are nil, no update necessary
-			continue
+		// if we weren't failing, then this returned nil.  We should set the "ok" variant of the condition
+		if newCondition == nil {
+			newCondition = newSuccessfulCondition(conditionType)
 		}
+		oldCondition := getCondition(status.Conditions, conditionType)
+
+		// only new condition of this type exists, add to the list
 		if oldCondition == nil {
-			// only new condition of this type exists, add to the list
 			status.Conditions = append(status.Conditions, *newCondition)
 			hasChanged = true
-		} else if newCondition == nil {
-			// only old condition of this type exists, set status to false
-			if oldCondition.Status != v1.ConditionFalse {
-				oldCondition.Status = v1.ConditionFalse
-				oldCondition.Message = okMessages[conditionType]
-				oldCondition.Reason = okReasons[conditionType]
-				oldCondition.LastTransitionTime = metav1.Now()
-				hasChanged = true
-			}
-		} else if oldCondition.Message != newCondition.Message {
+
+		} else if oldCondition.Status != newCondition.Status || oldCondition.Message != newCondition.Message || oldCondition.Reason != newCondition.Reason {
 			// old condition needs to be updated
 			if oldCondition.Status != newCondition.Status {
 				oldCondition.LastTransitionTime = metav1.Now()
@@ -159,6 +152,16 @@ func updateConditions(status *v1.NamespaceStatus, newConditions []v1.NamespaceCo
 		}
 	}
 	return
+}
+
+func newSuccessfulCondition(conditionType v1.NamespaceConditionType) *v1.NamespaceCondition {
+	return &v1.NamespaceCondition{
+		Type:               conditionType,
+		Status:             v1.ConditionFalse,
+		LastTransitionTime: metav1.Now(),
+		Reason:             okReasons[conditionType],
+		Message:            okMessages[conditionType],
+	}
 }
 
 func getCondition(conditions []v1.NamespaceCondition, conditionType v1.NamespaceConditionType) *v1.NamespaceCondition {

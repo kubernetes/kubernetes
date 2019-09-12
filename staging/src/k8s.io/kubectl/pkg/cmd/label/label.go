@@ -149,7 +149,6 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	usage := "identifying the resource to update the labels"
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, usage)
 	cmdutil.AddDryRunFlag(cmd)
-	cmdutil.AddIncludeUninitializedFlag(cmd)
 
 	return cmd
 }
@@ -182,6 +181,9 @@ func (o *LabelOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []st
 	}
 	o.resources = resources
 	o.newLabels, o.removeLabels, err = parseLabels(labelArgs)
+	if err != nil {
+		return err
+	}
 
 	if o.list && len(o.outputFormat) > 0 {
 		return fmt.Errorf("--list and --output may not be specified together")

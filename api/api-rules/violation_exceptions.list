@@ -368,6 +368,7 @@ API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/ap
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Enum
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,OneOf
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Required
+API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XListMapKeys
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrStringArray,Property
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,WebhookClientConfig,CABundle
@@ -389,6 +390,7 @@ API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/ap
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,Enum
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,OneOf
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,Required
+API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XListMapKeys
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrStringArray,Property
 API rule violation: list_type_missing,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,WebhookClientConfig,CABundle
@@ -523,6 +525,8 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XEmbeddedResource
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XIntOrString
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XListMapKeys
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XListType
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XPreserveUnknownFields
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrArray,Schema
@@ -536,6 +540,8 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,Schema
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XEmbeddedResource
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XIntOrString
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XListMapKeys
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XListType
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XPreserveUnknownFields
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrArray,Schema

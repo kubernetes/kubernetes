@@ -108,7 +108,7 @@ func TestSyncServiceWithSelector(t *testing.T) {
 	assert.Len(t, sliceList.Items, 1, "Expected 1 endpoint slices")
 	slice := sliceList.Items[0]
 	assert.Regexp(t, "^"+serviceName, slice.Name)
-	assert.Equal(t, serviceName, slice.Labels[serviceNameLabel])
+	assert.Equal(t, serviceName, slice.Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slice.Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slice.Endpoints)
 	assert.NotEmpty(t, slice.Annotations["endpoints.kubernetes.io/last-change-trigger-time"])
@@ -189,11 +189,11 @@ func TestSyncServiceEndpointSliceSelection(t *testing.T) {
 
 	// 3 slices, 2 with matching labels for our service
 	endpointSlices := []*discovery.EndpointSlice{{
-		ObjectMeta: metav1.ObjectMeta{Name: "matching-1", Namespace: ns, Labels: map[string]string{serviceNameLabel: serviceName}},
+		ObjectMeta: metav1.ObjectMeta{Name: "matching-1", Namespace: ns, Labels: map[string]string{discovery.LabelServiceName: serviceName}},
 	}, {
-		ObjectMeta: metav1.ObjectMeta{Name: "matching-2", Namespace: ns, Labels: map[string]string{serviceNameLabel: serviceName}},
+		ObjectMeta: metav1.ObjectMeta{Name: "matching-2", Namespace: ns, Labels: map[string]string{discovery.LabelServiceName: serviceName}},
 	}, {
-		ObjectMeta: metav1.ObjectMeta{Name: "not-matching-1", Namespace: ns, Labels: map[string]string{serviceNameLabel: "something-else"}},
+		ObjectMeta: metav1.ObjectMeta{Name: "not-matching-1", Namespace: ns, Labels: map[string]string{discovery.LabelServiceName: "something-else"}},
 	}}
 
 	// need to add them to both store and fake clientset

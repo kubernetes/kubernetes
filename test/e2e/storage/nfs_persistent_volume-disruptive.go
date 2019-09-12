@@ -29,7 +29,6 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -87,7 +86,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		// Get the first ready node IP that is not hosting the NFS pod.
 		var err error
 		if clientNodeIP == "" {
-			e2elog.Logf("Designating test node")
+			framework.Logf("Designating test node")
 			nodes := framework.GetReadySchedulableNodesOrDie(c)
 			for _, node := range nodes.Items {
 				if node.Name != nfsServerPod.Spec.NodeName {
@@ -157,11 +156,11 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 
 			// Delete PV and PVCs
 			if errs := framework.PVPVCCleanup(c, ns, pv1, pvc1); len(errs) > 0 {
-				e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pv1, pvc1 = nil, nil
 			if errs := framework.PVPVCCleanup(c, ns, pv2, pvc2); len(errs) > 0 {
-				e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pv2, pvc2 = nil, nil
 
@@ -187,7 +186,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 			framework.ExpectNoError(err)
 			err = framework.WaitForControllerManagerUp()
 			framework.ExpectNoError(err)
-			e2elog.Logf("kube-controller-manager restarted")
+			framework.Logf("kube-controller-manager restarted")
 
 			ginkgo.By("Observing the kube-controller-manager healthy for at least 2 minutes")
 			// Continue checking for 2 minutes to make sure kube-controller-manager is healthy
@@ -205,12 +204,12 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		)
 
 		ginkgo.BeforeEach(func() {
-			e2elog.Logf("Initializing test spec")
+			framework.Logf("Initializing test spec")
 			clientPod, pv, pvc = initTestCase(f, c, nfsPVconfig, pvcConfig, ns, clientNode.Name)
 		})
 
 		ginkgo.AfterEach(func() {
-			e2elog.Logf("Tearing down test spec")
+			framework.Logf("Tearing down test spec")
 			tearDownTestCase(c, f, ns, clientPod, pvc, pv, true /* force PV delete */)
 			pv, pvc, clientPod = nil, nil, nil
 		})
@@ -258,9 +257,9 @@ func initTestCase(f *framework.Framework, c clientset.Interface, pvConfig framew
 	framework.ExpectNoError(err)
 	pod := e2epod.MakePod(ns, nil, []*v1.PersistentVolumeClaim{pvc}, true, "")
 	pod.Spec.NodeName = nodeName
-	e2elog.Logf("Creating NFS client pod.")
+	framework.Logf("Creating NFS client pod.")
 	pod, err = c.CoreV1().Pods(ns).Create(pod)
-	e2elog.Logf("NFS client Pod %q created on Node %q", pod.Name, nodeName)
+	framework.Logf("NFS client Pod %q created on Node %q", pod.Name, nodeName)
 	framework.ExpectNoError(err)
 	defer func() {
 		if err != nil {

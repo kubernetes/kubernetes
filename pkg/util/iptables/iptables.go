@@ -69,6 +69,12 @@ type Interface interface {
 	AddReloadFunc(reloadFunc func())
 	// Destroy cleans up resources used by the Interface
 	Destroy()
+	// HasRandomFully reveals whether `-j MASQUERADE` takes the
+	// `--random-fully` option.  This is helpful to work around a
+	// Linux kernel bug that sometimes causes multiple flows to get
+	// mapped to the same IP:PORT and consequently some suffer packet
+	// drops.
+	HasRandomFully() bool
 }
 
 type Protocol byte
@@ -121,6 +127,8 @@ const NoFlushTables FlushFlag = false
 // (test whether a rule exists).
 var MinCheckVersion = utilversion.MustParseGeneric("1.4.11")
 
+var RandomFullyMinVersion = utilversion.MustParseGeneric("1.6.2")
+
 // Minimum iptables versions supporting the -w and -w<seconds> flags
 var WaitMinVersion = utilversion.MustParseGeneric("1.4.20")
 var WaitSecondsMinVersion = utilversion.MustParseGeneric("1.4.22")
@@ -139,6 +147,7 @@ type runner struct {
 	protocol        Protocol
 	hasCheck        bool
 	hasListener     bool
+	hasRandomFully  bool
 	waitFlag        []string
 	restoreWaitFlag []string
 	lockfilePath    string
@@ -166,6 +175,7 @@ func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Prot
 		protocol:        protocol,
 		hasCheck:        version.AtLeast(MinCheckVersion),
 		hasListener:     false,
+		hasRandomFully:  version.AtLeast(RandomFullyMinVersion),
 		waitFlag:        getIPTablesWaitFlag(version),
 		restoreWaitFlag: getIPTablesRestoreWaitFlag(version),
 		lockfilePath:    lockfilePath,
@@ -630,6 +640,10 @@ func (runner *runner) reload() {
 	for _, f := range runner.reloadFuncs {
 		f()
 	}
+}
+
+func (runner *runner) HasRandomFully() bool {
+	return runner.hasRandomFully
 }
 
 var iptablesNotFoundStrings = []string{

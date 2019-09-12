@@ -51,9 +51,9 @@ type ServerRunOptions struct {
 	// decoded in a write request. 0 means no limit.
 	// We intentionally did not add a flag for this option. Users of the
 	// apiserver library can wire it to a flag.
-	MaxRequestBodyBytes       int64
-	TargetRAMMB               int
-	EnableInfightQuotaHandler bool
+	MaxRequestBodyBytes        int64
+	TargetRAMMB                int
+	EnableInflightQuotaHandler bool
 }
 
 func NewServerRunOptions() *ServerRunOptions {
@@ -116,7 +116,7 @@ func (s *ServerRunOptions) Validate() []error {
 		errors = append(errors, fmt.Errorf("--livez-grace-period can not be a negative value"))
 	}
 
-	if s.EnableInfightQuotaHandler {
+	if s.EnableInflightQuotaHandler {
 		if !utilfeature.DefaultFeatureGate.Enabled(features.RequestManagement) {
 			errors = append(errors, fmt.Errorf("--enable-inflight-quota-handler can not be set if feature "+
 				"gate RequestManagement is disabled"))
@@ -210,7 +210,7 @@ func (s *ServerRunOptions) AddUniversalFlags(fs *pflag.FlagSet) {
 		"handler, which picks a randomized value above this number as the connection timeout, "+
 		"to spread out load.")
 
-	fs.BoolVar(&s.EnableInfightQuotaHandler, "enable-inflight-quota-handler", s.EnableInfightQuotaHandler, ""+
+	fs.BoolVar(&s.EnableInflightQuotaHandler, "enable-inflight-quota-handler", s.EnableInflightQuotaHandler, ""+
 		"If true, replace the max-in-flight handler with an enhanced one that queues and dispatches with priority and fairness")
 
 	fs.DurationVar(&s.ShutdownDelayDuration, "shutdown-delay-duration", s.ShutdownDelayDuration, ""+

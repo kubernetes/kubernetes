@@ -390,6 +390,7 @@ func NewFakeProxier(ipt utiliptables.Interface, endpointSlicesEnabled bool) *Pro
 		nodePortAddresses:        make([]string, 0),
 		networkInterfacer:        utilproxytest.NewFakeNetwork(),
 	}
+	p.setInitialized(true)
 	p.syncRunner = async.NewBoundedFrequencyRunner("test-sync-runner", p.syncProxyRules, 0, time.Minute, 1)
 	return p
 }
@@ -435,6 +436,15 @@ func hasSrcType(rules []iptablestest.Rule, srcType string) bool {
 		return true
 	}
 
+	return false
+}
+
+func hasMasqRandomFully(rules []iptablestest.Rule) bool {
+	for _, r := range rules {
+		if r[iptablestest.Masquerade] == "--random-fully" {
+			return true
+		}
+	}
 	return false
 }
 
@@ -781,6 +791,25 @@ func TestNodePort(t *testing.T) {
 	kubeNodePortRules := ipt.GetRules(string(kubeNodePortsChain))
 	if !hasJump(kubeNodePortRules, svcChain, "", svcNodePort) {
 		errorf(fmt.Sprintf("Failed to find jump to svc chain %v", svcChain), kubeNodePortRules, t)
+	}
+}
+
+func TestMasqueradeRule(t *testing.T) {
+	for _, testcase := range []bool{false, true} {
+		ipt := iptablestest.NewFake().SetHasRandomFully(testcase)
+		fp := NewFakeProxier(ipt, false)
+		makeServiceMap(fp)
+		makeEndpointsMap(fp)
+		fp.syncProxyRules()
+
+		postRoutingRules := ipt.GetRules(string(kubePostroutingChain))
+		if !hasJump(postRoutingRules, "MASQUERADE", "", 0) {
+			errorf(fmt.Sprintf("Failed to find -j MASQUERADE in %s chain", kubePostroutingChain), postRoutingRules, t)
+		}
+		if hasMasqRandomFully(postRoutingRules) != testcase {
+			probs := map[bool]string{false: "found", true: "did not find"}
+			errorf(fmt.Sprintf("%s --random-fully in -j MASQUERADE rule in %s chain when HasRandomFully()==%v", probs[testcase], kubePostroutingChain, testcase), postRoutingRules, t)
+		}
 	}
 }
 
@@ -2335,9 +2364,9 @@ COMMIT
 	ipAddressType := discovery.AddressTypeIP
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:            fmt.Sprintf("%s-1", serviceName),
-			Namespace:       namespaceName,
-			OwnerReferences: []metav1.OwnerReference{{Kind: "Service", Name: serviceName}},
+			Name:      fmt.Sprintf("%s-1", serviceName),
+			Namespace: namespaceName,
+			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports: []discovery.EndpointPort{{
 			Name: utilpointer.StringPtr(""),
