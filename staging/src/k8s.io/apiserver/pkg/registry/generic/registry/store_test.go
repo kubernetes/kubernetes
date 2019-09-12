@@ -316,13 +316,13 @@ func TestStoreCreate(t *testing.T) {
 	}
 
 	// create the object with denying admission
-	objA, err := registry.Create(testContext, podA, denyCreateValidation, &metav1.CreateOptions{})
+	_, err := registry.Create(testContext, podA, denyCreateValidation, &metav1.CreateOptions{})
 	if err == nil {
 		t.Errorf("Expected admission error: %v", err)
 	}
 
 	// create the object
-	objA, err = registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
+	objA, err := registry.Create(testContext, podA, rest.ValidateAllObjectFunc, &metav1.CreateOptions{})
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -1335,6 +1335,9 @@ func TestStoreDeletionPropagation(t *testing.T) {
 			t.Fatalf("Unexpected error: %v", err)
 		}
 		_, _, err = registry.Delete(testContext, pod.Name, rest.ValidateAllObjectFunc, tc.options)
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
 		obj, err := registry.Get(testContext, pod.Name, &metav1.GetOptions{})
 		if tc.expectedNotFound {
 			if err == nil || !errors.IsNotFound(err) {
