@@ -155,7 +155,8 @@ const (
 	CapRWX                 Capability = "RWX"                 // support ReadWriteMany access modes
 	CapControllerExpansion Capability = "controllerExpansion" // support volume expansion for controller
 	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
-	CapVolumeLimits                   = "volumeLimits"        // support volume limits (can be *very* slow)
+	CapVolumeLimits        Capability = "volumeLimits"        // support volume limits (can be *very* slow)
+	CapSingleNodeVolume    Capability = "singleNodeVolume"    // support volume that can run on single node (like hostpath)
 )
 
 // DriverInfo represents static information about a TestDriver.
