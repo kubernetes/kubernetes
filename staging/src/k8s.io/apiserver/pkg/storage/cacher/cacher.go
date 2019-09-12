@@ -624,7 +624,10 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 		return err
 	}
 	listVal, err := conversion.EnforcePtr(listPtr)
-	if err != nil || listVal.Kind() != reflect.Slice {
+	if err != nil {
+		return err
+	}
+	if listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 	filter := filterWithAttrsFunction(key, pred)
@@ -693,7 +696,10 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		return err
 	}
 	listVal, err := conversion.EnforcePtr(listPtr)
-	if err != nil || listVal.Kind() != reflect.Slice {
+	if err != nil {
+		return err
+	}
+	if listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 	filter := filterWithAttrsFunction(key, pred)
