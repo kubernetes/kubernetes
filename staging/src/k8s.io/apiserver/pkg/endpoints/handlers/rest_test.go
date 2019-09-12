@@ -849,6 +849,8 @@ func TestFinishRequest(t *testing.T) {
 		expectedObj   runtime.Object
 		expectedErr   error
 		expectedPanic string
+
+		expectedPanicObj interface{}
 	}{
 		{
 			name:    "Expected obj is returned",
@@ -906,6 +908,17 @@ func TestFinishRequest(t *testing.T) {
 			expectedErr:   nil,
 			expectedPanic: "rest_test.go",
 		},
+		{
+			name:    "http.ErrAbortHandler panic is propagated without wrapping with stack",
+			timeout: time.Second,
+			fn: func() (runtime.Object, error) {
+				panic(http.ErrAbortHandler)
+			},
+			expectedObj:      nil,
+			expectedErr:      nil,
+			expectedPanic:    http.ErrAbortHandler.Error(),
+			expectedPanicObj: http.ErrAbortHandler,
+		},
 	}
 	for i, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -918,6 +931,10 @@ func TestFinishRequest(t *testing.T) {
 					t.Errorf("unexpected panic: %v", r)
 				case r != nil && len(tc.expectedPanic) > 0 && !strings.Contains(fmt.Sprintf("%v", r), tc.expectedPanic):
 					t.Errorf("expected panic containing '%s', got '%v'", tc.expectedPanic, r)
+				}
+
+				if tc.expectedPanicObj != nil && !reflect.DeepEqual(tc.expectedPanicObj, r) {
+					t.Errorf("expected panic obj %#v, got %#v", tc.expectedPanicObj, r)
 				}
 			}()
 			obj, err := finishRequest(tc.timeout, tc.fn)
