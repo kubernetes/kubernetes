@@ -23,8 +23,8 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
-	authenticationv1 "k8s.io/api/authentication/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/authentication/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	types "k8s.io/apimachinery/pkg/types"
@@ -139,11 +139,8 @@ func autoConvert_v1alpha1_Event_To_audit_Event(in *Event, out *audit.Event, s co
 	out.Stage = audit.Stage(in.Stage)
 	out.RequestURI = in.RequestURI
 	out.Verb = in.Verb
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.User, &out.User, 0); err != nil {
-		return err
-	}
-	out.ImpersonatedUser = (*audit.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
+	out.User = in.User
+	out.ImpersonatedUser = (*v1.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
 	out.UserAgent = in.UserAgent
 	if in.ObjectRef != nil {
@@ -155,7 +152,7 @@ func autoConvert_v1alpha1_Event_To_audit_Event(in *Event, out *audit.Event, s co
 	} else {
 		out.ObjectRef = nil
 	}
-	out.ResponseStatus = (*v1.Status)(unsafe.Pointer(in.ResponseStatus))
+	out.ResponseStatus = (*metav1.Status)(unsafe.Pointer(in.ResponseStatus))
 	out.RequestObject = (*runtime.Unknown)(unsafe.Pointer(in.RequestObject))
 	out.ResponseObject = (*runtime.Unknown)(unsafe.Pointer(in.ResponseObject))
 	out.RequestReceivedTimestamp = in.RequestReceivedTimestamp
@@ -170,11 +167,8 @@ func autoConvert_audit_Event_To_v1alpha1_Event(in *audit.Event, out *Event, s co
 	out.Stage = Stage(in.Stage)
 	out.RequestURI = in.RequestURI
 	out.Verb = in.Verb
-	// TODO: Inefficient conversion - can we improve it?
-	if err := s.Convert(&in.User, &out.User, 0); err != nil {
-		return err
-	}
-	out.ImpersonatedUser = (*authenticationv1.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
+	out.User = in.User
+	out.ImpersonatedUser = (*v1.UserInfo)(unsafe.Pointer(in.ImpersonatedUser))
 	out.SourceIPs = *(*[]string)(unsafe.Pointer(&in.SourceIPs))
 	out.UserAgent = in.UserAgent
 	if in.ObjectRef != nil {
@@ -186,7 +180,7 @@ func autoConvert_audit_Event_To_v1alpha1_Event(in *audit.Event, out *Event, s co
 	} else {
 		out.ObjectRef = nil
 	}
-	out.ResponseStatus = (*v1.Status)(unsafe.Pointer(in.ResponseStatus))
+	out.ResponseStatus = (*metav1.Status)(unsafe.Pointer(in.ResponseStatus))
 	out.RequestObject = (*runtime.Unknown)(unsafe.Pointer(in.RequestObject))
 	out.ResponseObject = (*runtime.Unknown)(unsafe.Pointer(in.ResponseObject))
 	out.RequestReceivedTimestamp = in.RequestReceivedTimestamp
