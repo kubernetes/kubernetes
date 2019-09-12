@@ -24,7 +24,7 @@ spec:
       labels:
         k8s-app: kubernetes-dashboard
       annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'docker/default'
+        seccomp.security.alpha.kubernetes.io/pod: 'runtime/default'
     spec:
       priorityClassName: system-cluster-critical
       containers:
@@ -55,6 +55,12 @@ spec:
             port: 8443
           initialDelaySeconds: 30
           timeoutSeconds: 30
+        securityContext:
+          runAsNonRoot: true
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsUser: 1001
+          runAsGroup: 2001
       volumes:
       - name: kubernetes-dashboard-certs
         secret:
