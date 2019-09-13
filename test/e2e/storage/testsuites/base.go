@@ -34,7 +34,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
-	csilib "k8s.io/csi-translation-lib"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/podlogs"
@@ -557,7 +557,8 @@ func addOpCounts(o1 opCounts, o2 opCounts) opCounts {
 func getMigrationVolumeOpCounts(cs clientset.Interface, pluginName string) (opCounts, opCounts) {
 	if len(pluginName) > 0 {
 		var migratedOps opCounts
-		csiName, err := csilib.GetCSINameFromInTreeName(pluginName)
+		l := csitrans.New()
+		csiName, err := l.GetCSINameFromInTreeName(pluginName)
 		if err != nil {
 			framework.Logf("Could not find CSI Name for in-tree plugin %v", pluginName)
 			migratedOps = opCounts{}

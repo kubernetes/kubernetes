@@ -61,12 +61,13 @@ func TestTranslationStability(t *testing.T) {
 		},
 	}
 	for _, test := range testCases {
+		ctl := New()
 		t.Logf("Testing %v", test.name)
-		csiSource, err := TranslateInTreePVToCSI(test.pv)
+		csiSource, err := ctl.TranslateInTreePVToCSI(test.pv)
 		if err != nil {
 			t.Errorf("Error when translating to CSI: %v", err)
 		}
-		newPV, err := TranslateCSIPVToInTree(csiSource)
+		newPV, err := ctl.TranslateCSIPVToInTree(csiSource)
 		if err != nil {
 			t.Errorf("Error when translating CSI Source to in tree volume: %v", err)
 		}
@@ -95,18 +96,19 @@ func TestPluginNameMappings(t *testing.T) {
 	}
 	for _, test := range testCases {
 		t.Logf("Testing %v", test.name)
-		csiPluginName, err := GetCSINameFromInTreeName(test.inTreePluginName)
+		ctl := New()
+		csiPluginName, err := ctl.GetCSINameFromInTreeName(test.inTreePluginName)
 		if err != nil {
 			t.Errorf("Error when mapping In-tree plugin name to CSI plugin name %s", err)
 		}
-		if !IsMigratedCSIDriverByName(csiPluginName) {
+		if !ctl.IsMigratedCSIDriverByName(csiPluginName) {
 			t.Errorf("%s expected to supersede an In-tree plugin", csiPluginName)
 		}
-		inTreePluginName, err := GetInTreeNameFromCSIName(csiPluginName)
+		inTreePluginName, err := ctl.GetInTreeNameFromCSIName(csiPluginName)
 		if err != nil {
 			t.Errorf("Error when mapping CSI plugin name to In-tree plugin name %s", err)
 		}
-		if !IsMigratableIntreePluginByName(inTreePluginName) {
+		if !ctl.IsMigratableIntreePluginByName(inTreePluginName) {
 			t.Errorf("%s expected to be migratable to a CSI name", inTreePluginName)
 		}
 		if inTreePluginName != test.inTreePluginName || csiPluginName != test.csiPluginName {

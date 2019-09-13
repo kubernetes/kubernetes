@@ -36,6 +36,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/pkg/controller"
 	cloudcontroller "k8s.io/kubernetes/pkg/controller/cloud"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -309,7 +310,8 @@ func startVolumeExpandController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.InformerFactory.Core().V1().PersistentVolumes(),
 			ctx.InformerFactory.Storage().V1().StorageClasses(),
 			ctx.Cloud,
-			ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration))
+			ProbeExpandableVolumePlugins(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),
+			csitrans.New())
 
 		if expandControllerErr != nil {
 			return nil, true, fmt.Errorf("failed to start volume expand controller : %v", expandControllerErr)
