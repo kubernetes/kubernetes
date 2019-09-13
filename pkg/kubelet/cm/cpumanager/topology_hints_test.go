@@ -23,6 +23,7 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
@@ -32,7 +33,7 @@ func topologyHintLessThan(a topologymanager.TopologyHint, b topologymanager.Topo
 	if a.Preferred != b.Preferred {
 		return a.Preferred == true
 	}
-	return a.SocketAffinity.IsNarrowerThan(b.SocketAffinity)
+	return a.NUMANodeAffinity.IsNarrowerThan(b.NUMANodeAffinity)
 }
 
 func TestGetTopologyHints(t *testing.T) {
@@ -49,91 +50,119 @@ func TestGetTopologyHints(t *testing.T) {
 	secondSocketMask, _ := socketmask.NewSocketMask(1)
 	crossSocketMask, _ := socketmask.NewSocketMask(0, 1)
 
-	m := manager{
-		policy: &staticPolicy{},
-		machineInfo: &cadvisorapi.MachineInfo{
-			NumCores: 12,
-			Topology: []cadvisorapi.Node{
-				{Id: 0,
-					Cores: []cadvisorapi.Core{
-						{Id: 0, Threads: []int{0, 6}},
-						{Id: 1, Threads: []int{1, 7}},
-						{Id: 2, Threads: []int{2, 8}},
-					},
+	machineInfo := cadvisorapi.MachineInfo{
+		NumCores: 12,
+		Topology: []cadvisorapi.Node{
+			{Id: 0,
+				Cores: []cadvisorapi.Core{
+					{Id: 0, Threads: []int{0, 6}},
+					{Id: 1, Threads: []int{1, 7}},
+					{Id: 2, Threads: []int{2, 8}},
 				},
-				{Id: 1,
-					Cores: []cadvisorapi.Core{
-						{Id: 0, Threads: []int{3, 9}},
-						{Id: 1, Threads: []int{4, 10}},
-						{Id: 2, Threads: []int{5, 11}},
-					},
+			},
+			{Id: 1,
+				Cores: []cadvisorapi.Core{
+					{Id: 0, Threads: []int{3, 9}},
+					{Id: 1, Threads: []int{4, 10}},
+					{Id: 2, Threads: []int{5, 11}},
 				},
 			},
 		},
-		state: &mockState{
-			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
-		},
+	}
+
+	numaNodeInfo := topology.NUMANodeInfo{
+		0: cpuset.NewCPUSet(0, 6, 1, 7, 2, 8),
+		1: cpuset.NewCPUSet(3, 9, 4, 10, 5, 11),
 	}
 
 	tcases := []struct {
 		name          string
 		pod           v1.Pod
 		container     v1.Container
+		defaultCPUSet cpuset.CPUSet
 		expectedHints []topologymanager.TopologyHint
 	}{
 		{
-			name:      "Request 2 CPUs; 4 available on Socket 0, 6 available on Socket 1",
-			pod:       *testPod1,
-			container: *testContainer1,
+			name:          "Request 2 CPUs, 4 available on NUMA 0, 6 available on NUMA 1",
+			pod:           *testPod1,
+			container:     *testContainer1,
+			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expectedHints: []topologymanager.TopologyHint{
 				{
-					SocketAffinity: firstSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: firstSocketMask,
+					Preferred:        true,
 				},
 				{
-					SocketAffinity: secondSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: secondSocketMask,
+					Preferred:        true,
 				},
 				{
-					SocketAffinity: crossSocketMask,
-					Preferred:      false,
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        false,
 				},
 			},
 		},
 		{
-			name:      "Request 5 CPUs; 4 available on Socket 0, 6 available on Socket 1",
-			pod:       *testPod2,
-			container: *testContainer2,
+			name:          "Request 5 CPUs, 4 available on NUMA 0, 6 available on NUMA 1",
+			pod:           *testPod2,
+			container:     *testContainer2,
+			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expectedHints: []topologymanager.TopologyHint{
 				{
-					SocketAffinity: secondSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: secondSocketMask,
+					Preferred:        true,
 				},
 				{
-					SocketAffinity: crossSocketMask,
-					Preferred:      false,
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        false,
 				},
 			},
 		},
 		{
-			name:      "Request 7 CPUs, 4 available on Socket 0, 6 available on Socket 1",
-			pod:       *testPod3,
-			container: *testContainer3,
+			name:          "Request 7 CPUs, 4 available on NUMA 0, 6 available on NUMA 1",
+			pod:           *testPod3,
+			container:     *testContainer3,
+			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expectedHints: []topologymanager.TopologyHint{
 				{
-					SocketAffinity: crossSocketMask,
-					Preferred:      true,
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        true,
 				},
 			},
 		},
 		{
-			name:          "Request 11 CPUs, 4 available on Socket 0, 6 available on Socket 1",
+			name:          "Request 11 CPUs, 4 available on NUMA 0, 6 available on NUMA 1",
 			pod:           *testPod4,
 			container:     *testContainer4,
+			defaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expectedHints: nil,
+		},
+		{
+			name:          "Request 2 CPUs, 1 available on NUMA 0, 1 available on NUMA 1",
+			pod:           *testPod1,
+			container:     *testContainer1,
+			defaultCPUSet: cpuset.NewCPUSet(0, 3),
+			expectedHints: []topologymanager.TopologyHint{
+				{
+					NUMANodeAffinity: crossSocketMask,
+					Preferred:        false,
+				},
+			},
 		},
 	}
 	for _, tc := range tcases {
+		topology, _ := topology.Discover(&machineInfo, numaNodeInfo)
+
+		m := manager{
+			policy: &staticPolicy{
+				topology: topology,
+			},
+			state: &mockState{
+				defaultCPUSet: tc.defaultCPUSet,
+			},
+			topology: topology,
+		}
+
 		hints := m.GetTopologyHints(tc.pod, tc.container)[string(v1.ResourceCPU)]
 		if len(tc.expectedHints) == 0 && len(hints) == 0 {
 			continue

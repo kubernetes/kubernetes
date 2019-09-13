@@ -39,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -570,7 +569,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 
 				for _, pod := range pods {
 					if err := deletePodAndPVCs(config, pod); err != nil {
-						e2elog.Logf("Deleting pod %v failed: %v", pod.Name, err)
+						framework.Logf("Deleting pod %v failed: %v", pod.Name, err)
 					}
 				}
 			}()
@@ -594,7 +593,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 						}
 						delete(pods, pod.Name)
 						numFinished++
-						e2elog.Logf("%v/%v pods finished", numFinished, totalPods)
+						framework.Logf("%v/%v pods finished", numFinished, totalPods)
 					case v1.PodFailed:
 					case v1.PodUnknown:
 						return false, fmt.Errorf("pod %v is in %v phase", pod.Name, pod.Status.Phase)
@@ -674,7 +673,7 @@ var _ = utils.SIGDescribe("PersistentVolumes-local ", func() {
 })
 
 func deletePodAndPVCs(config *localTestConfig, pod *v1.Pod) error {
-	e2elog.Logf("Deleting pod %v", pod.Name)
+	framework.Logf("Deleting pod %v", pod.Name)
 	if err := config.client.CoreV1().Pods(config.ns).Delete(pod.Name, nil); err != nil {
 		return err
 	}
@@ -827,7 +826,7 @@ func cleanupLocalPVCsPVs(config *localTestConfig, volumes []*localTestVolume) {
 		ginkgo.By("Cleaning up PVC and PV")
 		errs := framework.PVPVCCleanup(config.client, config.ns, volume.pv, volume.pvc)
 		if len(errs) > 0 {
-			e2elog.Failf("Failed to delete PV and/or PVC: %v", utilerrors.NewAggregate(errs))
+			framework.Failf("Failed to delete PV and/or PVC: %v", utilerrors.NewAggregate(errs))
 		}
 	}
 }
@@ -848,7 +847,7 @@ func verifyLocalVolume(config *localTestConfig, volume *localTestVolume) {
 func verifyLocalPod(config *localTestConfig, volume *localTestVolume, pod *v1.Pod, expectedNodeName string) {
 	podNodeName, err := podNodeName(config, pod)
 	framework.ExpectNoError(err)
-	e2elog.Logf("pod %q created on Node %q", pod.Name, podNodeName)
+	framework.Logf("pod %q created on Node %q", pod.Name, podNodeName)
 	framework.ExpectEqual(podNodeName, expectedNodeName)
 }
 
@@ -868,11 +867,11 @@ func makeLocalPVConfig(config *localTestConfig, volume *localTestVolume) framewo
 	// TODO: hostname may not be the best option
 	nodeKey := "kubernetes.io/hostname"
 	if volume.ltr.Node.Labels == nil {
-		e2elog.Failf("Node does not have labels")
+		framework.Failf("Node does not have labels")
 	}
 	nodeValue, found := volume.ltr.Node.Labels[nodeKey]
 	if !found {
-		e2elog.Failf("Node does not have required label %q", nodeKey)
+		framework.Failf("Node does not have required label %q", nodeKey)
 	}
 
 	pvConfig := framework.PersistentVolumeConfig{
@@ -1031,7 +1030,7 @@ func testReadFileContent(testFileDir string, testFile string, testFileContent st
 // Fail on error
 func podRWCmdExec(pod *v1.Pod, cmd string) string {
 	out, err := utils.PodExec(pod, cmd)
-	e2elog.Logf("podRWCmdExec out: %q err: %v", out, err)
+	framework.Logf("podRWCmdExec out: %q err: %v", out, err)
 	framework.ExpectNoError(err)
 	return out
 }

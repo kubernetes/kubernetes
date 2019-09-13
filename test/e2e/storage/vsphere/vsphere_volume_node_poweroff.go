@@ -33,7 +33,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -99,9 +98,9 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create Deployment with err: %v", err))
 		defer client.AppsV1().Deployments(namespace).Delete(deployment.Name, &metav1.DeleteOptions{})
 
-		ginkgo.By("Get pod from the deployement")
+		ginkgo.By("Get pod from the deployment")
 		podList, err := e2edeploy.GetPodsForDeployment(client, deployment)
-		framework.ExpectNoError(err, fmt.Sprintf("Failed to get pod from the deployement with err: %v", err))
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to get pod from the deployment with err: %v", err))
 		gomega.Expect(podList.Items).NotTo(gomega.BeEmpty())
 		pod := podList.Items[0]
 		node1 := pod.Spec.NodeName
@@ -159,19 +158,19 @@ func waitForPodToFailover(client clientset.Interface, deployment *appsv1.Deploym
 		}
 
 		if newNode != oldNode {
-			e2elog.Logf("The pod has been failed over from %q to %q", oldNode, newNode)
+			framework.Logf("The pod has been failed over from %q to %q", oldNode, newNode)
 			return true, nil
 		}
 
-		e2elog.Logf("Waiting for pod to be failed over from %q", oldNode)
+		framework.Logf("Waiting for pod to be failed over from %q", oldNode)
 		return false, nil
 	})
 
 	if err != nil {
 		if err == wait.ErrWaitTimeout {
-			e2elog.Logf("Time out after waiting for %v", timeout)
+			framework.Logf("Time out after waiting for %v", timeout)
 		}
-		e2elog.Logf("Pod did not fail over from %q with error: %v", oldNode, err)
+		framework.Logf("Pod did not fail over from %q with error: %v", oldNode, err)
 		return "", err
 	}
 

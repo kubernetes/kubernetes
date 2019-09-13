@@ -18,128 +18,579 @@ package printers
 
 import (
 	"bytes"
-	"fmt"
-	"reflect"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-var testNamespaceColumnDefinitions = []metav1beta1.TableColumnDefinition{
-	{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
-	{Name: "Status", Type: "string", Description: "The status of the namespace"},
-	{Name: "Age", Type: "string", Description: metav1.ObjectMeta{}.SwaggerDoc()["creationTimestamp"]},
+var testPodName = "test-pod-name"
+var testPodNamespace = "test-namespace"
+
+var testPod = &corev1.Pod{
+	TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      testPodName,
+		Namespace: testPodNamespace,
+		Labels: map[string]string{
+			"first-label":  "12",
+			"second-label": "label-value",
+		},
+	},
 }
 
-func testPrintNamespace(obj *corev1.Namespace, options PrintOptions) ([]metav1beta1.TableRow, error) {
-	if options.WithNamespace {
-		return nil, fmt.Errorf("namespace is not namespaced")
-	}
-	row := metav1beta1.TableRow{
-		Object: runtime.RawExtension{Object: obj},
-	}
-	row.Cells = append(row.Cells, obj.Name, obj.Status.Phase, "<unknown>")
-	return []metav1beta1.TableRow{row}, nil
+var testStatus = &metav1.Status{
+	TypeMeta: metav1.TypeMeta{APIVersion: "metav1", Kind: "Status"},
+	Status:   "Failure",
+	Message:  "test-status-message",
+	Reason:   "test-status-reason",
 }
 
-func TestPrintRowsForHandlerEntry(t *testing.T) {
-	printFunc := reflect.ValueOf(testPrintNamespace)
-
-	testCase := []struct {
-		name          string
-		h             *printHandler
-		opt           PrintOptions
-		eventType     string
-		obj           runtime.Object
-		includeHeader bool
-		expectOut     string
-		expectErr     string
+func TestPrintTable_MissingColumnsRows(t *testing.T) {
+	tests := []struct {
+		columns  []metav1.TableColumnDefinition
+		rows     []metav1.TableRow
+		options  PrintOptions
+		expected string
 	}{
+		// No columns and no rows means table string is empty.
 		{
-			name: "no tablecolumndefinition and includeheader flase",
-			h: &printHandler{
-				columnDefinitions: []metav1beta1.TableColumnDefinition{},
-				printFunc:         printFunc,
-			},
-			opt: PrintOptions{},
-			obj: &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: "test"},
-			},
-			includeHeader: false,
-			expectOut:     "test\t\t<unknown>\n",
+			columns:  []metav1.TableColumnDefinition{},
+			rows:     []metav1.TableRow{},
+			options:  PrintOptions{},
+			expected: "",
 		},
+		// No rows, means table string is empty (columns aren't printed).
 		{
-			name: "no tablecolumndefinition and includeheader true",
-			h: &printHandler{
-				columnDefinitions: []metav1beta1.TableColumnDefinition{},
-				printFunc:         printFunc,
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
 			},
-			opt: PrintOptions{},
-			obj: &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: "test"},
-			},
-			includeHeader: true,
-			expectOut:     "\ntest\t\t<unknown>\n",
-		},
-		{
-			name: "have tablecolumndefinition and includeheader true",
-			h: &printHandler{
-				columnDefinitions: testNamespaceColumnDefinitions,
-				printFunc:         printFunc,
-			},
-			opt: PrintOptions{},
-			obj: &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: "test"},
-			},
-			includeHeader: true,
-			expectOut:     "NAME\tSTATUS\tAGE\ntest\t\t<unknown>\n",
-		},
-		{
-			name: "with event type",
-			h: &printHandler{
-				columnDefinitions: testNamespaceColumnDefinitions,
-				printFunc:         printFunc,
-			},
-			opt:       PrintOptions{},
-			eventType: "ADDED",
-			obj: &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: "test"},
-			},
-			includeHeader: true,
-			expectOut:     "EVENT\tNAME\tSTATUS\tAGE\nADDED   \ttest\t\t<unknown>\n",
-		},
-		{
-			name: "print namespace and withnamespace true, should not print header",
-			h: &printHandler{
-				columnDefinitions: testNamespaceColumnDefinitions,
-				printFunc:         printFunc,
-			},
-			opt: PrintOptions{
-				WithNamespace: true,
-			},
-			obj: &corev1.Namespace{
-				ObjectMeta: metav1.ObjectMeta{Name: "test"},
-			},
-			includeHeader: true,
-			expectOut:     "",
-			expectErr:     "namespace is not namespaced",
+			rows:     []metav1.TableRow{},
+			options:  PrintOptions{},
+			expected: "",
 		},
 	}
-	for _, test := range testCase {
-		t.Run(test.name, func(t *testing.T) {
-			buffer := &bytes.Buffer{}
-			err := printRowsForHandlerEntry(buffer, test.h, test.eventType, test.obj, test.opt, test.includeHeader)
-			if err != nil {
-				if err.Error() != test.expectErr {
-					t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", test.name, test.expectErr, err)
-				}
-			}
-			if test.expectOut != buffer.String() {
-				t.Errorf("[%s]expect:\n %v\n but got:\n %v\n", test.name, test.expectOut, buffer.String())
-			}
-		})
+
+	for _, test := range tests {
+		// Create the table from the columns and rows.
+		table := &metav1.Table{
+			ColumnDefinitions: test.columns,
+			Rows:              test.rows,
+		}
+		// Print the table
+		out := bytes.NewBuffer([]byte{})
+		printer := NewTablePrinter(test.options)
+		printer.PrintObj(table, out)
+
+		// Validate the printed table is empty.
+		if len(out.String()) > 0 {
+			t.Errorf("Error Printing Table. Should be empty; got (%s)", out.String())
+		}
+	}
+}
+
+func TestPrintTable_ColumnPriority(t *testing.T) {
+	tests := []struct {
+		columns  []metav1.TableColumnDefinition
+		rows     []metav1.TableRow
+		options  PrintOptions
+		expected string
+	}{
+		// Test a basic single row table. Columns with priority > 0 are not printed.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer", Priority: 1}, // Priority > 0
+				{Name: "Age", Type: "string", Priority: 1},      // Priority > 0
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+			},
+			options:  PrintOptions{},
+			expected: "NAME    READY   STATUS\ntest1   1/1     podPhase\n",
+		},
+		// Test a basic multi-row table row table. Columns with priority > 0 are not printed.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer", Priority: 1}, // Priority > 0
+				{Name: "Age", Type: "string", Priority: 1},      // Priority > 0
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+				{Cells: []interface{}{"test2", "1/2", "podPhase", int64(30), "21h"}},
+				{Cells: []interface{}{"test3", "4/4", "podPhase", int64(1), "22h"}},
+			},
+			options: PrintOptions{},
+			expected: `NAME    READY   STATUS
+test1   1/1     podPhase
+test2   1/2     podPhase
+test3   4/4     podPhase
+`,
+		},
+		// Test a single row table with "wide" printing option. Columns with priority > 0 are printed.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer", Priority: 1},
+				{Name: "Age", Type: "string", Priority: 1},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+			},
+			// Print with no headers.
+			options:  PrintOptions{Wide: true},
+			expected: "NAME    READY   STATUS     RETRIES   AGE\ntest1   1/1     podPhase   5         20h\n",
+		},
+		// Test a multi-row table row table with "wide" printing option. Columns with priority > 0 are printed.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer", Priority: 1},
+				{Name: "Age", Type: "string", Priority: 1},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+				{Cells: []interface{}{"test2", "1/2", "podPhase", int64(30), "21h"}},
+				{Cells: []interface{}{"test3", "4/4", "podPhase", int64(1), "22h"}},
+			},
+			options: PrintOptions{Wide: true},
+			expected: `NAME    READY   STATUS     RETRIES   AGE
+test1   1/1     podPhase   5         20h
+test2   1/2     podPhase   30        21h
+test3   4/4     podPhase   1         22h
+`,
+		},
+	}
+	for _, test := range tests {
+		// Create the table from the columns and rows.
+		table := &metav1.Table{
+			ColumnDefinitions: test.columns,
+			Rows:              test.rows,
+		}
+		// Print the table
+		out := bytes.NewBuffer([]byte{})
+		printer := NewTablePrinter(test.options)
+		printer.PrintObj(table, out)
+		// Validate the expected output matches the printed table.
+		if test.expected != out.String() {
+			t.Errorf("Table printing error: expected (%s), got (%s)", test.expected, out.String())
+		}
+	}
+}
+
+func TestPrintTable_ColumnHeaders(t *testing.T) {
+	tests := []struct {
+		columns  []metav1.TableColumnDefinition
+		rows     []metav1.TableRow
+		options  PrintOptions
+		expected string
+	}{
+		// Test a basic single row table, shows columns.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+			},
+			options:  PrintOptions{},
+			expected: "NAME    READY   STATUS     RETRIES   AGE\ntest1   1/1     podPhase   5         20h\n",
+		},
+		// Test a basic multi-row table row table, shows columns.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+				{Cells: []interface{}{"test2", "1/2", "podPhase", int64(30), "21h"}},
+				{Cells: []interface{}{"test3", "4/4", "podPhase", int64(1), "22h"}},
+			},
+			options: PrintOptions{},
+			expected: `NAME    READY   STATUS     RETRIES   AGE
+test1   1/1     podPhase   5         20h
+test2   1/2     podPhase   30        21h
+test3   4/4     podPhase   1         22h
+`,
+		},
+		// Test a single row table with "NoHeaders" option, doesn't print columns.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+			},
+			// Print with no headers.
+			options:  PrintOptions{NoHeaders: true},
+			expected: "test1   1/1   podPhase   5     20h\n",
+		},
+		// Test a multi-row table row table with "NoHeaders" option, doesn't print columns.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"}},
+				{Cells: []interface{}{"test2", "1/2", "podPhase", int64(30), "21h"}},
+				{Cells: []interface{}{"test3", "4/4", "podPhase", int64(1), "22h"}},
+			},
+			options: PrintOptions{NoHeaders: true},
+			expected: `test1   1/1   podPhase   5     20h
+test2   1/2   podPhase   30    21h
+test3   4/4   podPhase   1     22h
+`,
+		},
+	}
+	for _, test := range tests {
+		// Create the table from the columns and rows.
+		table := &metav1.Table{
+			ColumnDefinitions: test.columns,
+			Rows:              test.rows,
+		}
+		// Print the table
+		out := bytes.NewBuffer([]byte{})
+		printer := NewTablePrinter(test.options)
+		printer.PrintObj(table, out)
+		// Validate the expected output matches the printed table.
+		if test.expected != out.String() {
+			t.Errorf("Table printing error: expected (%s), got (%s)", test.expected, out.String())
+		}
+	}
+}
+
+func TestPrintTable_WithNamespace(t *testing.T) {
+	tests := []struct {
+		columns  []metav1.TableColumnDefinition
+		rows     []metav1.TableRow
+		options  PrintOptions
+		expected string
+	}{
+		// Test a single row table "WithNamespace" option, prepends NAMESPACE column.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			// Print with namespace column prepended.
+			options: PrintOptions{WithNamespace: true},
+			expected: `NAMESPACE        NAME    READY   STATUS     RETRIES   AGE
+test-namespace   test1   1/1     podPhase   5         20h
+`,
+		},
+	}
+	for _, test := range tests {
+		// Create the table from the columns and rows.
+		table := &metav1.Table{
+			ColumnDefinitions: test.columns,
+			Rows:              test.rows,
+		}
+		// Print the table
+		out := bytes.NewBuffer([]byte{})
+		printer := NewTablePrinter(test.options)
+		printer.PrintObj(table, out)
+		// Validate the expected output matches the printed table.
+		if test.expected != out.String() {
+			t.Errorf("Table printing error: expected (%s), got (%s)", test.expected, out.String())
+		}
+	}
+}
+
+func TestPrintTable_WithKind(t *testing.T) {
+	tests := []struct {
+		columns  []metav1.TableColumnDefinition
+		rows     []metav1.TableRow
+		options  PrintOptions
+		expected string
+	}{
+		// Test a single row table "WithKind" option, prepends "pod" to name.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string", Format: "name"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells: []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+				},
+			},
+			// Print with Kind "pod" prepended to name.
+			options: PrintOptions{WithKind: true, Kind: schema.GroupKind{Kind: "Pod"}},
+			expected: `NAME        READY   STATUS     RETRIES   AGE
+pod/test1   1/1     podPhase   5         20h
+`,
+		},
+	}
+	for _, test := range tests {
+		// Create the table from the columns and rows.
+		table := &metav1.Table{
+			ColumnDefinitions: test.columns,
+			Rows:              test.rows,
+		}
+		// Print the table
+		out := bytes.NewBuffer([]byte{})
+		printer := NewTablePrinter(test.options)
+		printer.PrintObj(table, out)
+		// Validate the expected output matches the printed table.
+		if test.expected != out.String() {
+			t.Errorf("Table printing error: expected (%s), got (%s)", test.expected, out.String())
+		}
+	}
+}
+
+func TestPrintTable_WithLabels(t *testing.T) {
+	tests := []struct {
+		columns  []metav1.TableColumnDefinition
+		rows     []metav1.TableRow
+		options  PrintOptions
+		expected string
+	}{
+		// Test a table "ShowLabels" option, appends labels as columns.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			options: PrintOptions{ShowLabels: true},
+			expected: `NAME    READY   STATUS     RETRIES   AGE   LABELS
+test1   1/1     podPhase   5         20h   first-label=12,second-label=label-value
+`,
+		},
+		// Test a table "ColumnLabels" option, appends labels as columns.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			// Print "second-label" as column name, with label value.
+			options: PrintOptions{ColumnLabels: []string{"second-label"}},
+			expected: `NAME    READY   STATUS     RETRIES   AGE   SECOND-LABEL
+test1   1/1     podPhase   5         20h   label-value
+`,
+		},
+		// Test a table "ColumnLabels" option, appends labels as columns.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			// Print multiple-labels as columns, with their values.
+			options: PrintOptions{ColumnLabels: []string{"first-label", "second-label"}},
+			expected: `NAME    READY   STATUS     RETRIES   AGE   FIRST-LABEL   SECOND-LABEL
+test1   1/1     podPhase   5         20h   12            label-value
+`,
+		},
+	}
+	for _, test := range tests {
+		// Create the table from the columns and rows.
+		table := &metav1.Table{
+			ColumnDefinitions: test.columns,
+			Rows:              test.rows,
+		}
+		// Print the table
+		out := bytes.NewBuffer([]byte{})
+		printer := NewTablePrinter(test.options)
+		printer.PrintObj(table, out)
+		// Validate the expected output matches the printed table.
+		if test.expected != out.String() {
+			t.Errorf("Table printing error: expected (%s), got (%s)", test.expected, out.String())
+		}
+	}
+}
+
+func TestPrintTable_NonTable(t *testing.T) {
+	tests := []struct {
+		object   runtime.Object
+		options  PrintOptions
+		expected string
+	}{
+		// Test non-table default printing for a pod.
+		{
+			object:   testPod,
+			options:  PrintOptions{},
+			expected: "NAME            AGE\ntest-pod-name   <unknown>\n",
+		},
+		// Test non-table default printing for a pod with "NoHeaders" option.
+		{
+			object:   testPod,
+			options:  PrintOptions{NoHeaders: true},
+			expected: "test-pod-name   <unknown>\n",
+		},
+		// Test non-table default printing for a pod with "WithNamespace" option.
+		{
+			object:   testPod,
+			options:  PrintOptions{WithNamespace: true},
+			expected: "NAMESPACE        NAME            AGE\ntest-namespace   test-pod-name   <unknown>\n",
+		},
+		// Test non-table default printing for a pod with "ShowLabels" option.
+		{
+			object:  testPod,
+			options: PrintOptions{ShowLabels: true},
+			expected: `NAME            AGE         LABELS
+test-pod-name   <unknown>   first-label=12,second-label=label-value
+`,
+		},
+		// Test non-table default printing for a Status resource.
+		{
+			object:  testStatus,
+			options: PrintOptions{},
+			expected: `STATUS    REASON               MESSAGE
+Failure   test-status-reason   test-status-message
+`,
+		},
+		// Test non-table default printing for a Status resource with NoHeaders options.
+		{
+			object:   testStatus,
+			options:  PrintOptions{NoHeaders: true},
+			expected: "Failure   test-status-reason   test-status-message\n",
+		},
+	}
+	for _, test := range tests {
+		// Print the table
+		out := bytes.NewBuffer([]byte{})
+		printer := NewTablePrinter(test.options)
+		printer.PrintObj(test.object, out)
+		// Validate the expected output matches the printed table.
+		if test.expected != out.String() {
+			t.Errorf("Table printing error: expected (%s), got (%s)", test.expected, out.String())
+		}
+	}
+}
+
+func TestPrintTable_WatchEvents(t *testing.T) {
+	tests := []struct {
+		columns  []metav1.TableColumnDefinition
+		rows     []metav1.TableRow
+		options  PrintOptions
+		expected string
+	}{
+		// Print WatchEvent with Table resource.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			options: PrintOptions{},
+			expected: `EVENT   NAME    READY   STATUS     RETRIES   AGE
+Added   test1   1/1     podPhase   5         20h
+`,
+		},
+		// Print WatchEvent with Table, and "NoHeaders", "WithNamespace", and "ShowLabels" options.
+		{
+			columns: []metav1.TableColumnDefinition{
+				{Name: "Name", Type: "string"},
+				{Name: "Ready", Type: "string"},
+				{Name: "Status", Type: "string"},
+				{Name: "Retries", Type: "integer"},
+				{Name: "Age", Type: "string"},
+			},
+			rows: []metav1.TableRow{
+				{
+					Cells:  []interface{}{"test1", "1/1", "podPhase", int64(5), "20h"},
+					Object: runtime.RawExtension{Object: testPod},
+				},
+			},
+			options:  PrintOptions{NoHeaders: true, WithNamespace: true, ShowLabels: true},
+			expected: "Added   test-namespace   test1   1/1   podPhase   5     20h   first-label=12,second-label=label-value\n",
+		},
+	}
+	for _, test := range tests {
+		// Create the table from the columns and rows.
+		table := &metav1.Table{
+			ColumnDefinitions: test.columns,
+			Rows:              test.rows,
+		}
+		// Add the table to the WatchEvent.
+		event := &metav1.WatchEvent{
+			Type:   "Added",
+			Object: runtime.RawExtension{Object: table},
+		}
+		// Print the event
+		out := bytes.NewBuffer([]byte{})
+		printer := NewTablePrinter(test.options)
+		printer.PrintObj(event, out)
+		// Validate the expected output matches the printed table.
+		if test.expected != out.String() {
+			t.Errorf("Event/Table printing error: expected (%s), got (%s)", test.expected, out.String())
+		}
 	}
 }

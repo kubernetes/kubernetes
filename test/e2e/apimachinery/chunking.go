@@ -71,7 +71,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				}
 				e2elog.Logf("Got an error creating template %d: %v", i, err)
 			}
-			ginkgo.Fail("Unable to create template %d, exiting", i)
+			e2elog.Fail("Unable to create template %d, exiting", i)
 		})
 	})
 

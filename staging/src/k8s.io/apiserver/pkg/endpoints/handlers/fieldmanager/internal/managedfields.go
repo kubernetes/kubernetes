@@ -101,8 +101,11 @@ func decodeManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) (mana
 func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager string, err error) {
 	encodedManagerCopy := *encodedManager
 
+	// Never include fields type in the manager identifier
+	encodedManagerCopy.FieldsType = ""
+
 	// Never include the fields in the manager identifier
-	encodedManagerCopy.Fields = nil
+	encodedManagerCopy.FieldsV1 = nil
 
 	// Never include the time in the manager identifier
 	encodedManagerCopy.Time = nil
@@ -124,8 +127,8 @@ func BuildManagerIdentifier(encodedManager *metav1.ManagedFieldsEntry) (manager 
 
 func decodeVersionedSet(encodedVersionedSet *metav1.ManagedFieldsEntry) (versionedSet fieldpath.VersionedSet, err error) {
 	fields := EmptyFields
-	if encodedVersionedSet.Fields != nil {
-		fields = *encodedVersionedSet.Fields
+	if encodedVersionedSet.FieldsV1 != nil {
+		fields = *encodedVersionedSet.FieldsV1
 	}
 	set, err := FieldsToSet(fields)
 	if err != nil {
@@ -191,11 +194,12 @@ func encodeManagerVersionedSet(manager string, versionedSet fieldpath.VersionedS
 	if versionedSet.Applied() {
 		encodedVersionedSet.Operation = metav1.ManagedFieldsOperationApply
 	}
+	encodedVersionedSet.FieldsType = "FieldsV1"
 	fields, err := SetToFields(*versionedSet.Set())
 	if err != nil {
 		return nil, fmt.Errorf("error encoding set: %v", err)
 	}
-	encodedVersionedSet.Fields = &fields
+	encodedVersionedSet.FieldsV1 = &fields
 
 	return encodedVersionedSet, nil
 }

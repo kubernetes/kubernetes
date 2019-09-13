@@ -143,7 +143,6 @@ func NewCmdDelete(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra
 
 	deleteFlags.AddFlags(cmd)
 
-	cmdutil.AddIncludeUninitializedFlag(cmd)
 	return cmd
 }
 

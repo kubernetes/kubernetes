@@ -231,6 +231,7 @@ func TestPluginGetVolumeNameWithInline(t *testing.T) {
 
 func TestPluginCanSupport(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIInlineVolume, false)()
 
 	tests := []struct {
 		name       string
@@ -618,6 +619,9 @@ func TestPluginNewMounter(t *testing.T) {
 			csiClient, err := csiMounter.csiClientGetter.Get()
 			if csiClient == nil {
 				t.Error("mounter csiClient is nil")
+			}
+			if err != nil {
+				t.Fatal(err)
 			}
 			if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
 				t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)

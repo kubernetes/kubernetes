@@ -45,7 +45,7 @@ func (t *testTransformer) TransformToStorage(to []byte, context Context) (data [
 
 func TestPrefixFrom(t *testing.T) {
 	testErr := fmt.Errorf("test error")
-	transformErr := fmt.Errorf("test error")
+	transformErr := fmt.Errorf("transform error")
 	transformers := []PrefixTransformer{
 		{Prefix: []byte("first:"), Transformer: &testTransformer{from: []byte("value1")}},
 		{Prefix: []byte("second:"), Transformer: &testTransformer{from: []byte("value2")}},
@@ -64,7 +64,7 @@ func TestPrefixFrom(t *testing.T) {
 		{[]byte("first:value"), []byte("value1"), false, nil, 0},
 		{[]byte("second:value"), []byte("value2"), true, nil, 1},
 		{[]byte("third:value"), nil, false, testErr, -1},
-		{[]byte("fails:value"), nil, true, transformErr, 2},
+		{[]byte("fails:value"), nil, false, transformErr, 2},
 		{[]byte("stale:value"), []byte("value3"), true, nil, 3},
 	}
 	for i, test := range testCases {
@@ -128,7 +128,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
   apiserver_storage_transformation_operations_total{status="OK",transformation_type="from_storage",transformer_prefix="identity"} 1
   `,
@@ -142,7 +142,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
   apiserver_storage_transformation_operations_total{status="OK",transformation_type="from_storage",transformer_prefix="other:"} 1
   `,
@@ -156,7 +156,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
   apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="other:"} 1
   `,
@@ -170,7 +170,7 @@ func TestPrefixFromMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
   apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="from_storage",transformer_prefix="unknown"} 1
   `,
@@ -214,7 +214,7 @@ func TestPrefixToMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
   apiserver_storage_transformation_operations_total{status="OK",transformation_type="to_storage",transformer_prefix="other:"} 1
   `,
@@ -228,7 +228,7 @@ func TestPrefixToMetrics(t *testing.T) {
 				"apiserver_storage_transformation_operations_total",
 			},
 			want: `
-	# HELP apiserver_storage_transformation_operations_total Total number of transformations.
+	# HELP apiserver_storage_transformation_operations_total [ALPHA] Total number of transformations.
   # TYPE apiserver_storage_transformation_operations_total counter
   apiserver_storage_transformation_operations_total{status="Unknown",transformation_type="to_storage",transformer_prefix="other:"} 1
   `,

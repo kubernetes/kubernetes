@@ -28,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 // CleanCrdFn declares the clean up function needed to remove the CRD
@@ -55,17 +54,17 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 	// Creating a custom resource definition for use by assorted tests.
 	config, err := framework.LoadConfig()
 	if err != nil {
-		e2elog.Failf("failed to load config: %v", err)
+		framework.Failf("failed to load config: %v", err)
 		return nil, err
 	}
 	apiExtensionClient, err := crdclientset.NewForConfig(config)
 	if err != nil {
-		e2elog.Failf("failed to initialize apiExtensionClient: %v", err)
+		framework.Failf("failed to initialize apiExtensionClient: %v", err)
 		return nil, err
 	}
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		e2elog.Failf("failed to initialize dynamic client: %v", err)
+		framework.Failf("failed to initialize dynamic client: %v", err)
 		return nil, err
 	}
 
@@ -102,7 +101,7 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 	//create CRD and waits for the resource to be recognized and available.
 	crd, err = fixtures.CreateNewV1CustomResourceDefinitionWatchUnsafe(crd, apiExtensionClient)
 	if err != nil {
-		e2elog.Failf("failed to create CustomResourceDefinition: %v", err)
+		framework.Failf("failed to create CustomResourceDefinition: %v", err)
 		return nil, err
 	}
 
@@ -120,7 +119,7 @@ func CreateMultiVersionTestCRD(f *framework.Framework, group string, opts ...Opt
 	testcrd.CleanUp = func() error {
 		err := fixtures.DeleteV1CustomResourceDefinition(crd, apiExtensionClient)
 		if err != nil {
-			e2elog.Failf("failed to delete CustomResourceDefinition(%s): %v", name, err)
+			framework.Failf("failed to delete CustomResourceDefinition(%s): %v", name, err)
 		}
 		return err
 	}

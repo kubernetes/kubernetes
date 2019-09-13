@@ -22,6 +22,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"k8s.io/apimachinery/pkg/util/errors"
 )
 
 func init() {
@@ -129,6 +131,7 @@ func NewPrefixTransformers(err error, transformers ...PrefixTransformer) Transfo
 // the first transformer.
 func (t *prefixTransformers) TransformFromStorage(data []byte, context Context) ([]byte, bool, error) {
 	start := time.Now()
+	var errs []error
 	for i, transformer := range t.transformers {
 		if bytes.HasPrefix(data, transformer.Prefix) {
 			result, stale, err := transformer.Transformer.TransformFromStorage(data[len(transformer.Prefix):], context)
@@ -144,8 +147,47 @@ func (t *prefixTransformers) TransformFromStorage(data []byte, context Context) 
 			} else {
 				RecordTransformation("from_storage", string(transformer.Prefix), start, err)
 			}
+
+			// It is valid to have overlapping prefixes when the same encryption provider
+			// is specified multiple times but with different keys (the first provider is
+			// being rotated to and some later provider is being rotated away from).
+			//
+			// Example:
+			//
+			//  {
+			//    "aescbc": {
+			//      "keys": [
+			//        {
+			//          "name": "2",
+			//          "secret": "some key 2"
+			//        }
+			//      ]
+			//    }
+			//  },
+			//  {
+			//    "aescbc": {
+			//      "keys": [
+			//        {
+			//          "name": "1",
+			//          "secret": "some key 1"
+			//        }
+			//      ]
+			//    }
+			//  },
+			//
+			// The transformers for both aescbc configs share the prefix k8s:enc:aescbc:v1:
+			// but a failure in the first one should not prevent a later match from being attempted.
+			// Thus we never short-circuit on a prefix match that results in an error.
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+
 			return result, stale || i != 0, err
 		}
+	}
+	if err := errors.Reduce(errors.NewAggregate(errs)); err != nil {
+		return nil, false, err
 	}
 	RecordTransformation("from_storage", "unknown", start, t.err)
 	return nil, false, t.err

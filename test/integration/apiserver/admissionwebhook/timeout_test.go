@@ -312,7 +312,7 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 
 			if tt.expectInvocations != nil {
 				for i, invocation := range tt.expectInvocations {
-					if len(recorder.invocations) < i {
+					if len(recorder.invocations) <= i {
 						t.Errorf("expected invocation of %s, got none", invocation.path)
 						continue
 					}

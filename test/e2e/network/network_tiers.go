@@ -158,7 +158,7 @@ func waitAndVerifyLBWithTier(jig *e2eservice.TestJig, ns, svcName, existingIP st
 	// If the IP has been used by previous test, sometimes we get the lingering
 	// 404 errors even after the LB is long gone. Tolerate and retry until the
 	// the new LB is fully established since this feature is still Alpha in GCP.
-	jig.TestReachableHTTPWithRetriableErrorCodes(ingressIP, svcPort, []int{http.StatusNotFound}, checkTimeout)
+	e2eservice.TestReachableHTTPWithRetriableErrorCodes(ingressIP, svcPort, []int{http.StatusNotFound}, checkTimeout)
 
 	// Verify the network tier matches the desired.
 	svcNetTier, err := gcecloud.GetServiceNetworkTier(svc)

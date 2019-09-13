@@ -42,6 +42,7 @@ var csiTestDrivers = []func() testsuites.TestDriver{
 
 // List of testSuites to be executed in below loop
 var csiTestSuites = []func() testsuites.TestSuite{
+	testsuites.InitEphemeralTestSuite,
 	testsuites.InitVolumesTestSuite,
 	testsuites.InitVolumeIOTestSuite,
 	testsuites.InitVolumeModeTestSuite,
@@ -50,6 +51,8 @@ var csiTestSuites = []func() testsuites.TestSuite{
 	testsuites.InitSnapshottableTestSuite,
 	testsuites.InitMultiVolumeTestSuite,
 	testsuites.InitDisruptiveTestSuite,
+	testsuites.InitVolumeExpandTestSuite,
+	testsuites.InitVolumeLimitsTestSuite,
 }
 
 // This executes testSuites for csi volumes.

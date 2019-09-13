@@ -69,6 +69,12 @@ type Interface interface {
 	AddReloadFunc(reloadFunc func())
 	// Destroy cleans up resources used by the Interface
 	Destroy()
+	// HasRandomFully reveals whether `-j MASQUERADE` takes the
+	// `--random-fully` option.  This is helpful to work around a
+	// Linux kernel bug that sometimes causes multiple flows to get
+	// mapped to the same IP:PORT and consequently some suffer packet
+	// drops.
+	HasRandomFully() bool
 }
 
 type Protocol byte
@@ -121,6 +127,8 @@ const NoFlushTables FlushFlag = false
 // (test whether a rule exists).
 var MinCheckVersion = utilversion.MustParseGeneric("1.4.11")
 
+var RandomFullyMinVersion = utilversion.MustParseGeneric("1.6.2")
+
 // Minimum iptables versions supporting the -w and -w<seconds> flags
 var WaitMinVersion = utilversion.MustParseGeneric("1.4.20")
 var WaitSecondsMinVersion = utilversion.MustParseGeneric("1.4.22")
@@ -139,6 +147,7 @@ type runner struct {
 	protocol        Protocol
 	hasCheck        bool
 	hasListener     bool
+	hasRandomFully  bool
 	waitFlag        []string
 	restoreWaitFlag []string
 	lockfilePath    string
@@ -166,8 +175,9 @@ func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Prot
 		protocol:        protocol,
 		hasCheck:        version.AtLeast(MinCheckVersion),
 		hasListener:     false,
+		hasRandomFully:  version.AtLeast(RandomFullyMinVersion),
 		waitFlag:        getIPTablesWaitFlag(version),
-		restoreWaitFlag: getIPTablesRestoreWaitFlag(version),
+		restoreWaitFlag: getIPTablesRestoreWaitFlag(version, exec, protocol),
 		lockfilePath:    lockfilePath,
 	}
 	return runner
@@ -568,12 +578,46 @@ func getIPTablesWaitFlag(version *utilversion.Version) []string {
 }
 
 // Checks if iptables-restore has a "wait" flag
-func getIPTablesRestoreWaitFlag(version *utilversion.Version) []string {
+func getIPTablesRestoreWaitFlag(version *utilversion.Version, exec utilexec.Interface, protocol Protocol) []string {
 	if version.AtLeast(WaitRestoreMinVersion) {
 		return []string{WaitString, WaitSecondsValue}
-	} else {
+	}
+
+	// Older versions may have backported features; if iptables-restore supports
+	// --version, assume it also supports --wait
+	vstring, err := getIPTablesRestoreVersionString(exec, protocol)
+	if err != nil || vstring == "" {
+		klog.V(3).Infof("couldn't get iptables-restore version; assuming it doesn't support --wait")
 		return nil
 	}
+	if _, err := utilversion.ParseGeneric(vstring); err != nil {
+		klog.V(3).Infof("couldn't parse iptables-restore version; assuming it doesn't support --wait")
+		return nil
+	}
+	return []string{WaitString}
+}
+
+// getIPTablesRestoreVersionString runs "iptables-restore --version" to get the version string
+// in the form "X.X.X"
+func getIPTablesRestoreVersionString(exec utilexec.Interface, protocol Protocol) (string, error) {
+	// this doesn't access mutable state so we don't need to use the interface / runner
+
+	// iptables-restore hasn't always had --version, and worse complains
+	// about unrecognized commands but doesn't exit when it gets them.
+	// Work around that by setting stdin to nothing so it exits immediately.
+	iptablesRestoreCmd := iptablesRestoreCommand(protocol)
+	cmd := exec.Command(iptablesRestoreCmd, "--version")
+	cmd.SetStdin(bytes.NewReader([]byte{}))
+	bytes, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	versionMatcher := regexp.MustCompile("v([0-9]+(\\.[0-9]+)+)")
+	match := versionMatcher.FindStringSubmatch(string(bytes))
+	if match == nil {
+		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
+	}
+	return match[1], nil
 }
 
 // goroutine to listen for D-Bus signals
@@ -630,6 +674,10 @@ func (runner *runner) reload() {
 	for _, f := range runner.reloadFuncs {
 		f()
 	}
+}
+
+func (runner *runner) HasRandomFully() bool {
+	return runner.hasRandomFully
 }
 
 var iptablesNotFoundStrings = []string{

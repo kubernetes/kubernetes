@@ -56,10 +56,16 @@ type ServerRunOptions struct {
 	KubeletConfig             kubeletclient.KubeletClientConfig
 	KubernetesServiceNodePort int
 	MaxConnectionBytesPerSec  int64
-	ServiceClusterIPRange     net.IPNet // TODO: make this a list
-	ServiceNodePortRange      utilnet.PortRange
-	SSHKeyfile                string
-	SSHUser                   string
+	// ServiceClusterIPRange is mapped to input provided by user
+	ServiceClusterIPRanges string
+	//PrimaryServiceClusterIPRange and SecondaryServiceClusterIPRange are the results
+	// of parsing ServiceClusterIPRange into actual values
+	PrimaryServiceClusterIPRange   net.IPNet
+	SecondaryServiceClusterIPRange net.IPNet
+
+	ServiceNodePortRange utilnet.PortRange
+	SSHKeyfile           string
+	SSHUser              string
 
 	ProxyClientCertFile string
 	ProxyClientKeyFile  string
@@ -114,7 +120,6 @@ func NewServerRunOptions() *ServerRunOptions {
 		},
 		ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange,
 	}
-	s.ServiceClusterIPRange = kubeoptions.DefaultServiceIPCIDR
 
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
@@ -179,7 +184,8 @@ func (s *ServerRunOptions) Flags() (fss cliflag.NamedFlagSets) {
 		"of type NodePort, using this as the value of the port. If zero, the Kubernetes master "+
 		"service will be of type ClusterIP.")
 
-	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, ""+
+	// TODO (khenidak) change documentation as we move IPv6DualStack feature from ALPHA to BETA
+	fs.StringVar(&s.ServiceClusterIPRanges, "service-cluster-ip-range", s.ServiceClusterIPRanges, ""+
 		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
 		"overlap with any IP ranges assigned to nodes for pods.")
 

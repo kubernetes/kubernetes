@@ -98,7 +98,8 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	go func() {
 		defer func() {
 			err := recover()
-			if err != nil {
+			// do not wrap the sentinel ErrAbortHandler panic value
+			if err != nil && err != http.ErrAbortHandler {
 				// Same as stdlib http server code. Manually allocate stack
 				// trace buffer size to prevent excessively large logs
 				const size = 64 << 10

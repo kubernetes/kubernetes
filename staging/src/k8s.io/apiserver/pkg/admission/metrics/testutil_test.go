@@ -89,3 +89,35 @@ func expectHistogramCountTotal(t *testing.T, name string, labelFilter map[string
 		}
 	}
 }
+
+// expectCounterValue ensures that the counts of metrics matching the labelFilter is as
+// expected.
+func expectCounterValue(t *testing.T, name string, labelFilter map[string]string, wantCount int) {
+	metrics, err := prometheus.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Failed to gather metrics: %s", err)
+	}
+
+	counterSum := 0
+	for _, mf := range metrics {
+		if mf.GetName() != name {
+			continue // Ignore other metrics.
+		}
+		for _, metric := range mf.GetMetric() {
+			if !labelsMatch(metric, labelFilter) {
+				continue
+			}
+			counterSum += int(metric.GetCounter().GetValue())
+		}
+	}
+	if wantCount != counterSum {
+		t.Errorf("Wanted count %d, got %d for metric %s with labels %#+v", wantCount, counterSum, name, labelFilter)
+		for _, mf := range metrics {
+			if mf.GetName() == name {
+				for _, metric := range mf.GetMetric() {
+					t.Logf("\tnear match: %s", metric.String())
+				}
+			}
+		}
+	}
+}

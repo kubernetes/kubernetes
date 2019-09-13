@@ -96,9 +96,21 @@ func (kl *Kubelet) syncNetworkUtil() {
 		klog.Errorf("Failed to ensure that %s chain %s jumps to %s: %v", utiliptables.TableNAT, utiliptables.ChainPostrouting, KubePostroutingChain, err)
 		return
 	}
-	if _, err := kl.iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubePostroutingChain,
+	// Establish the masquerading rule.
+	// NB: THIS MUST MATCH the corresponding code in the iptables and ipvs
+	// modes of kube-proxy
+	masqRule := []string{
 		"-m", "comment", "--comment", "kubernetes service traffic requiring SNAT",
-		"-m", "mark", "--mark", masqueradeMark, "-j", "MASQUERADE"); err != nil {
+		"-m", "mark", "--mark", masqueradeMark,
+		"-j", "MASQUERADE",
+	}
+	if kl.iptClient.HasRandomFully() {
+		masqRule = append(masqRule, "--random-fully")
+		klog.V(3).Info("Using `--random-fully` in the MASQUERADE rule for iptables")
+	} else {
+		klog.V(2).Info("Not using `--random-fully` in the MASQUERADE rule for iptables because the local version of iptables does not support it")
+	}
+	if _, err := kl.iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubePostroutingChain, masqRule...); err != nil {
 		klog.Errorf("Failed to ensure SNAT rule for packets marked by %v in %v chain %v: %v", KubeMarkMasqChain, utiliptables.TableNAT, KubePostroutingChain, err)
 		return
 	}

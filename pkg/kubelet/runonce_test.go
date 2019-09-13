@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 )
 
 func TestRunOnce(t *testing.T) {
@@ -85,7 +86,7 @@ func TestRunOnce(t *testing.T) {
 		hostname:         testKubeletHostname,
 		nodeName:         testKubeletHostname,
 		runtimeState:     newRuntimeState(time.Second),
-		hostutil:         &mount.FakeHostUtil{},
+		hostutil:         hostutil.NewFakeHostUtil(nil),
 	}
 	kb.containerManager = cm.NewStubContainerManager()
 

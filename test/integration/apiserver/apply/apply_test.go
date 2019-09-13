@@ -386,81 +386,6 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 	}
 }
 
-// TestUpdateApplyConflict tests that applying to an object, which wasn't created by apply, will give conflicts
-func TestUpdateApplyConflict(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
-
-	_, client, closeFn := setup(t)
-	defer closeFn()
-
-	obj := []byte(`{
-		"apiVersion": "apps/v1",
-		"kind": "Deployment",
-		"metadata": {
-			"name": "deployment",
-			"labels": {"app": "nginx"}
-		},
-		"spec": {
-                        "replicas": 3,
-                        "selector": {
-                                "matchLabels": {
-                                         "app": "nginx"
-                                }
-                        },
-                        "template": {
-                                "metadata": {
-                                        "labels": {
-                                                "app": "nginx"
-                                        }
-                                },
-                                "spec": {
-				        "containers": [{
-					        "name":  "nginx",
-					        "image": "nginx:latest"
-				        }]
-                                }
-                        }
-		}
-	}`)
-
-	_, err := client.CoreV1().RESTClient().Post().
-		AbsPath("/apis/apps/v1").
-		Namespace("default").
-		Resource("deployments").
-		Body(obj).Do().Get()
-	if err != nil {
-		t.Fatalf("Failed to create object using post: %v", err)
-	}
-
-	obj = []byte(`{
-		"apiVersion": "apps/v1",
-		"kind": "Deployment",
-		"metadata": {
-			"name": "deployment",
-		},
-		"spec": {
-			"replicas": 101,
-		}
-	}`)
-	_, err = client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
-		AbsPath("/apis/apps/v1").
-		Namespace("default").
-		Resource("deployments").
-		Name("deployment").
-		Param("fieldManager", "apply_test").
-		Body([]byte(obj)).Do().Get()
-	if err == nil {
-		t.Fatalf("Expecting to get conflicts when applying object")
-	}
-	status, ok := err.(*errors.StatusError)
-	if !ok {
-		t.Fatalf("Expecting to get conflicts as API error")
-	}
-	if len(status.Status().Details.Causes) < 1 {
-		t.Fatalf("Expecting to get at least one conflict when applying object, got: %v", status.Status().Details.Causes)
-	}
-}
-
 // TestApplyManagedFields makes sure that managedFields api does not change
 func TestApplyManagedFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
@@ -550,7 +475,8 @@ func TestApplyManagedFields(t *testing.T) {
 					"operation": "Apply",
 					"apiVersion": "v1",
 					"time": "` + accessor.GetManagedFields()[0].Time.UTC().Format(time.RFC3339) + `",
-					"fields": {
+					"fieldsType": "FieldsV1",
+					"fieldsV1": {
 						"f:metadata": {
 							"f:labels": {
 								"f:test-label": {}
@@ -563,7 +489,8 @@ func TestApplyManagedFields(t *testing.T) {
 					"operation": "Update",
 					"apiVersion": "v1",
 					"time": "` + accessor.GetManagedFields()[1].Time.UTC().Format(time.RFC3339) + `",
-					"fields": {
+					"fieldsType": "FieldsV1",
+					"fieldsV1": {
 						"f:data": {
 							"f:key": {},
 							"f:new-key": {}
@@ -778,7 +705,7 @@ func TestApplyRemoveContainerPort(t *testing.T) {
 	}
 
 	if len(deployment.Spec.Template.Spec.Containers[0].Ports) > 0 {
-		t.Fatalf("Expected no container ports but got: %v", deployment.Spec.Template.Spec.Containers[0].Ports)
+		t.Fatalf("Expected no container ports but got: %v, object: \n%#v", deployment.Spec.Template.Spec.Containers[0].Ports, deployment)
 	}
 }
 
@@ -898,7 +825,7 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 					"manager": "sidecar_controller",
 					"operation": "Apply",
 					"apiVersion": "extensions/v1beta1",
-					"fields": {
+					"fieldsV1": {
 						"f:metadata": {
 							"f:labels": {
 								"f:sidecar_version": {}
@@ -1012,7 +939,8 @@ func TestApplyConvertsManagedFieldsVersion(t *testing.T) {
 		Operation:  metav1.ManagedFieldsOperationApply,
 		APIVersion: "apps/v1",
 		Time:       actual.Time,
-		Fields: &metav1.Fields{
+		FieldsType: "FieldsV1",
+		FieldsV1: &metav1.FieldsV1{
 			Raw: []byte(`{"f:metadata":{"f:labels":{"f:sidecar_version":{}}},"f:spec":{"f:template":{"f:spec":{"f:containers":{"k:{\"name\":\"sidecar\"}":{".":{},"f:image":{},"f:name":{}}}}}}}`),
 		},
 	}

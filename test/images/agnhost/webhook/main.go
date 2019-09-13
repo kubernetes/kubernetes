@@ -218,6 +218,7 @@ func main(cmd *cobra.Command, args []string) {
 	http.HandleFunc("/custom-resource", serveCustomResource)
 	http.HandleFunc("/mutating-custom-resource", serveMutateCustomResource)
 	http.HandleFunc("/crd", serveCRD)
+	http.HandleFunc("/readyz", func(w http.ResponseWriter, req *http.Request) { w.Write([]byte("ok")) })
 	server := &http.Server{
 		Addr:      fmt.Sprintf(":%d", port),
 		TLSConfig: configTLS(config),

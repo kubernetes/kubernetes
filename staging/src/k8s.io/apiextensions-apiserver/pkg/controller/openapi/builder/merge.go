@@ -18,12 +18,13 @@ package builder
 
 import (
 	"github.com/go-openapi/spec"
+	"k8s.io/kube-openapi/pkg/aggregator"
 )
 
 // MergeSpecs aggregates all OpenAPI specs, reusing the metadata of the first, static spec as the basis.
-// Later paths and definitions override earlier ones. None of the input is mutated, but input
-// and output share data structures.
-func MergeSpecs(staticSpec *spec.Swagger, crdSpecs ...*spec.Swagger) *spec.Swagger {
+// The static spec has the highest priority, and its paths and definitions won't get overlapped by
+// user-defined CRDs. None of the input is mutated, but input and output share data structures.
+func MergeSpecs(staticSpec *spec.Swagger, crdSpecs ...*spec.Swagger) (*spec.Swagger, error) {
 	// create shallow copy of staticSpec, but replace paths and definitions because we modify them.
 	specToReturn := *staticSpec
 	if staticSpec.Definitions != nil {
@@ -41,11 +42,19 @@ func MergeSpecs(staticSpec *spec.Swagger, crdSpecs ...*spec.Swagger) *spec.Swagg
 		}
 	}
 
+	crdSpec := &spec.Swagger{}
 	for _, s := range crdSpecs {
-		mergeSpec(&specToReturn, s)
+		// merge specs without checking conflicts, since the naming controller prevents
+		// conflicts between user-defined CRDs
+		mergeSpec(crdSpec, s)
 	}
 
-	return &specToReturn
+	// The static spec has the highest priority. Resolve conflicts to prevent user-defined
+	// CRDs potentially overlapping the built-in apiextensions API
+	if err := aggregator.MergeSpecsIgnorePathConflict(&specToReturn, crdSpec); err != nil {
+		return nil, err
+	}
+	return &specToReturn, nil
 }
 
 // mergeSpec copies paths and definitions from source to dest, mutating dest, but not source.

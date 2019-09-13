@@ -74,7 +74,7 @@ type PriorityFunctionFactory2 func(PluginFactoryArgs) (priorities.PriorityMapFun
 type PriorityConfigFactory struct {
 	Function          PriorityFunctionFactory
 	MapReduceFunction PriorityFunctionFactory2
-	Weight            int
+	Weight            int64
 }
 
 var (
@@ -88,7 +88,7 @@ var (
 
 	// Registered metadata producers
 	priorityMetadataProducer  PriorityMetadataProducerFactory
-	predicateMetadataProducer PredicateMetadataProducerFactory
+	predicateMetadataProducer predicates.PredicateMetadataProducer
 )
 
 const (
@@ -313,11 +313,11 @@ func RegisterPriorityMetadataProducerFactory(factory PriorityMetadataProducerFac
 	priorityMetadataProducer = factory
 }
 
-// RegisterPredicateMetadataProducerFactory registers a PredicateMetadataProducerFactory.
-func RegisterPredicateMetadataProducerFactory(factory PredicateMetadataProducerFactory) {
+// RegisterPredicateMetadataProducer registers a PredicateMetadataProducer.
+func RegisterPredicateMetadataProducer(producer predicates.PredicateMetadataProducer) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
-	predicateMetadataProducer = factory
+	predicateMetadataProducer = producer
 }
 
 // RegisterPriorityFunction registers a priority function with the algorithm registry. Returns the name,
@@ -329,7 +329,7 @@ func RegisterPriorityFunction(name string, function priorities.PriorityFunction,
 		Function: func(PluginFactoryArgs) priorities.PriorityFunction {
 			return function
 		},
-		Weight: weight,
+		Weight: int64(weight),
 	})
 }
 
@@ -344,7 +344,7 @@ func RegisterPriorityMapReduceFunction(
 		MapReduceFunction: func(PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 			return mapFunction, reduceFunction
 		},
-		Weight: weight,
+		Weight: int64(weight),
 	})
 }
 
@@ -505,14 +505,14 @@ func getPriorityMetadataProducer(args PluginFactoryArgs) (priorities.PriorityMet
 	return priorityMetadataProducer(args), nil
 }
 
-func getPredicateMetadataProducer(args PluginFactoryArgs) (predicates.PredicateMetadataProducer, error) {
+func getPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error) {
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 
 	if predicateMetadataProducer == nil {
 		return predicates.EmptyPredicateMetadataProducer, nil
 	}
-	return predicateMetadataProducer(args), nil
+	return predicateMetadataProducer, nil
 }
 
 func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]priorities.PriorityConfig, error) {
@@ -549,7 +549,7 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]pr
 
 // validateSelectedConfigs validates the config weights to avoid the overflow.
 func validateSelectedConfigs(configs []priorities.PriorityConfig) error {
-	var totalPriority int
+	var totalPriority int64
 	for _, config := range configs {
 		// Checks totalPriority against MaxTotalPriority to avoid overflow
 		if config.Weight*schedulerapi.MaxPriority > schedulerapi.MaxTotalPriority-totalPriority {

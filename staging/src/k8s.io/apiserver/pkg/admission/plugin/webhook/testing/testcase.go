@@ -217,6 +217,7 @@ type ValidatingTest struct {
 	IsCRD                  bool
 	IsDryRun               bool
 	AdditionalLabels       map[string]string
+	SkipBenchmark          bool
 	ExpectLabels           map[string]string
 	ExpectAllow            bool
 	ErrorContains          string
@@ -233,6 +234,7 @@ type MutatingTest struct {
 	IsCRD                  bool
 	IsDryRun               bool
 	AdditionalLabels       map[string]string
+	SkipBenchmark          bool
 	ExpectLabels           map[string]string
 	ExpectAllow            bool
 	ErrorContains          string
@@ -262,7 +264,7 @@ func ConvertToMutatingTestCases(tests []ValidatingTest, configurationName string
 				break
 			}
 		}
-		r[i] = MutatingTest{t.Name, ConvertToMutatingWebhooks(t.Webhooks), t.Path, t.IsCRD, t.IsDryRun, t.AdditionalLabels, t.ExpectLabels, t.ExpectAllow, t.ErrorContains, t.ExpectAnnotations, t.ExpectStatusCode, t.ExpectReinvokeWebhooks}
+		r[i] = MutatingTest{t.Name, ConvertToMutatingWebhooks(t.Webhooks), t.Path, t.IsCRD, t.IsDryRun, t.AdditionalLabels, t.SkipBenchmark, t.ExpectLabels, t.ExpectAllow, t.ErrorContains, t.ExpectAnnotations, t.ExpectStatusCode, t.ExpectReinvokeWebhooks}
 	}
 	return r
 }
@@ -404,7 +406,8 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
 
-			ExpectAllow: true,
+			SkipBenchmark: true,
+			ExpectAllow:   true,
 		},
 		{
 			Name: "match & fail (but disallow because fail close on nil FailurePolicy)",
@@ -499,7 +502,8 @@ func NewNonMutatingTestCases(url *url.URL) []ValidatingTest {
 				ObjectSelector:          &metav1.LabelSelector{},
 				AdmissionReviewVersions: []string{"v1beta1"},
 			}},
-			ExpectAllow: true,
+			SkipBenchmark: true,
+			ExpectAllow:   true,
 		},
 		{
 			Name: "absent response and fail closed",

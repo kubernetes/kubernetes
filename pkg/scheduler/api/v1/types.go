@@ -39,7 +39,7 @@ type Policy struct {
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 1-100.
-	HardPodAffinitySymmetricWeight int `json:"hardPodAffinitySymmetricWeight"`
+	HardPodAffinitySymmetricWeight int32 `json:"hardPodAffinitySymmetricWeight"`
 
 	// When AlwaysCheckAllPredicates is set to true, scheduler checks all
 	// the configured predicates even after one or more of them fails.
@@ -66,7 +66,7 @@ type PriorityPolicy struct {
 	Name string `json:"name"`
 	// The numeric multiplier for the node scores that the priority function generates
 	// The weight should be non-zero and can be a positive or a negative integer
-	Weight int `json:"weight"`
+	Weight int64 `json:"weight"`
 	// Holds the parameters to configure the given priority function
 	Argument *PriorityArgument `json:"argument"`
 }
@@ -137,9 +137,9 @@ type RequestedToCapacityRatioArguments struct {
 // UtilizationShapePoint represents single point of priority function shape.
 type UtilizationShapePoint struct {
 	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
-	Utilization int `json:"utilization"`
+	Utilization int32 `json:"utilization"`
 	// Score assigned to given utilization (y axis). Valid values are 0 to 10.
-	Score int `json:"score"`
+	Score int32 `json:"score"`
 }
 
 // ResourceSpec represents single resource and weight for bin packing of priority RequestedToCapacityRatioArguments.
@@ -147,7 +147,7 @@ type ResourceSpec struct {
 	// Name of the resource to be managed by RequestedToCapacityRatio function.
 	Name apiv1.ResourceName `json:"name,casttype=ResourceName"`
 	// Weight of the resource.
-	Weight int `json:"weight,omitempty"`
+	Weight int64 `json:"weight,omitempty"`
 }
 
 // ExtenderManagedResource describes the arguments of extended resources
@@ -200,7 +200,7 @@ type ExtenderConfig struct {
 	PrioritizeVerb string `json:"prioritizeVerb,omitempty"`
 	// The numeric multiplier for the node scores that the prioritize call generates.
 	// The weight should be a positive integer
-	Weight int `json:"weight,omitempty"`
+	Weight int64 `json:"weight,omitempty"`
 	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.
@@ -276,7 +276,7 @@ type ExtenderPreemptionArgs struct {
 //   numPDBViolations: the count of violations of PodDisruptionBudget
 type Victims struct {
 	Pods             []*apiv1.Pod `json:"pods"`
-	NumPDBViolations int          `json:"numPDBViolations"`
+	NumPDBViolations int64        `json:"numPDBViolations"`
 }
 
 // MetaPod represent identifier for a v1.Pod
@@ -290,7 +290,7 @@ type MetaPod struct {
 //   numPDBViolations: the count of violations of PodDisruptionBudget
 type MetaVictims struct {
 	Pods             []*MetaPod `json:"pods"`
-	NumPDBViolations int        `json:"numPDBViolations"`
+	NumPDBViolations int64      `json:"numPDBViolations"`
 }
 
 // FailedNodesMap represents the filtered out nodes, with node names and failure messages
@@ -333,7 +333,7 @@ type HostPriority struct {
 	// Name of the host
 	Host string `json:"host"`
 	// Score associated with the host
-	Score int `json:"score"`
+	Score int64 `json:"score"`
 }
 
 // HostPriorityList declares a []HostPriority type.

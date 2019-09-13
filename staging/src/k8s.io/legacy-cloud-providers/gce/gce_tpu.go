@@ -35,7 +35,7 @@ import (
 // newTPUService returns a new tpuService using the client to communicate with
 // the Cloud TPU APIs.
 func newTPUService(client *http.Client) (*tpuService, error) {
-	s, err := tpuapi.New(client)
+	s, err := tpuapi.NewService(context.Background())
 	if err != nil {
 		return nil, err
 	}

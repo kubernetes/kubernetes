@@ -69,6 +69,7 @@ go_library(
             "//pkg/apis/core/v1/helper:go_default_library",
             "//pkg/apis/core/v1/helper/qos:go_default_library",
             "//pkg/kubelet/cadvisor:go_default_library",
+            "//pkg/kubelet/cm/cpumanager/topology:go_default_library",
             "//pkg/kubelet/cm/devicemanager:go_default_library",
             "//pkg/kubelet/cm/util:go_default_library",
             "//pkg/kubelet/events:go_default_library",

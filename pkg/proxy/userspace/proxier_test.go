@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -1135,6 +1136,14 @@ func TestOnServiceAddChangeMap(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestNoopEndpointSlice(t *testing.T) {
+	p := Proxier{}
+	p.OnEndpointSliceAdd(&discovery.EndpointSlice{})
+	p.OnEndpointSliceUpdate(&discovery.EndpointSlice{}, &discovery.EndpointSlice{})
+	p.OnEndpointSliceDelete(&discovery.EndpointSlice{})
+	p.OnEndpointSlicesSynced()
 }
 
 func makeFakeExec() *fakeexec.FakeExec {

@@ -40,6 +40,7 @@ go_library(
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/finalizer:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/nonstructuralschema:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/openapi:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/controller/status:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/crdserverscheme:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/features:go_default_library",
@@ -81,6 +82,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/openapi:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/webhook:go_default_library",
         "//staging/src/k8s.io/client-go/scale:go_default_library",
         "//staging/src/k8s.io/client-go/scale/scheme/autoscalingv1:go_default_library",
@@ -90,6 +92,7 @@ go_library(
         "//vendor/github.com/go-openapi/strfmt:go_default_library",
         "//vendor/github.com/go-openapi/validate:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )
 

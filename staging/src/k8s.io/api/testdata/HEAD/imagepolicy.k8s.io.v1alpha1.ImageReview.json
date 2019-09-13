@@ -35,26 +35,27 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
   "spec": {
     "containers": [
       {
-        "image": "18"
+        "image": "19"
       }
     ],
     "annotations": {
-      "19": "20"
+      "20": "21"
     },
-    "namespace": "21"
+    "namespace": "22"
   },
   "status": {
     "allowed": true,
-    "reason": "22",
+    "reason": "23",
     "auditAnnotations": {
-      "23": "24"
+      "24": "25"
     }
   }
 }

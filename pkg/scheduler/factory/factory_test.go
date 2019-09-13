@@ -539,7 +539,7 @@ func (f *fakeExtender) Filter(
 func (f *fakeExtender) Prioritize(
 	pod *v1.Pod,
 	nodes []*v1.Node,
-) (hostPriorities *schedulerapi.HostPriorityList, weight int, err error) {
+) (hostPriorities *schedulerapi.HostPriorityList, weight int64, err error) {
 	return nil, 0, nil
 }
 

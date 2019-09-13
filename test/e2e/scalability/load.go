@@ -58,7 +58,6 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -251,27 +250,27 @@ var _ = SIGDescribe("Load capacity", func() {
 			serviceCreationPhase := testPhaseDurations.StartPhase(120, "services creation")
 			defer serviceCreationPhase.End()
 			if itArg.services {
-				e2elog.Logf("Creating services")
+				framework.Logf("Creating services")
 				services := generateServicesForConfigs(configs)
 				createService := func(i int) {
 					defer ginkgo.GinkgoRecover()
 					framework.ExpectNoError(testutils.CreateServiceWithRetries(clientset, services[i].Namespace, services[i]))
 				}
 				workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), createService)
-				e2elog.Logf("%v Services created.", len(services))
+				framework.Logf("%v Services created.", len(services))
 				defer func(services []*v1.Service) {
 					serviceCleanupPhase := testPhaseDurations.StartPhase(800, "services deletion")
 					defer serviceCleanupPhase.End()
-					e2elog.Logf("Starting to delete services...")
+					framework.Logf("Starting to delete services...")
 					deleteService := func(i int) {
 						defer ginkgo.GinkgoRecover()
 						framework.ExpectNoError(testutils.DeleteResourceWithRetries(clientset, api.Kind("Service"), services[i].Namespace, services[i].Name, nil))
 					}
 					workqueue.ParallelizeUntil(context.TODO(), serviceOperationsParallelism, len(services), deleteService)
-					e2elog.Logf("Services deleted")
+					framework.Logf("Services deleted")
 				}(services)
 			} else {
-				e2elog.Logf("Skipping service creation")
+				framework.Logf("Skipping service creation")
 			}
 			serviceCreationPhase.End()
 			// Create all secrets.
@@ -299,7 +298,7 @@ var _ = SIGDescribe("Load capacity", func() {
 					Client:    f.ClientSet,
 					Name:      daemonName,
 					Namespace: f.Namespace.Name,
-					LogFunc:   e2elog.Logf,
+					LogFunc:   framework.Logf,
 				}
 				daemonConfig.Run()
 				defer func(config *testutils.DaemonConfig) {
@@ -328,7 +327,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			// to make it possible to create/schedule them in the meantime.
 			// Currently we assume <throughput> pods/second average throughput.
 			// We may want to revisit it in the future.
-			e2elog.Logf("Starting to create %v objects...", itArg.kind)
+			framework.Logf("Starting to create %v objects...", itArg.kind)
 			creatingTime := time.Duration(totalPods/throughput) * time.Second
 
 			createAllResources(configs, creatingTime, testPhaseDurations.StartPhase(200, "load pods creation"))
@@ -341,7 +340,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			// The expected number of created/deleted pods is totalPods/4 when scaling,
 			// as each RC changes its size from X to a uniform random value in [X/2, 3X/2].
 			scalingTime := time.Duration(totalPods/(4*throughput)) * time.Second
-			e2elog.Logf("Starting to scale %v objects first time...", itArg.kind)
+			framework.Logf("Starting to scale %v objects first time...", itArg.kind)
 			scaleAllResources(configs, scalingTime, testPhaseDurations.StartPhase(300, "scaling first time"))
 			ginkgo.By("============================================================================")
 
@@ -349,7 +348,7 @@ var _ = SIGDescribe("Load capacity", func() {
 			// Currently we assume <throughput> pods/second average deletion throughput.
 			// We may want to revisit it in the future.
 			deletingTime := time.Duration(totalPods/throughput) * time.Second
-			e2elog.Logf("Starting to delete %v objects...", itArg.kind)
+			framework.Logf("Starting to delete %v objects...", itArg.kind)
 			deleteAllResources(configs, deletingTime, testPhaseDurations.StartPhase(500, "load pods deletion"))
 		})
 	}
@@ -531,7 +530,7 @@ func GenerateConfigsForGroup(
 				Client:    nil, // this will be overwritten later
 				Name:      secretName,
 				Namespace: namespace,
-				LogFunc:   e2elog.Logf,
+				LogFunc:   framework.Logf,
 			})
 			secretNames = append(secretNames, secretName)
 		}
@@ -543,7 +542,7 @@ func GenerateConfigsForGroup(
 				Client:    nil, // this will be overwritten later
 				Name:      configMapName,
 				Namespace: namespace,
-				LogFunc:   e2elog.Logf,
+				LogFunc:   framework.Logf,
 			})
 			configMapNames = append(configMapNames, configMapName)
 		}
@@ -592,7 +591,7 @@ func GenerateConfigsForGroup(
 		case batch.Kind("Job"):
 			config = &testutils.JobConfig{RCConfig: *baseConfig}
 		default:
-			e2elog.Failf("Unsupported kind for config creation: %v", kind)
+			framework.Failf("Unsupported kind for config creation: %v", kind)
 		}
 		configs = append(configs, config)
 	}
@@ -705,7 +704,7 @@ func scaleResource(wg *sync.WaitGroup, config testutils.RunObjectConfig, scaling
 		if err == nil {
 			return true, nil
 		}
-		e2elog.Logf("Failed to list pods from %v %v due to: %v", config.GetKind(), config.GetName(), err)
+		framework.Logf("Failed to list pods from %v %v due to: %v", config.GetKind(), config.GetName(), err)
 		if testutils.IsRetryableAPIError(err) {
 			return false, nil
 		}

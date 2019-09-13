@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
@@ -49,16 +48,16 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 
 		origNodes, err := e2enode.GetReadyNodesIncludingTainted(c)
 		if err != nil {
-			e2elog.Logf("Unexpected error occurred: %v", err)
+			framework.Logf("Unexpected error occurred: %v", err)
 		}
 		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)
 
-		e2elog.Logf("Original number of ready nodes: %d", len(origNodes.Items))
+		framework.Logf("Original number of ready nodes: %d", len(origNodes.Items))
 
 		err = framework.DeleteNodeOnCloudProvider(&nodeToDelete)
 		if err != nil {
-			e2elog.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
+			framework.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
 		}
 
 		newNodes, err := e2enode.CheckReady(c, len(origNodes.Items)-1, 5*time.Minute)
@@ -67,9 +66,9 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 
 		_, err = c.CoreV1().Nodes().Get(nodeToDelete.Name, metav1.GetOptions{})
 		if err == nil {
-			e2elog.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)
+			framework.Failf("node %q still exists when it should be deleted", nodeToDelete.Name)
 		} else if !apierrs.IsNotFound(err) {
-			e2elog.Failf("failed to get node %q err: %q", nodeToDelete.Name, err)
+			framework.Failf("failed to get node %q err: %q", nodeToDelete.Name, err)
 		}
 
 	})

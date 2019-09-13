@@ -35,15 +35,16 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
   "spec": {
     "scaleTargetRef": {
-      "kind": "18",
-      "name": "19",
-      "apiVersion": "20"
+      "kind": "19",
+      "name": "20",
+      "apiVersion": "21"
     },
     "minReplicas": 896585016,
     "maxReplicas": -1971381490,
@@ -52,9 +53,9 @@
         "type": "枊a8衍`Ĩɘ.蘯6ċV夸eɑeʤ脽ě",
         "object": {
           "describedObject": {
-            "kind": "21",
-            "name": "22",
-            "apiVersion": "23"
+            "kind": "22",
+            "name": "23",
+            "apiVersion": "24"
           },
           "target": {
             "type": "凗蓏Ŋ蛊ĉy緅縕\u003eŽ",
@@ -63,7 +64,7 @@
             "averageUtilization": 1001983654
           },
           "metric": {
-            "name": "24",
+            "name": "25",
             "selector": {
               "matchLabels": {
                 "QQ.N2.1.L.l-Y._.4": "0.d.__Gg8-2_kS91.e5K-_e63_-_3-n-_-__3u-.__G"
@@ -79,7 +80,7 @@
         },
         "pods": {
           "metric": {
-            "name": "31",
+            "name": "32",
             "selector": {
               "matchLabels": {
                 "8-10pq-0-7-9-2-ekg-071a-2y-y-o0-5q-21.6h/87_2fNc5-_.-RX-82_g50_uL": "6N_._a69"
@@ -113,7 +114,7 @@
         },
         "external": {
           "metric": {
-            "name": "38",
+            "name": "39",
             "selector": {
               "matchLabels": {
                 "9s-m---vl80.5-6y-07b-3---g-jdi/z_-tY-R6S17_.8CnK_O.d-._NwcGnP-w-Sf5_Or.i1_7z.WH-.._d": "1_57__JR.N-1zL-4--6o--Bo-F__..XR.7_1-l"
@@ -148,7 +149,7 @@
         "type": "矀Kʝ瘴I\\p[ħsĨɆâĺɗŹ倗S",
         "object": {
           "metric": {
-            "name": "45",
+            "name": "46",
             "selector": {
               "matchLabels": {
                 "990-17-hg1-o-p665--4-j8---t6-r7---d--uml-89.n0v-1o-0hv--k6/0_OHz_.B-.-_w_--.8_r_N-.3n-x.-_-_-Nm-_X3.1d_YH3x---5": "s2oy"
@@ -167,14 +168,14 @@
             "averageUtilization": 1980459939
           },
           "describedObject": {
-            "kind": "52",
-            "name": "53",
-            "apiVersion": "54"
+            "kind": "53",
+            "name": "54",
+            "apiVersion": "55"
           }
         },
         "pods": {
           "metric": {
-            "name": "55",
+            "name": "56",
             "selector": {
               "matchLabels": {
                 "7-gg93--5-------g1c-fr4/mQ.GM72_-c-.-.6--3-___t-Z8SUGP.-_.uB-.--.gb_2_-8-----yJY.__-X2": "0_.GgT7_7B_D-..-.k4u-zA_--_.-.6GA26C-s.Nj-d-E"
@@ -206,7 +207,7 @@
         },
         "external": {
           "metric": {
-            "name": "62",
+            "name": "63",
             "selector": {
               "matchLabels": {
                 "Z": "C..7o_x3..-.8-Jp-9-4-Tm.__G-8...__.Q_c8.G.b_91"
@@ -232,8 +233,8 @@
         "type": "Ƚȿ醏g遧",
         "status": "ɸĻo:{柯?B俋¬h`職铳s44矕Ƈ",
         "lastTransitionTime": "2039-12-25T06:58:01Z",
-        "reason": "69",
-        "message": "70"
+        "reason": "70",
+        "message": "71"
       }
     ]
   }

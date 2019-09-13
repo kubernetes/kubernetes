@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/images"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e_node/services"
 
 	"github.com/onsi/ginkgo"
@@ -142,9 +141,9 @@ var _ = framework.KubeDescribe("Container Runtime Conformance Test", func() {
 							break
 						}
 						if i < flakeRetry {
-							e2elog.Logf("No.%d attempt failed: %v, retrying...", i, err)
+							framework.Logf("No.%d attempt failed: %v, retrying...", i, err)
 						} else {
-							e2elog.Failf("All %d attempts failed: %v", flakeRetry, err)
+							framework.Failf("All %d attempts failed: %v", flakeRetry, err)
 						}
 					}
 				})

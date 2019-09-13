@@ -18,7 +18,6 @@ package operationexecutor
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/api/core/v1"
@@ -30,6 +29,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
@@ -229,7 +229,7 @@ func getTestVolumeToUnmount(pod *v1.Pod, pvSpec v1.PersistentVolumeSpec, pluginN
 }
 
 func getMetricFamily(metricFamilyName string) *io_prometheus_client.MetricFamily {
-	metricFamilies, _ := prometheus.DefaultGatherer.Gather()
+	metricFamilies, _ := legacyregistry.DefaultGatherer.Gather()
 	for _, mf := range metricFamilies {
 		if *mf.Name == metricFamilyName {
 			return mf

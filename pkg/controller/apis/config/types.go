@@ -23,6 +23,7 @@ import (
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
+	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
@@ -74,6 +75,9 @@ type KubeControllerManagerConfiguration struct {
 	// EndpointControllerConfiguration holds configuration for EndpointController
 	// related features.
 	EndpointController endpointconfig.EndpointControllerConfiguration
+	// EndpointSliceControllerConfiguration holds configuration for
+	// EndpointSliceController related features.
+	EndpointSliceController endpointsliceconfig.EndpointSliceControllerConfiguration
 	// GarbageCollectorControllerConfiguration holds configuration for
 	// GarbageCollectorController related features.
 	GarbageCollectorController garbagecollectorconfig.GarbageCollectorControllerConfiguration

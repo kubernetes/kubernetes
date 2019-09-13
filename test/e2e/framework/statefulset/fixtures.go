@@ -31,7 +31,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	e2efwk "k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -157,7 +156,7 @@ func BreakPodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /usr/local/apache2/htdocs%v /tmp/ || true", path)
 	stdout, err := e2efwk.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
-	e2elog.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
+	e2efwk.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
 
@@ -181,7 +180,7 @@ func RestorePodHTTPProbe(ss *appsv1.StatefulSet, pod *v1.Pod) error {
 	// Ignore 'mv' errors to make this idempotent.
 	cmd := fmt.Sprintf("mv -v /tmp%v /usr/local/apache2/htdocs/ || true", path)
 	stdout, err := e2efwk.RunHostCmdWithRetries(pod.Namespace, pod.Name, cmd, StatefulSetPoll, StatefulPodTimeout)
-	e2elog.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
+	e2efwk.Logf("stdout of %v on %v: %v", cmd, pod.Name, stdout)
 	return err
 }
 
@@ -243,17 +242,17 @@ func ResumeNextPod(c clientset.Interface, ss *appsv1.StatefulSet) {
 	resumedPod := ""
 	for _, pod := range podList.Items {
 		if pod.Status.Phase != v1.PodRunning {
-			e2elog.Failf("Found pod in phase %q, cannot resume", pod.Status.Phase)
+			e2efwk.Failf("Found pod in phase %q, cannot resume", pod.Status.Phase)
 		}
 		if podutil.IsPodReady(&pod) || !hasPauseProbe(&pod) {
 			continue
 		}
 		if resumedPod != "" {
-			e2elog.Failf("Found multiple paused stateful pods: %v and %v", pod.Name, resumedPod)
+			e2efwk.Failf("Found multiple paused stateful pods: %v and %v", pod.Name, resumedPod)
 		}
 		_, err := e2efwk.RunHostCmdWithRetries(pod.Namespace, pod.Name, "dd if=/dev/zero of=/data/statefulset-continue bs=1 count=1 conv=fsync", StatefulSetPoll, StatefulPodTimeout)
 		e2efwk.ExpectNoError(err)
-		e2elog.Logf("Resumed pod %v", pod.Name)
+		e2efwk.Logf("Resumed pod %v", pod.Name)
 		resumedPod = pod.Name
 	}
 }

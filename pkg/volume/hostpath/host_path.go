@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
 	"k8s.io/kubernetes/pkg/volume/validation"
 )
@@ -207,7 +208,7 @@ type hostPathMounter struct {
 	*hostPath
 	readOnly bool
 	mounter  mount.Interface
-	hu       mount.HostUtils
+	hu       hostutil.HostUtils
 }
 
 var _ volume.Mounter = &hostPathMounter{}
@@ -361,7 +362,7 @@ type hostPathTypeChecker interface {
 type fileTypeChecker struct {
 	path   string
 	exists bool
-	hu     mount.HostUtils
+	hu     hostutil.HostUtils
 }
 
 func (ftc *fileTypeChecker) Exists() bool {
@@ -423,12 +424,12 @@ func (ftc *fileTypeChecker) GetPath() string {
 	return ftc.path
 }
 
-func newFileTypeChecker(path string, hu mount.HostUtils) hostPathTypeChecker {
+func newFileTypeChecker(path string, hu hostutil.HostUtils) hostPathTypeChecker {
 	return &fileTypeChecker{path: path, hu: hu}
 }
 
 // checkType checks whether the given path is the exact pathType
-func checkType(path string, pathType *v1.HostPathType, hu mount.HostUtils) error {
+func checkType(path string, pathType *v1.HostPathType, hu hostutil.HostUtils) error {
 	return checkTypeInternal(newFileTypeChecker(path, hu), pathType)
 }
 

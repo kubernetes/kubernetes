@@ -35,7 +35,8 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
@@ -45,6 +46,15 @@
     ]
   },
   "status": {
-    "phase": "`Ĩɘ.蘯6ċ"
+    "phase": "`Ĩɘ.蘯6ċ",
+    "conditions": [
+      {
+        "type": "夸eɑeʤ脽ěĂ凗蓏Ŋ蛊ĉy",
+        "status": "Ȋ甞谐颋ǅSǡƏS$+½H牗洝尿",
+        "lastTransitionTime": "2956-02-24T15:15:18Z",
+        "reason": "19",
+        "message": "20"
+      }
+    ]
   }
 }

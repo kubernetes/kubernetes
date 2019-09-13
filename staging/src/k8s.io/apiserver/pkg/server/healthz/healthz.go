@@ -101,6 +101,14 @@ func InstallReadyzHandler(mux mux, checks ...HealthChecker) {
 	InstallPathHandler(mux, "/readyz", checks...)
 }
 
+// InstallLivezHandler registers handlers for liveness checking on the path
+// "/livez" to mux. *All handlers* for mux must be specified in
+// exactly one call to InstallHandler. Calling InstallHandler more
+// than once for the same mux will result in a panic.
+func InstallLivezHandler(mux mux, checks ...HealthChecker) {
+	InstallPathHandler(mux, "/livez", checks...)
+}
+
 // InstallPathHandler registers handlers for health checking on
 // a specific path to mux. *All handlers* for the path must be
 // specified in exactly one call to InstallPathHandler. Calling

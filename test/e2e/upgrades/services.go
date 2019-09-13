@@ -72,7 +72,7 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 	if framework.ProviderIs("aws") {
 		timeout = e2eservice.LoadBalancerLagTimeoutAWS
 	}
-	jig.TestReachableHTTP(tcpIngressIP, svcPort, timeout)
+	e2eservice.TestReachableHTTP(tcpIngressIP, svcPort, timeout)
 
 	t.jig = jig
 	t.tcpService = tcpService
@@ -103,7 +103,7 @@ func (t *ServiceUpgradeTest) test(f *framework.Framework, done <-chan struct{}, 
 		// Continuous validation
 		ginkgo.By("continuously hitting the pod through the service's LoadBalancer")
 		wait.Until(func() {
-			t.jig.TestReachableHTTP(t.tcpIngressIP, t.svcPort, e2eservice.LoadBalancerLagTimeoutDefault)
+			e2eservice.TestReachableHTTP(t.tcpIngressIP, t.svcPort, e2eservice.LoadBalancerLagTimeoutDefault)
 		}, framework.Poll, done)
 	} else {
 		// Block until upgrade is done
@@ -113,7 +113,7 @@ func (t *ServiceUpgradeTest) test(f *framework.Framework, done <-chan struct{}, 
 
 	// Sanity check and hit it once more
 	ginkgo.By("hitting the pod through the service's LoadBalancer")
-	t.jig.TestReachableHTTP(t.tcpIngressIP, t.svcPort, e2eservice.LoadBalancerLagTimeoutDefault)
+	e2eservice.TestReachableHTTP(t.tcpIngressIP, t.svcPort, e2eservice.LoadBalancerLagTimeoutDefault)
 	t.jig.SanityCheckService(t.tcpService, v1.ServiceTypeLoadBalancer)
 
 	if testFinalizer {

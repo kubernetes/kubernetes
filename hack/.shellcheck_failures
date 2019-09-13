@@ -15,4 +15,3 @@
 ./cluster/pre-existing/util.sh
 ./cluster/validate-cluster.sh
 ./hack/lib/test.sh
-./test/images/image-util.sh

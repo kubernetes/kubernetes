@@ -24,12 +24,15 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/proxy"
 	proxyconfigapi "k8s.io/kubernetes/pkg/proxy/apis/config"
 	proxyconfigscheme "k8s.io/kubernetes/pkg/proxy/apis/config/scheme"
@@ -46,6 +49,7 @@ import (
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
 	"k8s.io/utils/exec"
+	utilsnet "k8s.io/utils/net"
 
 	"k8s.io/klog"
 )
@@ -170,26 +174,61 @@ func newProxyServer(
 		metrics.RegisterMetrics()
 	} else if proxyMode == proxyModeIPVS {
 		klog.V(0).Info("Using ipvs Proxier.")
-		proxier, err = ipvs.NewProxier(
-			iptInterface,
-			ipvsInterface,
-			ipsetInterface,
-			utilsysctl.New(),
-			execer,
-			config.IPVS.SyncPeriod.Duration,
-			config.IPVS.MinSyncPeriod.Duration,
-			config.IPVS.ExcludeCIDRs,
-			config.IPVS.StrictARP,
-			config.IPTables.MasqueradeAll,
-			int(*config.IPTables.MasqueradeBit),
-			config.ClusterCIDR,
-			hostname,
-			nodeIP,
-			recorder,
-			healthzServer,
-			config.IPVS.Scheduler,
-			config.NodePortAddresses,
-		)
+		if utilfeature.DefaultFeatureGate.Enabled(features.IPv6DualStack) {
+			klog.V(0).Info("creating dualStackProxier for ipvs.")
+
+			// Create iptables handlers for both families, one is already created
+			var ipt [2]utiliptables.Interface
+			if iptInterface.IsIpv6() {
+				ipt[1] = iptInterface
+				ipt[0] = utiliptables.New(execer, dbus, utiliptables.ProtocolIpv4)
+			} else {
+				ipt[0] = iptInterface
+				ipt[1] = utiliptables.New(execer, dbus, utiliptables.ProtocolIpv6)
+			}
+
+			proxier, err = ipvs.NewDualStackProxier(
+				ipt,
+				ipvsInterface,
+				ipsetInterface,
+				utilsysctl.New(),
+				execer,
+				config.IPVS.SyncPeriod.Duration,
+				config.IPVS.MinSyncPeriod.Duration,
+				config.IPVS.ExcludeCIDRs,
+				config.IPVS.StrictARP,
+				config.IPTables.MasqueradeAll,
+				int(*config.IPTables.MasqueradeBit),
+				cidrTuple(config.ClusterCIDR),
+				hostname,
+				nodeIPTuple(config.BindAddress),
+				recorder,
+				healthzServer,
+				config.IPVS.Scheduler,
+				config.NodePortAddresses,
+			)
+		} else {
+			proxier, err = ipvs.NewProxier(
+				iptInterface,
+				ipvsInterface,
+				ipsetInterface,
+				utilsysctl.New(),
+				execer,
+				config.IPVS.SyncPeriod.Duration,
+				config.IPVS.MinSyncPeriod.Duration,
+				config.IPVS.ExcludeCIDRs,
+				config.IPVS.StrictARP,
+				config.IPTables.MasqueradeAll,
+				int(*config.IPTables.MasqueradeBit),
+				config.ClusterCIDR,
+				hostname,
+				nodeIP,
+				recorder,
+				healthzServer,
+				config.IPVS.Scheduler,
+				config.NodePortAddresses,
+			)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
@@ -238,6 +277,46 @@ func newProxyServer(
 	}, nil
 }
 
+// cidrTuple takes a comma separated list of CIDRs and return a tuple (ipv4cidr,ipv6cidr)
+// The returned tuple is guaranteed to have the order (ipv4,ipv6) and if no cidr from a family is found an
+// empty string "" is inserted.
+func cidrTuple(cidrList string) [2]string {
+	cidrs := [2]string{"", ""}
+	foundIPv4 := false
+	foundIPv6 := false
+
+	for _, cidr := range strings.Split(cidrList, ",") {
+		if utilsnet.IsIPv6CIDRString(cidr) && !foundIPv6 {
+			cidrs[1] = cidr
+			foundIPv6 = true
+		} else if !foundIPv4 {
+			cidrs[0] = cidr
+			foundIPv4 = true
+		}
+		if foundIPv6 && foundIPv4 {
+			break
+		}
+	}
+
+	return cidrs
+}
+
+// nodeIPTuple takes an addresses and return a tuple (ipv4,ipv6)
+// The returned tuple is guaranteed to have the order (ipv4,ipv6). The address NOT of the passed address
+// will have "any" address (0.0.0.0 or ::) inserted.
+func nodeIPTuple(bindAddress string) [2]net.IP {
+	nodes := [2]net.IP{net.IPv4zero, net.IPv6zero}
+
+	adr := net.ParseIP(bindAddress)
+	if utilsnet.IsIPv6(adr) {
+		nodes[1] = adr
+	} else {
+		nodes[0] = adr
+	}
+
+	return nodes
+}
+
 func getProxyMode(proxyMode string, khandle ipvs.KernelHandler, ipsetver ipvs.IPSetVersioner, kcompat iptables.KernelCompatTester) string {
 	switch proxyMode {
 	case proxyModeUserspace:
@@ -247,7 +326,7 @@ func getProxyMode(proxyMode string, khandle ipvs.KernelHandler, ipsetver ipvs.IP
 	case proxyModeIPVS:
 		return tryIPVSProxy(khandle, ipsetver, kcompat)
 	}
-	klog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
+	klog.Warningf("Unknown proxy mode %q, assuming iptables proxy", proxyMode)
 	return tryIPTablesProxy(kcompat)
 }
 

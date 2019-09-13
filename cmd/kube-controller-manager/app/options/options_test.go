@@ -35,6 +35,7 @@ import (
 	daemonconfig "k8s.io/kubernetes/pkg/controller/daemon/config"
 	deploymentconfig "k8s.io/kubernetes/pkg/controller/deployment/config"
 	endpointconfig "k8s.io/kubernetes/pkg/controller/endpoint/config"
+	endpointsliceconfig "k8s.io/kubernetes/pkg/controller/endpointslice/config"
 	garbagecollectorconfig "k8s.io/kubernetes/pkg/controller/garbagecollector/config"
 	jobconfig "k8s.io/kubernetes/pkg/controller/job/config"
 	namespaceconfig "k8s.io/kubernetes/pkg/controller/namespace/config"
@@ -74,6 +75,7 @@ func TestAddFlags(t *testing.T) {
 		"--concurrent-deployment-syncs=10",
 		"--concurrent-statefulset-syncs=15",
 		"--concurrent-endpoint-syncs=10",
+		"--concurrent-service-endpoint-syncs=10",
 		"--concurrent-gc-syncs=30",
 		"--concurrent-namespace-syncs=20",
 		"--concurrent-replicaset-syncs=10",
@@ -111,6 +113,7 @@ func TestAddFlags(t *testing.T) {
 		"--leader-elect-resource-lock=configmap",
 		"--leader-elect-retry-period=5s",
 		"--master=192.168.4.20",
+		"--max-endpoints-per-slice=200",
 		"--min-resync-period=8h",
 		"--namespace-sync-period=10m",
 		"--node-cidr-mask-size=48",
@@ -234,6 +237,12 @@ func TestAddFlags(t *testing.T) {
 		EndpointController: &EndpointControllerOptions{
 			&endpointconfig.EndpointControllerConfiguration{
 				ConcurrentEndpointSyncs: 10,
+			},
+		},
+		EndpointSliceController: &EndpointSliceControllerOptions{
+			&endpointsliceconfig.EndpointSliceControllerConfiguration{
+				ConcurrentServiceEndpointSyncs: 10,
+				MaxEndpointsPerSlice:           200,
 			},
 		},
 		GarbageCollectorController: &GarbageCollectorControllerOptions{

@@ -123,3 +123,31 @@ func GetBootTime() (time.Time, error) {
 	}
 	return currentTime.Add(-time.Duration(output) * time.Millisecond).Truncate(time.Second), nil
 }
+
+// IsUnixDomainSocket returns whether a given file is a AF_UNIX socket file
+func IsUnixDomainSocket(filePath string) (bool, error) {
+	// Due to the absence of golang support for os.ModeSocket in Windows (https://github.com/golang/go/issues/33357)
+	// we need to dial the file and check if we receive an error to determine if a file is Unix Domain Socket file.
+
+	// Note that querrying for the Reparse Points (https://docs.microsoft.com/en-us/windows/win32/fileio/reparse-points)
+	// for the file (using FSCTL_GET_REPARSE_POINT) and checking for reparse tag: reparseTagSocket
+	// does NOT work in 1809 if the socket file is created within a bind mounted directory by a container
+	// and the FSCTL is issued in the host by the kubelet.
+
+	c, err := net.Dial("unix", filePath)
+	if err == nil {
+		c.Close()
+		return true, nil
+	}
+	return false, nil
+}
+
+// NormalizePath converts FS paths returned by certain go frameworks (like fsnotify)
+// to native Windows paths that can be passed to Windows specific code
+func NormalizePath(path string) string {
+	path = strings.ReplaceAll(path, "/", "\\")
+	if strings.HasPrefix(path, "\\") {
+		path = "c:" + path
+	}
+	return path
+}

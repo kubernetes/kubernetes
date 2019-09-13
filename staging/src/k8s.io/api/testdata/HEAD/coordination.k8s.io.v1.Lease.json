@@ -35,12 +35,13 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
   "spec": {
-    "holderIdentity": "18",
+    "holderIdentity": "19",
     "leaseDurationSeconds": 896585016,
     "leaseTransitions": 1305381319
   }

@@ -54,7 +54,7 @@ func TestInputStreamReader(t *testing.T) {
 		return
 	}
 	defer readCloser.Close()
-	result, err := ioutil.ReadAll(readCloser)
+	result, _ := ioutil.ReadAll(readCloser)
 	if string(result) != resultString {
 		t.Errorf("Stream content does not match. Got: %s. Expected: %s.", string(result), resultString)
 	}
@@ -118,7 +118,7 @@ func TestInputStreamTransport(t *testing.T) {
 		return
 	}
 	defer readCloser.Close()
-	result, err := ioutil.ReadAll(readCloser)
+	result, _ := ioutil.ReadAll(readCloser)
 	if string(result) != message {
 		t.Errorf("Stream content does not match. Got: %s. Expected: %s.", string(result), message)
 	}

@@ -1,0 +1,700 @@
+apiVersion: v1
+kind: PodTemplate
+metadata:
+  annotations:
+    "9": "10"
+  clusterName: "15"
+  creationTimestamp: null
+  deletionGracePeriodSeconds: -4955867275792137171
+  finalizers:
+  - "14"
+  generateName: "3"
+  generation: 8071137005907523419
+  labels:
+    "7": "8"
+  managedFields:
+  - apiVersion: "17"
+    manager: "16"
+    operation: 鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]
+  name: "2"
+  namespace: "4"
+  ownerReferences:
+  - apiVersion: "11"
+    blockOwnerDeletion: true
+    controller: false
+    kind: "12"
+    name: "13"
+    uid: Dz廔ȇ{sŊƏp
+  resourceVersion: "16964250748386560239"
+  selfLink: "5"
+  uid: ą飋īqJ枊a8衍`Ĩɘ.蘯6ċV夸e
+template:
+  metadata:
+    annotations:
+      "31": "32"
+    clusterName: "37"
+    creationTimestamp: null
+    deletionGracePeriodSeconds: 7323204920313990232
+    finalizers:
+    - "36"
+    generateName: "25"
+    generation: 1905795315403748486
+    labels:
+      "29": "30"
+    managedFields:
+    - apiVersion: "39"
+      manager: "38"
+      operation: B峅x4%a
+    name: "24"
+    namespace: "26"
+    ownerReferences:
+    - apiVersion: "33"
+      blockOwnerDeletion: false
+      controller: true
+      kind: "34"
+      name: "35"
+      uid: 谐颋ǅSǡƏS$+½H牗洝尿
+    resourceVersion: "1092536316763508004"
+    selfLink: "27"
+    uid: ^苣
+  spec:
+    activeDeadlineSeconds: 139065396842667255
+    affinity:
+      nodeAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - preference:
+            matchExpressions:
+            - key: "294"
+              operator: K.Q貇£ȹ嫰ƹǔw÷nI粛E煹ǐƲ
+              values:
+              - "295"
+            matchFields:
+            - key: "296"
+              operator: 7¤7djƯĖ漘Z剚敍0)鈼¬麄p呝T
+              values:
+              - "297"
+          weight: 279808574
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+          - matchExpressions:
+            - key: "290"
+              operator: ʭd鲡:贅wE@Ȗs«öʮĀ<é瞾ʀN
+              values:
+              - "291"
+            matchFields:
+            - key: "292"
+              operator: 軶ǃ*ʙ嫙&蒒5靇
+              values:
+              - "293"
+      podAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: 7u-tie4-7--gm3.38vl-1z---883d-v3j4-7y-p--u/d-4_4--.-_Z4.LA3HVG93_._.I3.__-.0-z_z0sn8
+                operator: DoesNotExist
+              matchLabels:
+                5l-59g-qy5--ar-gn58nc2-3--6-o-h-9-15v-5925a-x12a-214-3sc/M.JP_oA_4A.J2s3.XL6_EU--AH-Q.GM7B: N-_-vv-Q2qz.W..4....-h._.GgT7_7B_D-..-.k4uz
+            namespaces:
+            - "312"
+            topologyKey: "313"
+          weight: -1532958330
+        requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+            - key: x---.._1_.N_XvSA..e1Vx8_I-.-_56-__18Y--6-_3J--.48Y.q.v
+              operator: NotIn
+              values:
+              - C-_18_...E.-2D
+            matchLabels:
+              ? 39-295at-o7qff7-x--r7v66bm71u-n4f9wk-3--652x01--p--n4-4-l.onh-9289---x-p-qpt6-1w-3205c1lxeqyn-5--9d5a3-7bf46g-40883176jte/Pi.-_-a-G
+              : g.8_r_N-.3n-x.-_-_-Nm-_X31
+          namespaces:
+          - "304"
+          topologyKey: "305"
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+        - podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+              - key: VKPg___KA-._d._.U8
+                operator: DoesNotExist
+              matchLabels:
+                4--3os1-5-ufkr-x0u-1meljf-5269893-t-l/34_-y.8_38xm-.nx.sEK4.B.B: V.Z__Lv8_.O_..8n.--z_-..W
+            namespaces:
+            - "328"
+            topologyKey: "329"
+          weight: 789384689
+        requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+            - key: Q_c8.G.b_9_1o.w_aI._31-_I-A-_3bz._8M0U1_X
+              operator: NotIn
+              values:
+              - X_._D8T
+            matchLabels:
+              8747ox.x-r-927--6/79._-k-5___-Qq..csh-3--Z1Tvw39F_C-rtSY.g._2F7.-_e..Or_-3: 4-Tm._G
+          namespaces:
+          - "320"
+          topologyKey: "321"
+    automountServiceAccountToken: true
+    containers:
+    - args:
+      - "214"
+      command:
+      - "213"
+      env:
+      - name: "221"
+        value: "222"
+        valueFrom:
+          configMapKeyRef:
+            key: "228"
+            name: "227"
+            optional: false
+          fieldRef:
+            apiVersion: "223"
+            fieldPath: "224"
+          resourceFieldRef:
+            containerName: "225"
+            divisor: "706"
+            resource: "226"
+          secretKeyRef:
+            key: "230"
+            name: "229"
+            optional: false
+      envFrom:
+      - configMapRef:
+          name: "219"
+          optional: false
+        prefix: "218"
+        secretRef:
+          name: "220"
+          optional: true
+      image: "212"
+      imagePullPolicy: ?鷅bȻN
+      lifecycle:
+        postStart:
+          exec:
+            command:
+            - "251"
+          httpGet:
+            host: "254"
+            httpHeaders:
+            - name: "255"
+              value: "256"
+            path: "252"
+            port: "253"
+            scheme: Hǝ呮}臷Ľð»
+          tcpSocket:
+            host: "258"
+            port: "257"
+        preStop:
+          exec:
+            command:
+            - "259"
+          httpGet:
+            host: "262"
+            httpHeaders:
+            - name: "263"
+              value: "264"
+            path: "260"
+            port: "261"
+            scheme: 鄌eÞȦY籎顒
+          tcpSocket:
+            host: "266"
+            port: "265"
+      livenessProbe:
+        exec:
+          command:
+          - "237"
+        failureThreshold: 1499244521
+        httpGet:
+          host: "240"
+          httpHeaders:
+          - name: "241"
+            value: "242"
+          path: "238"
+          port: "239"
+          scheme: 抴ŨfZhUʎ浵ɲõ
+        initialDelaySeconds: -124607411
+        periodSeconds: -2138399859
+        successThreshold: 943356038
+        tcpSocket:
+          host: "243"
+          port: -1980941277
+        timeoutSeconds: -1967211777
+      name: "211"
+      ports:
+      - containerPort: -1215463021
+        hostIP: "217"
+        hostPort: -239302370
+        name: "216"
+        protocol: ăȲĻ¤Ħʅ芝
+      readinessProbe:
+        exec:
+          command:
+          - "244"
+        failureThreshold: 2064656704
+        httpGet:
+          host: "247"
+          httpHeaders:
+          - name: "248"
+            value: "249"
+          path: "245"
+          port: "246"
+          scheme: A徙ɶɊł/擇ɦĽ胚
+        initialDelaySeconds: -1950133943
+        periodSeconds: 1836896522
+        successThreshold: -2101285839
+        tcpSocket:
+          host: "250"
+          port: -1502363275
+        timeoutSeconds: -65465189
+      resources:
+        limits:
+          '*ĕʄő芖{|ǘ"^饣': "254"
+        requests:
+          Ř阌Ŗ怳冘HǺƶȤ^}穠C]躢|)黰: "190"
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          add:
+          - 榱*Gưoɘ檲
+          drop:
+          - 銦妰黖ȓƇ$缔獵偐ę腬瓷碑=ɉ
+        privileged: true
+        procMount: 猀2:ö
+        readOnlyRootFilesystem: false
+        runAsGroup: 1396880349510758210
+        runAsNonRoot: false
+        runAsUser: 2498881510781298156
+        seLinuxOptions:
+          level: "271"
+          role: "269"
+          type: "270"
+          user: "268"
+        windowsOptions:
+          gmsaCredentialSpec: "273"
+          gmsaCredentialSpecName: "272"
+      stdinOnce: true
+      terminationMessagePath: "267"
+      terminationMessagePolicy: 唼Ģ猇õǶț鹎ğ#咻痗ȡmƴy綸_
+      volumeDevices:
+      - devicePath: "236"
+        name: "235"
+      volumeMounts:
+      - mountPath: "232"
+        mountPropagation: ȫşŇɜa
+        name: "231"
+        readOnly: true
+        subPath: "233"
+        subPathExpr: "234"
+      workingDir: "215"
+    dnsConfig:
+      nameservers:
+      - "336"
+      options:
+      - name: "338"
+        value: "339"
+      searches:
+      - "337"
+    enableServiceLinks: false
+    hostAliases:
+    - hostnames:
+      - "334"
+      ip: "333"
+    hostNetwork: true
+    hostname: "288"
+    imagePullSecrets:
+    - name: "287"
+    initContainers:
+    - args:
+      - "153"
+      command:
+      - "152"
+      env:
+      - name: "160"
+        value: "161"
+        valueFrom:
+          configMapKeyRef:
+            key: "167"
+            name: "166"
+            optional: false
+          fieldRef:
+            apiVersion: "162"
+            fieldPath: "163"
+          resourceFieldRef:
+            containerName: "164"
+            divisor: "526"
+            resource: "165"
+          secretKeyRef:
+            key: "169"
+            name: "168"
+            optional: false
+      envFrom:
+      - configMapRef:
+          name: "158"
+          optional: true
+        prefix: "157"
+        secretRef:
+          name: "159"
+          optional: false
+      image: "151"
+      imagePullPolicy: Ȗ脵鴈Ō
+      lifecycle:
+        postStart:
+          exec:
+            command:
+            - "190"
+          httpGet:
+            host: "192"
+            httpHeaders:
+            - name: "193"
+              value: "194"
+            path: "191"
+            port: 1348141491
+            scheme: Ȃ揲ȼ
+          tcpSocket:
+            host: "196"
+            port: "195"
+        preStop:
+          exec:
+            command:
+            - "197"
+          httpGet:
+            host: "199"
+            httpHeaders:
+            - name: "200"
+              value: "201"
+            path: "198"
+            port: 468716734
+            scheme: Cʖ畬x骀
+          tcpSocket:
+            host: "203"
+            port: "202"
+      livenessProbe:
+        exec:
+          command:
+          - "176"
+        failureThreshold: -1040245211
+        httpGet:
+          host: "178"
+          httpHeaders:
+          - name: "179"
+            value: "180"
+          path: "177"
+          port: -662805900
+        initialDelaySeconds: 578888856
+        periodSeconds: -557582532
+        successThreshold: -773009446
+        tcpSocket:
+          host: "182"
+          port: "181"
+        timeoutSeconds: 2073854558
+      name: "150"
+      ports:
+      - containerPort: -1417286635
+        hostIP: "156"
+        hostPort: -737070070
+        name: "155"
+        protocol: /C龷ȪÆl殛瓷雼浢Ü礽绅
+      readinessProbe:
+        exec:
+          command:
+          - "183"
+        failureThreshold: -330720710
+        httpGet:
+          host: "185"
+          httpHeaders:
+          - name: "186"
+            value: "187"
+          path: "184"
+          port: -2064088433
+          scheme: Do©Ǿt'容柚ʕIã陫ʋs
+        initialDelaySeconds: 229600975
+        periodSeconds: -1697933829
+        successThreshold: -1438986781
+        tcpSocket:
+          host: "189"
+          port: "188"
+        timeoutSeconds: -35598353
+      resources:
+        limits:
+          i皬择,Q捇ȸ{+ɸ殁Ka縳: "499"
+        requests:
+          笓珣筩ƐP_痸荎: "787"
+      securityContext:
+        allowPrivilegeEscalation: true
+        capabilities:
+          add:
+          - yǠ/淹\韲翁&ʢsɜ
+          drop:
+          - \%枅:=ǛƓɥ踓Ǻǧ湬淊kŪ
+        privileged: false
+        procMount: ^
+        readOnlyRootFilesystem: true
+        runAsGroup: -4139900758039117471
+        runAsNonRoot: true
+        runAsUser: 8685765401091182865
+        seLinuxOptions:
+          level: "208"
+          role: "206"
+          type: "207"
+          user: "205"
+        windowsOptions:
+          gmsaCredentialSpec: "210"
+          gmsaCredentialSpecName: "209"
+      terminationMessagePath: "204"
+      terminationMessagePolicy: ů湙騘&
+      tty: true
+      volumeDevices:
+      - devicePath: "175"
+        name: "174"
+      volumeMounts:
+      - mountPath: "171"
+        mountPropagation: ¿燥ǖ_è绺
+        name: "170"
+        subPath: "172"
+        subPathExpr: "173"
+      workingDir: "154"
+    nodeName: "278"
+    nodeSelector:
+      "274": "275"
+    preemptionPolicy: 'z委>,趐V曡88 '
+    priority: -2137775067
+    priorityClassName: "335"
+    readinessGates:
+    - conditionType: '|gɳ礬.b屏ɧeʫį淓¯Ą0'
+    restartPolicy: 5w垁鷌辪虽U珝Żwʮ馜üNșƶ
+    runtimeClassName: "340"
+    schedulerName: "330"
+    securityContext:
+      fsGroup: 2404245025847758433
+      runAsGroup: -7736954297113301184
+      runAsNonRoot: true
+      runAsUser: -6995201567186416273
+      seLinuxOptions:
+        level: "282"
+        role: "280"
+        type: "281"
+        user: "279"
+      supplementalGroups:
+      - -2242514391033939790
+      sysctls:
+      - name: "285"
+        value: "286"
+      windowsOptions:
+        gmsaCredentialSpec: "284"
+        gmsaCredentialSpecName: "283"
+    serviceAccount: "277"
+    serviceAccountName: "276"
+    shareProcessNamespace: false
+    subdomain: "289"
+    terminationGracePeriodSeconds: 6132275361857491866
+    tolerations:
+    - effect: ?¶ȲƪE1º轪d覉;Ĕ颪œ]洈愥
+      key: "331"
+      operator: ŜŲ&洪y儕lmò
+      tolerationSeconds: -2713809069228546579
+      value: "332"
+    volumes:
+    - awsElasticBlockStore:
+        fsType: "50"
+        partition: 13677460
+        readOnly: true
+        volumeID: "49"
+      azureDisk:
+        cachingMode: n宂¬轚9Ȏ瀮
+        diskName: "113"
+        diskURI: "114"
+        fsType: "115"
+        kind: Ō¾\ĒP鄸靇杧ž譋娲瘹ɭ
+        readOnly: true
+      azureFile:
+        secretName: "99"
+        shareName: "100"
+      cephfs:
+        monitors:
+        - "84"
+        path: "85"
+        secretFile: "87"
+        secretRef:
+          name: "88"
+        user: "86"
+      cinder:
+        fsType: "82"
+        readOnly: true
+        secretRef:
+          name: "83"
+        volumeID: "81"
+      configMap:
+        defaultMode: -1570767512
+        items:
+        - key: "102"
+          mode: -1907421291
+          path: "103"
+        name: "101"
+        optional: false
+      csi:
+        driver: "145"
+        fsType: "146"
+        nodePublishSecretRef:
+          name: "149"
+        readOnly: true
+        volumeAttributes:
+          "147": "148"
+      downwardAPI:
+        defaultMode: -2077638334
+        items:
+        - fieldRef:
+            apiVersion: "92"
+            fieldPath: "93"
+          mode: 2107119206
+          path: "91"
+          resourceFieldRef:
+            containerName: "94"
+            divisor: "291"
+            resource: "95"
+      emptyDir:
+        medium: '励鹗塢ē '
+        sizeLimit: "995"
+      fc:
+        fsType: "97"
+        lun: -2040518604
+        targetWWNs:
+        - "96"
+        wwids:
+        - "98"
+      flexVolume:
+        driver: "76"
+        fsType: "77"
+        options:
+          "79": "80"
+        readOnly: true
+        secretRef:
+          name: "78"
+      flocker:
+        datasetName: "89"
+        datasetUUID: "90"
+      gcePersistentDisk:
+        fsType: "48"
+        partition: -664310043
+        pdName: "47"
+        readOnly: true
+      gitRepo:
+        directory: "53"
+        repository: "51"
+        revision: "52"
+      glusterfs:
+        endpoints: "66"
+        path: "67"
+        readOnly: true
+      hostPath:
+        path: "46"
+        type: DrȮ
+      iscsi:
+        fsType: "62"
+        initiatorName: "65"
+        iqn: "60"
+        iscsiInterface: "61"
+        lun: -314157282
+        portals:
+        - "63"
+        readOnly: true
+        secretRef:
+          name: "64"
+        targetPortal: "59"
+      name: "45"
+      nfs:
+        path: "58"
+        server: "57"
+      persistentVolumeClaim:
+        claimName: "68"
+        readOnly: true
+      photonPersistentDisk:
+        fsType: "117"
+        pdID: "116"
+      portworxVolume:
+        fsType: "132"
+        volumeID: "131"
+      projected:
+        defaultMode: -1253565243
+        sources:
+        - configMap:
+            items:
+            - key: "127"
+              mode: 813865935
+              path: "128"
+            name: "126"
+            optional: true
+          downwardAPI:
+            items:
+            - fieldRef:
+                apiVersion: "122"
+                fieldPath: "123"
+              mode: 75785535
+              path: "121"
+              resourceFieldRef:
+                containerName: "124"
+                divisor: "852"
+                resource: "125"
+          secret:
+            items:
+            - key: "119"
+              mode: 2036549700
+              path: "120"
+            name: "118"
+            optional: false
+          serviceAccountToken:
+            audience: "129"
+            expirationSeconds: 3094703520378368232
+            path: "130"
+      quobyte:
+        group: "111"
+        readOnly: true
+        registry: "108"
+        tenant: "112"
+        user: "110"
+        volume: "109"
+      rbd:
+        fsType: "71"
+        image: "70"
+        keyring: "74"
+        monitors:
+        - "69"
+        pool: "72"
+        readOnly: true
+        secretRef:
+          name: "75"
+        user: "73"
+      scaleIO:
+        fsType: "140"
+        gateway: "133"
+        protectionDomain: "136"
+        secretRef:
+          name: "135"
+        sslEnabled: true
+        storageMode: "138"
+        storagePool: "137"
+        system: "134"
+        volumeName: "139"
+      secret:
+        defaultMode: 819364842
+        items:
+        - key: "55"
+          mode: 1557090007
+          path: "56"
+        optional: true
+        secretName: "54"
+      storageos:
+        fsType: "143"
+        readOnly: true
+        secretRef:
+          name: "144"
+        volumeName: "141"
+        volumeNamespace: "142"
+      vsphereVolume:
+        fsType: "105"
+        storagePolicyID: "107"
+        storagePolicyName: "106"
+        volumePath: "104"

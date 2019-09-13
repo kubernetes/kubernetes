@@ -20,11 +20,10 @@ package storage
 
 import (
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -66,7 +65,7 @@ var _ = utils.SIGDescribe("Volumes", func() {
 				},
 			}
 			if _, err := cs.CoreV1().ConfigMaps(namespace.Name).Create(configMap); err != nil {
-				e2elog.Failf("unable to create test configmap: %v", err)
+				framework.Failf("unable to create test configmap: %v", err)
 			}
 			defer func() {
 				_ = cs.CoreV1().ConfigMaps(namespace.Name).Delete(configMap.Name, nil)

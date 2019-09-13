@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 )
@@ -73,7 +72,7 @@ var _ = SIGDescribe("Events", func() {
 			podClient.Delete(pod.Name, nil)
 		}()
 		if _, err := podClient.Create(pod); err != nil {
-			e2elog.Failf("Failed to create pod: %v", err)
+			framework.Failf("Failed to create pod: %v", err)
 		}
 
 		framework.ExpectNoError(f.WaitForPodRunning(pod.Name))
@@ -87,9 +86,9 @@ var _ = SIGDescribe("Events", func() {
 		ginkgo.By("retrieving the pod")
 		podWithUID, err := podClient.Get(pod.Name, metav1.GetOptions{})
 		if err != nil {
-			e2elog.Failf("Failed to get pod: %v", err)
+			framework.Failf("Failed to get pod: %v", err)
 		}
-		e2elog.Logf("%+v\n", podWithUID)
+		framework.Logf("%+v\n", podWithUID)
 		var events *v1.EventList
 		// Check for scheduler event about the pod.
 		ginkgo.By("checking for scheduler event about the pod")
@@ -106,7 +105,7 @@ var _ = SIGDescribe("Events", func() {
 				return false, err
 			}
 			if len(events.Items) > 0 {
-				e2elog.Logf("Saw scheduler event for our pod.")
+				framework.Logf("Saw scheduler event for our pod.")
 				return true, nil
 			}
 			return false, nil
@@ -126,7 +125,7 @@ var _ = SIGDescribe("Events", func() {
 				return false, err
 			}
 			if len(events.Items) > 0 {
-				e2elog.Logf("Saw kubelet event for our pod.")
+				framework.Logf("Saw kubelet event for our pod.")
 				return true, nil
 			}
 			return false, nil

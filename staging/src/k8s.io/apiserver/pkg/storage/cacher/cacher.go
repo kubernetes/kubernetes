@@ -24,8 +24,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,16 +39,26 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/klog"
 	utiltrace "k8s.io/utils/trace"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
+/*
+ * By default, all the following metrics are defined as falling under
+ * ALPHA stability level https://github.com/kubernetes/enhancements/blob/master/keps/sig-instrumentation/20190404-kubernetes-control-plane-metrics-stability.md#stability-classes)
+ *
+ * Promoting the stability level of the metric is a responsibility of the component owner, since it
+ * involves explicitly acknowledging support for the metric across multiple releases, in accordance with
+ * the metric stability policy.
+ */
 var (
-	initCounter = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "apiserver_init_events_total",
-			Help: "Counter of init events processed in watchcache broken by resource type",
+	initCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name:           "apiserver_init_events_total",
+			Help:           "Counter of init events processed in watchcache broken by resource type",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"resource"},
 	)
@@ -64,7 +72,7 @@ const (
 )
 
 func init() {
-	prometheus.MustRegister(initCounter)
+	legacyregistry.MustRegister(initCounter)
 }
 
 // Config contains the configuration for a given Cache.
@@ -616,7 +624,10 @@ func (c *Cacher) GetToList(ctx context.Context, key string, resourceVersion stri
 		return err
 	}
 	listVal, err := conversion.EnforcePtr(listPtr)
-	if err != nil || listVal.Kind() != reflect.Slice {
+	if err != nil {
+		return err
+	}
+	if listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 	filter := filterWithAttrsFunction(key, pred)
@@ -685,7 +696,10 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 		return err
 	}
 	listVal, err := conversion.EnforcePtr(listPtr)
-	if err != nil || listVal.Kind() != reflect.Slice {
+	if err != nil {
+		return err
+	}
+	if listVal.Kind() != reflect.Slice {
 		return fmt.Errorf("need a pointer to slice, got %v", listVal.Kind())
 	}
 	filter := filterWithAttrsFunction(key, pred)

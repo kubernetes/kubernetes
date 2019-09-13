@@ -185,7 +185,6 @@ func NewCmdApply(baseName string, f cmdutil.Factory, ioStreams genericclioptions
 	cmd.Flags().BoolVar(&o.OpenAPIPatch, "openapi-patch", o.OpenAPIPatch, "If true, use openapi to calculate diff when the openapi presents and the resource can be found in the openapi spec. Otherwise, fall back to use baked-in types.")
 	cmd.Flags().BoolVar(&o.ServerDryRun, "server-dry-run", o.ServerDryRun, "If true, request will be sent to server with dry-run flag, which means the modifications won't be persisted. This is an alpha feature and flag.")
 	cmd.Flags().Bool("dry-run", false, "If true, only print the object that would be sent, without sending it. Warning: --dry-run cannot accurately output the result of merging the local manifest and the server-side data. Use --server-dry-run to get the merged result instead.")
-	cmdutil.AddIncludeUninitializedFlag(cmd)
 	cmdutil.AddServerSideApplyFlags(cmd)
 
 	// apply subcommands
@@ -204,11 +203,11 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
 
 	if o.ForceConflicts && !o.ServerSideApply {
-		return fmt.Errorf("--experimental-force-conflicts only works with --experimental-server-side")
+		return fmt.Errorf("--force-conflicts only works with --server-side")
 	}
 
 	if o.DryRun && o.ServerSideApply {
-		return fmt.Errorf("--dry-run doesn't work with --experimental-server-side (did you mean --server-dry-run instead?)")
+		return fmt.Errorf("--dry-run doesn't work with --server-side (did you mean --server-dry-run instead?)")
 	}
 
 	if o.DryRun && o.ServerDryRun {
@@ -251,6 +250,9 @@ func (o *ApplyOptions) Complete(f cmdutil.Factory, cmd *cobra.Command) error {
 
 	o.OpenAPISchema, _ = f.OpenAPISchema()
 	o.Validator, err = f.Validator(cmdutil.GetFlagBool(cmd, "validate"))
+	if err != nil {
+		return err
+	}
 	o.Builder = f.NewBuilder()
 	o.Mapper, err = f.ToRESTMapper()
 	if err != nil {
@@ -418,7 +420,22 @@ func (o *ApplyOptions) Run() error {
 				if isIncompatibleServerError(err) {
 					err = fmt.Errorf("Server-side apply not available on the server: (%v)", err)
 				}
+				if errors.IsConflict(err) {
+					err = fmt.Errorf(`%v
 
+Please review the fields above--they currently have other managers. Here
+are the ways you can resolve this warning:
+* If you intend to manage all of these fields, please re-run the apply
+  command with the `+"`--force-conflicts`"+` flag.
+* If you do not intend to manage all of the fields, please edit your
+  manifest to remove references to the fields that should keep their
+  current managers.
+* You may co-own fields by updating your manifest to match the existing
+  value; in this case, you'll become the manager if the other manager(s)
+  stop managing the field (remove it from their configuration).
+
+See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
+				}
 				return err
 			}
 

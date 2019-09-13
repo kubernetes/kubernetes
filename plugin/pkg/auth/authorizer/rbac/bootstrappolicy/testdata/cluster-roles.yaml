@@ -548,6 +548,7 @@ items:
     - /apis
     - /apis/*
     - /healthz
+    - /livez
     - /openapi
     - /openapi/*
     - /readyz
@@ -1185,6 +1186,7 @@ items:
   rules:
   - nonResourceURLs:
     - /healthz
+    - /livez
     - /readyz
     - /version
     - /version/

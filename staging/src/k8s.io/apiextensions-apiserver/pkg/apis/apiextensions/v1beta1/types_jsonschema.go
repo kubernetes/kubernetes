@@ -26,8 +26,8 @@ type JSONSchemaProps struct {
 	Format      string        `json:"format,omitempty" protobuf:"bytes,6,opt,name=format"`
 	Title       string        `json:"title,omitempty" protobuf:"bytes,7,opt,name=title"`
 	// default is a default value for undefined object fields.
-	// Defaulting is an alpha feature under the CustomResourceDefaulting feature gate.
-	// Defaulting requires spec.preserveUnknownFields to be false.
+	// Defaulting is a beta feature under the CustomResourceDefaulting feature gate.
+	// CustomResourceDefinitions with defaults must be created using the v1 (or newer) CustomResourceDefinition API.
 	Default              *JSON                      `json:"default,omitempty" protobuf:"bytes,8,opt,name=default"`
 	Maximum              *float64                   `json:"maximum,omitempty" protobuf:"bytes,9,opt,name=maximum"`
 	ExclusiveMaximum     bool                       `json:"exclusiveMaximum,omitempty" protobuf:"bytes,10,opt,name=exclusiveMaximum"`
@@ -90,6 +90,33 @@ type JSONSchemaProps struct {
 	//      - type: string
 	//    - ... zero or more
 	XIntOrString bool `json:"x-kubernetes-int-or-string,omitempty" protobuf:"bytes,40,opt,name=xKubernetesIntOrString"`
+
+	// x-kubernetes-list-map-keys annotates an array with the x-kubernetes-list-type `map` by specifying the keys used
+	// as the index of the map.
+	//
+	// This tag MUST only be used on lists that have the "x-kubernetes-list-type"
+	// extension set to "map". Also, the values specified for this attribute must
+	// be a scalar typed field of the child structure (no nesting is supported).
+	//
+	// +optional
+	XListMapKeys []string `json:"x-kubernetes-list-map-keys,omitempty" protobuf:"bytes,41,rep,name=xKubernetesListMapKeys"`
+
+	// x-kubernetes-list-type annotates an array to further describe its topology.
+	// This extension must only be used on lists and may have 3 possible values:
+	//
+	// 1) `atomic`: the list is treated as a single entity, like a scalar.
+	//      Atomic lists will be entirely replaced when updated. This extension
+	//      may be used on any type of list (struct, scalar, ...).
+	// 2) `set`:
+	//      Sets are lists that must not have multiple items with the same value. Each
+	//      value must be a scalar (or another atomic type).
+	// 3) `map`:
+	//      These lists are like maps in that their elements have a non-index key
+	//      used to identify them. Order is preserved upon merge. The map tag
+	//      must only be used on a list with elements of type object.
+	// Defaults to atomic for arrays.
+	// +optional
+	XListType *string `json:"x-kubernetes-list-type,omitempty" protobuf:"bytes,42,opt,name=xKubernetesListType"`
 }
 
 // JSON represents any valid JSON value.

@@ -35,7 +35,8 @@
       {
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
-        "apiVersion": "17"
+        "apiVersion": "17",
+        "fieldsType": "18"
       }
     ]
   },
@@ -43,8 +44,8 @@
     {
       "type": "@Hr鯹)晿",
       "status": "`Ĩɘ.蘯6ċ",
-      "message": "18",
-      "error": "19"
+      "message": "19",
+      "error": "20"
     }
   ]
 }

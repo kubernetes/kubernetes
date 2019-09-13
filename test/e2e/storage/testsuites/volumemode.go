@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -162,7 +161,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				}, l.ns.Name)
 			}
 		default:
-			e2elog.Failf("Volume mode test doesn't support: %s", pattern.VolType)
+			framework.Failf("Volume mode test doesn't support: %s", pattern.VolType)
 		}
 	}
 
@@ -224,7 +223,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				err = common.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
-					e2elog.Logf("Warning: did not get event about FailedMountVolume")
+					framework.Logf("Warning: did not get event about FailedMountVolume")
 				}
 
 				// Check the pod is still not running
@@ -261,7 +260,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				err = common.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.ClaimProvisionTimeout)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
-					e2elog.Logf("Warning: did not get event about provisioing failed")
+					framework.Logf("Warning: did not get event about provisioing failed")
 				}
 
 				// Check the pvc is still pending
@@ -271,7 +270,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 			})
 		}
 	default:
-		e2elog.Failf("Volume mode test doesn't support volType: %v", pattern.VolType)
+		framework.Failf("Volume mode test doesn't support volType: %v", pattern.VolType)
 	}
 
 	ginkgo.It("should fail to use a volume in a pod with mismatched mode [Slow]", func() {
@@ -311,7 +310,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		err = common.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
 		// Events are unreliable, don't depend on them. They're used only to speed up the test.
 		if err != nil {
-			e2elog.Logf("Warning: did not get event about mismatched volume use")
+			framework.Logf("Warning: did not get event about mismatched volume use")
 		}
 
 		// Check the pod is still not running

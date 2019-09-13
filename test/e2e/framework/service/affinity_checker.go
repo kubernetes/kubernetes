@@ -17,8 +17,66 @@ limitations under the License.
 package service
 
 import (
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"fmt"
+	"net"
+	"strconv"
+
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
+
+// CheckAffinity function tests whether the service affinity works as expected.
+// If affinity is expected, the test will return true once affinityConfirmCount
+// number of same response observed in a row. If affinity is not expected, the
+// test will keep observe until different responses observed. The function will
+// return false only in case of unexpected errors.
+func CheckAffinity(execPod *v1.Pod, serviceIP string, servicePort int, shouldHold bool) bool {
+	serviceIPPort := net.JoinHostPort(serviceIP, strconv.Itoa(servicePort))
+	cmd := fmt.Sprintf(`curl -q -s --connect-timeout 2 http://%s/`, serviceIPPort)
+	timeout := TestTimeout
+	if execPod == nil {
+		timeout = LoadBalancerPollTimeout
+	}
+	var tracker affinityTracker
+	if pollErr := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		if execPod != nil {
+			stdout, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd)
+			if err != nil {
+				framework.Logf("Failed to get response from %s. Retry until timeout", serviceIPPort)
+				return false, nil
+			}
+			tracker.recordHost(stdout)
+		} else {
+			rawResponse := GetHTTPContent(serviceIP, servicePort, timeout, "")
+			tracker.recordHost(rawResponse.String())
+		}
+		trackerFulfilled, affinityHolds := tracker.checkHostTrace(AffinityConfirmCount)
+		if !shouldHold && !affinityHolds {
+			return true, nil
+		}
+		if shouldHold && trackerFulfilled && affinityHolds {
+			return true, nil
+		}
+		return false, nil
+	}); pollErr != nil {
+		trackerFulfilled, _ := tracker.checkHostTrace(AffinityConfirmCount)
+		if pollErr != wait.ErrWaitTimeout {
+			checkAffinityFailed(tracker, pollErr.Error())
+			return false
+		}
+		if !trackerFulfilled {
+			checkAffinityFailed(tracker, fmt.Sprintf("Connection to %s timed out or not enough responses.", serviceIPPort))
+		}
+		if shouldHold {
+			checkAffinityFailed(tracker, "Affinity should hold but didn't.")
+		} else {
+			checkAffinityFailed(tracker, "Affinity shouldn't hold but did.")
+		}
+		return true
+	}
+	return true
+}
 
 // affinityTracker tracks the destination of a request for the affinity tests.
 type affinityTracker struct {
@@ -28,7 +86,7 @@ type affinityTracker struct {
 // Record the response going to a given host.
 func (at *affinityTracker) recordHost(host string) {
 	at.hostTrace = append(at.hostTrace, host)
-	e2elog.Logf("Received response from host: %s", host)
+	framework.Logf("Received response from host: %s", host)
 }
 
 // Check that we got a constant count requests going to the same host.
@@ -51,6 +109,6 @@ func (at *affinityTracker) checkHostTrace(count int) (fulfilled, affinityHolds b
 }
 
 func checkAffinityFailed(tracker affinityTracker, err string) {
-	e2elog.Logf("%v", tracker.hostTrace)
-	e2elog.Failf(err)
+	framework.Logf("%v", tracker.hostTrace)
+	framework.Failf(err)
 }

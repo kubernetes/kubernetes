@@ -17,6 +17,7 @@ limitations under the License.
 package api
 
 import (
+	"math"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -30,11 +31,11 @@ const (
 	// MaxInt defines the max signed int value.
 	MaxInt = int(MaxUint >> 1)
 	// MaxTotalPriority defines the max total priority value.
-	MaxTotalPriority = MaxInt
+	MaxTotalPriority = int64(math.MaxInt64)
 	// MaxPriority defines the max priority value.
 	MaxPriority = 10
 	// MaxWeight defines the max weight value.
-	MaxWeight = MaxInt / MaxPriority
+	MaxWeight = int64(math.MaxInt64 / MaxPriority)
 	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
 	// that once found feasible, the scheduler stops looking for more nodes.
 	DefaultPercentageOfNodesToScore = 50
@@ -86,7 +87,7 @@ type PriorityPolicy struct {
 	Name string
 	// The numeric multiplier for the node scores that the priority function generates
 	// The weight should be a positive integer
-	Weight int
+	Weight int64
 	// Holds the parameters to configure the given priority function
 	Argument *PriorityArgument
 }
@@ -157,9 +158,9 @@ type RequestedToCapacityRatioArguments struct {
 // UtilizationShapePoint represents single point of priority function shape
 type UtilizationShapePoint struct {
 	// Utilization (x axis). Valid values are 0 to 100. Fully utilized node maps to 100.
-	Utilization int
+	Utilization int32
 	// Score assigned to given utilization (y axis). Valid values are 0 to 10.
-	Score int
+	Score int32
 }
 
 // ResourceSpec represents single resource for bin packing of priority RequestedToCapacityRatioArguments.
@@ -167,7 +168,7 @@ type ResourceSpec struct {
 	// Name of the resource to be managed by RequestedToCapacityRatio function.
 	Name v1.ResourceName
 	// Weight of the resource.
-	Weight int
+	Weight int64
 }
 
 // ExtenderManagedResource describes the arguments of extended resources
@@ -220,7 +221,7 @@ type ExtenderConfig struct {
 	PrioritizeVerb string
 	// The numeric multiplier for the node scores that the prioritize call generates.
 	// The weight should be a positive integer
-	Weight int
+	Weight int64
 	// Verb for the bind call, empty if not supported. This verb is appended to the URLPrefix when issuing the bind call to extender.
 	// If this method is implemented by the extender, it is the extender's responsibility to bind the pod to apiserver. Only one extender
 	// can implement this function.
@@ -271,7 +272,7 @@ type ExtenderPreemptionArgs struct {
 //   numPDBViolations: the count of violations of PodDisruptionBudget
 type Victims struct {
 	Pods             []*v1.Pod
-	NumPDBViolations int
+	NumPDBViolations int64
 }
 
 // MetaPod represent identifier for a v1.Pod
@@ -285,7 +286,7 @@ type MetaPod struct {
 //   numPDBViolations: the count of violations of PodDisruptionBudget
 type MetaVictims struct {
 	Pods             []*MetaPod
-	NumPDBViolations int
+	NumPDBViolations int64
 }
 
 // ExtenderArgs represents the arguments needed by the extender to filter/prioritize
@@ -341,7 +342,7 @@ type HostPriority struct {
 	// Name of the host
 	Host string
 	// Score associated with the host
-	Score int
+	Score int64
 }
 
 // HostPriorityList declares a []HostPriority type.

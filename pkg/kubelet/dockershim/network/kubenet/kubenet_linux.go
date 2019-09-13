@@ -499,6 +499,11 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id kubecontainer.ContainerID) error {
 	errList := []error{}
 
+	// Loopback network deletion failure should not be fatal on teardown
+	if err := plugin.delContainerFromNetwork(plugin.loConfig, "lo", namespace, name, id); err != nil {
+		klog.Warningf("Failed to delete loopback network: %v", err)
+	}
+
 	// no ip dependent actions
 	if err := plugin.delContainerFromNetwork(plugin.netConfig, network.DefaultInterfaceName, namespace, name, id); err != nil {
 		errList = append(errList, err)

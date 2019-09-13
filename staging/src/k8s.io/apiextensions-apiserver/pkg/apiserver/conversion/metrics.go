@@ -26,6 +26,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
 )
 
 var (
@@ -36,19 +38,19 @@ var (
 type converterMetricFactory struct {
 	// A map from a converter name to it's metric. Allows the converterMetric to be created
 	// again with the same metric for a specific converter (e.g. 'webhook').
-	durations   map[string]*prometheus.HistogramVec
+	durations   map[string]*metrics.HistogramVec
 	factoryLock sync.Mutex
 }
 
 func newConverterMertricFactory() *converterMetricFactory {
-	return &converterMetricFactory{durations: map[string]*prometheus.HistogramVec{}, factoryLock: sync.Mutex{}}
+	return &converterMetricFactory{durations: map[string]*metrics.HistogramVec{}, factoryLock: sync.Mutex{}}
 }
 
 var _ crConverterInterface = &converterMetric{}
 
 type converterMetric struct {
 	delegate  crConverterInterface
-	latencies *prometheus.HistogramVec
+	latencies *metrics.HistogramVec
 	crdName   string
 }
 
@@ -57,14 +59,15 @@ func (c *converterMetricFactory) addMetrics(converterName string, crdName string
 	defer c.factoryLock.Unlock()
 	metric, exists := c.durations[converterName]
 	if !exists {
-		metric = prometheus.NewHistogramVec(
-			prometheus.HistogramOpts{
-				Name:    fmt.Sprintf("apiserver_crd_%s_conversion_duration_seconds", converterName),
-				Help:    fmt.Sprintf("CRD %s conversion duration in seconds", converterName),
-				Buckets: latencyBuckets,
+		metric = metrics.NewHistogramVec(
+			&metrics.HistogramOpts{
+				Name:           fmt.Sprintf("apiserver_crd_%s_conversion_duration_seconds", converterName),
+				Help:           fmt.Sprintf("CRD %s conversion duration in seconds", converterName),
+				Buckets:        latencyBuckets,
+				StabilityLevel: metrics.ALPHA,
 			},
 			[]string{"crd_name", "from_version", "to_version", "succeeded"})
-		err := prometheus.Register(metric)
+		err := legacyregistry.Register(metric)
 		if err != nil {
 			return nil, err
 		}

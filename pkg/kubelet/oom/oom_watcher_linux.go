@@ -19,6 +19,8 @@ limitations under the License.
 package oom
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
@@ -58,7 +60,11 @@ func (ow *realWatcher) Start(ref *v1.ObjectReference) error {
 		for event := range outStream {
 			if event.ContainerName == "/" {
 				klog.V(1).Infof("Got sys oom event: %v", event)
-				ow.recorder.PastEventf(ref, metav1.Time{Time: event.TimeOfDeath}, v1.EventTypeWarning, systemOOMEvent, "System OOM encountered")
+				eventMsg := "System OOM encountered"
+				if event.ProcessName != "" && event.Pid != 0 {
+					eventMsg = fmt.Sprintf("%s, victim process: %s, pid: %d", eventMsg, event.ProcessName, event.Pid)
+				}
+				ow.recorder.PastEventf(ref, metav1.Time{Time: event.TimeOfDeath}, v1.EventTypeWarning, systemOOMEvent, eventMsg)
 			}
 		}
 		klog.Errorf("Unexpectedly stopped receiving OOM notifications")

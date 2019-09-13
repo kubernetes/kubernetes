@@ -31,7 +31,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -70,7 +69,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 		if len(nodeList.Items) != 0 {
 			nodeName = nodeList.Items[0].Name
 		} else {
-			e2elog.Failf("Unable to find ready and schedulable Node")
+			framework.Failf("Unable to find ready and schedulable Node")
 		}
 
 		nodeKey = "mounted_flexvolume_expand"
@@ -112,11 +111,11 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		e2elog.Logf("AfterEach: Cleaning up resources for mounted volume resize")
+		framework.Logf("AfterEach: Cleaning up resources for mounted volume resize")
 
 		if c != nil {
 			if errs := framework.PVPVCCleanup(c, ns, nil, pvc); len(errs) > 0 {
-				e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+				framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 			}
 			pvc, nodeName, isNodeLabeled, nodeLabelValue = nil, "", false, ""
 			nodeKeyValueLabel = make(map[string]string)
@@ -167,7 +166,7 @@ var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 
 		pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 		if pvcSize.Cmp(newSize) != 0 {
-			e2elog.Failf("error updating pvc size %q", pvc.Name)
+			framework.Failf("error updating pvc size %q", pvc.Name)
 		}
 
 		ginkgo.By("Waiting for cloudprovider resize to finish")

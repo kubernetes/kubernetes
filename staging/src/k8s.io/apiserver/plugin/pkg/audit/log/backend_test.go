@@ -25,6 +25,7 @@ import (
 
 	"github.com/pborman/uuid"
 
+	authnv1 "k8s.io/api/authentication/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -64,7 +65,7 @@ func TestLogEventsLegacy(t *testing.T) {
 				AuditID:                  types.UID(uuid.NewRandom().String()),
 				Stage:                    auditinternal.StageRequestReceived,
 				Verb:                     "get",
-				User: auditinternal.UserInfo{
+				User: authnv1.UserInfo{
 					Username: "admin",
 					Groups: []string{
 						"system:masters",
@@ -122,7 +123,7 @@ func TestLogEventsJson(t *testing.T) {
 			AuditID:                  types.UID(uuid.NewRandom().String()),
 			Stage:                    auditinternal.StageRequestReceived,
 			Verb:                     "get",
-			User: auditinternal.UserInfo{
+			User: authnv1.UserInfo{
 				Username: "admin",
 				Groups: []string{
 					"system:masters",

@@ -26,7 +26,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/evanphx/json-patch"
+	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -409,14 +409,9 @@ func AddDryRunFlag(cmd *cobra.Command) {
 }
 
 func AddServerSideApplyFlags(cmd *cobra.Command) {
-	cmd.Flags().Bool("experimental-server-side", false, "If true, apply runs in the server instead of the client. This is an alpha feature and flag.")
-	cmd.Flags().Bool("experimental-force-conflicts", false, "If true, server-side apply will force the changes against conflicts. This is an alpha feature and flag.")
-	cmd.Flags().String("experimental-field-manager", "kubectl", "Name of the manager used to track field ownership. This is an alpha feature and flag.")
-}
-
-func AddIncludeUninitializedFlag(cmd *cobra.Command) {
-	cmd.Flags().Bool("include-uninitialized", false, `If true, the kubectl command applies to uninitialized objects. If explicitly set to false, this flag overrides other flags that make the kubectl commands apply to uninitialized objects, e.g., "--all". Objects with empty metadata.initializers are regarded as initialized.`)
-	cmd.Flags().MarkDeprecated("include-uninitialized", "The Initializers feature has been removed. This flag is now a no-op, and will be removed in v1.15")
+	cmd.Flags().Bool("server-side", false, "If true, apply runs in the server instead of the client.")
+	cmd.Flags().Bool("force-conflicts", false, "If true, server-side apply will force the changes against conflicts.")
+	cmd.Flags().String("field-manager", "kubectl", "Name of the manager used to track field ownership.")
 }
 
 func AddPodRunningTimeoutFlag(cmd *cobra.Command, defaultTimeout time.Duration) {
@@ -488,15 +483,15 @@ func DumpReaderToFile(reader io.Reader, filename string) error {
 }
 
 func GetServerSideApplyFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "experimental-server-side")
+	return GetFlagBool(cmd, "server-side")
 }
 
 func GetForceConflictsFlag(cmd *cobra.Command) bool {
-	return GetFlagBool(cmd, "experimental-force-conflicts")
+	return GetFlagBool(cmd, "force-conflicts")
 }
 
 func GetFieldManagerFlag(cmd *cobra.Command) string {
-	return GetFlagString(cmd, "experimental-field-manager")
+	return GetFlagString(cmd, "field-manager")
 }
 
 func GetDryRunFlag(cmd *cobra.Command) bool {

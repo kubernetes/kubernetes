@@ -134,7 +134,7 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 	}
 
 	// there may still be content for us to remove
-	estimate, err := d.deleteAllContent(namespace.Name, *namespace.DeletionTimestamp)
+	estimate, err := d.deleteAllContent(namespace)
 	if err != nil {
 		return err
 	}
@@ -292,7 +292,7 @@ func (d *namespacedResourcesDeleter) updateNamespaceStatusFunc(namespace *v1.Nam
 	}
 	newNamespace := v1.Namespace{}
 	newNamespace.ObjectMeta = namespace.ObjectMeta
-	newNamespace.Status = namespace.Status
+	newNamespace.Status = *namespace.Status.DeepCopy()
 	newNamespace.Status.Phase = v1.NamespaceTerminating
 	return d.nsClient.UpdateStatus(&newNamespace)
 }
@@ -480,8 +480,11 @@ func (d *namespacedResourcesDeleter) deleteAllContentForGroupVersionResource(
 // deleteAllContent will use the dynamic client to delete each resource identified in groupVersionResources.
 // It returns an estimate of the time remaining before the remaining resources are deleted.
 // If estimate > 0, not all resources are guaranteed to be gone.
-func (d *namespacedResourcesDeleter) deleteAllContent(namespace string, namespaceDeletedAt metav1.Time) (int64, error) {
+func (d *namespacedResourcesDeleter) deleteAllContent(ns *v1.Namespace) (int64, error) {
+	namespace := ns.Name
+	namespaceDeletedAt := *ns.DeletionTimestamp
 	var errs []error
+	conditionUpdater := namespaceConditionUpdater{}
 	estimate := int64(0)
 	klog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s", namespace)
 
@@ -489,6 +492,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(namespace string, namespac
 	if err != nil {
 		// discovery errors are not fatal.  We often have some set of resources we can operate against even if we don't have a complete list
 		errs = append(errs, err)
+		conditionUpdater.ProcessDiscoverResourcesErr(err)
 	}
 	// TODO(sttts): get rid of opCache and pass the verbs (especially "deletecollection") down into the deleter
 	deletableResources := discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"delete"}}, resources)
@@ -496,6 +500,7 @@ func (d *namespacedResourcesDeleter) deleteAllContent(namespace string, namespac
 	if err != nil {
 		// discovery errors are not fatal.  We often have some set of resources we can operate against even if we don't have a complete list
 		errs = append(errs, err)
+		conditionUpdater.ProcessGroupVersionErr(err)
 	}
 	for gvr := range groupVersionResources {
 		gvrEstimate, err := d.deleteAllContentForGroupVersionResource(gvr, namespace, namespaceDeletedAt)
@@ -503,16 +508,25 @@ func (d *namespacedResourcesDeleter) deleteAllContent(namespace string, namespac
 			// If there is an error, hold on to it but proceed with all the remaining
 			// groupVersionResources.
 			errs = append(errs, err)
+			conditionUpdater.ProcessDeleteContentErr(err)
 		}
 		if gvrEstimate > estimate {
 			estimate = gvrEstimate
 		}
 	}
-	if len(errs) > 0 {
-		return estimate, utilerrors.NewAggregate(errs)
+
+	// we always want to update the conditions because if we have set a condition to "it worked" after it was previously, "it didn't work",
+	// we need to reflect that information.  Recall that additional finalizers can be set on namespaces, so this finalizer may clear itself and
+	// NOT remove the resource instance.
+	if hasChanged := conditionUpdater.Update(ns); hasChanged {
+		if _, err = d.nsClient.UpdateStatus(ns); err != nil {
+			utilruntime.HandleError(fmt.Errorf("couldn't update status condition for namespace %q: %v", namespace, err))
+		}
 	}
-	klog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v", namespace, estimate)
-	return estimate, nil
+
+	// if len(errs)==0, NewAggregate returns nil.
+	klog.V(4).Infof("namespace controller - deleteAllContent - namespace: %s, estimate: %v, errors: %v", namespace, estimate, utilerrors.NewAggregate(errs))
+	return estimate, utilerrors.NewAggregate(errs)
 }
 
 // estimateGrracefulTermination will estimate the graceful termination required for the specific entity in the namespace

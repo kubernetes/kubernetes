@@ -71,7 +71,7 @@ type rangeAllocator struct {
 // Caller must always pass in a list of existing nodes so the new allocator.
 // Caller must ensure that ClusterCIDRs are semantically correct e.g (1 for non DualStack, 2 for DualStack etc..)
 // can initialize its CIDR map. NodeList is only nil in testing.
-func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.NodeInformer, clusterCIDRs []*net.IPNet, serviceCIDR *net.IPNet, subNetMaskSize int, nodeList *v1.NodeList) (CIDRAllocator, error) {
+func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.NodeInformer, clusterCIDRs []*net.IPNet, serviceCIDR *net.IPNet, secondaryServiceCIDR *net.IPNet, subNetMaskSize int, nodeList *v1.NodeList) (CIDRAllocator, error) {
 	if client == nil {
 		klog.Fatalf("kubeClient is nil when starting NodeController")
 	}
@@ -108,6 +108,12 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 		ra.filterOutServiceRange(serviceCIDR)
 	} else {
 		klog.V(0).Info("No Service CIDR provided. Skipping filtering out service addresses.")
+	}
+
+	if secondaryServiceCIDR != nil {
+		ra.filterOutServiceRange(secondaryServiceCIDR)
+	} else {
+		klog.V(0).Info("No Secondary Service CIDR provided. Skipping filtering out secondary service addresses.")
 	}
 
 	if nodeList != nil {
@@ -295,6 +301,7 @@ func (r *rangeAllocator) filterOutServiceRange(serviceCIDR *net.IPNet) {
 	// serviceCIDR) or vice versa (which means that serviceCIDR contains
 	// clusterCIDR).
 	for idx, cidr := range r.clusterCIDRs {
+		// if they don't overlap then ignore the filtering
 		if !cidr.Contains(serviceCIDR.IP.Mask(cidr.Mask)) && !serviceCIDR.Contains(cidr.IP.Mask(serviceCIDR.Mask)) {
 			continue
 		}
