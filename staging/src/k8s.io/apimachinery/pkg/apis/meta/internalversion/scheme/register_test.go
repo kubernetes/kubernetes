@@ -14,13 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package internalversion
+package scheme
 
 import (
 	"net/url"
 	"reflect"
 	"testing"
 
+	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 )
@@ -35,7 +36,7 @@ func TestListOptions(t *testing.T) {
 		TimeoutSeconds:  &ten,
 		Watch:           true,
 	}
-	out := &ListOptions{}
+	out := &metainternalversion.ListOptions{}
 	if err := scheme.Convert(in, out, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +53,7 @@ func TestListOptions(t *testing.T) {
 		{LabelSelector: "a!!!"},
 		{FieldSelector: "a!!!"},
 	} {
-		out = &ListOptions{}
+		out = &metainternalversion.ListOptions{}
 		if err := scheme.Convert(failingObject, out, nil); err == nil {
 			t.Errorf("%d: unexpected conversion: %#v", i, out)
 		}
@@ -62,7 +63,7 @@ func TestListOptions(t *testing.T) {
 	if gvks, unversioned, err := scheme.ObjectKinds(in); err != nil || unversioned || gvks[0] != metav1.SchemeGroupVersion.WithKind("ListOptions") {
 		t.Errorf("unexpected: %v %v %v", gvks[0], unversioned, err)
 	}
-	if gvks, unversioned, err := scheme.ObjectKinds(out); err != nil || unversioned || gvks[0] != SchemeGroupVersion.WithKind("ListOptions") {
+	if gvks, unversioned, err := scheme.ObjectKinds(out); err != nil || unversioned || gvks[0] != metainternalversion.SchemeGroupVersion.WithKind("ListOptions") {
 		t.Errorf("unexpected: %v %v %v", gvks[0], unversioned, err)
 	}
 
