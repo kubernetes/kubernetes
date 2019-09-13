@@ -218,10 +218,6 @@ vendor/k8s.io/code-generator/cmd/client-gen/generators/fake
 vendor/k8s.io/code-generator/cmd/client-gen/generators/util
 vendor/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 vendor/k8s.io/component-base/metrics
-vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration
-vendor/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper
-vendor/k8s.io/kube-aggregator/pkg/controllers/autoregister
-vendor/k8s.io/kube-aggregator/pkg/controllers/openapi/aggregator
 vendor/k8s.io/kubectl/pkg/cmd/annotate
 vendor/k8s.io/kubectl/pkg/cmd/certificates
 vendor/k8s.io/kubectl/pkg/cmd/config
