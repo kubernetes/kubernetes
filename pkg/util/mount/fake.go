@@ -32,8 +32,11 @@ type FakeMounter struct {
 	MountCheckErrors map[string]error
 	// Some tests run things in parallel, make sure the mounter does not produce
 	// any golang's DATA RACE warnings.
-	mutex sync.Mutex
+	mutex      sync.Mutex
+	UmountFunc UmountFunc
 }
+
+type UmountFunc func(path string) error
 
 var _ Interface = &FakeMounter{}
 
@@ -117,6 +120,12 @@ func (f *FakeMounter) Unmount(target string) error {
 	newMountpoints := []MountPoint{}
 	for _, mp := range f.MountPoints {
 		if mp.Path == absTarget {
+			if f.UmountFunc != nil {
+				err := f.UmountFunc(absTarget)
+				if err != nil {
+					return err
+				}
+			}
 			klog.V(5).Infof("Fake mounter: unmounted %s from %s", mp.Device, absTarget)
 			// Don't copy it to newMountpoints
 			continue

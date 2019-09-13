@@ -409,6 +409,7 @@ func TestCleanSubPaths(t *testing.T) {
 		// Function that validates directory structure after the test
 		validate    func(base string) error
 		expectError bool
+		umount      func(path string) error
 	}{
 		{
 			name: "not-exists",
@@ -539,6 +540,37 @@ func TestCleanSubPaths(t *testing.T) {
 				return validateDirExists(baseSubdir)
 			},
 		},
+		{
+			name: "subpath-with-files",
+			prepare: func(base string) ([]mount.MountPoint, error) {
+				path := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1", "0")
+				path2 := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1", "1")
+				if err := os.MkdirAll(filepath.Join(path, "my-dir-1"), defaultPerm); err != nil {
+					return nil, err
+				}
+				if err := os.MkdirAll(filepath.Join(path2, "my-dir-2"), defaultPerm); err != nil {
+					return nil, err
+				}
+				mounts := []mount.MountPoint{
+					{Device: "/dev/sdb", Path: path},
+					{Device: "/dev/sdc", Path: path2},
+				}
+				return mounts, nil
+			},
+			umount: func(mountpath string) error {
+				fileInfo, err := ioutil.ReadDir(mountpath)
+				for _, file := range fileInfo {
+					if err = os.RemoveAll(filepath.Join(mountpath, file.Name())); err != nil {
+						return err
+					}
+				}
+
+				return nil
+			},
+			validate: func(base string) error {
+				return validateDirNotExists(filepath.Join(base, containerSubPathDirectoryName))
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -553,7 +585,7 @@ func TestCleanSubPaths(t *testing.T) {
 			t.Fatalf("failed to prepare test %q: %v", test.name, err.Error())
 		}
 
-		fm := &mount.FakeMounter{MountPoints: mounts}
+		fm := &mount.FakeMounter{MountPoints: mounts, UmountFunc: test.umount}
 
 		err = doCleanSubPaths(fm, base, testVol)
 		if err != nil && !test.expectError {
