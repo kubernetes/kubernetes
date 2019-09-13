@@ -146,7 +146,7 @@ func (o *ConvertOptions) RunConvert() error {
 	fmt.Fprintf(o.ErrOut, "kubectl convert is DEPRECATED and will be removed in a future version.\nIn order to convert, kubectl apply the object to the cluster, then kubectl get at the desired version.\n")
 
 	b := o.builder().
-		WithScheme(scheme.Scheme).
+		WithScheme(scheme.Scheme, scheme.Scheme.PrioritizedVersionsAllGroups()...).
 		LocalParam(o.local)
 	if !o.local {
 		schema, err := o.validator()
