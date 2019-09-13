@@ -17,11 +17,8 @@ limitations under the License.
 package endpointslice
 
 import (
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
 	"reflect"
-	"sort"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -33,7 +30,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery/validation"
-	"k8s.io/kubernetes/pkg/util/hash"
 )
 
 // podEndpointChanged returns true if the results of podToEndpoint are different
@@ -235,21 +231,6 @@ func addTriggerTimeAnnotation(endpointSlice *discovery.EndpointSlice, triggerTim
 	}
 }
 
-// deepHashObject creates a unique hash string from a go object.
-func deepHashObjectToString(objectToWrite interface{}) string {
-	hasher := md5.New()
-	hash.DeepHashObject(hasher, objectToWrite)
-	return hex.EncodeToString(hasher.Sum(nil)[0:])
-}
-
-// portMapKey is used to uniquely identify groups of endpoint ports.
-type portMapKey string
-
-func newPortMapKey(endpointPorts []discovery.EndpointPort) portMapKey {
-	sort.Sort(portsInOrder(endpointPorts))
-	return portMapKey(deepHashObjectToString(endpointPorts))
-}
-
 // endpointSliceEndpointLen helps sort endpoint slices by the number of
 // endpoints they contain.
 type endpointSliceEndpointLen []*discovery.EndpointSlice
@@ -258,15 +239,4 @@ func (sl endpointSliceEndpointLen) Len() int      { return len(sl) }
 func (sl endpointSliceEndpointLen) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
 func (sl endpointSliceEndpointLen) Less(i, j int) bool {
 	return len(sl[i].Endpoints) > len(sl[j].Endpoints)
-}
-
-// portsInOrder helps sort endpoint ports in a consistent way for hashing.
-type portsInOrder []discovery.EndpointPort
-
-func (sl portsInOrder) Len() int      { return len(sl) }
-func (sl portsInOrder) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
-func (sl portsInOrder) Less(i, j int) bool {
-	h1 := deepHashObjectToString(sl[i])
-	h2 := deepHashObjectToString(sl[j])
-	return h1 < h2
 }

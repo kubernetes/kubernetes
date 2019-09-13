@@ -17,20 +17,41 @@ limitations under the License.
 package endpoint
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"reflect"
+	"sort"
 
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1alpha1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/util/hash"
 )
 
 // EndpointsMatch is a type of function that returns true if pod endpoints match.
 type EndpointsMatch func(*v1.Pod, *v1.Pod) bool
+
+// PortMapKey is used to uniquely identify groups of endpoint ports.
+type PortMapKey string
+
+// NewPortMapKey generates a PortMapKey from endpoint ports.
+func NewPortMapKey(endpointPorts []discovery.EndpointPort) PortMapKey {
+	sort.Sort(portsInOrder(endpointPorts))
+	return PortMapKey(DeepHashObjectToString(endpointPorts))
+}
+
+// DeepHashObjectToString creates a unique hash string from a go object.
+func DeepHashObjectToString(objectToWrite interface{}) string {
+	hasher := md5.New()
+	hash.DeepHashObject(hasher, objectToWrite)
+	return hex.EncodeToString(hasher.Sum(nil)[0:])
+}
 
 // ShouldPodBeInEndpoints returns true if a specified pod should be in an
 // endpoints object.
@@ -171,4 +192,15 @@ func determineNeededServiceUpdates(oldServices, services sets.String, podChanged
 		services = services.Difference(oldServices).Union(oldServices.Difference(services))
 	}
 	return services
+}
+
+// portsInOrder helps sort endpoint ports in a consistent way for hashing.
+type portsInOrder []discovery.EndpointPort
+
+func (sl portsInOrder) Len() int      { return len(sl) }
+func (sl portsInOrder) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
+func (sl portsInOrder) Less(i, j int) bool {
+	h1 := DeepHashObjectToString(sl[i])
+	h2 := DeepHashObjectToString(sl[j])
+	return h1 < h2
 }
