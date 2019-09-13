@@ -37,6 +37,7 @@ import (
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
 	"k8s.io/kubernetes/test/integration/framework"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestCRDShadowGroup(t *testing.T) {
@@ -172,6 +173,7 @@ func TestCRDOpenAPI(t *testing.T) {
 				Plural: "foos",
 				Kind:   "Foo",
 			},
+			PreserveUnknownFields: utilpointer.BoolPtr(false),
 			Validation: &apiextensionsv1beta1.CustomResourceValidation{
 				OpenAPIV3Schema: &apiextensionsv1beta1.JSONSchemaProps{
 					Type: "object",
