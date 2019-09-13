@@ -161,3 +161,17 @@ func TestChinaEcrProvide(t *testing.T) {
 		}
 	}
 }
+
+// TestConcurrentEcrLazyProvide tests that LazyProvide is thread-safe, because it may be called from two places during
+// kubelet startup: PullImage to pull a particular pod's container image and RunPodSandbox to pull the sandbox image
+func TestConcurrentEcrLazyProvide(t *testing.T) {
+	region := "us-west-2"
+	provider := &lazyEcrProvider{
+		region:    region,
+		regionURL: registryURL(region),
+	}
+
+	for i := 0; i < 10; i++ {
+		go provider.LazyProvide()
+	}
+}
