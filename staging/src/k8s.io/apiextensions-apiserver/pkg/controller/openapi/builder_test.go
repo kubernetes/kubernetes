@@ -28,6 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestNewBuilder(t *testing.T) {
@@ -435,4 +436,99 @@ func schemaDiff(a, b *spec.Schema) string {
 		panic(err)
 	}
 	return diff.StringDiff(string(as), string(bs))
+}
+
+func TestBuildSwagger(t *testing.T) {
+	tests := []struct {
+		name                  string
+		schema                string
+		preserveUnknownFields *bool
+		wantedSchema          string
+	}{
+		{
+			"nil",
+			"",
+			nil,
+			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+		},
+		{
+			"with properties",
+			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
+			nil,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+		},
+		{
+			"with spec.preseveUnknownFields=true",
+			`{"type":"object","properties":{"foo":{"type":"string"}}}`,
+			utilpointer.BoolPtr(true),
+			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+		},
+		{
+			"v2",
+			`{"type":"object","properties":{"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}}}`,
+			nil,
+			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var validation *apiextensions.CustomResourceValidation
+			if len(tt.schema) > 0 {
+				v1beta1Schema := &v1beta1.JSONSchemaProps{}
+				if err := json.Unmarshal([]byte(tt.schema), &v1beta1Schema); err != nil {
+					t.Fatal(err)
+				}
+				internalSchema := &apiextensions.JSONSchemaProps{}
+				v1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
+				validation = &apiextensions.CustomResourceValidation{
+					OpenAPIV3Schema: internalSchema,
+				}
+			}
+
+			// TODO: mostly copied from the test above. reuse code to cleanup
+			got, err := BuildSwagger(&apiextensions.CustomResourceDefinition{
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group:   "bar.k8s.io",
+					Version: "v1",
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "foos",
+						Singular: "foo",
+						Kind:     "Foo",
+						ListKind: "FooList",
+					},
+					Scope:                 apiextensions.NamespaceScoped,
+					Validation:            validation,
+					PreserveUnknownFields: tt.preserveUnknownFields,
+				},
+			}, "v1")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			var wantedSchema spec.Schema
+			if err := json.Unmarshal([]byte(tt.wantedSchema), &wantedSchema); err != nil {
+				t.Fatal(err)
+			}
+
+			gotSchema := got.Definitions["io.k8s.bar.v1.Foo"]
+			gotProperties := properties(gotSchema.Properties)
+			wantedProperties := properties(wantedSchema.Properties)
+			if !gotProperties.Equal(wantedProperties) {
+				t.Fatalf("unexpected properties, got: %s, expected: %s", gotProperties.List(), wantedProperties.List())
+			}
+
+			// wipe out TypeMeta/ObjectMeta content, with those many lines of descriptions. We trust that they match here.
+			for _, metaField := range []string{"kind", "apiVersion", "metadata"} {
+				if _, found := gotSchema.Properties["kind"]; found {
+					prop := gotSchema.Properties[metaField]
+					prop.Description = ""
+					gotSchema.Properties[metaField] = prop
+				}
+			}
+
+			if !reflect.DeepEqual(&wantedSchema, &gotSchema) {
+				t.Errorf("unexpected schema: %s\nwant = %#v\ngot = %#v", schemaDiff(&wantedSchema, &gotSchema), &wantedSchema, &gotSchema)
+			}
+		})
+	}
 }
