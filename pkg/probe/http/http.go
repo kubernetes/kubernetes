@@ -113,7 +113,11 @@ func DoHTTPProbe(url *url.URL, headers http.Header, client GetHTTPInterface) (pr
 	defer res.Body.Close()
 	b, err := utilio.ReadAtMost(res.Body, maxRespBodyLength)
 	if err != nil {
-		return probe.Failure, "", err
+		if err == utilio.ErrLimitReached {
+			klog.V(4).Infof("Non fatal body truncation for %s, Response: %v", url.String(), *res)
+		} else {
+			return probe.Failure, "", err
+		}
 	}
 	body := string(b)
 	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
