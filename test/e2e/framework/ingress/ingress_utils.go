@@ -52,6 +52,7 @@ import (
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/manifest"
+	"k8s.io/kubernetes/test/e2e/network"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -836,6 +837,7 @@ type NginxIngressController struct {
 	rc     *v1.ReplicationController
 	pod    *v1.Pod
 	Client clientset.Interface
+	lbSvc  *v1.Service
 }
 
 // Init initializes the NginxIngressController
@@ -853,8 +855,8 @@ func (cont *NginxIngressController) Init() {
 			{Name: "https", Port: 443},
 			{Name: "stats", Port: 18080}}
 	})
-	svc := serviceJig.WaitForLoadBalancerOrFail(cont.Ns, "nginx-ingress-lb", framework.LoadBalancerCreateTimeoutDefault)
-	serviceJig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
+	cont.lbSvc = serviceJig.WaitForLoadBalancerOrFail(cont.Ns, "nginx-ingress-lb", framework.GetServiceLoadBalancerCreationTimeout(cont.Client))
+	serviceJig.SanityCheckService(cont.lbSvc, v1.ServiceTypeLoadBalancer)
 
 	read := func(file string) string {
 		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file), ginkgo.Fail))
@@ -876,6 +878,15 @@ func (cont *NginxIngressController) Init() {
 	}
 	cont.pod = &pods.Items[0]
 	e2elog.Logf("ingress controller running in pod %v", cont.pod.Name)
+}
+
+// TearDown cleans up the NginxIngressController.
+func (cont *NginxIngressController) TearDown() {
+	if cont.lbSvc == nil {
+		e2elog.Logf("No LoadBalancer service created, no cleanup necessary")
+		return
+	}
+	network.WaitForServiceDeletedWithFinalizer(cont.Client, cont.Ns, cont.lbSvc.Name)
 }
 
 func generateBacksideHTTPSIngressSpec(ns string) *networkingv1beta1.Ingress {
