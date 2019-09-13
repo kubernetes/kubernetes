@@ -54,7 +54,7 @@ will then have Transformers from the current `kustomization.yaml` applied.
 
 | Name          | Type      | Desc                                |
 | :------------ | :-------- | :---------------------------------- |
-| **base**      | []string  | List of paths must point to directories or git repositories containing `kustomization.yaml`s.   |
+| **bases**      | []string  | List of paths must point to directories or git repositories containing `kustomization.yaml`s.   |
 
 
 {% sample lang="yaml" %}
