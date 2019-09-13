@@ -570,8 +570,10 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 	for _, gvr := range gvrsToTest {
 		resource := resourcesByGVR[gvr]
 		t.Run(gvr.Group+"."+gvr.Version+"."+strings.ReplaceAll(resource.Name, "/", "."), func(t *testing.T) {
-			for _, verb := range []string{"create", "update", "patch", "connect", "delete", "deletecollection"} {
+			wg := sync.WaitGroup{}
+			for _, verb := range []string{"create", "update", "patch", "connect"} {
 				if shouldTestResourceVerb(gvr, resource, verb) {
+					wg.Add(1)
 					t.Run(verb, func(t *testing.T) {
 						holder.reset(t)
 						testFunc := getTestFunc(gvr, verb)
@@ -586,7 +588,26 @@ func testWebhookAdmission(t *testing.T, watchCache bool) {
 							resources:       resourcesByGVR,
 						})
 						holder.verify(t)
+						wg.Done()
 					})
+				}
+			}
+			wg.Wait()
+			for _, verb := range []string{"delete", "deletecollection"} {
+				if shouldTestResourceVerb(gvr, resource, verb) {
+					holder.reset(t)
+					testFunc := getTestFunc(gvr, verb)
+					testFunc(&testContext{
+						t:               t,
+						admissionHolder: holder,
+						client:          dynamicClient,
+						clientset:       client,
+						verb:            verb,
+						gvr:             gvr,
+						resource:        resource,
+						resources:       resourcesByGVR,
+					})
+					holder.verify(t)
 				}
 			}
 		})
