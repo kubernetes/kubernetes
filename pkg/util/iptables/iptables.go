@@ -177,7 +177,7 @@ func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Prot
 		hasListener:     false,
 		hasRandomFully:  version.AtLeast(RandomFullyMinVersion),
 		waitFlag:        getIPTablesWaitFlag(version),
-		restoreWaitFlag: getIPTablesRestoreWaitFlag(version),
+		restoreWaitFlag: getIPTablesRestoreWaitFlag(version, exec, protocol),
 		lockfilePath:    lockfilePath,
 	}
 	return runner
@@ -578,12 +578,46 @@ func getIPTablesWaitFlag(version *utilversion.Version) []string {
 }
 
 // Checks if iptables-restore has a "wait" flag
-func getIPTablesRestoreWaitFlag(version *utilversion.Version) []string {
+func getIPTablesRestoreWaitFlag(version *utilversion.Version, exec utilexec.Interface, protocol Protocol) []string {
 	if version.AtLeast(WaitRestoreMinVersion) {
 		return []string{WaitString, WaitSecondsValue}
-	} else {
+	}
+
+	// Older versions may have backported features; if iptables-restore supports
+	// --version, assume it also supports --wait
+	vstring, err := getIPTablesRestoreVersionString(exec, protocol)
+	if err != nil || vstring == "" {
+		klog.V(3).Infof("couldn't get iptables-restore version; assuming it doesn't support --wait")
 		return nil
 	}
+	if _, err := utilversion.ParseGeneric(vstring); err != nil {
+		klog.V(3).Infof("couldn't parse iptables-restore version; assuming it doesn't support --wait")
+		return nil
+	}
+	return []string{WaitString}
+}
+
+// getIPTablesRestoreVersionString runs "iptables-restore --version" to get the version string
+// in the form "X.X.X"
+func getIPTablesRestoreVersionString(exec utilexec.Interface, protocol Protocol) (string, error) {
+	// this doesn't access mutable state so we don't need to use the interface / runner
+
+	// iptables-restore hasn't always had --version, and worse complains
+	// about unrecognized commands but doesn't exit when it gets them.
+	// Work around that by setting stdin to nothing so it exits immediately.
+	iptablesRestoreCmd := iptablesRestoreCommand(protocol)
+	cmd := exec.Command(iptablesRestoreCmd, "--version")
+	cmd.SetStdin(bytes.NewReader([]byte{}))
+	bytes, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
+	}
+	versionMatcher := regexp.MustCompile("v([0-9]+(\\.[0-9]+)+)")
+	match := versionMatcher.FindStringSubmatch(string(bytes))
+	if match == nil {
+		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
+	}
+	return match[1], nil
 }
 
 // goroutine to listen for D-Bus signals
