@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -246,13 +246,11 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// If TaintNodesByCondition enabled, taint node with TaintNodeUnschedulable when initializing
+	// Taint node with TaintNodeUnschedulable when initializing
 	// node to avoid race condition; refer to #63897 for more detail.
-	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
-		if node.Spec.Unschedulable &&
-			!taintutil.TaintExists(nodeTaints, &unschedulableTaint) {
-			nodeTaints = append(nodeTaints, unschedulableTaint)
-		}
+	if node.Spec.Unschedulable &&
+		!taintutil.TaintExists(nodeTaints, &unschedulableTaint) {
+		nodeTaints = append(nodeTaints, unschedulableTaint)
 	}
 
 	if kl.externalCloudProvider {

@@ -29,13 +29,10 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
@@ -86,8 +83,6 @@ func TestPodAdmission(t *testing.T) {
 			},
 		},
 	}
-
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
 
 	tests := []struct {
 		pod                       *api.Pod

@@ -67,9 +67,6 @@ func newPod(nsName, name string, req, limit v1.ResourceList) *v1.Pod {
 
 // TestTaintNodeByCondition tests related cases for TaintNodeByCondition feature.
 func TestTaintNodeByCondition(t *testing.T) {
-	// Enable TaintNodeByCondition
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
-
 	// Build PodToleration Admission.
 	admission := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
 
@@ -110,7 +107,6 @@ func TestTaintNodeByCondition(t *testing.T) {
 		100,         // Unhealthy zone threshold
 		true,        // Run taint manager
 		true,        // Use taint based evictions
-		true,        // Enabled TaintNodeByCondition feature
 	)
 	if err != nil {
 		t.Errorf("Failed to create node controller: %v", err)
@@ -539,7 +535,12 @@ func TestTaintNodeByCondition(t *testing.T) {
 				t.Errorf("Failed to create node, err: %v", err)
 			}
 			if err := waitForNodeTaints(cs, node, test.expectedTaints); err != nil {
-				t.Errorf("Failed to taint node <%s>, err: %v", node.Name, err)
+				node, err = cs.CoreV1().Nodes().Get(node.Name, metav1.GetOptions{})
+				if err != nil {
+					t.Errorf("Failed to get node <%s>", node.Name)
+				}
+
+				t.Errorf("Failed to taint node <%s>, expected: %v, got: %v, err: %v", node.Name, test.expectedTaints, node.Spec.Taints, err)
 			}
 
 			var pods []*v1.Pod
@@ -689,7 +690,6 @@ func TestTaintBasedEvictions(t *testing.T) {
 				0.55,             // Unhealthy zone threshold
 				true,             // Run taint manager
 				true,             // Use taint based evictions
-				true,             // Enabled TaintNodeByCondition feature
 			)
 			if err != nil {
 				t.Errorf("Failed to create node controller: %v", err)

@@ -966,10 +966,8 @@ func TestTaintedNode(t *testing.T) {
 }
 
 // TestUnschedulableNodeDaemonDoesLaunchPod tests that the DaemonSet Pods can still be scheduled
-// to the Unschedulable nodes when TaintNodesByCondition are enabled.
+// to the Unschedulable nodes.
 func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
-
 	forEachFeatureGate(t, func(t *testing.T) {
 		forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
 			server, closeFn, dc, informers, clientset := setup(t)

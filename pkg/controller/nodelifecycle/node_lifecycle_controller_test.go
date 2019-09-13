@@ -182,7 +182,6 @@ func newNodeLifecycleControllerFromClient(
 		unhealthyZoneThreshold,
 		useTaints,
 		useTaints,
-		useTaints,
 	)
 	if err != nil {
 		return nil, err

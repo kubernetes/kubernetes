@@ -110,7 +110,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				]
 			}`,
 			expectedPredicates: sets.NewString(
-				"CheckNodeCondition", // mandatory predicate
+				"CheckNodeUnschedulable", // mandatory predicate
 				"PredicateOne",
 				"PredicateTwo",
 			),
@@ -118,6 +118,11 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"PriorityOne",
 				"PriorityTwo",
 			),
+			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "TaintToleration"},
+				},
+			},
 		},
 		{
 			policy: `{
@@ -125,10 +130,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"apiVersion" : "v1"
 			}`,
 			expectedPredicates: sets.NewString(
-				"CheckNodeCondition", // mandatory predicate
-				"CheckNodeDiskPressure",
-				"CheckNodeMemoryPressure",
-				"CheckNodePIDPressure",
+				"CheckNodeUnschedulable", // mandatory predicate
 				"MaxAzureDiskVolumeCount",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
@@ -168,9 +170,14 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"priorities" : []
 			}`,
 			expectedPredicates: sets.NewString(
-				"CheckNodeCondition", // mandatory predicate
+				"CheckNodeUnschedulable", // mandatory predicate
 			),
 			expectedPrioritizers: sets.NewString(),
+			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "TaintToleration"},
+				},
+			},
 		},
 		{
 			policy: `apiVersion: v1
@@ -185,7 +192,7 @@ priorities:
   weight: 5
 `,
 			expectedPredicates: sets.NewString(
-				"CheckNodeCondition", // mandatory predicate
+				"CheckNodeUnschedulable", // mandatory predicate
 				"PredicateOne",
 				"PredicateTwo",
 			),
@@ -193,16 +200,18 @@ priorities:
 				"PriorityOne",
 				"PriorityTwo",
 			),
+			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "TaintToleration"},
+				},
+			},
 		},
 		{
 			policy: `apiVersion: v1
 kind: Policy
 `,
 			expectedPredicates: sets.NewString(
-				"CheckNodeCondition", // mandatory predicate
-				"CheckNodeDiskPressure",
-				"CheckNodeMemoryPressure",
-				"CheckNodePIDPressure",
+				"CheckNodeUnschedulable", // mandatory predicate
 				"MaxAzureDiskVolumeCount",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
@@ -241,9 +250,14 @@ predicates: []
 priorities: []
 `,
 			expectedPredicates: sets.NewString(
-				"CheckNodeCondition", // mandatory predicate
+				"CheckNodeUnschedulable", // mandatory predicate
 			),
 			expectedPrioritizers: sets.NewString(),
+			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "TaintToleration"},
+				},
+			},
 		},
 	} {
 		// Add a ConfigMap object.
@@ -362,12 +376,6 @@ func TestUnschedulableNodes(t *testing.T) {
 		Reason:            fmt.Sprintf("schedulable condition"),
 		LastHeartbeatTime: metav1.Time{Time: time.Now()},
 	}
-	badCondition := v1.NodeCondition{
-		Type:              v1.NodeReady,
-		Status:            v1.ConditionUnknown,
-		Reason:            fmt.Sprintf("unschedulable condition"),
-		LastHeartbeatTime: metav1.Time{Time: time.Now()},
-	}
 	// Create a new schedulable node, since we're first going to apply
 	// the unschedulable condition and verify that pods aren't scheduled.
 	node := &v1.Node{
@@ -426,43 +434,6 @@ func TestUnschedulableNodes(t *testing.T) {
 				}
 			},
 		},
-		// Test node.Status.Conditions=ConditionTrue/Unknown
-		{
-			makeUnSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
-				n.Status = v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
-					},
-					Conditions: []v1.NodeCondition{badCondition},
-				}
-				if _, err = c.CoreV1().Nodes().UpdateStatus(n); err != nil {
-					t.Fatalf("Failed to update node with bad status condition: %v", err)
-				}
-				err = waitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
-					return node != nil && node.(*v1.Node).Status.Conditions[0].Status == v1.ConditionUnknown
-				})
-				if err != nil {
-					t.Fatalf("Failed to observe reflected update for status condition update: %v", err)
-				}
-			},
-			makeSchedulable: func(t *testing.T, n *v1.Node, nodeLister corelisters.NodeLister, c clientset.Interface) {
-				n.Status = v1.NodeStatus{
-					Capacity: v1.ResourceList{
-						v1.ResourcePods: *resource.NewQuantity(32, resource.DecimalSI),
-					},
-					Conditions: []v1.NodeCondition{goodCondition},
-				}
-				if _, err = c.CoreV1().Nodes().UpdateStatus(n); err != nil {
-					t.Fatalf("Failed to update node with healthy status condition: %v", err)
-				}
-				err = waitForReflection(t, nodeLister, nodeKey, func(node interface{}) bool {
-					return node != nil && node.(*v1.Node).Status.Conditions[0].Status == v1.ConditionTrue
-				})
-				if err != nil {
-					t.Fatalf("Failed to observe reflected update for status condition update: %v", err)
-				}
-			},
-		},
 	}
 
 	for i, mod := range nodeModifications {
@@ -484,7 +455,7 @@ func TestUnschedulableNodes(t *testing.T) {
 		// There are no schedulable nodes - the pod shouldn't be scheduled.
 		err = waitForPodToScheduleWithTimeout(context.clientSet, myPod, 2*time.Second)
 		if err == nil {
-			t.Errorf("Pod scheduled successfully on unschedulable nodes")
+			t.Errorf("Test %d: Pod scheduled successfully on unschedulable nodes", i)
 		}
 		if err != wait.ErrWaitTimeout {
 			t.Errorf("Test %d: failed while trying to confirm the pod does not get scheduled on the node: %v", i, err)
