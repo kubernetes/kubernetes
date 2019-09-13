@@ -96,8 +96,11 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 			return
 		}
 
-		// TODO(mikedanese): verify the response audience matches one of apiAuds if
-		// non-empty
+		if len(apiAuds) > 0 && len(resp.Audiences) > 0 && len(authenticator.Audiences(apiAuds).Intersect(resp.Audiences)) == 0 {
+			klog.Errorf("Unable to match the audience: %v , accepted: %v", resp.Audiences, apiAuds)
+			failed.ServeHTTP(w, req)
+			return
+		}
 
 		// authorization header is not required anymore in case of a successful authentication.
 		req.Header.Del("Authorization")
