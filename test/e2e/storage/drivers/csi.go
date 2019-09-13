@@ -96,6 +96,7 @@ func InitHostPathCSIDriver() testsuites.TestDriver {
 		testsuites.CapBlock:               true,
 		testsuites.CapPVCDataSource:       true,
 		testsuites.CapControllerExpansion: true,
+		testsuites.CapSingleNodeVolume:    true,
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
@@ -345,7 +346,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 // InitHostPathV0CSIDriver returns a variant of hostpathCSIDriver with different manifests.
 func InitHostPathV0CSIDriver() testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath-v0",
-		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapMultiPODs: true},
+		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapMultiPODs: true, testsuites.CapSingleNodeVolume: true},
 		nil, /* no volume attributes -> no ephemeral volume testing */
 		// Using the current set of rbac.yaml files is problematic here because they don't
 		// match the version of the rules that were written for the releases of external-attacher
