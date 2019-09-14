@@ -31,7 +31,7 @@ import (
 	// import DefaultProvider
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -124,7 +124,7 @@ func createScheduler(
 			Provider: &defaultProviderName,
 		},
 		stopCh,
-		schedulerframework.NewRegistry(),
+		schedulerplugins.NewDefaultRegistry(),
 		nil,
 		[]schedulerconfig.PluginConfig{},
 	)

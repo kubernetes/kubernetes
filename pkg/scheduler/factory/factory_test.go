@@ -40,7 +40,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	plugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -496,7 +496,7 @@ func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		bindTimeoutSeconds,
 		stopCh,
-		framework.NewRegistry(),
+		plugins.NewDefaultRegistry(),
 		nil,
 		[]config.PluginConfig{},
 	})
