@@ -501,7 +501,7 @@ function kube::build::ensure_data_container() {
       --volume /usr/local/go/pkg/darwin_386_cgo
       --volume /usr/local/go/pkg/windows_amd64_cgo
       --volume /usr/local/go/pkg/windows_386_cgo
-      --volume /usr/local/go/pkg/linux_mips64le__cgo
+      --volume /usr/local/go/pkg/linux_mips64le_cgo
       --name "${KUBE_DATA_CONTAINER_NAME}"
       --hostname "${HOSTNAME}"
       "${KUBE_BUILD_IMAGE}"
