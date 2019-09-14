@@ -29,6 +29,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"runtime"
 
 	"github.com/docker/docker/pkg/mount"
 	"github.com/google/cadvisor/devicemapper"
@@ -513,9 +514,13 @@ func (self *RealFsInfo) GetDirFsDevice(dir string) (*DeviceInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("stat failed on %s with error: %s", dir, err)
 	}
-
-	major := major(buf.Dev)
-	minor := minor(buf.Dev)
+	if  runtime.GOARCH == "mips64le" {
+		major := major(uint64(buf.Dev))
+		minor := minor(uint64(buf.Dev))
+	}else {
+		major := major(buf.Dev)
+		minor := minor(buf.Dev)
+	}
 	for device, partition := range self.partitions {
 		if partition.major == major && partition.minor == minor {
 			return &DeviceInfo{device, major, minor}, nil
@@ -756,10 +761,10 @@ func getBtrfsMajorMinorIds(mount *mount.Info) (int, int, error) {
 			return 0, 0, err
 		}
 
-		klog.V(4).Infof("btrfs dev major:minor %d:%d\n", int(major(buf.Dev)), int(minor(buf.Dev)))
-		klog.V(4).Infof("btrfs rdev major:minor %d:%d\n", int(major(buf.Rdev)), int(minor(buf.Rdev)))
+		klog.V(4).Infof("btrfs dev major:minor %d:%d\n", int(major(uint64(buf.Dev))), int(minor(uint64(buf.Dev))))
+		klog.V(4).Infof("btrfs rdev major:minor %d:%d\n", int(major(uint64(buf.Rdev))), int(minor(uint64(buf.Rdev))))
 
-		return int(major(buf.Dev)), int(minor(buf.Dev)), nil
+		return int(major(uint64(buf.Dev))), int(minor(uint64(buf.Dev))), nil
 	} else {
 		return 0, 0, fmt.Errorf("%s is not a block device", mount.Source)
 	}

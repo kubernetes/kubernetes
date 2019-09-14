@@ -24,6 +24,7 @@ var SYS_SETNS = map[string]uintptr{
 	"ppc64":   350,
 	"ppc64le": 350,
 	"s390x":   339,
+	"mips64le": 5303,
 }[runtime.GOARCH]
 
 // Deprecated: use syscall pkg instead (go >= 1.5 needed).

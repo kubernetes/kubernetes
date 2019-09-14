@@ -25,6 +25,7 @@ readonly KUBE_SUPPORTED_SERVER_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  linux/mips64le
 )
 
 # The node platforms we build for
@@ -34,6 +35,7 @@ readonly KUBE_SUPPORTED_NODE_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  linux/mips64le
   windows/amd64
 )
 
@@ -46,6 +48,7 @@ readonly KUBE_SUPPORTED_CLIENT_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  linux/mips64le
   darwin/amd64
   darwin/386
   windows/amd64
@@ -60,6 +63,7 @@ readonly KUBE_SUPPORTED_TEST_PLATFORMS=(
   linux/arm64
   linux/s390x
   linux/ppc64le
+  linux/mips64le
   darwin/amd64
   windows/amd64
 )
@@ -415,6 +419,10 @@ kube::golang::set_platform_envs() {
         export CGO_ENABLED=1
         export CC=s390x-linux-gnu-gcc
         ;;
+      "linux/mips64le")
+        export CGO_ENABLED=1
+        export CC=mips64le-linux-gnu-gcc
+        ;;
     esac
   fi
 }
@@ -700,7 +708,8 @@ kube::golang::build_binaries_for_platform() {
       ${goflags:+"${goflags[@]}"}
       -gcflags "${gogcflags:-}"
       -asmflags "${goasmflags:-}"
-      -ldflags "${goldflags:-}"
+      -ldflags "-B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \n') ${goldflags:-}"
+      #-ldflags "${goldflags:-}"
     )
     CGO_ENABLED=0 kube::golang::build_some_binaries "${statics[@]}"
   fi
@@ -710,7 +719,8 @@ kube::golang::build_binaries_for_platform() {
       ${goflags:+"${goflags[@]}"}
       -gcflags "${gogcflags:-}"
       -asmflags "${goasmflags:-}"
-      -ldflags "${goldflags:-}"
+      -ldflags "-B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \n') ${goldflags:-}"
+#      -ldflags "${goldflags:-}"
     )
     kube::golang::build_some_binaries "${nonstatics[@]}"
   fi
@@ -725,9 +735,10 @@ kube::golang::build_binaries_for_platform() {
       ${goflags:+"${goflags[@]}"} \
       -gcflags "${gogcflags:-}" \
       -asmflags "${goasmflags:-}" \
-      -ldflags "${goldflags:-}" \
       -o "${outfile}" \
+      -ldflags "-B 0x$(head -c20 /dev/urandom|od -An -tx1|tr -d ' \n') ${goldflags:-}" \
       "${testpkg}"
+      #      -ldflags "${goldflags:-}" \
   done
 }
 
