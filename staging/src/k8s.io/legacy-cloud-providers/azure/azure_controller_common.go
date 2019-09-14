@@ -150,15 +150,21 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 
 // DetachDisk detaches a disk from host. The vhd can be identified by diskName or diskURI.
 func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.NodeName) error {
+	instanceid, err := c.cloud.InstanceID(context.TODO(), nodeName)
+	if err != nil {
+		if err == cloudprovider.InstanceNotFound {
+			// if host doesn't exist, no need to detach
+			klog.Warningf("azureDisk - failed to get azure instance id(%q), DetachDisk(%s) will assume disk is already detached",
+				nodeName, diskURI)
+			return nil
+		}
+		klog.Warningf("failed to get azure instance id (%v)", err)
+		return fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
+	}
+
 	vmset, err := c.getNodeVMSet(nodeName)
 	if err != nil {
 		return err
-	}
-
-	instanceid, err := c.cloud.InstanceID(context.TODO(), nodeName)
-	if err != nil {
-		klog.Warningf("failed to get azure instance id (%v)", err)
-		return fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
 	}
 
 	klog.V(2).Infof("detach %v from node %q", diskURI, nodeName)
