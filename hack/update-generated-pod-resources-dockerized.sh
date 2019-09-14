@@ -19,7 +19,13 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd -P)"
-POD_RESOURCES_ALPHA="${KUBE_ROOT}/pkg/kubelet/apis/podresources/v1alpha1/"
+POD_RESOURCES_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/podresources"
+POD_RESOURCES_VERSION=$(find "${POD_RESOURCES_ROOT}" -maxdepth 1 -type d -path "${POD_RESOURCES_ROOT}/*" -printf "%f\n")
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
-kube::protoc::generate_proto "${POD_RESOURCES_ALPHA}"
+# generate pod resource proto
+for VERSION in ${POD_RESOURCES_VERSION}
+do
+    kube::protoc::generate_proto "${POD_RESOURCES_ROOT}/${VERSION}"
+    echo "Generated pod resources ${VERSION} api is up to date."
+done

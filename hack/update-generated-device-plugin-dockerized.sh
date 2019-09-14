@@ -19,9 +19,12 @@ set -o nounset
 set -o pipefail
 
 KUBE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd -P)"
-DEVICE_PLUGIN_ALPHA="${KUBE_ROOT}/pkg/kubelet/apis/deviceplugin/v1alpha/"
-DEVICE_PLUGIN_V1BETA1="${KUBE_ROOT}/pkg/kubelet/apis/deviceplugin/v1beta1/"
+DEVICE_PLUGIN_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/deviceplugin"
+DEVICE_PLUGIN_VERSION="$(find "${DEVICE_PLUGIN_ROOT}" -maxdepth 1 -type d -path "${DEVICE_PLUGIN_ROOT}/*" -printf "%f\n")"
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
-kube::protoc::generate_proto "${DEVICE_PLUGIN_ALPHA}"
-kube::protoc::generate_proto "${DEVICE_PLUGIN_V1BETA1}"
+for VERSION in ${DEVICE_PLUGIN_VERSION}
+do
+    kube::protoc::generate_proto "${DEVICE_PLUGIN_ROOT}/${VERSION}"
+    echo "Generated device plugin ${VERSION} api is up to date."
+done

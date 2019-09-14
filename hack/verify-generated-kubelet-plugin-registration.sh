@@ -20,31 +20,30 @@ set -o pipefail
 
 KUBE_ROOT=$(dirname "${BASH_SOURCE[0]}")/..
 ERROR="Kubelet Plugin Registration api is out of date. Please run hack/update-generated-kubelet-plugin-registration.sh"
-KUBELET_PLUGIN_REGISTRATION_V1ALPHA="${KUBE_ROOT}/pkg/kubelet/apis/pluginregistration/v1alpha1/"
-KUBELET_PLUGIN_REGISTRATION_V1BETA="${KUBE_ROOT}/pkg/kubelet/apis/pluginregistration/v1beta1/"
+KUBELET_PLUGIN_REGISTRATION_ROOT="${KUBE_ROOT}/pkg/kubelet/apis/pluginregistration"
+KUBELET_PLUGIN_REGISTRATION_VERSION="$(find "${KUBELET_PLUGIN_REGISTRATION_ROOT}" -maxdepth 1 -type d -path "${KUBELET_PLUGIN_REGISTRATION_ROOT}/*" -printf "%f\n")"
 
 source "${KUBE_ROOT}/hack/lib/protoc.sh"
 kube::golang::setup_env
 
 function cleanup {
-	rm -rf "${KUBELET_PLUGIN_REGISTRATION_V1ALPHA}/_tmp/"
-	rm -rf "${KUBELET_PLUGIN_REGISTRATION_V1BETA}/_tmp/"
+    for VERSION in ${KUBELET_PLUGIN_REGISTRATION_VERSION}
+    do
+        rm -rf "${KUBELET_PLUGIN_REGISTRATION_ROOT}/${VERSION}/_tmp"
+    done
 }
 
 trap cleanup EXIT
 
-mkdir -p "${KUBELET_PLUGIN_REGISTRATION_V1ALPHA}/_tmp"
-mkdir -p "${KUBELET_PLUGIN_REGISTRATION_V1BETA}/_tmp"
+for VERSION in ${KUBELET_PLUGIN_REGISTRATION_VERSION}
+do
+    KUBELET_PLUGIN_REGISTRATION_DIR="${KUBELET_PLUGIN_REGISTRATION_ROOT}/${VERSION}"
 
-cp "${KUBELET_PLUGIN_REGISTRATION_V1ALPHA}/api.pb.go" "${KUBELET_PLUGIN_REGISTRATION_V1ALPHA}/_tmp/"
-cp "${KUBELET_PLUGIN_REGISTRATION_V1BETA}/api.pb.go" "${KUBELET_PLUGIN_REGISTRATION_V1BETA}/_tmp/"
+    mkdir -p "${KUBELET_PLUGIN_REGISTRATION_DIR}/_tmp"
+    cp "${KUBELET_PLUGIN_REGISTRATION_DIR}/api.pb.go" "${KUBELET_PLUGIN_REGISTRATION_DIR}/_tmp/"
 
-# Check V1Alpha
-KUBE_VERBOSE=3 "${KUBE_ROOT}/hack/update-generated-kubelet-plugin-registration.sh"
-kube::protoc::diff "${KUBELET_PLUGIN_REGISTRATION_V1ALPHA}/api.pb.go" "${KUBELET_PLUGIN_REGISTRATION_V1ALPHA}/_tmp/api.pb.go" "${ERROR}"
-echo "Generated Kubelet Plugin Registration api is up to date."
-
-# Check V1Beta
-KUBE_VERBOSE=3 "${KUBE_ROOT}/hack/update-generated-kubelet-plugin-registration.sh"
-kube::protoc::diff "${KUBELET_PLUGIN_REGISTRATION_V1BETA}/api.pb.go" "${KUBELET_PLUGIN_REGISTRATION_V1BETA}/_tmp/api.pb.go" "${ERROR}"
-echo "Generated Kubelet Plugin Registration api is up to date."
+    KUBE_VERBOSE=3 "${KUBE_ROOT}/hack/update-generated-kubelet-plugin-registration.sh"
+    kube::protoc::diff "${KUBELET_PLUGIN_REGISTRATION_DIR}/api.pb.go" "${KUBELET_PLUGIN_REGISTRATION_DIR}/_tmp/api.pb.go" "${ERROR}"
+    rm -rf "${KUBELET_PLUGIN_REGISTRATION_DIR}/_tmp"
+    echo "Generated Kubelet Plugin Registration ${VERSION} api is up to date."
+done
