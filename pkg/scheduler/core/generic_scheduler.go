@@ -673,6 +673,7 @@ func (g *genericScheduler) podFitsOnNode(
 			}
 		}
 
+		pluginContext.Write(framework.ContextKeyPredicateMetadata, metaToUse)
 		status = g.framework.RunFilterPlugins(pluginContext, pod, info.Node().Name)
 		if !status.IsSuccess() && !status.IsUnschedulable() {
 			return false, failedPredicates, status, status.AsError()

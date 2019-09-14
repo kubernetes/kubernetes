@@ -32,6 +32,9 @@ type ContextData interface{}
 // ContextKey is the type of keys stored in PluginContext.
 type ContextKey string
 
+// ContextKeyPredicateMetadata is the context key of predicate metadata.
+const ContextKeyPredicateMetadata = "predicate_metadata"
+
 // PluginContext provides a mechanism for plugins to store and retrieve arbitrary data.
 // ContextData stored by one plugin can be read, altered, or deleted by another plugin.
 // PluginContext does not provide any data protection, as all plugins are assumed to be
