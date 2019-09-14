@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -127,6 +128,11 @@ func NewStatus(code Code, msg string) *Status {
 		code:    code,
 		message: msg,
 	}
+}
+
+// NewPredicateStatus returns a status with predicates failure reason.
+func NewPredicateStatus(predicates []predicates.PredicateFailureReason) *Status {
+	return nil
 }
 
 // WaitingPod represents a pod currently waiting in the permit phase.
