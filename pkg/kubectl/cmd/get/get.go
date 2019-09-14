@@ -751,7 +751,7 @@ func (o *GetOptions) printGeneric(r *resource.Result) error {
 
 	var obj runtime.Object
 	if !singleItemImplied || len(infos) != 1 {
-		// we have zero or multple items, so coerce all items into a list.
+		// we have zero or multiple items, so coerce all items into a list.
 		// we don't want an *unstructured.Unstructured list yet, as we
 		// may be dealing with non-unstructured objects. Compose all items
 		// into an corev1.List, and then decode using an unstructured scheme.
