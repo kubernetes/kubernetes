@@ -238,6 +238,11 @@ func FindMatchingVolume(
 				continue
 			}
 
+			// If PV label is not matched with PVC selector; return
+			if selector != nil && !selector.Matches(labels.Set(volume.Labels)) {
+				continue
+			}
+
 			// If PV node affinity is invalid, return no match.
 			// This means the prebound PV (and therefore PVC)
 			// is not suitable for this node.
