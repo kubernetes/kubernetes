@@ -17,7 +17,6 @@ limitations under the License.
 package factory
 
 import (
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -59,13 +58,13 @@ func TestValidatePriorityConfigOverFlow(t *testing.T) {
 		expected    bool
 	}{
 		{
-			description: "one of the weights is MaxInt64",
-			configs:     []priorities.PriorityConfig{{Weight: math.MaxInt64}, {Weight: 5}},
+			description: "one of the weights is MaxTotalPriority(MaxInt64)",
+			configs:     []priorities.PriorityConfig{{Weight: api.MaxTotalPriority}, {Weight: 5}},
 			expected:    true,
 		},
 		{
 			description: "after multiplication with MaxPriority the weight is larger than MaxWeight",
-			configs:     []priorities.PriorityConfig{{Weight: math.MaxInt64/api.MaxPriority + api.MaxPriority}, {Weight: 5}},
+			configs:     []priorities.PriorityConfig{{Weight: api.MaxWeight + api.MaxPriority}, {Weight: 5}},
 			expected:    true,
 		},
 		{
