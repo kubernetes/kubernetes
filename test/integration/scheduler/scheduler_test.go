@@ -41,7 +41,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	schedulerplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -597,49 +596,7 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
-	clientSet2 := clientset.NewForConfigOrDie(&restclient.Config{Host: context.httpServer.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
-	informerFactory2 := informers.NewSharedInformerFactory(context.clientSet, 0)
-	podInformer2 := factory.NewPodInformer(context.clientSet, 0)
-
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
-	eventBroadcaster2 := events.NewBroadcaster(&events.EventSinkImpl{Interface: clientSet2.EventsV1beta1().Events("")})
-	recorder := eventBroadcaster2.NewRecorder(legacyscheme.Scheme, "k8s.io/"+fooScheduler)
-	provider := schedulerconfig.SchedulerDefaultProviderName
-	algorithmSrc := schedulerconfig.SchedulerAlgorithmSource{
-		Provider: &provider,
-	}
-	sched2, err := scheduler.New(
-		clientSet2,
-		informerFactory2.Core().V1().Nodes(),
-		podInformer2,
-		informerFactory2.Core().V1().PersistentVolumes(),
-		informerFactory2.Core().V1().PersistentVolumeClaims(),
-		informerFactory2.Core().V1().ReplicationControllers(),
-		informerFactory2.Apps().V1().ReplicaSets(),
-		informerFactory2.Apps().V1().StatefulSets(),
-		informerFactory2.Core().V1().Services(),
-		informerFactory2.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory2.Storage().V1().StorageClasses(),
-		informerFactory2.Storage().V1beta1().CSINodes(),
-		recorder,
-		algorithmSrc,
-		stopCh,
-		schedulerplugins.NewDefaultRegistry(),
-		nil,
-		[]kubeschedulerconfig.PluginConfig{},
-		scheduler.WithName(fooScheduler),
-		scheduler.WithBindTimeoutSeconds(600),
-	)
-	if err != nil {
-		t.Errorf("Couldn't create scheduler config: %v", err)
-	}
-	eventBroadcaster2.StartRecordingToSink(stopCh)
-
-	go podInformer2.Informer().Run(stopCh)
-	informerFactory2.Start(stopCh)
-	sched2.Run()
+	context = initTestSchedulerWithOptions(t, context, true, nil, schedulerplugins.NewDefaultRegistry(), nil, []kubeschedulerconfig.PluginConfig{}, time.Second, scheduler.WithName(fooScheduler))
 
 	//	6. **check point-2**:
 	//		- testPodWithAnnotationFitsFoo should be scheduled

@@ -143,7 +143,7 @@ func initTestScheduler(
 ) *testContext {
 	// Pod preemption is enabled by default scheduler configuration.
 	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, schedulerplugins.NewDefaultRegistry(),
-		nil, []schedulerconfig.PluginConfig{}, false, time.Second)
+		nil, []schedulerconfig.PluginConfig{}, time.Second)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -156,8 +156,8 @@ func initTestSchedulerWithOptions(
 	pluginRegistry schedulerframework.Registry,
 	plugins *schedulerconfig.Plugins,
 	pluginConfig []schedulerconfig.PluginConfig,
-	disablePreemption bool,
 	resyncPeriod time.Duration,
+	opts ...scheduler.Option,
 ) *testContext {
 	// 1. Create scheduler
 	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, resyncPeriod)
@@ -187,6 +187,7 @@ func initTestSchedulerWithOptions(
 			Provider: &provider,
 		}
 	}
+	opts = append([]scheduler.Option{scheduler.WithBindTimeoutSeconds(600)}, opts...)
 	context.scheduler, err = scheduler.New(
 		context.clientSet,
 		context.informerFactory.Core().V1().Nodes(),
@@ -206,8 +207,7 @@ func initTestSchedulerWithOptions(
 		pluginRegistry,
 		plugins,
 		pluginConfig,
-		scheduler.WithPreemptionDisabled(disablePreemption),
-		scheduler.WithBindTimeoutSeconds(600),
+		opts...,
 	)
 
 	if err != nil {
@@ -274,7 +274,7 @@ func initTestDisablePreemption(t *testing.T, nsPrefix string) *testContext {
 	return initTestSchedulerWithOptions(
 		t, initTestMaster(t, nsPrefix, nil), true, nil,
 		schedulerplugins.NewDefaultRegistry(), nil, []schedulerconfig.PluginConfig{},
-		true, time.Second)
+		time.Second, scheduler.WithPreemptionDisabled(true))
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called
