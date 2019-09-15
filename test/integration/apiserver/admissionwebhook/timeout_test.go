@@ -327,8 +327,10 @@ func testWebhookTimeout(t *testing.T, watchCache bool) {
 					}
 				}
 
-				for _, invocation := range recorder.invocations[len(tt.expectInvocations):] {
-					t.Errorf("unexpected invocation of %s", invocation.path)
+				if len(recorder.invocations) > len(tt.expectInvocations) {
+					for _, invocation := range recorder.invocations[len(tt.expectInvocations):] {
+						t.Errorf("unexpected invocation of %s", invocation.path)
+					}
 				}
 			}
 		})
