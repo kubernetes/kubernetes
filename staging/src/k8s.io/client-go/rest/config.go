@@ -131,6 +131,11 @@ type Config struct {
 	// Version forces a specific version to be used (if registered)
 	// Do we need this?
 	// Version string
+
+	// RESTClientBuilder allows to inject function for building REST client.
+	// E.g. for mocking REST client to be used by various clientset clients.
+	// If not set, Config.RESTClient() falls to the default RESTClientFor.
+	RESTClientBuilder func(config *Config) (Interface, error)
 }
 
 var _ fmt.Stringer = new(Config)
@@ -145,6 +150,17 @@ func (sanitizedAuthConfigPersister) GoString() string {
 }
 func (sanitizedAuthConfigPersister) String() string {
 	return "rest.AuthProviderConfigPersister(--- REDACTED ---)"
+}
+
+// RESTClient returns a RESTClient that satisfies the requested attributes on a client Config
+// object. Note that a RESTClient may require fields that are optional when initializing a Client.
+// A RESTClient created by this method is generic - it expects to operate on an API that follows
+// the Kubernetes conventions, but may not be the Kubernetes API.
+func (c *Config) RESTClient() (Interface, error) {
+	if c.RESTClientBuilder == nil {
+		return RESTClientFor(c)
+	}
+	return c.RESTClientBuilder(c)
 }
 
 // GoString implements fmt.GoStringer and sanitizes sensitive fields of Config

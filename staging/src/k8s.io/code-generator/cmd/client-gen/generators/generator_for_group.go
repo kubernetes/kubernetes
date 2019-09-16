@@ -169,7 +169,7 @@ func NewForConfig(c *$.restConfig|raw$) (*$.GroupGoName$$.Version$Client, error)
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := $.restRESTClientFor|raw$(&config)
+	client, err := config.RESTClient()
 	if err != nil {
 		return nil, err
 	}
