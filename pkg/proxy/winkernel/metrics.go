@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -34,7 +32,7 @@ var (
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_duration_seconds",
 			Help:           "SyncProxyRules latency in seconds",
-			Buckets:        prometheus.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -44,7 +42,7 @@ var (
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_latency_microseconds",
 			Help:           "(Deprecated) SyncProxyRules latency in microseconds",
-			Buckets:        prometheus.ExponentialBuckets(1000, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
