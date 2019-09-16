@@ -41,7 +41,7 @@ usage() {
   exit 1
 }
 
-if [ -z ${MOUNTER_IMAGE} ]; then
+if [ -z "${MOUNTER_IMAGE}" ]; then
   echo "ERROR: No Container Registry mounter image is specified."
   echo
   usage
@@ -50,7 +50,7 @@ fi
 # Unmounts a mount point lazily. If a mount point does not exist, continue silently,
 # and without error.
 umount_silent() {
-  umount -l $1 &> /dev/null || /bin/true
+  umount -l "$1" &> /dev/null || /bin/true
 }
 
 # Waits for kubelet to restart for 1 minute.
@@ -82,10 +82,10 @@ flex_clean() {
   rm -rf ${MOUNTER_PATH}
 
   if [[ -n ${IMAGE_URL:-} ]]; then
-    docker rmi -f ${IMAGE_URL} &> /dev/null || /bin/true
+    docker rmi -f "${IMAGE_URL}" &> /dev/null || /bin/true
   fi
   if [[ -n ${MOUNTER_DEFAULT_NAME:-} ]]; then
-    docker rm -f ${MOUNTER_DEFAULT_NAME} &> /dev/null || /bin/true
+    docker rm -f "${MOUNTER_DEFAULT_NAME}" &> /dev/null || /bin/true
   fi
 }
 
@@ -99,31 +99,31 @@ generate_chroot_wrapper() {
     exit 1
   fi
 
-  for driver_dir in ${MOUNTER_PATH}/flexvolume/*; do
+  for driver_dir in "${MOUNTER_PATH}/flexvolume"/*; do
     if [ -d "$driver_dir" ]; then
 
-      filecount=$(ls -1 $driver_dir | wc -l)
-      if [ $filecount -gt 1 ]; then
+      filecount=$(cd "$driver_dir"; find . -mindepth 1 -maxdepth 1 -print0 | xargs -0 -n1 basename | wc -l)
+      if [ "$filecount" -gt 1 ]; then
         echo "ERROR: Expected 1 file in the FlexVolume directory but found $filecount."
         exit 1
       fi
 
-      driver_file=$( ls $driver_dir | head -n 1 )
+      driver_file=$(cd "$driver_dir"; find . -mindepth 1 -maxdepth 1 -print0 | xargs -0 -n1 basename | head -n 1)
 
       # driver_path points to the actual driver inside the mount utility image,
       # relative to image root.
       # wrapper_path is the wrapper script location, which is known to kubelet.
-      driver_path=flexvolume/$( basename $driver_dir )/${driver_file}
-      wrapper_dir=${VOLUME_PLUGIN_DIR}/$( basename $driver_dir )
+      driver_path=flexvolume/$( basename "$driver_dir" )/${driver_file}
+      wrapper_dir=${VOLUME_PLUGIN_DIR}/$( basename "$driver_dir" )
       wrapper_path=${wrapper_dir}/${driver_file}
 
-      mkdir -p $wrapper_dir
-      cat >$wrapper_path <<EOF
+      mkdir -p "$wrapper_dir"
+      cat >"$wrapper_path" <<EOF
 #!/usr/bin/env bash
 chroot ${MOUNTER_PATH} ${driver_path} "\$@"
 EOF
 
-      chmod 755 $wrapper_path
+      chmod 755 "$wrapper_path"
       echo "FlexVolume driver installed at ${wrapper_path}"
     fi
   done
@@ -139,11 +139,11 @@ ACCESS_TOKEN=$(curl -s -H 'Metadata-Flavor: Google' $SVC_ACCT_ENDPOINT/token | c
 PROJECT_ID=$(curl -s -H 'Metadata-Flavor: Google' $METADATA/project/project-id)
 IMAGE_URL=gcr.io/${PROJECT_ID}/${MOUNTER_IMAGE}
 MOUNTER_DEFAULT_NAME=flexvolume_mounter
-sudo -u ${SUDO_USER} docker login -u _token -p $ACCESS_TOKEN https://gcr.io > /dev/null
-sudo -u ${SUDO_USER} docker run --name=${MOUNTER_DEFAULT_NAME} ${IMAGE_URL}
+sudo -u "${SUDO_USER}" docker login -u _token -p "$ACCESS_TOKEN" https://gcr.io > /dev/null
+sudo -u "${SUDO_USER}" docker run --name=${MOUNTER_DEFAULT_NAME} "${IMAGE_URL}"
 docker export ${MOUNTER_DEFAULT_NAME} > /tmp/${MOUNTER_DEFAULT_NAME}.tar
 docker rm ${MOUNTER_DEFAULT_NAME} > /dev/null
-docker rmi ${IMAGE_URL} > /dev/null
+docker rmi "${IMAGE_URL}" > /dev/null
 
 echo
 echo "Loading mount utilities onto this instance..."
@@ -175,8 +175,7 @@ echo "Restarting Kubelet..."
 echo
 
 systemctl restart kubelet.service
-kubelet_wait
-if [ $? -eq 0 ]; then
+if kubelet_wait; then
   echo
   echo "FlexVolume is ready."
 else

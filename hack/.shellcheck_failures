@@ -6,7 +6,6 @@
 ./cluster/gce/config-test.sh
 ./cluster/gce/gci/configure-helper.sh
 ./cluster/gce/gci/configure.sh
-./cluster/gce/gci/flexvolume_node_setup.sh
 ./cluster/gce/gci/health-monitor.sh
 ./cluster/gce/gci/master-helper.sh
 ./cluster/gce/upgrade.sh
