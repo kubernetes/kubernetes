@@ -18,23 +18,24 @@ package compatibility
 
 import (
 	"fmt"
-	"net/http/httptest"
 	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/informers"
-	clientset "k8s.io/client-go/kubernetes"
-	restclient "k8s.io/client-go/rest"
-	utiltesting "k8s.io/client-go/util/testing"
+	"k8s.io/client-go/kubernetes/fake"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
+	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 )
 
 func TestCompatibility_v1_Scheduler(t *testing.T) {
@@ -1218,34 +1219,42 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		if !reflect.DeepEqual(policy, tc.ExpectedPolicy) {
 			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", v, tc.ExpectedPolicy, policy)
 		}
-
-		handler := utiltesting.FakeHandler{
-			StatusCode:   500,
-			ResponseBody: "",
-			T:            t,
+		policyConfigMap := v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "scheduler-custom-policy-config"},
+			Data:       map[string]string{schedulerconfig.SchedulerPolicyConfigMapKey: tc.JSON},
 		}
-		server := httptest.NewServer(&handler)
-		defer server.Close()
-		client := clientset.NewForConfigOrDie(&restclient.Config{Host: server.URL, ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+		policyConfigMap.APIVersion = "v1"
+		client := fake.NewSimpleClientset(&policyConfigMap)
+		algorithmSrc := schedulerconfig.SchedulerAlgorithmSource{
+			Policy: &schedulerconfig.SchedulerPolicySource{
+				ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
+					Namespace: policyConfigMap.Namespace,
+					Name:      policyConfigMap.Name,
+				},
+			},
+		}
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-		if _, err := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
-			Client:                         client,
-			NodeInformer:                   informerFactory.Core().V1().Nodes(),
-			PodInformer:                    informerFactory.Core().V1().Pods(),
-			PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
-			PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
-			ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
-			ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
-			StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
-			ServiceInformer:                informerFactory.Core().V1().Services(),
-			PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-			StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-			CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
-			HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-			DisablePreemption:              false,
-			PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-		}).CreateFromConfig(policy); err != nil {
+		if _, err := scheduler.New(
+			client,
+			informerFactory.Core().V1().Nodes(),
+			informerFactory.Core().V1().Pods(),
+			informerFactory.Core().V1().PersistentVolumes(),
+			informerFactory.Core().V1().PersistentVolumeClaims(),
+			informerFactory.Core().V1().ReplicationControllers(),
+			informerFactory.Apps().V1().ReplicaSets(),
+			informerFactory.Apps().V1().StatefulSets(),
+			informerFactory.Core().V1().Services(),
+			informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+			informerFactory.Storage().V1().StorageClasses(),
+			informerFactory.Storage().V1beta1().CSINodes(),
+			nil,
+			algorithmSrc,
+			make(chan struct{}),
+			schedulerframework.NewDefaultRegistry(),
+			nil,
+			[]kubeschedulerconfig.PluginConfig{},
+		); err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
 		}
