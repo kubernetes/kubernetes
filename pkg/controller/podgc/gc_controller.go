@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -113,8 +113,6 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 	}
 
 	terminatedPodCount := len(terminatedPods)
-	sort.Sort(byCreationTimestamp(terminatedPods))
-
 	deleteCount := terminatedPodCount - gcc.terminatedPodThreshold
 
 	if deleteCount > terminatedPodCount {
@@ -122,8 +120,12 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 	}
 	if deleteCount > 0 {
 		klog.Infof("garbage collecting %v pods", deleteCount)
+	} else {
+		return
 	}
 
+	// sort only when necessary
+	sort.Sort(byCreationTimestamp(terminatedPods))
 	var wait sync.WaitGroup
 	for i := 0; i < deleteCount; i++ {
 		wait.Add(1)
