@@ -24,7 +24,6 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	cliflag "k8s.io/component-base/cli/flag"
@@ -68,7 +67,7 @@ func NewCmdConfigSetCluster(out io.Writer, configAccess clientcmd.ConfigAccess) 
 	options := &createClusterOptions{configAccess: configAccess}
 
 	cmd := &cobra.Command{
-		Use:                   fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true] [--%v=server-name]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure, clientcmd.FlagTLSServerName),
+		Use:                   fmt.Sprintf("set-cluster NAME [--%v=server] [--%v=path/to/certificate/authority] [--%v=true] [--%v=tls-server-name]", clientcmd.FlagAPIServer, clientcmd.FlagCAFile, clientcmd.FlagInsecure, clientcmd.FlagTLSServerName),
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Sets a cluster entry in kubeconfig"),
 		Long:                  createClusterLong,
