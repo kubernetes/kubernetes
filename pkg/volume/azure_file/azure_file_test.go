@@ -267,11 +267,17 @@ func TestMounterAndUnmounterTypeAssert(t *testing.T) {
 	fake := &mount.FakeMounter{}
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("poduid")}}
 	mounter, err := plug.(*azureFilePlugin).newMounterInternal(volume.NewSpecFromVolume(spec), pod, &fakeAzureSvc{}, fake)
+	if err != nil {
+		t.Errorf("MounterInternal() failed: %v", err)
+	}
 	if _, ok := mounter.(volume.Unmounter); ok {
 		t.Errorf("Volume Mounter can be type-assert to Unmounter")
 	}
 
 	unmounter, err := plug.(*azureFilePlugin).newUnmounterInternal("vol1", types.UID("poduid"), &mount.FakeMounter{})
+	if err != nil {
+		t.Errorf("MounterInternal() failed: %v", err)
+	}
 	if _, ok := unmounter.(volume.Mounter); ok {
 		t.Errorf("Volume Unmounter can be type-assert to Mounter")
 	}
