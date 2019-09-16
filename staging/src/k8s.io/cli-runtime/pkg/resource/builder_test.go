@@ -54,9 +54,8 @@ import (
 )
 
 var (
-	corev1GV     = schema.GroupVersion{Version: "v1"}
-	corev1Codec  = scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(corev1GV), scheme.Codecs.UniversalDecoder(corev1GV), corev1GV, corev1GV)
-	metaAccessor = meta.NewAccessor()
+	corev1GV    = schema.GroupVersion{Version: "v1"}
+	corev1Codec = scheme.Codecs.CodecForVersions(scheme.Codecs.LegacyCodec(corev1GV), scheme.Codecs.UniversalDecoder(corev1GV), corev1GV, corev1GV)
 )
 
 func stringBody(body string) io.ReadCloser {
