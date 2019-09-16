@@ -69,7 +69,7 @@ func handleFlags() {
 	flag.Parse()
 }
 
-func init() {
+func TestMain(m *testing.M) {
 	// Register test flags, then parse flags.
 	handleFlags()
 
@@ -105,9 +105,6 @@ func init() {
 		AssetNames: generated.AssetNames,
 	})
 
-}
-
-func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	os.Exit(m.Run())
 }
