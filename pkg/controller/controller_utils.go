@@ -659,18 +659,7 @@ func (f *FakePodControl) CreatePodsWithControllerRef(namespace string, spec *v1.
 }
 
 func (f *FakePodControl) CreatePodsOnNode(nodeName, namespace string, template *v1.PodTemplateSpec, object runtime.Object, controllerRef *metav1.OwnerReference) error {
-	f.Lock()
-	defer f.Unlock()
-	f.CreateCallCount++
-	if f.CreateLimit != 0 && f.CreateCallCount > f.CreateLimit {
-		return fmt.Errorf("not creating pod, limit %d already reached (create call %d)", f.CreateLimit, f.CreateCallCount)
-	}
-	f.Templates = append(f.Templates, *template)
-	f.ControllerRefs = append(f.ControllerRefs, *controllerRef)
-	if f.Err != nil {
-		return f.Err
-	}
-	return nil
+	return f.CreatePodsWithControllerRef(namespace, template, object, controllerRef)
 }
 
 func (f *FakePodControl) DeletePod(namespace string, podID string, object runtime.Object) error {
