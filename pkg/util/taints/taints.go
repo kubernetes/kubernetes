@@ -273,13 +273,9 @@ func RemoveTaint(node *v1.Node, taint *v1.Taint) (*v1.Node, bool, error) {
 		return newNode, false, nil
 	}
 
-	if !TaintExists(nodeTaints, taint) {
-		return newNode, false, nil
-	}
-
-	newTaints, _ := DeleteTaint(nodeTaints, taint)
+	newTaints, deleted := DeleteTaint(nodeTaints, taint)
 	newNode.Spec.Taints = newTaints
-	return newNode, true, nil
+	return newNode, deleted, nil
 }
 
 // AddOrUpdateTaint tries to add a taint to annotations list. Returns a new copy of updated Node and true if something was updated
