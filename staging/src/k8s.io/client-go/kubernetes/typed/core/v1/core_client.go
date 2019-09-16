@@ -119,7 +119,7 @@ func NewForConfig(c *rest.Config) (*CoreV1Client, error) {
 	if err := setConfigDefaults(&config); err != nil {
 		return nil, err
 	}
-	client, err := rest.RESTClientFor(&config)
+	client, err := config.RESTClient()
 	if err != nil {
 		return nil, err
 	}
