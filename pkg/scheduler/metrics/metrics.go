@@ -94,7 +94,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "e2e_scheduling_duration_seconds",
 			Help:           "E2e scheduling latency in seconds (scheduling algorithm + binding)",
-			Buckets:        prometheus.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -103,7 +103,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "e2e_scheduling_latency_microseconds",
 			Help:           "(Deprecated) E2e scheduling latency in microseconds (scheduling algorithm + binding)",
-			Buckets:        prometheus.ExponentialBuckets(1000, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -112,7 +112,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "scheduling_algorithm_duration_seconds",
 			Help:           "Scheduling algorithm latency in seconds",
-			Buckets:        prometheus.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -121,7 +121,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "scheduling_algorithm_latency_microseconds",
 			Help:           "(Deprecated) Scheduling algorithm latency in microseconds",
-			Buckets:        prometheus.ExponentialBuckets(1000, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -130,7 +130,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "scheduling_algorithm_predicate_evaluation_seconds",
 			Help:           "Scheduling algorithm predicate evaluation duration in seconds",
-			Buckets:        prometheus.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -139,7 +139,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "scheduling_algorithm_predicate_evaluation",
 			Help:           "(Deprecated) Scheduling algorithm predicate evaluation duration in microseconds",
-			Buckets:        prometheus.ExponentialBuckets(1000, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -148,7 +148,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "scheduling_algorithm_priority_evaluation_seconds",
 			Help:           "Scheduling algorithm priority evaluation duration in seconds",
-			Buckets:        prometheus.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -157,7 +157,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "scheduling_algorithm_priority_evaluation",
 			Help:           "(Deprecated) Scheduling algorithm priority evaluation duration in microseconds",
-			Buckets:        prometheus.ExponentialBuckets(1000, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -166,7 +166,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "scheduling_algorithm_preemption_evaluation_seconds",
 			Help:           "Scheduling algorithm preemption evaluation duration in seconds",
-			Buckets:        prometheus.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -175,7 +175,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "scheduling_algorithm_preemption_evaluation",
 			Help:           "(Deprecated) Scheduling algorithm preemption evaluation duration in microseconds",
-			Buckets:        prometheus.ExponentialBuckets(1000, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -184,7 +184,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "binding_duration_seconds",
 			Help:           "Binding latency in seconds",
-			Buckets:        prometheus.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -193,7 +193,7 @@ var (
 			Subsystem:      SchedulerSubsystem,
 			Name:           "binding_latency_microseconds",
 			Help:           "(Deprecated) Binding latency in microseconds",
-			Buckets:        prometheus.ExponentialBuckets(1000, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
