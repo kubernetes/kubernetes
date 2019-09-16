@@ -23,7 +23,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -54,11 +53,11 @@ var _ = SIGDescribe("DNS", func() {
 		}
 		testUtilsPod, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(testUtilsPod)
 		framework.ExpectNoError(err)
-		e2elog.Logf("Created pod %v", testUtilsPod)
+		framework.Logf("Created pod %v", testUtilsPod)
 		defer func() {
-			e2elog.Logf("Deleting pod %s...", testUtilsPod.Name)
+			framework.Logf("Deleting pod %s...", testUtilsPod.Name)
 			if err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Delete(testUtilsPod.Name, metav1.NewDeleteOptions(0)); err != nil {
-				e2elog.Failf("Failed to delete pod %s: %v", testUtilsPod.Name, err)
+				framework.Failf("Failed to delete pod %s: %v", testUtilsPod.Name, err)
 			}
 		}()
 		framework.ExpectNoError(f.WaitForPodRunning(testUtilsPod.Name), "failed to wait for pod %s to be running", testUtilsPod.Name)
@@ -75,17 +74,17 @@ var _ = SIGDescribe("DNS", func() {
 		})
 		framework.ExpectNoError(err)
 
-		e2elog.Logf("ipconfig /all:\n%s", stdout)
+		framework.Logf("ipconfig /all:\n%s", stdout)
 		dnsRegex, err := regexp.Compile(`DNS Servers[\s*.]*:(\s*[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})+`)
 
 		if dnsRegex.MatchString(stdout) {
 			match := dnsRegex.FindString(stdout)
 
 			if !strings.Contains(match, testInjectedIP) {
-				e2elog.Failf("customized DNS options not found in ipconfig /all, got: %s", match)
+				framework.Failf("customized DNS options not found in ipconfig /all, got: %s", match)
 			}
 		} else {
-			e2elog.Failf("cannot find DNS server info in ipconfig /all output: \n%s", stdout)
+			framework.Failf("cannot find DNS server info in ipconfig /all output: \n%s", stdout)
 		}
 		// TODO: Add more test cases for other DNSPolicies.
 	})
