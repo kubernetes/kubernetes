@@ -24,8 +24,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"k8s.io/klog"
-
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 const defaultBoilerPlate = `
@@ -105,9 +103,8 @@ func NewCmdCompletion(out io.Writer, boilerPlate string) *cobra.Command {
 		Short:   "Output shell completion code for the specified shell (bash or zsh)",
 		Long:    completionLong,
 		Example: completionExample,
-		Run: func(cmd *cobra.Command, args []string) {
-			err := RunCompletion(out, boilerPlate, cmd, args)
-			kubeadmutil.CheckErr(err)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunCompletion(out, boilerPlate, cmd, args)
 		},
 		ValidArgs: GetSupportedShells(),
 	}

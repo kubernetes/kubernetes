@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 )
 
@@ -70,9 +69,8 @@ func NewCmdNode() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "node",
 		Short: "Upgrade commands for a node in the cluster",
-		Run: func(cmd *cobra.Command, args []string) {
-			err := nodeRunner.Run(args)
-			kubeadmutil.CheckErr(err)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return nodeRunner.Run(args)
 		},
 		Args: cobra.NoArgs,
 	}
@@ -207,16 +205,15 @@ func NewCmdUpgradeNodeConfig() *cobra.Command {
 		Use:        "config",
 		Short:      "Download the kubelet configuration from the cluster ConfigMap kubelet-config-1.X, where X is the minor version of the kubelet",
 		Deprecated: "use \"kubeadm upgrade node\" instead",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// This is required for preserving the old behavior of `kubeadm upgrade node config`.
 			// The new implementation exposed as a phase under `kubeadm upgrade node` infers the target
 			// kubelet config version from the kubeadm-config ConfigMap
 			if len(nodeOptions.kubeletVersion) == 0 {
-				kubeadmutil.CheckErr(errors.New("the --kubelet-version argument is required"))
+				return errors.New("the --kubelet-version argument is required")
 			}
 
-			err := nodeRunner.Run(args)
-			kubeadmutil.CheckErr(err)
+			return nodeRunner.Run(args)
 		},
 	}
 

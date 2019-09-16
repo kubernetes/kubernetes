@@ -67,7 +67,8 @@ func NewKubeadmCommand(in io.Reader, out, err io.Writer) *cobra.Command {
 			    You can then repeat the second step on as many other machines as you like.
 
 		`),
-
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			if rootfsPath != "" {
 				if err := kubeadmutil.Chroot(rootfsPath); err != nil {

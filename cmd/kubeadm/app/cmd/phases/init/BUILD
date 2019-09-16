@@ -41,7 +41,6 @@ go_library(
         "//cmd/kubeadm/app/phases/patchnode:go_default_library",
         "//cmd/kubeadm/app/phases/uploadconfig:go_default_library",
         "//cmd/kubeadm/app/preflight:go_default_library",
-        "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/apiclient:go_default_library",
         "//cmd/kubeadm/app/util/dryrun:go_default_library",
         "//cmd/kubeadm/app/util/pkiutil:go_default_library",

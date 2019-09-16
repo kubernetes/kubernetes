@@ -43,7 +43,6 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	tokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
@@ -108,24 +107,27 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			This should be a securely generated random token of the form "[a-z0-9]{6}.[a-z0-9]{16}".
 			If no [token] is given, kubeadm will generate a random token instead.
 		`),
-		Run: func(tokenCmd *cobra.Command, args []string) {
+		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				bto.TokenStr = args[0]
 			}
 			klog.V(1).Infoln("[token] validating mixed arguments")
-			err := validation.ValidateMixedArguments(tokenCmd.Flags())
-			kubeadmutil.CheckErr(err)
+			if err := validation.ValidateMixedArguments(tokenCmd.Flags()); err != nil {
+				return err
+			}
 
-			err = bto.ApplyTo(cfg)
-			kubeadmutil.CheckErr(err)
+			if err := bto.ApplyTo(cfg); err != nil {
+				return err
+			}
 
 			klog.V(1).Infoln("[token] getting Clientsets from kubeconfig file")
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = RunCreateToken(out, client, cfgPath, cfg, printJoinCommand, kubeConfigFile)
-			kubeadmutil.CheckErr(err)
+			return RunCreateToken(out, client, cfgPath, cfg, printJoinCommand, kubeConfigFile)
 		},
 	}
 
@@ -146,13 +148,14 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 		Long: dedent.Dedent(`
 			This command will list all bootstrap tokens for you.
 		`),
-		Run: func(tokenCmd *cobra.Command, args []string) {
+		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = RunListTokens(out, errW, client)
-			kubeadmutil.CheckErr(err)
+			return RunListTokens(out, errW, client)
 		},
 	}
 	tokenCmd.AddCommand(listCmd)
@@ -167,16 +170,17 @@ func NewCmdToken(out io.Writer, errW io.Writer) *cobra.Command {
 			The [token-value] is the full Token of the form "[a-z0-9]{6}.[a-z0-9]{16}" or the
 			Token ID of the form "[a-z0-9]{6}" to delete.
 		`),
-		Run: func(tokenCmd *cobra.Command, args []string) {
+		RunE: func(tokenCmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
-				kubeadmutil.CheckErr(errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern))
+				return errors.Errorf("missing subcommand; 'token delete' is missing token of form %q", bootstrapapi.BootstrapTokenIDPattern)
 			}
 			kubeConfigFile = cmdutil.GetKubeConfigPath(kubeConfigFile)
 			client, err := getClientset(kubeConfigFile, dryRun)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = RunDeleteTokens(out, client, args)
-			kubeadmutil.CheckErr(err)
+			return RunDeleteTokens(out, client, args)
 		},
 	}
 	tokenCmd.AddCommand(deleteCmd)
@@ -200,9 +204,8 @@ func NewCmdTokenGenerate(out io.Writer) *cobra.Command {
 			You can also use "kubeadm init" without specifying a token and it will
 			generate and print one for you.
 		`),
-		Run: func(cmd *cobra.Command, args []string) {
-			err := RunGenerateToken(out)
-			kubeadmutil.CheckErr(err)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return RunGenerateToken(out)
 		},
 	}
 }
