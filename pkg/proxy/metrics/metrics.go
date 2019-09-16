@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -35,7 +33,7 @@ var (
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_duration_seconds",
 			Help:           "SyncProxyRules latency in seconds",
-			Buckets:        prometheus.ExponentialBuckets(0.001, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -46,7 +44,7 @@ var (
 			Subsystem:      kubeProxySubsystem,
 			Name:           "sync_proxy_rules_latency_microseconds",
 			Help:           "(Deprecated) SyncProxyRules latency in microseconds",
-			Buckets:        prometheus.ExponentialBuckets(1000, 2, 15),
+			Buckets:        metrics.ExponentialBuckets(1000, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -75,10 +73,10 @@ var (
 			Name:      "network_programming_duration_seconds",
 			Help:      "In Cluster Network Programming Latency in seconds",
 			Buckets: merge(
-				prometheus.LinearBuckets(0.25, 0.25, 2), // 0.25s, 0.50s
-				prometheus.LinearBuckets(1, 1, 59),      // 1s, 2s, 3s, ... 59s
-				prometheus.LinearBuckets(60, 5, 12),     // 60s, 65s, 70s, ... 115s
-				prometheus.LinearBuckets(120, 30, 7),    // 2min, 2.5min, 3min, ..., 5min
+				metrics.LinearBuckets(0.25, 0.25, 2), // 0.25s, 0.50s
+				metrics.LinearBuckets(1, 1, 59),      // 1s, 2s, 3s, ... 59s
+				metrics.LinearBuckets(60, 5, 12),     // 60s, 65s, 70s, ... 115s
+				metrics.LinearBuckets(120, 30, 7),    // 2min, 2.5min, 3min, ..., 5min
 			),
 			StabilityLevel: metrics.ALPHA,
 		},
