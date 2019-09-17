@@ -59,7 +59,7 @@ spec:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           runAsUser: 1001
-          runAsGroup: 2001
+          runAsGroup: 1001
       volumes:
       - name: kubernetes-dashboard-certs
         secret:
