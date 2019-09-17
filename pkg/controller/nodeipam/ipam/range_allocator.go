@@ -223,6 +223,9 @@ func (r *rangeAllocator) occupyCIDRs(node *v1.Node) error {
 	if len(node.Spec.PodCIDRs) == 0 {
 		return nil
 	}
+	if len(node.Spec.PodCIDRs) > len(r.cidrSets) {
+		return fmt.Errorf("disabled IPv6DualStack fails to occupy DualStack CIDR for node: %v", node.Name)
+	}
 	for idx, cidr := range node.Spec.PodCIDRs {
 		_, podCIDR, err := net.ParseCIDR(cidr)
 		if err != nil {
@@ -278,6 +281,9 @@ func (r *rangeAllocator) ReleaseCIDR(node *v1.Node) error {
 		return nil
 	}
 
+	if len(node.Spec.PodCIDRs) > len(r.cidrSets) {
+		return fmt.Errorf("disabled IPv6DualStack fails to release DualStack CIDR for node: %v", node.Name)
+	}
 	for idx, cidr := range node.Spec.PodCIDRs {
 		_, podCIDR, err := net.ParseCIDR(cidr)
 		if err != nil {
@@ -344,6 +350,10 @@ func (r *rangeAllocator) updateCIDRsAllocation(data nodeReservedCIDRs) error {
 
 	// node has cidrs, release the reserved
 	if len(node.Spec.PodCIDRs) != 0 {
+		if len(data.allocatedCIDRs) > len(r.cidrSets) {
+			klog.Errorf("disabled IPv6DualStack fails to release DualStack CIDR for node: %v", node.Name)
+			return nil
+		}
 		klog.Errorf("Node %v already has a CIDR allocated %v. Releasing the new one.", node.Name, node.Spec.PodCIDRs)
 		for idx, cidr := range data.allocatedCIDRs {
 			if releaseErr := r.cidrSets[idx].Release(cidr); err != nil {
