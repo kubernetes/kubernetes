@@ -2185,24 +2185,36 @@ func Convert_apps_RollbackConfig_To_v1beta1_RollbackConfig(in *apps.RollbackConf
 }
 
 func autoConvert_v1beta1_RollingUpdateDaemonSet_To_apps_RollingUpdateDaemonSet(in *v1beta1.RollingUpdateDaemonSet, out *apps.RollingUpdateDaemonSet, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_apps_RollingUpdateDaemonSet_To_v1beta1_RollingUpdateDaemonSet(in *apps.RollingUpdateDaemonSet, out *v1beta1.RollingUpdateDaemonSet, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_v1beta1_RollingUpdateDeployment_To_apps_RollingUpdateDeployment(in *v1beta1.RollingUpdateDeployment, out *apps.RollingUpdateDeployment, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
-	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (*k8s.io/apimachinery/pkg/util/intstr.IntOrString vs k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+		return err
+	}
+	if err := metav1.Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_apps_RollingUpdateDeployment_To_v1beta1_RollingUpdateDeployment(in *apps.RollingUpdateDeployment, out *v1beta1.RollingUpdateDeployment, s conversion.Scope) error {
-	// WARNING: in.MaxUnavailable requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
-	// WARNING: in.MaxSurge requires manual conversion: inconvertible types (k8s.io/apimachinery/pkg/util/intstr.IntOrString vs *k8s.io/apimachinery/pkg/util/intstr.IntOrString)
+	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxUnavailable, &out.MaxUnavailable, s); err != nil {
+		return err
+	}
+	if err := metav1.Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(&in.MaxSurge, &out.MaxSurge, s); err != nil {
+		return err
+	}
 	return nil
 }
 
