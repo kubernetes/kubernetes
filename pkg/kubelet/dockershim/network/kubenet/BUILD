@@ -42,7 +42,6 @@ go_library(
             "//pkg/kubelet/dockershim/network:go_default_library",
             "//pkg/kubelet/dockershim/network/hostport:go_default_library",
             "//pkg/util/bandwidth:go_default_library",
-            "//pkg/util/dbus:go_default_library",
             "//pkg/util/ebtables:go_default_library",
             "//pkg/util/iptables:go_default_library",
             "//pkg/util/sysctl:go_default_library",

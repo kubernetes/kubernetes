@@ -75,7 +75,6 @@
 				"k8s.io/kubernetes/pkg/serviceaccount",
 				"k8s.io/kubernetes/pkg/util/async",
 				"k8s.io/kubernetes/pkg/util/conntrack",
-				"k8s.io/kubernetes/pkg/util/dbus",
 				"k8s.io/kubernetes/pkg/util/hash",
 				"k8s.io/kubernetes/pkg/util/iptables",
 				"k8s.io/kubernetes/pkg/util/metrics",
