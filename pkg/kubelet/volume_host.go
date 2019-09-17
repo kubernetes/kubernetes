@@ -66,6 +66,8 @@ func NewInitializedVolumePluginMgr(
 	var informerFactory informers.SharedInformerFactory
 	var csiDriverLister storagelisters.CSIDriverLister
 	var csiDriversSynced cache.InformerSynced
+	var csiNodeLister storagelisters.CSINodeLister
+	var csiNodeSynced cache.InformerSynced
 	const resyncPeriod = 0
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		// Don't initialize if kubeClient is nil
@@ -74,10 +76,19 @@ func NewInitializedVolumePluginMgr(
 			csiDriverInformer := informerFactory.Storage().V1beta1().CSIDrivers()
 			csiDriverLister = csiDriverInformer.Lister()
 			csiDriversSynced = csiDriverInformer.Informer().HasSynced
-
 		} else {
 			klog.Warning("kubeClient is nil. Skip initialization of CSIDriverLister")
 		}
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		if kubelet.kubeClient != nil {
+			informerFactory = informers.NewSharedInformerFactory(kubelet.kubeClient, resyncPeriod)
+			csiNodeInformer := informerFactory.Storage().V1beta1().CSINodes()
+			csiNodeLister = csiNodeInformer.Lister()
+			csiNodeSynced = csiNodeInformer.Informer().HasSynced
+		}
+	} else {
+		klog.Warning("kubeClient is nil. Skip initialization of CSINodeLister")
 	}
 
 	mountPodManager, err := mountpod.NewManager(kubelet.getRootDir(), kubelet.podManager)
@@ -94,6 +105,8 @@ func NewInitializedVolumePluginMgr(
 		informerFactory:  informerFactory,
 		csiDriverLister:  csiDriverLister,
 		csiDriversSynced: csiDriversSynced,
+		csiNodeLister:    csiNodeLister,
+		csiNodeSynced:    csiNodeSynced,
 	}
 
 	if err := kvh.volumePluginMgr.InitPlugins(plugins, prober, kvh); err != nil {
@@ -123,6 +136,8 @@ type kubeletVolumeHost struct {
 	informerFactory  informers.SharedInformerFactory
 	csiDriverLister  storagelisters.CSIDriverLister
 	csiDriversSynced cache.InformerSynced
+	csiNodeLister    storagelisters.CSINodeLister
+	csiNodeSynced    cache.InformerSynced
 }
 
 func (kvh *kubeletVolumeHost) SetKubeletError(err error) {
@@ -173,23 +188,38 @@ func (kvh *kubeletVolumeHost) CSIDriverLister() storagelisters.CSIDriverLister {
 	return kvh.csiDriverLister
 }
 
+func (kvh *kubeletVolumeHost) CSINodeLister() storagelisters.CSINodeLister {
+	return kvh.csiNodeLister
+}
+
 func (kvh *kubeletVolumeHost) CSIDriversSynced() cache.InformerSynced {
 	return kvh.csiDriversSynced
 }
 
 // WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
 func (kvh *kubeletVolumeHost) WaitForCacheSync() error {
-	if kvh.csiDriversSynced == nil {
-		klog.Error("csiDriversSynced not found on KubeletVolumeHost")
-		return fmt.Errorf("csiDriversSynced not found on KubeletVolumeHost")
+	if kvh.csiDriversSynced == nil && kvh.csiNodeSynced == nil {
+		klog.Error("csiDriversSynced and csiNodeSynced not found on KubeletVolumeHost")
+		return fmt.Errorf("csiDriversSynced and csiNodeSynced not found on KubeletVolumeHost")
 	}
 
-	synced := []cache.InformerSynced{kvh.csiDriversSynced}
-	if !cache.WaitForCacheSync(wait.NeverStop, synced...) {
-		klog.Warning("failed to wait for cache sync for CSIDriverLister")
-		return fmt.Errorf("failed to wait for cache sync for CSIDriverLister")
+	if kvh.csiDriversSynced != nil {
+		synced := []cache.InformerSynced{kvh.csiDriversSynced}
+		if !cache.WaitForCacheSync(wait.NeverStop, synced...) {
+			klog.Warning("failed to wait for cache sync for CSIDriverLister")
+			return fmt.Errorf("failed to wait for cache sync for CSIDriverLister")
+		}
 	}
 
+	if kvh.csiNodeSynced != nil {
+		synced := []cache.InformerSynced{kvh.csiNodeSynced}
+		if !cache.WaitForCacheSync(wait.NeverStop, synced...) {
+			klog.Warning("failed to wait for cache sync for CSINodeLister")
+			return fmt.Errorf("failed to wait for cache sync for CSINodeLister")
+		}
+	} else {
+		klog.V(4).Info("not waiting for cache sync for CSINodeLister")
+	}
 	return nil
 }
 

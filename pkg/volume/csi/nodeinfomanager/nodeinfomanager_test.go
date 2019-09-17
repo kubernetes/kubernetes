@@ -1074,7 +1074,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 			nil,
 		)
 
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil, nil)
 
 		// Act
 		_, err = nim.CreateCSINode()
@@ -1135,7 +1135,7 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 			nodeName,
 			nil,
 		)
-		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil)
+		nim := NewNodeInfoManager(types.NodeName(nodeName), host, nil, nil)
 
 		//// Act
 		nim.CreateCSINode()

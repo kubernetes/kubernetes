@@ -340,6 +340,8 @@ type KubeletVolumeHost interface {
 	CSIDriverLister() storagelisters.CSIDriverLister
 	// CSIDriverSynced returns the informer synced for the CSIDriver API Object
 	CSIDriversSynced() cache.InformerSynced
+	// CSINodeLister returns the informer lister for the CSINode API Object
+	CSINodeLister() storagelisters.CSINodeLister
 	// WaitForCacheSync is a helper function that waits for cache sync for CSIDriverLister
 	WaitForCacheSync() error
 	// Returns hostutil.HostUtils

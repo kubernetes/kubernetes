@@ -1510,7 +1510,11 @@ func (f *fakeVolumeHost) CSIDriversSynced() cache.InformerSynced {
 }
 
 func (f *fakeVolumeHost) CSINodeLister() storagelisters.CSINodeLister {
-	// not needed for testing
+	csiNodeInformer := f.informerFactory.Storage().V1beta1().CSINodes()
+	if csiNodeInformer != nil {
+		csiNodeLister := csiNodeInformer.Lister()
+		return csiNodeLister
+	}
 	return nil
 }
 

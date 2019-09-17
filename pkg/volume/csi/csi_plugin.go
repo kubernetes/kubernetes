@@ -192,6 +192,7 @@ func (h *RegistrationHandler) DeRegisterPlugin(pluginName string) {
 func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	p.host = host
 
+	var nodeLister storagelisters.CSINodeLister
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
 		csiClient := host.GetKubeClient()
 		if csiClient == nil {
@@ -214,7 +215,19 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 			}
 		}
 	}
-
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		csiClient := host.GetKubeClient()
+		if csiClient == nil {
+			klog.Warning(log("kubeclient not set, assuming standalone kubelet"))
+		} else {
+			kletHost, ok := host.(volume.KubeletVolumeHost)
+			if ok {
+				nodeLister = kletHost.CSINodeLister()
+			} else {
+				klog.Warningf("cannot get node lister from %v", host)
+			}
+		}
+	}
 	var migratedPlugins = map[string](func() bool){
 		csitranslationplugins.GCEPDInTreePluginName: func() bool {
 			return utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigrationGCE)
@@ -228,7 +241,7 @@ func (p *csiPlugin) Init(host volume.VolumeHost) error {
 	}
 
 	// Initializing the label management channels
-	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedPlugins)
+	nim = nodeinfomanager.NewNodeInfoManager(host.GetNodeName(), host, migratedPlugins, nodeLister)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) &&
 		utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {

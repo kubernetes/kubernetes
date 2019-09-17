@@ -37,6 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
@@ -65,6 +66,7 @@ type nodeInfoManager struct {
 	nodeName        types.NodeName
 	volumeHost      volume.VolumeHost
 	migratedPlugins map[string](func() bool)
+	nodeLister      storagelisters.CSINodeLister
 }
 
 // If no updates is needed, the function must return the same Node object as the input.
@@ -92,11 +94,13 @@ type Interface interface {
 func NewNodeInfoManager(
 	nodeName types.NodeName,
 	volumeHost volume.VolumeHost,
-	migratedPlugins map[string](func() bool)) Interface {
+	migratedPlugins map[string](func() bool),
+	nodeLister storagelisters.CSINodeLister) Interface {
 	return &nodeInfoManager{
 		nodeName:        nodeName,
 		volumeHost:      volumeHost,
 		migratedPlugins: migratedPlugins,
+		nodeLister:      nodeLister,
 	}
 }
 
@@ -378,8 +382,14 @@ func (nim *nodeInfoManager) tryUpdateCSINode(
 	driverNodeID string,
 	maxAttachLimit int64,
 	topology map[string]string) error {
-
-	nodeInfo, err := csiKubeClient.StorageV1beta1().CSINodes().Get(string(nim.nodeName), metav1.GetOptions{})
+	var nodeInfo *storagev1beta1.CSINode
+	var err error
+	if nim.nodeLister != nil {
+		nodeInfo, err = nim.nodeLister.Get(string(nim.nodeName))
+		klog.V(4).Infof("informer returned %v err: %v", nodeInfo, err)
+	} else {
+		return fmt.Errorf("node lister is absent for standalone kubelet mode")
+	}
 	if nodeInfo == nil || errors.IsNotFound(err) {
 		nodeInfo, err = nim.CreateCSINode()
 	}
@@ -396,6 +406,9 @@ func (nim *nodeInfoManager) InitializeCSINodeWithAnnotation() error {
 		return goerrors.New("error getting CSI client")
 	}
 
+	// if nim.nodeLister == nil {
+		// return fmt.Errorf("node lister should not be nil")
+	// }
 	var updateErrs []error
 	err := wait.ExponentialBackoff(updateBackoff, func() (bool, error) {
 		if err := nim.tryInitializeCSINodeWithAnnotation(csiKubeClient); err != nil {
