@@ -18,6 +18,7 @@ package kubenet
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"testing"
 
@@ -309,6 +310,35 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 		// Assert that the CNI DelNetwork made it through and we didn't crash
 		// without a runtime.
 		mockcni.AssertExpectations(t)
+	}
+}
+
+func TestGetRoutesConifg(t *testing.T) {
+	for _, test := range []struct {
+		cidrs  []string
+		routes string
+	}{
+		{
+			cidrs:  []string{"10.0.0.1/24"},
+			routes: `{"dst": "0.0.0.0/0"}`,
+		},
+		{
+			cidrs:  []string{"2001:4860:4860::8888/32"},
+			routes: `{"dst": "::/0"}`,
+		},
+		{
+			cidrs:  []string{"2001:4860:4860::8888/32", "10.0.0.1/24"},
+			routes: `{"dst": "0.0.0.0/0"},{"dst": "::/0"}`,
+		},
+	} {
+		var cidrs []*net.IPNet
+		for _, c := range test.cidrs {
+			_, cidr, err := net.ParseCIDR(c)
+			assert.NoError(t, err)
+			cidrs = append(cidrs, cidr)
+		}
+		fakeKubenet := &kubenetNetworkPlugin{podCIDRs: cidrs}
+		assert.Equal(t, test.routes, fakeKubenet.getRoutesConfig())
 	}
 }
 
