@@ -558,11 +558,19 @@ func TestCleanSubPaths(t *testing.T) {
 				return mounts, nil
 			},
 			umount: func(mountpath string) error {
-				fileInfo, err := ioutil.ReadDir(mountpath)
-				for _, file := range fileInfo {
-					if err = os.RemoveAll(filepath.Join(mountpath, file.Name())); err != nil {
+				err := filepath.Walk(mountpath, func(path string, info os.FileInfo, err error) error {
+					if path == mountpath {
+						// Skip top level directory
+						return nil
+					}
+
+					if err = os.RemoveAll(path); err != nil {
 						return err
 					}
+					return filepath.SkipDir
+				})
+				if err != nil {
+					return fmt.Errorf("error processing %s: %s", mountpath, err)
 				}
 
 				return nil
