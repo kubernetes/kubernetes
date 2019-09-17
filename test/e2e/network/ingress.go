@@ -737,6 +737,7 @@ var _ = SIGDescribe("Loadbalancing: L7", func() {
 			if ginkgo.CurrentGinkgoTestDescription().Failed {
 				framework.DescribeIng(ns)
 			}
+			defer nginxController.TearDown()
 			if jig.Ingress == nil {
 				ginkgo.By("No ingress created, no cleanup necessary")
 				return
