@@ -39,7 +39,6 @@ go_test(
     srcs = ["daemonset_util_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/features:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/extensions/v1beta1:go_default_library",
