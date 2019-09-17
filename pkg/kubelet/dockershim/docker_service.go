@@ -112,7 +112,7 @@ type NetworkPluginSettings struct {
 	NonMasqueradeCIDR string
 	// PluginName is the name of the plugin, runtime shim probes for
 	PluginName string
-	// PluginBinDirString is a list of directiores delimited by commas, in
+	// PluginBinDirString is a list of directories delimited by commas, in
 	// which the binaries for the plugin with PluginName may be found.
 	PluginBinDirString string
 	// PluginBinDirs is an array of directories in which the binaries for

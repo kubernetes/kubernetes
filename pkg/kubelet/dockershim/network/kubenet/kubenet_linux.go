@@ -29,7 +29,7 @@ import (
 
 	"github.com/containernetworking/cni/libcni"
 	cnitypes "github.com/containernetworking/cni/pkg/types"
-	cnitypes020 "github.com/containernetworking/cni/pkg/types/020"
+	cnitypescurrent "github.com/containernetworking/cni/pkg/types/current"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -67,13 +67,12 @@ const (
 	zeroCIDRv4 = "0.0.0.0/0"
 
 	NET_CONFIG_TEMPLATE = `{
-  "cniVersion": "0.1.0",
+  "cniVersion": "0.3.1",
   "name": "kubenet",
   "type": "bridge",
   "bridge": "%s",
   "mtu": %d,
-  "addIf": "%s",
-  "isGateway": true,
+  "isDefaultGateway": true,
   "ipMasq": false,
   "hairpinMode": %t,
   "ipam": {
@@ -192,7 +191,7 @@ func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode kubeletc
 	return nil
 }
 
-// TODO: move thic logic into cni bridge plugin and remove this from kubenet
+// TODO: move this logic into cni bridge plugin and remove this from kubenet
 func (plugin *kubenetNetworkPlugin) ensureMasqRule() error {
 	if plugin.nonMasqueradeCIDR != zeroCIDRv4 && plugin.nonMasqueradeCIDR != zeroCIDRv6 {
 		// switch according to target nonMasqueradeCidr ip family
@@ -278,7 +277,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	//setup hairpinMode
 	setHairpin := plugin.hairpinMode == kubeletconfig.HairpinVeth
 
-	json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, plugin.getRangesConfig(), plugin.getRoutesConfig())
+	json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, setHairpin, plugin.getRangesConfig(), plugin.getRoutesConfig())
 	klog.V(4).Infof("CNI network config set to %v", json)
 	plugin.netConfig, err = libcni.ConfFromBytes([]byte(json))
 	if err != nil {
@@ -331,7 +330,6 @@ func (plugin *kubenetNetworkPlugin) Capabilities() utilsets.Int {
 
 // setup sets up networking through CNI using the given ns/name and sandbox ID.
 func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kubecontainer.ContainerID, annotations map[string]string) error {
-	var ipv4, ipv6 net.IP
 	var podGateways []net.IP
 	var podCIDRs []net.IPNet
 
@@ -351,27 +349,31 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 		return err
 	}
 	// Coerce the CNI result version
-	res, err := cnitypes020.GetResult(resT)
+	res, err := cnitypescurrent.GetResult(resT)
 	if err != nil {
 		return fmt.Errorf("unable to understand network config: %v", err)
 	}
-	//TODO: v1.16 (khenidak) update NET_CONFIG_TEMPLATE to CNI version 0.3.0 or later so
-	// that we get multiple IP addresses in the returned Result structure
-	if res.IP4 != nil {
-		ipv4 = res.IP4.IP.IP.To4()
-		podGateways = append(podGateways, res.IP4.Gateway)
-		podCIDRs = append(podCIDRs, net.IPNet{IP: ipv4.Mask(res.IP4.IP.Mask), Mask: res.IP4.IP.Mask})
+
+	if len(res.IPs) == 0 {
+		return fmt.Errorf("cni didn't report any IPs")
 	}
 
-	if res.IP6 != nil {
-		ipv6 = res.IP6.IP.IP
-		podGateways = append(podGateways, res.IP6.Gateway)
-		podCIDRs = append(podCIDRs, net.IPNet{IP: ipv6.Mask(res.IP6.IP.Mask), Mask: res.IP6.IP.Mask})
+	// Logic taken from: https://github.com/kubernetes/kubernetes/pull/69821
+	for _, ip := range res.IPs {
+		if ip.Interface == nil || *ip.Interface > len(res.Interfaces) {
+			continue
+		}
+
+		intf := res.Interfaces[*ip.Interface]
+		if intf.Sandbox != "" && intf.Name == network.DefaultInterfaceName {
+			// Found our sandbox interface, use the IP
+			podGateways = append(podGateways, ip.Gateway)
+			podCIDRs = append(podCIDRs, net.IPNet{IP: ip.Address.IP.Mask(ip.Address.Mask), Mask: ip.Address.Mask})
+			// Add the IP to tracked IPs
+			plugin.addPodIP(id, ip.Address.IP.String())
+		}
 	}
 
-	if ipv4 == nil && ipv6 == nil {
-		return fmt.Errorf("cni didn't report ipv4 ipv6")
-	}
 	// Put the container bridge into promiscuous mode to force it to accept hairpin packets.
 	// TODO: Remove this once the kernel bug (#20096) is fixed.
 	if plugin.hairpinMode == kubeletconfig.PromiscuousBridge {
@@ -389,14 +391,6 @@ func (plugin *kubenetNetworkPlugin) setup(namespace string, name string, id kube
 
 		// configure the ebtables rules to eliminate duplicate packets by best effort
 		plugin.syncEbtablesDedupRules(link.Attrs().HardwareAddr, podCIDRs, podGateways)
-	}
-
-	// add the ip to tracked ips
-	if ipv4 != nil {
-		plugin.addPodIP(id, ipv4.String())
-	}
-	if ipv6 != nil {
-		plugin.addPodIP(id, ipv6.String())
 	}
 
 	if err := plugin.addTrafficShaping(id, annotations); err != nil {
