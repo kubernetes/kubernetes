@@ -331,11 +331,11 @@ CONVERSIONS_META := conversions.mk
 ifeq ($(DBG_MAKEFILE),1)
     $(warning ***** finding all +k8s:conversion-gen tags)
 endif
-CONVERSION_DIRS := $(shell                                              \
-    grep --color=never '^// *+k8s:conversion-gen=' $(ALL_K8S_TAG_FILES) \
-        | cut -f1 -d:                                                   \
-        | xargs -n1 dirname                                             \
-        | LC_ALL=C sort -u                                              \
+CONVERSION_DIRS := $(shell                                             \
+    grep --color=never '^// *+k8s:conversion-gen' $(ALL_K8S_TAG_FILES) \
+        | cut -f1 -d:                                                  \
+        | xargs -n1 dirname                                            \
+        | LC_ALL=C sort -u                                             \
 )
 
 CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))

@@ -323,6 +323,7 @@ type OwnerReference struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:conversion-gen:from-url-values=true
 
 // ListOptions is the query options to a standard REST list call.
 type ListOptions struct {
@@ -405,6 +406,7 @@ type ListOptions struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:conversion-gen:from-url-values=true
 
 // ExportOptions is the query options to the standard REST get call.
 // Deprecated. Planned for removal in 1.18.
@@ -419,6 +421,7 @@ type ExportOptions struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:conversion-gen:from-url-values=true
 
 // GetOptions is the standard query options to the standard REST get call.
 type GetOptions struct {
@@ -556,6 +559,7 @@ type PatchOptions struct {
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +k8s:conversion-gen:from-url-values=true
 
 // UpdateOptions may be provided when updating an API object.
 // All fields in UpdateOptions should also be present in PatchOptions.

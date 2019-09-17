@@ -36,6 +36,8 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_v1_ListMeta_To_v1_ListMeta,
 
+		Convert_v1_DeleteOptions_To_v1_DeleteOptions,
+
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
 		Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString,
 		Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString,
@@ -83,7 +85,10 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_Slice_string_To_v1_IncludeObjectPolicy,
 
-		Convert_url_values_To_v1_ListOptions,
+		Convert_url_Values_To_v1_ListOptions,
+		Convert_url_Values_To_v1_GetOptions,
+		Convert_url_Values_To_v1_ExportOptions,
+		Convert_url_Values_To_v1_UpdateOptions,
 	)
 }
 
@@ -350,54 +355,6 @@ func Convert_Slice_string_To_v1_DeletionPropagation(in *[]string, out *DeletionP
 func Convert_Slice_string_To_v1_IncludeObjectPolicy(in *[]string, out *IncludeObjectPolicy, s conversion.Scope) error {
 	if len(*in) > 0 {
 		*out = IncludeObjectPolicy((*in)[0])
-	}
-	return nil
-}
-
-func Convert_url_values_To_v1_ListOptions(in *url.Values, out *ListOptions, s conversion.Scope) error {
-	if values, ok := map[string][]string(*in)["labelSelector"]; ok && len(values) > 0 {
-		out.LabelSelector = values[0]
-	} else {
-		out.LabelSelector = ""
-	}
-	if values, ok := map[string][]string(*in)["fieldSelector"]; ok && len(values) > 0 {
-		out.FieldSelector = values[0]
-	} else {
-		out.FieldSelector = ""
-	}
-	if values, ok := map[string][]string(*in)["watch"]; ok && len(values) > 0 {
-		out.Watch = runtime.String_To_bool(values[0])
-	} else {
-		out.Watch = false
-	}
-	if values, ok := map[string][]string(*in)["allowWatchBookmarks"]; ok && len(values) > 0 {
-		out.AllowWatchBookmarks = runtime.String_To_bool(values[0])
-	} else {
-		out.AllowWatchBookmarks = false
-	}
-	if values, ok := map[string][]string(*in)["resourceVersion"]; ok && len(values) > 0 {
-		out.ResourceVersion = values[0]
-	} else {
-		out.ResourceVersion = ""
-	}
-	if values, ok := map[string][]string(*in)["timeoutSeconds"]; ok && len(values) > 0 {
-		if err := runtime.Convert_Slice_string_To_Pointer_int64(&values, &out.TimeoutSeconds, s); err != nil {
-			return err
-		}
-	} else {
-		out.TimeoutSeconds = nil
-	}
-	if values, ok := map[string][]string(*in)["limit"]; ok && len(values) > 0 {
-		if err := runtime.Convert_Slice_string_To_int64(&values, &out.Limit, s); err != nil {
-			return err
-		}
-	} else {
-		out.Limit = 0
-	}
-	if values, ok := map[string][]string(*in)["continue"]; ok && len(values) > 0 {
-		out.Continue = values[0]
-	} else {
-		out.Continue = ""
 	}
 	return nil
 }
