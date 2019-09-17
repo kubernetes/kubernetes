@@ -140,24 +140,36 @@ build() {
       ${SED} -i "s|BASEARCH|${arch}|g" $dockerfile_name
     fi
 
-    # copy the qemu-*-static binary to docker image to build the multi architecture image on x86 platform
-    if grep -q "CROSS_BUILD_" Dockerfile; then
-      if [[ "${arch}" == "amd64" ]]; then
-        ${SED} -i "/CROSS_BUILD_/d" Dockerfile
-      else
-        ${SED} -i "s|QEMUARCH|${QEMUARCHS[$arch]}|g" Dockerfile
-        # Register qemu-*-static for all supported processors except the current one
-        echo "Registering qemu-*-static binaries in the kernel"
-        local sudo=""
-        if [[ $(id -u) != 0 ]]; then
-          sudo=sudo
+    # Only the cross-build on x86 is guaranteed by far, other arches like aarch64 doesn't support cross-build
+    # thus, there is no need to tackle a disability feature on those platforms, and also help to prevent from
+    # ending up a wrong image tag on non-amd64 platforms.
+    build_arch=$(uname -m)
+    if [[ ${build_arch} = "x86_64" ]]; then
+        # copy the qemu-*-static binary to docker image to build the multi architecture image on x86 platform
+        if grep -q "CROSS_BUILD_" Dockerfile; then
+          if [[ "${arch}" == "amd64" ]]; then
+            ${SED} -i "/CROSS_BUILD_/d" Dockerfile
+          else
+            ${SED} -i "s|QEMUARCH|${QEMUARCHS[$arch]}|g" Dockerfile
+            # Register qemu-*-static for all supported processors except the current one
+            echo "Registering qemu-*-static binaries in the kernel"
+            local sudo=""
+            if [[ $(id -u) != 0 ]]; then
+	          sudo=sudo
+            fi
+            ${sudo} "${KUBE_ROOT}/third_party/multiarch/qemu-user-static/register/register.sh" --reset -p yes
+            curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/"${QEMUVERSION}"/x86_64_qemu-"${QEMUARCHS[$arch]}"-static.tar.gz | tar -xz -C "${temp_dir}"
+            # Ensure we don't get surprised by umask settings
+            chmod 0755 "${temp_dir}/qemu-${QEMUARCHS[$arch]}-static"
+            ${SED} -i "s/CROSS_BUILD_//g" Dockerfile
+          fi
         fi
-        ${sudo} "${KUBE_ROOT}/third_party/multiarch/qemu-user-static/register/register.sh" --reset -p yes
-        curl -sSL https://github.com/multiarch/qemu-user-static/releases/download/"${QEMUVERSION}"/x86_64_qemu-"${QEMUARCHS[$arch]}"-static.tar.gz | tar -xz -C "${temp_dir}"
-        # Ensure we don't get surprised by umask settings
-        chmod 0755 "${temp_dir}/qemu-${QEMUARCHS[$arch]}-static"
-        ${SED} -i "s/CROSS_BUILD_//g" Dockerfile
-      fi
+    elif [[ "${QEMUARCHS[$arch]}" != "${build_arch}" ]]; then
+		echo "skip cross-build $arch on non-supported platform ${build_arch}."
+		popd
+        continue
+    else
+        ${SED} -i "/CROSS_BUILD_/d" Dockerfile
     fi
 
     docker buildx build --progress=plain --no-cache --pull --output=type="${output_type}" --platform "${os_name}/${arch}" \
