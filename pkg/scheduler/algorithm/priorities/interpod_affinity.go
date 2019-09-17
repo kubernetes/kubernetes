@@ -75,6 +75,9 @@ func (p *podAffinityPriorityMap) processTerm(term *v1.PodAffinityTerm, podDefini
 	if match {
 		for _, node := range p.nodes {
 			if priorityutil.NodesHaveSameTopologyKey(node, fixedNode, term.TopologyKey) {
+				if p.counts[node.Name] == nil {
+					p.counts[node.Name] = new(int64)
+				}
 				atomic.AddInt64(p.counts[node.Name], weight)
 			}
 		}
