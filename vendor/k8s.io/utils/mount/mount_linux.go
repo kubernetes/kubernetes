@@ -21,6 +21,7 @@ package mount
 import (
 	"errors"
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/system"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -60,7 +61,7 @@ type Mounter struct {
 func New(mounterPath string) Interface {
 	return &Mounter{
 		mounterPath: mounterPath,
-		withSystemd: detectSystemd(),
+		withSystemd: system.DetectSystemd(),
 	}
 }
 
@@ -125,7 +126,7 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 		//
 		// systemd-mount is not used because it's too new for older distros
 		// (CentOS 7, Debian Jessie).
-		mountCmd, mountArgs = AddSystemdScope("systemd-run", target, mountCmd, mountArgs)
+		mountCmd, mountArgs = system.AddSystemdScope("systemd-run", target, mountCmd, mountArgs)
 	} else {
 		// No systemd-run on the host (or we failed to check it), assume kubelet
 		// does not run as a systemd service.
@@ -142,31 +143,6 @@ func (mounter *Mounter) doMount(mounterPath string, mountCmd string, source stri
 			err, mountCmd, args, string(output))
 	}
 	return err
-}
-
-// detectSystemd returns true if OS runs with systemd as init. When not sure
-// (permission errors, ...), it returns false.
-// There may be different ways how to detect systemd, this one makes sure that
-// systemd-runs (needed by Mount()) works.
-func detectSystemd() bool {
-	if _, err := exec.LookPath("systemd-run"); err != nil {
-		klog.V(2).Infof("Detected OS without systemd")
-		return false
-	}
-	// Try to run systemd-run --scope /bin/true, that should be enough
-	// to make sure that systemd is really running and not just installed,
-	// which happens when running in a container with a systemd-based image
-	// but with different pid 1.
-	cmd := exec.Command("systemd-run", "--description=Kubernetes systemd probe", "--scope", "true")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		klog.V(2).Infof("Cannot run systemd-run, assuming non-systemd OS")
-		klog.V(4).Infof("systemd-run failed with: %v", err)
-		klog.V(4).Infof("systemd-run output: %s", string(output))
-		return false
-	}
-	klog.V(2).Infof("Detected OS with systemd")
-	return true
 }
 
 // MakeMountArgs makes the arguments to the mount(8) command.
@@ -187,14 +163,6 @@ func MakeMountArgs(source, target, fstype string, options []string) []string {
 	mountArgs = append(mountArgs, target)
 
 	return mountArgs
-}
-
-// AddSystemdScope adds "system-run --scope" to given command line
-// implementation is shared with NsEnterMounter
-func AddSystemdScope(systemdRunPath, mountName, command string, args []string) (string, []string) {
-	descriptionArg := fmt.Sprintf("--description=Kubernetes transient mount for %s", mountName)
-	systemdRunArgs := []string{descriptionArg, "--scope", "--", command}
-	return systemdRunPath, append(systemdRunArgs, args...)
 }
 
 // Unmount unmounts the target.

@@ -18,6 +18,7 @@ package cephfs
 
 import (
 	"fmt"
+	"k8s.io/kubernetes/pkg/util/system"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -150,6 +151,7 @@ func (plugin *cephfsPlugin) newMounterInternal(spec *volume.Spec, podUID types.U
 			mounter:      mounter,
 			plugin:       plugin,
 			mountOptions: util.MountOptionFromSpec(spec),
+			withSystemd:  system.DetectSystemd(),
 		},
 	}, nil
 }
@@ -195,6 +197,7 @@ type cephfs struct {
 	plugin     *cephfsPlugin
 	volume.MetricsNil
 	mountOptions []string
+	withSystemd bool
 }
 
 type cephfsMounter struct {
@@ -403,8 +406,37 @@ func (cephfsVolume *cephfs) execFuseMount(mountpoint string) error {
 		mountArgs = append(mountArgs, strings.Join(opt, ","))
 	}
 
+	mountCmd := "ceph-fuse"
 	klog.V(4).Infof("Mounting cmd ceph-fuse with arguments (%s)", mountArgs)
-	command := exec.Command("ceph-fuse", mountArgs...)
+	if cephfsVolume.withSystemd {
+		// Try to run ceph-fuse via systemd-run --scope. This will escape the
+		// service where kubelet runs and any fuse daemons will be started in a
+		// specific scope. kubelet service than can be restarted without killing
+		// these fuse daemons.
+		//
+		// Complete command line (when mounterPath is not used):
+		// systemd-run --description=... --scope -- ceph-fuse -k <keyringFile> -m <monitorAddress>
+		//                                              -r <cephfsVolumePath> --id <cephfsVolumeID> <where>
+		//
+		// Expected flow:
+		// * systemd-run creates a transient scope (=~ cgroup) and executes its
+		//   argument (ceph-fuse) there.
+		// * mount does its job, forks a fuse daemon if necessary and finishes.
+		//   (systemd-run --scope finishes at this point, returning ceph-fuse's exit
+		//   code and stdout/stderr - thats one of --scope benefits).
+		// * systemd keeps the fuse daemon running in the scope (i.e. in its own
+		//   cgroup) until the fuse daemon dies (another --scope benefit).
+		//   Kubelet service can be restarted and the fuse daemon survives.
+		// * When the fuse daemon dies (e.g. during unmount) systemd removes the
+		//   scope automatically.
+		mountCmd, mountArgs = system.AddSystemdScope("systemd-run", mountpoint, mountCmd, mountArgs)
+	} else {
+		// No systemd-run on the host (or we failed to check it), assume kubelet
+		// does not run as a systemd service.
+		// No code here, mountCmd and mountArgs are already populated.
+	}
+
+	command := exec.Command(mountCmd, mountArgs...)
 	output, err := command.CombinedOutput()
 	if err != nil || !(strings.Contains(string(output), "starting fuse")) {
 		return fmt.Errorf("Ceph-fuse failed: %v\narguments: %s\nOutput: %s", err, mountArgs, string(output))
