@@ -208,7 +208,6 @@ vendor/k8s.io/client-go/metadata/fake
 vendor/k8s.io/client-go/rest
 vendor/k8s.io/client-go/rest/watch
 vendor/k8s.io/client-go/restmapper
-vendor/k8s.io/client-go/tools/cache
 vendor/k8s.io/client-go/tools/leaderelection
 vendor/k8s.io/client-go/transport
 vendor/k8s.io/code-generator/cmd/client-gen/generators/fake
