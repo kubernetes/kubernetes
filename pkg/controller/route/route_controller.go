@@ -300,6 +300,7 @@ func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreate
 		klog.V(2).Infof("set node %v with NodeNetworkUnavailable=true was canceled because it is already set", node.Name)
 		return nil
 	}
+	lastTransitionTime := condition.LastTransitionTime
 
 	klog.Infof("Patching node status %v with %v previous condition was:%+v", node.Name, routesCreated, condition)
 
@@ -324,7 +325,7 @@ func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreate
 				Status:             v1.ConditionTrue,
 				Reason:             "NoRouteCreated",
 				Message:            "RouteController failed to create a route",
-				LastTransitionTime: currentTime,
+				LastTransitionTime: lastTransitionTime,
 			})
 		}
 		if err != nil {
