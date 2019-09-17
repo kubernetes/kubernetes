@@ -409,7 +409,7 @@ func TestCleanSubPaths(t *testing.T) {
 		// Function that validates directory structure after the test
 		validate    func(base string) error
 		expectError bool
-		umount      func(path string) error
+		unmount     func(path string) error
 	}{
 		{
 			name: "not-exists",
@@ -557,7 +557,7 @@ func TestCleanSubPaths(t *testing.T) {
 				}
 				return mounts, nil
 			},
-			umount: func(mountpath string) error {
+			unmount: func(mountpath string) error {
 				err := filepath.Walk(mountpath, func(path string, info os.FileInfo, err error) error {
 					if path == mountpath {
 						// Skip top level directory
@@ -593,7 +593,7 @@ func TestCleanSubPaths(t *testing.T) {
 			t.Fatalf("failed to prepare test %q: %v", test.name, err.Error())
 		}
 
-		fm := &mount.FakeMounter{MountPoints: mounts, UmountFunc: test.umount}
+		fm := &mount.FakeMounter{MountPoints: mounts, UnmountFunc: test.unmount}
 
 		err = doCleanSubPaths(fm, base, testVol)
 		if err != nil && !test.expectError {

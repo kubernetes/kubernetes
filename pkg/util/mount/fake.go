@@ -32,11 +32,11 @@ type FakeMounter struct {
 	MountCheckErrors map[string]error
 	// Some tests run things in parallel, make sure the mounter does not produce
 	// any golang's DATA RACE warnings.
-	mutex      sync.Mutex
-	UmountFunc UmountFunc
+	mutex       sync.Mutex
+	UnmountFunc UnmountFunc
 }
 
-type UmountFunc func(path string) error
+type UnmountFunc func(path string) error
 
 var _ Interface = &FakeMounter{}
 
@@ -120,8 +120,8 @@ func (f *FakeMounter) Unmount(target string) error {
 	newMountpoints := []MountPoint{}
 	for _, mp := range f.MountPoints {
 		if mp.Path == absTarget {
-			if f.UmountFunc != nil {
-				err := f.UmountFunc(absTarget)
+			if f.UnmountFunc != nil {
+				err := f.UnmountFunc(absTarget)
 				if err != nil {
 					return err
 				}
