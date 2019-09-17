@@ -218,7 +218,6 @@ func InsertPredicateKeyToAlgorithmProviderMap(key string) {
 	for _, provider := range algorithmProviderMap {
 		provider.FitPredicateKeys.Insert(key)
 	}
-	return
 }
 
 // InsertPriorityKeyToAlgorithmProviderMap inserts a priority function to all algorithmProviders which are in algorithmProviderMap.
@@ -229,7 +228,6 @@ func InsertPriorityKeyToAlgorithmProviderMap(key string) {
 	for _, provider := range algorithmProviderMap {
 		provider.PriorityFunctionKeys.Insert(key)
 	}
-	return
 }
 
 // RegisterMandatoryFitPredicate registers a fit predicate with the algorithm registry, the predicate is used by
