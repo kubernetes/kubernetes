@@ -1211,9 +1211,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, nodeL
 
 func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing daemon set %q (%v)", key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing daemon set %q (%v)", key, time.Since(startTime))
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

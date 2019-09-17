@@ -145,9 +145,7 @@ func (c *Controller) processNextWorkItem() bool {
 func (c *Controller) processPVC(pvcNamespace, pvcName string) error {
 	klog.V(4).Infof("Processing PVC %s/%s", pvcNamespace, pvcName)
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished processing PVC %s/%s (%v)", pvcNamespace, pvcName, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished processing PVC %s/%s (%v)", pvcNamespace, pvcName, time.Since(startTime))
 
 	pvc, err := c.pvcLister.PersistentVolumeClaims(pvcNamespace).Get(pvcName)
 	if apierrs.IsNotFound(err) {

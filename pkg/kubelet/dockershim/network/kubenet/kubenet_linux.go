@@ -474,9 +474,7 @@ func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id k
 		return fmt.Errorf("kubenet cannot SetUpPod: %v", err)
 	}
 
-	defer func() {
-		klog.V(4).Infof("SetUpPod took %v for %s/%s", time.Since(start), namespace, name)
-	}()
+	defer klog.V(4).Infof("SetUpPod took %v for %s/%s", time.Since(start), namespace, name)
 
 	if err := plugin.setup(namespace, name, id, annotations); err != nil {
 		if err := plugin.teardown(namespace, name, id); err != nil {
@@ -550,9 +548,7 @@ func (plugin *kubenetNetworkPlugin) teardown(namespace string, name string, id k
 
 func (plugin *kubenetNetworkPlugin) TearDownPod(namespace string, name string, id kubecontainer.ContainerID) error {
 	start := time.Now()
-	defer func() {
-		klog.V(4).Infof("TearDownPod took %v for %s/%s", time.Since(start), namespace, name)
-	}()
+	defer klog.V(4).Infof("TearDownPod took %v for %s/%s", time.Since(start), namespace, name)
 
 	if plugin.netConfig == nil {
 		return fmt.Errorf("kubenet needs a PodCIDR to tear down pods")

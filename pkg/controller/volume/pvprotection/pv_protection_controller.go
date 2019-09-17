@@ -122,9 +122,7 @@ func (c *Controller) processNextWorkItem() bool {
 func (c *Controller) processPV(pvName string) error {
 	klog.V(4).Infof("Processing PV %s", pvName)
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished processing PV %s (%v)", pvName, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished processing PV %s (%v)", pvName, time.Since(startTime))
 
 	pv, err := c.pvLister.Get(pvName)
 	if apierrs.IsNotFound(err) {

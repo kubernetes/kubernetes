@@ -187,9 +187,7 @@ func (h *hostportSyncer) OpenPodHostportsAndSync(newPortMapping *PodPortMapping,
 // SyncHostports gathers all hostports on node and setup iptables rules enable them. And finally clean up stale hostports
 func (h *hostportSyncer) SyncHostports(natInterfaceName string, activePodPortMappings []*PodPortMapping) error {
 	start := time.Now()
-	defer func() {
-		klog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
-	}()
+	defer klog.V(4).Infof("syncHostportsRules took %v", time.Since(start))
 
 	hostportPodMap, err := gatherAllHostports(activePodPortMappings)
 	if err != nil {

@@ -407,9 +407,7 @@ func (ssc *StatefulSetController) worker() {
 // sync syncs the given statefulset.
 func (ssc *StatefulSetController) sync(key string) error {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing statefulset %q (%v)", key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing statefulset %q (%v)", key, time.Since(startTime))
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

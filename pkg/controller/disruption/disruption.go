@@ -515,9 +515,7 @@ func (dc *DisruptionController) processNextRecheckWorkItem() bool {
 
 func (dc *DisruptionController) sync(key string) error {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing PodDisruptionBudget %q (%v)", key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing PodDisruptionBudget %q (%v)", key, time.Since(startTime))
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

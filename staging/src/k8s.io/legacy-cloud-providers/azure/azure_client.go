@@ -199,9 +199,7 @@ func (az *azVirtualMachinesClient) CreateOrUpdate(ctx context.Context, resourceG
 	}
 
 	klog.V(10).Infof("azVirtualMachinesClient.CreateOrUpdate(%q, %q): start", resourceGroupName, VMName)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachinesClient.CreateOrUpdate(%q, %q): end", resourceGroupName, VMName)
-	}()
+	defer klog.V(10).Infof("azVirtualMachinesClient.CreateOrUpdate(%q, %q): end", resourceGroupName, VMName)
 
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, VMName, parameters)
 	if err != nil {
@@ -223,9 +221,7 @@ func (az *azVirtualMachinesClient) Update(ctx context.Context, resourceGroupName
 	}
 
 	klog.V(10).Infof("azVirtualMachinesClient.Update(%q, %q): start", resourceGroupName, VMName)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachinesClient.Update(%q, %q): end", resourceGroupName, VMName)
-	}()
+	defer klog.V(10).Infof("azVirtualMachinesClient.Update(%q, %q): end", resourceGroupName, VMName)
 
 	future, err := az.client.Update(ctx, resourceGroupName, VMName, parameters)
 	if err != nil {
@@ -246,9 +242,7 @@ func (az *azVirtualMachinesClient) Get(ctx context.Context, resourceGroupName st
 	}
 
 	klog.V(10).Infof("azVirtualMachinesClient.Get(%q, %q): start", resourceGroupName, VMName)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachinesClient.Get(%q, %q): end", resourceGroupName, VMName)
-	}()
+	defer klog.V(10).Infof("azVirtualMachinesClient.Get(%q, %q): end", resourceGroupName, VMName)
 
 	result, err = az.client.Get(ctx, resourceGroupName, VMName, expand)
 	mc.Observe(err)
@@ -264,9 +258,7 @@ func (az *azVirtualMachinesClient) List(ctx context.Context, resourceGroupName s
 	}
 
 	klog.V(10).Infof("azVirtualMachinesClient.List(%q): start", resourceGroupName)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachinesClient.List(%q): end", resourceGroupName)
-	}()
+	defer klog.V(10).Infof("azVirtualMachinesClient.List(%q): end", resourceGroupName)
 
 	iterator, err := az.client.ListComplete(ctx, resourceGroupName)
 	mc.Observe(err)
@@ -321,9 +313,7 @@ func (az *azInterfacesClient) CreateOrUpdate(ctx context.Context, resourceGroupN
 	}
 
 	klog.V(10).Infof("azInterfacesClient.CreateOrUpdate(%q,%q): start", resourceGroupName, networkInterfaceName)
-	defer func() {
-		klog.V(10).Infof("azInterfacesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, networkInterfaceName)
-	}()
+	defer klog.V(10).Infof("azInterfacesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, networkInterfaceName)
 
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, networkInterfaceName, parameters)
 	if err != nil {
@@ -343,9 +333,7 @@ func (az *azInterfacesClient) Get(ctx context.Context, resourceGroupName string,
 	}
 
 	klog.V(10).Infof("azInterfacesClient.Get(%q,%q): start", resourceGroupName, networkInterfaceName)
-	defer func() {
-		klog.V(10).Infof("azInterfacesClient.Get(%q,%q): end", resourceGroupName, networkInterfaceName)
-	}()
+	defer klog.V(10).Infof("azInterfacesClient.Get(%q,%q): end", resourceGroupName, networkInterfaceName)
 
 	result, err = az.client.Get(ctx, resourceGroupName, networkInterfaceName, expand)
 	mc.Observe(err)
@@ -361,9 +349,7 @@ func (az *azInterfacesClient) GetVirtualMachineScaleSetNetworkInterface(ctx cont
 	}
 
 	klog.V(10).Infof("azInterfacesClient.GetVirtualMachineScaleSetNetworkInterface(%q,%q,%q,%q): start", resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName)
-	defer func() {
-		klog.V(10).Infof("azInterfacesClient.GetVirtualMachineScaleSetNetworkInterface(%q,%q,%q,%q): end", resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName)
-	}()
+	defer klog.V(10).Infof("azInterfacesClient.GetVirtualMachineScaleSetNetworkInterface(%q,%q,%q,%q): end", resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName)
 
 	result, err = az.client.GetVirtualMachineScaleSetNetworkInterface(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, expand)
 	mc.Observe(err)
@@ -405,9 +391,7 @@ func (az *azLoadBalancersClient) CreateOrUpdate(ctx context.Context, resourceGro
 	}
 
 	klog.V(10).Infof("azLoadBalancersClient.CreateOrUpdate(%q,%q): start", resourceGroupName, loadBalancerName)
-	defer func() {
-		klog.V(10).Infof("azLoadBalancersClient.CreateOrUpdate(%q,%q): end", resourceGroupName, loadBalancerName)
-	}()
+	defer klog.V(10).Infof("azLoadBalancersClient.CreateOrUpdate(%q,%q): end", resourceGroupName, loadBalancerName)
 
 	req, err := az.createOrUpdatePreparer(ctx, resourceGroupName, loadBalancerName, parameters, etag)
 	if err != nil {
@@ -460,9 +444,7 @@ func (az *azLoadBalancersClient) Delete(ctx context.Context, resourceGroupName s
 	}
 
 	klog.V(10).Infof("azLoadBalancersClient.Delete(%q,%q): start", resourceGroupName, loadBalancerName)
-	defer func() {
-		klog.V(10).Infof("azLoadBalancersClient.Delete(%q,%q): end", resourceGroupName, loadBalancerName)
-	}()
+	defer klog.V(10).Infof("azLoadBalancersClient.Delete(%q,%q): end", resourceGroupName, loadBalancerName)
 
 	future, err := az.client.Delete(ctx, resourceGroupName, loadBalancerName)
 	if err != nil {
@@ -482,9 +464,7 @@ func (az *azLoadBalancersClient) Get(ctx context.Context, resourceGroupName stri
 	}
 
 	klog.V(10).Infof("azLoadBalancersClient.Get(%q,%q): start", resourceGroupName, loadBalancerName)
-	defer func() {
-		klog.V(10).Infof("azLoadBalancersClient.Get(%q,%q): end", resourceGroupName, loadBalancerName)
-	}()
+	defer klog.V(10).Infof("azLoadBalancersClient.Get(%q,%q): end", resourceGroupName, loadBalancerName)
 
 	result, err = az.client.Get(ctx, resourceGroupName, loadBalancerName, expand)
 	mc.Observe(err)
@@ -500,9 +480,7 @@ func (az *azLoadBalancersClient) List(ctx context.Context, resourceGroupName str
 	}
 
 	klog.V(10).Infof("azLoadBalancersClient.List(%q): start", resourceGroupName)
-	defer func() {
-		klog.V(10).Infof("azLoadBalancersClient.List(%q): end", resourceGroupName)
-	}()
+	defer klog.V(10).Infof("azLoadBalancersClient.List(%q): end", resourceGroupName)
 
 	iterator, err := az.client.ListComplete(ctx, resourceGroupName)
 	mc.Observe(err)
@@ -557,9 +535,7 @@ func (az *azPublicIPAddressesClient) CreateOrUpdate(ctx context.Context, resourc
 	}
 
 	klog.V(10).Infof("azPublicIPAddressesClient.CreateOrUpdate(%q,%q): start", resourceGroupName, publicIPAddressName)
-	defer func() {
-		klog.V(10).Infof("azPublicIPAddressesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, publicIPAddressName)
-	}()
+	defer klog.V(10).Infof("azPublicIPAddressesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, publicIPAddressName)
 
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, publicIPAddressName, parameters)
 	if err != nil {
@@ -580,9 +556,7 @@ func (az *azPublicIPAddressesClient) Delete(ctx context.Context, resourceGroupNa
 	}
 
 	klog.V(10).Infof("azPublicIPAddressesClient.Delete(%q,%q): start", resourceGroupName, publicIPAddressName)
-	defer func() {
-		klog.V(10).Infof("azPublicIPAddressesClient.Delete(%q,%q): end", resourceGroupName, publicIPAddressName)
-	}()
+	defer klog.V(10).Infof("azPublicIPAddressesClient.Delete(%q,%q): end", resourceGroupName, publicIPAddressName)
 
 	future, err := az.client.Delete(ctx, resourceGroupName, publicIPAddressName)
 	if err != nil {
@@ -602,9 +576,7 @@ func (az *azPublicIPAddressesClient) Get(ctx context.Context, resourceGroupName 
 	}
 
 	klog.V(10).Infof("azPublicIPAddressesClient.Get(%q,%q): start", resourceGroupName, publicIPAddressName)
-	defer func() {
-		klog.V(10).Infof("azPublicIPAddressesClient.Get(%q,%q): end", resourceGroupName, publicIPAddressName)
-	}()
+	defer klog.V(10).Infof("azPublicIPAddressesClient.Get(%q,%q): end", resourceGroupName, publicIPAddressName)
 
 	result, err = az.client.Get(ctx, resourceGroupName, publicIPAddressName, expand)
 	mc.Observe(err)
@@ -620,9 +592,7 @@ func (az *azPublicIPAddressesClient) GetVirtualMachineScaleSetPublicIPAddress(ct
 	}
 
 	klog.V(10).Infof("azPublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(%q,%q): start", resourceGroupName, publicIPAddressName)
-	defer func() {
-		klog.V(10).Infof("azPublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(%q,%q): end", resourceGroupName, publicIPAddressName)
-	}()
+	defer klog.V(10).Infof("azPublicIPAddressesClient.GetVirtualMachineScaleSetPublicIPAddress(%q,%q): end", resourceGroupName, publicIPAddressName)
 
 	result, err = az.client.GetVirtualMachineScaleSetPublicIPAddress(ctx, resourceGroupName, virtualMachineScaleSetName, virtualmachineIndex, networkInterfaceName, IPConfigurationName, publicIPAddressName, expand)
 	mc.Observe(err)
@@ -637,9 +607,7 @@ func (az *azPublicIPAddressesClient) List(ctx context.Context, resourceGroupName
 	}
 
 	klog.V(10).Infof("azPublicIPAddressesClient.List(%q): start", resourceGroupName)
-	defer func() {
-		klog.V(10).Infof("azPublicIPAddressesClient.List(%q): end", resourceGroupName)
-	}()
+	defer klog.V(10).Infof("azPublicIPAddressesClient.List(%q): end", resourceGroupName)
 
 	iterator, err := az.client.ListComplete(ctx, resourceGroupName)
 	mc.Observe(err)
@@ -694,9 +662,7 @@ func (az *azSubnetsClient) CreateOrUpdate(ctx context.Context, resourceGroupName
 	}
 
 	klog.V(10).Infof("azSubnetsClient.CreateOrUpdate(%q,%q,%q): start", resourceGroupName, virtualNetworkName, subnetName)
-	defer func() {
-		klog.V(10).Infof("azSubnetsClient.CreateOrUpdate(%q,%q,%q): end", resourceGroupName, virtualNetworkName, subnetName)
-	}()
+	defer klog.V(10).Infof("azSubnetsClient.CreateOrUpdate(%q,%q,%q): end", resourceGroupName, virtualNetworkName, subnetName)
 
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, virtualNetworkName, subnetName, subnetParameters)
 	if err != nil {
@@ -717,9 +683,7 @@ func (az *azSubnetsClient) Delete(ctx context.Context, resourceGroupName string,
 	}
 
 	klog.V(10).Infof("azSubnetsClient.Delete(%q,%q,%q): start", resourceGroupName, virtualNetworkName, subnetName)
-	defer func() {
-		klog.V(10).Infof("azSubnetsClient.Delete(%q,%q,%q): end", resourceGroupName, virtualNetworkName, subnetName)
-	}()
+	defer klog.V(10).Infof("azSubnetsClient.Delete(%q,%q,%q): end", resourceGroupName, virtualNetworkName, subnetName)
 
 	future, err := az.client.Delete(ctx, resourceGroupName, virtualNetworkName, subnetName)
 	if err != nil {
@@ -739,9 +703,7 @@ func (az *azSubnetsClient) Get(ctx context.Context, resourceGroupName string, vi
 	}
 
 	klog.V(10).Infof("azSubnetsClient.Get(%q,%q,%q): start", resourceGroupName, virtualNetworkName, subnetName)
-	defer func() {
-		klog.V(10).Infof("azSubnetsClient.Get(%q,%q,%q): end", resourceGroupName, virtualNetworkName, subnetName)
-	}()
+	defer klog.V(10).Infof("azSubnetsClient.Get(%q,%q,%q): end", resourceGroupName, virtualNetworkName, subnetName)
 
 	result, err = az.client.Get(ctx, resourceGroupName, virtualNetworkName, subnetName, expand)
 	mc.Observe(err)
@@ -756,9 +718,7 @@ func (az *azSubnetsClient) List(ctx context.Context, resourceGroupName string, v
 	}
 
 	klog.V(10).Infof("azSubnetsClient.List(%q,%q): start", resourceGroupName, virtualNetworkName)
-	defer func() {
-		klog.V(10).Infof("azSubnetsClient.List(%q,%q): end", resourceGroupName, virtualNetworkName)
-	}()
+	defer klog.V(10).Infof("azSubnetsClient.List(%q,%q): end", resourceGroupName, virtualNetworkName)
 
 	iterator, err := az.client.ListComplete(ctx, resourceGroupName, virtualNetworkName)
 	mc.Observe(err)
@@ -813,9 +773,7 @@ func (az *azSecurityGroupsClient) CreateOrUpdate(ctx context.Context, resourceGr
 	}
 
 	klog.V(10).Infof("azSecurityGroupsClient.CreateOrUpdate(%q,%q): start", resourceGroupName, networkSecurityGroupName)
-	defer func() {
-		klog.V(10).Infof("azSecurityGroupsClient.CreateOrUpdate(%q,%q): end", resourceGroupName, networkSecurityGroupName)
-	}()
+	defer klog.V(10).Infof("azSecurityGroupsClient.CreateOrUpdate(%q,%q): end", resourceGroupName, networkSecurityGroupName)
 
 	req, err := az.createOrUpdatePreparer(ctx, resourceGroupName, networkSecurityGroupName, parameters, etag)
 	if err != nil {
@@ -868,9 +826,7 @@ func (az *azSecurityGroupsClient) Delete(ctx context.Context, resourceGroupName 
 	}
 
 	klog.V(10).Infof("azSecurityGroupsClient.Delete(%q,%q): start", resourceGroupName, networkSecurityGroupName)
-	defer func() {
-		klog.V(10).Infof("azSecurityGroupsClient.Delete(%q,%q): end", resourceGroupName, networkSecurityGroupName)
-	}()
+	defer klog.V(10).Infof("azSecurityGroupsClient.Delete(%q,%q): end", resourceGroupName, networkSecurityGroupName)
 
 	future, err := az.client.Delete(ctx, resourceGroupName, networkSecurityGroupName)
 	if err != nil {
@@ -890,9 +846,7 @@ func (az *azSecurityGroupsClient) Get(ctx context.Context, resourceGroupName str
 	}
 
 	klog.V(10).Infof("azSecurityGroupsClient.Get(%q,%q): start", resourceGroupName, networkSecurityGroupName)
-	defer func() {
-		klog.V(10).Infof("azSecurityGroupsClient.Get(%q,%q): end", resourceGroupName, networkSecurityGroupName)
-	}()
+	defer klog.V(10).Infof("azSecurityGroupsClient.Get(%q,%q): end", resourceGroupName, networkSecurityGroupName)
 
 	result, err = az.client.Get(ctx, resourceGroupName, networkSecurityGroupName, expand)
 	mc.Observe(err)
@@ -907,9 +861,7 @@ func (az *azSecurityGroupsClient) List(ctx context.Context, resourceGroupName st
 	}
 
 	klog.V(10).Infof("azSecurityGroupsClient.List(%q): start", resourceGroupName)
-	defer func() {
-		klog.V(10).Infof("azSecurityGroupsClient.List(%q): end", resourceGroupName)
-	}()
+	defer klog.V(10).Infof("azSecurityGroupsClient.List(%q): end", resourceGroupName)
 
 	iterator, err := az.client.ListComplete(ctx, resourceGroupName)
 	mc.Observe(err)
@@ -963,9 +915,7 @@ func (az *azVirtualMachineScaleSetsClient) Get(ctx context.Context, resourceGrou
 	}
 
 	klog.V(10).Infof("azVirtualMachineScaleSetsClient.Get(%q,%q): start", resourceGroupName, VMScaleSetName)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineScaleSetsClient.Get(%q,%q): end", resourceGroupName, VMScaleSetName)
-	}()
+	defer klog.V(10).Infof("azVirtualMachineScaleSetsClient.Get(%q,%q): end", resourceGroupName, VMScaleSetName)
 
 	result, err = az.client.Get(ctx, resourceGroupName, VMScaleSetName)
 	mc.Observe(err)
@@ -981,9 +931,7 @@ func (az *azVirtualMachineScaleSetsClient) List(ctx context.Context, resourceGro
 	}
 
 	klog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q): start", resourceGroupName)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q): end", resourceGroupName)
-	}()
+	defer klog.V(10).Infof("azVirtualMachineScaleSetsClient.List(%q): end", resourceGroupName)
 
 	iterator, err := az.client.ListComplete(ctx, resourceGroupName)
 	mc.Observe(err)
@@ -1013,9 +961,7 @@ func (az *azVirtualMachineScaleSetsClient) CreateOrUpdate(ctx context.Context, r
 	}
 
 	klog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): start", resourceGroupName, vmScaleSetName)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): end", resourceGroupName, vmScaleSetName)
-	}()
+	defer klog.V(10).Infof("azVirtualMachineScaleSetsClient.CreateOrUpdate(%q,%q): end", resourceGroupName, vmScaleSetName)
 
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, vmScaleSetName, parameters)
 	if err != nil {
@@ -1060,9 +1006,7 @@ func (az *azVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGr
 	}
 
 	klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.Get(%q,%q,%q): start", resourceGroupName, VMScaleSetName, instanceID)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.Get(%q,%q,%q): end", resourceGroupName, VMScaleSetName, instanceID)
-	}()
+	defer klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.Get(%q,%q,%q): end", resourceGroupName, VMScaleSetName, instanceID)
 
 	result, err = az.client.Get(ctx, resourceGroupName, VMScaleSetName, instanceID)
 	mc.Observe(err)
@@ -1078,9 +1022,7 @@ func (az *azVirtualMachineScaleSetVMsClient) GetInstanceView(ctx context.Context
 	}
 
 	klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.GetInstanceView(%q,%q,%q): start", resourceGroupName, VMScaleSetName, instanceID)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.GetInstanceView(%q,%q,%q): end", resourceGroupName, VMScaleSetName, instanceID)
-	}()
+	defer klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.GetInstanceView(%q,%q,%q): end", resourceGroupName, VMScaleSetName, instanceID)
 
 	result, err = az.client.GetInstanceView(ctx, resourceGroupName, VMScaleSetName, instanceID)
 	mc.Observe(err)
@@ -1096,9 +1038,7 @@ func (az *azVirtualMachineScaleSetVMsClient) List(ctx context.Context, resourceG
 	}
 
 	klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.List(%q,%q,%q): start", resourceGroupName, virtualMachineScaleSetName, filter)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.List(%q,%q,%q): end", resourceGroupName, virtualMachineScaleSetName, filter)
-	}()
+	defer klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.List(%q,%q,%q): end", resourceGroupName, virtualMachineScaleSetName, filter)
 
 	iterator, err := az.client.ListComplete(ctx, resourceGroupName, virtualMachineScaleSetName, filter, selectParameter, expand)
 	mc.Observe(err)
@@ -1127,9 +1067,7 @@ func (az *azVirtualMachineScaleSetVMsClient) Update(ctx context.Context, resourc
 	}
 
 	klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.Update(%q,%q,%q): start", resourceGroupName, VMScaleSetName, instanceID)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.Update(%q,%q,%q): end", resourceGroupName, VMScaleSetName, instanceID)
-	}()
+	defer klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.Update(%q,%q,%q): end", resourceGroupName, VMScaleSetName, instanceID)
 
 	future, err := az.client.Update(ctx, resourceGroupName, VMScaleSetName, instanceID, parameters)
 	if err != nil {
@@ -1175,9 +1113,7 @@ func (az *azRoutesClient) CreateOrUpdate(ctx context.Context, resourceGroupName 
 	}
 
 	klog.V(10).Infof("azRoutesClient.CreateOrUpdate(%q,%q,%q): start", resourceGroupName, routeTableName, routeName)
-	defer func() {
-		klog.V(10).Infof("azRoutesClient.CreateOrUpdate(%q,%q,%q): end", resourceGroupName, routeTableName, routeName)
-	}()
+	defer klog.V(10).Infof("azRoutesClient.CreateOrUpdate(%q,%q,%q): end", resourceGroupName, routeTableName, routeName)
 
 	req, err := az.createOrUpdatePreparer(ctx, resourceGroupName, routeTableName, routeName, routeParameters, etag)
 	if err != nil {
@@ -1233,9 +1169,7 @@ func (az *azRoutesClient) Delete(ctx context.Context, resourceGroupName string, 
 	}
 
 	klog.V(10).Infof("azRoutesClient.Delete(%q,%q,%q): start", resourceGroupName, routeTableName, routeName)
-	defer func() {
-		klog.V(10).Infof("azRoutesClient.Delete(%q,%q,%q): end", resourceGroupName, routeTableName, routeName)
-	}()
+	defer klog.V(10).Infof("azRoutesClient.Delete(%q,%q,%q): end", resourceGroupName, routeTableName, routeName)
 
 	future, err := az.client.Delete(ctx, resourceGroupName, routeTableName, routeName)
 	if err != nil {
@@ -1281,9 +1215,7 @@ func (az *azRouteTablesClient) CreateOrUpdate(ctx context.Context, resourceGroup
 	}
 
 	klog.V(10).Infof("azRouteTablesClient.CreateOrUpdate(%q,%q): start", resourceGroupName, routeTableName)
-	defer func() {
-		klog.V(10).Infof("azRouteTablesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, routeTableName)
-	}()
+	defer klog.V(10).Infof("azRouteTablesClient.CreateOrUpdate(%q,%q): end", resourceGroupName, routeTableName)
 
 	req, err := az.createOrUpdatePreparer(ctx, resourceGroupName, routeTableName, parameters, etag)
 	if err != nil {
@@ -1335,9 +1267,7 @@ func (az *azRouteTablesClient) Get(ctx context.Context, resourceGroupName string
 	}
 
 	klog.V(10).Infof("azRouteTablesClient.Get(%q,%q): start", resourceGroupName, routeTableName)
-	defer func() {
-		klog.V(10).Infof("azRouteTablesClient.Get(%q,%q): end", resourceGroupName, routeTableName)
-	}()
+	defer klog.V(10).Infof("azRouteTablesClient.Get(%q,%q): end", resourceGroupName, routeTableName)
 
 	result, err = az.client.Get(ctx, resourceGroupName, routeTableName, expand)
 	mc.Observe(err)
@@ -1378,9 +1308,7 @@ func (az *azStorageAccountClient) Create(ctx context.Context, resourceGroupName 
 	}
 
 	klog.V(10).Infof("azStorageAccountClient.Create(%q,%q): start", resourceGroupName, accountName)
-	defer func() {
-		klog.V(10).Infof("azStorageAccountClient.Create(%q,%q): end", resourceGroupName, accountName)
-	}()
+	defer klog.V(10).Infof("azStorageAccountClient.Create(%q,%q): end", resourceGroupName, accountName)
 
 	future, err := az.client.Create(ctx, resourceGroupName, accountName, parameters)
 	if err != nil {
@@ -1401,9 +1329,7 @@ func (az *azStorageAccountClient) Delete(ctx context.Context, resourceGroupName 
 	}
 
 	klog.V(10).Infof("azStorageAccountClient.Delete(%q,%q): start", resourceGroupName, accountName)
-	defer func() {
-		klog.V(10).Infof("azStorageAccountClient.Delete(%q,%q): end", resourceGroupName, accountName)
-	}()
+	defer klog.V(10).Infof("azStorageAccountClient.Delete(%q,%q): end", resourceGroupName, accountName)
 
 	result, err = az.client.Delete(ctx, resourceGroupName, accountName)
 	mc.Observe(err)
@@ -1419,9 +1345,7 @@ func (az *azStorageAccountClient) ListKeys(ctx context.Context, resourceGroupNam
 	}
 
 	klog.V(10).Infof("azStorageAccountClient.ListKeys(%q,%q): start", resourceGroupName, accountName)
-	defer func() {
-		klog.V(10).Infof("azStorageAccountClient.ListKeys(%q,%q): end", resourceGroupName, accountName)
-	}()
+	defer klog.V(10).Infof("azStorageAccountClient.ListKeys(%q,%q): end", resourceGroupName, accountName)
 
 	result, err = az.client.ListKeys(ctx, resourceGroupName, accountName)
 	mc.Observe(err)
@@ -1437,9 +1361,7 @@ func (az *azStorageAccountClient) ListByResourceGroup(ctx context.Context, resou
 	}
 
 	klog.V(10).Infof("azStorageAccountClient.ListByResourceGroup(%q): start", resourceGroupName)
-	defer func() {
-		klog.V(10).Infof("azStorageAccountClient.ListByResourceGroup(%q): end", resourceGroupName)
-	}()
+	defer klog.V(10).Infof("azStorageAccountClient.ListByResourceGroup(%q): end", resourceGroupName)
 
 	result, err = az.client.ListByResourceGroup(ctx, resourceGroupName)
 	mc.Observe(err)
@@ -1455,9 +1377,7 @@ func (az *azStorageAccountClient) GetProperties(ctx context.Context, resourceGro
 	}
 
 	klog.V(10).Infof("azStorageAccountClient.GetProperties(%q,%q): start", resourceGroupName, accountName)
-	defer func() {
-		klog.V(10).Infof("azStorageAccountClient.GetProperties(%q,%q): end", resourceGroupName, accountName)
-	}()
+	defer klog.V(10).Infof("azStorageAccountClient.GetProperties(%q,%q): end", resourceGroupName, accountName)
 
 	result, err = az.client.GetProperties(ctx, resourceGroupName, accountName, "")
 	mc.Observe(err)
@@ -1498,9 +1418,7 @@ func (az *azDisksClient) CreateOrUpdate(ctx context.Context, resourceGroupName s
 	}
 
 	klog.V(10).Infof("azDisksClient.CreateOrUpdate(%q,%q): start", resourceGroupName, diskName)
-	defer func() {
-		klog.V(10).Infof("azDisksClient.CreateOrUpdate(%q,%q): end", resourceGroupName, diskName)
-	}()
+	defer klog.V(10).Infof("azDisksClient.CreateOrUpdate(%q,%q): end", resourceGroupName, diskName)
 
 	future, err := az.client.CreateOrUpdate(ctx, resourceGroupName, diskName, diskParameter)
 	if err != nil {
@@ -1521,9 +1439,7 @@ func (az *azDisksClient) Delete(ctx context.Context, resourceGroupName string, d
 	}
 
 	klog.V(10).Infof("azDisksClient.Delete(%q,%q): start", resourceGroupName, diskName)
-	defer func() {
-		klog.V(10).Infof("azDisksClient.Delete(%q,%q): end", resourceGroupName, diskName)
-	}()
+	defer klog.V(10).Infof("azDisksClient.Delete(%q,%q): end", resourceGroupName, diskName)
 
 	future, err := az.client.Delete(ctx, resourceGroupName, diskName)
 	if err != nil {
@@ -1542,9 +1458,7 @@ func (az *azDisksClient) Get(ctx context.Context, resourceGroupName string, disk
 	}
 
 	klog.V(10).Infof("azDisksClient.Get(%q,%q): start", resourceGroupName, diskName)
-	defer func() {
-		klog.V(10).Infof("azDisksClient.Get(%q,%q): end", resourceGroupName, diskName)
-	}()
+	defer klog.V(10).Infof("azDisksClient.Get(%q,%q): end", resourceGroupName, diskName)
 
 	result, err = az.client.Get(ctx, resourceGroupName, diskName)
 	mc.Observe(err)
@@ -1597,9 +1511,7 @@ func (az *azVirtualMachineSizesClient) List(ctx context.Context, location string
 	}
 
 	klog.V(10).Infof("azVirtualMachineSizesClient.List(%q): start", location)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineSizesClient.List(%q): end", location)
-	}()
+	defer klog.V(10).Infof("azVirtualMachineSizesClient.List(%q): end", location)
 
 	result, err = az.client.List(ctx, location)
 	mc.Observe(err)

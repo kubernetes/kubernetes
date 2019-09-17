@@ -173,9 +173,8 @@ func (cc *CertificateController) enqueueCertificateRequest(obj interface{}) {
 // with the signed certificate.
 func (cc *CertificateController) syncFunc(key string) error {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing certificate request %q (%v)", key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing certificate request %q (%v)", key, time.Since(startTime))
+
 	csr, err := cc.csrLister.Get(key)
 	if errors.IsNotFound(err) {
 		klog.V(3).Infof("csr has been deleted: %v", key)

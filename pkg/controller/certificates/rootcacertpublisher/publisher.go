@@ -171,9 +171,7 @@ func (c *Publisher) processNextWorkItem() bool {
 
 func (c *Publisher) syncNamespace(ns string) error {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing namespace %q (%v)", ns, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing namespace %q (%v)", ns, time.Since(startTime))
 
 	cm, err := c.cmLister.ConfigMaps(ns).Get(RootCACertConfigMapName)
 	switch {

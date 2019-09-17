@@ -767,9 +767,7 @@ func loadBalancerIPsAreEqual(oldService, newService *v1.Service) bool {
 // invoked concurrently with the same key.
 func (s *ServiceController) syncService(key string) error {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing service %q (%v)", key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing service %q (%v)", key, time.Since(startTime))
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

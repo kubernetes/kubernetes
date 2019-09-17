@@ -435,9 +435,7 @@ func (jm *JobController) getPodsForJob(j *batch.Job) ([]*v1.Pod, error) {
 // concurrently with the same key.
 func (jm *JobController) syncJob(key string) (bool, error) {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing job %q (%v)", key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing job %q (%v)", key, time.Since(startTime))
 
 	ns, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

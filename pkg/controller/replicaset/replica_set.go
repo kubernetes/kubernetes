@@ -562,9 +562,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing %v %q (%v)", rsc.Kind, key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing %v %q (%v)", rsc.Kind, key, time.Since(startTime))
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

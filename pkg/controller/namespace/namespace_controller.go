@@ -162,9 +162,7 @@ func (nm *NamespaceController) worker() {
 // syncNamespaceFromKey looks for a namespace with the specified key in its store and synchronizes it
 func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
 
 	namespace, err := nm.lister.Get(key)
 	if errors.IsNotFound(err) {

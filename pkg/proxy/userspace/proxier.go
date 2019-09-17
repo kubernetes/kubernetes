@@ -341,9 +341,7 @@ func (proxier *Proxier) Sync() {
 
 func (proxier *Proxier) syncProxyRules() {
 	start := time.Now()
-	defer func() {
-		klog.V(2).Infof("userspace syncProxyRules took %v", time.Since(start))
-	}()
+	defer klog.V(2).Infof("userspace syncProxyRules took %v", time.Since(start))
 
 	// don't sync rules till we've received services and endpoints
 	if !proxier.isInitialized() {

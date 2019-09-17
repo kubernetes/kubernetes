@@ -292,9 +292,7 @@ func (rq *ResourceQuotaController) Run(workers int, stopCh <-chan struct{}) {
 // syncResourceQuotaFromKey syncs a quota key
 func (rq *ResourceQuotaController) syncResourceQuotaFromKey(key string) (err error) {
 	startTime := time.Now()
-	defer func() {
-		klog.V(4).Infof("Finished syncing resource quota %q (%v)", key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing resource quota %q (%v)", key, time.Since(startTime))
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {

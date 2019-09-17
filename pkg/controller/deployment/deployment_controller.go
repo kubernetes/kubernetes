@@ -562,9 +562,7 @@ func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsLis
 func (dc *DeploymentController) syncDeployment(key string) error {
 	startTime := time.Now()
 	klog.V(4).Infof("Started syncing deployment %q (%v)", key, startTime)
-	defer func() {
-		klog.V(4).Infof("Finished syncing deployment %q (%v)", key, time.Since(startTime))
-	}()
+	defer klog.V(4).Infof("Finished syncing deployment %q (%v)", key, time.Since(startTime))
 
 	namespace, name, err := cache.SplitMetaNamespaceKey(key)
 	if err != nil {
