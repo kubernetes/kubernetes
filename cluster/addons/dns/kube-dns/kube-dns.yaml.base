@@ -154,7 +154,7 @@ spec:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           runAsUser: 1001
-          runAsGroup: 2001
+          runAsGroup: 1001
       - name: dnsmasq
         image: k8s.gcr.io/k8s-dns-dnsmasq-nanny:1.14.13
         livenessProbe:
@@ -231,6 +231,6 @@ spec:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           runAsUser: 1001
-          runAsGroup: 2001
+          runAsGroup: 1001
       dnsPolicy: Default  # Don't use cluster DNS.
       serviceAccountName: kube-dns
