@@ -92,6 +92,8 @@ const (
 )
 
 type cachedService struct {
+	// Protects cached service state
+	mu sync.Mutex
 	// The cached state of the service
 	state *v1.Service
 }
@@ -106,7 +108,7 @@ type serviceCache struct {
 type ServiceController struct {
 	cloud               cloudprovider.Interface
 	knownHosts          []*v1.Node
-	servicesToUpdate    []*v1.Service
+	servicesToUpdate    []string
 	kubeClient          clientset.Interface
 	clusterName         string
 	balancer            cloudprovider.LoadBalancer
@@ -277,6 +279,8 @@ func (s *ServiceController) processServiceCreateOrUpdate(service *v1.Service, ke
 	// TODO(@MrHohn): Remove the cache once we get rid of the non-finalizer deletion
 	// path. Ref https://github.com/kubernetes/enhancements/issues/980.
 	cachedService := s.cache.getOrCreate(key)
+	cachedService.mu.Lock()
+	defer cachedService.mu.Unlock()
 	if cachedService.state != nil && cachedService.state.UID != service.UID {
 		// This happens only when a service is deleted and re-created
 		// in a short period, which is only possible when it doesn't
@@ -329,8 +333,10 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 		if err != nil {
 			return op, fmt.Errorf("failed to check if load balancer exists before cleanup: %v", err)
 		}
-		if exists {
-			klog.V(2).Infof("Deleting existing load balancer for service %s", key)
+		// Always call EnsureLoadBalancerDeleted against load balancers to
+		// ensure the underlying components are completely deleted
+		if exists || service.Spec.Type == v1.ServiceTypeLoadBalancer {
+			klog.V(2).Infof("Deleting load balancer for service %s", key)
 			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
 			if err := s.balancer.EnsureLoadBalancerDeleted(context.TODO(), s.clusterName, service); err != nil {
 				return op, fmt.Errorf("failed to delete load balancer: %v", err)
@@ -423,18 +429,6 @@ func (s *serviceCache) GetByKey(key string) (interface{}, bool, error) {
 		return v, true, nil
 	}
 	return nil, false, nil
-}
-
-// ListKeys implements the interface required by DeltaFIFO to list the keys we
-// already know about.
-func (s *serviceCache) allServices() []*v1.Service {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	services := make([]*v1.Service, 0, len(s.serviceMap))
-	for _, v := range s.serviceMap {
-		services = append(services, v.state)
-	}
-	return services
 }
 
 func (s *serviceCache) get(serviceName string) (*cachedService, bool) {
@@ -692,7 +686,7 @@ func (s *ServiceController) nodeSyncLoop() {
 
 	// Try updating all services, and save the ones that fail to try again next
 	// round.
-	s.servicesToUpdate = s.cache.allServices()
+	s.servicesToUpdate = s.cache.ListKeys()
 	numServices := len(s.servicesToUpdate)
 	s.servicesToUpdate = s.updateLoadBalancerHosts(s.servicesToUpdate, newHosts)
 	klog.V(2).Infof("Successfully updated %d out of %d load balancers to direct traffic to the updated set of nodes",
@@ -704,15 +698,21 @@ func (s *ServiceController) nodeSyncLoop() {
 // updateLoadBalancerHosts updates all existing load balancers so that
 // they will match the list of hosts provided.
 // Returns the list of services that couldn't be updated.
-func (s *ServiceController) updateLoadBalancerHosts(services []*v1.Service, hosts []*v1.Node) (servicesToRetry []*v1.Service) {
-	for _, service := range services {
+func (s *ServiceController) updateLoadBalancerHosts(keys []string, hosts []*v1.Node) (servicesToRetry []string) {
+	for _, key := range keys {
 		func() {
-			if service == nil {
+			cachedService, ok := s.cache.get(key)
+			// Check if we already deleted the load balancer that was created for the service
+			if !ok {
 				return
 			}
+
+			cachedService.mu.Lock()
+			defer cachedService.mu.Unlock()
+			service := cachedService.state
 			if err := s.lockedUpdateLoadBalancerHosts(service, hosts); err != nil {
 				runtime.HandleError(fmt.Errorf("failed to update load balancer hosts for service %s/%s: %v", service.Namespace, service.Name, err))
-				servicesToRetry = append(servicesToRetry, service)
+				servicesToRetry = append(servicesToRetry, key)
 			}
 		}()
 	}
@@ -722,7 +722,7 @@ func (s *ServiceController) updateLoadBalancerHosts(services []*v1.Service, host
 // Updates the load balancer of a service, assuming we hold the mutex
 // associated with the service.
 func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *v1.Service, hosts []*v1.Node) error {
-	if !wantsLoadBalancer(service) {
+	if needsCleanup(service) {
 		return nil
 	}
 
@@ -800,6 +800,8 @@ func (s *ServiceController) processServiceDeletion(key string) error {
 		// In both cases we have nothing left to do.
 		return nil
 	}
+	cachedService.mu.Lock()
+	defer cachedService.mu.Unlock()
 	klog.V(2).Infof("Service %v has been deleted. Attempting to cleanup load balancer resources", key)
 	if err := s.processLoadBalancerDelete(cachedService.state, key); err != nil {
 		return err
