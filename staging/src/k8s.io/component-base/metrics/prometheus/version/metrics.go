@@ -1,5 +1,5 @@
 /*
-Copyright 2016 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,25 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package prometheus registers Kubernetes version information as a
-// prometheus metric.
-package prometheus
+package version
 
 import (
-	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/kubernetes/pkg/version"
+	"k8s.io/component-base/metrics"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/version"
 )
 
-func init() {
-	buildInfo := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "kubernetes_build_info",
-			Help: "A metric with a constant '1' value labeled by major, minor, git version, git commit, git tree state, build date, Go version, and compiler from which Kubernetes was built, and platform on which it is running.",
+var (
+	buildInfo = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Name:           "kubernetes_build_info",
+			Help:           "A metric with a constant '1' value labeled by major, minor, git version, git commit, git tree state, build date, Go version, and compiler from which Kubernetes was built, and platform on which it is running.",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"major", "minor", "gitVersion", "gitCommit", "gitTreeState", "buildDate", "goVersion", "compiler", "platform"},
 	)
-	info := version.Get()
-	buildInfo.WithLabelValues(info.Major, info.Minor, info.GitVersion, info.GitCommit, info.GitTreeState, info.BuildDate, info.GoVersion, info.Compiler, info.Platform).Set(1)
+)
 
-	prometheus.MustRegister(buildInfo)
+// RegisterBuildInfo registers the build and version info in a metadata metric in prometheus
+func init() {
+	info := version.Get()
+	legacyregistry.MustRegister(buildInfo)
+	buildInfo.WithLabelValues(info.Major, info.Minor, info.GitVersion, info.GitCommit, info.GitTreeState, info.BuildDate, info.GoVersion, info.Compiler, info.Platform).Set(1)
 }

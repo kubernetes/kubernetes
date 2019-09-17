@@ -79,7 +79,6 @@ filegroup(
         "//pkg/serviceaccount:all-srcs",
         "//pkg/ssh:all-srcs",
         "//pkg/util:all-srcs",
-        "//pkg/version:all-srcs",
         "//pkg/volume:all-srcs",
         "//pkg/watch/json:all-srcs",
         "//pkg/windows/service:all-srcs",

@@ -155,12 +155,9 @@ kube::version::ldflags() {
   function add_ldflag() {
     local key=${1}
     local val=${2}
-    # If you update these, also update the list pkg/version/def.bzl.
+    # If you update these, also update the list component-base/version/def.bzl.
     ldflags+=(
-      "-X '${KUBE_GO_PACKAGE}/pkg/version.${key}=${val}'"
       "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/client-go/pkg/version.${key}=${val}'"
-      "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/kubectl/pkg/version.${key}=${val}'"
-      "-X '${KUBE_GO_PACKAGE}/cmd/kubeadm/app/version.${key}=${val}'"
       "-X '${KUBE_GO_PACKAGE}/vendor/k8s.io/component-base/version.${key}=${val}'"
     )
   }

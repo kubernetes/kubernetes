@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	restclient "k8s.io/client-go/rest"
+	kubeversion "k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -57,7 +58,6 @@ import (
 	certificatesrest "k8s.io/kubernetes/pkg/registry/certificates/rest"
 	corerest "k8s.io/kubernetes/pkg/registry/core/rest"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
-	kubeversion "k8s.io/kubernetes/pkg/version"
 
 	"github.com/stretchr/testify/assert"
 )

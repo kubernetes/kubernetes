@@ -5,7 +5,7 @@ load(
     go_binary = "go_binary_conditional_pure",
 )
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
-load("//pkg/version:def.bzl", "version_x_defs")
+load("//staging/src/k8s.io/component-base/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "hyperkube",
@@ -25,10 +25,10 @@ go_library(
         "//cmd/kube-scheduler/app:go_default_library",
         "//cmd/kubelet/app:go_default_library",
         "//pkg/kubectl/cmd:go_default_library",
-        "//pkg/version/prometheus:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/prometheus/restclient:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/version:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
