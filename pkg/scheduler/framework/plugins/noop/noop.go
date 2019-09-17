@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package prebind
+package noop
 
 import (
 	"k8s.io/api/core/v1"
@@ -23,27 +23,28 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
-// NoOpFilter is a plugin that implements the filter plugin and always returns Success.
+// Filter is a plugin that implements the filter plugin and always returns Success.
 // This is just to make sure that all code dependencies are properly addressed while
 // working on legitimate plugins.
-type NoOpFilter struct{}
+// Note: The struct cannot be named NoOpFilter, otherwise the golint check cannot pass
+type Filter struct{}
 
-var _ = framework.FilterPlugin(NoOpFilter{})
+var _ = framework.FilterPlugin(Filter{})
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = "noop-filter"
 
 // Name returns name of the plugin. It is used in logs, etc.
-func (n NoOpFilter) Name() string {
+func (n Filter) Name() string {
 	return Name
 }
 
 // Filter invoked at the filter extension point.
-func (n NoOpFilter) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (n Filter) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
 
 // New initializes a new plugin and returns it.
 func New(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
-	return &NoOpFilter{}, nil
+	return &Filter{}, nil
 }
