@@ -912,3 +912,18 @@ func HasProgressDeadline(d *apps.Deployment) bool {
 func HasRevisionHistoryLimit(d *apps.Deployment) bool {
 	return d.Spec.RevisionHistoryLimit != nil && *d.Spec.RevisionHistoryLimit != math.MaxInt32
 }
+
+// ReplicaSetsByRevision sorts a list of ReplicaSet by revision, using their creation timestamp or name as a tie breaker.
+// By using the creation timestamp, this sorts from old to new replica sets.
+type ReplicaSetsByRevision []*apps.ReplicaSet
+
+func (o ReplicaSetsByRevision) Len() int      { return len(o) }
+func (o ReplicaSetsByRevision) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
+func (o ReplicaSetsByRevision) Less(i, j int) bool {
+	revision1, err1 := Revision(o[i])
+	revision2, err2 := Revision(o[j])
+	if err1 != nil || err2 != nil || revision1 == revision2 {
+		return controller.ReplicaSetsByCreationTimestamp(o).Less(i, j)
+	}
+	return revision1 < revision2
+}
