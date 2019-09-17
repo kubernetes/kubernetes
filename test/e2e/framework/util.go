@@ -40,6 +40,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/net/websocket"
 	"k8s.io/klog"
 
@@ -871,8 +872,11 @@ func deleteNS(c clientset.Interface, dynamicClient dynamic.Interface, namespace 
 	}
 
 	// wait for namespace to delete or timeout.
+	var lastNamespace *v1.Namespace
 	err := wait.PollImmediate(2*time.Second, timeout, func() (bool, error) {
-		if _, err := c.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
+		var err error
+		lastNamespace, err = c.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{})
+		if err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
 			}
@@ -902,6 +906,9 @@ func deleteNS(c clientset.Interface, dynamicClient dynamic.Interface, namespace 
 
 	// a timeout waiting for namespace deletion happened!
 	if err != nil {
+		// namespaces now have conditions that are useful for debugging generic resources and finalizers
+		e2elog.Logf("namespace did not cleanup: %s", spew.Sdump(lastNamespace))
+
 		// some content remains in the namespace
 		if remainingContent {
 			// pods remain
