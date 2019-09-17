@@ -1468,90 +1468,90 @@ func TestGetPodsToDelete(t *testing.T) {
 		// a scheduled, running, ready pod
 		// Note that a pending pod cannot be ready
 		{
-			"len(pods) = 0 (i.e., diff = 0 too)",
-			[]*v1.Pod{},
-			0,
-			[]*v1.Pod{},
+			name:                 "len(pods) = 0 (i.e., diff = 0 too)",
+			pods:                 []*v1.Pod{},
+			diff:                 0,
+			expectedPodsToDelete: []*v1.Pod{},
 		},
 		{
-			"diff = len(pods)",
-			[]*v1.Pod{
+			name: "diff = len(pods)",
+			pods: []*v1.Pod{
 				scheduledRunningNotReadyPod,
 				scheduledRunningReadyPod,
 			},
-			2,
-			[]*v1.Pod{scheduledRunningNotReadyPod, scheduledRunningReadyPod},
+			diff:                 2,
+			expectedPodsToDelete: []*v1.Pod{scheduledRunningNotReadyPod, scheduledRunningReadyPod},
 		},
 		{
-			"diff < len(pods)",
-			[]*v1.Pod{
+			name: "diff < len(pods)",
+			pods: []*v1.Pod{
 				scheduledRunningReadyPod,
 				scheduledRunningNotReadyPod,
 			},
-			1,
-			[]*v1.Pod{scheduledRunningNotReadyPod},
+			diff:                 1,
+			expectedPodsToDelete: []*v1.Pod{scheduledRunningNotReadyPod},
 		},
 		{
-			"various pod phases and conditions, diff = len(pods)",
-			[]*v1.Pod{
-				scheduledRunningReadyPod,
-				scheduledRunningNotReadyPod,
-				scheduledPendingPod,
-				unscheduledPendingPod,
-			},
-			4,
-			[]*v1.Pod{
+			name: "various pod phases and conditions, diff = len(pods)",
+			pods: []*v1.Pod{
 				scheduledRunningReadyPod,
 				scheduledRunningNotReadyPod,
 				scheduledPendingPod,
 				unscheduledPendingPod,
 			},
-		},
-		{
-			"scheduled vs unscheduled, diff < len(pods)",
-			[]*v1.Pod{
-				scheduledPendingPod,
-				unscheduledPendingPod,
-			},
-			1,
-			[]*v1.Pod{
-				unscheduledPendingPod,
-			},
-		},
-		{
-			"ready vs not-ready, diff < len(pods)",
-			[]*v1.Pod{
-				scheduledRunningReadyPod,
-				scheduledRunningNotReadyPod,
-				scheduledRunningNotReadyPod,
-			},
-			2,
-			[]*v1.Pod{
-				scheduledRunningNotReadyPod,
-				scheduledRunningNotReadyPod,
-			},
-		},
-		{
-			"pending vs running, diff < len(pods)",
-			[]*v1.Pod{
-				scheduledPendingPod,
-				scheduledRunningNotReadyPod,
-			},
-			1,
-			[]*v1.Pod{
-				scheduledPendingPod,
-			},
-		},
-		{
-			"various pod phases and conditions, diff < len(pods)",
-			[]*v1.Pod{
+			diff: 4,
+			expectedPodsToDelete: []*v1.Pod{
 				scheduledRunningReadyPod,
 				scheduledRunningNotReadyPod,
 				scheduledPendingPod,
 				unscheduledPendingPod,
 			},
-			3,
-			[]*v1.Pod{
+		},
+		{
+			name: "scheduled vs unscheduled, diff < len(pods)",
+			pods: []*v1.Pod{
+				scheduledPendingPod,
+				unscheduledPendingPod,
+			},
+			diff: 1,
+			expectedPodsToDelete: []*v1.Pod{
+				unscheduledPendingPod,
+			},
+		},
+		{
+			name: "ready vs not-ready, diff < len(pods)",
+			pods: []*v1.Pod{
+				scheduledRunningReadyPod,
+				scheduledRunningNotReadyPod,
+				scheduledRunningNotReadyPod,
+			},
+			diff: 2,
+			expectedPodsToDelete: []*v1.Pod{
+				scheduledRunningNotReadyPod,
+				scheduledRunningNotReadyPod,
+			},
+		},
+		{
+			name: "pending vs running, diff < len(pods)",
+			pods: []*v1.Pod{
+				scheduledPendingPod,
+				scheduledRunningNotReadyPod,
+			},
+			diff: 1,
+			expectedPodsToDelete: []*v1.Pod{
+				scheduledPendingPod,
+			},
+		},
+		{
+			name: "various pod phases and conditions, diff < len(pods)",
+			pods: []*v1.Pod{
+				scheduledRunningReadyPod,
+				scheduledRunningNotReadyPod,
+				scheduledPendingPod,
+				unscheduledPendingPod,
+			},
+			diff: 3,
+			expectedPodsToDelete: []*v1.Pod{
 				unscheduledPendingPod,
 				scheduledPendingPod,
 				scheduledRunningNotReadyPod,
