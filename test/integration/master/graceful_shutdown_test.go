@@ -92,6 +92,7 @@ func TestGracefulShutdown(t *testing.T) {
 	}
 	body.Close()
 	respErr := <-respErrCh
+	t.Logf("respErr %v", respErr)
 	if err != nil {
 		t.Fatal(err)
 	}
