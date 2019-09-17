@@ -165,7 +165,8 @@ func (p *podWorkers) managePodLoop(podUpdates <-chan UpdatePodOptions) {
 			// Time. This ensures the worker doesn't start syncing until
 			// after the cache is at least newer than the finished time of
 			// the previous sync.
-			status, err := p.podCache.GetNewerThan(podUID, lastSyncTime)
+			// Wait for plegRelistPeriod at most to make sure podCache updated if the last sync was finished just now
+			status, err := p.podCache.GetNewerThan(podUID, lastSyncTime.Add(plegRelistPeriod))
 			if err != nil {
 				// This is the legacy event thrown by manage pod loop
 				// all other events are now dispatched from syncPodFn

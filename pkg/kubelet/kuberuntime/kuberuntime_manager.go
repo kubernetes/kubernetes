@@ -565,7 +565,7 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 				message := fmt.Sprintf("Container %+v is dead, but RestartPolicy says that we should restart it.", container)
 				klog.V(3).Infof(message)
 				changes.ContainersToStart = append(changes.ContainersToStart, idx)
-				if containerStatus != nil && containerStatus.State == kubecontainer.ContainerStateUnknown {
+				if containerStatus != nil && containerStatus.State != kubecontainer.ContainerStateExited {
 					// If container is in unknown state, we don't know whether it
 					// is actually running or not, always try killing it before
 					// restart to avoid having 2 running instances of the same container.
