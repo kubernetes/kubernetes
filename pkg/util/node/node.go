@@ -122,7 +122,7 @@ func GetNodeIP(client clientset.Interface, hostname string) net.IP {
 		node, err := client.CoreV1().Nodes().Get(hostname, metav1.GetOptions{})
 		if err != nil {
 			klog.Errorf("Failed to retrieve node info: %v", err)
-			return false, nil
+			return false, err
 		}
 		nodeIP, err = GetNodeHostIP(node)
 		if err != nil {
@@ -170,7 +170,7 @@ func SetNodeCondition(c clientset.Interface, node types.NodeName, condition v1.N
 	condition.LastHeartbeatTime = metav1.NewTime(time.Now())
 	patch, err := generatePatch(condition)
 	if err != nil {
-		return nil
+		return fmt.Errorf("failed to generate patch: %v", err)
 	}
 	_, err = c.CoreV1().Nodes().PatchStatus(string(node), patch)
 	return err
