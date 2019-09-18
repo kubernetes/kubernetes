@@ -21,6 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // Filter is a plugin that implements the filter plugin and always returns Success.
@@ -40,7 +41,7 @@ func (n Filter) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (n Filter) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (n Filter) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	return nil
 }
 
