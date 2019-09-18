@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 type FakeNodeListInfo []*v1.Node
@@ -608,6 +609,60 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 			}
 			if !reflect.DeepEqual(test.expectedList, list) {
 				t.Errorf("expected \n\t%#v, \ngot \n\t%#v\n", test.expectedList, list)
+			}
+		})
+	}
+}
+
+func BenchmarkInterPodAffinityPriority(b *testing.B) {
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		existingPodsNum int
+		allNodesNum     int
+		prepFunc        func(existingPodsNum, allNodesNum int) (existingPods []*v1.Pod, allNodes []*v1.Node)
+	}{
+		{
+			name:            "1000nodes/incoming pod without PodAffinity and existing pods without PodAffinity",
+			pod:             st.MakePod().Name("p").Label("foo", "").Obj(),
+			existingPodsNum: 10000,
+			allNodesNum:     1000,
+			prepFunc:        st.MakeNodesAndPods,
+		},
+		{
+			name:            "1000nodes/incoming pod with PodAffinity and existing pods without PodAffinity",
+			pod:             st.MakePod().Name("p").Label("foo", "").PodAffinityExists("foo", "zone", st.PodAffinityWithPreferredReq).Obj(),
+			existingPodsNum: 10000,
+			allNodesNum:     1000,
+			prepFunc:        st.MakeNodesAndPods,
+		},
+		{
+			name:            "1000nodes/incoming pod without PodAffinity and existing pods with PodAffinity",
+			pod:             st.MakePod().Name("p").Label("foo", "").Obj(),
+			existingPodsNum: 10000,
+			allNodesNum:     1000,
+			prepFunc:        st.MakeNodesAndPodsForPodAffinity,
+		},
+		{
+			name:            "1000nodes/incoming pod with PodAffinity and existing pods with PodAffinity",
+			pod:             st.MakePod().Name("p").Label("foo", "").PodAffinityExists("foo", "zone", st.PodAffinityWithPreferredReq).Obj(),
+			existingPodsNum: 10000,
+			allNodesNum:     1000,
+			prepFunc:        st.MakeNodesAndPodsForPodAffinity,
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			existingPods, allNodes := tt.prepFunc(tt.existingPodsNum, tt.allNodesNum)
+			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(existingPods, allNodes)
+			interPodAffinity := InterPodAffinity{
+				info:                  FakeNodeListInfo(allNodes),
+				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				interPodAffinity.CalculateInterPodAffinityPriority(tt.pod, nodeNameToInfo, allNodes)
 			}
 		})
 	}

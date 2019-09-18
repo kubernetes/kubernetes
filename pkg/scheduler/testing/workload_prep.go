@@ -22,15 +22,15 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-// MakeNodesAndPods serves as a testing helper for EvenPodsSpread feature.
+// MakeNodesAndPodsForEvenPodsSpread serves as a testing helper for EvenPodsSpread feature.
 // It builds a fake cluster containing running Pods and Nodes.
 // The size of Pods and Nodes are determined by input arguments.
 // The specs of Pods and Nodes are generated with the following rules:
 // - If `pod` has "node" as a topologyKey, each generated node is applied with a unique label: "node: node<i>".
 // - If `pod` has "zone" as a topologyKey, each generated node is applied with a rotating label: "zone: zone[0-9]".
-// - Depending on "lableSelector.MatchExpressions[0].Key" the `pod` has in each topologySpreadConstraint,
+// - Depending on "labelSelector.MatchExpressions[0].Key" the `pod` has in each topologySpreadConstraint,
 //   each generated pod will be applied with label "key1", "key1,key2", ..., "key1,key2,...,keyN" in a rotating manner.
-func MakeNodesAndPods(pod *v1.Pod, existingPodsNum, allNodesNum, filteredNodesNum int) (existingPods []*v1.Pod, allNodes []*v1.Node, filteredNodes []*v1.Node) {
+func MakeNodesAndPodsForEvenPodsSpread(pod *v1.Pod, existingPodsNum, allNodesNum, filteredNodesNum int) (existingPods []*v1.Pod, allNodes []*v1.Node, filteredNodes []*v1.Node) {
 	var topologyKeys []string
 	var labels []string
 	zones := 10
@@ -61,6 +61,81 @@ func MakeNodesAndPods(pod *v1.Pod, existingPodsNum, allNodesNum, filteredNodesNu
 		for _, label := range labels[:i%len(labels)+1] {
 			podWrapper = podWrapper.Label(label, "")
 		}
+		existingPods = append(existingPods, podWrapper.Obj())
+	}
+	return
+}
+
+// MakeNodesAndPodsForPodAffinity serves as a testing helper for Pod(Anti)Affinity feature.
+// It builds a fake cluster containing running Pods and Nodes.
+// For simplicity, the Nodes will be labelled with "region", "zone" and "node". Nodes[i] will be applied with:
+// - "region": "region" + i%3
+// - "zone": "zone" + i%10
+// - "node": "node" + i
+// The Pods will be applied with various combinations of PodAffinity and PodAntiAffinity terms.
+func MakeNodesAndPodsForPodAffinity(existingPodsNum, allNodesNum int) (existingPods []*v1.Pod, allNodes []*v1.Node) {
+	tpKeyToSizeMap := map[string]int{
+		"region": 3,
+		"zone":   10,
+		"node":   allNodesNum,
+	}
+	// build nodes to spread across all topology domains
+	for i := 0; i < allNodesNum; i++ {
+		nodeName := fmt.Sprintf("node%d", i)
+		nodeWrapper := MakeNode().Name(nodeName)
+		for tpKey, size := range tpKeyToSizeMap {
+			nodeWrapper = nodeWrapper.Label(tpKey, fmt.Sprintf("%s%d", tpKey, i%size))
+		}
+		allNodes = append(allNodes, nodeWrapper.Obj())
+	}
+
+	labels := []string{"foo", "bar", "baz"}
+	tpKeys := []string{"region", "zone", "node"}
+
+	// Build pods.
+	// Each pod will be created with one affinity and one anti-affinity terms using all combinations of
+	// affinity and anti-affinity kinds listed below
+	// e.g., the first pod will have {affinity, anti-affinity} terms of kinds {NilPodAffinity, NilPodAffinity};
+	// the second will be {NilPodAffinity, PodAntiAffinityWithRequiredReq}, etc.
+	affinityKinds := []PodAffinityKind{
+		NilPodAffinity,
+		PodAffinityWithRequiredReq,
+		PodAffinityWithPreferredReq,
+		PodAffinityWithRequiredPreferredReq,
+	}
+	antiAffinityKinds := []PodAffinityKind{
+		NilPodAffinity,
+		PodAntiAffinityWithRequiredReq,
+		PodAntiAffinityWithPreferredReq,
+		PodAntiAffinityWithRequiredPreferredReq,
+	}
+
+	totalSize := len(affinityKinds) * len(antiAffinityKinds)
+	for i := 0; i < existingPodsNum; i++ {
+		podWrapper := MakePod().Name(fmt.Sprintf("pod%d", i)).Node(fmt.Sprintf("node%d", i%allNodesNum))
+		label, tpKey := labels[i%len(labels)], tpKeys[i%len(tpKeys)]
+
+		affinityIdx := i % totalSize
+		// len(affinityKinds) is equal to len(antiAffinityKinds)
+		leftIdx, rightIdx := affinityIdx/len(affinityKinds), affinityIdx%len(affinityKinds)
+		podWrapper = podWrapper.PodAffinityExists(label, tpKey, affinityKinds[leftIdx])
+		podWrapper = podWrapper.PodAntiAffinityExists(label, tpKey, antiAffinityKinds[rightIdx])
+		existingPods = append(existingPods, podWrapper.Obj())
+	}
+
+	return
+}
+
+// MakeNodesAndPods serves as a testing helper to generate regular Nodes and Pods
+// that don't use any advanced scheduling features.
+func MakeNodesAndPods(existingPodsNum, allNodesNum int) (existingPods []*v1.Pod, allNodes []*v1.Node) {
+	// build nodes
+	for i := 0; i < allNodesNum; i++ {
+		allNodes = append(allNodes, MakeNode().Name(fmt.Sprintf("node%d", i)).Obj())
+	}
+	// build pods
+	for i := 0; i < existingPodsNum; i++ {
+		podWrapper := MakePod().Name(fmt.Sprintf("pod%d", i)).Node(fmt.Sprintf("node%d", i%allNodesNum))
 		existingPods = append(existingPods, podWrapper.Obj())
 	}
 	return
