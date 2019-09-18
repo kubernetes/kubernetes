@@ -18,6 +18,7 @@ package benchmark
 
 import (
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/csi-translation-lib/plugins"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
@@ -388,26 +390,30 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 		}
 		time.Sleep(1 * time.Second)
 	}
+
+	scheduled := int32(0)
+	completedCh := make(chan struct{})
+	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(old, cur interface{}) {
+			curPod := cur.(*v1.Pod)
+			oldPod := old.(*v1.Pod)
+
+			if len(oldPod.Spec.NodeName) == 0 && len(curPod.Spec.NodeName) > 0 {
+				if atomic.AddInt32(&scheduled, 1) >= int32(b.N) {
+					completedCh <- struct{}{}
+				}
+			}
+		},
+	})
+
 	// start benchmark
 	b.ResetTimer()
 	config = testutils.NewTestPodCreatorConfig()
 	config.AddStrategy("sched-test", b.N, testPodStrategy)
 	podCreator = testutils.NewTestPodCreator(clientset, config)
 	podCreator.CreatePods()
-	for {
-		// TODO: Setup watch on apiserver and wait until all pods scheduled.
-		scheduled, err := getScheduledPods(podInformer)
-		if err != nil {
-			klog.Fatalf("%v", err)
-		}
-		if len(scheduled) >= numExistingPods+b.N {
-			break
-		}
 
-		// Note: This might introduce slight deviation in accuracy of benchmark results.
-		// Since the total amount of time is relatively large, it might not be a concern.
-		time.Sleep(100 * time.Millisecond)
-	}
+	<-completedCh
 
 	// Note: without this line we're taking the overhead of defer() into account.
 	b.StopTimer()
