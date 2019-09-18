@@ -289,7 +289,7 @@ func decodeDockerConfigFieldAuth(field string) (username, password string, err e
 
 	parts := strings.SplitN(string(decoded), ":", 2)
 	if len(parts) != 2 {
-		err = fmt.Errorf("unable to parse auth field")
+		err = fmt.Errorf("unable to parse auth field. Expected auth field to be of the format username:password.")
 		return
 	}
 
