@@ -23,7 +23,6 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -54,7 +53,7 @@ type fakeObjectDefaulter struct{}
 func (d *fakeObjectDefaulter) Default(in runtime.Object) {}
 
 type TestFieldManager struct {
-	fieldManager *fieldmanager.FieldManager
+	fieldManager fieldmanager.FieldManager
 	liveObj      runtime.Object
 }
 
@@ -86,14 +85,18 @@ func (f *TestFieldManager) Reset() {
 }
 
 func (f *TestFieldManager) Apply(obj []byte, manager string, force bool) error {
-	var err error
-	f.liveObj, err = f.fieldManager.Apply(f.liveObj, obj, manager, force)
+	out, err := f.fieldManager.Apply(f.liveObj, obj, manager, force)
+	if err == nil {
+		f.liveObj = out
+	}
 	return err
 }
 
 func (f *TestFieldManager) Update(obj runtime.Object, manager string) error {
-	var err error
-	f.liveObj, err = f.fieldManager.Update(f.liveObj, obj, manager)
+	out, err := f.fieldManager.Update(f.liveObj, obj, manager)
+	if err == nil {
+		f.liveObj = out
+	}
 	return err
 }
 
@@ -104,21 +107,6 @@ func (f *TestFieldManager) ManagedFields() []metav1.ManagedFieldsEntry {
 	}
 
 	return accessor.GetManagedFields()
-}
-
-func TestUpdateOnlyDoesNotTrackManagedFields(t *testing.T) {
-	f := NewTestFieldManager()
-
-	updatedObj := &corev1.Pod{}
-	updatedObj.ObjectMeta.Labels = map[string]string{"k": "v"}
-
-	if err := f.Update(updatedObj, "fieldmanager_test"); err != nil {
-		t.Fatalf("failed to update object: %v", err)
-	}
-
-	if m := f.ManagedFields(); len(m) != 0 {
-		t.Fatalf("managedFields were tracked on update only: %v", m)
-	}
 }
 
 // TestUpdateApplyConflict tests that applying to an object, which wasn't created by apply, will give conflicts

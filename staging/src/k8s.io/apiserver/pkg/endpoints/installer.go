@@ -560,6 +560,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field manager: %v", err)
 		}
+		fm = fieldmanager.NewSkipNonAppliedManager(fm, a.group.Creater, fqKindToRegister)
 		reqScope.FieldManager = fm
 	}
 	for _, action := range actions {

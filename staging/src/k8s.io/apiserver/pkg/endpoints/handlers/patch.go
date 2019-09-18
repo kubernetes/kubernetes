@@ -296,7 +296,7 @@ type patchMechanism interface {
 type jsonPatcher struct {
 	*patcher
 
-	fieldManager *fieldmanager.FieldManager
+	fieldManager fieldmanager.FieldManager
 }
 
 func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
@@ -364,7 +364,7 @@ type smpPatcher struct {
 
 	// Schema
 	schemaReferenceObj runtime.Object
-	fieldManager       *fieldmanager.FieldManager
+	fieldManager       fieldmanager.FieldManager
 }
 
 func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
@@ -404,7 +404,7 @@ type applyPatcher struct {
 	options      *metav1.PatchOptions
 	creater      runtime.ObjectCreater
 	kind         schema.GroupVersionKind
-	fieldManager *fieldmanager.FieldManager
+	fieldManager fieldmanager.FieldManager
 }
 
 func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Object, error) {

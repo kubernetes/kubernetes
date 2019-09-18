@@ -36,7 +36,18 @@ import (
 
 // FieldManager updates the managed fields and merge applied
 // configurations.
-type FieldManager struct {
+type FieldManager interface {
+	// Update is used when the object has already been merged (non-apply
+	// use-case), and simply updates the managed fields in the output
+	// object.
+	Update(liveObj, newObj runtime.Object, manager string) (runtime.Object, error)
+
+	// Apply is used when server-side apply is called, as it merges the
+	// object and update the managed fields.
+	Apply(liveObj runtime.Object, patch []byte, fieldManager string, force bool) (runtime.Object, error)
+}
+
+type fieldManager struct {
 	typeConverter   internal.TypeConverter
 	objectConverter runtime.ObjectConvertor
 	objectDefaulter runtime.ObjectDefaulter
@@ -45,15 +56,17 @@ type FieldManager struct {
 	updater         merge.Updater
 }
 
+var _ FieldManager = &fieldManager{}
+
 // NewFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
-func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (*FieldManager, error) {
+func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (FieldManager, error) {
 	typeConverter, err := internal.NewTypeConverter(models, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return &FieldManager{
+	return &fieldManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
 		objectDefaulter: objectDefaulter,
@@ -68,7 +81,7 @@ func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectC
 // NewCRDFieldManager creates a new FieldManager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
-func NewCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preserveUnknownFields bool) (_ *FieldManager, err error) {
+func NewCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion, preserveUnknownFields bool) (_ FieldManager, err error) {
 	var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
 	if models != nil {
 		typeConverter, err = internal.NewTypeConverter(models, preserveUnknownFields)
@@ -76,7 +89,7 @@ func NewCRDFieldManager(models openapiproto.Models, objectConverter runtime.Obje
 			return nil, err
 		}
 	}
-	return &FieldManager{
+	return &fieldManager{
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
 		objectDefaulter: objectDefaulter,
@@ -88,10 +101,8 @@ func NewCRDFieldManager(models openapiproto.Models, objectConverter runtime.Obje
 	}, nil
 }
 
-// Update is used when the object has already been merged (non-apply
-// use-case), and simply updates the managed fields in the output
-// object.
-func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (runtime.Object, error) {
+// Update implements FieldManager.
+func (f *fieldManager) Update(liveObj, newObj runtime.Object, manager string) (runtime.Object, error) {
 	// If the object doesn't have metadata, we should just return without trying to
 	// set the managedFields at all, so creates/updates/patches will work normally.
 	if _, err := meta.Accessor(newObj); err != nil {
@@ -110,10 +121,6 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode managed fields: %v", err)
 		}
-	}
-	// if managed field is still empty, skip updating managed fields altogether
-	if len(managed.Fields) == 0 {
-		return newObj, nil
 	}
 	newObjVersioned, err := f.toVersioned(newObj)
 	if err != nil {
@@ -172,15 +179,13 @@ func (f *FieldManager) Update(liveObj, newObj runtime.Object, manager string) (r
 	return newObj, nil
 }
 
-// Apply is used when server-side apply is called, as it merges the
-// object and update the managed fields.
-func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager string, force bool) (runtime.Object, error) {
+// Apply implements FieldManager.
+func (f *fieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager string, force bool) (runtime.Object, error) {
 	// If the object doesn't have metadata, apply isn't allowed.
-	accessor, err := meta.Accessor(liveObj)
+	_, err := meta.Accessor(liveObj)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't get accessor: %v", err)
 	}
-	missingManagedFields := (len(accessor.GetManagedFields()) == 0)
 
 	managed, err := internal.DecodeObjectManagedFields(liveObj)
 	if err != nil {
@@ -225,23 +230,6 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager 
 	}
 
 	apiVersion := fieldpath.APIVersion(f.groupVersion.String())
-	// if managed field is missing, create a single entry for all the fields
-	if missingManagedFields {
-		unknownManager, err := internal.BuildManagerIdentifier(&metav1.ManagedFieldsEntry{
-			Manager:    "before-first-apply",
-			Operation:  metav1.ManagedFieldsOperationUpdate,
-			APIVersion: f.groupVersion.String(),
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to create manager for existing fields: %v", err)
-		}
-		unknownFieldSet, err := liveObjTyped.ToFieldSet()
-		if err != nil {
-			return nil, fmt.Errorf("failed to create fieldset for existing fields: %v", err)
-		}
-		managed.Fields[unknownManager] = fieldpath.NewVersionedSet(unknownFieldSet, apiVersion, false)
-		f.stripFields(managed.Fields, unknownManager)
-	}
 	newObjTyped, managedFields, err := f.updater.Apply(liveObjTyped, patchObjTyped, apiVersion, managed.Fields, manager, force)
 	if err != nil {
 		if conflicts, ok := err.(merge.Conflicts); ok {
@@ -276,15 +264,15 @@ func (f *FieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager 
 	return newObjUnversioned, nil
 }
 
-func (f *FieldManager) toVersioned(obj runtime.Object) (runtime.Object, error) {
+func (f *fieldManager) toVersioned(obj runtime.Object) (runtime.Object, error) {
 	return f.objectConverter.ConvertToVersion(obj, f.groupVersion)
 }
 
-func (f *FieldManager) toUnversioned(obj runtime.Object) (runtime.Object, error) {
+func (f *fieldManager) toUnversioned(obj runtime.Object) (runtime.Object, error) {
 	return f.objectConverter.ConvertToVersion(obj, f.hubVersion)
 }
 
-func (f *FieldManager) buildManagerInfo(prefix string, operation metav1.ManagedFieldsOperationType) (string, error) {
+func (f *fieldManager) buildManagerInfo(prefix string, operation metav1.ManagedFieldsOperationType) (string, error) {
 	managerInfo := metav1.ManagedFieldsEntry{
 		Manager:    prefix,
 		Operation:  operation,
@@ -313,7 +301,7 @@ var stripSet = fieldpath.NewSet(
 )
 
 // stripFields removes a predefined set of paths found in typed from managed and returns the updated ManagedFields
-func (f *FieldManager) stripFields(managed fieldpath.ManagedFields, manager string) fieldpath.ManagedFields {
+func (f *fieldManager) stripFields(managed fieldpath.ManagedFields, manager string) fieldpath.ManagedFields {
 	vs, ok := managed[manager]
 	if ok {
 		if vs == nil {
