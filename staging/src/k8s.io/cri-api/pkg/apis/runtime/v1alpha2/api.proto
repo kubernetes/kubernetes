@@ -543,6 +543,18 @@ message LinuxContainerResources {
     string cpuset_cpus = 6;
     // CpusetMems constrains the allowed set of memory nodes. Default: "" (not specified).
     string cpuset_mems = 7;
+    // List of Hugepage limit, the limit consists of pagesize and limit.
+    repeated HugepageLimit hugepage_limits = 8;
+}
+
+// HugepageLimit contains pageSize and limit.
+// `page_size=1GB`, `limit=1073741824` means setting `1073741824` bytes
+// on hugetlb.1GB.limit_in_bytes of container level cgroup.
+message HugepageLimit {
+    // hugepage size in the format <size><unit-prefix>B (2MB, 1GB)
+    string page_size = 1;
+    // hugepages limit in bytes.
+    uint64 limit = 2;
 }
 
 // SELinuxOption are the labels to be applied to the container.
