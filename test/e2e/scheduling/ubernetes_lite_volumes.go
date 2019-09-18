@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 )
 
 var _ = SIGDescribe("Multi-AZ Cluster Volumes [sig-storage]", func() {
@@ -135,7 +136,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 	for index := 1; index <= zoneCount+1; index++ {
 		pvc := newNamedDefaultClaim(ns, index)
-		pvc, err = framework.CreatePVC(c, ns, pvc)
+		pvc, err = e2epv.CreatePVC(c, ns, pvc)
 		framework.ExpectNoError(err)
 		pvcList = append(pvcList, pvc)
 
@@ -151,7 +152,7 @@ func OnlyAllowNodeZones(f *framework.Framework, zoneCount int, image string) {
 
 	// Wait for all claims bound
 	for _, claim := range pvcList {
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, c, claim.Namespace, claim.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 	}
 
@@ -203,32 +204,32 @@ func PodsUseStaticPVsOrFail(f *framework.Framework, podCount int, image string) 
 		}
 		for _, config := range configs {
 			e2epod.WaitForPodNoLongerRunningInNamespace(c, config.pod.Name, ns)
-			framework.PVPVCCleanup(c, ns, config.pv, config.pvc)
-			err = framework.DeletePVSource(config.pvSource)
+			e2epv.PVPVCCleanup(c, ns, config.pv, config.pvc)
+			err = e2epv.DeletePVSource(config.pvSource)
 			framework.ExpectNoError(err)
 		}
 	}()
 
 	for i, config := range configs {
 		zone := zonelist[i%len(zones)]
-		config.pvSource, err = framework.CreatePVSource(zone)
+		config.pvSource, err = e2epv.CreatePVSource(zone)
 		framework.ExpectNoError(err)
 
-		pvConfig := framework.PersistentVolumeConfig{
+		pvConfig := e2epv.PersistentVolumeConfig{
 			NamePrefix: "multizone-pv",
 			PVSource:   *config.pvSource,
 			Prebind:    nil,
 		}
 		className := ""
-		pvcConfig := framework.PersistentVolumeClaimConfig{StorageClassName: &className}
+		pvcConfig := e2epv.PersistentVolumeClaimConfig{StorageClassName: &className}
 
-		config.pv, config.pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
+		config.pv, config.pvc, err = e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
 		framework.ExpectNoError(err)
 	}
 
 	ginkgo.By("Waiting for all PVCs to be bound")
 	for _, config := range configs {
-		framework.WaitOnPVandPVC(c, ns, config.pv, config.pvc)
+		e2epv.WaitOnPVandPVC(c, ns, config.pv, config.pvc)
 	}
 
 	ginkgo.By("Creating pods for each static PV")

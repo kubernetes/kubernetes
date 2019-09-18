@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -156,7 +157,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")
@@ -199,7 +200,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 			}
 
 			ginkgo.By("Creating a new pod with same volume")
-			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+			l.pod2, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod2)
 				framework.ExpectNoError(err, "while cleaning up pod before exiting resizing test")
@@ -220,7 +221,7 @@ func (v *volumeExpandTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 			var err error
 			ginkgo.By("Creating a pod with dynamically provisioned volume")
-			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+			l.pod, err = e2epod.CreateSecPodWithNodeSelection(f.ClientSet, f.Namespace.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 			defer func() {
 				err = e2epod.DeletePodWithWait(f.ClientSet, l.pod)
 				framework.ExpectNoError(err, "while cleaning up pod already deleted in resize test")

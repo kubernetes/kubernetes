@@ -27,6 +27,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -337,7 +338,7 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 	node e2epod.NodeSelection, pvcs []*v1.PersistentVolumeClaim, readSeedBase int64, writeSeedBase int64) string {
 	ginkgo.By(fmt.Sprintf("Creating pod on %+v with multiple volumes", node))
 	pod, err := e2epod.CreateSecPodWithNodeSelection(cs, ns, pvcs, nil,
-		false, "", false, false, framework.SELinuxLabel,
+		false, "", false, false, e2epv.SELinuxLabel,
 		nil, node, framework.PodStartTimeout)
 	defer func() {
 		framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))
@@ -411,7 +412,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		ginkgo.By(fmt.Sprintf("Creating pod%d with a volume on %+v", index, node))
 		pod, err := e2epod.CreateSecPodWithNodeSelection(cs, ns,
 			[]*v1.PersistentVolumeClaim{pvc}, nil,
-			false, "", false, false, framework.SELinuxLabel,
+			false, "", false, false, e2epv.SELinuxLabel,
 			nil, node, framework.PodStartTimeout)
 		defer func() {
 			framework.ExpectNoError(e2epod.DeletePodWithWait(cs, pod))

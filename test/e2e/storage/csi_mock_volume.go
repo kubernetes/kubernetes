@@ -37,6 +37,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -637,7 +638,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 		framework.ExpectNoError(err, "Failed to create class : %v", err)
 	}
 
-	claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+	claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 		ClaimSize:        t.ClaimSize,
 		StorageClassName: &(class.Name),
 		VolumeMode:       &t.VolumeMode,
@@ -646,7 +647,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 	framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
 	pvcClaims := []*v1.PersistentVolumeClaim{claim}
-	_, err = framework.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
+	_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 
 	pod, err := startPausePodWithClaim(cs, claim, node, ns)

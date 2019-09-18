@@ -33,6 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -83,13 +84,13 @@ var _ = utils.SIGDescribe("Node Poweroff [Feature:vsphere] [Slow] [Disruptive]",
 
 		ginkgo.By("Creating PVC using the Storage Class")
 		pvclaimSpec := getVSphereClaimSpecWithStorageClass(namespace, "1Gi", storageclass)
-		pvclaim, err := framework.CreatePVC(client, namespace, pvclaimSpec)
+		pvclaim, err := e2epv.CreatePVC(client, namespace, pvclaimSpec)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to create PVC with err: %v", err))
-		defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+		defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 		ginkgo.By("Waiting for PVC to be in bound phase")
 		pvclaims := []*v1.PersistentVolumeClaim{pvclaim}
-		pvs, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+		pvs, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err, fmt.Sprintf("Failed to wait until PVC phase set to bound: %v", err))
 		volumePath := pvs[0].Spec.VsphereVolume.VolumePath
 

@@ -1,25 +1,24 @@
-package(default_visibility = ["//visibility:public"])
-
 load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
-    srcs = ["fixtures.go"],
-    importpath = "k8s.io/kubernetes/test/e2e/framework/volume",
+    srcs = ["pv.go"],
+    importpath = "k8s.io/kubernetes/test/e2e/framework/pv",
+    visibility = ["//visibility:public"],
     deps = [
+        "//pkg/apis/storage/v1/util:go_default_library",
+        "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
-        "//test/e2e/framework/pv:go_default_library",
-        "//test/e2e/storage/utils:go_default_library",
-        "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/github.com/onsi/gomega:go_default_library",
     ],
 )
 
@@ -34,4 +33,5 @@ filegroup(
     name = "all-srcs",
     srcs = [":package-srcs"],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )

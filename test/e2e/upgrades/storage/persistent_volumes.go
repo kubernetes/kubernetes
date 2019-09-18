@@ -22,6 +22,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 
 	"github.com/onsi/ginkgo"
 	"k8s.io/kubernetes/test/e2e/upgrades"
@@ -51,11 +52,11 @@ func (t *PersistentVolumeUpgradeTest) Setup(f *framework.Framework) {
 	ns := f.Namespace.Name
 
 	ginkgo.By("Creating a PVC")
-	pvcConfig := framework.PersistentVolumeClaimConfig{
+	pvcConfig := e2epv.PersistentVolumeClaimConfig{
 		StorageClassName: nil,
 	}
-	t.pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns)
-	t.pvc, err = framework.CreatePVC(f.ClientSet, ns, t.pvc)
+	t.pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, ns)
+	t.pvc, err = e2epv.CreatePVC(f.ClientSet, ns, t.pvc)
 	framework.ExpectNoError(err)
 
 	ginkgo.By("Consuming the PV before upgrade")
@@ -72,7 +73,7 @@ func (t *PersistentVolumeUpgradeTest) Test(f *framework.Framework, done <-chan s
 
 // Teardown cleans up any remaining resources.
 func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
-	errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, nil, t.pvc)
+	errs := e2epv.PVPVCCleanup(f.ClientSet, f.Namespace.Name, nil, t.pvc)
 	if len(errs) > 0 {
 		e2elog.Failf("Failed to delete 1 or more PVs/PVCs. Errors: %v", utilerrors.NewAggregate(errs))
 	}

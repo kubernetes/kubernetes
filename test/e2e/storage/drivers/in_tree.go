@@ -56,6 +56,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -1255,7 +1256,7 @@ func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 		}
 	}
 	ginkgo.By("creating a test gce pd volume")
-	vname, err := framework.CreatePDWithRetry()
+	vname, err := e2epv.CreatePDWithRetry()
 	framework.ExpectNoError(err)
 	return &gcePdVolume{
 		volumeName: vname,
@@ -1263,7 +1264,7 @@ func (g *gcePdDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 }
 
 func (v *gcePdVolume) DeleteVolume() {
-	framework.DeletePDWithRetry(v.volumeName)
+	e2epv.DeletePDWithRetry(v.volumeName)
 }
 
 // vSphere
@@ -1513,7 +1514,7 @@ func (a *azureDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 			v1.LabelZoneFailureDomain: framework.TestContext.CloudConfig.Zone,
 		}
 	}
-	volumeName, err := framework.CreatePDWithRetry()
+	volumeName, err := e2epv.CreatePDWithRetry()
 	framework.ExpectNoError(err)
 	return &azureVolume{
 		volumeName: volumeName,
@@ -1521,7 +1522,7 @@ func (a *azureDriver) CreateVolume(config *testsuites.PerTestConfig, volType tes
 }
 
 func (v *azureVolume) DeleteVolume() {
-	framework.DeletePDWithRetry(v.volumeName)
+	e2epv.DeletePDWithRetry(v.volumeName)
 }
 
 // AWS
@@ -1650,7 +1651,7 @@ func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 		}
 	}
 	ginkgo.By("creating a test aws volume")
-	vname, err := framework.CreatePDWithRetry()
+	vname, err := e2epv.CreatePDWithRetry()
 	framework.ExpectNoError(err)
 	return &awsVolume{
 		volumeName: vname,
@@ -1658,7 +1659,7 @@ func (a *awsDriver) CreateVolume(config *testsuites.PerTestConfig, volType testp
 }
 
 func (v *awsVolume) DeleteVolume() {
-	framework.DeletePDWithRetry(v.volumeName)
+	e2epv.DeletePDWithRetry(v.volumeName)
 }
 
 // local

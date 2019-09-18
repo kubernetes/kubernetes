@@ -27,6 +27,7 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -49,11 +50,11 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 
 		ginkgo.By("Creating a PVC")
 		prefix := "pvc-protection"
-		framework.SkipIfNoDefaultStorageClass(client)
+		e2epv.SkipIfNoDefaultStorageClass(client)
 		t := testsuites.StorageClassTest{
 			ClaimSize: "1Gi",
 		}
-		pvc = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			NamePrefix: prefix,
 			ClaimSize:  t.ClaimSize,
 			VolumeMode: &t.VolumeMode,
@@ -68,7 +69,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 		framework.ExpectNoError(err, "While creating pod that uses the PVC or waiting for the Pod to become Running")
 
 		ginkgo.By("Waiting for PVC to become Bound")
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, framework.ClaimBindingTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, e2epv.ClaimBindingTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 
 		ginkgo.By("Checking that PVC Protection finalizer is set")
@@ -79,7 +80,7 @@ var _ = utils.SIGDescribe("PVC Protection", func() {
 
 	ginkgo.AfterEach(func() {
 		if pvcCreatedAndNotDeleted {
-			framework.DeletePersistentVolumeClaim(client, pvc.Name, nameSpace)
+			e2epv.DeletePersistentVolumeClaim(client, pvc.Name, nameSpace)
 		}
 	})
 

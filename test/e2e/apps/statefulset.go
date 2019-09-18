@@ -35,6 +35,7 @@ import (
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -97,7 +98,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should provide basic identity", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			framework.SkipIfNoDefaultStorageClass(c)
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 3
 			e2esset.PauseNewPods(ss)
 
@@ -136,7 +137,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should adopt matching orphans and release non-matching pods", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			framework.SkipIfNoDefaultStorageClass(c)
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 1
 			e2esset.PauseNewPods(ss)
 
@@ -221,7 +222,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should not deadlock when a pod's predecessor fails", func() {
 			ginkgo.By("Creating statefulset " + ssName + " in namespace " + ns)
-			framework.SkipIfNoDefaultStorageClass(c)
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 2
 			e2esset.PauseNewPods(ss)
 
@@ -257,7 +258,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 		// StorageClass and a dynamic provisioner.
 		ginkgo.It("should perform rolling updates and roll backs of template modifications with PVCs", func() {
 			ginkgo.By("Creating a new StatefulSet with PVCs")
-			framework.SkipIfNoDefaultStorageClass(c)
+			e2epv.SkipIfNoDefaultStorageClass(c)
 			*(ss.Spec.Replicas) = 3
 			rollbackTest(c, ns, ss)
 		})
