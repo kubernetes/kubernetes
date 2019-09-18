@@ -403,7 +403,7 @@ func NewNodeLifecycleController(
 		},
 	})
 	nc.podInformerSynced = podInformer.Informer().HasSynced
-	podInformer.Informer().AddIndexers(cache.Indexers{
+	err := podInformer.Informer().AddIndexers(cache.Indexers{
 		nodeNameKeyIndex: func(obj interface{}) ([]string, error) {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
@@ -415,6 +415,9 @@ func NewNodeLifecycleController(
 			return []string{pod.Spec.NodeName}, nil
 		},
 	})
+	if err != nil {
+		klog.Warningf("adding indexer got %v", err)
+	}
 
 	podIndexer := podInformer.Informer().GetIndexer()
 	nc.getPodsAssignedToNode = func(nodeName string) ([]v1.Pod, error) {
