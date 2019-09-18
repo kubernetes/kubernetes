@@ -76,7 +76,7 @@ func NewCreateCronJobOptions(ioStreams genericclioptions.IOStreams) *CreateCronJ
 	}
 }
 
-// NewCmdCreateCronJob is a command to to create CronJobs.
+// NewCmdCreateCronJob is a command to create CronJobs.
 func NewCmdCreateCronJob(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
 	o := NewCreateCronJobOptions(ioStreams)
 	cmd := &cobra.Command{

@@ -1482,13 +1482,13 @@ type TopologyRequirement struct {
 	// If requisite is specified, all topologies in preferred list MUST
 	// also be present in the list of requisite topologies.
 	//
-	// If the SP is unable to to make the provisioned volume available
+	// If the SP is unable to make the provisioned volume available
 	// from any of the preferred topologies, the SP MAY choose a topology
 	// from the list of requisite topologies.
 	// If the list of requisite topologies is not specified, then the SP
 	// MAY choose from the list of all possible topologies.
 	// If the list of requisite topologies is specified and the SP is
-	// unable to to make the provisioned volume available from any of the
+	// unable to make the provisioned volume available from any of the
 	// requisite topologies it MUST fail the CreateVolume call.
 	//
 	// Example 1:
