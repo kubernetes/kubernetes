@@ -210,6 +210,12 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 	if err != nil {
 		return err
 	}
+	// For kubectl get events Added default sorting by lastTimestamp
+	if sortBy == "" {
+		if len(args) == 1 && args[0] == "events" {
+			sortBy = ".lastTimestamp"
+		}
+	}
 	o.Sort = len(sortBy) > 0
 
 	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
@@ -504,6 +510,13 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	sorting, err := cmd.Flags().GetString("sort-by")
 	if err != nil {
 		return err
+	}
+
+	// For kubectl get events Added default sorting by .lastTimestamp
+	if sorting == "" {
+		if len(args) == 1 && args[0] == "events" {
+			sorting = ".lastTimestamp"
+		}
 	}
 
 	var positioner OriginalPositioner
