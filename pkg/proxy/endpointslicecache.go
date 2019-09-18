@@ -368,7 +368,7 @@ func (e byIP) Swap(i, j int) {
 	e[i], e[j] = e[j], e[i]
 }
 func (e byIP) Less(i, j int) bool {
-	return e[i].IP() < e[j].IP()
+	return e[i].String() < e[j].String()
 }
 
 // byPort helps sort EndpointSlice ports by port number

@@ -100,8 +100,8 @@ func TestEndpointsMapFromESC(t *testing.T) {
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
 				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
-					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.10:80"},
+					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.4:80"},
