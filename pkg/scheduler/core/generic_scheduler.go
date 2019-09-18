@@ -144,6 +144,9 @@ type ScheduleAlgorithm interface {
 	// Prioritizers returns a slice of priority config. This is exposed for
 	// testing.
 	Prioritizers() []priorities.PriorityConfig
+	// Extenders returns a slice of extender config. This is exposed for
+	// testing.
+	Extenders() []algorithm.SchedulerExtender
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -278,6 +281,10 @@ func (g *genericScheduler) Prioritizers() []priorities.PriorityConfig {
 // functions. It is exposed for testing only.
 func (g *genericScheduler) Predicates() map[string]predicates.FitPredicate {
 	return g.predicates
+}
+
+func (g *genericScheduler) Extenders() []algorithm.SchedulerExtender {
+	return g.extenders
 }
 
 // selectHost takes a prioritized list of nodes and then picks one

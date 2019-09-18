@@ -18,7 +18,6 @@ package compatibility
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -34,6 +33,7 @@ import (
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 )
@@ -1196,7 +1196,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			},
 		},
 	}
-
 	registeredPredicates := sets.NewString(factory.ListRegisteredFitPredicates()...)
 	registeredPriorities := sets.NewString(factory.ListRegisteredPriorityFunctions()...)
 	seenPredicates := sets.NewString()
@@ -1210,20 +1209,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			t.Errorf("%s: Error decoding: %v", v, err)
 			continue
 		}
-		for _, predicate := range policy.Predicates {
-			seenPredicates.Insert(predicate.Name)
-		}
-		for _, priority := range policy.Priorities {
-			seenPriorities.Insert(priority.Name)
-		}
-		if !reflect.DeepEqual(policy, tc.ExpectedPolicy) {
-			t.Errorf("%s: Expected:\n\t%#v\nGot:\n\t%#v", v, tc.ExpectedPolicy, policy)
-		}
 		policyConfigMap := v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "scheduler-custom-policy-config"},
 			Data:       map[string]string{schedulerconfig.SchedulerPolicyConfigMapKey: tc.JSON},
 		}
-		policyConfigMap.APIVersion = "v1"
 		client := fake.NewSimpleClientset(&policyConfigMap)
 		algorithmSrc := schedulerconfig.SchedulerAlgorithmSource{
 			Policy: &schedulerconfig.SchedulerPolicySource{
@@ -1235,7 +1224,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}
 		informerFactory := informers.NewSharedInformerFactory(client, 0)
 
-		if _, err := scheduler.New(
+		sched, err := scheduler.New(
 			client,
 			informerFactory.Core().V1().Nodes(),
 			informerFactory.Core().V1().Pods(),
@@ -1254,9 +1243,49 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			schedulerframework.NewDefaultRegistry(),
 			nil,
 			[]kubeschedulerconfig.PluginConfig{},
-		); err != nil {
+		)
+		if err != nil {
 			t.Errorf("%s: Error constructing: %v", v, err)
 			continue
+		}
+		schedPredicates := sets.NewString()
+		for p := range sched.Algorithm.Predicates() {
+			schedPredicates.Insert(p)
+		}
+		wantPredicates := sets.NewString()
+		wantPredicates.Insert("CheckNodeCondition") // mandatory predicate
+		for _, p := range tc.ExpectedPolicy.Predicates {
+			wantPredicates.Insert(p.Name)
+			seenPredicates.Insert(p.Name)
+		}
+		if !schedPredicates.Equal(wantPredicates) {
+			t.Errorf("Expected predicates %v, got %v", wantPredicates, schedPredicates)
+		}
+		schedPrioritizers := sets.NewString()
+		for _, p := range sched.Algorithm.Prioritizers() {
+			schedPrioritizers.Insert(p.Name)
+			seenPriorities.Insert(p.Name)
+		}
+		wantPrioritizers := sets.NewString()
+		for _, p := range tc.ExpectedPolicy.Priorities {
+			wantPrioritizers.Insert(p.Name)
+		}
+		if !schedPrioritizers.Equal(wantPrioritizers) {
+			t.Errorf("Expected prioritizers %v, got %v", wantPrioritizers, schedPrioritizers)
+		}
+		schedExtenders := sched.Algorithm.Extenders()
+		var wantExtenders []*core.HTTPExtender
+		for _, e := range tc.ExpectedPolicy.ExtenderConfigs {
+			extender, err := core.NewHTTPExtender(&e)
+			if err != nil {
+				t.Errorf("Error transforming extender: %+v", e)
+			}
+			wantExtenders = append(wantExtenders, extender.(*core.HTTPExtender))
+		}
+		for i := range schedExtenders {
+			if !core.Equal(wantExtenders[i], schedExtenders[i].(*core.HTTPExtender)) {
+				t.Errorf("Got extender #%d %+v, want %+v", i, schedExtenders[i], wantExtenders[i])
+			}
 		}
 	}
 

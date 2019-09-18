@@ -10,6 +10,7 @@ go_test(
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/api/latest:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//pkg/scheduler/framework/plugins:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
