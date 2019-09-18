@@ -18,12 +18,15 @@ package node
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -416,10 +419,6 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 	*/
 	framework.ConformanceIt("evicts pods with minTolerationSeconds [Disruptive]", func() {
 		podGroup := "taint-eviction-b"
-		observedDeletions := make(chan string, 100)
-		stopCh := make(chan struct{})
-		createTestController(cs, observedDeletions, stopCh, podGroup, ns)
-
 		// 1. Run two pods both with toleration; one with tolerationSeconds=5, the other with 25
 		pod1 := createPodForTaintsTest(true, additionalWaitPerDeleteSeconds, podGroup+"1", podGroup, ns)
 		pod2 := createPodForTaintsTest(true, 5*additionalWaitPerDeleteSeconds, podGroup+"2", podGroup, ns)
@@ -451,19 +450,23 @@ var _ = SIGDescribe("NoExecuteTaintManager Multiple Pods [Serial]", func() {
 		framework.ExpectNodeHasTaint(cs, nodeName, &testTaint)
 		defer e2enode.RemoveTaintOffNode(cs, nodeName, testTaint)
 
-		// 3. Wait to see if both pods get evicted in between [5, 25] seconds
-		ginkgo.By("Waiting for Pod1 and Pod2 to be deleted")
-		timeoutChannel := time.NewTimer(time.Duration(kubeletPodDeletionDelaySeconds+3*additionalWaitPerDeleteSeconds) * time.Second).C
-		var evicted int
-		for evicted != 2 {
-			select {
-			case <-timeoutChannel:
-				framework.Failf("Failed to evict all Pods. %d pod(s) is not evicted.", 2-evicted)
-				return
-			case podName := <-observedDeletions:
-				framework.Logf("Noticed Pod %q gets evicted.", podName)
-				evicted++
+		wait.PollImmediate(1*time.Second, (kubeletPodDeletionDelaySeconds+14*additionalWaitPerDeleteSeconds)*time.Second, func() (bool, error) {
+			deleted := 0
+			for i := 1; i < 3; i++ {
+				_, err := cs.CoreV1().Pods(ns).Get(fmt.Sprintf("%s%d", podGroup, i), metav1.GetOptions{})
+				if err == nil {
+					return false, nil
+				}
+				if apierrors.IsNotFound(err) {
+					deleted++
+				} else {
+					return false, err
+				}
 			}
-		}
+			if deleted == 2 {
+				return true, nil
+			}
+			return false, nil
+		})
 	})
 })
