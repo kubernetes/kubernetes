@@ -19,7 +19,6 @@ package token
 import (
 	"bytes"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/pkg/errors"
@@ -187,40 +186,33 @@ func buildSecureBootstrapKubeConfig(endpoint string, caCert []byte, clustername 
 
 // fetchKubeConfigWithTimeout tries to run fetchKubeConfigFunc on every DiscoveryRetryInterval, but until discoveryTimeout is reached
 func fetchKubeConfigWithTimeout(apiEndpoint string, discoveryTimeout time.Duration, fetchKubeConfigFunc func(string) (*clientcmdapi.Config, error)) (*clientcmdapi.Config, error) {
-	stopChan := make(chan struct{})
+	var configChan = make(chan *clientcmdapi.Config)
 	var resultingKubeConfig *clientcmdapi.Config
-	var once sync.Once
-	var wg sync.WaitGroup
 
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		wait.Until(func() {
+		for {
 			klog.V(1).Infof("[discovery] Trying to connect to API Server %q\n", apiEndpoint)
 			cfg, err := fetchKubeConfigFunc(apiEndpoint)
 			if err != nil {
 				klog.V(1).Infof("[discovery] Failed to connect to API Server %q: %v\n", apiEndpoint, err)
+			} else {
+				klog.V(1).Infof("[discovery] Successfully established connection with API Server %q\n", apiEndpoint)
+				configChan <- cfg
 				return
 			}
-			klog.V(1).Infof("[discovery] Successfully established connection with API Server %q\n", apiEndpoint)
-			once.Do(func() {
-				resultingKubeConfig = cfg
-				close(stopChan)
-			})
-		}, constants.DiscoveryRetryInterval, stopChan)
+			select {
+			case <-time.After(constants.DiscoveryRetryInterval):
+				continue
+			}
+		}
 	}()
 
 	select {
 	case <-time.After(discoveryTimeout):
-		once.Do(func() {
-			close(stopChan)
-		})
 		err := errors.Errorf("abort connecting to API servers after timeout of %v", discoveryTimeout)
 		klog.V(1).Infof("[discovery] %v\n", err)
-		wg.Wait()
 		return nil, err
-	case <-stopChan:
-		wg.Wait()
+	case resultingKubeConfig = <-configChan:
 		return resultingKubeConfig, nil
 	}
 }
