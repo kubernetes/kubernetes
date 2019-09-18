@@ -10812,6 +10812,9 @@ func TestValidateReplicationController(t *testing.T) {
 }
 
 func TestValidateNode(t *testing.T) {
+	opts := NodeValidationOptions{
+		ValidateSingleHugePageResource: true,
+	}
 	validSelector := map[string]string{"a": "b"}
 	invalidSelector := map[string]string{"NoUppercaseOrSpecialCharsLike=Equals": "b"}
 	successCases := []core.Node{
@@ -10918,7 +10921,7 @@ func TestValidateNode(t *testing.T) {
 		},
 	}
 	for _, successCase := range successCases {
-		if errs := ValidateNode(&successCase); len(errs) != 0 {
+		if errs := ValidateNode(&successCase, opts); len(errs) != 0 {
 			t.Errorf("expected success: %v", errs)
 		}
 	}
@@ -11142,7 +11145,7 @@ func TestValidateNode(t *testing.T) {
 		},
 	}
 	for k, v := range errorCases {
-		errs := ValidateNode(&v)
+		errs := ValidateNode(&v, opts)
 		if len(errs) == 0 {
 			t.Errorf("expected failure for %s", k)
 		}
@@ -11169,7 +11172,134 @@ func TestValidateNode(t *testing.T) {
 	}
 }
 
+func TestNodeValidationOptions(t *testing.T) {
+	updateTests := []struct {
+		oldNode core.Node
+		node    core.Node
+		opts    NodeValidationOptions
+		valid   bool
+	}{
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("0"),
+				},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, NodeValidationOptions{ValidateSingleHugePageResource: true}, false},
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("1Gi"),
+				},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("1Gi"),
+				},
+			},
+		}, NodeValidationOptions{ValidateSingleHugePageResource: true}, false},
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "not-validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("0"),
+				},
+			},
+		}, core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "not-validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, NodeValidationOptions{ValidateSingleHugePageResource: false}, true},
+	}
+	for i, test := range updateTests {
+		test.oldNode.ObjectMeta.ResourceVersion = "1"
+		test.node.ObjectMeta.ResourceVersion = "1"
+		errs := ValidateNodeUpdate(&test.node, &test.oldNode, test.opts)
+		if test.valid && len(errs) > 0 {
+			t.Errorf("%d: Unexpected error: %v", i, errs)
+			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
+		}
+		if !test.valid && len(errs) == 0 {
+			t.Errorf("%d: Unexpected non-error", i)
+			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
+		}
+	}
+	nodeTests := []struct {
+		node  core.Node
+		opts  NodeValidationOptions
+		valid bool
+	}{
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"): resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"): resource.MustParse("2Gi"),
+				},
+			},
+		}, NodeValidationOptions{ValidateSingleHugePageResource: true}, false},
+		{core.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "not-validate-single-hugepages",
+			},
+			Status: core.NodeStatus{
+				Capacity: core.ResourceList{
+					core.ResourceName("hugepages-2Mi"):  resource.MustParse("1Gi"),
+					core.ResourceName("hugepages-1Gi"):  resource.MustParse("2Gi"),
+					core.ResourceName("hugepages-64Ki"): resource.MustParse("2Gi"),
+				},
+			},
+		}, NodeValidationOptions{ValidateSingleHugePageResource: false}, true},
+	}
+	for i, test := range nodeTests {
+		test.node.ObjectMeta.ResourceVersion = "1"
+		errs := ValidateNode(&test.node, test.opts)
+		if test.valid && len(errs) > 0 {
+			t.Errorf("%d: Unexpected error: %v", i, errs)
+		}
+		if !test.valid && len(errs) == 0 {
+			t.Errorf("%d: Unexpected non-error", i)
+		}
+	}
+}
 func TestValidateNodeUpdate(t *testing.T) {
+	opts := NodeValidationOptions{
+		ValidateSingleHugePageResource: true,
+	}
 	tests := []struct {
 		oldNode core.Node
 		node    core.Node
@@ -11593,7 +11723,7 @@ func TestValidateNodeUpdate(t *testing.T) {
 	for i, test := range tests {
 		test.oldNode.ObjectMeta.ResourceVersion = "1"
 		test.node.ObjectMeta.ResourceVersion = "1"
-		errs := ValidateNodeUpdate(&test.node, &test.oldNode)
+		errs := ValidateNodeUpdate(&test.node, &test.oldNode, opts)
 		if test.valid && len(errs) > 0 {
 			t.Errorf("%d: Unexpected error: %v", i, errs)
 			t.Logf("%#v vs %#v", test.oldNode.ObjectMeta, test.node.ObjectMeta)
@@ -14779,6 +14909,9 @@ func makeNode(nodeName string, podCIDRs []string) core.Node {
 	}
 }
 func TestValidateNodeCIDRs(t *testing.T) {
+	opts := NodeValidationOptions{
+		ValidateSingleHugePageResource: true,
+	}
 	testCases := []struct {
 		expectError bool
 		node        core.Node
@@ -14839,7 +14972,7 @@ func TestValidateNodeCIDRs(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		errs := ValidateNode(&testCase.node)
+		errs := ValidateNode(&testCase.node, opts)
 		if len(errs) == 0 && testCase.expectError {
 			t.Errorf("expected failure for %s, but there were none", testCase.node.Name)
 			return
