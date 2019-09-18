@@ -124,7 +124,10 @@ func (f *PrintFlags) AddFlags(cmd *cobra.Command) {
 	f.TemplatePrinterFlags.AddFlags(cmd)
 
 	if f.OutputFormat != nil {
-		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(f.AllowedFormats(), "|")))
+		allowedFormats := f.AllowedFormats()
+		// sort formats for deterministic console output
+		sort.Strings(allowedFormats)
+		cmd.Flags().StringVarP(f.OutputFormat, "output", "o", *f.OutputFormat, fmt.Sprintf("Output format. One of: %s.", strings.Join(allowedFormats, "|")))
 		if f.OutputFlagSpecified == nil {
 			f.OutputFlagSpecified = func() bool {
 				return cmd.Flag("output").Changed
