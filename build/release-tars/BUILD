@@ -86,6 +86,7 @@ filegroup(
     srcs = [
         ":all-licenses-files",
         ":kubernetes-src.tar.gz",
+        "//:LICENSE",
     ],
     visibility = ["//visibility:private"],
 )
@@ -304,6 +305,7 @@ pkg_tar(
     name = "kubernetes",
     srcs = [
         ":all-licenses-files",
+        "//:LICENSE",
         "//:README.md",
         "//:version",
         "//cluster:all-srcs",
