@@ -823,18 +823,18 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 			reqScope := *requestScopes[v.Name]
-			fm, err := fieldmanager.NewCRDFieldManager(
+			reqScope.FieldManager, err = fieldmanager.NewDefaultCRDFieldManager(
 				openAPIModels,
 				reqScope.Convertor,
 				reqScope.Defaulter,
-				reqScope.Kind.GroupVersion(),
+				reqScope.Creater,
+				reqScope.Kind,
 				reqScope.HubGroupVersion,
 				*crd.Spec.PreserveUnknownFields,
 			)
 			if err != nil {
 				return nil, err
 			}
-			reqScope.FieldManager = fieldmanager.NewSkipNonAppliedManager(fm, reqScope.Creater, reqScope.Kind)
 			requestScopes[v.Name] = &reqScope
 		}
 

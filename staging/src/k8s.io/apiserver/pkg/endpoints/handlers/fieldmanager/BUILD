@@ -3,8 +3,11 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "buildmanagerinfo.go",
         "fieldmanager.go",
         "skipnonapplied.go",
+        "stripmeta.go",
+        "structuredmerge.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager",
     importpath = "k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager",
