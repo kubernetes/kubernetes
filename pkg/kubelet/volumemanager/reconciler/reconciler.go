@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/nestedpendingoperations/exponentialbackoff"
 	volumepkg "k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	utilpath "k8s.io/utils/path"

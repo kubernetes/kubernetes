@@ -19,11 +19,7 @@ go_library(
         "//pkg/util/nestedpendingoperations/exponentialbackoff:go_default_library",
         "//pkg/volume:go_default_library",
         "//pkg/volume/util:go_default_library",
-<<<<<<< HEAD
         "//pkg/volume/util/hostutil:go_default_library",
-        "//pkg/volume/util/nestedpendingoperations:go_default_library",
-=======
->>>>>>> Combine nestedpendingoperations and goroutinemap
         "//pkg/volume/util/operationexecutor:go_default_library",
         "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

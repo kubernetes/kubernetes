@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
-	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/util/nestedpendingoperations"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
