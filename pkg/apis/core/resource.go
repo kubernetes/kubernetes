@@ -20,35 +20,35 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
-func (self ResourceName) String() string {
-	return string(self)
+func (rn ResourceName) String() string {
+	return string(rn)
 }
 
 // Returns the CPU limit if specified.
-func (self *ResourceList) Cpu() *resource.Quantity {
-	if val, ok := (*self)[ResourceCPU]; ok {
+func (rl *ResourceList) Cpu() *resource.Quantity {
+	if val, ok := (*rl)[ResourceCPU]; ok {
 		return &val
 	}
 	return &resource.Quantity{Format: resource.DecimalSI}
 }
 
 // Returns the Memory limit if specified.
-func (self *ResourceList) Memory() *resource.Quantity {
-	if val, ok := (*self)[ResourceMemory]; ok {
+func (rl *ResourceList) Memory() *resource.Quantity {
+	if val, ok := (*rl)[ResourceMemory]; ok {
 		return &val
 	}
 	return &resource.Quantity{Format: resource.BinarySI}
 }
 
-func (self *ResourceList) Pods() *resource.Quantity {
-	if val, ok := (*self)[ResourcePods]; ok {
+func (rl *ResourceList) Pods() *resource.Quantity {
+	if val, ok := (*rl)[ResourcePods]; ok {
 		return &val
 	}
 	return &resource.Quantity{}
 }
 
-func (self *ResourceList) StorageEphemeral() *resource.Quantity {
-	if val, ok := (*self)[ResourceEphemeralStorage]; ok {
+func (rl *ResourceList) StorageEphemeral() *resource.Quantity {
+	if val, ok := (*rl)[ResourceEphemeralStorage]; ok {
 		return &val
 	}
 	return &resource.Quantity{}
