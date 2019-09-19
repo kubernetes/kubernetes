@@ -146,7 +146,8 @@
 				"github.com/shurcooL/sanitized_anchor_name",
 				"github.com/spf13/cobra",
 				"github.com/spf13/pflag",
-				"github.com/vishvananda/netlink"
+				"github.com/vishvananda/netlink",
+				"github.com/google/go-cmp/cmp"
 			]
 		},
 		{
