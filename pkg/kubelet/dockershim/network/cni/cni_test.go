@@ -228,8 +228,8 @@ func TestCNIPlugin(t *testing.T) {
 	cniPlugin.execer = fexec
 	cniPlugin.loNetwork.CNIConfig = mockLoCNI
 
-	mockLoCNI.On("AddNetworkList", mock.AnythingOfType("*context.emptyCtx"), cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(&types020.Result{IP4: &types020.IPConfig{IP: net.IPNet{IP: []byte{127, 0, 0, 1}}}}, nil)
-	mockLoCNI.On("DelNetworkList", mock.AnythingOfType("*context.emptyCtx"), cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
+	mockLoCNI.On("AddNetworkList", mock.AnythingOfType("*context.timerCtx"), cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(&types020.Result{IP4: &types020.IPConfig{IP: net.IPNet{IP: []byte{127, 0, 0, 1}}}}, nil)
+	mockLoCNI.On("DelNetworkList", mock.AnythingOfType("*context.timerCtx"), cniPlugin.loNetwork.NetworkConfig, mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 
 	// Check that status returns an error
 	if err := cniPlugin.Status(); err == nil {
