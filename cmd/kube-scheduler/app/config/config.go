@@ -26,7 +26,6 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection"
-	"k8s.io/client-go/tools/record"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -51,7 +50,7 @@ type Config struct {
 
 	// TODO: Remove the following after fully migrating to the new events api.
 	CoreEventClient           v1core.EventsGetter
-	LeaderElectionBroadcaster record.EventBroadcaster
+	LeaderElectionBroadcaster events.EventBroadcaster
 
 	Recorder    events.EventRecorder
 	Broadcaster events.EventBroadcaster

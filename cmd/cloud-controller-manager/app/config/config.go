@@ -21,7 +21,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ccmconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -49,7 +49,7 @@ type Config struct {
 	Kubeconfig *restclient.Config
 
 	// the event sink
-	EventRecorder record.EventRecorder
+	EventRecorder events.EventRecorder
 
 	// ClientBuilder will provide a client for this controller to use
 	ClientBuilder controller.ControllerClientBuilder
