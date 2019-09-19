@@ -2338,11 +2338,6 @@ message NodeSpec {
   // The DynamicKubeletConfig feature gate must be enabled for the Kubelet to use this field
   // +optional
   optional NodeConfigSource configSource = 6;
-
-  // Deprecated. Not all kubelets will set this field. Remove field after 1.13.
-  // see: https://issues.k8s.io/61966
-  // +optional
-  optional string externalID = 2;
 }
 
 // NodeStatus is information about the current status of a node.
