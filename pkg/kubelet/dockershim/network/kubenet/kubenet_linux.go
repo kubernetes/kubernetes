@@ -690,8 +690,11 @@ func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.Network
 	}
 
 	klog.V(3).Infof("Adding %s/%s to '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
-
-	res, err := plugin.cniConfig.AddNetwork(context.TODO(), config, rt)
+	// Because the default remote runtime request timeout is 4 min,so set slightly less than 240 seconds
+	// Todo get the timeout from parent ctx
+	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
+	defer cancelFunc()
+	res, err := plugin.cniConfig.AddNetwork(cniTimeoutCtx, config, rt)
 	if err != nil {
 		return nil, fmt.Errorf("error adding container to network: %v", err)
 	}
@@ -705,7 +708,11 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 	}
 
 	klog.V(3).Infof("Removing %s/%s from '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
-	err = plugin.cniConfig.DelNetwork(context.TODO(), config, rt)
+	// Because the default remote runtime request timeout is 4 min,so set slightly less than 240 seconds
+	// Todo get the timeout from parent ctx
+	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
+	defer cancelFunc()
+	err = plugin.cniConfig.DelNetwork(cniTimeoutCtx, config, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {

@@ -172,7 +172,7 @@ func TestTeardownCallsShaper(t *testing.T) {
 	kubenet.bandwidthShaper = fshaper
 	kubenet.hostportSyncer = hostporttest.NewFakeHostportSyncer()
 
-	mockcni.On("DelNetwork", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
+	mockcni.On("DelNetwork", mock.AnythingOfType("*context.timerCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 
 	details := make(map[string]interface{})
 	details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = "10.0.0.1/24"
@@ -301,7 +301,7 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 		existingContainerID := kubecontainer.BuildContainerID("docker", "123")
 		kubenet.podIPs[existingContainerID] = utilsets.NewString(tc.ip)
 
-		mockcni.On("DelNetwork", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
+		mockcni.On("DelNetwork", mock.AnythingOfType("*context.timerCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 
 		if err := kubenet.TearDownPod("namespace", "name", existingContainerID); err != nil {
 			t.Fatalf("Unexpected error in TearDownPod: %v", err)
