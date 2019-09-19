@@ -675,7 +675,7 @@ func (g *genericScheduler) podFitsOnNode(
 			}
 		}
 
-		status = g.framework.RunFilterPlugins(pluginContext, pod, info.Node().Name)
+		status = g.framework.RunFilterPlugins(pluginContext, pod, nodeInfoToUse)
 		if !status.IsSuccess() && !status.IsUnschedulable() {
 			return false, failedPredicates, status, status.AsError()
 		}

@@ -160,10 +160,10 @@ func (fp *FakeFilterPlugin) reset() {
 
 // Filter is a test function that returns an error or nil, depending on the
 // value of "failedNodeReturnCodeMap".
-func (fp *FakeFilterPlugin) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (fp *FakeFilterPlugin) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	atomic.AddInt32(&fp.numFilterCalled, 1)
 
-	if returnCode, ok := fp.failedNodeReturnCodeMap[nodeName]; ok {
+	if returnCode, ok := fp.failedNodeReturnCodeMap[nodeInfo.Node().Name]; ok {
 		return framework.NewStatus(returnCode, fmt.Sprintf("injecting failure for pod %v", pod.Name))
 	}
 
