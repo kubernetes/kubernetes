@@ -68,6 +68,23 @@ type Reflector struct {
 	// WatchListPageSize is the requested chunk size of initial and resync watch lists.
 	// Defaults to pager.PageSize.
 	WatchListPageSize int64
+
+	// MinimumResourceVersion sets the earliest allowed change a reflector's initial list and watch may start from.
+	// - if "0", then the reflector's initial list and watch may start from an arbitrarily old change
+	// - if non-zero, then the reflector's initial list and watch may start at any change that is not older than the
+	//   the change identified by the MinimumResourceVersion.
+	// - if "", then the reflector's initial list and watch starts from latest change applied to storage at the time
+	//   the reflector is run, based on a storage quorum read
+	// "" or a non-zero value may be used to ensure that arbitrarily old changes, which a reflector
+	// may have processed in the past, are not reprocessed when a reflector is stopped/started.
+	// For example, if object that were to be created and then deleted, a client-go application using a reflector
+	// with MinimumResourceVersion "0" might reprocess the entire creation and deletion of the object when it is
+	// restarted. But an application using a reflector with a non-zero MinimumResourceVersion that identifies a change
+	// after the object was deleted never would. Nor would a application with using a reflector with
+	// MinimumResourceVersion "".
+	// A non-zero value should be preferred to using "" to avoid the performance cost of a storage quorum read.
+	// Defaults to "0".
+	MinimumResourceVersion string
 }
 
 var (
@@ -97,13 +114,14 @@ func NewReflector(lw ListerWatcher, expectedType interface{}, store Store, resyn
 // NewNamedReflector same as NewReflector, but with a specified name for logging
 func NewNamedReflector(name string, lw ListerWatcher, expectedType interface{}, store Store, resyncPeriod time.Duration) *Reflector {
 	r := &Reflector{
-		name:          name,
-		listerWatcher: lw,
-		store:         store,
-		expectedType:  reflect.TypeOf(expectedType),
-		period:        time.Second,
-		resyncPeriod:  resyncPeriod,
-		clock:         &clock.RealClock{},
+		name:                   name,
+		listerWatcher:          lw,
+		store:                  store,
+		expectedType:           reflect.TypeOf(expectedType),
+		period:                 time.Second,
+		resyncPeriod:           resyncPeriod,
+		clock:                  &clock.RealClock{},
+		MinimumResourceVersion: "0",
 	}
 	return r
 }
@@ -153,10 +171,7 @@ func (r *Reflector) ListAndWatch(stopCh <-chan struct{}) error {
 	klog.V(3).Infof("Listing and watching %v from %s", r.expectedType, r.name)
 	var resourceVersion string
 
-	// Explicitly set "0" as resource version - it's fine for the List()
-	// to be served from cache and potentially be delayed relative to
-	// etcd contents. Reflector framework will catch up via Watch() eventually.
-	options := metav1.ListOptions{ResourceVersion: "0"}
+	options := metav1.ListOptions{ResourceVersion: r.MinimumResourceVersion}
 
 	if err := func() error {
 		initTrace := trace.New("Reflector ListAndWatch", trace.Field{"name", r.name})

@@ -99,6 +99,66 @@ func TestRunUntil(t *testing.T) {
 	}
 }
 
+func TestMinimumResourceVersion(t *testing.T) {
+	cases := []struct {
+		name       string
+		defaultRv  bool
+		minRv      string
+		expectedRv string
+	}{
+		{
+			name:       "default",
+			defaultRv:  true,
+			expectedRv: "0",
+		},
+		{
+			name:       "quorum",
+			minRv:      "",
+			expectedRv: "",
+		},
+		{
+			name:       "zero",
+			minRv:      "0",
+			expectedRv: "0",
+		},
+		{
+			name:       "non-zero",
+			minRv:      "456",
+			expectedRv: "456",
+		},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			stopCh := make(chan struct{})
+			store := NewStore(MetaNamespaceKeyFunc)
+			r := NewReflector(&testLW{}, &v1.Pod{}, store, 0)
+			if !tt.defaultRv {
+				r.MinimumResourceVersion = tt.minRv
+			}
+			fw := watch.NewFake()
+			actualRv := "unset"
+			r.listerWatcher = &testLW{
+				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+					return fw, nil
+				},
+				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+					defer close(stopCh)
+					actualRv = options.ResourceVersion
+					return &v1.PodList{ListMeta: metav1.ListMeta{ResourceVersion: "1"}}, nil
+				},
+			}
+			err := r.ListAndWatch(stopCh)
+			if actualRv != tt.expectedRv {
+				t.Errorf("Expected list option resourceVersion %s, but got %s", tt.expectedRv, actualRv)
+			}
+			if err != nil {
+				t.Errorf("ListAndWatch failed: %v", err)
+			}
+		})
+	}
+}
+
 func TestReflectorResyncChan(t *testing.T) {
 	s := NewStore(MetaNamespaceKeyFunc)
 	g := NewReflector(&testLW{}, &v1.Pod{}, s, time.Millisecond)
