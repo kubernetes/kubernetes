@@ -17,6 +17,8 @@ limitations under the License.
 package node
 
 import (
+	"os"
+	"strings"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -90,6 +92,7 @@ func TestGetPreferredAddress(t *testing.T) {
 }
 
 func TestGetHostname(t *testing.T) {
+	hostname, _ := os.Hostname()
 	testCases := []struct {
 		hostName         string
 		expectedHostName string
@@ -102,6 +105,11 @@ func TestGetHostname(t *testing.T) {
 		{
 			hostName:         " abc  ",
 			expectedHostName: "abc",
+			expectError:      false,
+		},
+		{
+			hostName:         "",
+			expectedHostName: strings.ToLower(hostname),
 			expectError:      false,
 		},
 	}
