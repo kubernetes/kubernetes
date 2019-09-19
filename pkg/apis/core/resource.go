@@ -25,7 +25,7 @@ func (rn ResourceName) String() string {
 }
 
 // CPU returns the CPU limit if specified.
-func (rl *ResourceList) Cpu() *resource.Quantity {
+func (rl *ResourceList) CPU() *resource.Quantity {
 	if val, ok := (*rl)[ResourceCPU]; ok {
 		return &val
 	}
