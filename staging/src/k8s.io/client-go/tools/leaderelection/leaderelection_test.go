@@ -33,8 +33,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/fake"
 	fakeclient "k8s.io/client-go/testing"
+	"k8s.io/client-go/tools/events"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/tools/record"
 )
 
 func createLockObject(objectType, namespace, name string, record rl.LeaderElectionRecord) (obj runtime.Object) {
@@ -240,7 +240,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 			objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
 			resourceLockConfig := rl.ResourceLockConfig{
 				Identity:      "baz",
-				EventRecorder: &record.FakeRecorder{},
+				EventRecorder: &events.FakeRecorder{},
 			}
 			c := &fake.Clientset{}
 			for _, reactor := range test.reactors {

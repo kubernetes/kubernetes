@@ -97,7 +97,7 @@ func (cml *ConfigMapLock) RecordEvent(s string) {
 		return
 	}
 	events := fmt.Sprintf("%v %v", cml.LockConfig.Identity, s)
-	cml.LockConfig.EventRecorder.Eventf(&v1.ConfigMap{ObjectMeta: cml.cm.ObjectMeta}, v1.EventTypeNormal, "LeaderElection", events)
+	cml.LockConfig.EventRecorder.Eventf(&v1.ConfigMap{ObjectMeta: cml.cm.ObjectMeta}, nil, v1.EventTypeNormal, "LeaderElection", RecordingAction, events)
 }
 
 // Describe is used to convert details on current resource lock

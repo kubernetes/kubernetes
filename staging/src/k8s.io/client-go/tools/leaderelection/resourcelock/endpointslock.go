@@ -92,7 +92,7 @@ func (el *EndpointsLock) RecordEvent(s string) {
 		return
 	}
 	events := fmt.Sprintf("%v %v", el.LockConfig.Identity, s)
-	el.LockConfig.EventRecorder.Eventf(&v1.Endpoints{ObjectMeta: el.e.ObjectMeta}, v1.EventTypeNormal, "LeaderElection", events)
+	el.LockConfig.EventRecorder.Eventf(&v1.Endpoints{ObjectMeta: el.e.ObjectMeta}, nil, v1.EventTypeNormal, "LeaderElection", RecordingAction, events)
 }
 
 // Describe is used to convert details on current resource lock

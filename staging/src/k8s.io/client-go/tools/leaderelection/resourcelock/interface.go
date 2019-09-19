@@ -20,9 +20,9 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	coordinationv1 "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/tools/events"
 )
 
 const (
@@ -30,6 +30,7 @@ const (
 	EndpointsResourceLock             = "endpoints"
 	ConfigMapsResourceLock            = "configmaps"
 	LeasesResourceLock                = "leases"
+	RecordingAction                   = "Recording"
 )
 
 // LeaderElectionRecord is the record that is stored in the leader election annotation.
@@ -49,11 +50,6 @@ type LeaderElectionRecord struct {
 	LeaderTransitions    int         `json:"leaderTransitions"`
 }
 
-// EventRecorder records a change in the ResourceLock.
-type EventRecorder interface {
-	Eventf(obj runtime.Object, eventType, reason, message string, args ...interface{})
-}
-
 // ResourceLockConfig common data that exists across different
 // resource locks
 type ResourceLockConfig struct {
@@ -61,7 +57,7 @@ type ResourceLockConfig struct {
 	// all participants in an election.
 	Identity string
 	// EventRecorder is optional.
-	EventRecorder EventRecorder
+	EventRecorder events.EventRecorder
 }
 
 // Interface offers a common interface for locking on arbitrary

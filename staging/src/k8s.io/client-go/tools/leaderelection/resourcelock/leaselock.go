@@ -75,7 +75,7 @@ func (ll *LeaseLock) RecordEvent(s string) {
 		return
 	}
 	events := fmt.Sprintf("%v %v", ll.LockConfig.Identity, s)
-	ll.LockConfig.EventRecorder.Eventf(&coordinationv1.Lease{ObjectMeta: ll.lease.ObjectMeta}, corev1.EventTypeNormal, "LeaderElection", events)
+	ll.LockConfig.EventRecorder.Eventf(&coordinationv1.Lease{ObjectMeta: ll.lease.ObjectMeta}, nil, corev1.EventTypeNormal, "LeaderElection", RecordingAction, events)
 }
 
 // Describe is used to convert details on current resource lock
