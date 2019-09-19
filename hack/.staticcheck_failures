@@ -23,7 +23,6 @@ pkg/controller/resourcequota
 pkg/controller/statefulset
 pkg/credentialprovider
 pkg/credentialprovider/aws
-pkg/credentialprovider/azure
 pkg/kubeapiserver/admission
 pkg/kubectl/cmd/get
 pkg/kubelet/apis/podresources
@@ -37,7 +36,6 @@ pkg/printers/internalversion
 pkg/probe/http
 pkg/proxy/healthcheck
 pkg/proxy/iptables
-pkg/proxy/ipvs
 pkg/proxy/userspace
 pkg/proxy/winkernel
 pkg/proxy/winuserspace
@@ -53,9 +51,7 @@ pkg/scheduler
 pkg/scheduler/algorithm/predicates
 pkg/scheduler/algorithm/priorities
 pkg/scheduler/api/v1
-pkg/scheduler/apis/config/v1alpha1
 pkg/scheduler/internal/queue
-pkg/security/podsecuritypolicy/sysctl
 pkg/util/coverage
 pkg/util/ebtables
 pkg/util/ipconfig

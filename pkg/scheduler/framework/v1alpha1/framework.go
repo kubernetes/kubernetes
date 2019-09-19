@@ -311,9 +311,9 @@ func (f *framework) RunPreFilterPlugins(
 // given node is not suitable for running pod.
 // Meanwhile, the failure message and status are set for the given node.
 func (f *framework) RunFilterPlugins(pc *PluginContext,
-	pod *v1.Pod, nodeName string) *Status {
+	pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	for _, pl := range f.filterPlugins {
-		status := pl.Filter(pc, pod, nodeName)
+		status := pl.Filter(pc, pod, nodeInfo)
 		if !status.IsSuccess() {
 			if !status.IsUnschedulable() {
 				errMsg := fmt.Sprintf("error while running %q filter plugin for pod %q: %v",
