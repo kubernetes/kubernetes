@@ -25,6 +25,7 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
 
 	"sigs.k8s.io/yaml"
@@ -34,7 +35,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	types "k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/client-go/dynamic"
@@ -592,6 +592,6 @@ embeddedNested:
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(expected, x) {
-		t.Errorf("unexpected diff: %s", diff.ObjectDiff(expected, x))
+		t.Errorf("unexpected diff: %s", cmp.Diff(expected, x))
 	}
 }

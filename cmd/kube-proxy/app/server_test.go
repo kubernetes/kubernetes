@@ -28,10 +28,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
 	"k8s.io/kubernetes/pkg/util/configz"
@@ -272,7 +272,7 @@ nodePortAddresses:
 		config, err := options.loadConfig([]byte(yaml))
 		assert.NoError(t, err, "unexpected error for %s: %v", tc.name, err)
 		if !reflect.DeepEqual(expected, config) {
-			t.Fatalf("unexpected config for %s, diff = %s", tc.name, diff.ObjectDiff(config, expected))
+			t.Fatalf("unexpected config for %s, diff = %s", tc.name, cmp.Diff(config, expected))
 		}
 	}
 }

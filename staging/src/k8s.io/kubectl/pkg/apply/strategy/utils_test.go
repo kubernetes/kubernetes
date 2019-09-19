@@ -17,6 +17,7 @@ limitations under the License.
 package strategy_test
 
 import (
+	"github.com/google/go-cmp/cmp"
 	. "github.com/onsi/gomega"
 
 	"fmt"
@@ -25,7 +26,6 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubectl/pkg/apply"
 	"k8s.io/kubectl/pkg/apply/parse"
 	"k8s.io/kubectl/pkg/util/openapi"
@@ -53,7 +53,7 @@ func runWith(instance apply.Strategy, recorded, local, remote, expected map[stri
 	merged, err := parsed.Merge(instance)
 	Expect(err).ShouldNot(HaveOccurred())
 	Expect(merged.Operation).Should(Equal(apply.SET))
-	Expect(merged.MergedResult).Should(Equal(expected), diff.ObjectDiff(merged.MergedResult, expected))
+	Expect(merged.MergedResult).Should(Equal(expected), cmp.Diff(merged.MergedResult, expected))
 }
 
 // create parses the yaml string into a map[string]interface{}.  Verifies that the string does not have

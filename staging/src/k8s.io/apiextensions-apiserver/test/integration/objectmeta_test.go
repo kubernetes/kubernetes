@@ -25,6 +25,7 @@ import (
 
 	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
+	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc"
 	"sigs.k8s.io/yaml"
 
@@ -38,7 +39,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -470,7 +470,7 @@ func TestEmbeddedResources(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(expected, foo.Object) {
-		t.Errorf("unexpected diff: %s", diff.ObjectDiff(expected, foo.Object))
+		t.Errorf("unexpected diff: %s", cmp.Diff(expected, foo.Object))
 	}
 
 	t.Logf("Trying to create wrongly typed CR")

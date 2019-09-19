@@ -22,13 +22,13 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -94,7 +94,7 @@ func TestMutatePodNonmutating(t *testing.T) {
 	// Creating the provider or the security context should not have mutated the psp or pod
 	// since all the strategies were permissive
 	if !reflect.DeepEqual(createPod(), pod) {
-		diffs := diff.ObjectDiff(createPod(), pod)
+		diffs := cmp.Diff(createPod(), pod)
 		t.Errorf("pod was mutated by MutatePod. diff:\n%s", diffs)
 	}
 	if !reflect.DeepEqual(createPSP(), psp) {
@@ -165,7 +165,7 @@ func TestMutateContainerNonmutating(t *testing.T) {
 		// Creating the provider or the security context should not have mutated the psp or pod
 		// since all the strategies were permissive
 		if !reflect.DeepEqual(createPod(), pod) {
-			diffs := diff.ObjectDiff(createPod(), pod)
+			diffs := cmp.Diff(createPod(), pod)
 			t.Errorf("pod was mutated. diff:\n%s", diffs)
 		}
 		if !reflect.DeepEqual(createPSP(), psp) {

@@ -19,13 +19,13 @@ package storage
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -197,7 +197,7 @@ func TestUpdateStatus(t *testing.T) {
 	pvOut := obj.(*api.PersistentVolume)
 	// only compare the relevant change b/c metadata will differ
 	if !apiequality.Semantic.DeepEqual(pvIn.Status, pvOut.Status) {
-		t.Errorf("unexpected object: %s", diff.ObjectDiff(pvIn.Status, pvOut.Status))
+		t.Errorf("unexpected object: %s", cmp.Diff(pvIn.Status, pvOut.Status))
 	}
 }
 

@@ -26,12 +26,12 @@ import (
 	"time"
 
 	cadvisorapiv1 "github.com/google/cadvisor/info/v1"
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	cloudprovider "k8s.io/cloud-provider"
@@ -350,7 +350,7 @@ func TestNodeAddress(t *testing.T) {
 			sortNodeAddresses(existingNode.Status.Addresses)
 
 			assert.True(t, apiequality.Semantic.DeepEqual(testCase.expectedAddresses, existingNode.Status.Addresses),
-				"Diff: %s", diff.ObjectDiff(testCase.expectedAddresses, existingNode.Status.Addresses))
+				"Diff: %s", cmp.Diff(testCase.expectedAddresses, existingNode.Status.Addresses))
 		})
 	}
 }
@@ -770,7 +770,7 @@ func TestMachineInfo(t *testing.T) {
 			}
 			// check expected node
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, tc.node),
-				"Diff: %s", diff.ObjectDiff(tc.expectNode, tc.node))
+				"Diff: %s", cmp.Diff(tc.expectNode, tc.node))
 			// check expected events
 			require.Equal(t, len(tc.expectEvents), len(events))
 			for i := range tc.expectEvents {
@@ -859,7 +859,7 @@ func TestVersionInfo(t *testing.T) {
 			require.Equal(t, tc.expectError, err)
 			// check expected node
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, tc.node),
-				"Diff: %s", diff.ObjectDiff(tc.expectNode, tc.node))
+				"Diff: %s", cmp.Diff(tc.expectNode, tc.node))
 		})
 	}
 }
@@ -938,7 +938,7 @@ func TestImages(t *testing.T) {
 				expectNode.Status.Images = makeExpectedImageList(tc.imageList, tc.maxImages, MaxNamesPerImageInNodeStatus)
 			}
 			assert.True(t, apiequality.Semantic.DeepEqual(expectNode, node),
-				"Diff: %s", diff.ObjectDiff(expectNode, node))
+				"Diff: %s", cmp.Diff(expectNode, node))
 		})
 	}
 
@@ -1101,7 +1101,7 @@ func TestReadyCondition(t *testing.T) {
 			}
 			// check expected condition
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
-				"Diff: %s", diff.ObjectDiff(tc.expectConditions, tc.node.Status.Conditions))
+				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
 			// check expected events
 			require.Equal(t, len(tc.expectEvents), len(events))
 			for i := range tc.expectEvents {
@@ -1222,7 +1222,7 @@ func TestMemoryPressureCondition(t *testing.T) {
 			}
 			// check expected condition
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
-				"Diff: %s", diff.ObjectDiff(tc.expectConditions, tc.node.Status.Conditions))
+				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
 			// check expected events
 			require.Equal(t, len(tc.expectEvents), len(events))
 			for i := range tc.expectEvents {
@@ -1343,7 +1343,7 @@ func TestPIDPressureCondition(t *testing.T) {
 			}
 			// check expected condition
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
-				"Diff: %s", diff.ObjectDiff(tc.expectConditions, tc.node.Status.Conditions))
+				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
 			// check expected events
 			require.Equal(t, len(tc.expectEvents), len(events))
 			for i := range tc.expectEvents {
@@ -1464,7 +1464,7 @@ func TestDiskPressureCondition(t *testing.T) {
 			}
 			// check expected condition
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectConditions, tc.node.Status.Conditions),
-				"Diff: %s", diff.ObjectDiff(tc.expectConditions, tc.node.Status.Conditions))
+				"Diff: %s", cmp.Diff(tc.expectConditions, tc.node.Status.Conditions))
 			// check expected events
 			require.Equal(t, len(tc.expectEvents), len(events))
 			for i := range tc.expectEvents {
@@ -1520,7 +1520,7 @@ func TestVolumesInUse(t *testing.T) {
 			}
 			// check expected volumes
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectVolumesInUse, tc.node.Status.VolumesInUse),
-				"Diff: %s", diff.ObjectDiff(tc.expectVolumesInUse, tc.node.Status.VolumesInUse))
+				"Diff: %s", cmp.Diff(tc.expectVolumesInUse, tc.node.Status.VolumesInUse))
 		})
 	}
 }
@@ -1583,7 +1583,7 @@ func TestVolumeLimits(t *testing.T) {
 			}
 			// check expected node
 			assert.True(t, apiequality.Semantic.DeepEqual(tc.expectNode, node),
-				"Diff: %s", diff.ObjectDiff(tc.expectNode, node))
+				"Diff: %s", cmp.Diff(tc.expectNode, node))
 		})
 	}
 }

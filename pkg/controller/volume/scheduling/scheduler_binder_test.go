@@ -23,12 +23,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/informers"
@@ -360,12 +360,12 @@ func (env *testEnv) validatePodCache(t *testing.T, name, node string, pod *v1.Po
 		for i := 0; i < aLen; i++ {
 			// Validate PV
 			if !reflect.DeepEqual(expectedBindings[i].pv, bindings[i].pv) {
-				t.Errorf("Test %q failed. binding.pv doesn't match [A-expected, B-got]: %s", name, diff.ObjectDiff(expectedBindings[i].pv, bindings[i].pv))
+				t.Errorf("Test %q failed. binding.pv doesn't match [A-expected, B-got]: %s", name, cmp.Diff(expectedBindings[i].pv, bindings[i].pv))
 			}
 
 			// Validate PVC
 			if !reflect.DeepEqual(expectedBindings[i].pvc, bindings[i].pvc) {
-				t.Errorf("Test %q failed. binding.pvc doesn't match [A-expected, B-got]: %s", name, diff.ObjectDiff(expectedBindings[i].pvc, bindings[i].pvc))
+				t.Errorf("Test %q failed. binding.pvc doesn't match [A-expected, B-got]: %s", name, cmp.Diff(expectedBindings[i].pvc, bindings[i].pvc))
 			}
 		}
 	}
@@ -382,7 +382,7 @@ func (env *testEnv) validatePodCache(t *testing.T, name, node string, pod *v1.Po
 	} else {
 		for i := 0; i < aLen; i++ {
 			if !reflect.DeepEqual(expectedProvisionings[i], provisionedClaims[i]) {
-				t.Errorf("Test %q failed. provisioned claims doesn't match [A-expected, B-got]: %s", name, diff.ObjectDiff(expectedProvisionings[i], provisionedClaims[i]))
+				t.Errorf("Test %q failed. provisioned claims doesn't match [A-expected, B-got]: %s", name, cmp.Diff(expectedProvisionings[i], provisionedClaims[i]))
 			}
 		}
 	}
@@ -473,7 +473,7 @@ func (env *testEnv) validateBind(
 		newCachedPV := cachedPV.DeepCopy()
 		newCachedPV.ResourceVersion = pv.ResourceVersion
 		if !reflect.DeepEqual(newCachedPV, pv) {
-			t.Errorf("Test %q failed: cached PV check failed [A-expected, B-got]:\n%s", name, diff.ObjectDiff(pv, cachedPV))
+			t.Errorf("Test %q failed: cached PV check failed [A-expected, B-got]:\n%s", name, cmp.Diff(pv, cachedPV))
 		}
 	}
 
@@ -501,7 +501,7 @@ func (env *testEnv) validateProvision(
 		newCachedPVC := cachedPVC.DeepCopy()
 		newCachedPVC.ResourceVersion = pvc.ResourceVersion
 		if !reflect.DeepEqual(newCachedPVC, pvc) {
-			t.Errorf("Test %q failed: cached PVC check failed [A-expected, B-got]:\n%s", name, diff.ObjectDiff(pvc, cachedPVC))
+			t.Errorf("Test %q failed: cached PVC check failed [A-expected, B-got]:\n%s", name, cmp.Diff(pvc, cachedPVC))
 		}
 	}
 

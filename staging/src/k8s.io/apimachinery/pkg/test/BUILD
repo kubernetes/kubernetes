@@ -32,6 +32,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer/protobuf:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],

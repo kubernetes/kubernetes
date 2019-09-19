@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/util/diff"
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
@@ -65,7 +65,7 @@ func TestGetAttrs(t *testing.T) {
 		"type":                           api.EventTypeNormal,
 	}
 	if e, a := expect, field; !reflect.DeepEqual(e, a) {
-		t.Errorf("diff: %s", diff.ObjectDiff(e, a))
+		t.Errorf("diff: %s", cmp.Diff(e, a))
 	}
 }
 

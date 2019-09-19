@@ -19,10 +19,10 @@ package volumeattachment
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -93,7 +93,7 @@ func TestVolumeAttachmentStrategy(t *testing.T) {
 	statusVolumeAttachment.Status = storage.VolumeAttachmentStatus{Attached: true}
 	Strategy.PrepareForCreate(ctx, statusVolumeAttachment)
 	if !apiequality.Semantic.DeepEqual(statusVolumeAttachment, volumeAttachment) {
-		t.Errorf("unexpected objects difference after creating with status: %v", diff.ObjectDiff(statusVolumeAttachment, volumeAttachment))
+		t.Errorf("unexpected objects difference after creating with status: %v", cmp.Diff(statusVolumeAttachment, volumeAttachment))
 	}
 
 	// Update of spec is disallowed
@@ -114,7 +114,7 @@ func TestVolumeAttachmentStrategy(t *testing.T) {
 	Strategy.PrepareForUpdate(ctx, statusVolumeAttachment, volumeAttachment)
 
 	if !apiequality.Semantic.DeepEqual(statusVolumeAttachment, volumeAttachment) {
-		t.Errorf("unexpected objects difference after modfying status: %v", diff.ObjectDiff(statusVolumeAttachment, volumeAttachment))
+		t.Errorf("unexpected objects difference after modfying status: %v", cmp.Diff(statusVolumeAttachment, volumeAttachment))
 	}
 }
 
@@ -133,7 +133,7 @@ func TestVolumeAttachmentStrategySourceInlineSpec(t *testing.T) {
 		t.Errorf("InlineVolumeSpec unexpectedly set to nil during PrepareForCreate")
 	}
 	if !apiequality.Semantic.DeepEqual(volumeAttachmentSaved, volumeAttachment) {
-		t.Errorf("unexpected difference in object after creation: %v", diff.ObjectDiff(volumeAttachment, volumeAttachmentSaved))
+		t.Errorf("unexpected difference in object after creation: %v", cmp.Diff(volumeAttachment, volumeAttachmentSaved))
 	}
 	Strategy.PrepareForUpdate(ctx, volumeAttachmentSaved, volumeAttachment)
 	if volumeAttachmentSaved.Spec.Source.InlineVolumeSpec == nil {
@@ -174,7 +174,7 @@ func TestVolumeAttachmentStatusStrategy(t *testing.T) {
 	expectedVolumeAttachment := statusVolumeAttachment.DeepCopy()
 	StatusStrategy.PrepareForUpdate(ctx, statusVolumeAttachment, volumeAttachment)
 	if !apiequality.Semantic.DeepEqual(statusVolumeAttachment, expectedVolumeAttachment) {
-		t.Errorf("unexpected objects differerence after modifying status: %v", diff.ObjectDiff(statusVolumeAttachment, expectedVolumeAttachment))
+		t.Errorf("unexpected objects differerence after modifying status: %v", cmp.Diff(statusVolumeAttachment, expectedVolumeAttachment))
 	}
 
 	// spec and metadata modifications should be dropped
@@ -192,7 +192,7 @@ func TestVolumeAttachmentStatusStrategy(t *testing.T) {
 
 	StatusStrategy.PrepareForUpdate(ctx, newVolumeAttachment, volumeAttachment)
 	if !apiequality.Semantic.DeepEqual(newVolumeAttachment, volumeAttachment) {
-		t.Errorf("unexpected objects differerence after modifying spec: %v", diff.ObjectDiff(newVolumeAttachment, volumeAttachment))
+		t.Errorf("unexpected objects differerence after modifying spec: %v", cmp.Diff(newVolumeAttachment, volumeAttachment))
 	}
 }
 

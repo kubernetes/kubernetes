@@ -19,6 +19,7 @@ package storage
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
@@ -208,6 +208,6 @@ func TestUpdateStatus(t *testing.T) {
 	autosclaerOut := obj.(*autoscaling.HorizontalPodAutoscaler)
 	// only compare the meaningful update b/c we can't compare due to metadata
 	if !apiequality.Semantic.DeepEqual(autoscalerIn.Status, autosclaerOut.Status) {
-		t.Errorf("unexpected object: %s", diff.ObjectDiff(autoscalerIn, autosclaerOut))
+		t.Errorf("unexpected object: %s", cmp.Diff(autoscalerIn, autosclaerOut))
 	}
 }

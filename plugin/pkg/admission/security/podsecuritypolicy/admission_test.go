@@ -23,6 +23,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
 	v1 "k8s.io/api/core/v1"
@@ -1973,7 +1974,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 		_, errs := admit.createProvidersFromPolicies([]*policy.PodSecurityPolicy{psp}, "namespace")
 
 		if !reflect.DeepEqual(psp, v.psp()) {
-			diff := diff.ObjectDiff(psp, v.psp())
+			diff := cmp.Diff(psp, v.psp())
 			t.Errorf("%s createProvidersFromPolicies mutated policy. diff:\n%s", k, diff)
 		}
 		if len(v.expectedErr) > 0 && len(errs) != 1 {

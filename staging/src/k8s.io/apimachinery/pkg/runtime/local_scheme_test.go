@@ -21,8 +21,8 @@ import (
 
 	"reflect"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 func TestPreferredVersionsAllGroups(t *testing.T) {
@@ -124,7 +124,7 @@ func TestPreferredVersionsAllGroups(t *testing.T) {
 			for group, expected := range test.expectedPrioritized {
 				actual := scheme.PrioritizedVersionsForGroup(group)
 				if !reflect.DeepEqual(expected, actual) {
-					t.Error(diff.ObjectDiff(expected, actual))
+					t.Error(cmp.Diff(expected, actual))
 				}
 			}
 
@@ -134,7 +134,7 @@ func TestPreferredVersionsAllGroups(t *testing.T) {
 				actualPrioritizedAll[actual.Group] = append(actualPrioritizedAll[actual.Group], actual)
 			}
 			if !reflect.DeepEqual(test.expectedPrioritized, actualPrioritizedAll) {
-				t.Error(diff.ObjectDiff(test.expectedPrioritized, actualPrioritizedAll))
+				t.Error(cmp.Diff(test.expectedPrioritized, actualPrioritizedAll))
 			}
 
 			preferredAll := scheme.PreferredVersionAllGroups()
@@ -143,7 +143,7 @@ func TestPreferredVersionsAllGroups(t *testing.T) {
 				actualPreferredAll[actual] = true
 			}
 			if !reflect.DeepEqual(test.expectedPreferred, actualPreferredAll) {
-				t.Error(diff.ObjectDiff(test.expectedPreferred, actualPreferredAll))
+				t.Error(cmp.Diff(test.expectedPreferred, actualPreferredAll))
 			}
 		})
 	}

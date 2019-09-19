@@ -25,6 +25,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	jsoniter "github.com/json-iterator/go"
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -244,7 +245,7 @@ func TestEncodePtr(t *testing.T) {
 		t.Fatalf("Got wrong type")
 	}
 	if !apiequality.Semantic.DeepEqual(obj2, pod) {
-		t.Errorf("\nExpected:\n\n %#v,\n\nGot:\n\n %#vDiff: %v\n\n", pod, obj2, diff.ObjectDiff(obj2, pod))
+		t.Errorf("\nExpected:\n\n %#v,\n\nGot:\n\n %#vDiff: %v\n\n", pod, obj2, cmp.Diff(obj2, pod))
 	}
 }
 

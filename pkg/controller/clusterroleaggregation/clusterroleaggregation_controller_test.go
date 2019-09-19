@@ -19,11 +19,11 @@ package clusterroleaggregation
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	fakeclient "k8s.io/client-go/kubernetes/fake"
 	rbaclisters "k8s.io/client-go/listers/rbac/v1"
 	clienttesting "k8s.io/client-go/testing"
@@ -174,7 +174,7 @@ func TestSyncClusterRole(t *testing.T) {
 				t.Fatalf("unexpected action %#v", action)
 			}
 			if !equality.Semantic.DeepEqual(updateAction.GetObject().(*rbacv1.ClusterRole), test.expectedClusterRole) {
-				t.Fatalf("%v", diff.ObjectDiff(test.expectedClusterRole, updateAction.GetObject().(*rbacv1.ClusterRole)))
+				t.Fatalf("%v", cmp.Diff(test.expectedClusterRole, updateAction.GetObject().(*rbacv1.ClusterRole)))
 
 			}
 		})

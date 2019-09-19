@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -31,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/utils/pointer"
@@ -196,7 +196,7 @@ func TestNewLease(t *testing.T) {
 				t.Fatalf("the new lease must be newly allocated, but got same address as base")
 			}
 			if !apiequality.Semantic.DeepEqual(tc.expect, newLease) {
-				t.Errorf("unexpected result from newLease: %s", diff.ObjectDiff(tc.expect, newLease))
+				t.Errorf("unexpected result from newLease: %s", cmp.Diff(tc.expect, newLease))
 			}
 		})
 	}

@@ -23,10 +23,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/google/gofuzz"
 	flag "github.com/spf13/pflag"
-
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 var fuzzIters = flag.Int("fuzz-iters", 50, "How many fuzzing iterations to do.")
@@ -521,7 +520,7 @@ func TestConverter_fuzz(t *testing.T) {
 				continue
 			}
 			if e, a := item.from, item.check; !reflect.DeepEqual(e, a) {
-				t.Errorf("(%v, %v): unexpected diff: %v", i, j, diff.ObjectDiff(e, a))
+				t.Errorf("(%v, %v): unexpected diff: %v", i, j, cmp.Diff(e, a))
 			}
 		}
 	}
@@ -569,7 +568,7 @@ func TestConverter_MapElemAddr(t *testing.T) {
 	third := Foo{}
 	err = c.Convert(&second, &third, AllowDifferentFieldTypeNames, nil)
 	if e, a := first, third; !reflect.DeepEqual(e, a) {
-		t.Errorf("Unexpected diff: %v", diff.ObjectDiff(e, a))
+		t.Errorf("Unexpected diff: %v", cmp.Diff(e, a))
 	}
 }
 

@@ -37,11 +37,11 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/apply:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/apply/parse:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/openapi:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/openapi/testing:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/types:go_default_library",
