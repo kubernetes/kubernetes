@@ -45,7 +45,7 @@ type NamespacedResourcesDeleterInterface interface {
 func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
 	metadataClient metadata.Interface, podsGetter v1clientset.PodsGetter,
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
-	finalizerToken v1.FinalizerName, deleteNamespaceWhenDone bool) NamespacedResourcesDeleterInterface {
+	finalizerToken v1.FinalizerName) NamespacedResourcesDeleterInterface {
 	d := &namespacedResourcesDeleter{
 		nsClient:       nsClient,
 		metadataClient: metadataClient,
@@ -53,9 +53,8 @@ func NewNamespacedResourcesDeleter(nsClient v1clientset.NamespaceInterface,
 		opCache: &operationNotSupportedCache{
 			m: make(map[operationKey]bool),
 		},
-		discoverResourcesFn:     discoverResourcesFn,
-		finalizerToken:          finalizerToken,
-		deleteNamespaceWhenDone: deleteNamespaceWhenDone,
+		discoverResourcesFn: discoverResourcesFn,
+		finalizerToken:      finalizerToken,
 	}
 	d.initOpCache()
 	return d
@@ -77,8 +76,6 @@ type namespacedResourcesDeleter struct {
 	// The finalizer token that should be removed from the namespace
 	// when all resources in that namespace have been deleted.
 	finalizerToken v1.FinalizerName
-	// Also delete the namespace when all resources in the namespace have been deleted.
-	deleteNamespaceWhenDone bool
 }
 
 // Delete deletes all resources in the given namespace.
@@ -89,7 +86,6 @@ type namespacedResourcesDeleter struct {
 //   (updates the namespace phase if it is not yet marked terminating)
 // After deleting the resources:
 // * It removes finalizer token from the given namespace.
-// * Deletes the namespace if deleteNamespaceWhenDone is true.
 //
 // Returns an error if any of those steps fail.
 // Returns ResourcesRemainingError if it deleted some resources but needs
@@ -127,10 +123,9 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 		return nil
 	}
 
-	// Delete the namespace if it is already finalized.
-	if d.deleteNamespaceWhenDone && finalized(namespace) {
-		// TODO(liggitt): just return in 1.16, once n-1 apiservers automatically delete when finalizers are all removed
-		return d.deleteNamespace(namespace)
+	// return if it is already finalized.
+	if finalized(namespace) {
+		return nil
 	}
 
 	// there may still be content for us to remove
@@ -152,12 +147,6 @@ func (d *namespacedResourcesDeleter) Delete(nsName string) error {
 			return nil
 		}
 		return err
-	}
-
-	// Check if we can delete now.
-	if d.deleteNamespaceWhenDone && finalized(namespace) {
-		// TODO(liggitt): just return in 1.16, once n-1 apiservers automatically delete when finalizers are all removed
-		return d.deleteNamespace(namespace)
 	}
 	return nil
 }
