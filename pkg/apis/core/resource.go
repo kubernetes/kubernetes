@@ -24,7 +24,7 @@ func (rn ResourceName) String() string {
 	return string(rn)
 }
 
-// Returns the CPU limit if specified.
+// CPU returns the CPU limit if specified.
 func (rl *ResourceList) Cpu() *resource.Quantity {
 	if val, ok := (*rl)[ResourceCPU]; ok {
 		return &val
@@ -32,7 +32,7 @@ func (rl *ResourceList) Cpu() *resource.Quantity {
 	return &resource.Quantity{Format: resource.DecimalSI}
 }
 
-// Returns the Memory limit if specified.
+// Memory returns the Memory limit if specified.
 func (rl *ResourceList) Memory() *resource.Quantity {
 	if val, ok := (*rl)[ResourceMemory]; ok {
 		return &val
@@ -40,6 +40,7 @@ func (rl *ResourceList) Memory() *resource.Quantity {
 	return &resource.Quantity{Format: resource.BinarySI}
 }
 
+// Pods returns the list of pods
 func (rl *ResourceList) Pods() *resource.Quantity {
 	if val, ok := (*rl)[ResourcePods]; ok {
 		return &val
@@ -47,6 +48,7 @@ func (rl *ResourceList) Pods() *resource.Quantity {
 	return &resource.Quantity{}
 }
 
+// StorageEphemeral returns the list of ephemeral storage volumes, if any
 func (rl *ResourceList) StorageEphemeral() *resource.Quantity {
 	if val, ok := (*rl)[ResourceEphemeralStorage]; ok {
 		return &val
