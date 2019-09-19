@@ -25,11 +25,16 @@ import (
 )
 
 const (
+	// UnknownContainerStatuses represents statuses of unknown containers
 	UnknownContainerStatuses = "UnknownContainerStatuses"
-	PodCompleted             = "PodCompleted"
-	ContainersNotReady       = "ContainersNotReady"
+	// PodCompleted represents that pod status is completed
+	PodCompleted = "PodCompleted"
+	// ContainersNotReady represents that container is not ready
+	ContainersNotReady = "ContainersNotReady"
+	// ContainersNotInitialized represents that container is not initialized
 	ContainersNotInitialized = "ContainersNotInitialized"
-	ReadinessGatesNotReady   = "ReadinessGatesNotReady"
+	// ReadinessGatesNotReady represents that readiness gates is not ready
+	ReadinessGatesNotReady = "ReadinessGatesNotReady"
 )
 
 // GenerateContainersReadyCondition returns the status of "ContainersReady" condition.

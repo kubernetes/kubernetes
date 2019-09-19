@@ -275,6 +275,7 @@ var AllowAllCapabilities api.Capability = "*"
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string
 
+//Constants which represent different FS Types
 const (
 	AzureFile             FSType = "azureFile"
 	Flocker               FSType = "flocker"
