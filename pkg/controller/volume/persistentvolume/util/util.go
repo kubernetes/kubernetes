@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -88,7 +89,10 @@ func IsDelayBindingMode(claim *v1.PersistentVolumeClaim, classLister storagelist
 
 	class, err := classLister.Get(className)
 	if err != nil {
-		return false, nil
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
 	}
 
 	if class.VolumeBindingMode == nil {
