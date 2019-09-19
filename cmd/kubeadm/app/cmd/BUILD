@@ -84,6 +84,7 @@ go_test(
         "//cmd/kubeadm/app/features:go_default_library",
         "//cmd/kubeadm/app/util:go_default_library",
         "//cmd/kubeadm/app/util/config:go_default_library",
+        "//cmd/kubeadm/app/util/output:go_default_library",
         "//cmd/kubeadm/app/util/runtime:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
