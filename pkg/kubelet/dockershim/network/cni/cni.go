@@ -93,15 +93,15 @@ type cniPortMapping struct {
 // https://github.com/containernetworking/plugins/blob/master/plugins/meta/bandwidth/README.md
 type cniBandwidthEntry struct {
 	// IngressRate is the bandwidth rate in bits per second for traffic through container. 0 for no limit. If ingressRate is set, ingressBurst must also be set
-	IngressRate int `json:"ingressRate,omitempty"`
+	IngressRate uint64 `json:"ingressRate,omitempty"`
 	// IngressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If ingressBurst is set, ingressRate must also be set
 	// NOTE: it's not used for now and default to 0.
-	IngressBurst int `json:"ingressBurst,omitempty"`
+	IngressBurst uint64 `json:"ingressBurst,omitempty"`
 	// EgressRate is the bandwidth is the bandwidth rate in bits per second for traffic through container. 0 for no limit. If egressRate is set, egressBurst must also be set
-	EgressRate int `json:"egressRate,omitempty"`
+	EgressRate uint64 `json:"egressRate,omitempty"`
 	// EgressBurst is the bandwidth burst in bits for traffic through container. 0 for no limit. If egressBurst is set, egressRate must also be set
 	// NOTE: it's not used for now and default to 0.
-	EgressBurst int `json:"egressBurst,omitempty"`
+	EgressBurst uint64 `json:"egressBurst,omitempty"`
 }
 
 // cniIPRange maps to the standard CNI ip range Capability
@@ -429,12 +429,12 @@ func (plugin *cniNetworkPlugin) buildCNIRuntimeConf(podName string, podNs string
 			// see: https://github.com/containernetworking/cni/blob/master/CONVENTIONS.md and
 			// https://github.com/containernetworking/plugins/blob/master/plugins/meta/bandwidth/README.md
 			// Rates are in bits per second, burst values are in bits.
-			bandwidthParam.IngressRate = int(ingress.Value())
-			bandwidthParam.IngressBurst = math.MaxInt32 // no limit
+			bandwidthParam.IngressRate = uint64(ingress.Value())
+			bandwidthParam.IngressBurst = math.MaxUint32 * 8 // no limit
 		}
 		if egress != nil {
-			bandwidthParam.EgressRate = int(egress.Value())
-			bandwidthParam.EgressBurst = math.MaxInt32 // no limit
+			bandwidthParam.EgressRate = uint64(egress.Value())
+			bandwidthParam.EgressBurst = math.MaxUint32 * 8 // no limit
 		}
 		rt.CapabilityArgs[bandwidthCapability] = bandwidthParam
 	}
