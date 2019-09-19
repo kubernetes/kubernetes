@@ -1630,27 +1630,147 @@ func TestEndpointSliceUpdate(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		for _, startingSlice := range tc.startingSlices {
-			tc.endpointChangeTracker.endpointSliceCache.Update(startingSlice)
-		}
+		t.Run(name, func(t *testing.T) {
+			initializeCache(tc.endpointChangeTracker.endpointSliceCache, tc.startingSlices)
 
-		got := tc.endpointChangeTracker.EndpointSliceUpdate(tc.paramEndpointSlice, tc.paramRemoveSlice)
-		if !reflect.DeepEqual(got, tc.expectedReturnVal) {
-			t.Errorf("[%s] EndpointSliceUpdate return value got: %v, want %v", name, got, tc.expectedReturnVal)
-		}
-		if tc.endpointChangeTracker.items == nil {
-			t.Errorf("[%s] Expected ect.items to not be nil", name)
-		}
-		if tc.expectedCurrentChange == nil {
-			if tc.endpointChangeTracker.items[tc.namespacedName] != nil {
-				t.Errorf("[%s] Expected ect.items[%s] to be nil", name, tc.namespacedName)
+			got := tc.endpointChangeTracker.EndpointSliceUpdate(tc.paramEndpointSlice, tc.paramRemoveSlice)
+			if !reflect.DeepEqual(got, tc.expectedReturnVal) {
+				t.Errorf("EndpointSliceUpdate return value got: %v, want %v", got, tc.expectedReturnVal)
 			}
-		} else {
-			if tc.endpointChangeTracker.items[tc.namespacedName] == nil {
-				t.Errorf("[%s] Expected ect.items[%s] to not be nil", name, tc.namespacedName)
+			if tc.endpointChangeTracker.items == nil {
+				t.Errorf("Expected ect.items to not be nil")
 			}
-			compareEndpointsMapsStr(t, tc.endpointChangeTracker.items[tc.namespacedName].current, tc.expectedCurrentChange)
-		}
+			changes := tc.endpointChangeTracker.checkoutChanges()
+			if tc.expectedCurrentChange == nil {
+				if len(changes) != 0 {
+					t.Errorf("Expected %s to have no changes", tc.namespacedName)
+				}
+			} else {
+				if len(changes) == 0 || changes[0] == nil {
+					t.Fatalf("Expected %s to have changes", tc.namespacedName)
+				}
+				compareEndpointsMapsStr(t, changes[0].current, tc.expectedCurrentChange)
+			}
+		})
+	}
+}
+
+func TestCheckoutChanges(t *testing.T) {
+	svcPortName0 := ServicePortName{types.NamespacedName{Namespace: "ns1", Name: "svc1"}, "port-0", v1.ProtocolTCP}
+	svcPortName1 := ServicePortName{types.NamespacedName{Namespace: "ns1", Name: "svc1"}, "port-1", v1.ProtocolTCP}
+
+	testCases := map[string]struct {
+		endpointChangeTracker *EndpointChangeTracker
+		expectedChanges       []*endpointsChange
+		useEndpointSlices     bool
+		items                 map[types.NamespacedName]*endpointsChange
+		appliedSlices         []*discovery.EndpointSlice
+		pendingSlices         []*discovery.EndpointSlice
+	}{
+		"empty slices": {
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true),
+			expectedChanges:       []*endpointsChange{},
+			useEndpointSlices:     true,
+			appliedSlices:         []*discovery.EndpointSlice{},
+			pendingSlices:         []*discovery.EndpointSlice{},
+		},
+		"without slices, empty items": {
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, false),
+			expectedChanges:       []*endpointsChange{},
+			items:                 map[types.NamespacedName]*endpointsChange{},
+			useEndpointSlices:     false,
+		},
+		"without slices, simple items": {
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, false),
+			expectedChanges: []*endpointsChange{{
+				previous: EndpointsMap{
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
+					svcPortName1: []Endpoint{newTestEp("10.0.1.1:443"), newTestEp("10.0.1.2:443")},
+				},
+				current: EndpointsMap{
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
+				},
+			}},
+			items: map[types.NamespacedName]*endpointsChange{
+				{Namespace: "ns1", Name: "svc1"}: {
+					previous: EndpointsMap{
+						svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
+						svcPortName1: []Endpoint{newTestEp("10.0.1.1:443"), newTestEp("10.0.1.2:443")},
+					},
+					current: EndpointsMap{
+						svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
+					},
+				},
+			},
+			useEndpointSlices: false,
+		},
+		"adding initial slice": {
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true),
+			expectedChanges: []*endpointsChange{{
+				previous: EndpointsMap{},
+				current: EndpointsMap{
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
+				},
+			}},
+			useEndpointSlices: true,
+			appliedSlices:     []*discovery.EndpointSlice{},
+			pendingSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 3, 3, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80)}),
+			},
+		},
+		"removing port in update": {
+			endpointChangeTracker: NewEndpointChangeTracker("", nil, nil, nil, true),
+			expectedChanges: []*endpointsChange{{
+				previous: EndpointsMap{
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
+					svcPortName1: []Endpoint{newTestEp("10.0.1.1:443"), newTestEp("10.0.1.2:443")},
+				},
+				current: EndpointsMap{
+					svcPortName0: []Endpoint{newTestEp("10.0.1.1:80"), newTestEp("10.0.1.2:80")},
+				},
+			}},
+			useEndpointSlices: true,
+			appliedSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 3, 3, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
+			},
+			pendingSlices: []*discovery.EndpointSlice{
+				generateEndpointSlice("svc1", "ns1", 1, 3, 3, []string{"host1"}, []*int32{utilpointer.Int32Ptr(80)}),
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			if tc.useEndpointSlices {
+				for _, slice := range tc.appliedSlices {
+					tc.endpointChangeTracker.EndpointSliceUpdate(slice, false)
+				}
+				tc.endpointChangeTracker.checkoutChanges()
+				for _, slice := range tc.pendingSlices {
+					tc.endpointChangeTracker.EndpointSliceUpdate(slice, false)
+				}
+			} else {
+				tc.endpointChangeTracker.items = tc.items
+			}
+
+			changes := tc.endpointChangeTracker.checkoutChanges()
+
+			if len(tc.expectedChanges) != len(changes) {
+				t.Fatalf("Expected %d changes, got %d", len(tc.expectedChanges), len(changes))
+			}
+
+			for i, change := range changes {
+				expectedChange := tc.expectedChanges[i]
+
+				if !reflect.DeepEqual(change.previous, expectedChange.previous) {
+					t.Errorf("[%d] Expected change.previous: %+v, got: %+v", i, expectedChange.previous, change.previous)
+				}
+
+				if !reflect.DeepEqual(change.current, expectedChange.current) {
+					t.Errorf("[%d] Expected change.current: %+v, got: %+v", i, expectedChange.current, change.current)
+				}
+			}
+		})
 	}
 }
 
@@ -1677,5 +1797,20 @@ func compareEndpointsMapsStr(t *testing.T, newMap EndpointsMap, expected map[Ser
 				}
 			}
 		}
+	}
+}
+
+func newTestEp(ep string) *BaseEndpointInfo {
+	return &BaseEndpointInfo{Endpoint: ep}
+}
+
+func initializeCache(endpointSliceCache *EndpointSliceCache, endpointSlices []*discovery.EndpointSlice) {
+	for _, endpointSlice := range endpointSlices {
+		endpointSliceCache.updatePending(endpointSlice, false)
+	}
+
+	for _, tracker := range endpointSliceCache.trackerByServiceMap {
+		tracker.applied = tracker.pending
+		tracker.pending = endpointSliceInfoByName{}
 	}
 }
