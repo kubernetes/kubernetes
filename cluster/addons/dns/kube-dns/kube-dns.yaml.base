@@ -196,7 +196,6 @@ spec:
         - name: kube-dns-config
           mountPath: /etc/k8s/dns/dnsmasq-nanny
         securityContext:
-          allowPrivilegeEscalation: false
           capabilities:
             drop:
               - all
