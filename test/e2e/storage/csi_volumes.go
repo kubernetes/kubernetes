@@ -22,6 +22,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
@@ -123,7 +124,7 @@ func testTopologyPositive(cs clientset.Interface, suffix, namespace string, dela
 		addSingleCSIZoneAllowedTopologyToStorageClass(cs, class, topoZone)
 	}
 	test.Client = cs
-	test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+	test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 		ClaimSize:        test.ClaimSize,
 		StorageClassName: &(class.Name),
 		VolumeMode:       &test.VolumeMode,
@@ -157,7 +158,7 @@ func testTopologyNegative(cs clientset.Interface, suffix, namespace string, dela
 	test.Client = cs
 	test.Class = newStorageClass(test, namespace, suffix)
 	addSingleCSIZoneAllowedTopologyToStorageClass(cs, test.Class, pvZone)
-	test.Claim = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+	test.Claim = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 		ClaimSize:        test.ClaimSize,
 		StorageClassName: &(test.Class.Name),
 		VolumeMode:       &test.VolumeMode,

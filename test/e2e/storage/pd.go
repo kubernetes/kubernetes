@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -131,7 +132,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				}
 
 				ginkgo.By("creating PD")
-				diskName, err := framework.CreatePDWithRetry()
+				diskName, err := e2epv.CreatePDWithRetry()
 				framework.ExpectNoError(err, "Error creating PD")
 
 				var fmtPod *v1.Pod
@@ -249,7 +250,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 
 				ginkgo.By(fmt.Sprintf("creating %d PD(s)", numPDs))
 				for i := 0; i < numPDs; i++ {
-					name, err := framework.CreatePDWithRetry()
+					name, err := e2epv.CreatePDWithRetry()
 					framework.ExpectNoError(err, fmt.Sprintf("Error creating PD %d", i))
 					diskNames = append(diskNames, name)
 				}
@@ -336,7 +337,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 				origNodeCnt := len(nodes.Items) // healhy nodes running kubelet
 
 				ginkgo.By("creating a pd")
-				diskName, err := framework.CreatePDWithRetry()
+				diskName, err := e2epv.CreatePDWithRetry()
 				framework.ExpectNoError(err, "Error creating a pd")
 
 				targetNode := &nodes.Items[0] // for node delete ops
@@ -435,7 +436,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		framework.SkipUnlessProviderIs("gce")
 
 		ginkgo.By("delete a PD")
-		framework.ExpectNoError(framework.DeletePDWithRetry("non-exist"))
+		framework.ExpectNoError(e2epv.DeletePDWithRetry("non-exist"))
 	})
 })
 
@@ -609,7 +610,7 @@ func detachAndDeletePDs(diskName string, hosts []types.NodeName) {
 		waitForPDDetach(diskName, host)
 	}
 	ginkgo.By(fmt.Sprintf("Deleting PD %q", diskName))
-	framework.ExpectNoError(framework.DeletePDWithRetry(diskName))
+	framework.ExpectNoError(e2epv.DeletePDWithRetry(diskName))
 }
 
 func waitForPDInVolumesInUse(

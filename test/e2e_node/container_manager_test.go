@@ -118,6 +118,7 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 							},
 						},
 					})
+
 					var pausePids []int
 					ginkgo.By("checking infra container's oom-score-adj")
 					gomega.Eventually(func() error {
@@ -139,12 +140,12 @@ var _ = framework.KubeDescribe("Container Manager Misc [Serial]", func() {
 					var shPids []int
 					ginkgo.By("checking besteffort container's oom-score-adj")
 					gomega.Eventually(func() error {
-						shPids, err = getPidsForProcess("serve_hostname", "")
+						shPids, err = getPidsForProcess("agnhost", "")
 						if err != nil {
 							return fmt.Errorf("failed to get list of serve hostname process pids: %v", err)
 						}
 						if len(shPids) != 1 {
-							return fmt.Errorf("expected only one serve_hostname process; found %d", len(shPids))
+							return fmt.Errorf("expected only one agnhost process; found %d", len(shPids))
 						}
 						return validateOOMScoreAdjSetting(shPids[0], 1000)
 					}, 2*time.Minute, time.Second*4).Should(gomega.BeNil())

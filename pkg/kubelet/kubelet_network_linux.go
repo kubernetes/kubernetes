@@ -20,10 +20,19 @@ package kubelet
 
 import (
 	"fmt"
+	"time"
 
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 )
+
+func (kl *Kubelet) initNetworkUtil() {
+	kl.syncNetworkUtil()
+	go kl.iptClient.Monitor(utiliptables.Chain("KUBE-KUBELET-CANARY"),
+		[]utiliptables.Table{utiliptables.TableMangle, utiliptables.TableNAT, utiliptables.TableFilter},
+		kl.syncNetworkUtil, 1*time.Minute, wait.NeverStop)
+}
 
 // syncNetworkUtil ensures the network utility are present on host.
 // Network util includes:

@@ -50,7 +50,6 @@ import (
 	informers "k8s.io/kube-aggregator/pkg/client/informers/externalversions/apiregistration/v1"
 	"k8s.io/kube-aggregator/pkg/controllers/autoregister"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master/controller/crdregistration"
 )
 
@@ -110,11 +109,10 @@ func createAggregatorConfig(
 			SharedInformerFactory: externalInformers,
 		},
 		ExtraConfig: aggregatorapiserver.ExtraConfig{
-			ProxyClientCert:                  certBytes,
-			ProxyClientKey:                   keyBytes,
-			ServiceResolver:                  serviceResolver,
-			ProxyTransport:                   proxyTransport,
-			EnableAggregatedDiscoveryTimeout: utilfeature.DefaultFeatureGate.Enabled(kubefeatures.EnableAggregatedDiscoveryTimeout),
+			ProxyClientCert: certBytes,
+			ProxyClientKey:  keyBytes,
+			ServiceResolver: serviceResolver,
+			ProxyTransport:  proxyTransport,
 		},
 	}
 

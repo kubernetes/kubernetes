@@ -5,7 +5,7 @@ load(
     "go_binary",
     "go_library",
 )
-load("//pkg/version:def.bzl", "version_x_defs")
+load("//staging/src/k8s.io/component-base/version:def.bzl", "version_x_defs")
 
 go_binary(
     name = "cloud-controller-manager",
@@ -23,6 +23,7 @@ go_library(
         "//pkg/cloudprovider/providers:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/prometheus/clientgo:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/version:go_default_library",
     ],
 )
 

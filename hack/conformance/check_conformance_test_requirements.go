@@ -82,7 +82,7 @@ func checkAllProviders(e2eFile string) error {
 }
 
 func processFile(e2ePath string) error {
-	regGoFile := regexp.MustCompile(".*.go")
+	regGoFile := regexp.MustCompile(".*\\.go")
 
 	files, err := ioutil.ReadDir(e2ePath)
 	if err != nil {

@@ -271,18 +271,20 @@ func GetPodIPs(execer utilexec.Interface, nsenterPath, netnsPath, interfaceName 
 		return []net.IP{ip}, nil
 	}
 
-	list := make([]net.IP, 0)
-	var err4, err6 error
-	if ipv4, err4 := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-4"); err4 != nil {
-		list = append(list, ipv4)
-	}
-
-	if ipv6, err6 := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, "-6"); err6 != nil {
-		list = append(list, ipv6)
+	var (
+		list []net.IP
+		errs []error
+	)
+	for _, addrType := range []string{"-4", "-6"} {
+		if ip, err := getOnePodIP(execer, nsenterPath, netnsPath, interfaceName, addrType); err == nil {
+			list = append(list, ip)
+		} else {
+			errs = append(errs, err)
+		}
 	}
 
 	if len(list) == 0 {
-		return nil, utilerrors.NewAggregate([]error{err4, err6})
+		return nil, utilerrors.NewAggregate(errs)
 	}
 	return list, nil
 

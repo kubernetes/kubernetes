@@ -26,16 +26,12 @@ import (
 )
 
 const (
-	// MaxUint defines the max unsigned int value.
-	MaxUint = ^uint(0)
-	// MaxInt defines the max signed int value.
-	MaxInt = int(MaxUint >> 1)
 	// MaxTotalPriority defines the max total priority value.
 	MaxTotalPriority = int64(math.MaxInt64)
 	// MaxPriority defines the max priority value.
 	MaxPriority = 10
 	// MaxWeight defines the max weight value.
-	MaxWeight = int64(math.MaxInt64 / MaxPriority)
+	MaxWeight = MaxTotalPriority / MaxPriority
 	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
 	// that once found feasible, the scheduler stops looking for more nodes.
 	DefaultPercentageOfNodesToScore = 50

@@ -16,7 +16,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/heketi/heketi/pkg/glusterfs/api"
 	"github.com/heketi/heketi/pkg/utils"
@@ -52,7 +51,7 @@ func (c *Client) BlockVolumeCreate(request *api.BlockVolumeCreateRequest) (
 		return nil, utils.GetErrorFromResponse(r)
 	}
 
-	r, err = c.waitForResponseWithTimer(r, time.Second)
+	r, err = c.pollResponse(r)
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +147,7 @@ func (c *Client) BlockVolumeDelete(id string) error {
 		return utils.GetErrorFromResponse(r)
 	}
 
-	r, err = c.waitForResponseWithTimer(r, time.Second)
+	r, err = c.pollResponse(r)
 	if err != nil {
 		return err
 	}

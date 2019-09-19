@@ -36,6 +36,8 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1_ListMeta_To_v1_ListMeta,
 
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
+		Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString,
+		Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString,
 
 		Convert_Pointer_v1_Duration_To_v1_Duration,
 		Convert_v1_Duration_To_Pointer_v1_Duration,
@@ -197,6 +199,21 @@ func Convert_v1_ListMeta_To_v1_ListMeta(in, out *ListMeta, s conversion.Scope) e
 // +k8s:conversion-fn=copy-only
 func Convert_intstr_IntOrString_To_intstr_IntOrString(in, out *intstr.IntOrString, s conversion.Scope) error {
 	*out = *in
+	return nil
+}
+
+func Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString(in **intstr.IntOrString, out *intstr.IntOrString, s conversion.Scope) error {
+	if *in == nil {
+		*out = intstr.IntOrString{} // zero value
+		return nil
+	}
+	*out = **in // copy
+	return nil
+}
+
+func Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString(in *intstr.IntOrString, out **intstr.IntOrString, s conversion.Scope) error {
+	temp := *in // copy
+	*out = &temp
 	return nil
 }
 

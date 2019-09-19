@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -55,7 +56,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		ns = f.Namespace.Name
 		var err error
 		framework.SkipUnlessProviderIs("gce", "gke", "aws")
-		defaultScName, err = framework.GetDefaultStorageClassName(c)
+		defaultScName, err = e2epv.GetDefaultStorageClassName(c)
 		if err != nil {
 			framework.Failf(err.Error())
 		}
@@ -64,7 +65,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			ClaimSize: "2Gi",
 		}
 
-		pvc = framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:  test.ClaimSize,
 			VolumeMode: &test.VolumeMode,
 		}, ns)
@@ -81,7 +82,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		if err != nil {
 			framework.Logf("Failed to get pvc %s/%s: %v", pvc.Namespace, pvc.Name, err)
 		} else {
-			framework.DeletePersistentVolumeClaim(c, newPvc.Name, newPvc.Namespace)
+			e2epv.DeletePersistentVolumeClaim(c, newPvc.Name, newPvc.Namespace)
 			if newPvc.Spec.VolumeName != "" {
 				err = framework.WaitForPersistentVolumeDeleted(c, newPvc.Spec.VolumeName, 5*time.Second, 5*time.Minute)
 				framework.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", newPvc.Spec.VolumeName)
@@ -387,14 +388,14 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			pvc *v1.PersistentVolumeClaim
 
 			className = "bound-unbound-count-test-sc"
-			pvConfig  = framework.PersistentVolumeConfig{
+			pvConfig  = e2epv.PersistentVolumeConfig{
 				PVSource: v1.PersistentVolumeSource{
 					HostPath: &v1.HostPathVolumeSource{Path: "/data"},
 				},
 				NamePrefix:       "pv-test-",
 				StorageClassName: className,
 			}
-			pvcConfig = framework.PersistentVolumeClaimConfig{StorageClassName: &className}
+			pvcConfig = e2epv.PersistentVolumeClaimConfig{StorageClassName: &className}
 
 			metrics = []struct {
 				name      string
@@ -442,8 +443,8 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 				framework.Skipf("Environment does not support getting controller-manager metrics - skipping")
 			}
 
-			pv = framework.MakePersistentVolume(pvConfig)
-			pvc = framework.MakePersistentVolumeClaim(pvcConfig, ns)
+			pv = e2epv.MakePersistentVolume(pvConfig)
+			pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, ns)
 
 			// Initializes all original metric values.
 			controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
@@ -455,10 +456,10 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-			if err := framework.DeletePersistentVolume(c, pv.Name); err != nil {
+			if err := e2epv.DeletePersistentVolume(c, pv.Name); err != nil {
 				framework.Failf("Error deleting pv: %v", err)
 			}
-			if err := framework.DeletePersistentVolumeClaim(c, pvc.Name, pvc.Namespace); err != nil {
+			if err := e2epv.DeletePersistentVolumeClaim(c, pvc.Name, pvc.Namespace); err != nil {
 				framework.Failf("Error deleting pvc: %v", err)
 			}
 
@@ -473,7 +474,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		ginkgo.It("should create unbound pv count metrics for pvc controller after creating pv only",
 			func() {
 				var err error
-				pv, err = framework.CreatePV(c, pv)
+				pv, err = e2epv.CreatePV(c, pv)
 				framework.ExpectNoError(err, "Error creating pv: %v", err)
 				waitForPVControllerSync(metricsGrabber, unboundPVKey, classKey)
 				validator([]map[string]int64{nil, {className: 1}, nil, nil})
@@ -482,7 +483,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		ginkgo.It("should create unbound pvc count metrics for pvc controller after creating pvc only",
 			func() {
 				var err error
-				pvc, err = framework.CreatePVC(c, ns, pvc)
+				pvc, err = e2epv.CreatePVC(c, ns, pvc)
 				framework.ExpectNoError(err, "Error creating pvc: %v", err)
 				waitForPVControllerSync(metricsGrabber, unboundPVCKey, namespaceKey)
 				validator([]map[string]int64{nil, nil, nil, {ns: 1}})
@@ -491,7 +492,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		ginkgo.It("should create bound pv/pvc count metrics for pvc controller after creating both pv and pvc",
 			func() {
 				var err error
-				pv, pvc, err = framework.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
+				pv, pvc, err = e2epv.CreatePVPVC(c, pvConfig, pvcConfig, ns, true)
 				framework.ExpectNoError(err, "Error creating pv pvc: %v", err)
 				waitForPVControllerSync(metricsGrabber, boundPVKey, classKey)
 				waitForPVControllerSync(metricsGrabber, boundPVCKey, namespaceKey)

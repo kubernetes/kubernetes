@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/podlogs"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
@@ -264,7 +265,7 @@ func (r *genericVolumeTestResource) cleanupResource() {
 		switch r.pattern.VolType {
 		case testpatterns.PreprovisionedPV:
 			ginkgo.By("Deleting pv and pvc")
-			if errs := framework.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.pv, r.pvc); len(errs) != 0 {
+			if errs := e2epv.PVPVCCleanup(f.ClientSet, f.Namespace.Name, r.pv, r.pvc); len(errs) != 0 {
 				framework.Failf("Failed to delete PVC or PV: %v", utilerrors.NewAggregate(errs))
 			}
 		case testpatterns.DynamicPV:
@@ -275,7 +276,7 @@ func (r *genericVolumeTestResource) cleanupResource() {
 					r.pv.Name, v1.PersistentVolumeReclaimDelete)
 			}
 			if r.pvc != nil {
-				err := framework.DeletePersistentVolumeClaim(f.ClientSet, r.pvc.Name, f.Namespace.Name)
+				err := e2epv.DeletePersistentVolumeClaim(f.ClientSet, r.pvc.Name, f.Namespace.Name)
 				framework.ExpectNoError(err, "Failed to delete PVC %v", r.pvc.Name)
 				if r.pv != nil {
 					err = framework.WaitForPersistentVolumeDeleted(f.ClientSet, r.pv.Name, 5*time.Second, 5*time.Minute)
@@ -306,7 +307,7 @@ func createPVCPV(
 	volMode v1.PersistentVolumeMode,
 	accessModes []v1.PersistentVolumeAccessMode,
 ) (*v1.PersistentVolume, *v1.PersistentVolumeClaim) {
-	pvConfig := framework.PersistentVolumeConfig{
+	pvConfig := e2epv.PersistentVolumeConfig{
 		NamePrefix:       fmt.Sprintf("%s-", name),
 		StorageClassName: f.Namespace.Name,
 		PVSource:         *pvSource,
@@ -314,7 +315,7 @@ func createPVCPV(
 		AccessModes:      accessModes,
 	}
 
-	pvcConfig := framework.PersistentVolumeClaimConfig{
+	pvcConfig := e2epv.PersistentVolumeClaimConfig{
 		StorageClassName: &f.Namespace.Name,
 		AccessModes:      accessModes,
 	}
@@ -325,10 +326,10 @@ func createPVCPV(
 	}
 
 	framework.Logf("Creating PVC and PV")
-	pv, pvc, err := framework.CreatePVCPV(f.ClientSet, pvConfig, pvcConfig, f.Namespace.Name, false)
+	pv, pvc, err := e2epv.CreatePVCPV(f.ClientSet, pvConfig, pvcConfig, f.Namespace.Name, false)
 	framework.ExpectNoError(err, "PVC, PV creation failed")
 
-	err = framework.WaitOnPVandPVC(f.ClientSet, f.Namespace.Name, pv, pvc)
+	err = e2epv.WaitOnPVandPVC(f.ClientSet, f.Namespace.Name, pv, pvc)
 	framework.ExpectNoError(err, "PVC, PV failed to bind")
 
 	return pv, pvc
@@ -346,7 +347,7 @@ func createPVCPVFromDynamicProvisionSC(
 	ns := f.Namespace.Name
 
 	ginkgo.By("creating a claim")
-	pvcCfg := framework.PersistentVolumeClaimConfig{
+	pvcCfg := e2epv.PersistentVolumeClaimConfig{
 		NamePrefix:       name,
 		ClaimSize:        claimSize,
 		StorageClassName: &(sc.Name),
@@ -354,14 +355,14 @@ func createPVCPVFromDynamicProvisionSC(
 		VolumeMode:       &volMode,
 	}
 
-	pvc := framework.MakePersistentVolumeClaim(pvcCfg, ns)
+	pvc := e2epv.MakePersistentVolumeClaim(pvcCfg, ns)
 
 	var err error
-	pvc, err = framework.CreatePVC(cs, ns, pvc)
+	pvc, err = e2epv.CreatePVC(cs, ns, pvc)
 	framework.ExpectNoError(err)
 
 	if !isDelayedBinding(sc) {
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 	}
 

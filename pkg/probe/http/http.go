@@ -25,8 +25,8 @@ import (
 	"time"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/probe"
-	"k8s.io/kubernetes/pkg/version"
 
 	"k8s.io/klog"
 	utilio "k8s.io/utils/io"

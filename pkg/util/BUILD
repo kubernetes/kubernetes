@@ -17,7 +17,6 @@ filegroup(
         "//pkg/util/configz:all-srcs",
         "//pkg/util/conntrack:all-srcs",
         "//pkg/util/coverage:all-srcs",
-        "//pkg/util/dbus:all-srcs",
         "//pkg/util/ebtables:all-srcs",
         "//pkg/util/env:all-srcs",
         "//pkg/util/filesystem:all-srcs",
