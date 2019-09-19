@@ -38,6 +38,7 @@ import (
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/flowcontrol"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	"github.com/stretchr/testify/assert"
 )
@@ -299,7 +300,7 @@ func TestAnonymousConfig(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(*actual, expected) {
-			t.Fatalf("AnonymousClientConfig dropped unexpected fields, identify whether they are security related or not: %s", diff.ObjectGoPrintDiff(expected, actual))
+			t.Fatalf("AnonymousClientConfig dropped unexpected fields, identify whether they are security related or not: %s", cmp.Diff(expected, actual))
 		}
 	}
 }

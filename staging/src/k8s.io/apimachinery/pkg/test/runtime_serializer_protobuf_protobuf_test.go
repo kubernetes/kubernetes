@@ -24,6 +24,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -32,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 type testObject struct {
@@ -357,7 +357,7 @@ func TestDecodeObjects(t *testing.T) {
 		}
 
 		if !apiequality.Semantic.DeepEqual(obj, test.obj) {
-			t.Errorf("%d: unexpected object:\n%s", i, diff.ObjectGoPrintDiff(test.obj, obj))
+			t.Errorf("%d: unexpected object:\n%s", i, cmp.Diff(test.obj, obj))
 			continue
 		}
 	}

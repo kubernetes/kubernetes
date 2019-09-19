@@ -20,12 +20,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 )
 
 const (
@@ -83,7 +83,7 @@ func TestList(t *testing.T) {
 		*newPartialObjectMetadata("group/version", "TheKind", "ns-foo", "name-baz"),
 	}
 	if !equality.Semantic.DeepEqual(listFirst.Items, expected) {
-		t.Fatal(diff.ObjectGoPrintDiff(expected, listFirst.Items))
+		t.Fatal(cmp.Diff(expected, listFirst.Items))
 	}
 }
 
@@ -136,7 +136,7 @@ func (tc *patchTestCase) verifyResult(result *metav1.PartialObjectMetadata) erro
 		return nil
 	}
 	if !equality.Semantic.DeepEqual(result, tc.expectedPatchedObject) {
-		return fmt.Errorf("unexpected diff in received object: %s", diff.ObjectGoPrintDiff(tc.expectedPatchedObject, result))
+		return fmt.Errorf("unexpected diff in received object: %s", cmp.Diff(tc.expectedPatchedObject, result))
 	}
 	return nil
 }

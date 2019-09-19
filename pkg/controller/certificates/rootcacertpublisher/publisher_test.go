@@ -20,9 +20,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/controller"
@@ -157,7 +157,7 @@ func TestConfigMapCreation(t *testing.T) {
 
 			actions := client.Actions()
 			if reflect.DeepEqual(actions, tc.ExpectActions) {
-				t.Errorf("Unexpected actions:\n%s", diff.ObjectGoPrintDiff(actions, tc.ExpectActions))
+				t.Errorf("Unexpected actions:\n%s", cmp.Diff(actions, tc.ExpectActions))
 			}
 		})
 	}

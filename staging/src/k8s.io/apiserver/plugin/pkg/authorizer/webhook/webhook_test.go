@@ -33,9 +33,9 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/authorization/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/client-go/tools/clientcmd/api/v1"
@@ -538,7 +538,7 @@ func TestWebhook(t *testing.T) {
 			continue
 		}
 		if !reflect.DeepEqual(gotAttr, tt.want) {
-			t.Errorf("case %d: got != want:\n%s", i, diff.ObjectGoPrintDiff(gotAttr, tt.want))
+			t.Errorf("case %d: got != want:\n%s", i, cmp.Diff(gotAttr, tt.want))
 		}
 	}
 }

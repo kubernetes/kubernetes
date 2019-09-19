@@ -25,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/coreos/etcd/clientv3"
+	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -32,7 +33,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
@@ -152,7 +152,7 @@ func TestEtcdStoragePath(t *testing.T) {
 			}
 
 			if !apiequality.Semantic.DeepDerivative(input, output) {
-				t.Errorf("Test stub for %s does not match: %s", kind, diff.ObjectGoPrintDiff(input, output))
+				t.Errorf("Test stub for %s does not match: %s", kind, cmp.Diff(input, output))
 			}
 
 			addGVKToEtcdBucket(cohabitatingResources, actualGVK, getEtcdBucket(testData.ExpectedEtcdPath))

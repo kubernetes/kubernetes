@@ -54,7 +54,6 @@ go_test(
     deps = [
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
         "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/json:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
