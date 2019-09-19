@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"net"
 	"testing"
 
 	"k8s.io/api/core/v1"
@@ -118,5 +119,73 @@ func TestGetHostname(t *testing.T) {
 			t.Errorf("[%d]: expected output %q, got %q", idx, test.expectedHostName, hostName)
 		}
 
+	}
+}
+
+func TestGetNodeHostIP(t *testing.T) {
+	testCases := []struct {
+		description    string
+		addresses      []v1.NodeAddress
+		expectedHostIP net.IP
+		expectError    bool
+	}{
+		{
+			description: "empty node addresses",
+			addresses:   []v1.NodeAddress{},
+			expectError: true,
+		},
+		{
+			description: "with external address only",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "1.2.3.4"},
+			},
+			expectedHostIP: net.ParseIP("1.2.3.4"),
+			expectError:    false,
+		},
+		{
+			description: "with external and internal address",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "1.2.3.4"},
+				{Type: v1.NodeInternalIP, Address: "5.6.7.8"},
+			},
+			expectedHostIP: net.ParseIP("5.6.7.8"),
+			expectError:    false,
+		},
+		{
+			description: "with external and multiple internal addresses",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "1.2.3.4"},
+				{Type: v1.NodeInternalIP, Address: "5.6.7.8"},
+				{Type: v1.NodeInternalIP, Address: "3.4.5.6"},
+			},
+			expectedHostIP: net.ParseIP("5.6.7.8"),
+			expectError:    false,
+		},
+		{
+			description: "with external and internal ipv6 addresses",
+			addresses: []v1.NodeAddress{
+				{Type: v1.NodeExternalIP, Address: "FE80:CD00:0000:0CDE:1257:0000:211E:729C"},
+				{Type: v1.NodeInternalIP, Address: "FE80:CD00:0000:0CDE:1257:0000:211E:809C"},
+				{Type: v1.NodeInternalIP, Address: "FE80:CD00:0000:0CDE:1257:0000:211E:729C"},
+			},
+			expectedHostIP: net.ParseIP("FE80:CD00:0000:0CDE:1257:0000:211E:809C"),
+			expectError:    false,
+		},
+	}
+
+	for idx, test := range testCases {
+		node := &v1.Node{
+			Status: v1.NodeStatus{Addresses: test.addresses},
+		}
+		hostIP, err := GetNodeHostIP(node)
+		if err != nil && !test.expectError {
+			t.Errorf("[%d]: unexpected error: %s", idx, err)
+		}
+		if err == nil && test.expectError {
+			t.Errorf("[%d]: expected error, got none", idx)
+		}
+		if !test.expectedHostIP.Equal(hostIP) {
+			t.Errorf("[%d]: for test case: %q expected output %q, got %q", idx, test.description, test.expectedHostIP, hostIP)
+		}
 	}
 }
