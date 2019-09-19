@@ -28,10 +28,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -126,7 +126,7 @@ func TestTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(status, &timeoutErr.ErrStatus) {
-		t.Errorf("unexpected object: %s", diff.ObjectReflectDiff(&timeoutErr.ErrStatus, status))
+		t.Errorf("unexpected object: %s", cmp.Diff(&timeoutErr.ErrStatus, status))
 	}
 	if record.Count() != 1 {
 		t.Errorf("did not invoke record method: %#v", record)

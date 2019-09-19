@@ -24,11 +24,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/rest"
 )
 
@@ -83,7 +83,7 @@ func TestClient(t *testing.T) {
 					},
 				}
 				if !reflect.DeepEqual(expect, obj) {
-					t.Fatal(diff.ObjectReflectDiff(expect, obj))
+					t.Fatal(cmp.Diff(expect, obj))
 				}
 			},
 		},
@@ -140,7 +140,7 @@ func TestClient(t *testing.T) {
 					},
 				}
 				if !reflect.DeepEqual(expect, objs.Items) {
-					t.Fatal(diff.ObjectReflectDiff(expect, objs.Items))
+					t.Fatal(cmp.Diff(expect, objs.Items))
 				}
 			},
 		},

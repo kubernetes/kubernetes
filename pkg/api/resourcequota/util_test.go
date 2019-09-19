@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -86,14 +86,14 @@ func TestDropDisabledFields(t *testing.T) {
 
 					// old ResourceQuota should never be changed
 					if !reflect.DeepEqual(oldrq, oldRQInfo.resourceQuota()) {
-						t.Errorf("old ResourceQuota changed: %v", diff.ObjectReflectDiff(oldrq, oldRQInfo.resourceQuota()))
+						t.Errorf("old ResourceQuota changed: %v", cmp.Diff(oldrq, oldRQInfo.resourceQuota()))
 					}
 
 					switch {
 					case enabled || oldRQHasSelector:
 						// new ResourceQuota should not be changed if the feature is enabled, or if the old ResourceQuota had ScopeSelector
 						if !reflect.DeepEqual(newrq, newRQInfo.resourceQuota()) {
-							t.Errorf("new ResourceQuota changed: %v", diff.ObjectReflectDiff(newrq, newRQInfo.resourceQuota()))
+							t.Errorf("new ResourceQuota changed: %v", cmp.Diff(newrq, newRQInfo.resourceQuota()))
 						}
 					case newRQHasSelector:
 						// new ResourceQuota should be changed
@@ -102,12 +102,12 @@ func TestDropDisabledFields(t *testing.T) {
 						}
 						// new ResourceQuota should not have ScopeSelector
 						if !reflect.DeepEqual(newrq, rqWithoutScopeSelector()) {
-							t.Errorf("new ResourceQuota had ScopeSelector: %v", diff.ObjectReflectDiff(newrq, rqWithoutScopeSelector()))
+							t.Errorf("new ResourceQuota had ScopeSelector: %v", cmp.Diff(newrq, rqWithoutScopeSelector()))
 						}
 					default:
 						// new ResourceQuota should not need to be changed
 						if !reflect.DeepEqual(newrq, newRQInfo.resourceQuota()) {
-							t.Errorf("new ResourceQuota changed: %v", diff.ObjectReflectDiff(newrq, newRQInfo.resourceQuota()))
+							t.Errorf("new ResourceQuota changed: %v", cmp.Diff(newrq, newRQInfo.resourceQuota()))
 						}
 					}
 				})

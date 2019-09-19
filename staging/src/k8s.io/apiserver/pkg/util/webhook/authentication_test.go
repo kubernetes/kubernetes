@@ -19,8 +19,8 @@ package webhook
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/rest"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -206,7 +206,7 @@ func TestAuthenticationDetection(t *testing.T) {
 			actual.Timeout = 0
 
 			if !equality.Semantic.DeepEqual(*actual, tc.expected) {
-				t.Errorf("%v", diff.ObjectReflectDiff(tc.expected, *actual))
+				t.Errorf("%v", cmp.Diff(tc.expected, *actual))
 			}
 		})
 	}

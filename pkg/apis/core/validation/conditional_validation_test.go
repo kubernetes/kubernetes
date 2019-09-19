@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -82,10 +82,10 @@ func TestValidatePodSCTP(t *testing.T) {
 					errs := ValidateConditionalPod(newPod, oldPod, nil)
 					// objects should never be changed
 					if !reflect.DeepEqual(oldPod, oldPodInfo.object()) {
-						t.Errorf("old object changed: %v", diff.ObjectReflectDiff(oldPod, oldPodInfo.object()))
+						t.Errorf("old object changed: %v", cmp.Diff(oldPod, oldPodInfo.object()))
 					}
 					if !reflect.DeepEqual(newPod, newPodInfo.object()) {
-						t.Errorf("new object changed: %v", diff.ObjectReflectDiff(newPod, newPodInfo.object()))
+						t.Errorf("new object changed: %v", cmp.Diff(newPod, newPodInfo.object()))
 					}
 
 					switch {
@@ -156,10 +156,10 @@ func TestValidateServiceSCTP(t *testing.T) {
 					errs := ValidateConditionalService(newService, oldService)
 					// objects should never be changed
 					if !reflect.DeepEqual(oldService, oldServiceInfo.object()) {
-						t.Errorf("old object changed: %v", diff.ObjectReflectDiff(oldService, oldServiceInfo.object()))
+						t.Errorf("old object changed: %v", cmp.Diff(oldService, oldServiceInfo.object()))
 					}
 					if !reflect.DeepEqual(newService, newServiceInfo.object()) {
-						t.Errorf("new object changed: %v", diff.ObjectReflectDiff(newService, newServiceInfo.object()))
+						t.Errorf("new object changed: %v", cmp.Diff(newService, newServiceInfo.object()))
 					}
 
 					switch {
@@ -230,10 +230,10 @@ func TestValidateEndpointsSCTP(t *testing.T) {
 					errs := ValidateConditionalEndpoints(newEndpoints, oldEndpoints)
 					// objects should never be changed
 					if !reflect.DeepEqual(oldEndpoints, oldEndpointsInfo.object()) {
-						t.Errorf("old object changed: %v", diff.ObjectReflectDiff(oldEndpoints, oldEndpointsInfo.object()))
+						t.Errorf("old object changed: %v", cmp.Diff(oldEndpoints, oldEndpointsInfo.object()))
 					}
 					if !reflect.DeepEqual(newEndpoints, newEndpointsInfo.object()) {
-						t.Errorf("new object changed: %v", diff.ObjectReflectDiff(newEndpoints, newEndpointsInfo.object()))
+						t.Errorf("new object changed: %v", cmp.Diff(newEndpoints, newEndpointsInfo.object()))
 					}
 
 					switch {

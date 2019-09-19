@@ -25,12 +25,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	authenticationv1 "k8s.io/api/authentication/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -816,7 +816,7 @@ func TestCollectDataWithServiceAccountToken(t *testing.T) {
 				t.Fatalf("unexpected failure making payload: %v", err)
 			}
 			if e, a := tc.payload, actualPayload; !reflect.DeepEqual(e, a) {
-				t.Errorf("expected and actual payload do not match:\n%s", diff.ObjectReflectDiff(e, a))
+				t.Errorf("expected and actual payload do not match:\n%s", cmp.Diff(e, a))
 			}
 		})
 	}

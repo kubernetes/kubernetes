@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/storage"
@@ -77,14 +77,14 @@ func TestDropAllowVolumeExpansion(t *testing.T) {
 
 					// old StorageClass should never be changed
 					if !reflect.DeepEqual(oldStorageClass, oldStorageClassInfo.sc()) {
-						t.Errorf("old StorageClass changed: %v", diff.ObjectReflectDiff(oldStorageClass, oldStorageClassInfo.sc()))
+						t.Errorf("old StorageClass changed: %v", cmp.Diff(oldStorageClass, oldStorageClassInfo.sc()))
 					}
 
 					switch {
 					case enabled || oldStorageClassHasAllowVolumeExpansion:
 						// new StorageClass should not be changed if the feature is enabled, or if the old StorageClass had AllowVolumeExpansion
 						if !reflect.DeepEqual(newStorageClass, newStorageClassInfo.sc()) {
-							t.Errorf("new StorageClass changed: %v", diff.ObjectReflectDiff(newStorageClass, newStorageClassInfo.sc()))
+							t.Errorf("new StorageClass changed: %v", cmp.Diff(newStorageClass, newStorageClassInfo.sc()))
 						}
 					case newStorageClassHasAllowVolumeExpansion:
 						// new StorageClass should be changed
@@ -93,12 +93,12 @@ func TestDropAllowVolumeExpansion(t *testing.T) {
 						}
 						// new StorageClass should not have AllowVolumeExpansion
 						if !reflect.DeepEqual(newStorageClass, scWithoutAllowVolumeExpansion()) {
-							t.Errorf("new StorageClass had StorageClassAllowVolumeExpansion: %v", diff.ObjectReflectDiff(newStorageClass, scWithoutAllowVolumeExpansion()))
+							t.Errorf("new StorageClass had StorageClassAllowVolumeExpansion: %v", cmp.Diff(newStorageClass, scWithoutAllowVolumeExpansion()))
 						}
 					default:
 						// new StorageClass should not need to be changed
 						if !reflect.DeepEqual(newStorageClass, newStorageClassInfo.sc()) {
-							t.Errorf("new StorageClass changed: %v", diff.ObjectReflectDiff(newStorageClass, newStorageClassInfo.sc()))
+							t.Errorf("new StorageClass changed: %v", cmp.Diff(newStorageClass, newStorageClassInfo.sc()))
 						}
 					}
 				})

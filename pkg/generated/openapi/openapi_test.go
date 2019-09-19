@@ -22,8 +22,7 @@ import (
 	"testing"
 
 	"github.com/go-openapi/spec"
-
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestOpenAPIRoundtrip(t *testing.T) {
@@ -43,7 +42,7 @@ func TestOpenAPIRoundtrip(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(value.Schema, roundTripped) {
-				t.Errorf("unexpected diff (a=expected,b=roundtripped):\n%s", diff.ObjectReflectDiff(value.Schema, roundTripped))
+				t.Errorf("unexpected diff (a=expected,b=roundtripped):\n%s", cmp.Diff(value.Schema, roundTripped))
 				return
 			}
 		})

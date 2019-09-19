@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -80,14 +80,14 @@ func TestDropAllowedProcMountTypes(t *testing.T) {
 
 					// old PodSecurityPolicySpec should never be changed
 					if !reflect.DeepEqual(oldPSPSpec, oldPSPSpecInfo.sc()) {
-						t.Errorf("old PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(oldPSPSpec, oldPSPSpecInfo.sc()))
+						t.Errorf("old PodSecurityPolicySpec changed: %v", cmp.Diff(oldPSPSpec, oldPSPSpecInfo.sc()))
 					}
 
 					switch {
 					case enabled || oldPSPSpecHasAllowedProcMountTypes:
 						// new PodSecurityPolicySpec should not be changed if the feature is enabled, or if the old PodSecurityPolicySpec had AllowedProcMountTypes
 						if !reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
-							t.Errorf("new PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(newPSPSpec, newPSPSpecInfo.sc()))
+							t.Errorf("new PodSecurityPolicySpec changed: %v", cmp.Diff(newPSPSpec, newPSPSpecInfo.sc()))
 						}
 					case newPSPSpecHasAllowedProcMountTypes:
 						// new PodSecurityPolicySpec should be changed
@@ -96,12 +96,12 @@ func TestDropAllowedProcMountTypes(t *testing.T) {
 						}
 						// new PodSecurityPolicySpec should not have AllowedProcMountTypes
 						if !reflect.DeepEqual(newPSPSpec, scWithoutAllowedProcMountTypes()) {
-							t.Errorf("new PodSecurityPolicySpec had PodSecurityPolicySpecAllowedProcMountTypes: %v", diff.ObjectReflectDiff(newPSPSpec, scWithoutAllowedProcMountTypes()))
+							t.Errorf("new PodSecurityPolicySpec had PodSecurityPolicySpecAllowedProcMountTypes: %v", cmp.Diff(newPSPSpec, scWithoutAllowedProcMountTypes()))
 						}
 					default:
 						// new PodSecurityPolicySpec should not need to be changed
 						if !reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
-							t.Errorf("new PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(newPSPSpec, newPSPSpecInfo.sc()))
+							t.Errorf("new PodSecurityPolicySpec changed: %v", cmp.Diff(newPSPSpec, newPSPSpecInfo.sc()))
 						}
 					}
 				})
@@ -160,14 +160,14 @@ func TestDropRunAsGroup(t *testing.T) {
 
 					// old PodSecurityPolicySpec should never be changed
 					if !reflect.DeepEqual(oldPSPSpec, oldPSPSpecInfo.sc()) {
-						t.Errorf("old PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(oldPSPSpec, oldPSPSpecInfo.sc()))
+						t.Errorf("old PodSecurityPolicySpec changed: %v", cmp.Diff(oldPSPSpec, oldPSPSpecInfo.sc()))
 					}
 
 					switch {
 					case enabled || oldPSPSpecHasRunAsGroup:
 						// new PodSecurityPolicySpec should not be changed if the feature is enabled, or if the old PodSecurityPolicySpec had RunAsGroup
 						if !reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
-							t.Errorf("new PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(newPSPSpec, newPSPSpecInfo.sc()))
+							t.Errorf("new PodSecurityPolicySpec changed: %v", cmp.Diff(newPSPSpec, newPSPSpecInfo.sc()))
 						}
 					case newPSPSpecHasRunAsGroup:
 						// new PodSecurityPolicySpec should be changed
@@ -176,12 +176,12 @@ func TestDropRunAsGroup(t *testing.T) {
 						}
 						// new PodSecurityPolicySpec should not have RunAsGroup
 						if !reflect.DeepEqual(newPSPSpec, scWithoutRunAsGroup()) {
-							t.Errorf("new PodSecurityPolicySpec had RunAsGroup: %v", diff.ObjectReflectDiff(newPSPSpec, scWithoutRunAsGroup()))
+							t.Errorf("new PodSecurityPolicySpec had RunAsGroup: %v", cmp.Diff(newPSPSpec, scWithoutRunAsGroup()))
 						}
 					default:
 						// new PodSecurityPolicySpec should not need to be changed
 						if !reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
-							t.Errorf("new PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(newPSPSpec, newPSPSpecInfo.sc()))
+							t.Errorf("new PodSecurityPolicySpec changed: %v", cmp.Diff(newPSPSpec, newPSPSpecInfo.sc()))
 						}
 					}
 				})
@@ -249,14 +249,14 @@ func TestDropSysctls(t *testing.T) {
 
 					// old PodSecurityPolicySpec should never be changed
 					if !reflect.DeepEqual(oldPSPSpec, oldPSPSpecInfo.sc()) {
-						t.Errorf("old PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(oldPSPSpec, oldPSPSpecInfo.sc()))
+						t.Errorf("old PodSecurityPolicySpec changed: %v", cmp.Diff(oldPSPSpec, oldPSPSpecInfo.sc()))
 					}
 
 					switch {
 					case enabled || oldPSPSpecHasSysctls:
 						// new PodSecurityPolicySpec should not be changed if the feature is enabled, or if the old PodSecurityPolicySpec had Sysctls
 						if !reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
-							t.Errorf("new PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(newPSPSpec, newPSPSpecInfo.sc()))
+							t.Errorf("new PodSecurityPolicySpec changed: %v", cmp.Diff(newPSPSpec, newPSPSpecInfo.sc()))
 						}
 					case newPSPSpecHasSysctls:
 						// new PodSecurityPolicySpec should be changed
@@ -265,12 +265,12 @@ func TestDropSysctls(t *testing.T) {
 						}
 						// new PodSecurityPolicySpec should not have Sysctls
 						if !reflect.DeepEqual(newPSPSpec, scWithoutSysctls()) {
-							t.Errorf("new PodSecurityPolicySpec had Sysctls: %v", diff.ObjectReflectDiff(newPSPSpec, scWithoutSysctls()))
+							t.Errorf("new PodSecurityPolicySpec had Sysctls: %v", cmp.Diff(newPSPSpec, scWithoutSysctls()))
 						}
 					default:
 						// new PodSecurityPolicySpec should not need to be changed
 						if !reflect.DeepEqual(newPSPSpec, newPSPSpecInfo.sc()) {
-							t.Errorf("new PodSecurityPolicySpec changed: %v", diff.ObjectReflectDiff(newPSPSpec, newPSPSpecInfo.sc()))
+							t.Errorf("new PodSecurityPolicySpec changed: %v", cmp.Diff(newPSPSpec, newPSPSpecInfo.sc()))
 						}
 					}
 				})

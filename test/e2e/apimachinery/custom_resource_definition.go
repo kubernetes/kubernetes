@@ -17,6 +17,7 @@ limitations under the License.
 package apimachinery
 
 import (
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -27,7 +28,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
@@ -117,7 +117,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 				framework.ExpectNotEqual(expected, nil)
 				if !equality.Semantic.DeepEqual(actual.Spec, expected.Spec) {
 					e2elog.Failf("Expected CustomResourceDefinition in list with name %s to match crd created with same name, but got different specs:\n%s",
-						actual.Name, diff.ObjectReflectDiff(expected.Spec, actual.Spec))
+						actual.Name, cmp.Diff(expected.Spec, actual.Spec))
 				}
 			}
 
@@ -161,7 +161,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 				framework.ExpectNoError(err, "getting CustomResourceDefinition status")
 				status := unstructuredToCRD(u)
 				if !equality.Semantic.DeepEqual(status.Spec, crd.Spec) {
-					e2elog.Failf("Expected CustomResourceDefinition Spec to match status sub-resource Spec, but got:\n%s", diff.ObjectReflectDiff(status.Spec, crd.Spec))
+					e2elog.Failf("Expected CustomResourceDefinition Spec to match status sub-resource Spec, but got:\n%s", cmp.Diff(status.Spec, crd.Spec))
 				}
 				status.Status.Conditions = append(status.Status.Conditions, updateCondition)
 				updated, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().UpdateStatus(status)

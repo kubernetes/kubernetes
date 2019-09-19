@@ -32,7 +32,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/scheme"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/transport"
@@ -378,7 +377,7 @@ func TestCopyConfig(t *testing.T) {
 		expected.AuthConfigPersister = nil
 
 		if !reflect.DeepEqual(*actual, expected) {
-			t.Fatalf("CopyConfig  dropped unexpected fields, identify whether they are security related or not: %s", diff.ObjectReflectDiff(expected, *actual))
+			t.Fatalf("CopyConfig  dropped unexpected fields, identify whether they are security related or not: %s", cmp.Diff(expected, *actual))
 		}
 	}
 }

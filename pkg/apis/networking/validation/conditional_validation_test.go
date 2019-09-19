@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -85,10 +85,10 @@ func TestValidateNetworkPolicySCTP(t *testing.T) {
 					errs := ValidateConditionalNetworkPolicy(newNetworkPolicy, oldNetworkPolicy)
 					// objects should never be changed
 					if !reflect.DeepEqual(oldNetworkPolicy, oldNetworkPolicyInfo.object()) {
-						t.Errorf("old object changed: %v", diff.ObjectReflectDiff(oldNetworkPolicy, oldNetworkPolicyInfo.object()))
+						t.Errorf("old object changed: %v", cmp.Diff(oldNetworkPolicy, oldNetworkPolicyInfo.object()))
 					}
 					if !reflect.DeepEqual(newNetworkPolicy, newNetworkPolicyInfo.object()) {
-						t.Errorf("new object changed: %v", diff.ObjectReflectDiff(newNetworkPolicy, newNetworkPolicyInfo.object()))
+						t.Errorf("new object changed: %v", cmp.Diff(newNetworkPolicy, newNetworkPolicyInfo.object()))
 					}
 
 					switch {

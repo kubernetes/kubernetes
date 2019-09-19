@@ -27,7 +27,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
 	"k8s.io/apiserver/pkg/storage/value"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
@@ -319,7 +318,7 @@ func TestLegacyConfig(t *testing.T) {
 		},
 	}
 	if !reflect.DeepEqual(legacyConfigObject, expected) {
-		t.Fatal(diff.ObjectReflectDiff(expected, legacyConfigObject))
+		t.Fatal(cmp.Diff(expected, legacyConfigObject))
 	}
 }
 func TestEncryptionProviderConfigCorrect(t *testing.T) {

@@ -35,6 +35,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
@@ -45,7 +46,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/streaming"
 	"k8s.io/apimachinery/pkg/util/clock"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/watch"
@@ -858,22 +858,22 @@ func TestTransformUnstructuredError(t *testing.T) {
 			expect = err
 		}
 		if !reflect.DeepEqual(expect, transformed) {
-			t.Errorf("%d: unexpected Error(): %s", i, diff.ObjectReflectDiff(expect, transformed))
+			t.Errorf("%d: unexpected Error(): %s", i, cmp.Diff(expect, transformed))
 		}
 
 		// verify result.Get properly transforms the error
 		if _, err := result.Get(); !reflect.DeepEqual(expect, err) {
-			t.Errorf("%d: unexpected error on Get(): %s", i, diff.ObjectReflectDiff(expect, err))
+			t.Errorf("%d: unexpected error on Get(): %s", i, cmp.Diff(expect, err))
 		}
 
 		// verify result.Into properly handles the error
 		if err := result.Into(&v1.Pod{}); !reflect.DeepEqual(expect, err) {
-			t.Errorf("%d: unexpected error on Into(): %s", i, diff.ObjectReflectDiff(expect, err))
+			t.Errorf("%d: unexpected error on Into(): %s", i, cmp.Diff(expect, err))
 		}
 
 		// verify result.Raw leaves the error in the untransformed state
 		if _, err := result.Raw(); !reflect.DeepEqual(result.err, err) {
-			t.Errorf("%d: unexpected error on Raw(): %s", i, diff.ObjectReflectDiff(expect, err))
+			t.Errorf("%d: unexpected error on Raw(): %s", i, cmp.Diff(expect, err))
 		}
 	}
 }
@@ -1066,7 +1066,7 @@ func TestRequestWatch(t *testing.T) {
 						t.Fatalf("Watch closed early, %d/%d read", i, len(testCase.Expect))
 					}
 					if !reflect.DeepEqual(evt, out) {
-						t.Fatalf("Event %d does not match: %s", i, diff.ObjectReflectDiff(evt, out))
+						t.Fatalf("Event %d does not match: %s", i, cmp.Diff(evt, out))
 					}
 				}
 			}

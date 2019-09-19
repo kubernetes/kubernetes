@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -78,14 +78,14 @@ func TestDropNonPreemptingPriority(t *testing.T) {
 
 					// old PriorityClass should never be changed
 					if !reflect.DeepEqual(oldPriorityClass, oldPriorityClassInfo.pc()) {
-						t.Errorf("old PriorityClass changed: %v", diff.ObjectReflectDiff(oldPriorityClass, oldPriorityClassInfo.pc()))
+						t.Errorf("old PriorityClass changed: %v", cmp.Diff(oldPriorityClass, oldPriorityClassInfo.pc()))
 					}
 
 					switch {
 					case enabled || oldPriorityClassHasNonPreemptingPriority:
 						// new PriorityClass should not be changed if the feature is enabled, or if the old PriorityClass had NonPreemptingPriority
 						if !reflect.DeepEqual(newPriorityClass, newPriorityClassInfo.pc()) {
-							t.Errorf("new PriorityClass changed: %v", diff.ObjectReflectDiff(newPriorityClass, newPriorityClassInfo.pc()))
+							t.Errorf("new PriorityClass changed: %v", cmp.Diff(newPriorityClass, newPriorityClassInfo.pc()))
 						}
 					case newPriorityClassHasNonPreemptingPriority:
 						// new PriorityClass should be changed
@@ -94,12 +94,12 @@ func TestDropNonPreemptingPriority(t *testing.T) {
 						}
 						// new PriorityClass should not have NonPreemptingPriority
 						if !reflect.DeepEqual(newPriorityClass, pcWithoutNonPreemptingPriority()) {
-							t.Errorf("new PriorityClass had PriorityClassNonPreemptingPriority: %v", diff.ObjectReflectDiff(newPriorityClass, pcWithoutNonPreemptingPriority()))
+							t.Errorf("new PriorityClass had PriorityClassNonPreemptingPriority: %v", cmp.Diff(newPriorityClass, pcWithoutNonPreemptingPriority()))
 						}
 					default:
 						// new PriorityClass should not need to be changed
 						if !reflect.DeepEqual(newPriorityClass, newPriorityClassInfo.pc()) {
-							t.Errorf("new PriorityClass changed: %v", diff.ObjectReflectDiff(newPriorityClass, newPriorityClassInfo.pc()))
+							t.Errorf("new PriorityClass changed: %v", cmp.Diff(newPriorityClass, newPriorityClassInfo.pc()))
 						}
 					}
 				})

@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
@@ -572,7 +571,7 @@ func TestConvertToTableList(t *testing.T) {
 			continue
 		}
 		if !apiequality.Semantic.DeepEqual(test.out, out) {
-			t.Errorf("%d: mismatch: %s", i, diff.ObjectReflectDiff(test.out, out))
+			t.Errorf("%d: mismatch: %s", i, cmp.Diff(test.out, out))
 		}
 	}
 }

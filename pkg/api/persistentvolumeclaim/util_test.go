@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/util/diff"
+	"github.com/google/go-cmp/cmp"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/apis/core"
@@ -88,14 +88,14 @@ func TestDropAlphaPVCVolumeMode(t *testing.T) {
 
 					// old pvc should never be changed
 					if !reflect.DeepEqual(oldpvc, oldpvcInfo.pvc()) {
-						t.Errorf("old pvc changed: %v", diff.ObjectReflectDiff(oldpvc, oldpvcInfo.pvc()))
+						t.Errorf("old pvc changed: %v", cmp.Diff(oldpvc, oldpvcInfo.pvc()))
 					}
 
 					switch {
 					case enabled || oldpvcHasVolumeMode:
 						// new pvc should not be changed if the feature is enabled, or if the old pvc had BlockVolume
 						if !reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
-							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newpvc, newpvcInfo.pvc()))
+							t.Errorf("new pvc changed: %v", cmp.Diff(newpvc, newpvcInfo.pvc()))
 						}
 					case newpvcHasVolumeMode:
 						// new pvc should be changed
@@ -104,12 +104,12 @@ func TestDropAlphaPVCVolumeMode(t *testing.T) {
 						}
 						// new pvc should not have BlockVolume
 						if !reflect.DeepEqual(newpvc, pvcWithoutVolumeMode()) {
-							t.Errorf("new pvc had pvcBlockVolume: %v", diff.ObjectReflectDiff(newpvc, pvcWithoutVolumeMode()))
+							t.Errorf("new pvc had pvcBlockVolume: %v", cmp.Diff(newpvc, pvcWithoutVolumeMode()))
 						}
 					default:
 						// new pvc should not need to be changed
 						if !reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
-							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newpvc, newpvcInfo.pvc()))
+							t.Errorf("new pvc changed: %v", cmp.Diff(newpvc, newpvcInfo.pvc()))
 						}
 					}
 				})
@@ -181,14 +181,14 @@ func TestDropDisabledSnapshotDataSource(t *testing.T) {
 
 					// old pvc should never be changed
 					if !reflect.DeepEqual(oldpvc, oldpvcInfo.pvc()) {
-						t.Errorf("old pvc changed: %v", diff.ObjectReflectDiff(oldpvc, oldpvcInfo.pvc()))
+						t.Errorf("old pvc changed: %v", cmp.Diff(oldpvc, oldpvcInfo.pvc()))
 					}
 
 					switch {
 					case enabled || oldPvcHasDataSource:
 						// new pvc should not be changed if the feature is enabled, or if the old pvc had DataSource
 						if !reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
-							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newpvc, newpvcInfo.pvc()))
+							t.Errorf("new pvc changed: %v", cmp.Diff(newpvc, newpvcInfo.pvc()))
 						}
 					case newPvcHasDataSource:
 						// new pvc should be changed
@@ -197,12 +197,12 @@ func TestDropDisabledSnapshotDataSource(t *testing.T) {
 						}
 						// new pvc should not have DataSource
 						if !reflect.DeepEqual(newpvc, pvcWithoutDataSource()) {
-							t.Errorf("new pvc had DataSource: %v", diff.ObjectReflectDiff(newpvc, pvcWithoutDataSource()))
+							t.Errorf("new pvc had DataSource: %v", cmp.Diff(newpvc, pvcWithoutDataSource()))
 						}
 					default:
 						// new pvc should not need to be changed
 						if !reflect.DeepEqual(newpvc, newpvcInfo.pvc()) {
-							t.Errorf("new pvc changed: %v", diff.ObjectReflectDiff(newpvc, newpvcInfo.pvc()))
+							t.Errorf("new pvc changed: %v", cmp.Diff(newpvc, newpvcInfo.pvc()))
 						}
 					}
 				})

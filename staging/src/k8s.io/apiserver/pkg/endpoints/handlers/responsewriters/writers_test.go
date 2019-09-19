@@ -28,10 +28,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -260,7 +260,7 @@ func TestSerializeObject(t *testing.T) {
 				t.Fatalf("unexpected code: %v", result.StatusCode)
 			}
 			if !reflect.DeepEqual(result.Header, tt.wantHeaders) {
-				t.Fatal(diff.ObjectReflectDiff(tt.wantHeaders, result.Header))
+				t.Fatal(cmp.Diff(tt.wantHeaders, result.Header))
 			}
 			body, _ := ioutil.ReadAll(result.Body)
 			if !bytes.Equal(tt.wantBody, body) {

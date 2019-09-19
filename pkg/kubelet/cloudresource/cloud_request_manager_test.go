@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/cloud-provider/fake"
 )
 
@@ -54,7 +54,7 @@ func TestNodeAddressesDelay(t *testing.T) {
 		t.Errorf("Unexpected err: %q\n", err)
 	}
 	if !reflect.DeepEqual(nodeAddresses, cloud.Addresses) {
-		t.Errorf("Unexpected diff of node addresses: %v", diff.ObjectReflectDiff(nodeAddresses, cloud.Addresses))
+		t.Errorf("Unexpected diff of node addresses: %v", cmp.Diff(nodeAddresses, cloud.Addresses))
 	}
 
 	// Change the IP address
@@ -126,7 +126,7 @@ func TestNodeAddressesUsesLastSuccess(t *testing.T) {
 				t.Errorf("unexpected err: %v", err)
 			}
 			if got, want := nodeAddresses, test.wantAddrs; !reflect.DeepEqual(got, want) {
-				t.Errorf("Unexpected diff of node addresses: %v", diff.ObjectReflectDiff(got, want))
+				t.Errorf("Unexpected diff of node addresses: %v", cmp.Diff(got, want))
 			}
 		})
 	}

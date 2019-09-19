@@ -21,12 +21,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/utils/pointer"
 )
@@ -82,10 +82,10 @@ func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
 					dropDisabledFields(&newCRD.Spec, oldCRDSpec)
 					// old CRD should never be changed
 					if !reflect.DeepEqual(oldCRD, oldCRDInfo.crd()) {
-						t.Errorf("old crd changed: %v", diff.ObjectReflectDiff(oldCRD, oldCRDInfo.crd()))
+						t.Errorf("old crd changed: %v", cmp.Diff(oldCRD, oldCRDInfo.crd()))
 					}
 					if !reflect.DeepEqual(newCRD, newCRDInfo.crd()) {
-						t.Errorf("new crd changed: %v", diff.ObjectReflectDiff(newCRD, newCRDInfo.crd()))
+						t.Errorf("new crd changed: %v", cmp.Diff(newCRD, newCRDInfo.crd()))
 					}
 				},
 			)
@@ -140,10 +140,10 @@ func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
 					dropDisabledFields(&newCRD.Spec, oldCRDSpec)
 					// old CRD should never be changed
 					if !reflect.DeepEqual(oldCRD, oldCRDInfo.crd()) {
-						t.Errorf("old crd changed: %v", diff.ObjectReflectDiff(oldCRD, oldCRDInfo.crd()))
+						t.Errorf("old crd changed: %v", cmp.Diff(oldCRD, oldCRDInfo.crd()))
 					}
 					if !reflect.DeepEqual(newCRD, newCRDInfo.crd()) {
-						t.Errorf("new crd changed: %v", diff.ObjectReflectDiff(newCRD, newCRDInfo.crd()))
+						t.Errorf("new crd changed: %v", cmp.Diff(newCRD, newCRDInfo.crd()))
 					}
 				},
 			)
@@ -211,10 +211,10 @@ func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
 					dropDisabledFields(&newCRD.Spec, oldCRDSpec)
 					// old CRD should never be changed
 					if !reflect.DeepEqual(oldCRD, oldCRDInfo.crd()) {
-						t.Errorf("old crd changed: %v", diff.ObjectReflectDiff(oldCRD, oldCRDInfo.crd()))
+						t.Errorf("old crd changed: %v", cmp.Diff(oldCRD, oldCRDInfo.crd()))
 					}
 					if !reflect.DeepEqual(newCRD, newCRDInfo.crd()) {
-						t.Errorf("new crd changed: %v", diff.ObjectReflectDiff(newCRD, newCRDInfo.crd()))
+						t.Errorf("new crd changed: %v", cmp.Diff(newCRD, newCRDInfo.crd()))
 					}
 				},
 			)
@@ -280,10 +280,10 @@ func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
 					dropDisabledFields(&newCRD.Spec, oldCRDSpec)
 					// old CRD should never be changed
 					if !reflect.DeepEqual(oldCRD, oldCRDInfo.crd()) {
-						t.Errorf("old crd changed: %v", diff.ObjectReflectDiff(oldCRD, oldCRDInfo.crd()))
+						t.Errorf("old crd changed: %v", cmp.Diff(oldCRD, oldCRDInfo.crd()))
 					}
 					if !reflect.DeepEqual(newCRD, newCRDInfo.crd()) {
-						t.Errorf("new crd changed: %v", diff.ObjectReflectDiff(newCRD, newCRDInfo.crd()))
+						t.Errorf("new crd changed: %v", cmp.Diff(newCRD, newCRDInfo.crd()))
 					}
 				},
 			)
@@ -342,10 +342,10 @@ func TestDropDisableFieldsCustomResourceDefinition(t *testing.T) {
 					dropDisabledFields(&newCRD.Spec, oldCRDSpec)
 					// old CRD should never be changed
 					if !reflect.DeepEqual(oldCRD, oldCRDInfo.crd()) {
-						t.Errorf("old crd changed: %v", diff.ObjectReflectDiff(oldCRD, oldCRDInfo.crd()))
+						t.Errorf("old crd changed: %v", cmp.Diff(oldCRD, oldCRDInfo.crd()))
 					}
 					if !reflect.DeepEqual(newCRD, newCRDInfo.crd()) {
-						t.Errorf("new crd changed: %v", diff.ObjectReflectDiff(newCRD, newCRDInfo.crd()))
+						t.Errorf("new crd changed: %v", cmp.Diff(newCRD, newCRDInfo.crd()))
 					}
 				},
 			)

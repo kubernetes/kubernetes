@@ -20,11 +20,11 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/rest/fake"
 	cmdtesting "k8s.io/kubectl/pkg/cmd/testing"
@@ -144,7 +144,7 @@ func TestCreateRole(t *testing.T) {
 				t.Fatal(err)
 			}
 			if !equality.Semantic.DeepEqual(test.expectedRole, actual) {
-				t.Errorf("%s", diff.ObjectReflectDiff(test.expectedRole, actual))
+				t.Errorf("%s", cmp.Diff(test.expectedRole, actual))
 			}
 		})
 	}

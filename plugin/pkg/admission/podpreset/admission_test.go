@@ -22,12 +22,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	fuzz "github.com/google/gofuzz"
 	corev1 "k8s.io/api/core/v1"
 	settingsv1alpha1 "k8s.io/api/settings/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	kadmission "k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -882,7 +882,7 @@ func TestEnvFromMergeKey(t *testing.T) {
 			}
 
 			if !reflect.DeepEqual(orig, clone) {
-				t.Errorf("expected all but known non-identifying fields for envFrom to be in envFromMergeKey but found unaccounted for differences, diff:\n%s", diff.ObjectReflectDiff(orig, clone))
+				t.Errorf("expected all but known non-identifying fields for envFrom to be in envFromMergeKey but found unaccounted for differences, diff:\n%s", cmp.Diff(orig, clone))
 			}
 
 		})

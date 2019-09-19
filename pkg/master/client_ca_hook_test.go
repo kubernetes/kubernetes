@@ -20,10 +20,10 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/client-go/kubernetes/fake"
 	clienttesting "k8s.io/client-go/testing"
 )
@@ -219,7 +219,7 @@ func TestWriteClientCAs(t *testing.T) {
 
 			actualConfigMaps, updated := getFinalConfigMaps(client)
 			if !reflect.DeepEqual(test.expectedConfigMaps, actualConfigMaps) {
-				t.Fatalf("%s: %v", test.name, diff.ObjectReflectDiff(test.expectedConfigMaps, actualConfigMaps))
+				t.Fatalf("%s: %v", test.name, cmp.Diff(test.expectedConfigMaps, actualConfigMaps))
 			}
 			if test.expectUpdate != updated {
 				t.Fatalf("%s: expected %v, got %v", test.name, test.expectUpdate, updated)

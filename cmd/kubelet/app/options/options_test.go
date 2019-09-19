@@ -21,9 +21,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/spf13/pflag"
 
-	"k8s.io/apimachinery/pkg/util/diff"
 	cliflag "k8s.io/component-base/cli/flag"
 )
 
@@ -105,7 +105,7 @@ func TestRoundTrip(t *testing.T) {
 		}
 		cleanFlags(outputFlags)
 		if !reflect.DeepEqual(modifiedFlags, outputFlags) {
-			t.Errorf("%s: flags did not round trip: %s", testCase.name, diff.ObjectReflectDiff(modifiedFlags, outputFlags))
+			t.Errorf("%s: flags did not round trip: %s", testCase.name, cmp.Diff(modifiedFlags, outputFlags))
 			continue
 		}
 	}
