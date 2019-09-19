@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 type FakeNodeListInfo []*v1.Node
@@ -506,6 +507,22 @@ func TestInterPodAffinityPriority(t *testing.T) {
 			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: 0}, {Host: "machine3", Score: schedulerapi.MaxPriority}, {Host: "machine4", Score: 0}},
 			name:         "Affinity and Anti Affinity and symmetry: considered only preferredDuringSchedulingIgnoredDuringExecution in both pod affinity & anti affinity & symmetry",
 		},
+		// Cover https://github.com/kubernetes/kubernetes/issues/82796 which panics upon:
+		// 1. Some nodes in a topology don't have pods with affinity, but other nodes in the same topology have.
+		// 2. The incoming pod doesn't have affinity.
+		{
+			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+			pods: []*v1.Pod{
+				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
+				{Spec: v1.PodSpec{NodeName: "machine2", Affinity: stayWithS1InRegionAwayFromS2InAz}},
+			},
+			nodes: []*v1.Node{
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChina}},
+			},
+			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}},
+			name:         "Avoid panic when partial nodes in a topology don't have pods with affinity",
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -608,6 +625,60 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 			}
 			if !reflect.DeepEqual(test.expectedList, list) {
 				t.Errorf("expected \n\t%#v, \ngot \n\t%#v\n", test.expectedList, list)
+			}
+		})
+	}
+}
+
+func BenchmarkInterPodAffinityPriority(b *testing.B) {
+	tests := []struct {
+		name            string
+		pod             *v1.Pod
+		existingPodsNum int
+		allNodesNum     int
+		prepFunc        func(existingPodsNum, allNodesNum int) (existingPods []*v1.Pod, allNodes []*v1.Node)
+	}{
+		{
+			name:            "1000nodes/incoming pod without PodAffinity and existing pods without PodAffinity",
+			pod:             st.MakePod().Name("p").Label("foo", "").Obj(),
+			existingPodsNum: 10000,
+			allNodesNum:     1000,
+			prepFunc:        st.MakeNodesAndPods,
+		},
+		{
+			name:            "1000nodes/incoming pod with PodAffinity and existing pods without PodAffinity",
+			pod:             st.MakePod().Name("p").Label("foo", "").PodAffinityExists("foo", "zone", st.PodAffinityWithPreferredReq).Obj(),
+			existingPodsNum: 10000,
+			allNodesNum:     1000,
+			prepFunc:        st.MakeNodesAndPods,
+		},
+		{
+			name:            "1000nodes/incoming pod without PodAffinity and existing pods with PodAffinity",
+			pod:             st.MakePod().Name("p").Label("foo", "").Obj(),
+			existingPodsNum: 10000,
+			allNodesNum:     1000,
+			prepFunc:        st.MakeNodesAndPodsForPodAffinity,
+		},
+		{
+			name:            "1000nodes/incoming pod with PodAffinity and existing pods with PodAffinity",
+			pod:             st.MakePod().Name("p").Label("foo", "").PodAffinityExists("foo", "zone", st.PodAffinityWithPreferredReq).Obj(),
+			existingPodsNum: 10000,
+			allNodesNum:     1000,
+			prepFunc:        st.MakeNodesAndPodsForPodAffinity,
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			existingPods, allNodes := tt.prepFunc(tt.existingPodsNum, tt.allNodesNum)
+			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(existingPods, allNodes)
+			interPodAffinity := InterPodAffinity{
+				info:                  FakeNodeListInfo(allNodes),
+				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				interPodAffinity.CalculateInterPodAffinityPriority(tt.pod, nodeNameToInfo, allNodes)
 			}
 		})
 	}

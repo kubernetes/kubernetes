@@ -190,7 +190,7 @@ func (p *PodWrapper) NodeSelector(m map[string]string) *PodWrapper {
 }
 
 // NodeAffinityIn creates a HARD node affinity (with the operator In)
-// and injects into the innner pod.
+// and injects into the inner pod.
 func (p *PodWrapper) NodeAffinityIn(key string, vals []string) *PodWrapper {
 	if p.Spec.Affinity == nil {
 		p.Spec.Affinity = &v1.Affinity{}
@@ -204,7 +204,7 @@ func (p *PodWrapper) NodeAffinityIn(key string, vals []string) *PodWrapper {
 }
 
 // NodeAffinityNotIn creates a HARD node affinity (with the operator NotIn)
-// and injects into the innner pod.
+// and injects into the inner pod.
 func (p *PodWrapper) NodeAffinityNotIn(key string, vals []string) *PodWrapper {
 	if p.Spec.Affinity == nil {
 		p.Spec.Affinity = &v1.Affinity{}
@@ -214,6 +214,104 @@ func (p *PodWrapper) NodeAffinityNotIn(key string, vals []string) *PodWrapper {
 	}
 	nodeSelector := MakeNodeSelector().NotIn(key, vals).Obj()
 	p.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution = nodeSelector
+	return p
+}
+
+// PodAffinityKind represents different kinds of PodAffinity.
+type PodAffinityKind int
+
+const (
+	// NilPodAffinity is a no-op which doesn't apply any PodAffinity.
+	NilPodAffinity PodAffinityKind = iota
+	// PodAffinityWithRequiredReq applies a HARD requirement to pod.spec.affinity.PodAffinity.
+	PodAffinityWithRequiredReq
+	// PodAffinityWithPreferredReq applies a SOFT requirement to pod.spec.affinity.PodAffinity.
+	PodAffinityWithPreferredReq
+	// PodAffinityWithRequiredPreferredReq applies HARD and SOFT requirements to pod.spec.affinity.PodAffinity.
+	PodAffinityWithRequiredPreferredReq
+	// PodAntiAffinityWithRequiredReq applies a HARD requirement to pod.spec.affinity.PodAntiAffinity.
+	PodAntiAffinityWithRequiredReq
+	// PodAntiAffinityWithPreferredReq applies a SOFT requirement to pod.spec.affinity.PodAntiAffinity.
+	PodAntiAffinityWithPreferredReq
+	// PodAntiAffinityWithRequiredPreferredReq applies HARD and SOFT requirements to pod.spec.affinity.PodAntiAffinity.
+	PodAntiAffinityWithRequiredPreferredReq
+)
+
+// PodAffinityExists creates an PodAffinity with the operator "Exists"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAffinityExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
+	if kind == NilPodAffinity {
+		return p
+	}
+
+	if p.Spec.Affinity == nil {
+		p.Spec.Affinity = &v1.Affinity{}
+	}
+	if p.Spec.Affinity.PodAffinity == nil {
+		p.Spec.Affinity.PodAffinity = &v1.PodAffinity{}
+	}
+	labelSelector := MakeLabelSelector().Exists(labelKey).Obj()
+	term := v1.PodAffinityTerm{LabelSelector: labelSelector, TopologyKey: topologyKey}
+	switch kind {
+	case PodAffinityWithRequiredReq:
+		p.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			term,
+		)
+	case PodAffinityWithPreferredReq:
+		p.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			v1.WeightedPodAffinityTerm{Weight: 1, PodAffinityTerm: term},
+		)
+	case PodAffinityWithRequiredPreferredReq:
+		p.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			term,
+		)
+		p.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			v1.WeightedPodAffinityTerm{Weight: 1, PodAffinityTerm: term},
+		)
+	}
+	return p
+}
+
+// PodAntiAffinityExists creates an PodAntiAffinity with the operator "Exists"
+// and injects into the inner pod.
+func (p *PodWrapper) PodAntiAffinityExists(labelKey, topologyKey string, kind PodAffinityKind) *PodWrapper {
+	if kind == NilPodAffinity {
+		return p
+	}
+
+	if p.Spec.Affinity == nil {
+		p.Spec.Affinity = &v1.Affinity{}
+	}
+	if p.Spec.Affinity.PodAntiAffinity == nil {
+		p.Spec.Affinity.PodAntiAffinity = &v1.PodAntiAffinity{}
+	}
+	labelSelector := MakeLabelSelector().Exists(labelKey).Obj()
+	term := v1.PodAffinityTerm{LabelSelector: labelSelector, TopologyKey: topologyKey}
+	switch kind {
+	case PodAntiAffinityWithRequiredReq:
+		p.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			term,
+		)
+	case PodAntiAffinityWithPreferredReq:
+		p.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			v1.WeightedPodAffinityTerm{Weight: 1, PodAffinityTerm: term},
+		)
+	case PodAntiAffinityWithRequiredPreferredReq:
+		p.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAntiAffinity.RequiredDuringSchedulingIgnoredDuringExecution,
+			term,
+		)
+		p.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution = append(
+			p.Spec.Affinity.PodAntiAffinity.PreferredDuringSchedulingIgnoredDuringExecution,
+			v1.WeightedPodAffinityTerm{Weight: 1, PodAffinityTerm: term},
+		)
+	}
 	return p
 }
 
