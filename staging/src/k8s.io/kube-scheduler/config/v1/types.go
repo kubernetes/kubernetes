@@ -18,11 +18,24 @@ package v1
 
 import (
 	gojson "encoding/json"
+	"math"
 	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+)
+
+const (
+	// MaxTotalPriority defines the max total priority value.
+	MaxTotalPriority = int64(math.MaxInt64)
+	// MaxPriority defines the max priority value.
+	MaxPriority = 10
+	// MaxWeight defines the max weight value.
+	MaxWeight = MaxTotalPriority / MaxPriority
+	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
+	// that once found feasible, the scheduler stops looking for more nodes.
+	DefaultPercentageOfNodesToScore = 50
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

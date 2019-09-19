@@ -22,16 +22,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"k8s.io/apimachinery/pkg/runtime/serializer/versioning"
 	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	// Init the api v1 package
-	_ "k8s.io/kubernetes/pkg/scheduler/api/v1"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 )
 
 // Version is the string that represents the current external default version.
 const Version = "v1"
 
 // OldestVersion is the string that represents the oldest server version supported.
-const OldestVersion = "v1"
+// const OldestVersion = "v1"
 
 // Versions is the list of versions that are recognized in code. The order provided
 // may be assumed to be least feature rich to most feature rich, and clients may
@@ -44,10 +42,10 @@ var Versions = []string{"v1"}
 var Codec runtime.Codec
 
 func init() {
-	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, schedulerapi.Scheme, schedulerapi.Scheme, true)
+	jsonSerializer := json.NewSerializer(json.DefaultMetaFactory, scheme.Scheme, scheme.Scheme, true)
 	serializer := yaml.NewDecodingSerializer(jsonSerializer)
 	Codec = versioning.NewDefaultingCodecForScheme(
-		schedulerapi.Scheme,
+		scheme.Scheme,
 		serializer,
 		serializer,
 		schema.GroupVersion{Version: Version},
