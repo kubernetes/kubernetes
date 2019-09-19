@@ -73,6 +73,8 @@ func makeLabels(labels, annotations map[string]string) map[string]string {
 	for k, v := range annotations {
 		// Assume there won't be conflict.
 		merged[fmt.Sprintf("%s%s", annotationPrefix, k)] = v
+		// Add annotation without prefix
+		merged[k] = v
 	}
 	return merged
 }
@@ -107,7 +109,13 @@ func extractLabels(input map[string]string) (map[string]string, map[string]strin
 			annotations[strings.TrimPrefix(k, annotationPrefix)] = v
 			continue
 		}
-		labels[k] = v
+
+		// Check to see if label also exists as annotation
+		if _, exists := input[fmt.Sprintf("%s%s", annotationPrefix, k)]; !exists {
+			// Append label if it does not exist as annotation
+			labels[k] = v
+		}
+
 	}
 	return labels, annotations
 }
