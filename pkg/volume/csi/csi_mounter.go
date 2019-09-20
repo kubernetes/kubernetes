@@ -252,34 +252,31 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		mountOptions,
 	)
 
-	if err != nil {
-		if removeMountDirErr := removeMountDir(c.plugin, dir); removeMountDirErr != nil {
-			klog.Error(log("mounter.SetupAt failed to remove mount dir after a NodePublish() error [%s]: %v", dir, removeMountDirErr))
+	defer func() {
+		if err != nil {
+			// attempt to rollback mount and its dir.
+			klog.Warningf("reverting NodePublishVolume for [%s] due to failure %q", c.volumeID, err.Error())
+			if unpubErr := csi.NodeUnpublishVolume(ctx, c.volumeID, dir); unpubErr != nil {
+				klog.Error(log("NodeUnpublishVolume failed for [%s]: %v", c.volumeID, unpubErr))
+			}
+			klog.Warningf("reverting created MountDir for [%s] due to failure %q", c.volumeID, err.Error())
+			if unmountErr := removeMountDir(c.plugin, dir); unmountErr != nil {
+				klog.Error(log("removeMountDir failed for [%s]: %v", dir, unmountErr))
+			}
 		}
-		return errors.New(log("mounter.SetupAt failed: %v", err))
-	}
+	}()
 
 	// apply volume ownership
 	// The following logic is derived from https://github.com/kubernetes/kubernetes/issues/66323
 	// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
 	// if fstype is provided and pv.AccessMode == ReadWriteOnly, then apply fsgroup
 
-	err = c.applyFSGroup(fsType, mounterArgs.FsGroup)
-	if err != nil {
-		// attempt to rollback mount.
-		fsGrpErr := fmt.Errorf("applyFSGroup failed for vol %s: %v", c.volumeID, err)
-		if unpubErr := csi.NodeUnpublishVolume(ctx, c.volumeID, dir); unpubErr != nil {
-			klog.Error(log("NodeUnpublishVolume failed for [%s]: %v", c.volumeID, unpubErr))
-			return fsGrpErr
-		}
-
-		if unmountErr := removeMountDir(c.plugin, dir); unmountErr != nil {
-			klog.Error(log("removeMountDir failed for [%s]: %v", dir, unmountErr))
-			return fsGrpErr
-		}
-		return fsGrpErr
+	if err == nil {
+		err = c.applyFSGroup(fsType, mounterArgs.FsGroup)
 	}
-
+	if err != nil {
+		return err
+	}
 	klog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
 	return nil
 }

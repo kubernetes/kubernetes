@@ -325,6 +325,18 @@ func TestMounterSetUpSimple(t *testing.T) {
 			shouldFail: true,
 			spec:       func(fsType string, options []string) *volume.Spec { return nil },
 		},
+		{
+			name:       "setup with invalid fstype",
+			podUID:     types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			mode:       storagev1beta1.VolumeLifecyclePersistent,
+			fsType:     "invalid",
+			shouldFail: true,
+			spec: func(fsType string, options []string) *volume.Spec {
+				pvSrc := volume.NewSpecFromPersistentVolume(makeTestPV("pv3", 20, testDriver, "vol3"), false)
+				pvSrc.PersistentVolume.Spec.CSI.FSType = fsType
+				return pvSrc
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -362,6 +374,10 @@ func TestMounterSetUpSimple(t *testing.T) {
 
 			// Mounter.SetUp()
 			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
+				if tc.shouldFail {
+					t.Logf("csiMounter.SetUp failed as expected, skip further validation: %s", err.Error())
+					return
+				}
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 

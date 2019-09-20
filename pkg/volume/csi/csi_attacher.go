@@ -390,6 +390,14 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		csiSource.VolumeAttributes,
 		mountOptions)
 
+	defer func() {
+		if err != nil && stageUnstageSet {
+			klog.Warningf("reverting NodeStageVolume for [%s] due to failure %q", csiSource.VolumeHandle, err.Error())
+			if unstage := csi.NodeUnstageVolume(ctx, csiSource.VolumeHandle, deviceMountPath); unstage != nil {
+				klog.Error(log("NodeStageVolume failed for [%s]: %v", csiSource.VolumeHandle, unstage))
+			}
+		}
+	}()
 	if err != nil {
 		return err
 	}
