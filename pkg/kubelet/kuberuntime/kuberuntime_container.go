@@ -654,30 +654,54 @@ func isSidecar(containers []v1.Container, name string) bool {
 	return false
 }
 
+func gracePeriodRemaining(pod *v1.Pod, gracePeriodOverride *int64, startTime time.Time) *int64 {
+	timeElapsed := int64(time.Since(startTime).Seconds())
+
+	switch {
+	case gracePeriodOverride != nil:
+		newPeriod := *gracePeriodOverride - timeElapsed
+		gracePeriodOverride = &newPeriod
+	case pod.DeletionGracePeriodSeconds != nil:
+		newPeriod := *pod.DeletionGracePeriodSeconds - timeElapsed
+		gracePeriodOverride = &newPeriod
+	case pod.Spec.TerminationGracePeriodSeconds != nil:
+		newPeriod := *pod.Spec.TerminationGracePeriodSeconds - timeElapsed
+		gracePeriodOverride = &newPeriod
+	}
+
+	return gracePeriodOverride
+}
+
 // killContainersWithSyncResult kills all pod's containers with sync results.
 func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, runningPod kubecontainer.Pod, gracePeriodOverride *int64) (syncResults []*kubecontainer.SyncResult) {
 	containerResults := make(chan *kubecontainer.SyncResult, len(runningPod.Containers))
 	wg := sync.WaitGroup{}
 
-	var containers []*kubecontainer.Container
+	containers := runningPod.Containers
 	var sidecars []*kubecontainer.Container
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarLifecycle) {
 		if pod != nil {
+			var nonSidecars []*kubecontainer.Container
 			for _, container := range runningPod.Containers {
 				if isSidecar(pod.Spec.Containers, container.Name) {
 					sidecars = append(sidecars, container)
 				} else {
-					containers = append(containers, container)
+					nonSidecars = append(nonSidecars, container)
 				}
 			}
-		} else {
-			containers = runningPod.Containers
+			containers = nonSidecars
+		}
+		if len(sidecars) != 0 {
+			timePreStopStarted := time.Now()
+			m.preStopContainers(pod, sidecars)
+			gracePeriodOverride = gracePeriodRemaining(pod, gracePeriodOverride, timePreStopStarted)
 		}
 	} else {
 		containers = runningPod.Containers
 	}
 
+	timeContainerKillStarted := time.Now()
 	wg.Add(len(containers))
 	for _, container := range containers {
 		go func(container *kubecontainer.Container) {
@@ -695,6 +719,8 @@ func (m *kubeGenericRuntimeManager) killContainersWithSyncResult(pod *v1.Pod, ru
 	wg.Wait()
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.SidecarLifecycle) && len(sidecars) != 0 {
+		gracePeriodOverride = gracePeriodRemaining(pod, gracePeriodOverride, timeContainerKillStarted)
+
 		wg.Add(len(sidecars))
 		for _, container := range sidecars {
 			go func(container *kubecontainer.Container) {
