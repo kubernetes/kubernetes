@@ -2123,8 +2123,8 @@ function setup-etcd-encryption {
   echo "${ENCRYPTION_PROVIDER_CONFIG}" | base64 --decode > "${encryption_provider_config_path}"
   kube_api_server_params+=" --encryption-provider-config=${encryption_provider_config_path}"
 
-  default_encryption_provider_config_vol=$(echo "{ \"name\": \"encryptionconfig\", \"hostPath\": {\"path\": \"${encryption_provider_config_path}\", \"type\": \"File\"}}" | base64)
-  default_encryption_provider_config_vol_mnt=$(echo "{ \"name\": \"encryptionconfig\", \"mountPath\": \"${encryption_provider_config_path}\", \"readOnly\": true}" | base64)
+  default_encryption_provider_config_vol=$(echo "{ \"name\": \"encryptionconfig\", \"hostPath\": {\"path\": \"${encryption_provider_config_path}\", \"type\": \"File\"}}" | base64 -w0)
+  default_encryption_provider_config_vol_mnt=$(echo "{ \"name\": \"encryptionconfig\", \"mountPath\": \"${encryption_provider_config_path}\", \"readOnly\": true}" | base64 -w0)
 
   encryption_provider_config_vol_mnt=$(echo "${ENCRYPTION_PROVIDER_CONFIG_VOL_MNT:-"${default_encryption_provider_config_vol_mnt}"}" | base64 --decode)
   encryption_provider_config_vol=$(echo "${ENCRYPTION_PROVIDER_CONFIG_VOL:-"${default_encryption_provider_config_vol}"}" | base64 --decode)
