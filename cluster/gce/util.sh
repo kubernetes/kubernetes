@@ -793,6 +793,10 @@ function construct-linux-kubelet-flags {
 }
 
 # Sets KUBELET_ARGS with the kubelet flags for Windows nodes.
+# Note that to configure flags with explicit empty string values, we can't escape
+# double-quotes, because they still break sc.exe after expansion in the
+# binPath parameter, and single-quotes get parsed as characters instead of
+# string delimiters.
 function construct-windows-kubelet-flags {
   local flags="$(construct-common-kubelet-flags)"
 
@@ -856,11 +860,8 @@ function construct-windows-kubelet-flags {
   # actually log to the file
   flags+=" --logtostderr=false"
 
-  # Configure flags with explicit empty string values. We can't escape
-  # double-quotes, because they still break sc.exe after expansion in the
-  # binPath parameter, and single-quotes get parsed as characters instead of
-  # string delimiters.
-  flags+=" --resolv-conf="
+  # Configure the file path for host dns configuration
+  flags+=" --resolv-conf=${WINDOWS_CNI_CONFIG_DIR}\hostdns.conf"
 
   # Both --cgroups-per-qos and --enforce-node-allocatable should be disabled on
   # windows; the latter requires the former to be enabled to work.
