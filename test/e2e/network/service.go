@@ -1239,7 +1239,7 @@ var _ = SIGDescribe("Services", func() {
 			e2elog.Failf("Created service with conflicting NodePort: %v", result2)
 		}
 		expectedErr := fmt.Sprintf("%d.*port is already allocated", port.NodePort)
-		framework.ExpectEqual(fmt.Sprintf("%v", err), gomega.MatchRegexp(expectedErr))
+		gomega.Expect(fmt.Sprintf("%v", err)).To(gomega.MatchRegexp(expectedErr))
 
 		ginkgo.By("deleting service " + serviceName1 + " to release NodePort")
 		err = t.DeleteService(serviceName1)
