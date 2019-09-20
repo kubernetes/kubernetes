@@ -64,7 +64,6 @@ var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "H
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-var perlImage = imageutils.GetE2EImage(imageutils.Perl)
 
 const (
 	// Kubelet internal cgroup name for node allocatable cgroup.

@@ -56,8 +56,6 @@ import (
 const (
 	// Plugin name of the external provisioner
 	externalPluginName = "example.com/nfs"
-	// Number of PVCs for multi PVC tests
-	multiPVCcount = 3
 )
 
 func checkZoneFromLabelAndAffinity(pv *v1.PersistentVolume, zone string, matchZone bool) {
