@@ -138,6 +138,11 @@ const (
 	useServerPrintColumns          = "server-print"
 )
 
+var eventSorting = map[string]string{
+	"events": ".lastTimestamp",
+	"event":  ".lastTimestamp",
+}
+
 // NewGetOptions returns a GetOptions with default chunk size 500.
 func NewGetOptions(parent string, streams genericclioptions.IOStreams) *GetOptions {
 	return &GetOptions{
@@ -211,11 +216,15 @@ func (o *GetOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []stri
 		return err
 	}
 	// For kubectl get events Added default sorting by lastTimestamp
-	if sortBy == "" {
-		if len(args) == 1 && args[0] == "events" {
-			sortBy = ".lastTimestamp"
+	if !cmd.Flags().Changed("sort-by") {
+		if len(args) == 1 {
+			value, ok := eventSorting[args[0]]
+			if ok {
+				sortBy = value
+			}
 		}
 	}
+
 	o.Sort = len(sortBy) > 0
 
 	o.NoHeaders = cmdutil.GetFlagBool(cmd, "no-headers")
@@ -513,9 +522,12 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	}
 
 	// For kubectl get events Added default sorting by .lastTimestamp
-	if sorting == "" {
-		if len(args) == 1 && args[0] == "events" {
-			sorting = ".lastTimestamp"
+	if !cmd.Flags().Changed("sort-by") {
+		if len(args) == 1 {
+			value, ok := eventSorting[args[0]]
+			if ok {
+				sorting = value
+			}
 		}
 	}
 
