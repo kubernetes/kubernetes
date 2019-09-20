@@ -119,7 +119,7 @@ func (ds *dockerService) determinePodIPBySandboxID(sandboxID string) []string {
 
 		// Versions and feature support
 		// ============================
-		// Windows version == Windows Server, Version 1709,, Supports both sandbox and non-sandbox case
+		// Windows version == Windows Server, Version 1709, Supports both sandbox and non-sandbox case
 		// Windows version == Windows Server 2016   Support only non-sandbox case
 		// Windows version < Windows Server 2016 is Not Supported
 
