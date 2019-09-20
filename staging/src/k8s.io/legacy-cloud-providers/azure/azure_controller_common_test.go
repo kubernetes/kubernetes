@@ -59,8 +59,6 @@ func TestDetachDisk(t *testing.T) {
 
 	err := common.DetachDisk("", diskURI, "node1")
 	if err != nil {
-		fmt.Printf("TestAttachDisk return expected error: %v", err)
-	} else {
-		t.Errorf("TestAttachDisk unexpected nil err")
+		t.Errorf("TestAttachDisk got unexpected error: %v", err)
 	}
 }
