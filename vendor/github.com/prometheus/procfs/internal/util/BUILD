@@ -4,7 +4,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "parse.go",
-        "sysreadfile_linux.go",
+        "sysreadfile.go",
+        "sysreadfile_compat.go",
+        "valueparser.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/procfs/internal/util",
     importpath = "github.com/prometheus/procfs/internal/util",

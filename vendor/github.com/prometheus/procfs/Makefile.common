@@ -29,12 +29,15 @@ GO           ?= go
 GOFMT        ?= $(GO)fmt
 FIRST_GOPATH := $(firstword $(subst :, ,$(shell $(GO) env GOPATH)))
 GOOPTS       ?=
+GOHOSTOS     ?= $(shell $(GO) env GOHOSTOS)
+GOHOSTARCH   ?= $(shell $(GO) env GOHOSTARCH)
 
 GO_VERSION        ?= $(shell $(GO) version)
 GO_VERSION_NUMBER ?= $(word 3, $(GO_VERSION))
 PRE_GO_111        ?= $(shell echo $(GO_VERSION_NUMBER) | grep -E 'go1\.(10|[0-9])\.')
 
-unexport GOVENDOR
+GOVENDOR :=
+GO111MODULE :=
 ifeq (, $(PRE_GO_111))
 	ifneq (,$(wildcard go.mod))
 		# Enforce Go modules support just in case the directory is inside GOPATH (and for Travis CI).
@@ -55,31 +58,57 @@ $(warning Some recipes may not work as expected as the current Go runtime is '$(
 		# This repository isn't using Go modules (yet).
 		GOVENDOR := $(FIRST_GOPATH)/bin/govendor
 	endif
-
-	unexport GO111MODULE
 endif
 PROMU        := $(FIRST_GOPATH)/bin/promu
-STATICCHECK  := $(FIRST_GOPATH)/bin/staticcheck
 pkgs          = ./...
 
-GO_VERSION        ?= $(shell $(GO) version)
-GO_BUILD_PLATFORM ?= $(subst /,-,$(lastword $(GO_VERSION)))
+ifeq (arm, $(GOHOSTARCH))
+	GOHOSTARM ?= $(shell GOARM= $(GO) env GOARM)
+	GO_BUILD_PLATFORM ?= $(GOHOSTOS)-$(GOHOSTARCH)v$(GOHOSTARM)
+else
+	GO_BUILD_PLATFORM ?= $(GOHOSTOS)-$(GOHOSTARCH)
+endif
 
-PROMU_VERSION ?= 0.2.0
+PROMU_VERSION ?= 0.4.0
 PROMU_URL     := https://github.com/prometheus/promu/releases/download/v$(PROMU_VERSION)/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM).tar.gz
+
+GOLANGCI_LINT :=
+GOLANGCI_LINT_OPTS ?=
+GOLANGCI_LINT_VERSION ?= v1.16.0
+# golangci-lint only supports linux, darwin and windows platforms on i386/amd64.
+# windows isn't included here because of the path separator being different.
+ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux darwin))
+	ifeq ($(GOHOSTARCH),$(filter $(GOHOSTARCH),amd64 i386))
+		GOLANGCI_LINT := $(FIRST_GOPATH)/bin/golangci-lint
+	endif
+endif
 
 PREFIX                  ?= $(shell pwd)
 BIN_DIR                 ?= $(shell pwd)
 DOCKER_IMAGE_TAG        ?= $(subst /,-,$(shell git rev-parse --abbrev-ref HEAD))
+DOCKERFILE_PATH         ?= ./
 DOCKER_REPO             ?= prom
 
-.PHONY: all
-all: precheck style staticcheck unused build test
+DOCKER_ARCHS            ?= amd64
+
+BUILD_DOCKER_ARCHS = $(addprefix common-docker-,$(DOCKER_ARCHS))
+PUBLISH_DOCKER_ARCHS = $(addprefix common-docker-publish-,$(DOCKER_ARCHS))
+TAG_DOCKER_ARCHS = $(addprefix common-docker-tag-latest-,$(DOCKER_ARCHS))
+
+ifeq ($(GOHOSTARCH),amd64)
+        ifeq ($(GOHOSTOS),$(filter $(GOHOSTOS),linux freebsd darwin windows))
+                # Only supported on amd64
+                test-flags := -race
+        endif
+endif
 
 # This rule is used to forward a target like "build" to "common-build".  This
 # allows a new "build" target to be defined in a Makefile which includes this
 # one and override "common-build" without override warnings.
 %: common-% ;
+
+.PHONY: common-all
+common-all: precheck style check_license lint unused build test
 
 .PHONY: common-style
 common-style:
@@ -102,6 +131,15 @@ common-check_license:
                exit 1; \
        fi
 
+.PHONY: common-deps
+common-deps:
+	@echo ">> getting dependencies"
+ifdef GO111MODULE
+	GO111MODULE=$(GO111MODULE) $(GO) mod download
+else
+	$(GO) get $(GOOPTS) -t ./...
+endif
+
 .PHONY: common-test-short
 common-test-short:
 	@echo ">> running short tests"
@@ -110,26 +148,35 @@ common-test-short:
 .PHONY: common-test
 common-test:
 	@echo ">> running all tests"
-	GO111MODULE=$(GO111MODULE) $(GO) test -race $(GOOPTS) $(pkgs)
+	GO111MODULE=$(GO111MODULE) $(GO) test $(test-flags) $(GOOPTS) $(pkgs)
 
 .PHONY: common-format
 common-format:
 	@echo ">> formatting code"
-	GO111MODULE=$(GO111MODULE) $(GO) fmt $(GOOPTS) $(pkgs)
+	GO111MODULE=$(GO111MODULE) $(GO) fmt $(pkgs)
 
 .PHONY: common-vet
 common-vet:
 	@echo ">> vetting code"
 	GO111MODULE=$(GO111MODULE) $(GO) vet $(GOOPTS) $(pkgs)
 
-.PHONY: common-staticcheck
-common-staticcheck: $(STATICCHECK)
-	@echo ">> running staticcheck"
+.PHONY: common-lint
+common-lint: $(GOLANGCI_LINT)
+ifdef GOLANGCI_LINT
+	@echo ">> running golangci-lint"
 ifdef GO111MODULE
-	GO111MODULE=$(GO111MODULE) $(STATICCHECK) -ignore "$(STATICCHECK_IGNORE)" -checks "SA*" $(pkgs)
+# 'go list' needs to be executed before staticcheck to prepopulate the modules cache.
+# Otherwise staticcheck might fail randomly for some reason not yet explained.
+	GO111MODULE=$(GO111MODULE) $(GO) list -e -compiled -test=true -export=false -deps=true -find=false -tags= -- ./... > /dev/null
+	GO111MODULE=$(GO111MODULE) $(GOLANGCI_LINT) run $(GOLANGCI_LINT_OPTS) $(pkgs)
 else
-	$(STATICCHECK) -ignore "$(STATICCHECK_IGNORE)" $(pkgs)
+	$(GOLANGCI_LINT) run $(pkgs)
 endif
+endif
+
+# For backward-compatibility.
+.PHONY: common-staticcheck
+common-staticcheck: lint
 
 .PHONY: common-unused
 common-unused: $(GOVENDOR)
@@ -140,8 +187,9 @@ else
 ifdef GO111MODULE
 	@echo ">> running check for unused/missing packages in go.mod"
 	GO111MODULE=$(GO111MODULE) $(GO) mod tidy
+ifeq (,$(wildcard vendor))
 	@git diff --exit-code -- go.sum go.mod
-ifneq (,$(wildcard vendor))
+else
 	@echo ">> running check for unused packages in vendor/"
 	GO111MODULE=$(GO111MODULE) $(GO) mod vendor
 	@git diff --exit-code -- go.sum go.mod vendor/
@@ -159,45 +207,50 @@ common-tarball: promu
 	@echo ">> building release tarball"
 	$(PROMU) tarball --prefix $(PREFIX) $(BIN_DIR)
 
-.PHONY: common-docker
-common-docker:
-	docker build -t "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" .
+.PHONY: common-docker $(BUILD_DOCKER_ARCHS)
+common-docker: $(BUILD_DOCKER_ARCHS)
+$(BUILD_DOCKER_ARCHS): common-docker-%:
+	docker build -t "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(DOCKER_IMAGE_TAG)" \
+		--build-arg ARCH="$*" \
+		--build-arg OS="linux" \
+		$(DOCKERFILE_PATH)
 
-.PHONY: common-docker-publish
-common-docker-publish:
-	docker push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)"
+.PHONY: common-docker-publish $(PUBLISH_DOCKER_ARCHS)
+common-docker-publish: $(PUBLISH_DOCKER_ARCHS)
+$(PUBLISH_DOCKER_ARCHS): common-docker-publish-%:
+	docker push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(DOCKER_IMAGE_TAG)"
 
-.PHONY: common-docker-tag-latest
-common-docker-tag-latest:
-	docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):latest"
+.PHONY: common-docker-tag-latest $(TAG_DOCKER_ARCHS)
+common-docker-tag-latest: $(TAG_DOCKER_ARCHS)
+$(TAG_DOCKER_ARCHS): common-docker-tag-latest-%:
+	docker tag "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:$(DOCKER_IMAGE_TAG)" "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$*:latest"
+
+.PHONY: common-docker-manifest
+common-docker-manifest:
+	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest create -a "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" $(foreach ARCH,$(DOCKER_ARCHS),$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME)-linux-$(ARCH):$(DOCKER_IMAGE_TAG))
+	DOCKER_CLI_EXPERIMENTAL=enabled docker manifest push "$(DOCKER_REPO)/$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)"
 
 .PHONY: promu
 promu: $(PROMU)
 
 $(PROMU):
-	curl -s -L $(PROMU_URL) | tar -xvz -C /tmp
-	mkdir -v -p $(FIRST_GOPATH)/bin
-	cp -v /tmp/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM)/promu $(PROMU)
+	$(eval PROMU_TMP := $(shell mktemp -d))
+	curl -s -L $(PROMU_URL) | tar -xvzf - -C $(PROMU_TMP)
+	mkdir -p $(FIRST_GOPATH)/bin
+	cp $(PROMU_TMP)/promu-$(PROMU_VERSION).$(GO_BUILD_PLATFORM)/promu $(FIRST_GOPATH)/bin/promu
+	rm -r $(PROMU_TMP)
 
 .PHONY: proto
 proto:
 	@echo ">> generating code from proto files"
 	@./scripts/genproto.sh
 
-.PHONY: $(STATICCHECK)
-$(STATICCHECK):
-ifdef GO111MODULE
-# Get staticcheck from a temporary directory to avoid modifying the local go.{mod,sum}.
-# See https://github.com/golang/go/issues/27643.
-# For now, we are using the next branch of staticcheck because master isn't compatible yet with Go modules.
-	tmpModule=$$(mktemp -d 2>&1) && \
-	mkdir -p $${tmpModule}/staticcheck && \
-	cd "$${tmpModule}"/staticcheck && \
-	GO111MODULE=on $(GO) mod init example.com/staticcheck && \
-	GO111MODULE=on GOOS= GOARCH= $(GO) get -u honnef.co/go/tools/cmd/staticcheck@next && \
-	rm -rf $${tmpModule};
-else
-	GOOS= GOARCH= GO111MODULE=off $(GO) get -u honnef.co/go/tools/cmd/staticcheck
+ifdef GOLANGCI_LINT
+$(GOLANGCI_LINT):
+	mkdir -p $(FIRST_GOPATH)/bin
+	curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/$(GOLANGCI_LINT_VERSION)/install.sh \
+		| sed -e '/install -d/d' \
+		| sh -s -- -b $(FIRST_GOPATH)/bin $(GOLANGCI_LINT_VERSION)
 endif
 
 ifdef GOVENDOR
@@ -211,7 +264,6 @@ precheck::
 
 define PRECHECK_COMMAND_template =
 precheck:: $(1)_precheck
-
 
 PRECHECK_COMMAND_$(1) ?= $(1) $$(strip $$(PRECHECK_OPTIONS_$(1)))
 .PHONY: $(1)_precheck

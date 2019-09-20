@@ -6,10 +6,11 @@ go 1.12
 
 require (
 	github.com/blang/semver v3.5.0+incompatible
-	github.com/prometheus/client_golang v0.9.2
-	github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910
-	github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
-	github.com/prometheus/procfs v0.0.0-20181204211112-1dc9a6cbc91a
+	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+	github.com/prometheus/client_golang v1.1.0
+	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
+	github.com/prometheus/common v0.6.0
+	github.com/prometheus/procfs v0.0.6-0.20190917143953-de25ac347ef9
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.3.0
 	k8s.io/apimachinery v0.0.0
@@ -19,6 +20,10 @@ require (
 )
 
 replace (
+	github.com/beorn7/perks => github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
+	github.com/golang/protobuf => github.com/golang/protobuf v1.3.1
+	github.com/prometheus/client_model => github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910
+	github.com/prometheus/common => github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
