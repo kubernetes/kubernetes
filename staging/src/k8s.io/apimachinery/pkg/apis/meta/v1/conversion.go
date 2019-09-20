@@ -35,6 +35,8 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 
 		Convert_v1_ListMeta_To_v1_ListMeta,
 
+		Convert_v1_DeleteOptions_To_v1_DeleteOptions,
+
 		Convert_intstr_IntOrString_To_intstr_IntOrString,
 		Convert_Pointer_intstr_IntOrString_To_intstr_IntOrString,
 		Convert_intstr_IntOrString_To_Pointer_intstr_IntOrString,
