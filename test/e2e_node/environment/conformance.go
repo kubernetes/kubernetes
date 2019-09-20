@@ -45,11 +45,11 @@ func init() {
 	// Set this to false to undo util/logs.go settings it to true.  Prevents cadvisor log spam.
 	// Remove this once util/logs.go stops setting the flag to true.
 	flag.Set("logtostderr", "false")
-	flag.Parse()
 }
 
 // TODO: Should we write an e2e test for this?
 func main() {
+	flag.Parse()
 	o := strings.Split(*checkFlag, ",")
 	errs := check(o...)
 	if len(errs) > 0 {
