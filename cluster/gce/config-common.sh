@@ -20,7 +20,7 @@
 #   NUM_NODES
 #   NUM_WINDOWS_NODES
 function get-num-nodes {
-  echo "$((${NUM_NODES} + ${NUM_WINDOWS_NODES}))"
+  echo "$((NUM_NODES + NUM_WINDOWS_NODES))"
 }
 
 # Vars assumed:
@@ -117,7 +117,7 @@ function get-cluster-ip-range {
 # $1: The number of max pods limitation.
 function get-alias-range-size() {
   for pow in {0..31}; do
-    if (( 1 << $pow >= $1 * 2 )); then
+    if (( 1 << pow >= $1 * 2 )); then
       echo $((32 - pow))
       return 0
     fi
@@ -127,25 +127,28 @@ function get-alias-range-size() {
 # in order to initialize properly.
 NODE_SCOPES="${NODE_SCOPES:-monitoring,logging-write,storage-ro}"
 
+# Below exported vars are used in cluster/gce/util.sh (or maybe somewhere else),
+# please remove those vars when not needed any more.
+
 # Root directory for Kubernetes files on Windows nodes.
 WINDOWS_K8S_DIR="C:\etc\kubernetes"
 # Directory where Kubernetes binaries will be installed on Windows nodes.
-WINDOWS_NODE_DIR="${WINDOWS_K8S_DIR}\node\bin"
+export WINDOWS_NODE_DIR="${WINDOWS_K8S_DIR}\node\bin"
 # Directory where Kubernetes log files will be stored on Windows nodes.
-WINDOWS_LOGS_DIR="${WINDOWS_K8S_DIR}\logs"
+export WINDOWS_LOGS_DIR="${WINDOWS_K8S_DIR}\logs"
 # Directory where CNI binaries will be stored on Windows nodes.
-WINDOWS_CNI_DIR="${WINDOWS_K8S_DIR}\cni"
+export WINDOWS_CNI_DIR="${WINDOWS_K8S_DIR}\cni"
 # Directory where CNI config files will be stored on Windows nodes.
-WINDOWS_CNI_CONFIG_DIR="${WINDOWS_K8S_DIR}\cni\config"
+export WINDOWS_CNI_CONFIG_DIR="${WINDOWS_K8S_DIR}\cni\config"
 # Pod manifests directory for Windows nodes on Windows nodes.
-WINDOWS_MANIFESTS_DIR="${WINDOWS_K8S_DIR}\manifests"
+export WINDOWS_MANIFESTS_DIR="${WINDOWS_K8S_DIR}\manifests"
 # Directory where cert/key files will be stores on Windows nodes.
-WINDOWS_PKI_DIR="${WINDOWS_K8S_DIR}\pki"
+export WINDOWS_PKI_DIR="${WINDOWS_K8S_DIR}\pki"
 # Path for kubelet config file on Windows nodes.
-WINDOWS_KUBELET_CONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet-config.yaml"
+export WINDOWS_KUBELET_CONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet-config.yaml"
 # Path for kubeconfig file on Windows nodes.
-WINDOWS_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet.kubeconfig"
+export WINDOWS_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet.kubeconfig"
 # Path for bootstrap kubeconfig file on Windows nodes.
-WINDOWS_BOOTSTRAP_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet.bootstrap-kubeconfig"
+export WINDOWS_BOOTSTRAP_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubelet.bootstrap-kubeconfig"
 # Path for kube-proxy kubeconfig file on Windows nodes.
-WINDOWS_KUBEPROXY_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubeproxy.kubeconfig"
+export WINDOWS_KUBEPROXY_KUBECONFIG_FILE="${WINDOWS_K8S_DIR}\kubeproxy.kubeconfig"
