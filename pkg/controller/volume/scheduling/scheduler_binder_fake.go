@@ -60,6 +60,10 @@ func (b *FakeVolumeBinder) BindPodVolumes(assumedPod *v1.Pod) error {
 	return b.config.BindErr
 }
 
+// DeletePodBindings fimplements SchedulerVolumeBinder.DeletePodBindings.
+func (b *FakeVolumeBinder) DeletePodBindings(assumedPod *v1.Pod) {
+}
+
 // GetBindingsCache implements SchedulerVolumeBinder.GetBindingsCache.
 func (b *FakeVolumeBinder) GetBindingsCache() PodBindingCache {
 	return nil

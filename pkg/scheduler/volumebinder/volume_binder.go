@@ -19,7 +19,6 @@ package volumebinder
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -49,13 +48,5 @@ func NewVolumeBinder(
 func NewFakeVolumeBinder(config *volumescheduling.FakeVolumeBinderConfig) *VolumeBinder {
 	return &VolumeBinder{
 		Binder: volumescheduling.NewFakeVolumeBinder(config),
-	}
-}
-
-// DeletePodBindings will delete the cached volume bindings for the given pod.
-func (b *VolumeBinder) DeletePodBindings(pod *v1.Pod) {
-	cache := b.Binder.GetBindingsCache()
-	if cache != nil && pod != nil {
-		cache.DeleteBindings(pod)
 	}
 }

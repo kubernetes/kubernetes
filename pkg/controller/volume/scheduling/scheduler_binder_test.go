@@ -429,7 +429,7 @@ func (env *testEnv) validateAssume(t *testing.T, name string, pod *v1.Pod, bindi
 	}
 }
 
-func (env *testEnv) validateFailedAssume(t *testing.T, name string, pod *v1.Pod, bindings []*bindingInfo, provisionings []*v1.PersistentVolumeClaim) {
+func (env *testEnv) validateCacheRestored(t *testing.T, name string, pod *v1.Pod, bindings []*bindingInfo, provisionings []*v1.PersistentVolumeClaim) {
 	// All PVs have been unmodified in cache
 	pvCache := env.internalBinder.pvCache
 	for _, b := range bindings {
@@ -997,6 +997,9 @@ func TestAssumePodVolumes(t *testing.T) {
 
 		expectedBindings      []*bindingInfo
 		expectedProvisionings []*v1.PersistentVolumeClaim
+
+		// This function runs after volumes are successfully assumed.
+		runAfterAssumedSuccessfully func(t *testing.T, testEnv *testEnv, test string, pod *v1.Pod)
 	}{
 		"all-bound": {
 			podPVCs:          []*v1.PersistentVolumeClaim{boundPVC},
@@ -1045,6 +1048,19 @@ func TestAssumePodVolumes(t *testing.T) {
 			provisionedPVCs: []*v1.PersistentVolumeClaim{provisionedPVC2},
 			shouldFail:      true,
 		},
+		"one-binding, one-pvc-provisioned, pod-delete-after-assuming": {
+			podPVCs:               []*v1.PersistentVolumeClaim{unboundPVC, provisionedPVC},
+			bindings:              []*bindingInfo{makeBinding(unboundPVC, pvNode1a)},
+			pvs:                   []*v1.PersistentVolume{pvNode1a},
+			provisionedPVCs:       []*v1.PersistentVolumeClaim{provisionedPVC},
+			expectedBindings:      []*bindingInfo{makeBinding(unboundPVC, pvNode1aBound)},
+			expectedProvisionings: []*v1.PersistentVolumeClaim{selectedNodePVC},
+			runAfterAssumedSuccessfully: func(t *testing.T, testEnv *testEnv, name string, pod *v1.Pod) {
+				testEnv.binder.DeletePodBindings(pod)
+				testEnv.validateCacheRestored(t, name, pod,
+					[]*bindingInfo{makeBinding(unboundPVC, pvNode1a)}, []*v1.PersistentVolumeClaim{provisionedPVC})
+			},
+		},
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1079,12 +1095,15 @@ func TestAssumePodVolumes(t *testing.T) {
 		if scenario.expectedProvisionings == nil {
 			scenario.expectedProvisionings = scenario.provisionedPVCs
 		}
+		testEnv.validatePodCache(t, name, pod.Spec.NodeName, pod, scenario.expectedBindings, scenario.expectedProvisionings)
 		if scenario.shouldFail {
-			testEnv.validateFailedAssume(t, name, pod, scenario.expectedBindings, scenario.expectedProvisionings)
+			testEnv.validateCacheRestored(t, name, pod, scenario.expectedBindings, scenario.expectedProvisionings)
 		} else {
 			testEnv.validateAssume(t, name, pod, scenario.expectedBindings, scenario.expectedProvisionings)
+			if scenario.runAfterAssumedSuccessfully != nil {
+				scenario.runAfterAssumedSuccessfully(t, testEnv, name, pod)
+			}
 		}
-		testEnv.validatePodCache(t, name, pod.Spec.NodeName, pod, scenario.expectedBindings, scenario.expectedProvisionings)
 	}
 }
 
@@ -1505,13 +1524,13 @@ func TestBindPodVolumes(t *testing.T) {
 			initPVs:  []*v1.PersistentVolume{pvNode1a},
 			initPVCs: []*v1.PersistentVolumeClaim{unboundPVC},
 			delayFunc: func(t *testing.T, testEnv *testEnv, pod *v1.Pod, pvs []*v1.PersistentVolume, pvcs []*v1.PersistentVolumeClaim) {
-				bindingsCache := testEnv.binder.GetBindingsCache()
+				// Delete the pod from the cache
+				testEnv.binder.DeletePodBindings(pod)
+
+				bindingsCache := testEnv.internalBinder.podBindingCache
 				if bindingsCache == nil {
 					t.Fatalf("Failed to get bindings cache")
 				}
-
-				// Delete the pod from the cache
-				bindingsCache.DeleteBindings(pod)
 
 				// Check that it's deleted
 				bindings := bindingsCache.GetBindings(pod, "node1")

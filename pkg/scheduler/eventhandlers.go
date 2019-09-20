@@ -249,7 +249,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 	}
 	if sched.VolumeBinder != nil {
 		// Volume binder only wants to keep unassigned pods
-		sched.VolumeBinder.DeletePodBindings(pod)
+		sched.VolumeBinder.Binder.DeletePodBindings(pod)
 	}
 }
 

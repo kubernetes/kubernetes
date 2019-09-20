@@ -95,8 +95,10 @@ type SchedulerVolumeBinder interface {
 	// This function can be called in parallel.
 	BindPodVolumes(assumedPod *v1.Pod) error
 
-	// GetBindingsCache returns the cache used (if any) to store volume binding decisions.
-	GetBindingsCache() PodBindingCache
+	// DeletePodBindings eill:
+	// 1. Restore PV cache and PVC cache if the volumes of given pod are assigned to a node.
+	// 2. Delete the cached volume bindings for the given pod.
+	DeletePodBindings(assumedPod *v1.Pod)
 }
 
 type volumeBinder struct {
@@ -110,6 +112,11 @@ type volumeBinder struct {
 	// Stores binding decisions that were made in FindPodVolumes for use in AssumePodVolumes.
 	// AssumePodVolumes modifies the bindings again for use in BindPodVolumes.
 	podBindingCache PodBindingCache
+
+	// Stores assumed node for cleanup
+	// Key = pod name
+	// Value = node name
+	podToAssumedNode map[string]string
 
 	// Amount of time to wait for the bind operation to succeed
 	bindTimeout time.Duration
@@ -125,20 +132,27 @@ func NewVolumeBinder(
 	bindTimeout time.Duration) SchedulerVolumeBinder {
 
 	b := &volumeBinder{
-		kubeClient:      kubeClient,
-		classLister:     storageClassInformer.Lister(),
-		nodeInformer:    nodeInformer,
-		pvcCache:        NewPVCAssumeCache(pvcInformer.Informer()),
-		pvCache:         NewPVAssumeCache(pvInformer.Informer()),
-		podBindingCache: NewPodBindingCache(),
-		bindTimeout:     bindTimeout,
+		kubeClient:       kubeClient,
+		classLister:      storageClassInformer.Lister(),
+		nodeInformer:     nodeInformer,
+		pvcCache:         NewPVCAssumeCache(pvcInformer.Informer()),
+		pvCache:          NewPVAssumeCache(pvInformer.Informer()),
+		podBindingCache:  NewPodBindingCache(),
+		podToAssumedNode: map[string]string{},
+		bindTimeout:      bindTimeout,
 	}
 
 	return b
 }
 
-func (b *volumeBinder) GetBindingsCache() PodBindingCache {
-	return b.podBindingCache
+func (b *volumeBinder) DeletePodBindings(pod *v1.Pod) {
+	podName := getPodName(pod)
+	if nodeName, ok := b.podToAssumedNode[podName]; ok {
+		b.revertAssumedPVs(b.podBindingCache.GetBindings(pod, nodeName))
+		b.revertAssumedPVCs(b.podBindingCache.GetProvisionedPVCs(pod, nodeName))
+		delete(b.podToAssumedNode, podName)
+	}
+	b.podBindingCache.DeleteBindings(pod)
 }
 
 // FindPodVolumes caches the matching PVs and PVCs to provision per node in podBindingCache.
@@ -320,6 +334,8 @@ func (b *volumeBinder) AssumePodVolumes(assumedPod *v1.Pod, nodeName string) (al
 	// Even if length is zero, update the cache with an empty slice to indicate that no
 	// operations are needed
 	b.podBindingCache.UpdateBindings(assumedPod, nodeName, newBindings, newProvisionedPVCs)
+
+	b.podToAssumedNode[podName] = nodeName
 
 	return
 }
