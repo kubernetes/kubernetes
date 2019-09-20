@@ -20,6 +20,7 @@ import (
 	"net/http"
 	goruntime "runtime"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	genericapifilters "k8s.io/apiserver/pkg/endpoints/filters"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	apiserver "k8s.io/apiserver/pkg/server"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/apiserver/pkg/server/mux"
 	"k8s.io/apiserver/pkg/server/routes"
 	componentbaseconfig "k8s.io/component-base/config"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/configz"
 )
@@ -63,8 +63,8 @@ func NewBaseHandler(c *componentbaseconfig.DebuggingConfiguration, checks ...hea
 		}
 	}
 	configz.InstallHandler(mux)
-	//lint:ignore SA1019 See the Metrics Stability Migration KEP
-	mux.Handle("/metrics", legacyregistry.Handler())
+	// See the Metrics Stability Migration KEP
+	mux.Handle("/metrics", promhttp.Handler())
 
 	return mux
 }

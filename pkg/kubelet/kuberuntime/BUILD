@@ -122,6 +122,7 @@ go_test(
         "//staging/src/k8s.io/cri-api/pkg/apis/testing:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/google/cadvisor/info/v1:go_default_library",
+        "//vendor/github.com/prometheus/client_golang/prometheus/promhttp:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",

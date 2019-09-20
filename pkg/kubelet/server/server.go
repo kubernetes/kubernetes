@@ -56,7 +56,6 @@ import (
 	"k8s.io/apiserver/pkg/util/flushwriter"
 	"k8s.io/component-base/logs"
 	compbasemetrics "k8s.io/component-base/metrics"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/v1/validation"
@@ -297,8 +296,8 @@ func (s *Server) InstallDefaultHandlers(enableCAdvisorJSONEndpoints bool) {
 	s.restfulCont.Add(ws)
 
 	s.restfulCont.Add(stats.CreateHandlers(statsPath, s.host, s.resourceAnalyzer, enableCAdvisorJSONEndpoints))
-	//lint:ignore SA1019 https://github.com/kubernetes/enhancements/issues/1206
-	s.restfulCont.Handle(metricsPath, legacyregistry.Handler())
+	// https://github.com/kubernetes/enhancements/issues/1206
+	s.restfulCont.Handle(metricsPath, promhttp.Handler())
 
 	// cAdvisor metrics are exposed under the secured handler as well
 	r := prometheus.NewRegistry()

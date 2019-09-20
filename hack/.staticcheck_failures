@@ -1,8 +1,6 @@
 cluster/images/etcd-version-monitor
 cluster/images/etcd/migrate
 cmd/kube-controller-manager/app
-cmd/kube-proxy/app
-cmd/kube-scheduler/app
 cmd/linkcheck
 cmd/preferredimports
 hack/make-rules/helpers/go2make/testdata/dir-with-gofiles

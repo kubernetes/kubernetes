@@ -27,6 +27,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
@@ -41,7 +42,6 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
-	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog"
@@ -293,7 +293,7 @@ func buildHandlerChain(handler http.Handler, authn authenticator.Request, authz 
 
 func installMetricHandler(pathRecorderMux *mux.PathRecorderMux) {
 	configz.InstallHandler(pathRecorderMux)
-	defaultMetricsHandler := legacyregistry.Handler().ServeHTTP
+	defaultMetricsHandler := promhttp.Handler().ServeHTTP
 	pathRecorderMux.HandleFunc("/metrics", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method == "DELETE" {
 			metrics.Reset()

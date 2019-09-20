@@ -18,9 +18,7 @@ package legacyregistry
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/component-base/metrics"
-	"net/http"
 )
 
 var (
@@ -32,16 +30,6 @@ var (
 func init() {
 	RawMustRegister(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
 	RawMustRegister(prometheus.NewGoCollector())
-}
-
-// Handler returns an HTTP handler for the DefaultGatherer. It is
-// already instrumented with InstrumentHandler (using "prometheus" as handler
-// name).
-//
-// Deprecated: Please note the issues described in the doc comment of
-// InstrumentHandler. You might want to consider using promhttp.Handler instead.
-func Handler() http.Handler {
-	return prometheus.InstrumentHandler("prometheus", promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{}))
 }
 
 // Register registers a collectable metric but uses the global registry

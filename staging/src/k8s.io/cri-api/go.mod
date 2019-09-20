@@ -17,7 +17,6 @@ require (
 )
 
 replace (
-	github.com/golang/protobuf => github.com/golang/protobuf v1.3.1
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f

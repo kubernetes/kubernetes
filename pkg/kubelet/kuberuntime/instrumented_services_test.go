@@ -24,6 +24,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/component-base/metrics/legacyregistry"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/kubelet/metrics"
@@ -41,8 +42,7 @@ func TestRecordOperation(t *testing.T) {
 
 	prometheusURL := "http://" + temporalServer + "/metrics"
 	mux := http.NewServeMux()
-	//lint:ignore SA1019 ignore deprecated warning until we move off of global registries
-	mux.Handle("/metrics", legacyregistry.Handler())
+	mux.Handle("/metrics", promhttp.Handler())
 	server := &http.Server{
 		Addr:    temporalServer,
 		Handler: mux,

@@ -135,7 +135,7 @@ github.com/bazelbuild/buildtools/file
 github.com/bazelbuild/buildtools/lang
 github.com/bazelbuild/buildtools/tables
 github.com/bazelbuild/buildtools/wspace
-# github.com/beorn7/perks v1.0.1 => github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
+# github.com/beorn7/perks v1.0.1 => github.com/beorn7/perks v1.0.1
 github.com/beorn7/perks/quantile
 # github.com/blang/semver v3.5.0+incompatible => github.com/blang/semver v3.5.0+incompatible
 github.com/blang/semver
@@ -423,7 +423,7 @@ github.com/gogo/protobuf/vanity/command
 github.com/golang/groupcache/lru
 # github.com/golang/mock v1.2.0 => github.com/golang/mock v1.2.0
 github.com/golang/mock/gomock
-# github.com/golang/protobuf v1.3.2 => github.com/golang/protobuf v1.3.1
+# github.com/golang/protobuf v1.3.2 => github.com/golang/protobuf v1.3.2
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
 github.com/golang/protobuf/protoc-gen-go/descriptor
@@ -720,9 +720,9 @@ github.com/prometheus/client_golang/prometheus
 github.com/prometheus/client_golang/prometheus/internal
 github.com/prometheus/client_golang/prometheus/promhttp
 github.com/prometheus/client_golang/prometheus/testutil
-# github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90 => github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910
+# github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90 => github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
 github.com/prometheus/client_model/go
-# github.com/prometheus/common v0.6.0 => github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
+# github.com/prometheus/common v0.6.0 => github.com/prometheus/common v0.6.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/internal/bitbucket.org/ww/goautoneg
 github.com/prometheus/common/model

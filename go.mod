@@ -204,7 +204,7 @@ replace (
 	github.com/aws/aws-sdk-go => github.com/aws/aws-sdk-go v1.16.26
 	github.com/bazelbuild/bazel-gazelle => github.com/bazelbuild/bazel-gazelle v0.0.0-20181012220611-c728ce9f663e
 	github.com/bazelbuild/buildtools => github.com/bazelbuild/buildtools v0.0.0-20180226164855-80c7f0d45d7e
-	github.com/beorn7/perks => github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
+	github.com/beorn7/perks => github.com/beorn7/perks v1.0.1
 	github.com/bifurcation/mint => github.com/bifurcation/mint v0.0.0-20180715133206-93c51c6ce115
 	github.com/blang/semver => github.com/blang/semver v3.5.0+incompatible
 	github.com/boltdb/bolt => github.com/boltdb/bolt v1.3.1
@@ -258,6 +258,8 @@ replace (
 	github.com/globalsign/mgo => github.com/globalsign/mgo v0.0.0-20181015135952-eeefdecb41b8
 	github.com/go-acme/lego => github.com/go-acme/lego v2.5.0+incompatible
 	github.com/go-bindata/go-bindata => github.com/go-bindata/go-bindata v3.1.1+incompatible
+	github.com/go-kit/kit => github.com/go-kit/kit v0.8.0
+	github.com/go-logfmt/logfmt => github.com/go-logfmt/logfmt v0.4.0
 	github.com/go-logr/logr => github.com/go-logr/logr v0.1.0
 	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.2
 	github.com/go-openapi/errors => github.com/go-openapi/errors v0.19.2
@@ -275,7 +277,7 @@ replace (
 	github.com/golang/glog => github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/groupcache => github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock => github.com/golang/mock v1.2.0
-	github.com/golang/protobuf => github.com/golang/protobuf v1.3.1
+	github.com/golang/protobuf => github.com/golang/protobuf v1.3.2
 	github.com/golangplus/bytes => github.com/golangplus/bytes v0.0.0-20160111154220-45c989fe5450
 	github.com/golangplus/fmt => github.com/golangplus/fmt v0.0.0-20150411045040-2a5d6d7d2995
 	github.com/golangplus/testing => github.com/golangplus/testing v0.0.0-20180327235837-af21d9c3145e
@@ -313,11 +315,13 @@ replace (
 	github.com/json-iterator/go => github.com/json-iterator/go v1.1.7
 	github.com/jstemmer/go-junit-report => github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	github.com/jtolds/gls => github.com/jtolds/gls v4.20.0+incompatible
+	github.com/julienschmidt/httprouter => github.com/julienschmidt/httprouter v1.2.0
 	github.com/karrick/godirwalk => github.com/karrick/godirwalk v1.7.5
 	github.com/kisielk/errcheck => github.com/kisielk/errcheck v1.2.0
 	github.com/kisielk/gotool => github.com/kisielk/gotool v1.0.0
 	github.com/klauspost/cpuid => github.com/klauspost/cpuid v1.2.0
 	github.com/konsorten/go-windows-terminal-sequences => github.com/konsorten/go-windows-terminal-sequences v1.0.1
+	github.com/kr/logfmt => github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515
 	github.com/kr/pretty => github.com/kr/pretty v0.1.0
 	github.com/kr/pty => github.com/kr/pty v1.1.5
 	github.com/kr/text => github.com/kr/text v0.1.0
@@ -352,6 +356,7 @@ replace (
 	github.com/mrunalp/fileutils => github.com/mrunalp/fileutils v0.0.0-20160930181131-4ee1cc9a8058
 	github.com/munnerz/goautoneg => github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
 	github.com/mvdan/xurls => github.com/mvdan/xurls v1.1.0
+	github.com/mwitkow/go-conntrack => github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223
 	github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/naoina/go-stringutil => github.com/naoina/go-stringutil v0.1.0
 	github.com/naoina/toml => github.com/naoina/toml v0.1.1
@@ -370,8 +375,8 @@ replace (
 	github.com/pquerna/cachecontrol => github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021
 	github.com/pquerna/ffjson => github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20
 	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.1.0
-	github.com/prometheus/client_model => github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910
-	github.com/prometheus/common => github.com/prometheus/common v0.0.0-20181126121408-4724e9255275
+	github.com/prometheus/client_model => github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
+	github.com/prometheus/common => github.com/prometheus/common v0.6.0
 	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.6-0.20190917143953-de25ac347ef9
 	github.com/quobyte/api => github.com/quobyte/api v0.1.2
 	github.com/remyoudompheng/bigfft => github.com/remyoudompheng/bigfft v0.0.0-20170806203942-52369c62f446
@@ -429,6 +434,7 @@ replace (
 	google.golang.org/genproto => google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873
 	google.golang.org/grpc => google.golang.org/grpc v1.23.0
 	gopkg.in/airbrake/gobrake.v2 => gopkg.in/airbrake/gobrake.v2 v2.0.9
+	gopkg.in/alecthomas/kingpin.v2 => gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 => gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127
 	gopkg.in/errgo.v2 => gopkg.in/errgo.v2 v2.1.0
 	gopkg.in/fsnotify.v1 => gopkg.in/fsnotify.v1 v1.4.7
