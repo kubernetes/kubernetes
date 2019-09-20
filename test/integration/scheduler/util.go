@@ -463,6 +463,7 @@ type pausePodConfig struct {
 	NodeName                          string
 	SchedulerName                     string
 	Priority                          *int32
+	PriorityClassName                 string
 }
 
 // initPausePod initializes a pod API object from the given config. It is used
@@ -484,10 +485,11 @@ func initPausePod(cs clientset.Interface, conf *pausePodConfig) *v1.Pod {
 					Image: imageutils.GetPauseImageName(),
 				},
 			},
-			Tolerations:   conf.Tolerations,
-			NodeName:      conf.NodeName,
-			SchedulerName: conf.SchedulerName,
-			Priority:      conf.Priority,
+			Tolerations:       conf.Tolerations,
+			NodeName:          conf.NodeName,
+			SchedulerName:     conf.SchedulerName,
+			Priority:          conf.Priority,
+			PriorityClassName: conf.PriorityClassName,
 		},
 	}
 	if conf.Resources != nil {

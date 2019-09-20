@@ -27,12 +27,18 @@ import (
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	"k8s.io/kubernetes/plugin/pkg/admission/priority"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"k8s.io/klog"
@@ -364,6 +370,102 @@ func TestDisablePreemption(t *testing.T) {
 		pods = append(pods, preemptor)
 		cleanupPods(cs, t, pods)
 	}
+}
+
+// This test verifies that system critical priorities are created automatically and resolved properly.
+func TestPodPriorityResolution(t *testing.T) {
+	admission := priority.NewPlugin()
+	context := initTestScheduler(t, initTestMaster(t, "preemption", admission), true, nil)
+	defer cleanupTest(t, context)
+	cs := context.clientSet
+
+	// Build clientset and informers for controllers.
+	externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
+		QPS:           -1,
+		Host:          context.httpServer.URL,
+		ContentConfig: restclient.ContentConfig{GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"}}})
+	externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
+	admission.SetExternalKubeClientSet(externalClientset)
+	admission.SetExternalKubeInformerFactory(externalInformers)
+	externalInformers.Start(context.stopCh)
+	externalInformers.WaitForCacheSync(context.stopCh)
+
+	tests := []struct {
+		Name             string
+		PriorityClass    string
+		Pod              *v1.Pod
+		ExpectedPriority int32
+		ExpectedError    error
+	}{
+		{
+			Name:             "SystemNodeCritical priority class",
+			PriorityClass:    scheduling.SystemNodeCritical,
+			ExpectedPriority: scheduling.SystemCriticalPriority + 1000,
+			Pod: initPausePod(cs, &pausePodConfig{
+				Name:              fmt.Sprintf("pod1-%v", scheduling.SystemNodeCritical),
+				Namespace:         metav1.NamespaceSystem,
+				PriorityClassName: scheduling.SystemNodeCritical,
+			}),
+		},
+		{
+			Name:             "SystemClusterCritical priority class",
+			PriorityClass:    scheduling.SystemClusterCritical,
+			ExpectedPriority: scheduling.SystemCriticalPriority,
+			Pod: initPausePod(cs, &pausePodConfig{
+				Name:              fmt.Sprintf("pod2-%v", scheduling.SystemClusterCritical),
+				Namespace:         metav1.NamespaceSystem,
+				PriorityClassName: scheduling.SystemClusterCritical,
+			}),
+		},
+		{
+			Name:             "Invalid priority class should result in error",
+			PriorityClass:    "foo",
+			ExpectedPriority: scheduling.SystemCriticalPriority,
+			Pod: initPausePod(cs, &pausePodConfig{
+				Name:              fmt.Sprintf("pod3-%v", scheduling.SystemClusterCritical),
+				Namespace:         metav1.NamespaceSystem,
+				PriorityClassName: "foo",
+			}),
+			ExpectedError: fmt.Errorf("Error creating pause pod: pods \"pod3-system-cluster-critical\" is forbidden: no PriorityClass with name foo was found"),
+		},
+	}
+
+	// Create a node with some resources and a label.
+	nodeRes := &v1.ResourceList{
+		v1.ResourcePods:   *resource.NewQuantity(32, resource.DecimalSI),
+		v1.ResourceCPU:    *resource.NewMilliQuantity(500, resource.DecimalSI),
+		v1.ResourceMemory: *resource.NewQuantity(500, resource.DecimalSI),
+	}
+	_, err := createNode(context.clientSet, "node1", nodeRes)
+	if err != nil {
+		t.Fatalf("Error creating nodes: %v", err)
+	}
+
+	pods := make([]*v1.Pod, 0, len(tests))
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
+			pod, err := runPausePod(cs, test.Pod)
+			if err != nil {
+				if test.ExpectedError == nil {
+					t.Fatalf("Test [PodPriority/%v]: Error running pause pod: %v", test.PriorityClass, err)
+				}
+				if err.Error() != test.ExpectedError.Error() {
+					t.Fatalf("Test [PodPriority/%v]: Expected error %v but got error %v", test.PriorityClass, test.ExpectedError, err)
+				}
+				return
+			}
+			pods = append(pods, pod)
+			if pod.Spec.Priority != nil {
+				if *pod.Spec.Priority != test.ExpectedPriority {
+					t.Errorf("Expected pod %v to have priority %v but was %v", pod.Name, test.ExpectedPriority, pod.Spec.Priority)
+				}
+			} else {
+				t.Errorf("Expected pod %v to have priority %v but was nil", pod.Name, test.PriorityClass)
+			}
+		})
+	}
+	cleanupPods(cs, t, pods)
+	cleanupNodes(cs, t)
 }
 
 func mkPriorityPodWithGrace(tc *testContext, name string, priority int32, grace int64) *v1.Pod {

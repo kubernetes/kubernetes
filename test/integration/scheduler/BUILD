@@ -24,6 +24,7 @@ go_test(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/scheduling:go_default_library",
         "//pkg/controller/nodelifecycle:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/scheduler:go_default_library",
@@ -39,6 +40,7 @@ go_test(
         "//plugin/pkg/admission/defaulttolerationseconds:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",
+        "//plugin/pkg/admission/priority:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
