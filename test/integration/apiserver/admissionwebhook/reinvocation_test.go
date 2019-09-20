@@ -26,6 +26,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -312,25 +313,36 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 		}
 	}
 
-	_, err = client.CoreV1().Pods("default").Create(reinvocationMarkerFixture)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	for i, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			upCh := recorder.Reset()
-			ns := fmt.Sprintf("reinvoke-%d", i)
-			_, err = client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns}})
+			testCaseID := strconv.Itoa(i)
+			ns := "reinvoke-" + testCaseID
+			nsLabels := map[string]string{"test-case": testCaseID}
+			_, err = client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: ns, Labels: nsLabels}})
 			if err != nil {
 				t.Fatal(err)
 			}
 
+			// Write markers to a separate namespace to avoid cross-talk
+			markerNs := ns + "-markers"
+			markerNsLabels := map[string]string{"test-markers": testCaseID}
+			_, err = client.CoreV1().Namespaces().Create(&v1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: markerNs, Labels: markerNsLabels}})
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Create a maker object to use to check for the webhook configurations to be ready.
+			marker, err := client.CoreV1().Pods(markerNs).Create(newReinvocationMarkerFixture(markerNs))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			fail := admissionv1beta1.Fail
 			webhooks := []admissionv1beta1.MutatingWebhook{}
 			for j, webhook := range tt.webhooks {
-				name := fmt.Sprintf("admission.integration.test.%d.%s", j, strings.TrimPrefix(webhook.path, "/"))
-				fail := admissionv1beta1.Fail
 				endpoint := webhookServer.URL + webhook.path
+				name := fmt.Sprintf("admission.integration.test.%d.%s", j, strings.TrimPrefix(webhook.path, "/"))
 				webhooks = append(webhooks, admissionv1beta1.MutatingWebhook{
 					Name: name,
 					ClientConfig: admissionv1beta1.WebhookClientConfig{
@@ -342,11 +354,28 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 						Rule:       admissionv1beta1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
 					}},
 					ObjectSelector:          webhook.objectSelector,
+					NamespaceSelector:       &metav1.LabelSelector{MatchLabels: nsLabels},
 					FailurePolicy:           &fail,
 					ReinvocationPolicy:      webhook.policy,
 					AdmissionReviewVersions: []string{"v1beta1"},
 				})
 			}
+			// Register a marker checking webhook with each set of webhook configurations
+			markerEndpoint := webhookServer.URL + "/marker"
+			webhooks = append(webhooks, admissionv1beta1.MutatingWebhook{
+				Name: "admission.integration.test.marker",
+				ClientConfig: admissionv1beta1.WebhookClientConfig{
+					URL:      &markerEndpoint,
+					CABundle: localhostCert,
+				},
+				Rules: []admissionv1beta1.RuleWithOperations{{
+					Operations: []admissionv1beta1.OperationType{admissionv1beta1.OperationAll},
+					Rule:       admissionv1beta1.Rule{APIGroups: []string{""}, APIVersions: []string{"v1"}, Resources: []string{"pods"}},
+				}},
+				NamespaceSelector:       &metav1.LabelSelector{MatchLabels: markerNsLabels},
+				ObjectSelector:          &metav1.LabelSelector{MatchLabels: map[string]string{"marker": "true"}},
+				AdmissionReviewVersions: []string{"v1beta1"},
+			})
 
 			cfg, err := client.AdmissionregistrationV1beta1().MutatingWebhookConfigurations().Create(&admissionv1beta1.MutatingWebhookConfiguration{
 				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("admission.integration.test-%d", i)},
@@ -364,7 +393,7 @@ func testWebhookReinvocationPolicy(t *testing.T, watchCache bool) {
 
 			// wait until new webhook is called the first time
 			if err := wait.PollImmediate(time.Millisecond*5, wait.ForeverTestTimeout, func() (bool, error) {
-				_, err = client.CoreV1().Pods("default").Patch(reinvocationMarkerFixture.Name, types.JSONPatchType, []byte("[]"))
+				_, err = client.CoreV1().Pods(markerNs).Patch(marker.Name, types.JSONPatchType, []byte("[]"))
 				select {
 				case <-upCh:
 					return true, nil
@@ -529,17 +558,15 @@ func newReinvokeWebhookHandler(recorder *invocationRecorder) http.Handler {
 			http.Error(w, err.Error(), 400)
 		}
 
-		// When resetting between tests, a marker object is patched until this webhook
-		// observes it, at which point it is considered ready.
-		if pod.Namespace == reinvocationMarkerFixture.Namespace && pod.Name == reinvocationMarkerFixture.Name {
-			recorder.MarkerReceived()
-			allow(w)
-			return
-		}
-
 		recorder.IncrementCount(r.URL.Path)
 
 		switch r.URL.Path {
+		case "/marker":
+			// When resetting between tests, a marker object is patched until this webhook
+			// observes it, at which point it is considered ready.
+			recorder.MarkerReceived()
+			allow(w)
+			return
 		case "/noop":
 			allow(w)
 		case "/settrue":
@@ -600,15 +627,20 @@ func expectedAuditEvents(webhookMutationAnnotations, webhookPatchAnnotations map
 	}
 }
 
-var reinvocationMarkerFixture = &corev1.Pod{
-	ObjectMeta: metav1.ObjectMeta{
-		Namespace: "default",
-		Name:      "marker",
-	},
-	Spec: corev1.PodSpec{
-		Containers: []v1.Container{{
-			Name:  "fake-name",
-			Image: "fakeimage",
-		}},
-	},
+func newReinvocationMarkerFixture(namespace string) *corev1.Pod {
+	return &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+			Name:      "marker",
+			Labels: map[string]string{
+				"marker": "true",
+			},
+		},
+		Spec: corev1.PodSpec{
+			Containers: []v1.Container{{
+				Name:  "fake-name",
+				Image: "fakeimage",
+			}},
+		},
+	}
 }
