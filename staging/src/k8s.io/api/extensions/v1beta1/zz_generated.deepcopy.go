@@ -1065,11 +1065,6 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 		*out = make([]AllowedFlexVolume, len(*in))
 		copy(*out, *in)
 	}
-	if in.AllowedCSIDrivers != nil {
-		in, out := &in.AllowedCSIDrivers, &out.AllowedCSIDrivers
-		*out = make([]AllowedCSIDriver, len(*in))
-		copy(*out, *in)
-	}
 	if in.AllowedUnsafeSysctls != nil {
 		in, out := &in.AllowedUnsafeSysctls, &out.AllowedUnsafeSysctls
 		*out = make([]string, len(*in))
@@ -1083,6 +1078,11 @@ func (in *PodSecurityPolicySpec) DeepCopyInto(out *PodSecurityPolicySpec) {
 	if in.AllowedProcMountTypes != nil {
 		in, out := &in.AllowedProcMountTypes, &out.AllowedProcMountTypes
 		*out = make([]corev1.ProcMountType, len(*in))
+		copy(*out, *in)
+	}
+	if in.AllowedCSIDrivers != nil {
+		in, out := &in.AllowedCSIDrivers, &out.AllowedCSIDrivers
+		*out = make([]AllowedCSIDriver, len(*in))
 		copy(*out, *in)
 	}
 	if in.RuntimeClass != nil {

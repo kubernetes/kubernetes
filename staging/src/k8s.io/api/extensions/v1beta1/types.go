@@ -928,10 +928,6 @@ type PodSecurityPolicySpec struct {
 	// is allowed in the "volumes" field.
 	// +optional
 	AllowedFlexVolumes []AllowedFlexVolume `json:"allowedFlexVolumes,omitempty" protobuf:"bytes,18,rep,name=allowedFlexVolumes"`
-	// AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
-	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
-	// +optional
-	AllowedCSIDrivers []AllowedCSIDriver `json:"allowedCSIDrivers,omitempty" protobuf:"bytes,23,rep,name=allowedCSIDrivers"`
 	// allowedUnsafeSysctls is a list of explicitly allowed unsafe sysctls, defaults to none.
 	// Each entry is either a plain sysctl name or ends in "*" in which case it is considered
 	// as a prefix of allowed sysctls. Single * means all unsafe sysctls are allowed.
@@ -956,6 +952,10 @@ type PodSecurityPolicySpec struct {
 	// This requires the ProcMountType feature flag to be enabled.
 	// +optional
 	AllowedProcMountTypes []v1.ProcMountType `json:"allowedProcMountTypes,omitempty" protobuf:"bytes,21,opt,name=allowedProcMountTypes"`
+	// AllowedCSIDrivers is a whitelist of inline CSI drivers that must be explicitly set to be embedded within a pod spec.
+	// An empty value indicates that any CSI driver can be used for inline ephemeral volumes.
+	// +optional
+	AllowedCSIDrivers []AllowedCSIDriver `json:"allowedCSIDrivers,omitempty" protobuf:"bytes,23,rep,name=allowedCSIDrivers"`
 	// runtimeClass is the strategy that will dictate the allowable RuntimeClasses for a pod.
 	// If this field is omitted, the pod's runtimeClassName field is unrestricted.
 	// Enforcement of this field depends on the RuntimeClass feature gate being enabled.

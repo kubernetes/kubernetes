@@ -1934,10 +1934,10 @@ func autoConvert_v1beta1_PodSecurityPolicySpec_To_policy_PodSecurityPolicySpec(i
 	}
 	out.AllowedHostPaths = *(*[]policy.AllowedHostPath)(unsafe.Pointer(&in.AllowedHostPaths))
 	out.AllowedFlexVolumes = *(*[]policy.AllowedFlexVolume)(unsafe.Pointer(&in.AllowedFlexVolumes))
-	out.AllowedCSIDrivers = *(*[]policy.AllowedCSIDriver)(unsafe.Pointer(&in.AllowedCSIDrivers))
 	out.AllowedUnsafeSysctls = *(*[]string)(unsafe.Pointer(&in.AllowedUnsafeSysctls))
 	out.ForbiddenSysctls = *(*[]string)(unsafe.Pointer(&in.ForbiddenSysctls))
 	out.AllowedProcMountTypes = *(*[]core.ProcMountType)(unsafe.Pointer(&in.AllowedProcMountTypes))
+	out.AllowedCSIDrivers = *(*[]policy.AllowedCSIDriver)(unsafe.Pointer(&in.AllowedCSIDrivers))
 	out.RuntimeClass = (*policy.RuntimeClassStrategyOptions)(unsafe.Pointer(in.RuntimeClass))
 	return nil
 }
