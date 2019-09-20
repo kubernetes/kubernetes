@@ -41,11 +41,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	unversionedapps "k8s.io/client-go/kubernetes/typed/apps/v1"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -87,10 +86,11 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("DaemonSet")
 // DaemonSetsController is responsible for synchronizing DaemonSet objects stored
 // in the system with actual running pods.
 type DaemonSetsController struct {
-	kubeClient    clientset.Interface
-	eventRecorder record.EventRecorder
-	podControl    controller.PodControlInterface
-	crControl     controller.ControllerRevisionControlInterface
+	kubeClient       clientset.Interface
+	eventBroadcaster events.EventBroadcaster
+	eventRecorder    events.EventRecorder
+	podControl       controller.PodControlInterface
+	crControl        controller.ControllerRevisionControlInterface
 
 	// An dsc is temporarily suspended after creating/deleting these many replicas.
 	// It resumes normal action after observing the watch events for them.
@@ -146,9 +146,7 @@ func NewDaemonSetsController(
 	kubeClient clientset.Interface,
 	failedPodsBackoff *flowcontrol.Backoff,
 ) (*DaemonSetsController, error) {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("daemon_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -156,11 +154,12 @@ func NewDaemonSetsController(
 		}
 	}
 	dsc := &DaemonSetsController{
-		kubeClient:    kubeClient,
-		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
+		kubeClient:       kubeClient,
+		eventBroadcaster: eventBroadcaster,
+		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, "daemonset-controller"),
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "daemonset-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, "daemonset-controller"),
 		},
 		crControl: controller.RealControllerRevisionControl{
 			KubeClient: kubeClient,
@@ -266,6 +265,10 @@ func (dsc *DaemonSetsController) Run(workers int, stopCh <-chan struct{}) {
 
 	klog.Infof("Starting daemon sets controller")
 	defer klog.Infof("Shutting down daemon sets controller")
+
+	if dsc.kubeClient != nil && dsc.eventBroadcaster != nil {
+		dsc.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync("daemon sets", stopCh, dsc.podStoreSynced, dsc.nodeStoreSynced, dsc.historyStoreSynced, dsc.dsStoreSynced) {
 		return
@@ -918,7 +921,7 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 				msg := fmt.Sprintf("Found failed daemon pod %s/%s on node %s, will try to kill it", pod.Namespace, pod.Name, node.Name)
 				klog.V(2).Infof(msg)
 				// Emit an event so that it's discoverable to users.
-				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedDaemonPodReason, msg)
+				dsc.eventRecorder.Eventf(ds, pod, v1.EventTypeWarning, "FailedPod", FailedDaemonPodReason, msg)
 				podsToDelete = append(podsToDelete, pod.Name)
 			} else {
 				daemonPodsRunning = append(daemonPodsRunning, pod)
@@ -1236,7 +1239,7 @@ func (dsc *DaemonSetsController) syncDaemonSet(key string) error {
 
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(ds.Spec.Selector, &everything) {
-		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, SelectingAllReason, "This daemon set is selecting all pods. A non-empty selector is required.")
+		dsc.eventRecorder.Eventf(ds, nil, v1.EventTypeWarning, "NonEmptySelector", SelectingAllReason, "This daemon set is selecting all pods. A non-empty selector is required.")
 		return nil
 	}
 
@@ -1408,14 +1411,14 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.
 				emitEvent = true
 			}
 			if emitEvent {
-				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason())
+				dsc.eventRecorder.Eventf(ds, node, v1.EventTypeWarning, "Unknown", FailedPlacementReason, fmt.Sprintf("failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason()))
 			}
 		}
 	}
 	// only emit this event if insufficient resource is the only thing
 	// preventing the daemon pod from scheduling
 	if shouldSchedule && insufficientResourceErr != nil {
-		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, insufficientResourceErr.Error())
+		dsc.eventRecorder.Eventf(ds, node, v1.EventTypeWarning, "InsufficientResource", FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, insufficientResourceErr.Error())
 		shouldSchedule = false
 	}
 	return

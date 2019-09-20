@@ -41,7 +41,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	clientretry "k8s.io/client-go/util/retry"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -390,16 +390,29 @@ func NewUIDTrackingControllerExpectations(ce ControllerExpectationsInterface) *U
 const (
 	// FailedCreatePodReason is added in an event and in a replica set condition
 	// when a pod for a replica set is failed to be created.
-	FailedCreatePodReason = "FailedCreate"
+	FailedCreatePodReasonError = "Error"
 	// SuccessfulCreatePodReason is added in an event when a pod for a replica set
 	// is successfully created.
-	SuccessfulCreatePodReason = "SuccessfulCreate"
+	SuccessfulCreatePodReason = ""
 	// FailedDeletePodReason is added in an event and in a replica set condition
 	// when a pod for a replica set is failed to be deleted.
-	FailedDeletePodReason = "FailedDelete"
+	FailedDeletePodReasonError = "Error"
 	// SuccessfulDeletePodReason is added in an event when a pod for a replica set
 	// is successfully deleted.
-	SuccessfulDeletePodReason = "SuccessfulDelete"
+	SuccessfulDeletePodReason = ""
+
+	// FailedCreatePodAction is added in an event and in a replica set condition
+	// when a pod for a replica set is failed to be created.
+	FailedCreatePodAction = "FailedToCreatePod"
+	// SuccessfulCreatePodAction is added in an event when a pod for a replica set
+	// is successfully created.
+	SuccessfulCreatePodAction = "CreatedPod"
+	// FailedDeletePodAction is added in an event and in a replica set condition
+	// when a pod for a replica set is failed to be deleted.
+	FailedDeletePodAction = "FailedToDeletePod"
+	// SuccessfulDeletePodAction is added in an event when a pod for a replica set
+	// is successfully deleted.
+	SuccessfulDeletePodAction = "DeletedPod"
 )
 
 // RSControlInterface is an interface that knows how to add or delete
@@ -412,7 +425,7 @@ type RSControlInterface interface {
 // RealRSControl is the default implementation of RSControllerInterface.
 type RealRSControl struct {
 	KubeClient clientset.Interface
-	Recorder   record.EventRecorder
+	Recorder   events.EventRecorder
 }
 
 var _ RSControlInterface = &RealRSControl{}
@@ -461,7 +474,7 @@ type PodControlInterface interface {
 // RealPodControl is the default implementation of PodControlInterface.
 type RealPodControl struct {
 	KubeClient clientset.Interface
-	Recorder   record.EventRecorder
+	Recorder   events.EventRecorder
 }
 
 var _ PodControlInterface = &RealPodControl{}
@@ -577,7 +590,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	}
 	newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
-		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
+		r.Recorder.Eventf(object, pod, v1.EventTypeWarning, FailedCreatePodReasonError, FailedCreatePodAction, fmt.Sprintf("Error creating: %v", err))
 		return err
 	}
 	accessor, err := meta.Accessor(object)
@@ -586,7 +599,7 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 		return nil
 	}
 	klog.V(4).Infof("Controller %v created pod %v", accessor.GetName(), newPod.Name)
-	r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulCreatePodReason, "Created pod: %v", newPod.Name)
+	r.Recorder.Eventf(object, pod, v1.EventTypeNormal, SuccessfulCreatePodReason, SuccessfulCreatePodAction, fmt.Sprintf("Created pod: %v", newPod.Name))
 
 	return nil
 }
@@ -598,10 +611,10 @@ func (r RealPodControl) DeletePod(namespace string, podID string, object runtime
 	}
 	klog.V(2).Infof("Controller %v deleting pod %v/%v", accessor.GetName(), namespace, podID)
 	if err := r.KubeClient.CoreV1().Pods(namespace).Delete(podID, nil); err != nil && !apierrors.IsNotFound(err) {
-		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedDeletePodReason, "Error deleting: %v", err)
+		r.Recorder.Eventf(object, nil, v1.EventTypeWarning, FailedDeletePodReasonError, FailedDeletePodAction, fmt.Sprintf("Error deleting: %v", err))
 		return fmt.Errorf("unable to delete pods: %v", err)
 	}
-	r.Recorder.Eventf(object, v1.EventTypeNormal, SuccessfulDeletePodReason, "Deleted pod: %v", podID)
+	r.Recorder.Eventf(object, nil, v1.EventTypeNormal, SuccessfulDeletePodReason, SuccessfulDeletePodAction, fmt.Sprintf("Deleted pod: %v", podID))
 
 	return nil
 }

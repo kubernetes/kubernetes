@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/controller"
@@ -37,7 +37,6 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/klog"
 )
 
 func TestEnsureNodeExistsByProviderID(t *testing.T) {
@@ -220,16 +219,14 @@ func TestNodeInitialized(t *testing.T) {
 		Err: nil,
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: fnh.EventsV1beta1().Events("")})
 	cloudNodeController := &CloudNodeController{
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, "cloud-node-controller"),
 		nodeStatusUpdateFrequency: 1 * time.Second,
 	}
-	eventBroadcaster.StartLogging(klog.Infof)
-
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
@@ -285,15 +282,13 @@ func TestNodeIgnored(t *testing.T) {
 		Err: nil,
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: fnh.EventsV1beta1().Events("")})
 	cloudNodeController := &CloudNodeController{
 		kubeClient:   fnh,
 		nodeInformer: factory.Core().V1().Nodes(),
 		cloud:        fakeCloud,
-		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, "cloud-node-controller"),
 	}
-	eventBroadcaster.StartLogging(klog.Infof)
-
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 	assert.Equal(t, 0, len(fnh.UpdatedNodes), "Node was wrongly updated")
 
@@ -358,15 +353,13 @@ func TestGCECondition(t *testing.T) {
 		Err:      nil,
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: fnh.EventsV1beta1().Events("")})
 	cloudNodeController := &CloudNodeController{
 		kubeClient:   fnh,
 		nodeInformer: factory.Core().V1().Nodes(),
 		cloud:        fakeCloud,
-		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, "cloud-node-controller"),
 	}
-	eventBroadcaster.StartLogging(klog.Infof)
-
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
@@ -447,15 +440,13 @@ func TestZoneInitialized(t *testing.T) {
 		Err: nil,
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: fnh.EventsV1beta1().Events("")})
 	cloudNodeController := &CloudNodeController{
 		kubeClient:   fnh,
 		nodeInformer: factory.Core().V1().Nodes(),
 		cloud:        fakeCloud,
-		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, "cloud-node-controller"),
 	}
-	eventBroadcaster.StartLogging(klog.Infof)
-
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
@@ -536,16 +527,14 @@ func TestNodeAddresses(t *testing.T) {
 		Err:                nil,
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: fnh.EventsV1beta1().Events("")})
 	cloudNodeController := &CloudNodeController{
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
 		nodeStatusUpdateFrequency: 1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, "cloud-node-controller"),
 	}
-	eventBroadcaster.StartLogging(klog.Infof)
-
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
@@ -648,16 +637,14 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 		Err:                nil,
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: fnh.EventsV1beta1().Events("")})
 	cloudNodeController := &CloudNodeController{
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
 		nodeStatusUpdateFrequency: 1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, "cloud-node-controller"),
 	}
-	eventBroadcaster.StartLogging(klog.Infof)
-
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
@@ -937,16 +924,14 @@ func TestNodeProviderID(t *testing.T) {
 		Err: nil,
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: fnh.EventsV1beta1().Events("")})
 	cloudNodeController := &CloudNodeController{
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
 		nodeStatusUpdateFrequency: 1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, "cloud-node-controller"),
 	}
-	eventBroadcaster.StartLogging(klog.Infof)
-
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
@@ -1020,15 +1005,14 @@ func TestNodeProviderIDAlreadySet(t *testing.T) {
 		Err: nil,
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: fnh.EventsV1beta1().Events("")})
 	cloudNodeController := &CloudNodeController{
 		kubeClient:                fnh,
 		nodeInformer:              factory.Core().V1().Nodes(),
 		cloud:                     fakeCloud,
 		nodeStatusUpdateFrequency: 1 * time.Second,
-		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"}),
+		recorder:                  eventBroadcaster.NewRecorder(scheme.Scheme, "cloud-node-controller"),
 	}
-	eventBroadcaster.StartLogging(klog.Infof)
 
 	cloudNodeController.AddCloudNode(fnh.Existing[0])
 

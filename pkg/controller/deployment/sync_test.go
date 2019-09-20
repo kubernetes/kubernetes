@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/controller"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 )
@@ -274,7 +274,7 @@ func TestScale(t *testing.T) {
 			fake := fake.Clientset{}
 			dc := &DeploymentController{
 				client:        &fake,
-				eventRecorder: &record.FakeRecorder{},
+				eventRecorder: &events.FakeRecorder{},
 			}
 
 			if test.newRS != nil {
@@ -417,7 +417,7 @@ func TestDeploymentController_cleanupDeployment(t *testing.T) {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}
 
-		controller.eventRecorder = &record.FakeRecorder{}
+		controller.eventRecorder = &events.FakeRecorder{}
 		controller.dListerSynced = alwaysReady
 		controller.rsListerSynced = alwaysReady
 		controller.podListerSynced = alwaysReady

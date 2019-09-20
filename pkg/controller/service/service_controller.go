@@ -33,10 +33,9 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
@@ -113,8 +112,8 @@ type ServiceController struct {
 	cache               *serviceCache
 	serviceLister       corelisters.ServiceLister
 	serviceListerSynced cache.InformerSynced
-	eventBroadcaster    record.EventBroadcaster
-	eventRecorder       record.EventRecorder
+	eventBroadcaster    events.EventBroadcaster
+	eventRecorder       events.EventRecorder
 	nodeLister          corelisters.NodeLister
 	nodeListerSynced    cache.InformerSynced
 	// services that need to be synced
@@ -130,10 +129,8 @@ func New(
 	nodeInformer coreinformers.NodeInformer,
 	clusterName string,
 ) (*ServiceController, error) {
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(klog.Infof)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "service-controller"})
+	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, "service-controller")
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("service_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -219,6 +216,10 @@ func (s *ServiceController) Run(stopCh <-chan struct{}, workers int) {
 	klog.Info("Starting service controller")
 	defer klog.Info("Shutting down service controller")
 
+	if s.kubeClient != nil && s.eventBroadcaster != nil {
+		s.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
+
 	if !cache.WaitForNamedCacheSync("service", stopCh, s.serviceListerSynced, s.nodeListerSynced) {
 		return
 	}
@@ -290,7 +291,7 @@ func (s *ServiceController) processServiceCreateOrUpdate(service *v1.Service, ke
 	cachedService.state = service
 	op, err := s.syncLoadBalancerIfNeeded(service, key)
 	if err != nil {
-		s.eventRecorder.Eventf(service, v1.EventTypeWarning, "SyncLoadBalancerFailed", "Error syncing load balancer: %v", err)
+		s.eventRecorder.Eventf(service, nil, v1.EventTypeWarning, "Error", "FailedToSyncLoadBalancer", fmt.Sprintf("Error syncing load balancer: %v", err))
 		return err
 	}
 	if op == deleteLoadBalancer {
@@ -331,7 +332,7 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 		}
 		if exists {
 			klog.V(2).Infof("Deleting existing load balancer for service %s", key)
-			s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
+			s.eventRecorder.Eventf(service, nil, v1.EventTypeNormal, "", "DeletingLoadBalancer", "Deleting load balancer")
 			if err := s.balancer.EnsureLoadBalancerDeleted(context.TODO(), s.clusterName, service); err != nil {
 				return op, fmt.Errorf("failed to delete load balancer: %v", err)
 			}
@@ -343,12 +344,12 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 		if err := s.removeFinalizer(service); err != nil {
 			return op, fmt.Errorf("failed to remove load balancer cleanup finalizer: %v", err)
 		}
-		s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
+		s.eventRecorder.Eventf(service, nil, v1.EventTypeNormal, "", "DeletedLoadBalancer", "Deleted load balancer")
 	} else {
 		// Create or update the load balancer if service wants one.
 		op = ensureLoadBalancer
 		klog.V(2).Infof("Ensuring load balancer for service %s", key)
-		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuringLoadBalancer", "Ensuring load balancer")
+		s.eventRecorder.Eventf(service, nil, v1.EventTypeNormal, "", "EnsuringLoadBalancer", "Ensuring load balancer")
 		if utilfeature.DefaultFeatureGate.Enabled(serviceLoadBalancerFinalizerFeature) {
 			// Always try to add finalizer prior to load balancer creation.
 			// It will be a no-op if finalizer already exists.
@@ -370,7 +371,7 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 			}
 			return op, fmt.Errorf("failed to ensure load balancer: %v", err)
 		}
-		s.eventRecorder.Event(service, v1.EventTypeNormal, "EnsuredLoadBalancer", "Ensured load balancer")
+		s.eventRecorder.Eventf(service, nil, v1.EventTypeNormal, "", "EnsuredLoadBalancer", "Ensured load balancer")
 	}
 
 	if err := s.patchStatus(service, previousStatus, newStatus); err != nil {
@@ -394,7 +395,7 @@ func (s *ServiceController) ensureLoadBalancer(service *v1.Service) (*v1.LoadBal
 
 	// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
 	if len(nodes) == 0 {
-		s.eventRecorder.Event(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer")
+		s.eventRecorder.Eventf(service, nil, v1.EventTypeWarning, "NoNodes", "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer")
 	}
 
 	// - Only one protocol supported per service
@@ -491,14 +492,14 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 		return false
 	}
 	if wantsLoadBalancer(oldService) != wantsLoadBalancer(newService) {
-		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "Type", "%v -> %v",
-			oldService.Spec.Type, newService.Spec.Type)
+		s.eventRecorder.Eventf(newService, oldService, v1.EventTypeNormal, "Type", "NeedsToBeUpdated", fmt.Sprintf("%v -> %v",
+			oldService.Spec.Type, newService.Spec.Type))
 		return true
 	}
 
 	if wantsLoadBalancer(newService) && !reflect.DeepEqual(oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges) {
-		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "LoadBalancerSourceRanges", "%v -> %v",
-			oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges)
+		s.eventRecorder.Eventf(newService, oldService, v1.EventTypeNormal, "LoadBalancerSourceRanges", "NeedsToBeUpdated", fmt.Sprintf("%v -> %v",
+			oldService.Spec.LoadBalancerSourceRanges, newService.Spec.LoadBalancerSourceRanges))
 		return true
 	}
 
@@ -510,19 +511,19 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 		return true
 	}
 	if !loadBalancerIPsAreEqual(oldService, newService) {
-		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "LoadbalancerIP", "%v -> %v",
-			oldService.Spec.LoadBalancerIP, newService.Spec.LoadBalancerIP)
+		s.eventRecorder.Eventf(newService, oldService, v1.EventTypeNormal, "LoadbalancerIP", "NeedsToBeUpdated", fmt.Sprintf("%v -> %v",
+			oldService.Spec.LoadBalancerIP, newService.Spec.LoadBalancerIP))
 		return true
 	}
 	if len(oldService.Spec.ExternalIPs) != len(newService.Spec.ExternalIPs) {
-		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "ExternalIP", "Count: %v -> %v",
-			len(oldService.Spec.ExternalIPs), len(newService.Spec.ExternalIPs))
+		s.eventRecorder.Eventf(newService, oldService, v1.EventTypeNormal, "ExternalIP", "NeedsToBeUpdated", fmt.Sprintf("Count: %v -> %v",
+			len(oldService.Spec.ExternalIPs), len(newService.Spec.ExternalIPs)))
 		return true
 	}
 	for i := range oldService.Spec.ExternalIPs {
 		if oldService.Spec.ExternalIPs[i] != newService.Spec.ExternalIPs[i] {
-			s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "ExternalIP", "Added: %v",
-				newService.Spec.ExternalIPs[i])
+			s.eventRecorder.Eventf(newService, oldService, v1.EventTypeNormal, "ExternalIP", "NeedsToBeUpdated", fmt.Sprintf("Added: %v",
+				newService.Spec.ExternalIPs[i]))
 			return true
 		}
 	}
@@ -530,18 +531,18 @@ func (s *ServiceController) needsUpdate(oldService *v1.Service, newService *v1.S
 		return true
 	}
 	if oldService.UID != newService.UID {
-		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "UID", "%v -> %v",
-			oldService.UID, newService.UID)
+		s.eventRecorder.Eventf(newService, oldService, v1.EventTypeNormal, "UID", "NeedsToBeUpdated", fmt.Sprintf("%v -> %v",
+			oldService.UID, newService.UID))
 		return true
 	}
 	if oldService.Spec.ExternalTrafficPolicy != newService.Spec.ExternalTrafficPolicy {
-		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "ExternalTrafficPolicy", "%v -> %v",
-			oldService.Spec.ExternalTrafficPolicy, newService.Spec.ExternalTrafficPolicy)
+		s.eventRecorder.Eventf(newService, oldService, v1.EventTypeNormal, "ExternalTrafficPolicy", "NeedsToBeUpdated", fmt.Sprintf("%v -> %v",
+			oldService.Spec.ExternalTrafficPolicy, newService.Spec.ExternalTrafficPolicy))
 		return true
 	}
 	if oldService.Spec.HealthCheckNodePort != newService.Spec.HealthCheckNodePort {
-		s.eventRecorder.Eventf(newService, v1.EventTypeNormal, "HealthCheckNodePort", "%v -> %v",
-			oldService.Spec.HealthCheckNodePort, newService.Spec.HealthCheckNodePort)
+		s.eventRecorder.Eventf(newService, oldService, v1.EventTypeNormal, "HealthCheckNodePort", "NeedsToBeUpdated", fmt.Sprintf("%v -> %v",
+			oldService.Spec.HealthCheckNodePort, newService.Spec.HealthCheckNodePort))
 		return true
 	}
 
@@ -731,9 +732,9 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *v1.Service, h
 	if err == nil {
 		// If there are no available nodes for LoadBalancer service, make a EventTypeWarning event for it.
 		if len(hosts) == 0 {
-			s.eventRecorder.Event(service, v1.EventTypeWarning, "UnAvailableLoadBalancer", "There are no available nodes for LoadBalancer")
+			s.eventRecorder.Eventf(service, nil, v1.EventTypeWarning, "UnAvailableLoadBalancer", "FailedUpdateLoadBalancer", "There are no available nodes for LoadBalancer")
 		} else {
-			s.eventRecorder.Event(service, v1.EventTypeNormal, "UpdatedLoadBalancer", "Updated load balancer with new hosts")
+			s.eventRecorder.Eventf(service, nil, v1.EventTypeNormal, "", "UpdatedLoadBalancer", "Updated load balancer with new hosts")
 		}
 		return nil
 	}
@@ -750,7 +751,7 @@ func (s *ServiceController) lockedUpdateLoadBalancerHosts(service *v1.Service, h
 		return nil
 	}
 
-	s.eventRecorder.Eventf(service, v1.EventTypeWarning, "UpdateLoadBalancerFailed", "Error updating load balancer with new hosts %v: %v", nodeNames(hosts), err)
+	s.eventRecorder.Eventf(service, nil, v1.EventTypeWarning, "Error", "FailedToUpdateLoadBalancer", "Error updating load balancer with new hosts %v: %v", nodeNames(hosts), err)
 	return err
 }
 
@@ -813,12 +814,12 @@ func (s *ServiceController) processLoadBalancerDelete(service *v1.Service, key s
 	if !wantsLoadBalancer(service) {
 		return nil
 	}
-	s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletingLoadBalancer", "Deleting load balancer")
+	s.eventRecorder.Eventf(service, nil, v1.EventTypeNormal, "", "DeletingLoadBalancer", "Deleting load balancer")
 	if err := s.balancer.EnsureLoadBalancerDeleted(context.TODO(), s.clusterName, service); err != nil {
-		s.eventRecorder.Eventf(service, v1.EventTypeWarning, "DeleteLoadBalancerFailed", "Error deleting load balancer: %v", err)
+		s.eventRecorder.Eventf(service, nil, v1.EventTypeWarning, "Error", "FailedToDeleteLoadBalancer", fmt.Sprintf("Error deleting load balancer: %v", err))
 		return err
 	}
-	s.eventRecorder.Event(service, v1.EventTypeNormal, "DeletedLoadBalancer", "Deleted load balancer")
+	s.eventRecorder.Eventf(service, nil, v1.EventTypeNormal, "", "DeletedLoadBalancer", "Deleted load balancer")
 	return nil
 }
 

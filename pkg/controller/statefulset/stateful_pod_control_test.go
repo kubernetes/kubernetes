@@ -26,7 +26,7 @@ import (
 
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -36,7 +36,7 @@ import (
 )
 
 func TestStatefulPodControlCreatesPods(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
@@ -69,7 +69,7 @@ func TestStatefulPodControlCreatesPods(t *testing.T) {
 }
 
 func TestStatefulPodControlCreatePodExists(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
@@ -101,7 +101,7 @@ func TestStatefulPodControlCreatePodExists(t *testing.T) {
 }
 
 func TestStatefulPodControlCreatePodPvcCreateFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
@@ -139,7 +139,7 @@ func (f *fakeIndexer) GetByKey(key string) (interface{}, bool, error) {
 }
 
 func TestStatefulPodControlCreatePodPvcGetFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
@@ -168,7 +168,7 @@ func TestStatefulPodControlCreatePodPvcGetFailure(t *testing.T) {
 }
 
 func TestStatefulPodControlCreatePodFailed(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
@@ -198,7 +198,7 @@ func TestStatefulPodControlCreatePodFailed(t *testing.T) {
 }
 
 func TestStatefulPodControlNoOpUpdate(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
@@ -217,7 +217,7 @@ func TestStatefulPodControlNoOpUpdate(t *testing.T) {
 }
 
 func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := fake.NewSimpleClientset(set, pod)
@@ -244,7 +244,7 @@ func TestStatefulPodControlUpdatesIdentity(t *testing.T) {
 }
 
 func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
@@ -274,7 +274,7 @@ func TestStatefulPodControlUpdateIdentityFailure(t *testing.T) {
 }
 
 func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
@@ -321,7 +321,7 @@ func TestStatefulPodControlUpdatesPodStorage(t *testing.T) {
 }
 
 func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
@@ -358,7 +358,7 @@ func TestStatefulPodControlUpdatePodStorageFailure(t *testing.T) {
 }
 
 func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
@@ -394,7 +394,7 @@ func TestStatefulPodControlUpdatePodConflictSuccess(t *testing.T) {
 }
 
 func TestStatefulPodControlDeletesStatefulPod(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}
@@ -414,7 +414,7 @@ func TestStatefulPodControlDeletesStatefulPod(t *testing.T) {
 }
 
 func TestStatefulPodControlDeleteFailure(t *testing.T) {
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	set := newStatefulSet(3)
 	pod := newStatefulSetPod(set, 0)
 	fakeClient := &fake.Clientset{}

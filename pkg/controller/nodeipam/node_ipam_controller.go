@@ -24,9 +24,9 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	v1 "k8s.io/api/core/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
@@ -67,6 +67,9 @@ type Controller struct {
 	cidrAllocator ipam.CIDRAllocator
 
 	forcefullyDeletePod func(*v1.Pod) error
+
+	eventBroadcaster events.EventBroadcaster
+	eventRecorder    events.EventRecorder
 }
 
 // NewNodeIpamController returns a new node IP Address Management controller to
@@ -88,14 +91,8 @@ func NewNodeIpamController(
 		klog.Fatalf("kubeClient is nil when starting Controller")
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-
-	klog.Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(
-		&v1core.EventSinkImpl{
-			Interface: kubeClient.CoreV1().Events(""),
-		})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "node-ipam-autoscaler")
 
 	if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("node_ipam_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
@@ -128,6 +125,8 @@ func NewNodeIpamController(
 		serviceCIDR:          serviceCIDR,
 		secondaryServiceCIDR: secondaryServiceCIDR,
 		allocatorType:        allocatorType,
+		eventBroadcaster:     eventBroadcaster,
+		eventRecorder:        recorder,
 	}
 
 	// TODO: Abstract this check into a generic controller manager should run method.
@@ -153,6 +152,11 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 
 	klog.Infof("Starting ipam controller")
 	defer klog.Infof("Shutting down ipam controller")
+
+	if nc.kubeClient != nil && nc.eventBroadcaster != nil {
+		klog.Infof("Sending events to api server.")
+		nc.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync("node", stopCh, nc.nodeInformerSynced) {
 		return

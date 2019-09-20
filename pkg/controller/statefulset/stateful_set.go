@@ -32,11 +32,10 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -70,6 +69,8 @@ type StatefulSetController struct {
 	revListerSynced cache.InformerSynced
 	// StatefulSets that need to be synced.
 	queue workqueue.RateLimitingInterface
+	// eventBroadcaster is used to initialize event recorder and start recording
+	eventBroadcaster events.EventBroadcaster
 }
 
 // NewStatefulSetController creates a new statefulset controller.
@@ -80,10 +81,8 @@ func NewStatefulSetController(
 	revInformer appsinformers.ControllerRevisionInformer,
 	kubeClient clientset.Interface,
 ) *StatefulSetController {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "statefulset-controller"})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "statefulset-controller")
 
 	ssc := &StatefulSetController{
 		kubeClient: kubeClient,
@@ -102,7 +101,8 @@ func NewStatefulSetController(
 		queue:           workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "statefulset"),
 		podControl:      controller.RealPodControl{KubeClient: kubeClient, Recorder: recorder},
 
-		revListerSynced: revInformer.Informer().HasSynced,
+		revListerSynced:  revInformer.Informer().HasSynced,
+		eventBroadcaster: eventBroadcaster,
 	}
 
 	podInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -144,6 +144,10 @@ func (ssc *StatefulSetController) Run(workers int, stopCh <-chan struct{}) {
 
 	klog.Infof("Starting stateful set controller")
 	defer klog.Infof("Shutting down statefulset controller")
+
+	if ssc.kubeClient != nil && ssc.eventBroadcaster != nil {
+		ssc.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync("stateful set", stopCh, ssc.podListerSynced, ssc.setListerSynced, ssc.pvcListerSynced, ssc.revListerSynced) {
 		return

@@ -33,11 +33,10 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/api/v1/endpoints"
@@ -79,10 +78,8 @@ const (
 // NewEndpointController returns a new *EndpointController.
 func NewEndpointController(podInformer coreinformers.PodInformer, serviceInformer coreinformers.ServiceInformer,
 	endpointsInformer coreinformers.EndpointsInformer, client clientset.Interface, endpointUpdatesBatchPeriod time.Duration) *EndpointController {
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(klog.Infof)
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-controller"})
+	broadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, "endpoint-controller")
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_controller", client.CoreV1().RESTClient().GetRateLimiter())
@@ -126,8 +123,8 @@ func NewEndpointController(podInformer coreinformers.PodInformer, serviceInforme
 // EndpointController manages selector-based service endpoints.
 type EndpointController struct {
 	client           clientset.Interface
-	eventBroadcaster record.EventBroadcaster
-	eventRecorder    record.EventRecorder
+	eventBroadcaster events.EventBroadcaster
+	eventRecorder    events.EventRecorder
 
 	// serviceLister is able to list/get services and is populated by the shared informer passed to
 	// NewEndpointController.
@@ -175,6 +172,10 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 
 	klog.Infof("Starting endpoint controller")
 	defer klog.Infof("Shutting down endpoint controller")
+
+	if e.eventBroadcaster != nil && e.client != nil {
+		e.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync("endpoint", stopCh, e.podsSynced, e.servicesSynced, e.endpointsSynced) {
 		return
@@ -528,9 +529,9 @@ func (e *EndpointController) syncService(key string) error {
 		}
 
 		if createEndpoints {
-			e.eventRecorder.Eventf(newEndpoints, v1.EventTypeWarning, "FailedToCreateEndpoint", "Failed to create endpoint for service %v/%v: %v", service.Namespace, service.Name, err)
+			e.eventRecorder.Eventf(newEndpoints, service, v1.EventTypeWarning, "Error", "FailedToCreateEndpoint", fmt.Sprintf("Failed to create endpoint for service %v/%v: %v", service.Namespace, service.Name, err))
 		} else {
-			e.eventRecorder.Eventf(newEndpoints, v1.EventTypeWarning, "FailedToUpdateEndpoint", "Failed to update endpoint %v/%v: %v", service.Namespace, service.Name, err)
+			e.eventRecorder.Eventf(newEndpoints, service, v1.EventTypeWarning, "Error", "FailedToUpdateEndpoint", fmt.Sprintf("Failed to update endpoint %v/%v: %v", service.Namespace, service.Name, err))
 		}
 
 		return err

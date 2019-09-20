@@ -47,11 +47,10 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -103,39 +102,41 @@ type ReplicaSetController struct {
 
 	// Controllers that need to be synced
 	queue workqueue.RateLimitingInterface
+
+	// eventBroadcaster is used to initialize event recorder and start recording
+	eventBroadcaster events.EventBroadcaster
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
 func NewReplicaSetController(rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
 	return NewBaseController(rsInformer, podInformer, kubeClient, burstReplicas,
 		apps.SchemeGroupVersion.WithKind("ReplicaSet"),
 		"replicaset_controller",
 		"replicaset",
-		controller.RealPodControl{
-			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "replicaset-controller"}),
-		},
 	)
 }
 
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
 func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
-	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface) *ReplicaSetController {
+	gvk schema.GroupVersionKind, metricOwnerName, queueName string) *ReplicaSetController {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage(metricOwnerName, kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")})
+
 	rsc := &ReplicaSetController{
 		GroupVersionKind: gvk,
 		kubeClient:       kubeClient,
-		podControl:       podControl,
+		podControl: controller.RealPodControl{
+			KubeClient: kubeClient,
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, "replicaset-controller"),
+		},
 		burstReplicas:    burstReplicas,
 		expectations:     controller.NewUIDTrackingControllerExpectations(controller.NewControllerExpectations()),
 		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), queueName),
+		eventBroadcaster: eventBroadcaster,
 	}
 
 	rsInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -167,7 +168,7 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 
 // SetEventRecorder replaces the event recorder used by the ReplicaSetController
 // with the given recorder. Only used for testing.
-func (rsc *ReplicaSetController) SetEventRecorder(recorder record.EventRecorder) {
+func (rsc *ReplicaSetController) SetEventRecorder(recorder events.EventRecorder) {
 	// TODO: Hack. We can't cleanly shutdown the event recorder, so benchmarks
 	// need to pass in a fake.
 	rsc.podControl = controller.RealPodControl{KubeClient: rsc.kubeClient, Recorder: recorder}
@@ -181,6 +182,10 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	controllerName := strings.ToLower(rsc.Kind)
 	klog.Infof("Starting %v controller", controllerName)
 	defer klog.Infof("Shutting down %v controller", controllerName)
+
+	if rsc.kubeClient != nil && rsc.eventBroadcaster != nil {
+		rsc.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync(rsc.Kind, stopCh, rsc.podListerSynced, rsc.rsListerSynced) {
 		return

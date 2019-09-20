@@ -30,9 +30,8 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	clientretry "k8s.io/client-go/util/retry"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
@@ -48,9 +47,10 @@ var UpdateNodeSpecBackoff = wait.Backoff{
 }
 
 type CloudNodeController struct {
-	nodeInformer coreinformers.NodeInformer
-	kubeClient   clientset.Interface
-	recorder     record.EventRecorder
+	nodeInformer     coreinformers.NodeInformer
+	kubeClient       clientset.Interface
+	eventBroadcaster events.EventBroadcaster
+	recorder         events.EventRecorder
 
 	cloud cloudprovider.Interface
 
@@ -64,12 +64,8 @@ func NewCloudNodeController(
 	cloud cloudprovider.Interface,
 	nodeStatusUpdateFrequency time.Duration) (*CloudNodeController, error) {
 
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
-	eventBroadcaster.StartLogging(klog.Infof)
-
-	klog.Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "node-controller")
 
 	if _, ok := cloud.Instances(); !ok {
 		return nil, errors.New("cloud provider does not support instances")
@@ -78,6 +74,7 @@ func NewCloudNodeController(
 	cnc := &CloudNodeController{
 		nodeInformer:              nodeInformer,
 		kubeClient:                kubeClient,
+		eventBroadcaster:          eventBroadcaster,
 		recorder:                  recorder,
 		cloud:                     cloud,
 		nodeStatusUpdateFrequency: nodeStatusUpdateFrequency,
@@ -98,6 +95,15 @@ func NewCloudNodeController(
 // via a goroutine
 func (cnc *CloudNodeController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
+	if cnc.kubeClient != nil {
+		if cnc.eventBroadcaster != nil {
+			klog.V(0).Infof("Sending events to api server.")
+			cnc.eventBroadcaster.StartRecordingToSink(stopCh)
+		}
+	} else {
+		klog.V(0).Infof("No api server defined - no events will be sent to API server.")
+	}
 
 	// The following loops run communicate with the APIServer with a worst case complexity
 	// of O(num_nodes) per cycle. These functions are justified here because these events fire

@@ -34,10 +34,9 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	clientretry "k8s.io/client-go/util/retry"
 	cloudprovider "k8s.io/cloud-provider"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
@@ -64,8 +63,8 @@ type RouteController struct {
 	clusterCIDRs     []*net.IPNet
 	nodeLister       corelisters.NodeLister
 	nodeListerSynced cache.InformerSynced
-	broadcaster      record.EventBroadcaster
-	recorder         record.EventRecorder
+	broadcaster      events.EventBroadcaster
+	recorder         events.EventRecorder
 }
 
 func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDRs []*net.IPNet) *RouteController {
@@ -77,9 +76,8 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 		klog.Fatal("RouteController: Must specify clusterCIDR.")
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "route_controller")
 
 	rc := &RouteController{
 		routes:           routes,
@@ -106,7 +104,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	}
 
 	if rc.broadcaster != nil {
-		rc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: rc.kubeClient.CoreV1().Events("")})
+		rc.broadcaster.StartRecordingToSink(stopCh)
 	}
 
 	// TODO: If we do just the full Resync every 5 minutes (default value)
@@ -203,7 +201,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 									Name:      string(nodeName),
 									UID:       types.UID(nodeName),
 									Namespace: "",
-								}, v1.EventTypeWarning, "FailedToCreateRoute", msg)
+								}, nil, v1.EventTypeWarning, "Error", "FailedToCreateRoute", msg)
 							klog.V(4).Infof(msg)
 							return err
 						}

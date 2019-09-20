@@ -501,7 +501,7 @@ func (tc *legacyTestCase) runTest(t *testing.T) {
 	defaultDownscaleStabilisationWindow := 5 * time.Minute
 
 	hpaController := NewHorizontalController(
-		eventClient.CoreV1(),
+		eventClient,
 		testScaleClient,
 		testClient.AutoscalingV1(),
 		testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme),

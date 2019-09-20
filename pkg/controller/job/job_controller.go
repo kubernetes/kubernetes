@@ -35,11 +35,10 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	batchv1listers "k8s.io/client-go/listers/batch/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
@@ -58,6 +57,13 @@ var (
 	DefaultJobBackOff = 10 * time.Second
 	// MaxJobBackOff is the max backoff period, exported for the e2e test
 	MaxJobBackOff = 360 * time.Second
+)
+
+const (
+	// JobFailedAction is the action add in an event when job failed.
+	JobFailedAction = "Failed"
+	// JobCompletedAction is the action add in an event when job completed.
+	JobCompletedAction = "Completed"
 )
 
 type JobController struct {
@@ -86,13 +92,12 @@ type JobController struct {
 	// Jobs that need to be updated
 	queue workqueue.RateLimitingInterface
 
-	recorder record.EventRecorder
+	eventBroadcaster events.EventBroadcaster
+	recorder         events.EventRecorder
 }
 
 func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchinformers.JobInformer, kubeClient clientset.Interface) *JobController {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")})
 
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("job_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
@@ -102,11 +107,12 @@ func NewJobController(podInformer coreinformers.PodInformer, jobInformer batchin
 		kubeClient: kubeClient,
 		podControl: controller.RealPodControl{
 			KubeClient: kubeClient,
-			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+			Recorder:   eventBroadcaster.NewRecorder(scheme.Scheme, "job-controller"),
 		},
-		expectations: controller.NewControllerExpectations(),
-		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job"),
-		recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "job-controller"}),
+		expectations:     controller.NewControllerExpectations(),
+		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.NewItemExponentialFailureRateLimiter(DefaultJobBackOff, MaxJobBackOff), "job"),
+		eventBroadcaster: eventBroadcaster,
+		recorder:         eventBroadcaster.NewRecorder(scheme.Scheme, "job-controller"),
 	}
 
 	jobInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -142,6 +148,10 @@ func (jm *JobController) Run(workers int, stopCh <-chan struct{}) {
 
 	klog.Infof("Starting job controller")
 	defer klog.Infof("Shutting down job controller")
+
+	if jm.kubeClient != nil && jm.eventBroadcaster != nil {
+		jm.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync("job", stopCh, jm.podStoreSynced, jm.jobStoreSynced) {
 		return
@@ -530,7 +540,7 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		failed += active
 		active = 0
 		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, failureReason, failureMessage))
-		jm.recorder.Event(&job, v1.EventTypeWarning, failureReason, failureMessage)
+		jm.recorder.Eventf(&job, nil, v1.EventTypeWarning, failureReason, JobFailedAction, failureMessage)
 	} else {
 		if jobNeedsSync && job.DeletionTimestamp == nil {
 			active, manageJobErr = jm.manageJob(activePods, succeeded, &job)
@@ -555,10 +565,10 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 			if completions >= *job.Spec.Completions {
 				complete = true
 				if active > 0 {
-					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManyActivePods", "Too many active pods running after completion count reached")
+					jm.recorder.Eventf(&job, nil, v1.EventTypeWarning, "TooManyActivePods", JobCompletedAction, "Too many active pods running after completion count reached")
 				}
 				if completions > *job.Spec.Completions {
-					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
+					jm.recorder.Eventf(&job, nil, v1.EventTypeWarning, "TooManySucceededPods", JobCompletedAction, "Too many succeeded pods running after completion count reached")
 				}
 			}
 		}

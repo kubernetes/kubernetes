@@ -31,10 +31,9 @@ import (
 	informers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/controller/nodeipam/ipam/cidrset"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -60,7 +59,8 @@ type rangeAllocator struct {
 	// Channel that is used to pass updating Nodes and their reserved CIDRs to the background
 	// This increases a throughput of CIDR assignment by not blocking on long operations.
 	nodeCIDRUpdateChannel chan nodeReservedCIDRs
-	recorder              record.EventRecorder
+	eventBroadcaster      events.EventBroadcaster
+	recorder              events.EventRecorder
 	// Keep a set of nodes that are currectly being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
 	nodesInProcessing sets.String
@@ -76,11 +76,9 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 		klog.Fatalf("kubeClient is nil when starting NodeController")
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
-	eventBroadcaster.StartLogging(klog.Infof)
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "cidrAllocator")
 	klog.V(0).Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
 
 	// create a cidrSet for each cidr we operate on
 	// cidrSet are mapped to clusterCIDR by index
@@ -100,6 +98,7 @@ func NewCIDRRangeAllocator(client clientset.Interface, nodeInformer informers.No
 		nodeLister:            nodeInformer.Lister(),
 		nodesSynced:           nodeInformer.Informer().HasSynced,
 		nodeCIDRUpdateChannel: make(chan nodeReservedCIDRs, cidrUpdateQueueSize),
+		eventBroadcaster:      eventBroadcaster,
 		recorder:              recorder,
 		nodesInProcessing:     sets.NewString(),
 	}
@@ -171,6 +170,10 @@ func (r *rangeAllocator) Run(stopCh <-chan struct{}) {
 
 	klog.Infof("Starting range CIDR allocator")
 	defer klog.Infof("Shutting down range CIDR allocator")
+
+	if r.client != nil && r.eventBroadcaster != nil {
+		r.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync("cidrallocator", stopCh, r.nodesSynced) {
 		return

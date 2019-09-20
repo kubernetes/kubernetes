@@ -39,11 +39,10 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/deployment/util"
@@ -66,9 +65,10 @@ var controllerKind = apps.SchemeGroupVersion.WithKind("Deployment")
 // in the system with actual running replica sets and pods.
 type DeploymentController struct {
 	// rsControl is used for adopting/releasing replica sets.
-	rsControl     controller.RSControlInterface
-	client        clientset.Interface
-	eventRecorder record.EventRecorder
+	rsControl        controller.RSControlInterface
+	client           clientset.Interface
+	eventBroadcaster events.EventBroadcaster
+	eventRecorder    events.EventRecorder
 
 	// To allow injection of syncDeployment for testing.
 	syncHandler func(dKey string) error
@@ -98,9 +98,7 @@ type DeploymentController struct {
 
 // NewDeploymentController creates a new DeploymentController.
 func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, client clientset.Interface) (*DeploymentController, error) {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		if err := metrics.RegisterMetricAndTrackRateLimiterUsage("deployment_controller", client.CoreV1().RESTClient().GetRateLimiter()); err != nil {
@@ -108,9 +106,10 @@ func NewDeploymentController(dInformer appsinformers.DeploymentInformer, rsInfor
 		}
 	}
 	dc := &DeploymentController{
-		client:        client,
-		eventRecorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "deployment-controller"}),
-		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
+		client:           client,
+		eventBroadcaster: eventBroadcaster,
+		eventRecorder:    eventBroadcaster.NewRecorder(scheme.Scheme, "deployment-controller"),
+		queue:            workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "deployment"),
 	}
 	dc.rsControl = controller.RealRSControl{
 		KubeClient: client,
@@ -151,6 +150,10 @@ func (dc *DeploymentController) Run(workers int, stopCh <-chan struct{}) {
 
 	klog.Infof("Starting deployment controller")
 	defer klog.Infof("Shutting down deployment controller")
+
+	if dc.client != nil && dc.eventBroadcaster != nil {
+		dc.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync("deployment", stopCh, dc.dListerSynced, dc.rsListerSynced, dc.podListerSynced) {
 		return
@@ -585,7 +588,7 @@ func (dc *DeploymentController) syncDeployment(key string) error {
 
 	everything := metav1.LabelSelector{}
 	if reflect.DeepEqual(d.Spec.Selector, &everything) {
-		dc.eventRecorder.Eventf(d, v1.EventTypeWarning, "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
+		dc.eventRecorder.Eventf(d, nil, v1.EventTypeWarning, "RequiredNonEmptySelector", "SelectingAll", "This deployment is selecting all pods. A non-empty selector is required.")
 		if d.Status.ObservedGeneration < d.Generation {
 			d.Status.ObservedGeneration = d.Generation
 			dc.client.AppsV1().Deployments(d.Namespace).UpdateStatus(d)

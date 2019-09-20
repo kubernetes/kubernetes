@@ -35,11 +35,10 @@ import (
 	informers "k8s.io/client-go/informers/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -72,7 +71,8 @@ type cloudCIDRAllocator struct {
 	// and not blocking on long operations (which shouldn't be done from
 	// event handlers anyway).
 	nodeUpdateChannel chan string
-	recorder          record.EventRecorder
+	eventBroadcaster  events.EventBroadcaster
+	recorder          events.EventRecorder
 
 	// Keep a set of nodes that are currectly being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
@@ -87,11 +87,8 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 		klog.Fatalf("kubeClient is nil when starting NodeController")
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cidrAllocator"})
-	eventBroadcaster.StartLogging(klog.Infof)
-	klog.V(0).Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "cidrAllocator")
 
 	gceCloud, ok := cloud.(*gce.Cloud)
 	if !ok {
@@ -105,6 +102,7 @@ func NewCloudCIDRAllocator(client clientset.Interface, cloud cloudprovider.Inter
 		nodeLister:        nodeInformer.Lister(),
 		nodesSynced:       nodeInformer.Informer().HasSynced,
 		nodeUpdateChannel: make(chan string, cidrUpdateQueueSize),
+		eventBroadcaster:  eventBroadcaster,
 		recorder:          recorder,
 		nodesInProcessing: map[string]*nodeProcessingInfo{},
 	}
@@ -136,6 +134,11 @@ func (ca *cloudCIDRAllocator) Run(stopCh <-chan struct{}) {
 
 	klog.Infof("Starting cloud CIDR allocator")
 	defer klog.Infof("Shutting down cloud CIDR allocator")
+
+	if ca.client != nil && ca.eventBroadcaster != nil {
+		klog.V(0).Infof("Sending events to api server.")
+		ca.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync("cidrallocator", stopCh, ca.nodesSynced) {
 		return

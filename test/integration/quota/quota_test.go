@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/pkg/controller"
 	replicationcontroller "k8s.io/kubernetes/pkg/controller/replication"
@@ -95,7 +95,7 @@ func TestQuota(t *testing.T) {
 		clientset,
 		replicationcontroller.BurstReplicas,
 	)
-	rm.SetEventRecorder(&record.FakeRecorder{})
+	rm.SetEventRecorder(&events.FakeRecorder{})
 	go rm.Run(3, controllerCh)
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources
@@ -293,7 +293,7 @@ func TestQuotaLimitedResourceDenial(t *testing.T) {
 		clientset,
 		replicationcontroller.BurstReplicas,
 	)
-	rm.SetEventRecorder(&record.FakeRecorder{})
+	rm.SetEventRecorder(&events.FakeRecorder{})
 	go rm.Run(3, controllerCh)
 
 	discoveryFunc := clientset.Discovery().ServerPreferredNamespacedResources

@@ -38,14 +38,13 @@ import (
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	policyclientset "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
@@ -96,8 +95,8 @@ type DisruptionController struct {
 	queue        workqueue.RateLimitingInterface
 	recheckQueue workqueue.DelayingInterface
 
-	broadcaster record.EventBroadcaster
-	recorder    record.EventRecorder
+	broadcaster events.EventBroadcaster
+	recorder    events.EventRecorder
 
 	getUpdater func() updater
 }
@@ -128,9 +127,9 @@ func NewDisruptionController(
 		kubeClient:   kubeClient,
 		queue:        workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "disruption"),
 		recheckQueue: workqueue.NewNamedDelayingQueue("disruption_recheck"),
-		broadcaster:  record.NewBroadcaster(),
+		broadcaster:  events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")}),
 	}
-	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "controllermanager"})
+	dc.recorder = dc.broadcaster.NewRecorder(scheme.Scheme, "controllermanager")
 
 	dc.getUpdater = func() updater { return dc.writePdbStatus }
 
@@ -337,9 +336,9 @@ func (dc *DisruptionController) Run(stopCh <-chan struct{}) {
 		return
 	}
 
-	if dc.kubeClient != nil {
+	if dc.kubeClient != nil && dc.broadcaster != nil {
 		klog.Infof("Sending events to api server.")
-		dc.broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: dc.kubeClient.CoreV1().Events("")})
+		dc.broadcaster.StartRecordingToSink(stopCh)
 	} else {
 		klog.Infof("No api server defined - no events will be sent to API server.")
 	}
@@ -452,7 +451,7 @@ func (dc *DisruptionController) getPdbForPod(pod *v1.Pod) *policy.PodDisruptionB
 	if len(pdbs) > 1 {
 		msg := fmt.Sprintf("Pod %q/%q matches multiple PodDisruptionBudgets.  Chose %q arbitrarily.", pod.Namespace, pod.Name, pdbs[0].Name)
 		klog.Warning(msg)
-		dc.recorder.Event(pod, v1.EventTypeWarning, "MultiplePodDisruptionBudgets", msg)
+		dc.recorder.Eventf(pod, nil, v1.EventTypeWarning, "MultiplePodDisruptionBudgets", "MatchedPDB", msg)
 	}
 	return pdbs[0]
 }
@@ -543,16 +542,16 @@ func (dc *DisruptionController) sync(key string) error {
 func (dc *DisruptionController) trySync(pdb *policy.PodDisruptionBudget) error {
 	pods, err := dc.getPodsForPdb(pdb)
 	if err != nil {
-		dc.recorder.Eventf(pdb, v1.EventTypeWarning, "NoPods", "Failed to get pods: %v", err)
+		dc.recorder.Eventf(pdb, nil, v1.EventTypeWarning, "ErrorHappened", "FailedToGetPod", fmt.Sprintf("Failed to get pods: %v", err))
 		return err
 	}
 	if len(pods) == 0 {
-		dc.recorder.Eventf(pdb, v1.EventTypeNormal, "NoPods", "No matching pods found")
+		dc.recorder.Eventf(pdb, nil, v1.EventTypeNormal, "NoPods", "GotNoPod", "No matching pods found")
 	}
 
 	expectedCount, desiredHealthy, err := dc.getExpectedPodCount(pdb, pods)
 	if err != nil {
-		dc.recorder.Eventf(pdb, v1.EventTypeWarning, "CalculateExpectedPodCountFailed", "Failed to calculate the number of expected pods: %v", err)
+		dc.recorder.Eventf(pdb, nil, v1.EventTypeWarning, "ErrorHappened", "FailedToCalculateExpectedPodCount", fmt.Sprintf("Failed to calculate the number of expected pods: %v", err))
 		return err
 	}
 
@@ -633,7 +632,7 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 		controllerRef := metav1.GetControllerOf(pod)
 		if controllerRef == nil {
 			err = fmt.Errorf("found no controller ref for pod %q", pod.Name)
-			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllerRef", err.Error())
+			dc.recorder.Eventf(pdb, pod, v1.EventTypeWarning, "NoControllerRef", "FoundNoController", err.Error())
 			return
 		}
 
@@ -658,7 +657,7 @@ func (dc *DisruptionController) getExpectedScale(pdb *policy.PodDisruptionBudget
 		}
 		if !foundController {
 			err = fmt.Errorf("found no controllers for pod %q", pod.Name)
-			dc.recorder.Event(pdb, v1.EventTypeWarning, "NoControllers", err.Error())
+			dc.recorder.Eventf(pdb, pod, v1.EventTypeWarning, "NoControllers", "FoundNoController", err.Error())
 			return
 		}
 	}
@@ -716,7 +715,7 @@ func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy
 		if expectedDeletion.Before(currentTime) {
 			klog.V(1).Infof("Pod %s/%s was expected to be deleted at %s but it wasn't, updating pdb %s/%s",
 				pod.Namespace, pod.Name, disruptionTime.String(), pdb.Namespace, pdb.Name)
-			dc.recorder.Eventf(pod, v1.EventTypeWarning, "NotDeleted", "Pod was expected by PDB %s/%s to be deleted but it wasn't",
+			dc.recorder.Eventf(pod, pdb, v1.EventTypeWarning, "ExpectedByPDB", "NotDeleted", "Pod was expected by PDB %s/%s to be deleted but it wasn't",
 				pdb.Namespace, pdb.Namespace)
 		} else {
 			if recheckTime == nil || expectedDeletion.Before(*recheckTime) {

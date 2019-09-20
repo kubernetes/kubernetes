@@ -43,12 +43,11 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
 	coordlisters "k8s.io/client-go/listers/coordination/v1beta1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
@@ -246,7 +245,8 @@ type Controller struct {
 
 	getPodsAssignedToNode func(nodeName string) ([]v1.Pod, error)
 
-	recorder record.EventRecorder
+	eventBroadcaster events.EventBroadcaster
+	recorder         events.EventRecorder
 
 	// Value controlling Controller monitoring period, i.e. how often does Controller
 	// check node health signal posted from kubelet. This value should be lower than
@@ -324,15 +324,8 @@ func NewNodeLifecycleController(
 		klog.Fatalf("kubeClient is nil when starting Controller")
 	}
 
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "node-controller"})
-	eventBroadcaster.StartLogging(klog.Infof)
-
-	klog.Infof("Sending events to api server.")
-	eventBroadcaster.StartRecordingToSink(
-		&v1core.EventSinkImpl{
-			Interface: v1core.New(kubeClient.CoreV1().RESTClient()).Events(""),
-		})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "node-controller")
 
 	if kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("node_lifecycle_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
@@ -343,6 +336,7 @@ func NewNodeLifecycleController(
 		now:                         metav1.Now,
 		knownNodeSet:                make(map[string]*v1.Node),
 		nodeHealthMap:               newNodeHealthMap(),
+		eventBroadcaster:            eventBroadcaster,
 		recorder:                    recorder,
 		nodeMonitorPeriod:           nodeMonitorPeriod,
 		nodeStartupGracePeriod:      nodeStartupGracePeriod,
@@ -494,6 +488,11 @@ func (nc *Controller) Run(stopCh <-chan struct{}) {
 
 	klog.Infof("Starting node controller")
 	defer klog.Infof("Shutting down node controller")
+
+	if nc.eventBroadcaster != nil && nc.kubeClient != nil {
+		klog.Infof("Sending events to api server.")
+		nc.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync("taint", stopCh, nc.leaseInformerSynced, nc.nodeInformerSynced, nc.podInformerSynced, nc.daemonSetInformerSynced) {
 		return
@@ -713,7 +712,7 @@ func (nc *Controller) monitorNodeHealth() error {
 
 	for i := range added {
 		klog.V(1).Infof("Controller observed a new Node: %#v", added[i].Name)
-		nodeutil.RecordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "RegisteredNode", fmt.Sprintf("Registered Node %v in Controller", added[i].Name))
+		nodeutil.RecordNodeEvent(nc.recorder, added[i].Name, string(added[i].UID), v1.EventTypeNormal, "", "RegisteredNode", fmt.Sprintf("Registered Node %v in Controller", added[i].Name))
 		nc.knownNodeSet[added[i].Name] = added[i]
 		nc.addPodEvictorForNewZone(added[i])
 		if nc.useTaintBasedEvictions {
@@ -725,7 +724,7 @@ func (nc *Controller) monitorNodeHealth() error {
 
 	for i := range deleted {
 		klog.V(1).Infof("Controller observed a Node deletion: %v", deleted[i].Name)
-		nodeutil.RecordNodeEvent(nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
+		nodeutil.RecordNodeEvent(nc.recorder, deleted[i].Name, string(deleted[i].UID), v1.EventTypeNormal, "", "RemovingNode", fmt.Sprintf("Removing Node %v from Controller", deleted[i].Name))
 		delete(nc.knownNodeSet, deleted[i].Name)
 	}
 

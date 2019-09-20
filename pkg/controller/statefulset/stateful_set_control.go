@@ -25,7 +25,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
@@ -55,7 +55,7 @@ func NewDefaultStatefulSetControl(
 	podControl StatefulPodControlInterface,
 	statusUpdater StatefulSetStatusUpdaterInterface,
 	controllerHistory history.Interface,
-	recorder record.EventRecorder) StatefulSetControlInterface {
+	recorder events.EventRecorder) StatefulSetControlInterface {
 	return &defaultStatefulSetControl{podControl, statusUpdater, controllerHistory, recorder}
 }
 
@@ -63,7 +63,7 @@ type defaultStatefulSetControl struct {
 	podControl        StatefulPodControlInterface
 	statusUpdater     StatefulSetStatusUpdaterInterface
 	controllerHistory history.Interface
-	recorder          record.EventRecorder
+	recorder          events.EventRecorder
 }
 
 // UpdateStatefulSet executes the core logic loop for a stateful set, applying the predictable and
@@ -371,7 +371,7 @@ func (ssc *defaultStatefulSetControl) updateStatefulSet(
 	for i := range replicas {
 		// delete and recreate failed pods
 		if isFailed(replicas[i]) {
-			ssc.recorder.Eventf(set, v1.EventTypeWarning, "RecreatingFailedPod",
+			ssc.recorder.Eventf(set, replicas[i], v1.EventTypeWarning, "PodFailure", "RecreatingFailedPod",
 				"StatefulSet %s/%s is recreating failed Pod %s",
 				set.Namespace,
 				set.Name,

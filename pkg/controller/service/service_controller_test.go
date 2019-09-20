@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -80,7 +80,7 @@ func newController() (*ServiceController, *fakecloud.Cloud, *fake.Clientset) {
 	controller, _ := New(cloud, client, serviceInformer, nodeInformer, "test-cluster")
 	controller.nodeListerSynced = alwaysReady
 	controller.serviceListerSynced = alwaysReady
-	controller.eventRecorder = record.NewFakeRecorder(100)
+	controller.eventRecorder = events.NewFakeRecorder(100)
 
 	cloud.Calls = nil     // ignore any cloud calls made in init()
 	client.ClearActions() // ignore any client calls made in init()
@@ -659,7 +659,7 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 
 			errMsg := "Error syncing load balancer"
 			if gotEvent := func() bool {
-				events := controller.eventRecorder.(*record.FakeRecorder).Events
+				events := controller.eventRecorder.(*events.FakeRecorder).Events
 				for len(events) > 0 {
 					e := <-events
 					if strings.Contains(e, errMsg) {

@@ -29,9 +29,8 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	fakecloud "k8s.io/cloud-provider/fake"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 )
 
@@ -245,16 +244,15 @@ func Test_NodesDeleted(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			eventBroadcaster := record.NewBroadcaster()
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: testcase.fnh.EventsV1beta1().Events("")})
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
 				nodeLister:        nodeInformer.Lister(),
 				kubeClient:        testcase.fnh,
 				cloud:             testcase.fakeCloud,
-				recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
+				recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, "cloud-node-lifecycle-controller"),
 				nodeMonitorPeriod: 1 * time.Second,
 			}
 
-			eventBroadcaster.StartLogging(klog.Infof)
 			cloudNodeLifecycleController.MonitorNodes()
 
 			if !reflect.DeepEqual(testcase.fnh.DeletedNodes, testcase.deleteNodes) {
@@ -426,16 +424,15 @@ func Test_NodesShutdown(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			eventBroadcaster := record.NewBroadcaster()
+			eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: testcase.fnh.EventsV1beta1().Events("")})
 			cloudNodeLifecycleController := &CloudNodeLifecycleController{
 				nodeLister:        nodeInformer.Lister(),
 				kubeClient:        testcase.fnh,
 				cloud:             testcase.fakeCloud,
-				recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"}),
+				recorder:          eventBroadcaster.NewRecorder(scheme.Scheme, "cloud-node-lifecycle-controller"),
 				nodeMonitorPeriod: 1 * time.Second,
 			}
 
-			eventBroadcaster.StartLogging(klog.Infof)
 			cloudNodeLifecycleController.MonitorNodes()
 
 			if !reflect.DeepEqual(testcase.fnh.UpdatedNodes, testcase.updatedNodes) {

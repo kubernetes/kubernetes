@@ -31,8 +31,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/apis/core/helper"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -81,7 +80,8 @@ type GetPodsByNodeNameFunc func(nodeName string) ([]v1.Pod, error)
 // from Nodes tainted with NoExecute Taints.
 type NoExecuteTaintManager struct {
 	client                clientset.Interface
-	recorder              record.EventRecorder
+	eventBroadcaster      events.EventBroadcaster
+	recorder              events.EventRecorder
 	getPod                GetPodFunc
 	getNode               GetNodeFunc
 	getPodsAssignedToNode GetPodsByNodeNameFunc
@@ -155,18 +155,12 @@ func getMinTolerationTime(tolerations []v1.Toleration) time.Duration {
 // NewNoExecuteTaintManager creates a new NoExecuteTaintManager that will use passed clientset to
 // communicate with the API server.
 func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode GetNodeFunc, getPodsAssignedToNode GetPodsByNodeNameFunc) *NoExecuteTaintManager {
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "taint-controller"})
-	eventBroadcaster.StartLogging(klog.Infof)
-	if c != nil {
-		klog.V(0).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: c.CoreV1().Events("")})
-	} else {
-		klog.Fatalf("kubeClient is nil when starting NodeController")
-	}
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: c.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "taint-controller")
 
 	tm := &NoExecuteTaintManager{
 		client:                c,
+		eventBroadcaster:      eventBroadcaster,
 		recorder:              recorder,
 		getPod:                getPod,
 		getNode:               getNode,
@@ -184,6 +178,15 @@ func NewNoExecuteTaintManager(c clientset.Interface, getPod GetPodFunc, getNode 
 // Run starts NoExecuteTaintManager which will run in loop until `stopCh` is closed.
 func (tc *NoExecuteTaintManager) Run(stopCh <-chan struct{}) {
 	klog.V(0).Infof("Starting NoExecuteTaintManager")
+
+	if tc.client != nil {
+		if tc.eventBroadcaster != nil {
+			klog.V(0).Infof("Sending events to api server.")
+			tc.eventBroadcaster.StartRecordingToSink(stopCh)
+		}
+	} else {
+		klog.Fatalf("kubeClient is nil when starting NodeController")
+	}
 
 	for i := 0; i < UpdateWorkerSize; i++ {
 		tc.nodeUpdateChannels = append(tc.nodeUpdateChannels, make(chan nodeUpdateItem, NodeUpdateChannelSize))
@@ -480,7 +483,7 @@ func (tc *NoExecuteTaintManager) emitPodDeletionEvent(nsName types.NamespacedNam
 		Name:      nsName.Name,
 		Namespace: nsName.Namespace,
 	}
-	tc.recorder.Eventf(ref, v1.EventTypeNormal, "TaintManagerEviction", "Marking for deletion Pod %s", nsName.String())
+	tc.recorder.Eventf(ref, nil, v1.EventTypeNormal, "MarkingFoDeletionPod", "TaintManagerEviction", "Marking for deletion Pod %s", nsName.String())
 }
 
 func (tc *NoExecuteTaintManager) emitCancelPodDeletionEvent(nsName types.NamespacedName) {
@@ -492,5 +495,5 @@ func (tc *NoExecuteTaintManager) emitCancelPodDeletionEvent(nsName types.Namespa
 		Name:      nsName.Name,
 		Namespace: nsName.Namespace,
 	}
-	tc.recorder.Eventf(ref, v1.EventTypeNormal, "TaintManagerEviction", "Cancelling deletion of Pod %s", nsName.String())
+	tc.recorder.Eventf(ref, nil, v1.EventTypeNormal, "CancelingDeletion", "TaintManagerEviction", "Cancelling deletion of Pod %s", nsName.String())
 }

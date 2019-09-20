@@ -27,7 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -44,7 +44,7 @@ import (
 // DeletePods will delete all pods from master running on given node,
 // and return true if any pods were deleted, or were found pending
 // deletion.
-func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore appsv1listers.DaemonSetLister) (bool, error) {
+func DeletePods(kubeClient clientset.Interface, recorder events.EventRecorder, nodeName, nodeUID string, daemonStore appsv1listers.DaemonSetLister) (bool, error) {
 	remaining := false
 	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName).String()
 	options := metav1.ListOptions{FieldSelector: selector}
@@ -56,7 +56,7 @@ func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 	}
 
 	if len(pods.Items) > 0 {
-		RecordNodeEvent(recorder, nodeName, nodeUID, v1.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
+		RecordNodeEvent(recorder, nodeName, nodeUID, v1.EventTypeNormal, "", "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
 	}
 
 	for _, pod := range pods.Items {
@@ -85,7 +85,7 @@ func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 		}
 
 		klog.V(2).Infof("Starting deletion of pod %v/%v", pod.Namespace, pod.Name)
-		recorder.Eventf(&pod, v1.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
+		recorder.Eventf(&pod, nil, v1.EventTypeNormal, "NodeControllerEviction", "Deleted", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
 		if err := kubeClient.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 			return false, err
 		}
@@ -158,7 +158,7 @@ func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
 }
 
 // RecordNodeEvent records a event related to a node.
-func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype, reason, event string) {
+func RecordNodeEvent(recorder events.EventRecorder, nodeName, nodeUID, eventtype, reason, action, event string) {
 	ref := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      nodeName,
@@ -166,11 +166,11 @@ func RecordNodeEvent(recorder record.EventRecorder, nodeName, nodeUID, eventtype
 		Namespace: "",
 	}
 	klog.V(2).Infof("Recording %s event message for node %s", event, nodeName)
-	recorder.Eventf(ref, eventtype, reason, "Node %s event: %s", nodeName, event)
+	recorder.Eventf(ref, nil, eventtype, reason, action, "Node %s event: %s", nodeName, event)
 }
 
 // RecordNodeStatusChange records a event related to a node status change. (Common to lifecycle and ipam)
-func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newStatus string) {
+func RecordNodeStatusChange(recorder events.EventRecorder, node *v1.Node, newStatus string) {
 	ref := &v1.ObjectReference{
 		Kind:      "Node",
 		Name:      node.Name,
@@ -180,7 +180,7 @@ func RecordNodeStatusChange(recorder record.EventRecorder, node *v1.Node, newSta
 	klog.V(2).Infof("Recording status change %s event message for node %s", newStatus, node.Name)
 	// TODO: This requires a transaction, either both node status is updated
 	// and event is recorded or neither should happen, see issue #6055.
-	recorder.Eventf(ref, v1.EventTypeNormal, newStatus, "Node %s status is now: %s", node.Name, newStatus)
+	recorder.Eventf(ref, nil, v1.EventTypeNormal, "", "ChangedStatus", fmt.Sprintf("Node %s status is now: %s", node.Name, newStatus))
 }
 
 // SwapNodeControllerTaint returns true in case of success and false

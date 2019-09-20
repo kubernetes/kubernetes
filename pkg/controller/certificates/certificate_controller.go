@@ -31,10 +31,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	certificatesinformers "k8s.io/client-go/informers/certificates/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	certificateslisters "k8s.io/client-go/listers/certificates/v1beta1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/controller"
 )
@@ -51,6 +51,9 @@ type CertificateController struct {
 	handler func(*certificates.CertificateSigningRequest) error
 
 	queue workqueue.RateLimitingInterface
+
+	eventBroadcaster events.EventBroadcaster
+	eventRecorder    events.EventRecorder
 }
 
 func NewCertificateController(
@@ -60,9 +63,8 @@ func NewCertificateController(
 	handler func(*certificates.CertificateSigningRequest) error,
 ) *CertificateController {
 	// Send events to the apiserver
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "certificate-controller")
 
 	cc := &CertificateController{
 		name:       name,
@@ -72,7 +74,9 @@ func NewCertificateController(
 			// 10 qps, 100 bucket size.  This is only for retry speed and its only the overall factor (not per item)
 			&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 		), "certificate"),
-		handler: handler,
+		handler:          handler,
+		eventBroadcaster: eventBroadcaster,
+		eventRecorder:    recorder,
 	}
 
 	// Manage the addition/update of certificate requests
@@ -117,6 +121,10 @@ func (cc *CertificateController) Run(workers int, stopCh <-chan struct{}) {
 
 	klog.Infof("Starting certificate controller %q", cc.name)
 	defer klog.Infof("Shutting down certificate controller %q", cc.name)
+
+	if cc.kubeClient != nil && cc.eventBroadcaster != nil {
+		cc.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync(fmt.Sprintf("certificate-%s", cc.name), stopCh, cc.csrsSynced) {
 		return

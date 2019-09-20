@@ -30,9 +30,8 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	v1lister "k8s.io/client-go/listers/core/v1"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
@@ -52,9 +51,10 @@ var ShutdownTaint = &v1.Taint{
 // CloudNodeLifecycleController is responsible for deleting/updating kubernetes
 // nodes that have been deleted/shutdown on the cloud provider
 type CloudNodeLifecycleController struct {
-	kubeClient clientset.Interface
-	nodeLister v1lister.NodeLister
-	recorder   record.EventRecorder
+	kubeClient       clientset.Interface
+	nodeLister       v1lister.NodeLister
+	eventbroadcaster events.EventBroadcaster
+	recorder         events.EventRecorder
 
 	cloud cloudprovider.Interface
 
@@ -70,12 +70,8 @@ func NewCloudNodeLifecycleController(
 	cloud cloudprovider.Interface,
 	nodeMonitorPeriod time.Duration) (*CloudNodeLifecycleController, error) {
 
-	eventBroadcaster := record.NewBroadcaster()
-	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-lifecycle-controller"})
-	eventBroadcaster.StartLogging(klog.Infof)
-
-	klog.Info("Sending events to api server")
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: kubeClient.EventsV1beta1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, "cloud-node-lifecycle-controller")
 
 	if kubeClient == nil {
 		return nil, errors.New("kubernetes client is nil")
@@ -92,6 +88,7 @@ func NewCloudNodeLifecycleController(
 	c := &CloudNodeLifecycleController{
 		kubeClient:        kubeClient,
 		nodeLister:        nodeInformer.Lister(),
+		eventbroadcaster:  eventBroadcaster,
 		recorder:          recorder,
 		cloud:             cloud,
 		nodeMonitorPeriod: nodeMonitorPeriod,
@@ -104,6 +101,11 @@ func NewCloudNodeLifecycleController(
 // be called via a goroutine
 func (c *CloudNodeLifecycleController) Run(stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
+
+	if c.kubeClient != nil && c.eventbroadcaster != nil {
+		klog.Info("Sending events to api server")
+		c.eventbroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	// The following loops run communicate with the APIServer with a worst case complexity
 	// of O(num_nodes) per cycle. These functions are justified here because these events fire
@@ -186,9 +188,7 @@ func (c *CloudNodeLifecycleController) MonitorNodes() {
 			Namespace: "",
 		}
 
-		c.recorder.Eventf(ref, v1.EventTypeNormal,
-			fmt.Sprintf("Deleting node %v because it does not exist in the cloud provider", node.Name),
-			"Node %s event: %s", node.Name, deleteNodeEvent)
+		c.recorder.Eventf(ref, nil, v1.EventTypeNormal, "", deleteNodeEvent, node.Name)
 
 		if err := c.kubeClient.CoreV1().Nodes().Delete(node.Name, nil); err != nil {
 			klog.Errorf("unable to delete node %q: %v", node.Name, err)

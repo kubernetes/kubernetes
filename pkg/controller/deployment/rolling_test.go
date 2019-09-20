@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 )
 
 func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
@@ -88,7 +88,7 @@ func TestDeploymentController_reconcileNewReplicaSet(t *testing.T) {
 		fake := fake.Clientset{}
 		controller := &DeploymentController{
 			client:        &fake,
-			eventRecorder: &record.FakeRecorder{},
+			eventRecorder: &events.FakeRecorder{},
 		}
 		scaled, err := controller.reconcileNewReplicaSet(allRSs, newRS, deployment)
 		if err != nil {
@@ -194,7 +194,7 @@ func TestDeploymentController_reconcileOldReplicaSets(t *testing.T) {
 		fakeClientset := fake.Clientset{}
 		controller := &DeploymentController{
 			client:        &fakeClientset,
-			eventRecorder: &record.FakeRecorder{},
+			eventRecorder: &events.FakeRecorder{},
 		}
 
 		scaled, err := controller.reconcileOldReplicaSets(allRSs, oldRSs, newRS, deployment)
@@ -263,7 +263,7 @@ func TestDeploymentController_cleanupUnhealthyReplicas(t *testing.T) {
 
 		controller := &DeploymentController{
 			client:        &fakeClientset,
-			eventRecorder: &record.FakeRecorder{},
+			eventRecorder: &events.FakeRecorder{},
 		}
 		_, cleanupCount, err := controller.cleanupUnhealthyReplicas(oldRSs, deployment, int32(test.maxCleanupCount))
 		if err != nil {
@@ -337,7 +337,7 @@ func TestDeploymentController_scaleDownOldReplicaSetsForRollingUpdate(t *testing
 		fakeClientset := fake.Clientset{}
 		controller := &DeploymentController{
 			client:        &fakeClientset,
-			eventRecorder: &record.FakeRecorder{},
+			eventRecorder: &events.FakeRecorder{},
 		}
 		scaled, err := controller.scaleDownOldReplicaSetsForRollingUpdate(allRSs, oldRSs, deployment)
 		if err != nil {

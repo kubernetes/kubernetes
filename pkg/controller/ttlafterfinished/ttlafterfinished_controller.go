@@ -31,10 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	batchinformers "k8s.io/client-go/informers/batch/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	batchlisters "k8s.io/client-go/listers/batch/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubectl/pkg/scheme"
 	"k8s.io/kubernetes/pkg/controller"
@@ -51,8 +50,9 @@ import (
 // This is implemented outside of Job controller for separation of concerns, and
 // because it will be extended to handle other finishable resource types.
 type Controller struct {
-	client   clientset.Interface
-	recorder record.EventRecorder
+	client           clientset.Interface
+	eventBroadcaster events.EventBroadcaster
+	recorder         events.EventRecorder
 
 	// jLister can list/get Jobs from the shared informer's store
 	jLister batchlisters.JobLister
@@ -70,9 +70,7 @@ type Controller struct {
 
 // New creates an instance of Controller
 func New(jobInformer batchinformers.JobInformer, client clientset.Interface) *Controller {
-	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.Infof)
-	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: client.CoreV1().Events("")})
+	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage("ttl_after_finished_controller", client.CoreV1().RESTClient().GetRateLimiter())
@@ -80,7 +78,7 @@ func New(jobInformer batchinformers.JobInformer, client clientset.Interface) *Co
 
 	tc := &Controller{
 		client:   client,
-		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "ttl-after-finished-controller"}),
+		recorder: eventBroadcaster.NewRecorder(scheme.Scheme, "ttl-after-finished-controller"),
 		queue:    workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "ttl_jobs_to_delete"),
 	}
 
@@ -104,6 +102,10 @@ func (tc *Controller) Run(workers int, stopCh <-chan struct{}) {
 
 	klog.Infof("Starting TTL after finished controller")
 	defer klog.Infof("Shutting down TTL after finished controller")
+
+	if tc.client != nil && tc.eventBroadcaster != nil {
+		tc.eventBroadcaster.StartRecordingToSink(stopCh)
+	}
 
 	if !cache.WaitForNamedCacheSync("TTL after finished", stopCh, tc.jListerSynced) {
 		return

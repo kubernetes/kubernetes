@@ -32,7 +32,7 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
 	_ "k8s.io/kubernetes/pkg/apis/authentication/install"
 	_ "k8s.io/kubernetes/pkg/apis/authorization/install"
@@ -187,7 +187,7 @@ func (f *fixture) newController() (*DeploymentController, informers.SharedInform
 	if err != nil {
 		return nil, nil, err
 	}
-	c.eventRecorder = &record.FakeRecorder{}
+	c.eventRecorder = &events.FakeRecorder{}
 	c.dListerSynced = alwaysReady
 	c.rsListerSynced = alwaysReady
 	c.podListerSynced = alwaysReady

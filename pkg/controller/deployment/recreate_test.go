@@ -18,6 +18,7 @@ package deployment
 
 import (
 	"fmt"
+
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
@@ -26,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/kubernetes/pkg/controller"
 )
 
@@ -69,7 +70,7 @@ func TestScaleDownOldReplicaSets(t *testing.T) {
 		if err != nil {
 			t.Fatalf("error creating Deployment controller: %v", err)
 		}
-		c.eventRecorder = &record.FakeRecorder{}
+		c.eventRecorder = &events.FakeRecorder{}
 
 		c.scaleDownOldReplicaSetsForRecreate(oldRSs, test.d)
 		for j := range oldRSs {

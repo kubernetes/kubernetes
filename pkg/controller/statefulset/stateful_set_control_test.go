@@ -41,7 +41,7 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/history"
@@ -53,7 +53,7 @@ func setupController(client clientset.Interface) (*fakeStatefulPodControl, *fake
 	informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 	spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1().StatefulSets())
 	ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
-	recorder := record.NewFakeRecorder(10)
+	recorder := events.NewFakeRecorder(10)
 	ssc := NewDefaultStatefulSetControl(spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder)
 
 	stop := make(chan struct{})
@@ -496,7 +496,7 @@ func TestStatefulSetControl_getSetRevisions(t *testing.T) {
 		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 		spc := newFakeStatefulPodControl(informerFactory.Core().V1().Pods(), informerFactory.Apps().V1().StatefulSets())
 		ssu := newFakeStatefulSetStatusUpdater(informerFactory.Apps().V1().StatefulSets())
-		recorder := record.NewFakeRecorder(10)
+		recorder := events.NewFakeRecorder(10)
 		ssc := defaultStatefulSetControl{spc, ssu, history.NewFakeHistory(informerFactory.Apps().V1().ControllerRevisions()), recorder}
 
 		stop := make(chan struct{})

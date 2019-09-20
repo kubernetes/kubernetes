@@ -28,7 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	// For the cronjob controller to do conversions.
 	_ "k8s.io/kubernetes/pkg/apis/batch/install"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
@@ -285,7 +285,7 @@ func TestSyncOne_RunOrNot(t *testing.T) {
 
 		jc := &fakeJobControl{Job: job}
 		sjc := &fakeSJControl{}
-		recorder := record.NewFakeRecorder(10)
+		recorder := events.NewFakeRecorder(10)
 
 		syncOne(&sj, js, tc.now, jc, sjc, recorder)
 		expectedCreates := 0
@@ -552,7 +552,7 @@ func TestCleanupFinishedJobs_DeleteOrNot(t *testing.T) {
 
 		jc := &fakeJobControl{Job: job}
 		sjc := &fakeSJControl{}
-		recorder := record.NewFakeRecorder(10)
+		recorder := events.NewFakeRecorder(10)
 
 		cleanupFinishedJobs(&sj, js, jc, sjc, recorder)
 
@@ -712,7 +712,7 @@ func TestSyncOne_Status(t *testing.T) {
 
 		jc := &fakeJobControl{}
 		sjc := &fakeSJControl{}
-		recorder := record.NewFakeRecorder(10)
+		recorder := events.NewFakeRecorder(10)
 
 		// Run the code
 		syncOne(&sj, jobs, tc.now, jc, sjc, recorder)
