@@ -19,6 +19,7 @@ package util
 import (
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"strings"
 	"syscall"
@@ -224,6 +225,16 @@ func TestCheckInvalidErr(t *testing.T) {
 		{
 			errors.NewInvalid(corev1.SchemeGroupVersion.WithKind("Invalid4").GroupKind(), "invalidation", field.ErrorList{field.Invalid(field.NewPath("field4"), "multi4", "details"), field.Invalid(field.NewPath("field4"), "multi4", "details")}),
 			"The Invalid4 \"invalidation\" is invalid: field4: Invalid value: \"multi4\": details\n",
+			DefaultErrorExitCode,
+		},
+		{
+			&errors.StatusError{metav1.Status{
+				Status: metav1.StatusFailure,
+				Code:   http.StatusUnprocessableEntity,
+				Reason: metav1.StatusReasonInvalid,
+				// Details is nil.
+			}},
+			"The request is invalid",
 			DefaultErrorExitCode,
 		},
 	})
