@@ -131,7 +131,6 @@ pkg/kubelet/lifecycle
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
-pkg/kubelet/qos
 pkg/kubelet/remote
 pkg/kubelet/stats
 pkg/kubelet/status
