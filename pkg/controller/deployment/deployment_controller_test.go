@@ -330,7 +330,7 @@ func TestDontSyncDeploymentsWithEmptyPodSelector(t *testing.T) {
 	f.objects = append(f.objects, d)
 
 	// Normally there should be a status update to sync observedGeneration but the fake
-	// deployment has no generation set so there is no action happpening here.
+	// deployment has no generation set so there is no action happening here.
 	f.run(testutil.GetKey(d, t))
 }
 
