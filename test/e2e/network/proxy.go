@@ -312,14 +312,14 @@ func nodeProxyTest(f *framework.Framework, prefix, nodeDest string) {
 		} else {
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(status, http.StatusOK)
-			gomega.Expect(d).To(gomega.BeNumerically("<", proxyHTTPCallTimeout))
+			framework.ExpectEqual(d, gomega.BeNumerically("<", proxyHTTPCallTimeout))
 		}
 	}
 	if serviceUnavailableErrors > 0 {
 		e2elog.Logf("error: %d requests to proxy node logs failed", serviceUnavailableErrors)
 	}
 	maxFailures := int(math.Floor(0.1 * float64(proxyAttempts)))
-	gomega.Expect(serviceUnavailableErrors).To(gomega.BeNumerically("<", maxFailures))
+	framework.ExpectEqual(serviceUnavailableErrors, gomega.BeNumerically("<", maxFailures))
 }
 
 // waitForEndpoint waits for the specified endpoint to be ready.
