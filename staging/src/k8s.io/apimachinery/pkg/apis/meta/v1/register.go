@@ -82,6 +82,7 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
 	utilruntime.Must(AddConversionFuncs(scheme))
 	utilruntime.Must(RegisterDefaults(scheme))
+	utilruntime.Must(RegisterConversions(scheme))
 }
 
 // scheme is the registry for the common types that adhere to the meta v1 API spec.
@@ -107,6 +108,7 @@ func init() {
 
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
 	utilruntime.Must(RegisterDefaults(scheme))
+	utilruntime.Must(RegisterConversions(scheme))
 }
 
 func AddMetaToScheme(scheme *runtime.Scheme) error {

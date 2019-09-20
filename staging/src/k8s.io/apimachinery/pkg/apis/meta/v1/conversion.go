@@ -18,7 +18,6 @@ package v1
 
 import (
 	"fmt"
-	"net/url"
 	"strconv"
 	"strings"
 
@@ -84,11 +83,6 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_Slice_string_To_v1_DeletionPropagation,
 
 		Convert_Slice_string_To_v1_IncludeObjectPolicy,
-
-		Convert_url_Values_To_v1_ListOptions,
-		Convert_url_Values_To_v1_GetOptions,
-		Convert_url_Values_To_v1_ExportOptions,
-		Convert_url_Values_To_v1_UpdateOptions,
 	)
 }
 

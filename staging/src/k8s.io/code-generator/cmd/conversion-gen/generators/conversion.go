@@ -482,6 +482,7 @@ type genConversion struct {
 	manualConversions conversionFuncMap
 	imports           namer.ImportTracker
 	types             []*types.Type
+	customConversions map[conversionPair]struct{}
 	skippedFields     map[*types.Type][]string
 	useUnsafe         TypesEqual
 	genConversions    bool
@@ -500,6 +501,7 @@ func NewGenConversion(sanitizedName, typesPackage, outputPackage string, manualC
 		manualConversions: manualConversions,
 		imports:           generator.NewImportTracker(),
 		types:             []*types.Type{},
+		customConversions: map[conversionPair]struct{}{},
 		skippedFields:     map[*types.Type][]string{},
 		useUnsafe:         useUnsafe,
 		genConversions:    genConversions,
@@ -561,16 +563,29 @@ func (g *genConversion) convertibleOnlyWithinPackage(inType, outType *types.Type
 }
 
 func (g *genConversion) Filter(c *generator.Context, t *types.Type) bool {
-	peerType := getPeerTypeFor(c, t, g.peerPackages)
-	if peerType == nil {
-		return false
-	}
-	if !g.convertibleOnlyWithinPackage(t, peerType) {
-		return false
-	}
+	result := false
 
-	g.types = append(g.types, t)
-	return true
+	if g.genConversions {
+		peerType := getPeerTypeFor(c, t, g.peerPackages)
+		if peerType == nil {
+			return false
+		}
+		if !g.convertibleOnlyWithinPackage(t, peerType) {
+			return false
+		}
+		g.types = append(g.types, t)
+		result = true
+	}
+	if g.genFromUrlValues {
+		urlPackage := c.Universe["net/url"]
+		valuesType := urlPackage.Types["Values"]
+		comments := append(append([]string{}, t.SecondClosestCommentLines...), t.CommentLines...)
+		if tagvals := extractFromUrlValuesTag(comments); tagvals != nil && tagvals[0] == "true" {
+			g.customConversions[conversionPair{valuesType, t}] = struct{}{}
+			result = true
+		}
+	}
+	return result
 }
 
 func (g *genConversion) isOtherPackage(pkg string) bool {
@@ -662,6 +677,12 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 		for _, pair := range pairs {
 			args := argsFromType(pair.inType, pair.outType).With("Scope", types.Ref(conversionPackagePath, "Scope")).With("fn", g.manualConversions[pair])
 			sw.Do("if err := s.AddConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return $.fn|raw$(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
+		}
+	}
+	if g.genFromUrlValues {
+		for t := range g.customConversions {
+			args := argsFromType(t.inType, t.outType).With("Scope", types.Ref(conversionPackagePath, "Scope"))
+			sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
 		}
 	}
 
