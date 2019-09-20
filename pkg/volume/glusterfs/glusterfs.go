@@ -88,13 +88,12 @@ const (
 	// default values, but they play a different role and
 	// could take a different value. Only thing we need is:
 	// absGidMin <= defGidMin <= defGidMax <= absGidMax
-	absoluteGidMin          = 2000
-	absoluteGidMax          = math.MaxInt32
-	linuxGlusterMountBinary = "mount.glusterfs"
-	heketiAnn               = "heketi-dynamic-provisioner"
-	glusterTypeAnn          = "gluster.org/type"
-	glusterDescAnn          = "Gluster-Internal: Dynamically provisioned PV"
-	heketiVolIDAnn          = "gluster.kubernetes.io/heketi-volume-id"
+	absoluteGidMin = 2000
+	absoluteGidMax = math.MaxInt32
+	heketiAnn      = "heketi-dynamic-provisioner"
+	glusterTypeAnn = "gluster.org/type"
+	glusterDescAnn = "Gluster-Internal: Dynamically provisioned PV"
+	heketiVolIDAnn = "gluster.kubernetes.io/heketi-volume-id"
 
 	// Error string returned by heketi
 	errIDNotFound = "Id not found"

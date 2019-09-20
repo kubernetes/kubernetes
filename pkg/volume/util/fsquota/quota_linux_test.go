@@ -43,24 +43,6 @@ tmpfs /tmp tmpfs rw,nosuid,nodev 0 0
 /dev/sdb1 /virt xfs rw,noatime,attr2,inode64,usrquota,prjquota 0 0
 `
 
-const dummyMountDataPquota = `tmpfs /tmp tmpfs rw,nosuid,nodev 0 0
-/dev/sda1 /boot ext4 rw,relatime 0 0
-/dev/mapper/fedora-root / ext4 rw,noatime 0 0
-/dev/mapper/fedora-home /home ext4 rw,noatime 0 0
-/dev/sdb1 /mnt/virt xfs rw,noatime,attr2,inode64,usrquota,prjquota 0 0
-`
-const dummyMountDataNoPquota = `tmpfs /tmp tmpfs rw,nosuid,nodev 0 0
-/dev/sda1 /boot ext4 rw,relatime 0 0
-/dev/mapper/fedora-root / ext4 rw,noatime 0 0
-/dev/mapper/fedora-home /home ext4 rw,noatime 0 0
-/dev/sdb1 /mnt/virt xfs rw,noatime,attr2,inode64,usrquota 0 0
-`
-
-const dummyMountTest = `/dev/sda1 / ext4 rw,noatime 0 0
-/dev/sda2 /quota ext4 rw,prjquota 0 0
-/dev/sda3 /noquota ext4 rw 0 0
-`
-
 func dummyFakeMount1() mount.Interface {
 	return &mount.FakeMounter{
 		MountPoints: []mount.MountPoint{
