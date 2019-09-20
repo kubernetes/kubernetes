@@ -907,6 +907,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 				body:        body,
 				contentType: contentType,
 				statusCode:  resp.StatusCode,
+				header:      resp.Header,
 			}
 		}
 	}
@@ -923,6 +924,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 			body:        body,
 			contentType: contentType,
 			statusCode:  resp.StatusCode,
+			header:      resp.Header,
 			decoder:     decoder,
 			err:         err,
 		}
@@ -932,6 +934,7 @@ func (r *Request) transformResponse(resp *http.Response, req *http.Request) Resu
 		body:        body,
 		contentType: contentType,
 		statusCode:  resp.StatusCode,
+		header:      resp.Header,
 		decoder:     decoder,
 	}
 }
@@ -1071,6 +1074,7 @@ type Result struct {
 	contentType string
 	err         error
 	statusCode  int
+	header      http.Header
 
 	decoder runtime.Decoder
 }
@@ -1111,6 +1115,12 @@ func (r Result) Get() (runtime.Object, error) {
 // error was returned.)
 func (r Result) StatusCode(statusCode *int) Result {
 	*statusCode = r.statusCode
+	return r
+}
+
+// Header returns the HTTP header of the response.
+func (r Result) Header(header *http.Header) Result {
+	*header = r.header
 	return r
 }
 

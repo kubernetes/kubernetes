@@ -508,12 +508,18 @@ func TestURLTemplate(t *testing.T) {
 func TestTransformResponse(t *testing.T) {
 	invalid := []byte("aaaaa")
 	uri, _ := url.Parse("http://localhost")
+	etagHeader := http.Header{
+		"ETag":    []string{"xyzzy"},
+		"Date":    []string{"Tue, 15 Nov 1994 08:12:31 GMT"},
+		"Expires": []string{"Thu, 01 Dec 1994 16:00:00 GMT"},
+	}
 	testCases := []struct {
-		Response *http.Response
-		Data     []byte
-		Created  bool
-		Error    bool
-		ErrFn    func(err error) bool
+		Response     *http.Response
+		Data         []byte
+		Created      bool
+		Error        bool
+		ErrFn        func(err error) bool
+		ExpectHeader http.Header
 	}{
 		{Response: &http.Response{StatusCode: 200}, Data: []byte{}},
 		{Response: &http.Response{StatusCode: 201}, Data: []byte{}, Created: true},
@@ -533,6 +539,7 @@ func TestTransformResponse(t *testing.T) {
 			ErrFn: func(err error) bool {
 				return err.Error() != "aaaaa" && apierrors.IsUnauthorized(err)
 			},
+			ExpectHeader: http.Header{"Content-Type": []string{"application/json"}},
 		},
 		{
 			Response: &http.Response{
@@ -548,6 +555,8 @@ func TestTransformResponse(t *testing.T) {
 		{Response: &http.Response{StatusCode: 403}, Error: true},
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
+		{Response: &http.Response{StatusCode: 200, Header: etagHeader}, ExpectHeader: etagHeader},
+		{Response: &http.Response{StatusCode: 304, Header: etagHeader}, ExpectHeader: etagHeader, Error: true},
 	}
 	for i, test := range testCases {
 		r := NewRequest(nil, "", uri, "", defaultContentConfig(), defaultSerializers(t), nil, nil, 0)
@@ -555,7 +564,7 @@ func TestTransformResponse(t *testing.T) {
 			test.Response.Body = ioutil.NopCloser(bytes.NewReader([]byte{}))
 		}
 		result := r.transformResponse(test.Response, &http.Request{})
-		response, created, err := result.body, result.statusCode == http.StatusCreated, result.err
+		response, created, header, err := result.body, result.statusCode == http.StatusCreated, result.header, result.err
 		hasErr := err != nil
 		if hasErr != test.Error {
 			t.Errorf("%d: unexpected error: %t %v", i, test.Error, err)
@@ -577,6 +586,9 @@ func TestTransformResponse(t *testing.T) {
 		}
 		if test.Created != created {
 			t.Errorf("%d: expected created %t, got %t", i, test.Created, created)
+		}
+		if !reflect.DeepEqual(header, test.ExpectHeader) {
+			t.Errorf("%d: header did not match, expect: %#v, got: %#v", i, test.ExpectHeader, header)
 		}
 	}
 }
