@@ -172,6 +172,8 @@ kernelSpec:
     - CC_STACKPROTECTOR_REGULAR # Linux kernel <= 4.17
     - CC_STACKPROTECTOR_ALL # Linux kernel <= 4.17
     - STACKPROTECTOR_STRONG # Linux kernel >= 4.18
+    - STACKPROTECTOR_REGULAR
+    - STACKPROTECTOR_ALL
     description: 'Add the stack buffer overflow protections.'
   - name: STRICT_DEVMEM
     description: 'Required for blocking the direct physical memory access.'
