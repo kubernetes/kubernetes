@@ -211,7 +211,8 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 		if err != nil {
 			return err
 		}
-		c.AddHealthChecks(kmsPluginHealthzChecks...)
+		c.HealthzChecks = append(c.ReadyzChecks, kmsPluginHealthzChecks...)
+		c.ReadyzChecks = append(c.ReadyzChecks, kmsPluginHealthzChecks...)
 	}
 
 	return nil
