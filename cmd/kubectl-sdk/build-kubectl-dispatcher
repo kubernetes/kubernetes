@@ -1,0 +1,105 @@
+#!/bin/bash
+##################################################################
+# Copyright 2020 Google Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# Build the kubectl dispatcher binary. This binary is distributed
+# to Google customers through gcloud. The kubectl dispatcher
+# version is the default GKE cluster version.
+#
+# The kubectl dispatcher code current lives at:
+#
+#    sso://gke-internal/kubernetes/cmd/kubectl-sdk
+#
+# This code is basically the same as "cmd/kubectl", but it has
+# a check to see if there is a kubectl version closer to the API
+# server version.
+#
+# Parameter (required):
+#   release branch at default GKE cluster version
+#   (e.g. release-1.17.17-gke.55)
+#
+# Usage:
+#   build-kubectl-dispatcher release-1.17.17-gke.55
+#
+##################################################################
+
+# Input and validate the script argument.
+# Example branch argument: release-1.17.17-gke.55
+if [ "$#" -ne 1 ]; then
+  echo "Error: expected 1 argument, got $#"
+  exit 1
+fi
+BRANCH=$1
+re='release-([0-9]\.[0-9]+\.[0-9]+)*'
+if ! [[ $BRANCH =~ $re ]] ; then
+  echo "Error: parsing branch argument $BRANCH"
+  echo "Example branch argument: release-1.17.14-gke.9"
+  exit 1
+fi
+
+VERSION=${BASH_REMATCH[1]}
+CROSS_VERSION=v1.13.9-5
+
+echo
+echo "Building kubectl dispatcher"
+echo "  BRANCH: $BRANCH"
+
+# Create the temp directory for the kubernetes code
+TMP_DIR=$(mktemp -d -t kubectl-dispatcher-XXXXXXXXXX)
+# Kubernetes directory
+K8S_ROOT_DIR=${TMP_DIR}/src/k8s.io
+K8S_DIR=${K8S_ROOT_DIR}/kubernetes
+mkdir -p ${K8S_ROOT_DIR}
+
+# Git clone the kubernetes code, and checkout the correct branch.
+echo
+echo "Cloning branch $BRANCH into temp dir: ${K8S_DIR}"
+echo
+git clone sso://gke-internal/kubernetes ${K8S_DIR}
+git -C ${K8S_DIR} checkout "${BRANCH}"
+
+# The following fixups are necessary because of drift from
+# Kubernetes open source and previous branches.
+#
+# Updates the cross-version to the one specified at the beginning
+# of the script. Necessary because of k8s cross compile image drift.
+CROSS_VERSION_FILE=${K8S_DIR}/build/build-image/cross/VERSION
+echo $CROSS_VERSION > ${CROSS_VERSION_FILE}
+
+# Update the Dockerfile to recent working stuff.
+# Necessary because of k8s drift.
+sed -i 's|gcr.io/gke-release-staging/kube-cross|us.gcr.io/k8s-artifacts-prod/build-image/kube-cross|g' ${K8S_DIR}/build/build-image/Dockerfile
+
+# Copy the cross-compile.sh script into the kubernetes directory
+cp ./cross-compile ${K8S_DIR}
+
+# Locally commit the changes we've made to the k8s repo.
+git -C ${K8S_DIR} add .
+git -C ${K8S_DIR} commit -m 'commit cross-compile script'
+
+# Run the make
+echo
+echo "Cross-compiling kubectl dispatcher"
+echo "  VERSION: ${VERSION}"
+echo "  CROSS VERSION: ${CROSS_VERSION}"
+echo
+export GOPATH=${TMP_DIR}
+(cd -- ${K8S_DIR} && ./cross-compile $VERSION)
+
+echo "Cleaning up..."
+
+rm -rf ${TMP_DIR}
+
+echo "FINISHED"
