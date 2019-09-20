@@ -432,7 +432,7 @@ func PVMultiNodeCheck(client clientset.Interface, claim *v1.PersistentVolumeClai
 	framework.ExpectNoError(e2epod.WaitForPodSuccessInNamespaceSlow(client, pod.Name, pod.Namespace))
 	runningPod, err = client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "get pod")
-	gomega.Expect(runningPod.Spec.NodeName).NotTo(gomega.Equal(actualNodeName), "second pod should have run on a different node")
+	framework.ExpectNotEqual(runningPod.Spec.NodeName, actualNodeName, "second pod should have run on a different node")
 	StopPod(client, pod)
 	pod = nil
 }

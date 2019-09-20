@@ -1300,8 +1300,7 @@ var _ = SIGDescribe("Services", func() {
 			e2elog.Failf("failed to prevent update of service with out-of-range NodePort: %v", result)
 		}
 		expectedErr := fmt.Sprintf("%d.*port is not in the valid range", outOfRangeNodePort)
-		framework.ExpectEqual(fmt.Sprintf("%v", err), gomega.MatchRegexp(expectedErr))
-
+		gomega.Expect(fmt.Sprintf("%v", err)).To(gomega.MatchRegexp(expectedErr))
 		ginkgo.By("deleting original service " + serviceName)
 		err = t.DeleteService(serviceName)
 		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
@@ -1314,7 +1313,7 @@ var _ = SIGDescribe("Services", func() {
 		if err == nil {
 			e2elog.Failf("failed to prevent create of service with out-of-range NodePort (%d): %v", outOfRangeNodePort, service)
 		}
-		framework.ExpectEqual(fmt.Sprintf("%v", err), gomega.MatchRegexp(expectedErr))
+		gomega.Expect(fmt.Sprintf("%v", err)).To(gomega.MatchRegexp(expectedErr))
 	})
 
 	ginkgo.It("should release NodePorts on delete", func() {
@@ -1648,7 +1647,7 @@ var _ = SIGDescribe("Services", func() {
 		lbIngress := &svc.Status.LoadBalancer.Ingress[0]
 		svcPort := int(svc.Spec.Ports[0].Port)
 		// should have an internal IP.
-		framework.ExpectEqual(isInternalEndpoint(lbIngress), gomega.BeTrue())
+		gomega.Expect(isInternalEndpoint(lbIngress)).To(gomega.BeTrue())
 
 		// ILBs are not accessible from the test orchestrator, so it's necessary to use
 		//  a pod to test the service.
@@ -1694,7 +1693,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 		// should have an external IP.
 		jig.SanityCheckService(svc, v1.ServiceTypeLoadBalancer)
-		framework.ExpectEqual(isInternalEndpoint(lbIngress), gomega.BeFalse())
+		gomega.Expect(isInternalEndpoint(lbIngress)).To(gomega.BeFalse())
 
 		ginkgo.By("hitting the external load balancer")
 		e2elog.Logf("Waiting up to %v for service %q's external LB to respond to requests", createTimeout, serviceName)
@@ -2465,7 +2464,7 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 	if serviceType == v1.ServiceTypeNodePort {
 		nodes := framework.GetReadySchedulableNodesOrDie(cs)
 		addrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-		framework.ExpectEqual(len(addrs), gomega.BeNumerically(">", 0), "ginkgo.Failed to get Node internal IP")
+		gomega.Expect(len(addrs)).To(gomega.BeNumerically(">", 0), "ginkgo.Failed to get Node internal IP")
 		svcIP = addrs[0]
 		servicePort = int(svc.Spec.Ports[0].NodePort)
 	} else {
@@ -2482,17 +2481,17 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 	framework.ExpectNoError(err, "failed to fetch pod: %s in namespace: %s", execPod.Name, ns)
 
 	if !isTransitionTest {
-		framework.ExpectEqual(e2eservice.CheckAffinity(execPod, svcIP, servicePort, true), gomega.BeTrue())
+		gomega.Expect(e2eservice.CheckAffinity(execPod, svcIP, servicePort, true)).To(gomega.BeTrue())
 	}
 	if isTransitionTest {
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
-		framework.ExpectEqual(e2eservice.CheckAffinity(execPod, svcIP, servicePort, false), gomega.BeTrue())
+		gomega.Expect(e2eservice.CheckAffinity(execPod, svcIP, servicePort, false)).To(gomega.BeTrue())
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
-		framework.ExpectEqual(e2eservice.CheckAffinity(execPod, svcIP, servicePort, true), gomega.BeTrue())
+		gomega.Expect(e2eservice.CheckAffinity(execPod, svcIP, servicePort, true)).To(gomega.BeTrue())
 	}
 }
 
@@ -2530,17 +2529,17 @@ func execAffinityTestForLBServiceWithOptionalTransition(f *framework.Framework, 
 	port := int(svc.Spec.Ports[0].Port)
 
 	if !isTransitionTest {
-		framework.ExpectEqual(e2eservice.CheckAffinity(nil, ingressIP, port, true), gomega.BeTrue())
+		gomega.Expect(e2eservice.CheckAffinity(nil, ingressIP, port, true)).To(gomega.BeTrue())
 	}
 	if isTransitionTest {
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityNone
 		})
-		framework.ExpectEqual(e2eservice.CheckAffinity(nil, ingressIP, port, false), gomega.BeTrue())
+		gomega.Expect(e2eservice.CheckAffinity(nil, ingressIP, port, false)).To(gomega.BeTrue())
 		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
 			svc.Spec.SessionAffinity = v1.ServiceAffinityClientIP
 		})
-		framework.ExpectEqual(e2eservice.CheckAffinity(nil, ingressIP, port, true), gomega.BeTrue())
+		gomega.Expect(e2eservice.CheckAffinity(nil, ingressIP, port, true)).To(gomega.BeTrue())
 	}
 }
 
