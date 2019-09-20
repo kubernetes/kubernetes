@@ -157,9 +157,14 @@ func (c *SSHTunneler) SecondsSinceSync() int64 {
 }
 
 func (c *SSHTunneler) SecondsSinceSSHKeySync() int64 {
-	now := c.clock.Now().Unix()
-	then := atomic.LoadInt64(&c.lastSSHKeySync)
-	return now - then
+	// If the CCM doesn't support installing SSH keys this function will eventually cause
+	// the health check to fail because the time is never updated.
+	if c.InstallSSHKey != nil {
+		now := c.clock.Now().Unix()
+		then := atomic.LoadInt64(&c.lastSSHKeySync)
+		return now - then
+	}
+	return 0
 }
 
 func (c *SSHTunneler) installSSHKeySyncLoop(user, publicKeyfile string) {
