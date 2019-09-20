@@ -163,6 +163,9 @@ func (es mockScheduler) Predicates() map[string]predicates.FitPredicate {
 func (es mockScheduler) Prioritizers() []priorities.PriorityConfig {
 	return nil
 }
+func (es mockScheduler) Extenders() []algorithm.SchedulerExtender {
+	return nil
+}
 
 func (es mockScheduler) Preempt(pc *framework.PluginContext, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	return nil, nil, nil, nil
