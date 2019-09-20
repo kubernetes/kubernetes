@@ -380,6 +380,17 @@ type CompletedConfig struct {
 	*completedConfig
 }
 
+// AddHealthChecks adds a health check to our config to be exposed by the health endpoints
+// of our configured apiserver. We should prefer this to adding healthChecks directly to
+// the config unless we explicitly want to add a healthcheck only to a specific health endpoint.
+func (c *Config) AddHealthChecks(healthChecks ...healthz.HealthChecker) {
+	for _, check := range healthChecks {
+		c.HealthzChecks = append(c.HealthzChecks, check)
+		c.LivezChecks = append(c.LivezChecks, check)
+		c.ReadyzChecks = append(c.ReadyzChecks, check)
+	}
+}
+
 // Complete fills in any fields not set that are required to have valid data and can be derived
 // from other fields. If you're going to `ApplyOptions`, do that first. It's mutating the receiver.
 func (c *Config) Complete(informers informers.SharedInformerFactory) CompletedConfig {
