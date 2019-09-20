@@ -48,7 +48,12 @@ go_test(
         "fieldmanager_test.go",
         "skipnonapplied_test.go",
     ],
-    data = ["//api/openapi-spec"],
+    data = [
+        "endpoints.yaml",
+        "node.yaml",
+        "pod.yaml",
+        "//api/openapi-spec",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
