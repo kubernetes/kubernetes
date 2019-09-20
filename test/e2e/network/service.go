@@ -1301,6 +1301,7 @@ var _ = SIGDescribe("Services", func() {
 		}
 		expectedErr := fmt.Sprintf("%d.*port is not in the valid range", outOfRangeNodePort)
 		gomega.Expect(fmt.Sprintf("%v", err)).To(gomega.MatchRegexp(expectedErr))
+
 		ginkgo.By("deleting original service " + serviceName)
 		err = t.DeleteService(serviceName)
 		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
