@@ -19,7 +19,9 @@ limitations under the License.
 package cni
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	cniTypes020 "github.com/containernetworking/cni/pkg/types/020"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -43,8 +45,11 @@ func (plugin *cniNetworkPlugin) GetPodNetworkStatus(namespace string, name strin
 		return nil, fmt.Errorf("CNI failed to retrieve network namespace path: %v", err)
 	}
 
-	result, err := plugin.addToNetwork(plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil, nil)
-
+	// Because the default remote runtime request timeout is 4 min,so set slightly less than 240 seconds
+	// Todo get the timeout from parent ctx
+	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
+	defer cancelFunc()
+	result, err := plugin.addToNetwork(cniTimeoutCtx, plugin.getDefaultNetwork(), name, namespace, id, netnsPath, nil, nil)
 	klog.V(5).Infof("GetPodNetworkStatus result %+v", result)
 	if err != nil {
 		klog.Errorf("error while adding to cni network: %s", err)
