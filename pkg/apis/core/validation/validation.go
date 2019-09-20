@@ -4922,14 +4922,14 @@ func ValidateSecret(secret *core.Secret) field.ErrorList {
 			allErrs = append(allErrs, field.Invalid(dataPath.Key(core.DockerConfigKey), "<secret contents redacted>", err.Error()))
 		}
 	case core.SecretTypeDockerConfigJSON:
-		dockerConfigJsonBytes, exists := secret.Data[core.DockerConfigJSONKey]
+		dockerConfigJSONBytes, exists := secret.Data[core.DockerConfigJSONKey]
 		if !exists {
 			allErrs = append(allErrs, field.Required(dataPath.Key(core.DockerConfigJSONKey), ""))
 			break
 		}
 
 		// make sure that the content is well-formed json.
-		if err := json.Unmarshal(dockerConfigJsonBytes, &map[string]interface{}{}); err != nil {
+		if err := json.Unmarshal(dockerConfigJSONBytes, &map[string]interface{}{}); err != nil {
 			allErrs = append(allErrs, field.Invalid(dataPath.Key(core.DockerConfigJSONKey), "<secret contents redacted>", err.Error()))
 		}
 	case core.SecretTypeBasicAuth:
