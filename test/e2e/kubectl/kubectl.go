@@ -378,12 +378,12 @@ var _ = SIGDescribe("Kubectl client", func() {
 		forEachGBFile := func(run func(s string)) {
 			guestbookRoot := "test/e2e/testing-manifests/guestbook"
 			for _, gbAppFile := range []string{
-				"redis-slave-service.yaml",
-				"redis-master-service.yaml",
+				"agnhost-slave-service.yaml",
+				"agnhost-master-service.yaml",
 				"frontend-service.yaml",
 				"frontend-deployment.yaml.in",
-				"redis-master-deployment.yaml.in",
-				"redis-slave-deployment.yaml.in",
+				"agnhost-master-deployment.yaml.in",
+				"agnhost-slave-deployment.yaml.in",
 			} {
 				contents := commonutils.SubstituteImageName(string(testfiles.ReadOrDie(filepath.Join(guestbookRoot, gbAppFile))))
 				run(contents)
@@ -393,7 +393,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		/*
 			Release : v1.9
 			Testname: Kubectl, guestbook application
-			Description: Create Guestbook application that contains redis server, 2 instances of redis slave, frontend application, frontend service and redis master service and redis slave service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend redis database. Application flow MUST work as expected and the data written MUST be available to read.
+			Description: Create Guestbook application that contains an agnhost master server, 2 agnhost slaves, frontend application, frontend service and agnhost master service and agnhost slave service. Using frontend service, the test will write an entry into the guestbook application which will store the entry into the backend agnhost store. Application flow MUST work as expected and the data written MUST be available to read.
 		*/
 		framework.ConformanceIt("should create and stop a working application ", func() {
 			defer forEachGBFile(func(contents string) {
@@ -2216,17 +2216,17 @@ func validateGuestbookApp(c clientset.Interface, ns string) {
 	err := testutils.WaitForPodsWithLabelRunning(c, ns, label)
 	framework.ExpectNoError(err)
 	framework.Logf("Waiting for frontend to serve content.")
-	if !waitForGuestbookResponse(c, "get", "", `{"data": ""}`, guestbookStartupTimeout, ns) {
+	if !waitForGuestbookResponse(c, "get", "", `{"data":""}`, guestbookStartupTimeout, ns) {
 		framework.Failf("Frontend service did not start serving content in %v seconds.", guestbookStartupTimeout.Seconds())
 	}
 
 	framework.Logf("Trying to add a new entry to the guestbook.")
-	if !waitForGuestbookResponse(c, "set", "TestEntry", `{"message": "Updated"}`, guestbookResponseTimeout, ns) {
+	if !waitForGuestbookResponse(c, "set", "TestEntry", `{"message":"Updated"}`, guestbookResponseTimeout, ns) {
 		framework.Failf("Cannot added new entry in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 
 	framework.Logf("Verifying that added entry can be retrieved.")
-	if !waitForGuestbookResponse(c, "get", "", `{"data": "TestEntry"}`, guestbookResponseTimeout, ns) {
+	if !waitForGuestbookResponse(c, "get", "", `{"data":"TestEntry"}`, guestbookResponseTimeout, ns) {
 		framework.Failf("Entry to guestbook wasn't correctly added in %v seconds.", guestbookResponseTimeout.Seconds())
 	}
 }
@@ -2255,7 +2255,7 @@ func makeRequestToGuestbook(c clientset.Interface, cmd, value string, ns string)
 	result, err := proxyRequest.Namespace(ns).
 		Context(ctx).
 		Name("frontend").
-		Suffix("/guestbook.php").
+		Suffix("/guestbook").
 		Param("cmd", cmd).
 		Param("key", "messages").
 		Param("value", value).

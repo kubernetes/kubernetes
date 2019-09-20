@@ -1,26 +1,28 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: frontend
+  name: agnhost-master
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
-      app: guestbook
-      tier: frontend
+      app: agnhost
+      role: master
+      tier: backend
   template:
     metadata:
       labels:
-        app: guestbook
-        tier: frontend
+        app: agnhost
+        role: master
+        tier: backend
     spec:
       containers:
-      - name: guestbook-frontend
+      - name: master
         image: {{.AgnhostImage}}
-        args: [ "guestbook", "--backend-port", "6379" ]
+        args: [ "guestbook", "--http-port", "6379" ]
         resources:
           requests:
             cpu: 100m
             memory: 100Mi
         ports:
-        - containerPort: 80
+        - containerPort: 6379
