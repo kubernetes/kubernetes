@@ -110,7 +110,7 @@ func getEbtablesVersionString(exec utilexec.Interface) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	versionMatcher := regexp.MustCompile("v([0-9]+\\.[0-9]+\\.[0-9]+)")
+	versionMatcher := regexp.MustCompile(`v([0-9]+\.[0-9]+\.[0-9]+)`)
 	match := versionMatcher.FindStringSubmatch(string(bytes))
 	if match == nil {
 		return "", fmt.Errorf("no ebtables version found in string: %s", bytes)
