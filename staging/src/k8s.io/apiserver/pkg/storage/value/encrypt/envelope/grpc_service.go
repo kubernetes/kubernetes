@@ -61,7 +61,7 @@ func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error)
 		return nil, err
 	}
 
-	connection, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(grpc.FailFast(false)), grpc.WithDialer(
+	connection, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(grpc.WaitForReady(true)), grpc.WithDialer(
 		func(string, time.Duration) (net.Conn, error) {
 			// Ignoring addr and timeout arguments:
 			// addr - comes from the closure
