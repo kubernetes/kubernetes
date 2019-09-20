@@ -268,7 +268,6 @@ function gke-setup-containerd {
       "capabilities": {
         "portMappings": true
       },
-      "noSnat": true
     }
   ]
 }
