@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"os"
 	"strings"
 	"time"
@@ -174,7 +175,16 @@ func (ds *dockerService) RunPodSandbox(ctx context.Context, r *runtimeapi.RunPod
 		}
 		networkOptions["dns"] = string(dnsOption)
 	}
-	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations, networkOptions)
+	var networkTimeout time.Duration
+	if deadline, hasDeadline := ctx.Deadline(); hasDeadline {
+		// compute the timeout
+		if timeout := time.Until(deadline); timeout > 0 {
+			networkTimeout = timeout
+		} else {
+			networkTimeout = network.CNITimeoutSec * time.Second
+		}
+	}
+	err = ds.network.SetUpPod(config.GetMetadata().Namespace, config.GetMetadata().Name, cID, config.Annotations, networkOptions, networkTimeout)
 	if err != nil {
 		errList := []error{fmt.Errorf("failed to set up sandbox container %q network for pod %q: %v", createResp.ID, config.Metadata.Name, err)}
 

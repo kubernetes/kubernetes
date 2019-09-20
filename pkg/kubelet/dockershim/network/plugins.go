@@ -68,7 +68,7 @@ type NetworkPlugin interface {
 	// SetUpPod is the method called after the infra container of
 	// the pod has been created but before the other containers of the
 	// pod are launched.
-	SetUpPod(namespace string, name string, podSandboxID kubecontainer.ContainerID, annotations, options map[string]string) error
+	SetUpPod(namespace string, name string, podSandboxID kubecontainer.ContainerID, annotations, options map[string]string, networkTimeout time.Duration) error
 
 	// TearDownPod is the method called before a pod's infra container will be deleted
 	TearDownPod(namespace string, name string, podSandboxID kubecontainer.ContainerID) error
@@ -214,7 +214,7 @@ func (plugin *NoopNetworkPlugin) Capabilities() utilsets.Int {
 	return utilsets.NewInt()
 }
 
-func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations, options map[string]string) error {
+func (plugin *NoopNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations, options map[string]string, networkTimeout time.Duration) error {
 	return nil
 }
 
@@ -398,14 +398,14 @@ func (pm *PluginManager) GetPodNetworkStatus(podNamespace, podName string, id ku
 	return netStatus, nil
 }
 
-func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer.ContainerID, annotations, options map[string]string) error {
+func (pm *PluginManager) SetUpPod(podNamespace, podName string, id kubecontainer.ContainerID, annotations, options map[string]string, networkTimeout time.Duration) error {
 	defer recordOperation("set_up_pod", time.Now())
 	fullPodName := kubecontainer.BuildPodFullName(podName, podNamespace)
 	pm.podLock(fullPodName).Lock()
 	defer pm.podUnlock(fullPodName)
 
 	klog.V(3).Infof("Calling network plugin %s to set up pod %q", pm.plugin.Name(), fullPodName)
-	if err := pm.plugin.SetUpPod(podNamespace, podName, id, annotations, options); err != nil {
+	if err := pm.plugin.SetUpPod(podNamespace, podName, id, annotations, options, networkTimeout); err != nil {
 		return fmt.Errorf("networkPlugin %s failed to set up pod %q network: %v", pm.plugin.Name(), fullPodName, err)
 	}
 

@@ -462,7 +462,7 @@ func (plugin *kubenetNetworkPlugin) addPortMapping(id kubecontainer.ContainerID,
 	return nil
 }
 
-func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations, options map[string]string) error {
+func (plugin *kubenetNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations, options map[string]string, networkTimeout time.Duration) error {
 	start := time.Now()
 
 	if err := plugin.Status(); err != nil {

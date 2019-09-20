@@ -30,6 +30,7 @@ import (
 	"reflect"
 	"testing"
 	"text/template"
+	"time"
 
 	types020 "github.com/containernetworking/cni/pkg/types/020"
 	"github.com/stretchr/testify/mock"
@@ -267,7 +268,7 @@ func TestCNIPlugin(t *testing.T) {
 	bandwidthAnnotation["kubernetes.io/egress-bandwidth"] = "1M"
 
 	// Set up the pod
-	err = plug.SetUpPod("podNamespace", "podName", containerID, bandwidthAnnotation, nil)
+	err = plug.SetUpPod("podNamespace", "podName", containerID, bandwidthAnnotation, nil, network.CNITimeoutSec*time.Second)
 	if err != nil {
 		t.Errorf("Expected nil: %v", err)
 	}

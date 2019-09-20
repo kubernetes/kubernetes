@@ -21,6 +21,7 @@ import (
 	"net"
 	"sync"
 	"testing"
+	"time"
 
 	utilsets "k8s.io/apimachinery/pkg/util/sets"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -108,7 +109,7 @@ func TestPluginManager(t *testing.T) {
 				// concurrently.
 				allCreatedWg.Wait()
 
-				if err := pm.SetUpPod("", name, id, nil, nil); err != nil {
+				if err := pm.SetUpPod("", name, id, nil, nil, network.CNITimeoutSec*time.Second); err != nil {
 					t.Errorf("Failed to set up pod %q: %v", name, err)
 					return
 				}
@@ -159,7 +160,7 @@ func (p *hookableFakeNetworkPlugin) Capabilities() utilsets.Int {
 	return utilsets.NewInt()
 }
 
-func (p *hookableFakeNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations, options map[string]string) error {
+func (p *hookableFakeNetworkPlugin) SetUpPod(namespace string, name string, id kubecontainer.ContainerID, annotations, options map[string]string, networkTimeout time.Duration) error {
 	if p.setupHook != nil {
 		p.setupHook(namespace, name, id)
 	}
@@ -210,7 +211,7 @@ func TestMultiPodParallelNetworkOps(t *testing.T) {
 		// Setup will block on the runner pod completing.  If network
 		// operations locking isn't correct (eg pod network operations
 		// block other pods) setUpPod() will never return.
-		if err := pm.SetUpPod("", podName, containerID, nil, nil); err != nil {
+		if err := pm.SetUpPod("", podName, containerID, nil, nil, network.CNITimeoutSec*time.Second); err != nil {
 			t.Errorf("Failed to set up waiter pod: %v", err)
 			return
 		}
@@ -230,7 +231,7 @@ func TestMultiPodParallelNetworkOps(t *testing.T) {
 		podName := "runner"
 		containerID := kubecontainer.ContainerID{ID: podName}
 
-		if err := pm.SetUpPod("", podName, containerID, nil, nil); err != nil {
+		if err := pm.SetUpPod("", podName, containerID, nil, nil, network.CNITimeoutSec*time.Second); err != nil {
 			t.Errorf("Failed to set up runner pod: %v", err)
 			return
 		}
