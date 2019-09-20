@@ -28,6 +28,7 @@ filegroup(
         "//cmd/kubeadm:all-srcs",
         "//cmd/kubectl:all-srcs",
         "//cmd/kubectl-convert:all-srcs",
+        "//cmd/kubectl-sdk:all-srcs",
         "//cmd/kubelet:all-srcs",
         "//cmd/kubemark:all-srcs",
         "//cmd/linkcheck:all-srcs",
