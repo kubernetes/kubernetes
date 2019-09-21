@@ -34,10 +34,8 @@ type Gauge struct {
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewGauge(opts *GaugeOpts) *Gauge {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	kc := &Gauge{
 		GaugeOpts:  opts,
 		lazyMetric: lazyMetric{},
@@ -86,10 +84,8 @@ type GaugeVec struct {
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewGaugeVec(opts *GaugeOpts, labels []string) *GaugeVec {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	cv := &GaugeVec{
 		GaugeVec:       noopGaugeVec,
 		GaugeOpts:      opts,
