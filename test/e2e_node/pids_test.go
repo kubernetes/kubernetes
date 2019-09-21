@@ -18,7 +18,6 @@ package e2e_node
 
 import (
 	"fmt"
-	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -32,7 +31,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 // makePodToVerifyPids returns a pod that verifies specified cgroup with pids
@@ -79,28 +77,6 @@ func makePodToVerifyPids(baseName string, pidsLimit resource.Quantity) *v1.Pod {
 		},
 	}
 	return pod
-}
-
-// enablePodPidsLimitInKubelet enables pod pid limit feature for kubelet with a sensible default test limit
-func enablePodPidsLimitInKubelet(f *framework.Framework) *kubeletconfig.KubeletConfiguration {
-	oldCfg, err := getCurrentKubeletConfig()
-	framework.ExpectNoError(err)
-	newCfg := oldCfg.DeepCopy()
-	if newCfg.FeatureGates == nil {
-		newCfg.FeatureGates = make(map[string]bool)
-		newCfg.FeatureGates["SupportPodPidsLimit"] = true
-	}
-	newCfg.PodPidsLimit = int64(1024)
-	// Update the Kubelet configuration.
-	framework.ExpectNoError(setKubeletConfiguration(f, newCfg))
-
-	// Wait for the Kubelet to be ready.
-	gomega.Eventually(func() bool {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		return len(nodeList.Items) == 1
-	}, time.Minute, time.Second).Should(gomega.BeTrue())
-
-	return oldCfg
 }
 
 func runPodPidsLimitTests(f *framework.Framework) {

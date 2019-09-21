@@ -107,10 +107,6 @@ test/e2e/storage/vsphere
 test/e2e/upgrades
 test/e2e/upgrades/storage
 test/e2e/windows
-test/e2e_node
-test/e2e_node/environment
-test/e2e_node/remote
-test/e2e_node/runner/remote
 test/images/agnhost/dns
 test/images/agnhost/inclusterclient
 test/images/agnhost/net/nat

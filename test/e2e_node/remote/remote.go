@@ -136,7 +136,7 @@ const (
 )
 
 func getTimestamp() string {
-	return fmt.Sprintf(time.Now().Format(timestampFormat))
+	return fmt.Sprint(time.Now().Format(timestampFormat))
 }
 
 func newWorkspaceDir() string {

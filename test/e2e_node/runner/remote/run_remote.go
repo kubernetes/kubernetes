@@ -40,9 +40,9 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/system"
 
 	"github.com/pborman/uuid"
-	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.beta"
+	"google.golang.org/api/option"
 	"k8s.io/klog"
 	"sigs.k8s.io/yaml"
 )
@@ -726,12 +726,12 @@ func getComputeClient() (*compute.Service, error) {
 		}
 
 		var client *http.Client
-		client, err = google.DefaultClient(oauth2.NoContext, compute.ComputeScope)
+		client, err = google.DefaultClient(context.Background(), compute.ComputeScope)
 		if err != nil {
 			continue
 		}
 
-		cs, err = compute.New(client)
+		cs, err = compute.NewService(context.Background(), option.WithHTTPClient(client))
 		if err != nil {
 			continue
 		}
