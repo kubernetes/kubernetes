@@ -513,6 +513,7 @@ staging/src/k8s.io/kubectl/pkg/cmd/logs
 staging/src/k8s.io/kubectl/pkg/cmd/patch
 staging/src/k8s.io/kubectl/pkg/cmd/plugin
 staging/src/k8s.io/kubectl/pkg/cmd/portforward
+staging/src/k8s.io/kubectl/pkg/cmd/proxy
 staging/src/k8s.io/kubectl/pkg/cmd/replace
 staging/src/k8s.io/kubectl/pkg/cmd/rollingupdate
 staging/src/k8s.io/kubectl/pkg/cmd/rollout
