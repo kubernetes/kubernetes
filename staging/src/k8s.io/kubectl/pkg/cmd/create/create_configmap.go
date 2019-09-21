@@ -29,7 +29,7 @@ import (
 
 var (
 	configMapLong = templates.LongDesc(i18n.T(`
-		Create a configmap based on a file, directory, or specified literal value.
+		Create as configmap based on a file, directory, or specified literal value.
 
 		A single configmap may package one or more key/value pairs.
 
@@ -53,6 +53,9 @@ var (
 		  # Create a new configmap named my-config from the key=value pairs in the file
 		  kubectl create configmap my-config --from-file=path/to/bar
 
+		  # Create a new configmap named my-config and add labels
+		  kubectl create configmap my-config --from-file=path/to/bar --add-label=key1=value1 --add-label=key2=value2
+
 		  # Create a new configmap named my-config from an env file
 		  kubectl create configmap my-config --from-env-file=path/to/bar.env`))
 )
@@ -69,7 +72,7 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	}
 
 	cmd := &cobra.Command{
-		Use:                   "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
+		Use: "configmap NAME [--from-file=[key=]source] [--from-literal=key1=value1] [--dry-run]",
 		DisableFlagsInUseLine: true,
 		Aliases:               []string{"cm"},
 		Short:                 i18n.T("Create a configmap from a local file, directory or literal value"),
@@ -90,6 +93,8 @@ func NewCmdCreateConfigMap(f cmdutil.Factory, ioStreams genericclioptions.IOStre
 	cmd.Flags().StringArray("from-literal", []string{}, "Specify a key and literal value to insert in configmap (i.e. mykey=somevalue)")
 	cmd.Flags().String("from-env-file", "", "Specify the path to a file to read lines of key=val pairs to create a configmap (i.e. a Docker .env file).")
 	cmd.Flags().Bool("append-hash", false, "Append a hash of the configmap to its name.")
+	cmd.Flags().StringSlice("add-label", []string{}, "Add a label as key=val pair.")
+
 	return cmd
 }
 
@@ -109,6 +114,7 @@ func (o *ConfigMapOpts) Complete(f cmdutil.Factory, cmd *cobra.Command, args []s
 			LiteralSources: cmdutil.GetFlagStringArray(cmd, "from-literal"),
 			EnvFileSource:  cmdutil.GetFlagString(cmd, "from-env-file"),
 			AppendHash:     cmdutil.GetFlagBool(cmd, "append-hash"),
+			AddLabels:      cmdutil.GetFlagStringSlice(cmd, "add-label"),
 		}
 	default:
 		return errUnsupportedGenerator(cmd, generatorName)

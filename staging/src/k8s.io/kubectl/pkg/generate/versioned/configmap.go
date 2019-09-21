@@ -46,6 +46,8 @@ type ConfigMapGeneratorV1 struct {
 	EnvFileSource string
 	// AppendHash; if true, derive a hash from the ConfigMap and append it to the name
 	AppendHash bool
+	// AddLabels to derive the configMap from (optional)
+	AddLabels []string
 }
 
 // Ensure it supports the generator pattern that uses parameter injection.
@@ -97,6 +99,15 @@ func (s ConfigMapGeneratorV1) Generate(genericParams map[string]interface{}) (ru
 		delegate.AppendHash = hashBool
 		delete(genericParams, "append-hash")
 	}
+	addLabelsStrings, found := genericParams["add-label"]
+	if found {
+		addLabelsArray, isArray := addLabelsStrings.([]string)
+		if !isArray {
+			return nil, fmt.Errorf("expected []string, found :%v", addLabelsStrings)
+		}
+		delegate.AddLabels = addLabelsArray
+		delete(genericParams, "add-label")
+	}
 	params := map[string]string{}
 	for key, value := range genericParams {
 		strVal, isString := value.(string)
@@ -121,6 +132,7 @@ func (s ConfigMapGeneratorV1) ParamNames() []generate.GeneratorParam {
 		{Name: "from-env-file", Required: false},
 		{Name: "force", Required: false},
 		{Name: "hash", Required: false},
+		{Name: "add-label", Required: false},
 	}
 }
 
@@ -154,6 +166,11 @@ func (s ConfigMapGeneratorV1) StructuredGenerate() (runtime.Object, error) {
 			return nil, err
 		}
 		configMap.Name = fmt.Sprintf("%s-%s", configMap.Name, h)
+	}
+	if len(s.AddLabels) > 0 {
+		if err := addLabels(configMap, s.AddLabels); err != nil {
+			return nil, err
+		}
 	}
 	return configMap, nil
 }
@@ -279,6 +296,33 @@ func addKeyFromLiteralToConfigMap(configMap *v1.ConfigMap, keyName, data string)
 		return err
 	}
 	configMap.Data[keyName] = data
+	return nil
+}
+
+// addLabels
+func addLabels(configMap *v1.ConfigMap, labels []string) error {
+	configMap.Labels = map[string]string{}
+
+	for _, label := range labels {
+
+		keyName, value, err := util.ParseLabel(label)
+		if err != nil {
+			return err
+		}
+		err = addLabelToConfigMap(configMap, keyName, value)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addLabelToConfigMap(configMap *v1.ConfigMap, keyName, data string) error {
+	err := validateNewConfigMap(configMap, keyName)
+	if err != nil {
+		return err
+	}
+	configMap.Labels[keyName] = data
 	return nil
 }
 

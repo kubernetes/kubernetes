@@ -91,3 +91,9 @@ func ParseLiteralSource(source string) (keyName, value string, err error) {
 
 	return items[0], items[1], nil
 }
+
+// ParseLabel see ParseLiteralSource.
+func ParseLabel(source string) (keyName, value string, err error) {
+
+	return ParseLiteralSource(source)
+}
