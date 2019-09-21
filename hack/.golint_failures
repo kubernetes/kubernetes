@@ -133,8 +133,6 @@ pkg/kubelet/pod/testing
 pkg/kubelet/preemption
 pkg/kubelet/remote
 pkg/kubelet/stats
-pkg/kubelet/status
-pkg/kubelet/status/testing
 pkg/kubelet/sysctl
 pkg/kubelet/types
 pkg/kubemark
