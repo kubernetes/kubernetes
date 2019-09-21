@@ -53,6 +53,16 @@ const (
 	STABLE StabilityLevel = "STABLE"
 )
 
+// setDefaults takes 'ALPHA' in case of empty.
+func (sl *StabilityLevel) setDefaults() {
+	switch *sl {
+	case "":
+		*sl = ALPHA
+	default:
+		// no-op, since we have a StabilityLevel already
+	}
+}
+
 // CounterOpts is an alias for Opts. See there for doc comments.
 type CounterOpts KubeOpts
 
