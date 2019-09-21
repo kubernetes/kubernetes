@@ -27,7 +27,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
@@ -1138,7 +1137,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			client := fake.NewSimpleClientset(&policyConfigMap)
 			algorithmSrc := schedulerapi.SchedulerAlgorithmSource{
 				Policy: &schedulerapi.SchedulerPolicySource{
-					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
+					ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
 						Namespace: policyConfigMap.Namespace,
 						Name:      policyConfigMap.Name,
 					},
@@ -1164,7 +1163,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				make(chan struct{}),
 				schedulerframework.NewDefaultRegistry(),
 				nil,
-				[]kubeschedulerconfig.PluginConfig{},
+				[]schedulerapi.PluginConfig{},
 			)
 			if err != nil {
 				t.Fatalf("%s: Error constructing: %v", v, err)

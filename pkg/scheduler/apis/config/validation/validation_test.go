@@ -24,7 +24,6 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
-	"k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
@@ -187,7 +186,7 @@ func TestValidatePolicy(t *testing.T) {
 		},
 		{
 			name:     "policy weight exceeds maximum",
-			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "WeightPriority", Weight: api.MaxWeight}}},
+			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "WeightPriority", Weight: config.MaxWeight}}},
 			expected: errors.New("Priority WeightPriority should have a positive weight applied to it or it has overflown"),
 		},
 		{

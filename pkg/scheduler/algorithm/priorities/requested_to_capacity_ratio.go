@@ -21,7 +21,7 @@ import (
 	"math"
 
 	"k8s.io/klog"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 // FunctionShape represents shape of scoring function.

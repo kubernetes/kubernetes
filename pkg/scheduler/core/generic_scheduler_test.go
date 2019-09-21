@@ -39,8 +39,7 @@ import (
 	algorithmpredicates "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -139,7 +138,7 @@ func getNodeReducePriority(pod *v1.Pod, meta interface{}, nodeNameToInfo map[str
 
 // EmptyPluginRegistry is a test plugin set used by the default scheduler.
 var EmptyPluginRegistry = framework.Registry{}
-var emptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, []schedulerconfig.PluginConfig{})
+var emptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, []schedulerapi.PluginConfig{})
 
 // FakeFilterPlugin is a test filter plugin used by default scheduler.
 type FakeFilterPlugin struct {
@@ -260,15 +259,15 @@ func TestGenericScheduler(t *testing.T) {
 
 	filterPlugin := &FakeFilterPlugin{}
 	filterPluginRegistry := framework.Registry{filterPlugin.Name(): newPlugin(filterPlugin)}
-	filterFramework, err := framework.NewFramework(filterPluginRegistry, &schedulerconfig.Plugins{
-		Filter: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
+	filterFramework, err := framework.NewFramework(filterPluginRegistry, &schedulerapi.Plugins{
+		Filter: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{
 				{
 					Name: filterPlugin.Name(),
 				},
 			},
 		},
-	}, []schedulerconfig.PluginConfig{})
+	}, []schedulerapi.PluginConfig{})
 	if err != nil {
 		t.Errorf("Unexpected error when initialize scheduling framework, err :%v", err.Error())
 	}
@@ -1128,15 +1127,15 @@ func TestSelectNodesForPreemption(t *testing.T) {
 
 	filterPlugin := &FakeFilterPlugin{}
 	filterPluginRegistry := framework.Registry{filterPlugin.Name(): newPlugin(filterPlugin)}
-	filterFramework, err := framework.NewFramework(filterPluginRegistry, &schedulerconfig.Plugins{
-		Filter: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
+	filterFramework, err := framework.NewFramework(filterPluginRegistry, &schedulerapi.Plugins{
+		Filter: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{
 				{
 					Name: filterPlugin.Name(),
 				},
 			},
 		},
-	}, []schedulerconfig.PluginConfig{})
+	}, []schedulerapi.PluginConfig{})
 	if err != nil {
 		t.Errorf("Unexpected error when initialize scheduling framework, err :%v", err.Error())
 	}

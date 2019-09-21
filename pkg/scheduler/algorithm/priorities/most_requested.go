@@ -17,7 +17,7 @@ limitations under the License.
 package priorities
 
 import (
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 var (

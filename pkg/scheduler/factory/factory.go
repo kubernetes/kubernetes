@@ -50,9 +50,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/api/validation"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -190,8 +189,8 @@ type Configurator struct {
 
 	// framework configuration arguments.
 	registry     framework.Registry
-	plugins      *config.Plugins
-	pluginConfig []config.PluginConfig
+	plugins      *schedulerapi.Plugins
+	pluginConfig []schedulerapi.PluginConfig
 }
 
 // ConfigFactoryArgs is a set arguments passed to NewConfigFactory.
@@ -214,8 +213,8 @@ type ConfigFactoryArgs struct {
 	BindTimeoutSeconds             int64
 	StopCh                         <-chan struct{}
 	Registry                       framework.Registry
-	Plugins                        *config.Plugins
-	PluginConfig                   []config.PluginConfig
+	Plugins                        *schedulerapi.Plugins
+	PluginConfig                   []schedulerapi.PluginConfig
 }
 
 // NewConfigFactory initializes the default implementation of a Configurator. To encourage eventual privatization of the struct type, we only

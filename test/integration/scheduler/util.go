@@ -52,7 +52,7 @@ import (
 
 	// Register defaults in pkg/scheduler/algorithmprovider.
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	schedulerplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"

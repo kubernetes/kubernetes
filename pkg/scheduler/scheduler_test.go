@@ -45,8 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -60,7 +59,7 @@ import (
 var (
 	emptyPluginRegistry = framework.Registry{}
 	// emptyPluginConfig is an empty plugin config used in tests.
-	emptyPluginConfig []kubeschedulerconfig.PluginConfig
+	emptyPluginConfig []schedulerapi.PluginConfig
 	// emptyFramework is an empty framework used in tests.
 	// Note: If the test runs in goroutine, please don't use this variable to avoid a race condition.
 	emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, emptyPluginConfig)
@@ -198,7 +197,7 @@ func TestSchedulerCreation(t *testing.T) {
 		informerFactory.Storage().V1().StorageClasses(),
 		informerFactory.Storage().V1beta1().CSINodes(),
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
-		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
+		schedulerapi.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
 		emptyPluginRegistry,
 		nil,
@@ -698,7 +697,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 }
 
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
-	framework, _ := framework.NewFramework(emptyPluginRegistry, nil, []kubeschedulerconfig.PluginConfig{})
+	framework, _ := framework.NewFramework(emptyPluginRegistry, nil, []schedulerapi.PluginConfig{})
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil, nil),
