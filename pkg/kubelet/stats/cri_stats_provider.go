@@ -752,13 +752,6 @@ func removeTerminatedContainers(containers []*runtimeapi.Container) []*runtimeap
 
 	result := make([]*runtimeapi.Container, 0)
 	for _, refs := range containerMap {
-		if len(refs) == 1 {
-			result = append(result, refs[0])
-			if refs[0].State == runtimeapi.ContainerState_CONTAINER_RUNNING {
-				result = append(result, refs[0])
-			}
-			continue
-		}
 		for i := 0; i < len(refs); i++ {
 			if refs[i].State == runtimeapi.ContainerState_CONTAINER_RUNNING {
 				result = append(result, refs[i])
