@@ -65,8 +65,8 @@ func (p *ephemeralTestSuite) skipRedundantSuite(driver TestDriver, pattern testp
 
 func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
-		config      *PerTestConfig
-		testCleanup func()
+		config        *PerTestConfig
+		driverCleanup func()
 
 		testCase *EphemeralTest
 	}
@@ -94,7 +94,7 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 		l = local{}
 
 		// Now do the more expensive test initialization.
-		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.testCase = &EphemeralTest{
 			Client:     l.config.Framework.ClientSet,
 			Namespace:  f.Namespace.Name,
@@ -107,9 +107,9 @@ func (p *ephemeralTestSuite) defineTests(driver TestDriver, pattern testpatterns
 	}
 
 	cleanup := func() {
-		if l.testCleanup != nil {
-			l.testCleanup()
-			l.testCleanup = nil
+		if l.driverCleanup != nil {
+			l.driverCleanup()
+			l.driverCleanup = nil
 		}
 	}
 
