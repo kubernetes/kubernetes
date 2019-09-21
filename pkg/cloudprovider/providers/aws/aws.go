@@ -880,6 +880,12 @@ func (s *awsSdkEC2) DescribeInstances(request *ec2.DescribeInstancesInput) ([]*e
 	results := []*ec2.Instance{}
 	var nextToken *string
 	requestTime := time.Now()
+
+	// We can't pass a zero-length Filters to AWS (it's an error)
+	if request.Filters != nil && len(request.Filters) == 0 {
+		request.Filters = nil
+	}
+
 	for {
 		response, err := s.ec2.DescribeInstances(request)
 		if err != nil {
