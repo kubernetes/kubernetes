@@ -55,7 +55,7 @@ export GO111MODULE=on
 
 pushd "${_kubetmp}" > /dev/null 2>&1
   # Destroy deps in the copy of the kube tree
-  rm -rf ./Godeps/LICENSES ./vendor
+  rm -rf ./vendor
 
   # Recreate the vendor tree using the nice clean set we just downloaded
   hack/update-vendor.sh

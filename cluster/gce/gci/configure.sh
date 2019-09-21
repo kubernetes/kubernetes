@@ -421,7 +421,7 @@ function install-kube-binary-config {
     mv "${src_dir}/kubelet" "${KUBE_BIN}"
     mv "${src_dir}/kubectl" "${KUBE_BIN}"
 
-    mv "${KUBE_HOME}/kubernetes/LICENSES" "${KUBE_HOME}"
+    mv "${KUBE_HOME}/kubernetes/LICENSE" "${KUBE_HOME}"
     mv "${KUBE_HOME}/kubernetes/kubernetes-src.tar.gz" "${KUBE_HOME}"
   fi
 
