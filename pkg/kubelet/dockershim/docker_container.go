@@ -391,7 +391,7 @@ func (ds *dockerService) ContainerStatus(_ context.Context, req *runtimeapi.Cont
 			}
 		} else if r.State.ExitCode != 0 { // Case 2
 			state = runtimeapi.ContainerState_CONTAINER_EXITED
-			// Adjust finshedAt and startedAt time to createdAt time to avoid
+			// Adjust finishedAt and startedAt time to createdAt time to avoid
 			// the confusion.
 			finishedAt, startedAt = createdAt, createdAt
 			reason = "ContainerCannotRun"
