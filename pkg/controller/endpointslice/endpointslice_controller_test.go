@@ -140,9 +140,8 @@ func TestSyncServiceMissing(t *testing.T) {
 
 	err := esController.syncService(fmt.Sprintf("%s/%s", namespace, missingServiceName))
 
-	// Since the service doesn't exist, we should get a not found error
-	assert.NotNil(t, err, "Expected no error syncing service")
-	assert.Equal(t, err.Error(), "service \"notthere\" not found")
+	// nil should be returned when the service doesn't exist
+	assert.Nil(t, err, "Expected no error syncing service")
 
 	// That should mean no client actions were performed
 	assert.Len(t, client.Actions(), 0)
