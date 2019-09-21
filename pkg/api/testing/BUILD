@@ -112,5 +112,6 @@ go_test(
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
         "//vendor/github.com/json-iterator/go:go_default_library",
+        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
