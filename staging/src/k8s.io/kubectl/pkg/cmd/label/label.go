@@ -54,6 +54,7 @@ type LabelOptions struct {
 
 	// Common user flags
 	overwrite       bool
+	idempotent      bool
 	list            bool
 	local           bool
 	dryrun          bool
@@ -86,6 +87,7 @@ var (
 		* A label key and value must begin with a letter or number, and may contain letters, numbers, hyphens, dots, and underscores, up to %[1]d characters each.
 		* Optionally, the key can begin with a DNS subdomain prefix and a single '/', like example.com/my-app
 		* If --overwrite is true, then existing labels can be overwritten, otherwise attempting to overwrite a label will result in an error.
+		* If --idempotent is true, and no change would need to be made in order to comply with the command line, the command will succeed, but not change the object.
 		* If --resource-version is specified, then updates will use this resource version, otherwise the existing resource-version will be used.`))
 
 	labelExample = templates.Examples(i18n.T(`
@@ -124,7 +126,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	o := NewLabelOptions(ioStreams)
 
 	cmd := &cobra.Command{
-		Use:                   "label [--overwrite] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
+		Use:                   "label [--overwrite|--idempotent] (-f FILENAME | TYPE NAME) KEY_1=VAL_1 ... KEY_N=VAL_N [--resource-version=version]",
 		DisableFlagsInUseLine: true,
 		Short:                 i18n.T("Update the labels on a resource"),
 		Long:                  fmt.Sprintf(labelLong, validation.LabelValueMaxLength),
@@ -140,6 +142,7 @@ func NewCmdLabel(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	o.PrintFlags.AddFlags(cmd)
 
 	cmd.Flags().BoolVar(&o.overwrite, "overwrite", o.overwrite, "If true, allow labels to be overwritten, otherwise reject label updates that overwrite existing labels.")
+	cmd.Flags().BoolVar(&o.idempotent, "idempotent", o.idempotent, "If true, the command will succeed if complying with the command line would not require a change to the object, otherwise reject label updates that would not actually change the value.")
 	cmd.Flags().BoolVar(&o.list, "list", o.list, "If true, display the labels for a given resource.")
 	cmd.Flags().BoolVar(&o.local, "local", o.local, "If true, label will NOT contact api-server but run locally.")
 	cmd.Flags().StringVarP(&o.selector, "selector", "l", o.selector, "Selector (label query) to filter on, not including uninitialized ones, supports '=', '==', and '!='.(e.g. -l key1=value1,key2=value2).")
@@ -258,7 +261,7 @@ func (o *LabelOptions) RunLabel() error {
 			return err
 		}
 		if o.dryrun || o.local || o.list {
-			err = labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
+			err = labelFunc(obj, o.overwrite, o.idempotent, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
 				return err
 			}
@@ -283,7 +286,7 @@ func (o *LabelOptions) RunLabel() error {
 				}
 			}
 
-			if err := labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels); err != nil {
+			if err := labelFunc(obj, o.overwrite, o.idempotent, o.resourceVersion, o.newLabels, o.removeLabels); err != nil {
 				return err
 			}
 			if err := o.Recorder.Record(obj); err != nil {
@@ -355,14 +358,33 @@ func updateDataChangeMsg(oldObj []byte, newObj []byte) string {
 	return msg
 }
 
-func validateNoOverwrites(accessor metav1.Object, labels map[string]string) error {
+//
+// filter out the labels that do not need to be changed or have previously been set, depending on the options 'overwrite' and 'idempotent'
+// Only labels in need of setting will be returned, or a list or errors if this is not permitted.
+//
+func mergeExisting(overwrite bool, idempotent bool, accessor metav1.Object, labels map[string]string) (map[string]string, error) {
 	allErrs := []error{}
-	for key := range labels {
-		if value, found := accessor.GetLabels()[key]; found {
-			allErrs = append(allErrs, fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", key, value))
+	filteredLabels := map[string]string{}
+
+	for key, newValue := range labels {
+		if oldValue, found := accessor.GetLabels()[key]; found {
+			if oldValue == newValue {
+				if !idempotent {
+					allErrs = append(allErrs, fmt.Errorf("'%s' is already set to value (%s), and --idempotent is false", key, oldValue))
+				}
+				// no else branch, as there is nothing to do.
+			} else {
+				if !overwrite {
+					allErrs = append(allErrs, fmt.Errorf("'%s' already has a value (%s), and --overwrite is false", key, oldValue))
+				} else {
+					filteredLabels[key] = newValue
+				}
+			}
+		} else {
+			filteredLabels[key] = newValue
 		}
 	}
-	return utilerrors.NewAggregate(allErrs)
+	return filteredLabels, utilerrors.NewAggregate(allErrs)
 }
 
 func parseLabels(spec []string) (map[string]string, []string, error) {
@@ -392,15 +414,15 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	return labels, remove, nil
 }
 
-func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, labels map[string]string, remove []string) error {
+func labelFunc(obj runtime.Object, overwrite bool, idempotent bool, resourceVersion string, labels map[string]string, remove []string) error {
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
 		return err
 	}
-	if !overwrite {
-		if err := validateNoOverwrites(accessor, labels); err != nil {
-			return err
-		}
+
+	mergedLabels, err := mergeExisting(overwrite, idempotent, accessor, labels)
+	if err != nil {
+		return err
 	}
 
 	objLabels := accessor.GetLabels()
@@ -408,16 +430,18 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 		objLabels = make(map[string]string)
 	}
 
-	for key, value := range labels {
-		objLabels[key] = value
-	}
-	for _, label := range remove {
-		delete(objLabels, label)
-	}
-	accessor.SetLabels(objLabels)
+	if len(mergedLabels)+len(remove) > 0 {
+		for key, value := range labels {
+			objLabels[key] = value
+		}
+		for _, label := range remove {
+			delete(objLabels, label)
+		}
+		accessor.SetLabels(objLabels)
 
-	if len(resourceVersion) != 0 {
-		accessor.SetResourceVersion(resourceVersion)
+		if len(resourceVersion) != 0 {
+			accessor.SetResourceVersion(resourceVersion)
+		}
 	}
 	return nil
 }

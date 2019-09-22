@@ -91,7 +91,7 @@ func TestValidateLabels(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		err := validateNoOverwrites(test.meta, test.labels)
+		_, err := mergeExisting(false, false, test.meta, test.labels)
 		if test.expectErr && err == nil {
 			t.Errorf("%s: unexpected non-error", test.test)
 		}
@@ -157,13 +157,14 @@ func TestParseLabels(t *testing.T) {
 
 func TestLabelFunc(t *testing.T) {
 	tests := []struct {
-		obj       runtime.Object
-		overwrite bool
-		version   string
-		labels    map[string]string
-		remove    []string
-		expected  runtime.Object
-		expectErr bool
+		obj        runtime.Object
+		overwrite  bool
+		idempotent bool
+		version    string
+		labels     map[string]string
+		remove     []string
+		expected   runtime.Object
+		expectErr  bool
 	}{
 		{
 			obj: &v1.Pod{
@@ -258,9 +259,95 @@ func TestLabelFunc(t *testing.T) {
 				},
 			},
 		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+			labels: map[string]string{"a": "f"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "b",
+						"c": "d",
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+			labels: map[string]string{"a": "b"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "b",
+						"c": "d",
+					},
+				},
+			},
+			expectErr: true,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+			labels: map[string]string{"a": "f"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "f",
+						"c": "d",
+					},
+				},
+			},
+			overwrite: true,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+			labels: map[string]string{"a": "f"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "f",
+						"c": "d",
+					},
+				},
+			},
+			overwrite:  true,
+			idempotent: true,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+			labels: map[string]string{"a": "b"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"a": "b",
+						"c": "d",
+					},
+				},
+			},
+			idempotent: true,
+		},
 	}
 	for _, test := range tests {
-		err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
+		err := labelFunc(test.obj, test.overwrite, test.idempotent, test.version, test.labels, test.remove)
 		if test.expectErr {
 			if err == nil {
 				t.Errorf("unexpected non-error: %v", test)
