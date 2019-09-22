@@ -10,7 +10,6 @@ require (
 )
 
 replace (
-	github.com/beorn7/perks => github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
 	github.com/prometheus/client_model => github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910
 	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.0-20181204211112-1dc9a6cbc91a
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
