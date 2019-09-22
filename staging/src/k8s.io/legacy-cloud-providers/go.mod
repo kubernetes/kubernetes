@@ -16,7 +16,7 @@ require (
 	github.com/dnaeon/go-vcr v1.0.1 // indirect
 	github.com/gophercloud/gophercloud v0.1.0
 	github.com/mitchellh/mapstructure v1.1.2
-	github.com/prometheus/client_golang v0.9.2
+	github.com/prometheus/client_golang v0.9.4
 	github.com/rubiojr/go-vhd v0.0.0-20160810183302-0bfd3b39853c
 	github.com/satori/go.uuid v1.2.0 // indirect
 	github.com/stretchr/testify v1.3.0
@@ -40,6 +40,9 @@ require (
 )
 
 replace (
+	github.com/beorn7/perks => github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973
+	github.com/prometheus/client_model => github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910
+	github.com/prometheus/procfs => github.com/prometheus/procfs v0.0.0-20181204211112-1dc9a6cbc91a
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
