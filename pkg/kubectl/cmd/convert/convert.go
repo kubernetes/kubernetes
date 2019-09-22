@@ -186,7 +186,7 @@ func (o *ConvertOptions) RunConvert() error {
 	}
 
 	internalEncoder := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-	internalVersionJSONEncoder := unstructured.JSONFallbackEncoder{Encoder: internalEncoder}
+	internalVersionJSONEncoder := unstructured.NewJSONFallbackEncoder(internalEncoder)
 	objects, err := asVersionedObject(infos, !singleItemImplied, specifiedOutputVersion, internalVersionJSONEncoder)
 	if err != nil {
 		return err
