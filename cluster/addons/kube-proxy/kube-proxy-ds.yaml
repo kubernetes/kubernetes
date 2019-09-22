@@ -26,7 +26,6 @@ spec:
       hostNetwork: true
       nodeSelector:
         node.kubernetes.io/kube-proxy-ds-ready: "true"
-        beta.kubernetes.io/os: linux
       tolerations:
       - operator: "Exists"
         effect: "NoExecute"
