@@ -115,6 +115,10 @@ func InstallLivezHandler(mux mux, checks ...HealthChecker) {
 // InstallPathHandler more than once for the same path and mux will
 // result in a panic.
 func InstallPathHandler(mux mux, path string, checks ...HealthChecker) {
+	installPathHandler(mux, path, stopwatch, checks...)
+}
+
+func installPathHandler(mux mux, path string, timer checkTimer, checks ...HealthChecker) {
 	if len(checks) == 0 {
 		klog.V(5).Info("No default health checks specified. Installing the ping handler.")
 		checks = []HealthChecker{PingHealthz}
@@ -122,7 +126,7 @@ func InstallPathHandler(mux mux, path string, checks ...HealthChecker) {
 
 	klog.V(5).Infof("Installing health checkers for (%v): %v", path, formatQuoted(checkerNames(checks...)...))
 
-	mux.Handle(path, handleRootHealthz(checks...))
+	mux.Handle(path, handleRootHealthz(timer, checks...))
 	for _, check := range checks {
 		mux.Handle(fmt.Sprintf("%s/%v", path, check.Name()), adaptCheckToHandler(check.Check))
 	}
@@ -158,11 +162,46 @@ func getExcludedChecks(r *http.Request) sets.String {
 	return sets.NewString()
 }
 
+type verbosityLevel int
+
+const (
+	quiet verbosityLevel = iota
+	verbose
+	duration
+)
+
+// verbosity returns the level of verbosity for health check.
+func verbosity(r *http.Request) verbosityLevel {
+	param, ok := r.URL.Query()["verbose"]
+	if !ok {
+		return quiet
+	}
+
+	for _, v := range param {
+		if v == "duration" {
+			return duration
+		}
+	}
+
+	return verbose
+}
+
+// checkTimer measure the duration of a check.
+type checkTimer func(check func()) time.Duration
+
+func stopwatch(check func()) time.Duration {
+	t := time.Now()
+	check()
+	return time.Since(t)
+}
+
 // handleRootHealthz returns an http.HandlerFunc that serves the provided checks.
-func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
+func handleRootHealthz(timer checkTimer, checks ...HealthChecker) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		failed := false
 		excluded := getExcludedChecks(r)
+		vlevel := verbosity(r)
+
 		var verboseOut bytes.Buffer
 		for _, check := range checks {
 			// no-op the check if we've specified we want to exclude the check
@@ -171,15 +210,21 @@ func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
 				fmt.Fprintf(&verboseOut, "[+]%v excluded: ok\n", check.Name())
 				continue
 			}
-			if err := check.Check(r); err != nil {
-				// don't include the error since this endpoint is public.  If someone wants more detail
-				// they should have explicit permission to the detailed checks.
-				klog.V(4).Infof("healthz check %v failed: %v", check.Name(), err)
-				fmt.Fprintf(&verboseOut, "[-]%v failed: reason withheld\n", check.Name())
-				failed = true
-			} else {
-				fmt.Fprintf(&verboseOut, "[+]%v ok\n", check.Name())
+			dur := timer(func() {
+				if err := check.Check(r); err != nil {
+					// don't include the error since this endpoint is public.  If someone wants more detail
+					// they should have explicit permission to the detailed checks.
+					klog.V(4).Infof("healthz check %v failed: %v", check.Name(), err)
+					fmt.Fprintf(&verboseOut, "[-]%v failed: reason withheld", check.Name())
+					failed = true
+				} else {
+					fmt.Fprintf(&verboseOut, "[+]%v ok", check.Name())
+				}
+			})
+			if vlevel == duration {
+				fmt.Fprintf(&verboseOut, " %s", dur)
 			}
+			fmt.Fprint(&verboseOut, "\n")
 		}
 		if excluded.Len() > 0 {
 			fmt.Fprintf(&verboseOut, "warn: some health checks cannot be excluded: no matches for %v\n", formatQuoted(excluded.List()...))
@@ -195,7 +240,7 @@ func handleRootHealthz(checks ...HealthChecker) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
-		if _, found := r.URL.Query()["verbose"]; !found {
+		if vlevel == quiet {
 			fmt.Fprint(w, "ok")
 			return
 		}

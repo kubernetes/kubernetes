@@ -24,6 +24,7 @@ import (
 	"net/url"
 	"reflect"
 	"testing"
+	"time"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
@@ -107,6 +108,13 @@ func testMultipleChecks(path string, t *testing.T) {
 		{"/ping", "ok", http.StatusOK, true},
 		{"/bad", "internal server error: this will fail\n", http.StatusInternalServerError, true},
 		{"", "[+]ping ok\n[-]bad failed: reason withheld\nhealthz check failed\n", http.StatusInternalServerError, true},
+		{"?verbose=duration", "[+]ping ok 250ns\nhealthz check passed\n", http.StatusOK, false},
+	}
+
+	timer := func(check func()) time.Duration {
+		// Mocks the duration of every check to exactly 250ns.
+		check()
+		return time.Duration(250)
 	}
 
 	for i, test := range tests {
@@ -118,11 +126,10 @@ func testMultipleChecks(path string, t *testing.T) {
 			}))
 		}
 		if path == "" {
-			InstallHandler(mux, checks...)
 			path = "/healthz"
-		} else {
-			InstallPathHandler(mux, path, checks...)
 		}
+		installPathHandler(mux, path, timer, checks...)
+
 		req, err := http.NewRequest("GET", fmt.Sprintf("http://example.com%s%v", path, test.path), nil)
 		if err != nil {
 			t.Fatalf("case[%d] Unexpected error: %v", i, err)
