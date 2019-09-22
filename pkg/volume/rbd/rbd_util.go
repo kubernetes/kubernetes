@@ -570,10 +570,6 @@ func (util *RBDUtil) cleanOldRBDFile(plugin *rbdPlugin, rbdFile string) error {
 		return fmt.Errorf("rbd: decode err: %v.", err)
 	}
 
-	if err != nil {
-		klog.Errorf("failed to load rbd info from %s: %v", rbdFile, err)
-		return err
-	}
 	// Remove rbd lock if found.
 	// The disk is not attached to this node anymore, so the lock on image
 	// for this node can be removed safely.
