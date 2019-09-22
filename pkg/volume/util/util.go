@@ -424,14 +424,6 @@ func GetVolumeMode(volumeSpec *volume.Spec) (v1.PersistentVolumeMode, error) {
 	return "", fmt.Errorf("cannot get volumeMode for volume: %v", volumeSpec.Name())
 }
 
-// GetPersistentVolumeClaimVolumeMode retrieves VolumeMode from pvc.
-func GetPersistentVolumeClaimVolumeMode(claim *v1.PersistentVolumeClaim) (v1.PersistentVolumeMode, error) {
-	if claim.Spec.VolumeMode != nil {
-		return *claim.Spec.VolumeMode, nil
-	}
-	return "", fmt.Errorf("cannot get volumeMode from pvc: %v", claim.Name)
-}
-
 // GetPersistentVolumeClaimQualifiedName returns a qualified name for pvc.
 func GetPersistentVolumeClaimQualifiedName(claim *v1.PersistentVolumeClaim) string {
 	return utilstrings.JoinQualifiedName(claim.GetNamespace(), claim.GetName())
