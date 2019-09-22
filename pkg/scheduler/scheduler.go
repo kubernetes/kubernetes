@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config/latest"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -263,7 +263,7 @@ func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
 	if err != nil {
 		return fmt.Errorf("couldn't read policy config: %v", err)
 	}
-	err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), []byte(data), policy)
 	if err != nil {
 		return fmt.Errorf("invalid policy: %v", err)
 	}
@@ -281,7 +281,7 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *kubeschedule
 	if !found {
 		return fmt.Errorf("missing policy config map value at key %q", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
 	}
-	err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), []byte(data), policy)
 	if err != nil {
 		return fmt.Errorf("invalid policy: %v", err)
 	}
