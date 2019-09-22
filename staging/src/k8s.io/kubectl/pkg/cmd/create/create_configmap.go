@@ -53,11 +53,11 @@ var (
 		  # Create a new configmap named my-config from the key=value pairs in the file
 		  kubectl create configmap my-config --from-file=path/to/bar
 
-		  # Create a new configmap named my-config and add labels
-		  kubectl create configmap my-config --from-file=path/to/bar --add-label=key1=value1 --add-label=key2=value2
-
 		  # Create a new configmap named my-config from an env file
-		  kubectl create configmap my-config --from-env-file=path/to/bar.env`))
+		  kubectl create configmap my-config --from-env-file=path/to/bar.env
+
+		  # Create a new configmap named my-config and add labels
+		  kubectl create configmap my-config --from-file=path/to/bar --add-label=key1=value1 --add-label=key2=value2`))
 )
 
 // ConfigMapOpts holds properties for create configmap sub-command
