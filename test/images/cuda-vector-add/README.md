@@ -6,10 +6,12 @@ This is a small CUDA application that performs a simple vector addition. Useful 
 
 ```
 # Build
-$ make
+$ cd $K8S_ROOT/test/images
+$ make all WHAT=cuda-vector-add
 
 # Push
-$ make push
+$ cd $K8S_ROOT/test/images
+$ make all-push WHAT=cuda-vector-add
 ```
 
 ## Version history:
