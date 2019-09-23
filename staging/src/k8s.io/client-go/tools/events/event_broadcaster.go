@@ -53,7 +53,6 @@ type eventKey struct {
 	action              string
 	reason              string
 	reportingController string
-	reportingInstance   string
 	regarding           corev1.ObjectReference
 	related             corev1.ObjectReference
 }
@@ -264,7 +263,6 @@ func getKey(event *v1beta1.Event) eventKey {
 		action:              event.Action,
 		reason:              event.Reason,
 		reportingController: event.ReportingController,
-		reportingInstance:   event.ReportingInstance,
 		regarding:           event.Regarding,
 	}
 	if event.Related != nil {
