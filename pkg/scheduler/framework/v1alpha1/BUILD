@@ -43,6 +43,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "context_test.go",
         "framework_test.go",
         "interface_test.go",
         "registry_test.go",

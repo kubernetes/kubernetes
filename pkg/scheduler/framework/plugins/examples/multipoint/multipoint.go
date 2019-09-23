@@ -37,6 +37,17 @@ func (mc CommunicatingPlugin) Name() string {
 	return Name
 }
 
+type contextData struct {
+	data string
+}
+
+func (f *contextData) Clone() framework.ContextData {
+	copy := &contextData{
+		data: f.data,
+	}
+	return copy
+}
+
 // Reserve is the functions invoked by the framework at "reserve" extension point.
 func (mc CommunicatingPlugin) Reserve(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
 	if pod == nil {
@@ -44,7 +55,7 @@ func (mc CommunicatingPlugin) Reserve(pc *framework.PluginContext, pod *v1.Pod, 
 	}
 	if pod.Name == "my-test-pod" {
 		pc.Lock()
-		pc.Write(framework.ContextKey(pod.Name), "never bind")
+		pc.Write(framework.ContextKey(pod.Name), &contextData{data: "never bind"})
 		pc.Unlock()
 	}
 	return nil
@@ -57,8 +68,10 @@ func (mc CommunicatingPlugin) PreBind(pc *framework.PluginContext, pod *v1.Pod, 
 	}
 	pc.RLock()
 	defer pc.RUnlock()
-	if v, e := pc.Read(framework.ContextKey(pod.Name)); e == nil && v == "never bind" {
-		return framework.NewStatus(framework.Unschedulable, "pod is not permitted")
+	if v, e := pc.Read(framework.ContextKey(pod.Name)); e == nil {
+		if value, ok := v.(*contextData); ok && value.data == "never bind" {
+			return framework.NewStatus(framework.Unschedulable, "pod is not permitted")
+		}
 	}
 	return nil
 }

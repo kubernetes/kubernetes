@@ -27,7 +27,12 @@ const (
 )
 
 // ContextData is a generic type for arbitrary data stored in PluginContext.
-type ContextData interface{}
+type ContextData interface {
+	// Clone is an interface to make a copy of ContextData. For performance reasons,
+	// clone should make shallow copies for members (e.g., slices or maps) that are not
+	// impacted by PreFilter's optional AddPod/RemovePod methods.
+	Clone() ContextData
+}
 
 // ContextKey is the type of keys stored in PluginContext.
 type ContextKey string
@@ -46,6 +51,15 @@ func NewPluginContext() *PluginContext {
 	return &PluginContext{
 		storage: make(map[ContextKey]ContextData),
 	}
+}
+
+// Clone creates a copy of PluginContext and returns its pointer.
+func (c *PluginContext) Clone() *PluginContext {
+	copy := NewPluginContext()
+	for k, v := range c.storage {
+		copy.Write(k, v.Clone())
+	}
+	return copy
 }
 
 // Read retrieves data with the given "key" from PluginContext. If the key is not
