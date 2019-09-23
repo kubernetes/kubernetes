@@ -40,7 +40,7 @@ require (
 	k8s.io/cli-runtime v0.0.0
 	k8s.io/client-go v0.0.0
 	k8s.io/component-base v0.0.0
-	k8s.io/klog v0.4.0
+	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20190816220812-743ec37842bf
 	k8s.io/metrics v0.0.0
 	k8s.io/utils v0.0.0-20190801114015-581e00157fb1
