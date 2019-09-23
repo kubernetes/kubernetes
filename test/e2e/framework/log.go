@@ -39,3 +39,14 @@ func FailfWithOffset(offset int, format string, args ...interface{}) {
 	log("INFO", msg)
 	ginkgowrapper.Fail(nowStamp()+": "+msg, 1+offset)
 }
+
+// Fail is a replacement for ginkgo.Fail which logs the problem as it occurs
+// and then calls ginkgowrapper.Fail.
+func Fail(msg string, callerSkip ...int) {
+	skip := 1
+	if len(callerSkip) > 0 {
+		skip += callerSkip[0]
+	}
+	log("FAIL", msg)
+	ginkgowrapper.Fail(nowStamp()+": "+msg, skip)
+}
