@@ -54,6 +54,9 @@ type CertificateRenewHandler struct {
 	// FileName defines the name (or the BaseName) of the certificate file
 	FileName string
 
+	// CAName define the name for the CA on which this certificate depends
+	CAName string
+
 	// CABaseName define the base name for the CA that should be used for certificate renewal
 	CABaseName string
 
@@ -93,6 +96,7 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 				Name:       cert.Name,
 				LongName:   cert.LongName,
 				FileName:   cert.BaseName,
+				CAName:     ca.Name,
 				CABaseName: ca.BaseName, //Nb. this is a path for etcd certs (they are stored in a subfolder)
 				readwriter: pkiReadWriter,
 			}
