@@ -22,7 +22,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
 	cputopology "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
@@ -79,7 +79,7 @@ type Store interface {
 
 //TopologyHint is a struct containing the NUMANodeAffinity for a Container
 type TopologyHint struct {
-	NUMANodeAffinity socketmask.SocketMask
+	NUMANodeAffinity bitmask.BitMask
 	// Preferred is set to true when the NUMANodeAffinity encodes a preferred
 	// allocation for the Container. It is set to false otherwise.
 	Preferred bool
@@ -179,7 +179,7 @@ func (m *manager) iterateAllProviderTopologyHints(allProviderHints [][]TopologyH
 func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) TopologyHint {
 	// Set the default affinity as an any-numa affinity containing the list
 	// of NUMA Nodes available on this machine.
-	defaultAffinity, _ := socketmask.NewSocketMask(m.numaNodes...)
+	defaultAffinity, _ := bitmask.NewBitMask(m.numaNodes...)
 
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider. If no hints are provided, assume
@@ -224,7 +224,7 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
 		preferred := true
-		var numaAffinities []socketmask.SocketMask
+		var numaAffinities []bitmask.BitMask
 		for _, hint := range permutation {
 			// Only consider hints that have an actual NUMANodeAffinity set.
 			if hint.NUMANodeAffinity != nil {
@@ -241,7 +241,7 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		}
 
 		// Merge the affinities using a bitwise-and operation.
-		mergedAffinity, _ := socketmask.NewSocketMask(m.numaNodes...)
+		mergedAffinity, _ := bitmask.NewBitMask(m.numaNodes...)
 		mergedAffinity.And(numaAffinities...)
 
 		// Build a mergedHintfrom the merged affinity mask, indicating if an

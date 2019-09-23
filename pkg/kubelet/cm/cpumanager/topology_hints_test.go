@@ -26,7 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
 func topologyHintLessThan(a topologymanager.TopologyHint, b topologymanager.TopologyHint) bool {
@@ -46,9 +46,9 @@ func TestGetTopologyHints(t *testing.T) {
 	testPod4 := makePod("11", "11")
 	testContainer4 := &testPod4.Spec.Containers[0]
 
-	firstSocketMask, _ := socketmask.NewSocketMask(0)
-	secondSocketMask, _ := socketmask.NewSocketMask(1)
-	crossSocketMask, _ := socketmask.NewSocketMask(0, 1)
+	firstSocketMask, _ := bitmask.NewBitMask(0)
+	secondSocketMask, _ := bitmask.NewBitMask(1)
+	crossSocketMask, _ := bitmask.NewBitMask(0, 1)
 
 	machineInfo := cadvisorapi.MachineInfo{
 		NumCores: 12,

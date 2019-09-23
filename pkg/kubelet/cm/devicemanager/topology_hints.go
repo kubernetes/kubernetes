@@ -21,7 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
 // GetTopologyHints implements the TopologyManager HintProvider Interface which
@@ -78,7 +78,7 @@ func (m *ManagerImpl) generateDeviceTopologyHints(resource string, devices sets.
 
 	// Iterate through all combinations of NUMA Nodes and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	socketmask.IterateSocketMasks(m.numaNodes, func(mask socketmask.SocketMask) {
+	bitmask.IterateBitMasks(m.numaNodes, func(mask bitmask.BitMask) {
 		// First, update minAffinitySize for the current request size.
 		devicesInMask := 0
 		for _, device := range m.allDevices[resource] {

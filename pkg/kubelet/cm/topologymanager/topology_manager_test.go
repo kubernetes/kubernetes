@@ -24,12 +24,12 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-func NewTestSocketMask(sockets ...int) socketmask.SocketMask {
-	s, _ := socketmask.NewSocketMask(sockets...)
+func NewTestBitMask(sockets ...int) bitmask.BitMask {
+	s, _ := bitmask.NewBitMask(sockets...)
 	return s
 }
 
@@ -117,7 +117,7 @@ func TestCalculateAffinity(t *testing.T) {
 			name: "TopologyHint not set",
 			hp:   []HintProvider{},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				NUMANodeAffinity: NewTestBitMask(numaNodes...),
 				Preferred:        true,
 			},
 		},
@@ -129,7 +129,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				NUMANodeAffinity: NewTestBitMask(numaNodes...),
 				Preferred:        true,
 			},
 		},
@@ -143,7 +143,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				NUMANodeAffinity: NewTestBitMask(numaNodes...),
 				Preferred:        true,
 			},
 		},
@@ -157,7 +157,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				NUMANodeAffinity: NewTestBitMask(numaNodes...),
 				Preferred:        false,
 			},
 		},
@@ -176,7 +176,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				NUMANodeAffinity: NewTestBitMask(numaNodes...),
 				Preferred:        true,
 			},
 		},
@@ -195,7 +195,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				NUMANodeAffinity: NewTestBitMask(numaNodes...),
 				Preferred:        true,
 			},
 		},
@@ -206,7 +206,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 						},
@@ -216,7 +216,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 						},
@@ -224,7 +224,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(0),
+				NUMANodeAffinity: NewTestBitMask(0),
 				Preferred:        true,
 			},
 		},
@@ -235,7 +235,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 						},
@@ -245,7 +245,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 						},
@@ -253,7 +253,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(1),
+				NUMANodeAffinity: NewTestBitMask(1),
 				Preferred:        true,
 			},
 		},
@@ -264,7 +264,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 						},
@@ -274,7 +274,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        true,
 							},
 						},
@@ -282,7 +282,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(0),
+				NUMANodeAffinity: NewTestBitMask(0),
 				Preferred:        true,
 			},
 		},
@@ -293,7 +293,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 						},
@@ -303,7 +303,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        true,
 							},
 						},
@@ -311,7 +311,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(1),
+				NUMANodeAffinity: NewTestBitMask(1),
 				Preferred:        true,
 			},
 		},
@@ -322,7 +322,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 						},
@@ -332,7 +332,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 						},
@@ -340,7 +340,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
+				NUMANodeAffinity: NewTestBitMask(numaNodes...),
 				Preferred:        false,
 			},
 		},
@@ -351,7 +351,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 						},
@@ -361,7 +361,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        false,
 							},
 						},
@@ -369,7 +369,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(0),
+				NUMANodeAffinity: NewTestBitMask(0),
 				Preferred:        false,
 			},
 		},
@@ -380,7 +380,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 						},
@@ -390,7 +390,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        false,
 							},
 						},
@@ -398,7 +398,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(1),
+				NUMANodeAffinity: NewTestBitMask(1),
 				Preferred:        false,
 			},
 		},
@@ -410,7 +410,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 						},
@@ -418,7 +418,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(0),
+				NUMANodeAffinity: NewTestBitMask(0),
 				Preferred:        true,
 			},
 		},
@@ -430,7 +430,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 						},
@@ -438,7 +438,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(1),
+				NUMANodeAffinity: NewTestBitMask(1),
 				Preferred:        true,
 			},
 		},
@@ -449,11 +449,11 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 						},
@@ -463,7 +463,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 						},
@@ -471,7 +471,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(0),
+				NUMANodeAffinity: NewTestBitMask(0),
 				Preferred:        true,
 			},
 		},
@@ -482,11 +482,11 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 						},
@@ -496,7 +496,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 						},
@@ -504,7 +504,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(1),
+				NUMANodeAffinity: NewTestBitMask(1),
 				Preferred:        true,
 			},
 		},
@@ -515,11 +515,11 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 						},
@@ -529,7 +529,7 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
@@ -537,7 +537,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(0),
+				NUMANodeAffinity: NewTestBitMask(0),
 				Preferred:        false,
 			},
 		},
@@ -548,11 +548,11 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 						},
@@ -562,11 +562,11 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
@@ -574,7 +574,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(0),
+				NUMANodeAffinity: NewTestBitMask(0),
 				Preferred:        true,
 			},
 		},
@@ -585,11 +585,11 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
@@ -599,15 +599,15 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
@@ -615,7 +615,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(1),
+				NUMANodeAffinity: NewTestBitMask(1),
 				Preferred:        true,
 			},
 		},
@@ -626,25 +626,25 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
@@ -652,7 +652,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(1),
+				NUMANodeAffinity: NewTestBitMask(1),
 				Preferred:        true,
 			},
 		},
@@ -664,21 +664,21 @@ func TestCalculateAffinity(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource1": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        true,
 							},
 						},
 						"resource2": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
@@ -686,7 +686,7 @@ func TestCalculateAffinity(t *testing.T) {
 				},
 			},
 			expected: TopologyHint{
-				NUMANodeAffinity: NewTestSocketMask(0),
+				NUMANodeAffinity: NewTestBitMask(0),
 				Preferred:        false,
 			},
 		},
@@ -835,11 +835,11 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
@@ -857,15 +857,15 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
@@ -883,7 +883,7 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
@@ -901,11 +901,11 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
@@ -923,15 +923,15 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0),
+								NUMANodeAffinity: NewTestBitMask(0),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(1),
+								NUMANodeAffinity: NewTestBitMask(1),
 								Preferred:        true,
 							},
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
@@ -949,7 +949,7 @@ func TestAdmit(t *testing.T) {
 					map[string][]TopologyHint{
 						"resource": {
 							{
-								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								NUMANodeAffinity: NewTestBitMask(0, 1),
 								Preferred:        false,
 							},
 						},
