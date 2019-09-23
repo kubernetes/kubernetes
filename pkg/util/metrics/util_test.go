@@ -37,7 +37,7 @@ func TestRegisterMetricAndTrackRateLimiterUsage(t *testing.T) {
 		{
 			ownerName:   "owner_name",
 			rateLimiter: flowcontrol.NewTokenBucketRateLimiter(1, 1),
-			err:         "already registered",
+			err:         "",
 		},
 		{
 			ownerName:   "invalid-owner-name",
@@ -53,6 +53,10 @@ func TestRegisterMetricAndTrackRateLimiterUsage(t *testing.T) {
 				t.Errorf("[%d] unexpected error: %v", i, e)
 			} else if !strings.Contains(e.Error(), tc.err) {
 				t.Errorf("[%d] expected an error containing %q: %v", i, tc.err, e)
+			}
+		} else {
+			if tc.err != "" {
+				t.Errorf("[%d] expected an error containing %q, but return nil", i, tc.err)
 			}
 		}
 	}
