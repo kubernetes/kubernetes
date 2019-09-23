@@ -178,6 +178,7 @@ The main themes of this release are:
 
 - The etcd and KMS plugin health checks are not exposed in the new `livez` and `readyz` endpoints. This will be fixed in 1.16.1.
 - Systems running `iptables` 1.8.0 or newer should start it in legacy mode. Please note that this affects all versions of Kubernetes and not only v1.16.0. For more detailed information about the issue and how to apply a workaround, please refer to the official documentation
+- Generating informers for packages in directories containing dots in their name is broken. This will be fixed in v1.16.1. ([#82860](https://github.com/kubernetes/kubernetes/issues/82860))
 
 ## Urgent Upgrade Notes
 
