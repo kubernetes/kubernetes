@@ -109,7 +109,7 @@ func (p *PodSyncResult) AddSyncResult(result ...*SyncResult) {
 func (p *PodSyncResult) AddPodSyncResult(result PodSyncResult) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	p.AddSyncResult(result.SyncResults...)
+	p.SyncResults = append(p.SyncResults, result.SyncResults...)
 	p.SyncError = result.SyncError
 }
 
