@@ -4724,7 +4724,6 @@ type Secret struct {
 }
 
 // MaxSecretSize represents the max secret size.
-// 1 * 1024 * 1024 = 1 MB
 const MaxSecretSize = 1 * 1024 * 1024
 
 // SecretType defines the types of secrets
