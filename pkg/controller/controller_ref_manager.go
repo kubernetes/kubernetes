@@ -64,7 +64,7 @@ func (m *BaseControllerRefManager) CanAdopt() error {
 //
 // No reconciliation will be attempted if the controller is being deleted.
 func (m *BaseControllerRefManager) ClaimObject(obj metav1.Object, match func(metav1.Object) bool, adopt, release func(metav1.Object) error) (bool, error) {
-	controllerRef := metav1.GetControllerOf(obj)
+	controllerRef := metav1.GetControllerOfNoCopy(obj)
 	if controllerRef != nil {
 		if controllerRef.UID != m.Controller.GetUID() {
 			// Owned by someone else. Ignore.
