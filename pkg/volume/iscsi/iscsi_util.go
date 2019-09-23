@@ -18,6 +18,7 @@ package iscsi
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -86,7 +87,7 @@ func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
 	if !b.chapDiscovery {
 		return nil
 	}
-	out, err := b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "update", "-n", "discovery.sendtargets.auth.authmethod", "-v", "CHAP")
+	out, err := execWithLog(b, "iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "update", "-n", "discovery.sendtargets.auth.authmethod", "-v", "CHAP")
 	if err != nil {
 		return fmt.Errorf("iscsi: failed to update discoverydb with CHAP, output: %v", string(out))
 	}
@@ -94,6 +95,7 @@ func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
 	for _, k := range chapSt {
 		v := b.secret[k]
 		if len(v) > 0 {
+			// explicitly not using execWithLog so secrets are not logged
 			out, err := b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "update", "-n", k, "-v", v)
 			if err != nil {
 				return fmt.Errorf("iscsi: failed to update discoverydb key %q error: %v", k, string(out))
@@ -108,7 +110,7 @@ func updateISCSINode(b iscsiDiskMounter, tp string) error {
 		return nil
 	}
 
-	out, err := b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", "node.session.auth.authmethod", "-v", "CHAP")
+	out, err := execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", "node.session.auth.authmethod", "-v", "CHAP")
 	if err != nil {
 		return fmt.Errorf("iscsi: failed to update node with CHAP, output: %v", string(out))
 	}
@@ -116,6 +118,7 @@ func updateISCSINode(b iscsiDiskMounter, tp string) error {
 	for _, k := range chapSess {
 		v := b.secret[k]
 		if len(v) > 0 {
+			// explicitly not using execWithLog so secrets are not logged
 			out, err := b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", k, "-v", v)
 			if err != nil {
 				return fmt.Errorf("iscsi: failed to update node session key %q error: %v", k, string(out))
@@ -279,7 +282,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 	var iscsiTransport string
 	var lastErr error
 
-	out, err := b.exec.Run("iscsiadm", "-m", "iface", "-I", b.InitIface, "-o", "show")
+	out, err := execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.InitIface, "-o", "show")
 	if err != nil {
 		klog.Errorf("iscsi: could not read iface %s error: %s", b.InitIface, string(out))
 		return "", err
@@ -323,7 +326,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 				klog.V(4).Infof("Could not get SCSI host number for portal %s, will attempt login", tp)
 
 				// build discoverydb and discover iscsi target
-				b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "new")
+				execWithLog(b, "iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "new")
 
 				// update discoverydb with CHAP secret
 				err = updateISCSIDiscoverydb(b, tp)
@@ -332,10 +335,10 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 					continue
 				}
 
-				out, err = b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "--discover")
+				out, err = execWithLog(b, "iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "--discover")
 				if err != nil {
 					// delete discoverydb record
-					b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "delete")
+					execWithLog(b, "iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "delete")
 					lastErr = fmt.Errorf("iscsi: failed to sendtargets to portal %s output: %s, err %v", tp, string(out), err)
 					continue
 				}
@@ -348,16 +351,16 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 				}
 
 				// login to iscsi target
-				out, err = b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "--login")
+				out, err = execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "--login")
 				if err != nil {
 					// delete the node record from database
-					b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-I", b.Iface, "-T", b.Iqn, "-o", "delete")
+					execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-I", b.Iface, "-T", b.Iqn, "-o", "delete")
 					lastErr = fmt.Errorf("iscsi: failed to attach disk: Error: %s (%v)", string(out), err)
 					continue
 				}
 
 				// in case of node failure/restart, explicitly set to manual login so it doesn't hang on boot
-				out, err = b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "-n", "node.startup", "-v", "manual")
+				out, err = execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-o", "update", "-n", "node.startup", "-v", "manual")
 				if err != nil {
 					// don't fail if we can't set startup mode, but log warning so there is a clue
 					klog.Warningf("Warning: Failed to set iSCSI login mode to manual. Error: %v", err)
@@ -400,9 +403,10 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 			}
 
 			if exist := waitForPathToExist(&devicePath, deviceDiscoveryTimeout, iscsiTransport); !exist {
-				klog.Errorf("Could not attach disk: Timeout after %ds", deviceDiscoveryTimeout)
+				msg := fmt.Sprintf("Timed out waiting for device at path %s after %ds", devicePath, deviceDiscoveryTimeout)
+				klog.Error(msg)
 				// update last error
-				lastErr = fmt.Errorf("Could not attach disk: Timeout after %ds", deviceDiscoveryTimeout)
+				lastErr = errors.New(msg)
 				continue
 			} else {
 				devicePaths[tp] = devicePath
@@ -412,7 +416,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 		if len(devicePaths) == 0 {
 			// No path attached, report error and stop trying. kubelet will try again in a short while
 			// delete cloned iface
-			b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "delete")
+			execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "delete")
 			klog.Errorf("iscsi: failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
 			return "", fmt.Errorf("failed to get any path for iscsi disk, last err seen:\n%v", lastErr)
 		}
@@ -856,7 +860,7 @@ func cloneIface(b iscsiDiskMounter) error {
 		return fmt.Errorf("iscsi: cannot clone iface with same name: %s", b.InitIface)
 	}
 	// get pre-configured iface records
-	out, err := b.exec.Run("iscsiadm", "-m", "iface", "-I", b.InitIface, "-o", "show")
+	out, err := execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.InitIface, "-o", "show")
 	if err != nil {
 		lastErr = fmt.Errorf("iscsi: failed to show iface records: %s (%v)", string(out), err)
 		return lastErr
@@ -870,7 +874,7 @@ func cloneIface(b iscsiDiskMounter) error {
 	// update initiatorname
 	params["iface.initiatorname"] = b.InitiatorName
 	// create new iface
-	out, err = b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "new")
+	out, err = execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "new")
 	if err != nil {
 		exit, ok := err.(utilexec.ExitError)
 		if ok && exit.ExitStatus() == iscsiadmErrorSessExists {
@@ -882,9 +886,9 @@ func cloneIface(b iscsiDiskMounter) error {
 	}
 	// update new iface records
 	for key, val := range params {
-		_, err = b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "update", "-n", key, "-v", val)
+		_, err = execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "update", "-n", key, "-v", val)
 		if err != nil {
-			b.exec.Run("iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "delete")
+			execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "delete")
 			lastErr = fmt.Errorf("iscsi: failed to update iface records: %s (%v). iface(%s) will be used", string(out), err, b.InitIface)
 			break
 		}
@@ -957,4 +961,15 @@ func ignoreExitCodes(err error, ignoredExitCodes ...int) error {
 		}
 	}
 	return err
+}
+
+func execWithLog(b iscsiDiskMounter, cmd string, args ...string) ([]byte, error) {
+	start := time.Now()
+	out, err := b.exec.Run(cmd, args...)
+	if klog.V(5) {
+		d := time.Now().Sub(start)
+		klog.V(5).Infof("Executed %s %v in %v, err: %v", cmd, args, d, err)
+		klog.V(5).Infof("Output: %s", string(out))
+	}
+	return out, err
 }

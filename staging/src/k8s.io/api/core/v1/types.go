@@ -4670,6 +4670,10 @@ const (
 	NamespaceDeletionContentFailure NamespaceConditionType = "NamespaceDeletionContentFailure"
 	// NamespaceDeletionGVParsingFailure contains information about namespace deleter errors parsing GV for legacy types.
 	NamespaceDeletionGVParsingFailure NamespaceConditionType = "NamespaceDeletionGroupVersionParsingFailure"
+	// NamespaceContentRemaining contains information about resources remaining in a namespace.
+	NamespaceContentRemaining NamespaceConditionType = "NamespaceContentRemaining"
+	// NamespaceFinalizersRemaining contains information about which finalizers are on resources remaining in a namespace.
+	NamespaceFinalizersRemaining NamespaceConditionType = "NamespaceFinalizersRemaining"
 )
 
 // NamespaceCondition contains details about state of namespace.

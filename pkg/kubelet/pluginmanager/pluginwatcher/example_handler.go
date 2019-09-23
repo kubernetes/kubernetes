@@ -50,7 +50,6 @@ const (
 	exampleEventValidate   examplePluginEvent = 0
 	exampleEventRegister   examplePluginEvent = 1
 	exampleEventDeRegister examplePluginEvent = 2
-	exampleEventError      examplePluginEvent = 3
 )
 
 // NewExampleHandler provide a example handler

@@ -276,7 +276,7 @@ var AllowAllCapabilities v1.Capability = "*"
 // FSType gives strong typing to different file systems that are used by volumes.
 type FSType string
 
-var (
+const (
 	AzureFile             FSType = "azureFile"
 	Flocker               FSType = "flocker"
 	FlexVolume            FSType = "flexVolume"

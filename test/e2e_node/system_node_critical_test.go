@@ -28,7 +28,6 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -79,7 +78,7 @@ var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptiv
 						return nil
 					}
 					msg := fmt.Sprintf("NodeCondition: %s not encountered yet", v1.NodeDiskPressure)
-					e2elog.Logf(msg)
+					framework.Logf(msg)
 					return fmt.Errorf(msg)
 				}, time.Minute*2, time.Second*4).Should(gomega.BeNil())
 
@@ -87,9 +86,9 @@ var _ = framework.KubeDescribe("SystemNodeCriticalPod [Slow] [Serial] [Disruptiv
 				gomega.Consistently(func() error {
 					err := checkMirrorPodRunning(f.ClientSet, mirrorPodName, ns)
 					if err == nil {
-						e2elog.Logf("mirror pod %q is running", mirrorPodName)
+						framework.Logf("mirror pod %q is running", mirrorPodName)
 					} else {
-						e2elog.Logf(err.Error())
+						framework.Logf(err.Error())
 					}
 					return err
 				}, time.Minute*8, time.Second*4).ShouldNot(gomega.HaveOccurred())

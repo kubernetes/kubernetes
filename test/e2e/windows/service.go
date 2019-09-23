@@ -22,7 +22,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 
@@ -46,7 +45,7 @@ var _ = SIGDescribe("Services", func() {
 		jig := e2eservice.NewTestJig(cs, serviceName)
 		nodeIP, err := e2enode.PickIP(jig.Client)
 		if err != nil {
-			e2elog.Logf("Unexpected error occurred: %v", err)
+			framework.Logf("Unexpected error occurred: %v", err)
 		}
 		// TODO: write a wrapper for ExpectNoErrorWithOffset()
 		framework.ExpectNoErrorWithOffset(0, err)

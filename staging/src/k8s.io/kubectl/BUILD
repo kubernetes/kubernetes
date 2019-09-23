@@ -25,7 +25,6 @@ filegroup(
         "//staging/src/k8s.io/kubectl/pkg/scheme:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/util:all-srcs",
         "//staging/src/k8s.io/kubectl/pkg/validation:all-srcs",
-        "//staging/src/k8s.io/kubectl/pkg/version:all-srcs",
         "//staging/src/k8s.io/kubectl/test/data:all-srcs",
     ],
     tags = ["automanaged"],

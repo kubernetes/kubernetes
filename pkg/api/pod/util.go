@@ -681,7 +681,7 @@ func sysctlsInUse(podSpec *api.PodSpec) bool {
 	return false
 }
 
-// emptyDirSizeLimitInUse returns true if any pod's EptyDir volumes use SizeLimit.
+// emptyDirSizeLimitInUse returns true if any pod's EmptyDir volumes use SizeLimit.
 func emptyDirSizeLimitInUse(podSpec *api.PodSpec) bool {
 	if podSpec == nil {
 		return false

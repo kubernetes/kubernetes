@@ -364,8 +364,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 				}
 				_, precompute := NewServiceAffinityPredicate(lister, st.FakeServiceLister(test.services), FakeNodeListInfo(nodeList), nil)
 				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", precompute)
-				pmf := PredicateMetadataFactory{lister}
-				meta := pmf.GetMetadata(test.pendingPod, nodeInfoMap)
+				meta := GetPredicateMetadata(test.pendingPod, nodeInfoMap)
 				return meta.(*predicateMetadata), nodeInfoMap
 			}
 
@@ -1683,7 +1682,7 @@ func BenchmarkTestGetTPMapMatchingSpreadConstraints(b *testing.B) {
 	}
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
-			existingPods, allNodes, _ := st.MakeNodesAndPods(tt.pod, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
+			existingPods, allNodes, _ := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(existingPods, allNodes)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {

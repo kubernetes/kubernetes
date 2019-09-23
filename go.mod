@@ -61,7 +61,7 @@ require (
 	github.com/go-openapi/strfmt v0.19.0
 	github.com/go-openapi/validate v0.19.2
 	github.com/go-ozzo/ozzo-validation v3.5.0+incompatible // indirect
-	github.com/godbus/dbus v4.1.0+incompatible
+	github.com/godbus/dbus v4.1.0+incompatible // indirect
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock v1.2.0
@@ -74,10 +74,8 @@ require (
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.7.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.1
-	github.com/heketi/heketi v9.0.0+incompatible
-	github.com/heketi/rest v0.0.0-20180404230133-aa6a65207413 // indirect
+	github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
 	github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6 // indirect
-	github.com/heketi/utils v0.0.0-20170317161834-435bc5bdfa64 // indirect
 	github.com/json-iterator/go v1.1.7
 	github.com/karrick/godirwalk v1.7.5 // indirect
 	github.com/libopenstorage/openstorage v1.0.0
@@ -88,7 +86,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.5 // indirect
 	github.com/mesos/mesos-go v0.0.9 // indirect
 	github.com/miekg/dns v1.1.4
-	github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2 // indirect
+	github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989 // indirect
 	github.com/mistifyio/go-zfs v2.1.1+incompatible // indirect
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb // indirect
 	github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c // indirect
@@ -304,10 +302,8 @@ replace (
 	github.com/hashicorp/go-syslog => github.com/hashicorp/go-syslog v1.0.0
 	github.com/hashicorp/golang-lru => github.com/hashicorp/golang-lru v0.5.1
 	github.com/hashicorp/hcl => github.com/hashicorp/hcl v1.0.0
-	github.com/heketi/heketi => github.com/heketi/heketi v9.0.0+incompatible
-	github.com/heketi/rest => github.com/heketi/rest v0.0.0-20180404230133-aa6a65207413
+	github.com/heketi/heketi => github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
 	github.com/heketi/tests => github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6
-	github.com/heketi/utils => github.com/heketi/utils v0.0.0-20170317161834-435bc5bdfa64
 	github.com/hpcloud/tail => github.com/hpcloud/tail v1.0.0
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 	github.com/inconshreveable/mousetrap => github.com/inconshreveable/mousetrap v1.0.0
@@ -344,7 +340,7 @@ replace (
 	github.com/mesos/mesos-go => github.com/mesos/mesos-go v0.0.9
 	github.com/mholt/certmagic => github.com/mholt/certmagic v0.6.2-0.20190624175158-6a42ef9fe8c2
 	github.com/miekg/dns => github.com/miekg/dns v1.1.4
-	github.com/mindprince/gonvml => github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2
+	github.com/mindprince/gonvml => github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989
 	github.com/mistifyio/go-zfs => github.com/mistifyio/go-zfs v2.1.1+incompatible
 	github.com/mitchellh/go-homedir => github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/go-wordwrap => github.com/mitchellh/go-wordwrap v1.0.0

@@ -32,7 +32,6 @@ import (
 	"github.com/pkg/errors"
 
 	errorsutil "k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/klog"
 )
 
 var _ Validator = &KernelValidator{}
@@ -255,12 +254,7 @@ func (k *KernelValidator) parseKernelConfig(r io.Reader) (map[string]kConfigOpti
 			continue
 		}
 		fields := strings.Split(line, "=")
-		if len(fields) != 2 {
-			klog.Errorf("Unexpected fields number in config %q", line)
-			continue
-		}
-		config[fields[0]] = kConfigOption(fields[1])
+		config[fields[0]] = kConfigOption(fields[1][0])
 	}
 	return config, nil
-
 }

@@ -36,9 +36,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
+	schedulerplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/test/integration/framework"
 
@@ -47,15 +46,13 @@ import (
 )
 
 type testContext struct {
-	closeFn             framework.CloseFunc
-	httpServer          *httptest.Server
-	ns                  *v1.Namespace
-	clientSet           *clientset.Clientset
-	informerFactory     informers.SharedInformerFactory
-	schedulerConfigArgs *factory.ConfigFactoryArgs
-	schedulerConfig     *factory.Config
-	scheduler           *scheduler.Scheduler
-	stopCh              chan struct{}
+	closeFn         framework.CloseFunc
+	httpServer      *httptest.Server
+	ns              *v1.Namespace
+	clientSet       *clientset.Clientset
+	informerFactory informers.SharedInformerFactory
+	scheduler       *scheduler.Scheduler
+	stopCh          chan struct{}
 }
 
 // initTestMaster initializes a test environment and creates a master with default
@@ -109,83 +106,68 @@ func initTestSchedulerWithOptions(
 	context.informerFactory = informers.NewSharedInformerFactory(context.clientSet, resyncPeriod)
 
 	podInformer := context.informerFactory.Core().V1().Pods()
-
-	context.schedulerConfigArgs = createConfiguratorArgsWithPodInformer(
-		context.clientSet, podInformer, context.informerFactory, schedulerframework.NewRegistry(), nil,
-		[]schedulerconfig.PluginConfig{}, context.stopCh)
-	configFactory := factory.NewConfigFactory(context.schedulerConfigArgs)
-
-	var err error
-	context.schedulerConfig, err = configFactory.Create()
-	if err != nil {
-		t.Fatalf("Couldn't create scheduler config: %v", err)
-	}
-
-	// set DisablePreemption option
-	context.schedulerConfig.DisablePreemption = false
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: context.clientSet.EventsV1beta1().Events(""),
 	})
-	context.schedulerConfig.Recorder = eventBroadcaster.NewRecorder(
+	recorder := eventBroadcaster.NewRecorder(
 		legacyscheme.Scheme,
 		v1.DefaultSchedulerName,
 	)
 
-	context.scheduler = scheduler.NewFromConfig(context.schedulerConfig)
+	var err error
+	context.scheduler, err = createSchedulerWithPodInformer(
+		context.clientSet, podInformer, context.informerFactory, schedulerplugins.NewDefaultRegistry(), nil,
+		[]schedulerconfig.PluginConfig{}, recorder, context.stopCh)
 
-	scheduler.AddAllEventHandlers(context.scheduler,
-		v1.DefaultSchedulerName,
-		context.informerFactory.Core().V1().Nodes(),
-		podInformer,
-		context.informerFactory.Core().V1().PersistentVolumes(),
-		context.informerFactory.Core().V1().PersistentVolumeClaims(),
-		context.informerFactory.Core().V1().Services(),
-		context.informerFactory.Storage().V1().StorageClasses(),
-		context.informerFactory.Storage().V1beta1().CSINodes(),
-	)
+	if err != nil {
+		t.Fatalf("Couldn't create scheduler: %v", err)
+	}
 
 	stopCh := make(chan struct{})
 	eventBroadcaster.StartRecordingToSink(stopCh)
 
-	context.informerFactory.Start(context.schedulerConfig.StopEverything)
-	context.informerFactory.WaitForCacheSync(context.schedulerConfig.StopEverything)
+	context.informerFactory.Start(context.scheduler.StopEverything)
+	context.informerFactory.WaitForCacheSync(context.scheduler.StopEverything)
 
 	context.scheduler.Run()
 	return context
 }
 
-// createConfiguratorWithPodInformer creates a configurator for scheduler.
-func createConfiguratorArgsWithPodInformer(
+// createSchedulerWithPodInformer creates a new scheduler.
+func createSchedulerWithPodInformer(
 	clientSet clientset.Interface,
 	podInformer coreinformers.PodInformer,
 	informerFactory informers.SharedInformerFactory,
 	pluginRegistry schedulerframework.Registry,
 	plugins *schedulerconfig.Plugins,
 	pluginConfig []schedulerconfig.PluginConfig,
+	recorder events.EventRecorder,
 	stopCh <-chan struct{},
-) *factory.ConfigFactoryArgs {
-	return &factory.ConfigFactoryArgs{
-		Client:                         clientSet,
-		NodeInformer:                   informerFactory.Core().V1().Nodes(),
-		PodInformer:                    podInformer,
-		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
-		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
-		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
-		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
-		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
-		ServiceInformer:                informerFactory.Core().V1().Services(),
-		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
-		Registry:                       pluginRegistry,
-		Plugins:                        plugins,
-		PluginConfig:                   pluginConfig,
-		HardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-		DisablePreemption:              false,
-		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-		BindTimeoutSeconds:             600,
-		StopCh:                         stopCh,
-	}
+) (*scheduler.Scheduler, error) {
+	defaultProviderName := schedulerconfig.SchedulerDefaultProviderName
+
+	return scheduler.New(
+		clientSet,
+		informerFactory.Core().V1().Nodes(),
+		podInformer,
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().ReplicationControllers(),
+		informerFactory.Apps().V1().ReplicaSets(),
+		informerFactory.Apps().V1().StatefulSets(),
+		informerFactory.Core().V1().Services(),
+		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		informerFactory.Storage().V1().StorageClasses(),
+		informerFactory.Storage().V1beta1().CSINodes(),
+		recorder,
+		schedulerconfig.SchedulerAlgorithmSource{
+			Provider: &defaultProviderName,
+		},
+		stopCh,
+		pluginRegistry,
+		plugins,
+		pluginConfig,
+	)
 }
 
 // cleanupTest deletes the scheduler and the test namespace. It should be called

@@ -25,11 +25,10 @@ import (
 	"sync"
 	"time"
 
-	godbus "github.com/godbus/dbus"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilversion "k8s.io/apimachinery/pkg/util/version"
+	utilwait "k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog"
-	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilexec "k8s.io/utils/exec"
 	utiltrace "k8s.io/utils/trace"
 )
@@ -65,10 +64,17 @@ type Interface interface {
 	Restore(table Table, data []byte, flush FlushFlag, counters RestoreCountersFlag) error
 	// RestoreAll is the same as Restore except that no table is specified.
 	RestoreAll(data []byte, flush FlushFlag, counters RestoreCountersFlag) error
-	// AddReloadFunc adds a function to call on iptables reload
-	AddReloadFunc(reloadFunc func())
-	// Destroy cleans up resources used by the Interface
-	Destroy()
+	// Monitor detects when the given iptables tables have been flushed by an external
+	// tool (e.g. a firewall reload) by creating canary chains and polling to see if
+	// they have been deleted. (Specifically, it polls tables[0] every interval until
+	// the canary has been deleted from there, then waits a short additional time for
+	// the canaries to be deleted from the remaining tables as well. You can optimize
+	// the polling by listing a relatively empty table in tables[0]). When a flush is
+	// detected, this calls the reloadFunc so the caller can reload their own iptables
+	// rules. If it is unable to create the canary chains (either initially or after
+	// a reload) it will log an error and stop monitoring.
+	// (This function should be called from a goroutine.)
+	Monitor(canary Chain, tables []Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{})
 	// HasRandomFully reveals whether `-j MASQUERADE` takes the
 	// `--random-fully` option.  This is helpful to work around a
 	// Linux kernel bug that sometimes causes multiple flows to get
@@ -143,22 +149,17 @@ const LockfilePath16x = "/run/xtables.lock"
 type runner struct {
 	mu              sync.Mutex
 	exec            utilexec.Interface
-	dbus            utildbus.Interface
 	protocol        Protocol
 	hasCheck        bool
-	hasListener     bool
 	hasRandomFully  bool
 	waitFlag        []string
 	restoreWaitFlag []string
 	lockfilePath    string
-
-	reloadFuncs []func()
-	signal      chan *godbus.Signal
 }
 
 // newInternal returns a new Interface which will exec iptables, and allows the
 // caller to change the iptables-restore lockfile path
-func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol, lockfilePath string) Interface {
+func newInternal(exec utilexec.Interface, protocol Protocol, lockfilePath string) Interface {
 	version, err := getIPTablesVersion(exec, protocol)
 	if err != nil {
 		klog.Warningf("Error checking iptables version, assuming version at least %s: %v", MinCheckVersion, err)
@@ -171,57 +172,19 @@ func newInternal(exec utilexec.Interface, dbus utildbus.Interface, protocol Prot
 
 	runner := &runner{
 		exec:            exec,
-		dbus:            dbus,
 		protocol:        protocol,
 		hasCheck:        version.AtLeast(MinCheckVersion),
-		hasListener:     false,
 		hasRandomFully:  version.AtLeast(RandomFullyMinVersion),
 		waitFlag:        getIPTablesWaitFlag(version),
-		restoreWaitFlag: getIPTablesRestoreWaitFlag(version),
+		restoreWaitFlag: getIPTablesRestoreWaitFlag(version, exec, protocol),
 		lockfilePath:    lockfilePath,
 	}
 	return runner
 }
 
 // New returns a new Interface which will exec iptables.
-func New(exec utilexec.Interface, dbus utildbus.Interface, protocol Protocol) Interface {
-	return newInternal(exec, dbus, protocol, "")
-}
-
-// Destroy is part of Interface.
-func (runner *runner) Destroy() {
-	if runner.signal != nil {
-		runner.signal <- nil
-	}
-}
-
-const (
-	firewalldName      = "org.fedoraproject.FirewallD1"
-	firewalldPath      = "/org/fedoraproject/FirewallD1"
-	firewalldInterface = "org.fedoraproject.FirewallD1"
-)
-
-// Connects to D-Bus and listens for FirewallD start/restart. (On non-FirewallD-using
-// systems, this is effectively a no-op; we listen for the signals, but they will never be
-// emitted, so reload() will never be called.)
-func (runner *runner) connectToFirewallD() {
-	bus, err := runner.dbus.SystemBus()
-	if err != nil {
-		klog.V(1).Infof("Could not connect to D-Bus system bus: %s", err)
-		return
-	}
-	runner.hasListener = true
-
-	rule := fmt.Sprintf("type='signal',sender='%s',path='%s',interface='%s',member='Reloaded'", firewalldName, firewalldPath, firewalldInterface)
-	bus.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule)
-
-	rule = fmt.Sprintf("type='signal',interface='org.freedesktop.DBus',member='NameOwnerChanged',path='/org/freedesktop/DBus',sender='org.freedesktop.DBus',arg0='%s'", firewalldName)
-	bus.BusObject().Call("org.freedesktop.DBus.AddMatch", 0, rule)
-
-	runner.signal = make(chan *godbus.Signal, 10)
-	bus.Signal(runner.signal)
-
-	go runner.dbusSignalHandler(bus)
+func New(exec utilexec.Interface, protocol Protocol) Interface {
+	return newInternal(exec, protocol, "")
 }
 
 // EnsureChain is part of Interface.
@@ -529,12 +492,78 @@ func (runner *runner) checkRuleUsingCheck(args []string) (bool, error) {
 	return false, fmt.Errorf("error checking rule: %v: %s", err, out)
 }
 
+const (
+	// Max time we wait for an iptables flush to complete after we notice it has started
+	iptablesFlushTimeout = 5 * time.Second
+	// How often we poll while waiting for an iptables flush to complete
+	iptablesFlushPollTime = 100 * time.Millisecond
+)
+
+// Monitor is part of Interface
+func (runner *runner) Monitor(canary Chain, tables []Table, reloadFunc func(), interval time.Duration, stopCh <-chan struct{}) {
+	for {
+		for _, table := range tables {
+			if _, err := runner.EnsureChain(table, canary); err != nil {
+				klog.Warningf("Could not set up iptables canary %s/%s: %v", string(table), string(canary), err)
+				return
+			}
+		}
+
+		// Poll until stopCh is closed or iptables is flushed
+		err := utilwait.PollUntil(interval, func() (bool, error) {
+			if runner.chainExists(tables[0], canary) {
+				return false, nil
+			}
+			klog.V(2).Infof("iptables canary %s/%s deleted", string(tables[0]), string(canary))
+
+			// Wait for the other canaries to be deleted too before returning
+			// so we don't start reloading too soon.
+			err := utilwait.PollImmediate(iptablesFlushPollTime, iptablesFlushTimeout, func() (bool, error) {
+				for i := 1; i < len(tables); i++ {
+					if runner.chainExists(tables[i], canary) {
+						return false, nil
+					}
+				}
+				return true, nil
+			})
+			if err != nil {
+				klog.Warning("Inconsistent iptables state detected.")
+			}
+			return true, nil
+		}, stopCh)
+
+		if err != nil {
+			// stopCh was closed
+			for _, table := range tables {
+				_ = runner.DeleteChain(table, canary)
+			}
+			return
+		}
+
+		klog.V(2).Infof("Reloading after iptables flush")
+		reloadFunc()
+	}
+}
+
+// chainExists is used internally by Monitor; none of the public Interface methods can be
+// used to distinguish "chain exists" from "chain does not exist" with no side effects
+func (runner *runner) chainExists(table Table, chain Chain) bool {
+	fullArgs := makeFullArgs(table, chain)
+
+	runner.mu.Lock()
+	defer runner.mu.Unlock()
+
+	_, err := runner.run(opListChain, fullArgs)
+	return err == nil
+}
+
 type operation string
 
 const (
 	opCreateChain operation = "-N"
 	opFlushChain  operation = "-F"
 	opDeleteChain operation = "-X"
+	opListChain   operation = "-L"
 	opAppendRule  operation = "-A"
 	opCheckRule   operation = "-C"
 	opDeleteRule  operation = "-D"
@@ -578,68 +607,46 @@ func getIPTablesWaitFlag(version *utilversion.Version) []string {
 }
 
 // Checks if iptables-restore has a "wait" flag
-func getIPTablesRestoreWaitFlag(version *utilversion.Version) []string {
+func getIPTablesRestoreWaitFlag(version *utilversion.Version, exec utilexec.Interface, protocol Protocol) []string {
 	if version.AtLeast(WaitRestoreMinVersion) {
 		return []string{WaitString, WaitSecondsValue}
-	} else {
+	}
+
+	// Older versions may have backported features; if iptables-restore supports
+	// --version, assume it also supports --wait
+	vstring, err := getIPTablesRestoreVersionString(exec, protocol)
+	if err != nil || vstring == "" {
+		klog.V(3).Infof("couldn't get iptables-restore version; assuming it doesn't support --wait")
 		return nil
 	}
+	if _, err := utilversion.ParseGeneric(vstring); err != nil {
+		klog.V(3).Infof("couldn't parse iptables-restore version; assuming it doesn't support --wait")
+		return nil
+	}
+	return []string{WaitString}
 }
 
-// goroutine to listen for D-Bus signals
-func (runner *runner) dbusSignalHandler(bus utildbus.Connection) {
-	firewalld := bus.Object(firewalldName, firewalldPath)
+// getIPTablesRestoreVersionString runs "iptables-restore --version" to get the version string
+// in the form "X.X.X"
+func getIPTablesRestoreVersionString(exec utilexec.Interface, protocol Protocol) (string, error) {
+	// this doesn't access mutable state so we don't need to use the interface / runner
 
-	for s := range runner.signal {
-		if s == nil {
-			// Unregister
-			bus.Signal(runner.signal)
-			return
-		}
-
-		switch s.Name {
-		case "org.freedesktop.DBus.NameOwnerChanged":
-			name := s.Body[0].(string)
-			newOwner := s.Body[2].(string)
-
-			if name != firewalldName || len(newOwner) == 0 {
-				continue
-			}
-
-			// FirewallD startup (specifically the part where it deletes
-			// all existing iptables rules) may not yet be complete when
-			// we get this signal, so make a dummy request to it to
-			// synchronize.
-			firewalld.Call(firewalldInterface+".getDefaultZone", 0)
-
-			runner.reload()
-		case firewalldInterface + ".Reloaded":
-			runner.reload()
-		}
+	// iptables-restore hasn't always had --version, and worse complains
+	// about unrecognized commands but doesn't exit when it gets them.
+	// Work around that by setting stdin to nothing so it exits immediately.
+	iptablesRestoreCmd := iptablesRestoreCommand(protocol)
+	cmd := exec.Command(iptablesRestoreCmd, "--version")
+	cmd.SetStdin(bytes.NewReader([]byte{}))
+	bytes, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", err
 	}
-}
-
-// AddReloadFunc is part of Interface
-func (runner *runner) AddReloadFunc(reloadFunc func()) {
-	runner.mu.Lock()
-	defer runner.mu.Unlock()
-
-	// We only need to listen to firewalld if there are Reload functions, so lazy
-	// initialize the listener.
-	if !runner.hasListener {
-		runner.connectToFirewallD()
+	versionMatcher := regexp.MustCompile("v([0-9]+(\\.[0-9]+)+)")
+	match := versionMatcher.FindStringSubmatch(string(bytes))
+	if match == nil {
+		return "", fmt.Errorf("no iptables version found in string: %s", bytes)
 	}
-
-	runner.reloadFuncs = append(runner.reloadFuncs, reloadFunc)
-}
-
-// runs all reload funcs to re-sync iptables rules
-func (runner *runner) reload() {
-	klog.V(1).Infof("reloading iptables rules")
-
-	for _, f := range runner.reloadFuncs {
-		f()
-	}
+	return match[1], nil
 }
 
 func (runner *runner) HasRandomFully() bool {

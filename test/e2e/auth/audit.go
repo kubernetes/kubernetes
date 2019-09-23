@@ -37,7 +37,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -740,9 +739,9 @@ func expectEvents(f *framework.Framework, expectedEvents []utils.AuditEvent) {
 		defer stream.Close()
 		missingReport, err := utils.CheckAuditLines(stream, expectedEvents, auditv1.SchemeGroupVersion)
 		if err != nil {
-			e2elog.Logf("Failed to observe audit events: %v", err)
+			framework.Logf("Failed to observe audit events: %v", err)
 		} else if len(missingReport.MissingEvents) > 0 {
-			e2elog.Logf(missingReport.String())
+			framework.Logf(missingReport.String())
 		}
 		return len(missingReport.MissingEvents) == 0, nil
 	})

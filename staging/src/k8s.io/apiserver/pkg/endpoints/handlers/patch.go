@@ -26,7 +26,7 @@ import (
 	jsonpatch "github.com/evanphx/json-patch"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
-	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
+	metainternalversionscheme "k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -110,7 +110,7 @@ func PatchResource(r rest.Patcher, scope *RequestScope, admit admission.Interfac
 		}
 
 		options := &metav1.PatchOptions{}
-		if err := metainternalversion.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
+		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), scope.MetaGroupVersion, options); err != nil {
 			err = errors.NewBadRequest(err.Error())
 			scope.err(err, w, req)
 			return
@@ -296,7 +296,7 @@ type patchMechanism interface {
 type jsonPatcher struct {
 	*patcher
 
-	fieldManager *fieldmanager.FieldManager
+	fieldManager fieldmanager.FieldManager
 }
 
 func (p *jsonPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
@@ -364,7 +364,7 @@ type smpPatcher struct {
 
 	// Schema
 	schemaReferenceObj runtime.Object
-	fieldManager       *fieldmanager.FieldManager
+	fieldManager       fieldmanager.FieldManager
 }
 
 func (p *smpPatcher) applyPatchToCurrentObject(currentObject runtime.Object) (runtime.Object, error) {
@@ -404,7 +404,7 @@ type applyPatcher struct {
 	options      *metav1.PatchOptions
 	creater      runtime.ObjectCreater
 	kind         schema.GroupVersionKind
-	fieldManager *fieldmanager.FieldManager
+	fieldManager fieldmanager.FieldManager
 }
 
 func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Object, error) {

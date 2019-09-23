@@ -29,7 +29,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 func newTokenSecret(tokenID, tokenSecret string) *v1.Secret {
@@ -84,7 +83,7 @@ func WaitforSignedClusterInfoByBootStrapToken(c clientset.Interface, tokenID str
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
 		cfgMap, err := c.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
-			e2elog.Failf("Failed to get cluster-info configMap: %v", err)
+			framework.Failf("Failed to get cluster-info configMap: %v", err)
 			return false, err
 		}
 		_, ok := cfgMap.Data[bootstrapapi.JWSSignatureKeyPrefix+tokenID]
@@ -100,7 +99,7 @@ func WaitForSignedClusterInfoGetUpdatedByBootstrapToken(c clientset.Interface, t
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
 		cfgMap, err := c.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
-			e2elog.Failf("Failed to get cluster-info configMap: %v", err)
+			framework.Failf("Failed to get cluster-info configMap: %v", err)
 			return false, err
 		}
 		updated, ok := cfgMap.Data[bootstrapapi.JWSSignatureKeyPrefix+tokenID]
@@ -116,7 +115,7 @@ func WaitForSignedClusterInfoByBootstrapTokenToDisappear(c clientset.Interface, 
 	return wait.Poll(framework.Poll, 2*time.Minute, func() (bool, error) {
 		cfgMap, err := c.CoreV1().ConfigMaps(metav1.NamespacePublic).Get(bootstrapapi.ConfigMapClusterInfo, metav1.GetOptions{})
 		if err != nil {
-			e2elog.Failf("Failed to get cluster-info configMap: %v", err)
+			framework.Failf("Failed to get cluster-info configMap: %v", err)
 			return false, err
 		}
 		_, ok := cfgMap.Data[bootstrapapi.JWSSignatureKeyPrefix+tokenID]

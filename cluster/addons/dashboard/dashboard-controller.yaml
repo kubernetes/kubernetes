@@ -62,6 +62,8 @@ spec:
       - name: tmp-volume
         emptyDir: {}
       serviceAccountName: kubernetes-dashboard
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"

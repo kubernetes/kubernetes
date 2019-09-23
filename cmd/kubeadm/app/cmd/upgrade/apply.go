@@ -73,12 +73,13 @@ func NewCmdApply(apf *applyPlanFlags) *cobra.Command {
 		Use:                   "apply [version]",
 		DisableFlagsInUseLine: true,
 		Short:                 "Upgrade your Kubernetes cluster to the specified version",
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			userVersion, err := getK8sVersionFromUserInput(flags.applyPlanFlags, args, true)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = runApply(flags, userVersion)
-			kubeadmutil.CheckErr(err)
+			return runApply(flags, userVersion)
 		},
 	}
 

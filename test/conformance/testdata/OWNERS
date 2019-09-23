@@ -13,6 +13,7 @@ reviewers:
 approvers:
   - bgrant0607
   - smarterclayton
+  - johnbelamaric
 labels:
   - area/conformance
   - sig/architecture

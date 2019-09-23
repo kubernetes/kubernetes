@@ -171,7 +171,7 @@ func (*fakeFramework) RunPreFilterPlugins(pc *framework.PluginContext, pod *v1.P
 	return nil
 }
 
-func (*fakeFramework) RunFilterPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (*fakeFramework) RunFilterPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	return nil
 }
 

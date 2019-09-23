@@ -28,7 +28,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
 	"github.com/coreos/etcd/pkg/transport"
 	"github.com/pkg/errors"
 
@@ -179,11 +178,8 @@ func NewFakeStaticPodPathManager(moveFileFunc func(string, string) error) (Stati
 		return nil, err
 	}
 
-	kustomizeDir := ""
-
 	return &fakeStaticPodPathManager{
 		kubernetesDir:     kubernetesDir,
-		kustomizeDir:      kustomizeDir,
 		realManifestDir:   realManifestDir,
 		tempManifestDir:   upgradedManifestDir,
 		backupManifestDir: backupManifestDir,
@@ -241,17 +237,12 @@ func (spm *fakeStaticPodPathManager) CleanupDirs() error {
 
 type fakeTLSEtcdClient struct{ TLS bool }
 
-func (c fakeTLSEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
-
 func (c fakeTLSEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 
-func (c fakeTLSEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
-	return map[string]*clientv3.StatusResponse{
-		"https://1.2.3.4:2379": {
-			Version: "3.1.12",
-		}}, nil
+func (c fakeTLSEtcdClient) CheckClusterHealth() error {
+	return nil
 }
 
 func (c fakeTLSEtcdClient) GetClusterVersions() (map[string]string, error) {
@@ -280,13 +271,11 @@ func (c fakeTLSEtcdClient) RemoveMember(id uint64) ([]etcdutil.Member, error) {
 
 type fakePodManifestEtcdClient struct{ ManifestDir, CertificatesDir string }
 
-func (c fakePodManifestEtcdClient) ClusterAvailable() (bool, error) { return true, nil }
-
 func (c fakePodManifestEtcdClient) WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error) {
 	return true, nil
 }
 
-func (c fakePodManifestEtcdClient) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
+func (c fakePodManifestEtcdClient) CheckClusterHealth() error {
 	// Make sure the certificates generated from the upgrade are readable from disk
 	tlsInfo := transport.TLSInfo{
 		CertFile:      filepath.Join(c.CertificatesDir, constants.EtcdCACertName),
@@ -294,13 +283,7 @@ func (c fakePodManifestEtcdClient) GetClusterStatus() (map[string]*clientv3.Stat
 		TrustedCAFile: filepath.Join(c.CertificatesDir, constants.EtcdHealthcheckClientKeyName),
 	}
 	_, err := tlsInfo.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]*clientv3.StatusResponse{
-		"https://1.2.3.4:2379": {Version: "3.1.12"},
-	}, nil
+	return err
 }
 
 func (c fakePodManifestEtcdClient) GetClusterVersions() (map[string]string, error) {

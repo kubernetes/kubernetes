@@ -30,7 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -41,8 +41,8 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		err       error
 		pvc       *v1.PersistentVolumeClaim
 		pv        *v1.PersistentVolume
-		pvConfig  framework.PersistentVolumeConfig
-		pvcConfig framework.PersistentVolumeClaimConfig
+		pvConfig  e2epv.PersistentVolumeConfig
+		pvcConfig e2epv.PersistentVolumeClaimConfig
 		volLabel  labels.Set
 		selector  *metav1.LabelSelector
 	)
@@ -54,10 +54,10 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		framework.ExpectNoError(framework.WaitForAllNodesSchedulable(client, framework.TestContext.NodeSchedulableTimeout))
 
 		// Enforce binding only within test space via selector labels
-		volLabel = labels.Set{framework.VolumeSelectorKey: nameSpace}
+		volLabel = labels.Set{e2epv.VolumeSelectorKey: nameSpace}
 		selector = metav1.SetAsLabelSelector(volLabel)
 
-		pvConfig = framework.PersistentVolumeConfig{
+		pvConfig = e2epv.PersistentVolumeConfig{
 			NamePrefix: "hostpath-",
 			Labels:     volLabel,
 			PVSource: v1.PersistentVolumeSource{
@@ -68,20 +68,20 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		}
 
 		emptyStorageClass := ""
-		pvcConfig = framework.PersistentVolumeClaimConfig{
+		pvcConfig = e2epv.PersistentVolumeClaimConfig{
 			Selector:         selector,
 			StorageClassName: &emptyStorageClass,
 		}
 
 		ginkgo.By("Creating a PV")
 		// make the pv definitions
-		pv = framework.MakePersistentVolume(pvConfig)
+		pv = e2epv.MakePersistentVolume(pvConfig)
 		// create the PV
 		pv, err = client.CoreV1().PersistentVolumes().Create(pv)
 		framework.ExpectNoError(err, "Error creating PV")
 
 		ginkgo.By("Waiting for PV to enter phase Available")
-		framework.ExpectNoError(framework.WaitForPersistentVolumePhase(v1.VolumeAvailable, client, pv.Name, 1*time.Second, 30*time.Second))
+		framework.ExpectNoError(e2epv.WaitForPersistentVolumePhase(v1.VolumeAvailable, client, pv.Name, 1*time.Second, 30*time.Second))
 
 		ginkgo.By("Checking that PV Protection finalizer is set")
 		pv, err = client.CoreV1().PersistentVolumes().Get(pv.Name, metav1.GetOptions{})
@@ -90,9 +90,9 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 	})
 
 	ginkgo.AfterEach(func() {
-		e2elog.Logf("AfterEach: Cleaning up test resources.")
-		if errs := framework.PVPVCCleanup(client, nameSpace, pv, pvc); len(errs) > 0 {
-			e2elog.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
+		framework.Logf("AfterEach: Cleaning up test resources.")
+		if errs := e2epv.PVPVCCleanup(client, nameSpace, pv, pvc); len(errs) > 0 {
+			framework.Failf("AfterEach: Failed to delete PVC and/or PV. Errors: %v", utilerrors.NewAggregate(errs))
 		}
 	})
 
@@ -100,17 +100,17 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		ginkgo.By("Deleting the PV")
 		err = client.CoreV1().PersistentVolumes().Delete(pv.Name, metav1.NewDeleteOptions(0))
 		framework.ExpectNoError(err, "Error deleting PV")
-		framework.WaitForPersistentVolumeDeleted(client, pv.Name, framework.Poll, framework.PVDeletingTimeout)
+		framework.WaitForPersistentVolumeDeleted(client, pv.Name, framework.Poll, e2epv.PVDeletingTimeout)
 	})
 
 	ginkgo.It("Verify that PV bound to a PVC is not removed immediately", func() {
 		ginkgo.By("Creating a PVC")
-		pvc = framework.MakePersistentVolumeClaim(pvcConfig, nameSpace)
+		pvc = e2epv.MakePersistentVolumeClaim(pvcConfig, nameSpace)
 		pvc, err = client.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err, "Error creating PVC")
 
 		ginkgo.By("Waiting for PVC to become Bound")
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, framework.ClaimBindingTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, nameSpace, pvc.Name, framework.Poll, e2epv.ClaimBindingTimeout)
 		framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 
 		ginkgo.By("Deleting the PV, however, the PV must not be removed from the system as it's bound to a PVC")
@@ -127,6 +127,6 @@ var _ = utils.SIGDescribe("PV Protection", func() {
 		framework.ExpectNoError(err, "Error deleting PVC")
 
 		ginkgo.By("Checking that the PV is automatically removed from the system because it's no longer bound to a PVC")
-		framework.WaitForPersistentVolumeDeleted(client, pv.Name, framework.Poll, framework.PVDeletingTimeout)
+		framework.WaitForPersistentVolumeDeleted(client, pv.Name, framework.Poll, e2epv.PVDeletingTimeout)
 	})
 })

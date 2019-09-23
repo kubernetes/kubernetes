@@ -23,6 +23,7 @@ package operationexecutor
 import (
 	"context"
 	"fmt"
+	"k8s.io/klog"
 	"net"
 	"time"
 
@@ -112,11 +113,14 @@ func (og *operationGenerator) GenerateRegisterPluginFunc(
 		}
 		// We add the plugin to the actual state of world cache before calling a plugin consumer's Register handle
 		// so that if we receive a delete event during Register Plugin, we can process it as a DeRegister call.
-		actualStateOfWorldUpdater.AddPlugin(cache.PluginInfo{
+		err = actualStateOfWorldUpdater.AddPlugin(cache.PluginInfo{
 			SocketPath:           socketPath,
 			FoundInDeprecatedDir: foundInDeprecatedDir,
 			Timestamp:            timestamp,
 		})
+		if err != nil {
+			klog.Errorf("RegisterPlugin error -- failed to add plugin at socket %s, err: %v", socketPath, err)
+		}
 		if err := handler.RegisterPlugin(infoResp.Name, infoResp.Endpoint, infoResp.SupportedVersions); err != nil {
 			return og.notifyPlugin(client, false, fmt.Sprintf("RegisterPlugin error -- plugin registration failed with err: %v", err))
 		}

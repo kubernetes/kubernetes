@@ -26,6 +26,7 @@ import (
 	"github.com/pborman/uuid"
 	"k8s.io/klog"
 
+	authnv1 "k8s.io/api/authentication/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -68,9 +69,9 @@ func NewEventFromRequest(req *http.Request, level auditinternal.Level, attribs a
 
 	if user := attribs.GetUser(); user != nil {
 		ev.User.Username = user.GetName()
-		ev.User.Extra = map[string]auditinternal.ExtraValue{}
+		ev.User.Extra = map[string]authnv1.ExtraValue{}
 		for k, v := range user.GetExtra() {
-			ev.User.Extra[k] = auditinternal.ExtraValue(v)
+			ev.User.Extra[k] = authnv1.ExtraValue(v)
 		}
 		ev.User.Groups = user.GetGroups()
 		ev.User.UID = user.GetUID()
@@ -95,14 +96,14 @@ func LogImpersonatedUser(ae *auditinternal.Event, user user.Info) {
 	if ae == nil || ae.Level.Less(auditinternal.LevelMetadata) {
 		return
 	}
-	ae.ImpersonatedUser = &auditinternal.UserInfo{
+	ae.ImpersonatedUser = &authnv1.UserInfo{
 		Username: user.GetName(),
 	}
 	ae.ImpersonatedUser.Groups = user.GetGroups()
 	ae.ImpersonatedUser.UID = user.GetUID()
-	ae.ImpersonatedUser.Extra = map[string]auditinternal.ExtraValue{}
+	ae.ImpersonatedUser.Extra = map[string]authnv1.ExtraValue{}
 	for k, v := range user.GetExtra() {
-		ae.ImpersonatedUser.Extra[k] = auditinternal.ExtraValue(v)
+		ae.ImpersonatedUser.Extra[k] = authnv1.ExtraValue(v)
 	}
 }
 

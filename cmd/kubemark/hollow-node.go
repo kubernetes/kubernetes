@@ -37,8 +37,10 @@ import (
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
+	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client metric registration
+	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
+	"k8s.io/component-base/version/verflag"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	_ "k8s.io/kubernetes/pkg/client/metrics/prometheus" // for client metric registration
 	"k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
@@ -48,8 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
 	fakesysctl "k8s.io/kubernetes/pkg/util/sysctl/testing"
-	_ "k8s.io/kubernetes/pkg/version/prometheus" // for version metric registration
-	"k8s.io/kubernetes/pkg/version/verflag"
 	fakeexec "k8s.io/utils/exec/testing"
 )
 

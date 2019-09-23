@@ -30,7 +30,6 @@ import (
 	"k8s.io/klog"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
-	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
 
@@ -47,12 +46,13 @@ func NewCmdPlan(apf *applyPlanFlags) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "plan [version] [flags]",
 		Short: "Check which versions are available to upgrade to and validate whether your current cluster is upgradeable. To skip the internet check, pass in the optional [version] parameter",
-		Run: func(_ *cobra.Command, args []string) {
+		RunE: func(_ *cobra.Command, args []string) error {
 			userVersion, err := getK8sVersionFromUserInput(flags.applyPlanFlags, args, false)
-			kubeadmutil.CheckErr(err)
+			if err != nil {
+				return err
+			}
 
-			err = runPlan(flags, userVersion)
-			kubeadmutil.CheckErr(err)
+			return runPlan(flags, userVersion)
 		},
 	}
 

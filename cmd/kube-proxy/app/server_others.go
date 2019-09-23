@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	"k8s.io/kubernetes/pkg/proxy/userspace"
 	"k8s.io/kubernetes/pkg/util/configz"
-	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilipset "k8s.io/kubernetes/pkg/util/ipset"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilipvs "k8s.io/kubernetes/pkg/util/ipvs"
@@ -84,13 +83,11 @@ func newProxyServer(
 	var ipvsInterface utilipvs.Interface
 	var kernelHandler ipvs.KernelHandler
 	var ipsetInterface utilipset.Interface
-	var dbus utildbus.Interface
 
 	// Create a iptables utils.
 	execer := exec.New()
 
-	dbus = utildbus.New()
-	iptInterface = utiliptables.New(execer, dbus, protocol)
+	iptInterface = utiliptables.New(execer, protocol)
 	kernelHandler = ipvs.NewLinuxKernelHandler()
 	ipsetInterface = utilipset.New(execer)
 	canUseIPVS, _ := ipvs.CanUseIPVSProxier(kernelHandler, ipsetInterface)
@@ -181,10 +178,10 @@ func newProxyServer(
 			var ipt [2]utiliptables.Interface
 			if iptInterface.IsIpv6() {
 				ipt[1] = iptInterface
-				ipt[0] = utiliptables.New(execer, dbus, utiliptables.ProtocolIpv4)
+				ipt[0] = utiliptables.New(execer, utiliptables.ProtocolIpv4)
 			} else {
 				ipt[0] = iptInterface
-				ipt[1] = utiliptables.New(execer, dbus, utiliptables.ProtocolIpv6)
+				ipt[1] = utiliptables.New(execer, utiliptables.ProtocolIpv6)
 			}
 
 			proxier, err = ipvs.NewDualStackProxier(
@@ -252,8 +249,6 @@ func newProxyServer(
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
 		}
 	}
-
-	iptInterface.AddReloadFunc(proxier.Sync)
 
 	return &ProxyServer{
 		Client:                 client,
@@ -326,7 +321,7 @@ func getProxyMode(proxyMode string, khandle ipvs.KernelHandler, ipsetver ipvs.IP
 	case proxyModeIPVS:
 		return tryIPVSProxy(khandle, ipsetver, kcompat)
 	}
-	klog.Warningf("Flag proxy-mode=%q unknown, assuming iptables proxy", proxyMode)
+	klog.Warningf("Unknown proxy mode %q, assuming iptables proxy", proxyMode)
 	return tryIPTablesProxy(kcompat)
 }
 

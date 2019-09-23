@@ -111,25 +111,26 @@ type RunObjectConfig interface {
 }
 
 type RCConfig struct {
-	Affinity          *v1.Affinity
-	Client            clientset.Interface
-	ScalesGetter      scaleclient.ScalesGetter
-	Image             string
-	Command           []string
-	Name              string
-	Namespace         string
-	PollInterval      time.Duration
-	Timeout           time.Duration
-	PodStatusFile     *os.File
-	Replicas          int
-	CpuRequest        int64 // millicores
-	CpuLimit          int64 // millicores
-	MemRequest        int64 // bytes
-	MemLimit          int64 // bytes
-	GpuLimit          int64 // count
-	ReadinessProbe    *v1.Probe
-	DNSPolicy         *v1.DNSPolicy
-	PriorityClassName string
+	Affinity                      *v1.Affinity
+	Client                        clientset.Interface
+	ScalesGetter                  scaleclient.ScalesGetter
+	Image                         string
+	Command                       []string
+	Name                          string
+	Namespace                     string
+	PollInterval                  time.Duration
+	Timeout                       time.Duration
+	PodStatusFile                 *os.File
+	Replicas                      int
+	CpuRequest                    int64 // millicores
+	CpuLimit                      int64 // millicores
+	MemRequest                    int64 // bytes
+	MemLimit                      int64 // bytes
+	GpuLimit                      int64 // count
+	ReadinessProbe                *v1.Probe
+	DNSPolicy                     *v1.DNSPolicy
+	PriorityClassName             string
+	TerminationGracePeriodSeconds *int64
 
 	// Env vars, set the same for every pod.
 	Env map[string]string
@@ -321,7 +322,8 @@ func (config *DeploymentConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
-					Affinity: config.Affinity,
+					Affinity:                      config.Affinity,
+					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(nil),
 					Containers: []v1.Container{
 						{
 							Name:    config.Name,
@@ -401,7 +403,8 @@ func (config *ReplicaSetConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
-					Affinity: config.Affinity,
+					Affinity:                      config.Affinity,
+					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(nil),
 					Containers: []v1.Container{
 						{
 							Name:    config.Name,
@@ -473,7 +476,8 @@ func (config *JobConfig) create() error {
 					Annotations: config.Annotations,
 				},
 				Spec: v1.PodSpec{
-					Affinity: config.Affinity,
+					Affinity:                      config.Affinity,
+					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(nil),
 					Containers: []v1.Container{
 						{
 							Name:    config.Name,
@@ -598,7 +602,7 @@ func (config *RCConfig) create() error {
 					DNSPolicy:                     *config.DNSPolicy,
 					NodeSelector:                  config.NodeSelector,
 					Tolerations:                   config.Tolerations,
-					TerminationGracePeriodSeconds: &one,
+					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(&one),
 					PriorityClassName:             config.PriorityClassName,
 				},
 			},
@@ -1535,6 +1539,13 @@ func attachConfigMaps(template *v1.PodTemplateSpec, configMapNames []string) {
 
 	template.Spec.Volumes = volumes
 	template.Spec.Containers[0].VolumeMounts = mounts
+}
+
+func (config *RCConfig) getTerminationGracePeriodSeconds(defaultGrace *int64) *int64 {
+	if config.TerminationGracePeriodSeconds == nil || *config.TerminationGracePeriodSeconds < 0 {
+		return defaultGrace
+	}
+	return config.TerminationGracePeriodSeconds
 }
 
 func attachServiceAccountTokenProjection(template *v1.PodTemplateSpec, name string) {

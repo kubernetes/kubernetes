@@ -62,7 +62,7 @@ type HorizontalPodAutoscalerSpec struct {
 // MetricSourceType indicates the type of metric.
 type MetricSourceType string
 
-var (
+const (
 	// ObjectMetricSourceType is a metric describing a kubernetes object
 	// (for example, hits-per-second on an Ingress object).
 	ObjectMetricSourceType MetricSourceType = "Object"
@@ -231,7 +231,7 @@ type HorizontalPodAutoscalerStatus struct {
 // a HorizontalPodAutoscaler.
 type HorizontalPodAutoscalerConditionType string
 
-var (
+const (
 	// ScalingActive indicates that the HPA controller is able to scale if necessary:
 	// it's correctly configured, can fetch the desired metrics, and isn't disabled.
 	ScalingActive HorizontalPodAutoscalerConditionType = "ScalingActive"

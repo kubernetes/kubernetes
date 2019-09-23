@@ -298,6 +298,7 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 	allVolumesAdded := true
 	mounts, devices := util.GetPodVolumeNames(pod)
 
+	expandInUsePV := utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes)
 	// Process volume spec for each volume defined in pod
 	for _, podVolume := range pod.Spec.Volumes {
 		if !mounts.Has(podVolume.Name) && !devices.Has(podVolume.Name) {
@@ -331,15 +332,15 @@ func (dswp *desiredStateOfWorldPopulator) processPodVolumes(
 				err)
 			dswp.desiredStateOfWorld.AddErrorToPod(uniquePodName, err.Error())
 			allVolumesAdded = false
+		} else {
+			klog.V(4).Infof(
+				"Added volume %q (volSpec=%q) for pod %q to desired state.",
+				podVolume.Name,
+				volumeSpec.Name(),
+				uniquePodName)
 		}
 
-		klog.V(4).Infof(
-			"Added volume %q (volSpec=%q) for pod %q to desired state.",
-			podVolume.Name,
-			volumeSpec.Name(),
-			uniquePodName)
-
-		if utilfeature.DefaultFeatureGate.Enabled(features.ExpandInUsePersistentVolumes) {
+		if expandInUsePV {
 			dswp.checkVolumeFSResize(pod, podVolume, pvc, volumeSpec,
 				uniquePodName, mountedVolumesForPod, processedVolumesForFSResize)
 		}

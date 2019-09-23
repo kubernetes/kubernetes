@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 )
@@ -248,7 +249,7 @@ func (p *Provider) CreatePVSource(zone, diskName string) (*v1.PersistentVolumeSo
 
 // DeletePVSource deletes a persistent volume source
 func (p *Provider) DeletePVSource(pvSource *v1.PersistentVolumeSource) error {
-	return framework.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
+	return e2epv.DeletePDWithRetry(pvSource.GCEPersistentDisk.PDName)
 }
 
 // CleanupServiceResources cleans up GCE Service Type=LoadBalancer resources with

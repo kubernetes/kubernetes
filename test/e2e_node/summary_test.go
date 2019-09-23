@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
 	systemdutil "github.com/coreos/go-systemd/util"
@@ -46,7 +45,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
-				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2elog.Logf)
+				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 			}
 			ginkgo.By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()
@@ -90,8 +89,8 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"StartTime": recent(maxStartAge),
 					"CPU": ptrMatchAllFields(gstruct.Fields{
 						"Time":                 recent(maxStatsAge),
-						"UsageNanoCores":       bounded(10000, 2E9),
-						"UsageCoreNanoSeconds": bounded(10000000, 1E15),
+						"UsageNanoCores":       bounded(10000, 2e9),
+						"UsageCoreNanoSeconds": bounded(10000000, 1e15),
 					}),
 					"Memory": ptrMatchAllFields(gstruct.Fields{
 						"Time": recent(maxStatsAge),
@@ -101,7 +100,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"WorkingSetBytes": bounded(1*volume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*volume.Mb, memoryLimit),
-						"PageFaults":      bounded(1000, 1E9),
+						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
 					"Accelerators":       gomega.BeEmpty(),
@@ -152,7 +151,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 			}
 			// The Kubelet only manages the 'misc' system container if the host is not running systemd.
 			if !systemdutil.IsRunningSystemd() {
-				e2elog.Logf("Host not running systemd; expecting 'misc' system container.")
+				framework.Logf("Host not running systemd; expecting 'misc' system container.")
 				miscContExpectations := sysContExpectations().(*gstruct.FieldsMatcher)
 				// Misc processes are system-dependent, so relax the memory constraints.
 				miscContExpectations.Fields["Memory"] = ptrMatchAllFields(gstruct.Fields{
@@ -162,7 +161,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"UsageBytes":      bounded(100*volume.Kb, memoryLimit),
 					"WorkingSetBytes": bounded(100*volume.Kb, memoryLimit),
 					"RSSBytes":        bounded(100*volume.Kb, memoryLimit),
-					"PageFaults":      bounded(1000, 1E9),
+					"PageFaults":      bounded(1000, 1e9),
 					"MajorPageFaults": bounded(0, 100000),
 				})
 				systemContainers["misc"] = miscContExpectations
@@ -177,8 +176,8 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"StartTime": recent(maxStartAge),
 						"CPU": ptrMatchAllFields(gstruct.Fields{
 							"Time":                 recent(maxStatsAge),
-							"UsageNanoCores":       bounded(10000, 1E9),
-							"UsageCoreNanoSeconds": bounded(10000000, 1E11),
+							"UsageNanoCores":       bounded(10000, 1e9),
+							"UsageCoreNanoSeconds": bounded(10000000, 1e11),
 						}),
 						"Memory": ptrMatchAllFields(gstruct.Fields{
 							"Time":            recent(maxStatsAge),
@@ -195,18 +194,18 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(volume.Kb, 10*volume.Mb),
-							"InodesFree":     bounded(1E4, 1E8),
-							"Inodes":         bounded(1E4, 1E8),
-							"InodesUsed":     bounded(0, 1E8),
+							"InodesFree":     bounded(1e4, 1e8),
+							"Inodes":         bounded(1e4, 1e8),
+							"InodesUsed":     bounded(0, 1e8),
 						}),
 						"Logs": ptrMatchAllFields(gstruct.Fields{
 							"Time":           recent(maxStatsAge),
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(volume.Kb, 10*volume.Mb),
-							"InodesFree":     bounded(1E4, 1E8),
-							"Inodes":         bounded(1E4, 1E8),
-							"InodesUsed":     bounded(0, 1E8),
+							"InodesFree":     bounded(1e4, 1e8),
+							"Inodes":         bounded(1e4, 1e8),
+							"InodesUsed":     bounded(0, 1e8),
 						}),
 						"UserDefinedMetrics": gomega.BeEmpty(),
 					}),
@@ -224,8 +223,8 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 				}),
 				"CPU": ptrMatchAllFields(gstruct.Fields{
 					"Time":                 recent(maxStatsAge),
-					"UsageNanoCores":       bounded(10000, 1E9),
-					"UsageCoreNanoSeconds": bounded(10000000, 1E11),
+					"UsageNanoCores":       bounded(10000, 1e9),
+					"UsageCoreNanoSeconds": bounded(10000000, 1e11),
 				}),
 				"Memory": ptrMatchAllFields(gstruct.Fields{
 					"Time":            recent(maxStatsAge),
@@ -245,9 +244,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"AvailableBytes": fsCapacityBounds,
 							"CapacityBytes":  fsCapacityBounds,
 							"UsedBytes":      bounded(volume.Kb, 1*volume.Mb),
-							"InodesFree":     bounded(1E4, 1E8),
-							"Inodes":         bounded(1E4, 1E8),
-							"InodesUsed":     bounded(0, 1E8),
+							"InodesFree":     bounded(1e4, 1e8),
+							"Inodes":         bounded(1e4, 1e8),
+							"InodesUsed":     bounded(0, 1e8),
 						}),
 					}),
 				}),
@@ -256,9 +255,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"AvailableBytes": fsCapacityBounds,
 					"CapacityBytes":  fsCapacityBounds,
 					"UsedBytes":      bounded(volume.Kb, 21*volume.Mb),
-					"InodesFree":     bounded(1E4, 1E8),
-					"Inodes":         bounded(1E4, 1E8),
-					"InodesUsed":     bounded(0, 1E8),
+					"InodesFree":     bounded(1e4, 1e8),
+					"Inodes":         bounded(1e4, 1e8),
+					"InodesUsed":     bounded(0, 1e8),
 				}),
 			})
 
@@ -269,8 +268,8 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 					"SystemContainers": gstruct.MatchAllElements(summaryObjectID, systemContainers),
 					"CPU": ptrMatchAllFields(gstruct.Fields{
 						"Time":                 recent(maxStatsAge),
-						"UsageNanoCores":       bounded(100E3, 2E9),
-						"UsageCoreNanoSeconds": bounded(1E9, 1E15),
+						"UsageNanoCores":       bounded(100e3, 2e9),
+						"UsageCoreNanoSeconds": bounded(1e9, 1e15),
 					}),
 					"Memory": ptrMatchAllFields(gstruct.Fields{
 						"Time":            recent(maxStatsAge),
@@ -279,7 +278,7 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"WorkingSetBytes": bounded(10*volume.Mb, memoryLimit),
 						// this now returns /sys/fs/cgroup/memory.stat total_rss
 						"RSSBytes":        bounded(1*volume.Kb, memoryLimit),
-						"PageFaults":      bounded(1000, 1E9),
+						"PageFaults":      bounded(1000, 1e9),
 						"MajorPageFaults": bounded(0, 100000),
 					}),
 					// TODO(#28407): Handle non-eth0 network interface names.
@@ -300,9 +299,9 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 						"CapacityBytes":  fsCapacityBounds,
 						// we assume we are not running tests on machines < 10tb of disk
 						"UsedBytes":  bounded(volume.Kb, 10*volume.Tb),
-						"InodesFree": bounded(1E4, 1E8),
-						"Inodes":     bounded(1E4, 1E8),
-						"InodesUsed": bounded(0, 1E8),
+						"InodesFree": bounded(1e4, 1e8),
+						"Inodes":     bounded(1e4, 1e8),
+						"InodesUsed": bounded(0, 1e8),
 					}),
 					"Runtime": ptrMatchAllFields(gstruct.Fields{
 						"ImageFs": ptrMatchAllFields(gstruct.Fields{
@@ -311,15 +310,15 @@ var _ = framework.KubeDescribe("Summary API [NodeConformance]", func() {
 							"CapacityBytes":  fsCapacityBounds,
 							// we assume we are not running tests on machines < 10tb of disk
 							"UsedBytes":  bounded(volume.Kb, 10*volume.Tb),
-							"InodesFree": bounded(1E4, 1E8),
-							"Inodes":     bounded(1E4, 1E8),
-							"InodesUsed": bounded(0, 1E8),
+							"InodesFree": bounded(1e4, 1e8),
+							"Inodes":     bounded(1e4, 1e8),
+							"InodesUsed": bounded(0, 1e8),
 						}),
 					}),
 					"Rlimit": ptrMatchAllFields(gstruct.Fields{
 						"Time":                  recent(maxStatsAge),
-						"MaxPID":                bounded(0, 1E8),
-						"NumOfRunningProcesses": bounded(0, 1E8),
+						"MaxPID":                bounded(0, 1e8),
+						"NumOfRunningProcesses": bounded(0, 1e8),
 					}),
 				}),
 				// Ignore extra pods since the tests run in parallel.
@@ -391,7 +390,7 @@ func summaryObjectID(element interface{}) string {
 	case kubeletstatsv1alpha1.UserDefinedMetric:
 		return el.Name
 	default:
-		e2elog.Failf("Unknown type: %T", el)
+		framework.Failf("Unknown type: %T", el)
 		return "???"
 	}
 }
@@ -419,7 +418,7 @@ func recent(d time.Duration) types.GomegaMatcher {
 func recordSystemCgroupProcesses() {
 	cfg, err := getCurrentKubeletConfig()
 	if err != nil {
-		e2elog.Logf("Failed to read kubelet config: %v", err)
+		framework.Logf("Failed to read kubelet config: %v", err)
 		return
 	}
 	cgroups := map[string]string{
@@ -428,24 +427,24 @@ func recordSystemCgroupProcesses() {
 	}
 	for name, cgroup := range cgroups {
 		if cgroup == "" {
-			e2elog.Logf("Skipping unconfigured cgroup %s", name)
+			framework.Logf("Skipping unconfigured cgroup %s", name)
 			continue
 		}
 
 		pids, err := ioutil.ReadFile(fmt.Sprintf("/sys/fs/cgroup/cpu/%s/cgroup.procs", cgroup))
 		if err != nil {
-			e2elog.Logf("Failed to read processes in cgroup %s: %v", name, err)
+			framework.Logf("Failed to read processes in cgroup %s: %v", name, err)
 			continue
 		}
 
-		e2elog.Logf("Processes in %s cgroup (%s):", name, cgroup)
+		framework.Logf("Processes in %s cgroup (%s):", name, cgroup)
 		for _, pid := range strings.Fields(string(pids)) {
 			path := fmt.Sprintf("/proc/%s/cmdline", pid)
 			cmd, err := ioutil.ReadFile(path)
 			if err != nil {
-				e2elog.Logf("  ginkgo.Failed to read %s: %v", path, err)
+				framework.Logf("  ginkgo.Failed to read %s: %v", path, err)
 			} else {
-				e2elog.Logf("  %s", cmd)
+				framework.Logf("  %s", cmd)
 			}
 		}
 	}

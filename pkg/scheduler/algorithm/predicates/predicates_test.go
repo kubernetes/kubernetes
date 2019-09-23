@@ -93,12 +93,6 @@ func newResourceOverheadPod(pod *v1.Pod, overhead v1.ResourceList) *v1.Pod {
 	pod.Spec.Overhead = overhead
 	return pod
 }
-
-func GetPredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata {
-	pm := PredicateMetadataFactory{st.FakePodLister{p}}
-	return pm.GetMetadata(p, nodeInfo)
-}
-
 func TestPodFitsResources(t *testing.T) {
 
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.PodOverhead, true)()

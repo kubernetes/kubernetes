@@ -33,6 +33,7 @@ import (
 	"k8s.io/apiserver/pkg/endpoints"
 	"k8s.io/apiserver/pkg/features"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	utilpointer "k8s.io/utils/pointer"
 )
 
 func TestNewBuilder(t *testing.T) {
@@ -554,50 +555,72 @@ func schemaDiff(a, b *spec.Schema) string {
 
 func TestBuildSwagger(t *testing.T) {
 	tests := []struct {
-		name         string
-		schema       string
-		wantedSchema string
-		opts         Options
+		name                  string
+		schema                string
+		preserveUnknownFields *bool
+		wantedSchema          string
+		opts                  Options
 	}{
 		{
 			"nil",
 			"",
+			nil,
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"with properties",
 			`{"type":"object","properties":{"spec":{"type":"object"},"status":{"type":"object"}}}`,
+			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"spec":{"type":"object"},"status":{"type":"object"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"with invalid-typed properties",
 			`{"type":"object","properties":{"spec":{"type":"bug"},"status":{"type":"object"}}}`,
+			nil,
+			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: true, StripDefaults: true},
+		},
+		{
+			"with non-structural schema",
+			`{"type":"object","properties":{"foo":{"type":"array"}}}`,
+			nil,
+			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
+			Options{V2: true, StripDefaults: true},
+		},
+		{
+			"with spec.preseveUnknownFields=true",
+			`{"type":"object","properties":{"foo":{"type":"string"}}}`,
+			utilpointer.BoolPtr(true),
 			`{"type":"object","x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"with stripped defaults",
 			`{"type":"object","properties":{"foo":{"type":"string","default":"bar"}}}`,
+			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"with stripped defaults",
 			`{"type":"object","properties":{"foo":{"type":"string","default":"bar"}}}`,
+			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"v2",
 			`{"type":"object","properties":{"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}}}`,
+			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string"}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: true, StripDefaults: true},
 		},
 		{
 			"v3",
 			`{"type":"object","properties":{"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}}}`,
+			nil,
 			`{"type":"object","properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"metadata":{"$ref":"#/definitions/io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta"},"foo":{"type":"string","oneOf":[{"pattern":"a"},{"pattern":"b"}]}},"x-kubernetes-group-version-kind":[{"group":"bar.k8s.io","kind":"Foo","version":"v1"}]}`,
 			Options{V2: false, StripDefaults: true},
 		},
@@ -628,8 +651,9 @@ func TestBuildSwagger(t *testing.T) {
 						Kind:     "Foo",
 						ListKind: "FooList",
 					},
-					Scope:      apiextensions.NamespaceScoped,
-					Validation: validation,
+					Scope:                 apiextensions.NamespaceScoped,
+					Validation:            validation,
+					PreserveUnknownFields: tt.preserveUnknownFields,
 				},
 			}, "v1", tt.opts)
 			if err != nil {

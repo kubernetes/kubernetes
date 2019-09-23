@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -101,8 +101,8 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		dc := f.DynamicClient
 
 		// Now do the more expensive test initialization.
-		config, testCleanup := driver.PrepareTest(f)
-		defer testCleanup()
+		config, driverCleanup := driver.PrepareTest(f)
+		defer driverCleanup()
 
 		vsc := sDriver.GetSnapshotClass(config)
 		class := dDriver.GetDynamicProvisionStorageClass(config, "")
@@ -110,18 +110,18 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 			framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", driver.GetDriverInfo().Name)
 		}
 
-		pvc := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+		pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        dDriver.GetClaimSize(),
 			StorageClassName: &(class.Name),
 		}, config.Framework.Namespace.Name)
 
-		e2elog.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
+		framework.Logf("In creating storage class object and pvc object for driver - sc: %v, pvc: %v", class, pvc)
 
 		ginkgo.By("creating a StorageClass " + class.Name)
 		class, err := cs.StorageV1().StorageClasses().Create(class)
 		framework.ExpectNoError(err)
 		defer func() {
-			e2elog.Logf("deleting storage class %s", class.Name)
+			framework.Logf("deleting storage class %s", class.Name)
 			framework.ExpectNoError(cs.StorageV1().StorageClasses().Delete(class.Name, nil))
 		}()
 
@@ -129,14 +129,14 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		pvc, err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Create(pvc)
 		framework.ExpectNoError(err)
 		defer func() {
-			e2elog.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
+			framework.Logf("deleting claim %q/%q", pvc.Namespace, pvc.Name)
 			// typically this claim has already been deleted
 			err = cs.CoreV1().PersistentVolumeClaims(pvc.Namespace).Delete(pvc.Name, nil)
 			if err != nil && !apierrs.IsNotFound(err) {
-				e2elog.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
+				framework.Failf("Error deleting claim %q. Error: %v", pvc.Name, err)
 			}
 		}()
-		err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
+		err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, cs, pvc.Namespace, pvc.Name, framework.Poll, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("checking the claim")
@@ -152,7 +152,7 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		vsc, err = dc.Resource(snapshotClassGVR).Create(vsc, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
-			e2elog.Logf("deleting SnapshotClass %s", vsc.GetName())
+			framework.Logf("deleting SnapshotClass %s", vsc.GetName())
 			framework.ExpectNoError(dc.Resource(snapshotClassGVR).Delete(vsc.GetName(), nil))
 		}()
 
@@ -162,11 +162,11 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		snapshot, err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Create(snapshot, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 		defer func() {
-			e2elog.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
+			framework.Logf("deleting snapshot %q/%q", snapshot.GetNamespace(), snapshot.GetName())
 			// typically this snapshot has already been deleted
 			err = dc.Resource(snapshotGVR).Namespace(snapshot.GetNamespace()).Delete(snapshot.GetName(), nil)
 			if err != nil && !apierrs.IsNotFound(err) {
-				e2elog.Failf("Error deleting snapshot %q. Error: %v", pvc.Name, err)
+				framework.Failf("Error deleting snapshot %q. Error: %v", pvc.Name, err)
 			}
 		}()
 		err = WaitForSnapshotReady(dc, snapshot.GetNamespace(), snapshot.GetName(), framework.Poll, framework.SnapshotCreateTimeout)
@@ -198,27 +198,27 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 
 // WaitForSnapshotReady waits for a VolumeSnapshot to be ready to use or until timeout occurs, whichever comes first.
 func WaitForSnapshotReady(c dynamic.Interface, ns string, snapshotName string, Poll, timeout time.Duration) error {
-	e2elog.Logf("Waiting up to %v for VolumeSnapshot %s to become ready", timeout, snapshotName)
+	framework.Logf("Waiting up to %v for VolumeSnapshot %s to become ready", timeout, snapshotName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
 		snapshot, err := c.Resource(snapshotGVR).Namespace(ns).Get(snapshotName, metav1.GetOptions{})
 		if err != nil {
-			e2elog.Logf("Failed to get claim %q, retrying in %v. Error: %v", snapshotName, Poll, err)
+			framework.Logf("Failed to get claim %q, retrying in %v. Error: %v", snapshotName, Poll, err)
 			continue
 		} else {
 			status := snapshot.Object["status"]
 			if status == nil {
-				e2elog.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
+				framework.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
 				continue
 			}
 			value := status.(map[string]interface{})
 			if value["readyToUse"] == true {
-				e2elog.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
+				framework.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
 				return nil
 			} else if value["ready"] == true {
-				e2elog.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
+				framework.Logf("VolumeSnapshot %s found and is ready", snapshotName, time.Since(start))
 				return nil
 			} else {
-				e2elog.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
+				framework.Logf("VolumeSnapshot %s found but is not ready.", snapshotName)
 			}
 		}
 	}

@@ -252,63 +252,68 @@ func formatURL(scheme string, host string, port int, path string) *url.URL {
 type execInContainer struct {
 	// run executes a command in a container. Combined stdout and stderr output is always returned. An
 	// error is returned if one occurred.
-	run func() ([]byte, error)
+	run    func() ([]byte, error)
+	writer io.Writer
 }
 
 func (pb *prober) newExecInContainer(container v1.Container, containerID kubecontainer.ContainerID, cmd []string, timeout time.Duration) exec.Cmd {
-	return execInContainer{func() ([]byte, error) {
+	return &execInContainer{run: func() ([]byte, error) {
 		return pb.runner.RunInContainer(containerID, cmd, timeout)
 	}}
 }
 
-func (eic execInContainer) Run() error {
-	return fmt.Errorf("unimplemented")
+func (eic *execInContainer) Run() error {
+	return nil
 }
 
-func (eic execInContainer) CombinedOutput() ([]byte, error) {
+func (eic *execInContainer) CombinedOutput() ([]byte, error) {
 	return eic.run()
 }
 
-func (eic execInContainer) Output() ([]byte, error) {
+func (eic *execInContainer) Output() ([]byte, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 
-func (eic execInContainer) SetDir(dir string) {
+func (eic *execInContainer) SetDir(dir string) {
 	//unimplemented
 }
 
-func (eic execInContainer) SetStdin(in io.Reader) {
+func (eic *execInContainer) SetStdin(in io.Reader) {
 	//unimplemented
 }
 
-func (eic execInContainer) SetStdout(out io.Writer) {
+func (eic *execInContainer) SetStdout(out io.Writer) {
+	eic.writer = out
+}
+
+func (eic *execInContainer) SetStderr(out io.Writer) {
+	eic.writer = out
+}
+
+func (eic *execInContainer) SetEnv(env []string) {
 	//unimplemented
 }
 
-func (eic execInContainer) SetStderr(out io.Writer) {
+func (eic *execInContainer) Stop() {
 	//unimplemented
 }
 
-func (eic execInContainer) SetEnv(env []string) {
-	//unimplemented
+func (eic *execInContainer) Start() error {
+	data, err := eic.run()
+	if eic.writer != nil {
+		eic.writer.Write(data)
+	}
+	return err
 }
 
-func (eic execInContainer) Stop() {
-	//unimplemented
+func (eic *execInContainer) Wait() error {
+	return nil
 }
 
-func (eic execInContainer) Start() error {
-	return fmt.Errorf("unimplemented")
-}
-
-func (eic execInContainer) Wait() error {
-	return fmt.Errorf("unimplemented")
-}
-
-func (eic execInContainer) StdoutPipe() (io.ReadCloser, error) {
+func (eic *execInContainer) StdoutPipe() (io.ReadCloser, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 
-func (eic execInContainer) StderrPipe() (io.ReadCloser, error) {
+func (eic *execInContainer) StderrPipe() (io.ReadCloser, error) {
 	return nil, fmt.Errorf("unimplemented")
 }

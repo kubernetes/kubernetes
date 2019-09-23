@@ -54,6 +54,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
+	schedulerplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -156,7 +157,7 @@ func initTestScheduler(
 	policy *schedulerapi.Policy,
 ) *testContext {
 	// Pod preemption is enabled by default scheduler configuration.
-	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, schedulerframework.NewRegistry(),
+	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, schedulerplugins.NewDefaultRegistry(),
 		nil, []schedulerconfig.PluginConfig{}, false, time.Second)
 }
 
@@ -284,7 +285,7 @@ func initTest(t *testing.T, nsPrefix string) *testContext {
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *testContext {
 	return initTestSchedulerWithOptions(
 		t, initTestMaster(t, nsPrefix, nil), true, nil,
-		schedulerframework.NewRegistry(), nil, []schedulerconfig.PluginConfig{},
+		schedulerplugins.NewDefaultRegistry(), nil, []schedulerconfig.PluginConfig{},
 		true, time.Second)
 }
 
@@ -462,6 +463,7 @@ type pausePodConfig struct {
 	NodeName                          string
 	SchedulerName                     string
 	Priority                          *int32
+	PriorityClassName                 string
 }
 
 // initPausePod initializes a pod API object from the given config. It is used
@@ -483,10 +485,11 @@ func initPausePod(cs clientset.Interface, conf *pausePodConfig) *v1.Pod {
 					Image: imageutils.GetPauseImageName(),
 				},
 			},
-			Tolerations:   conf.Tolerations,
-			NodeName:      conf.NodeName,
-			SchedulerName: conf.SchedulerName,
-			Priority:      conf.Priority,
+			Tolerations:       conf.Tolerations,
+			NodeName:          conf.NodeName,
+			SchedulerName:     conf.SchedulerName,
+			Priority:          conf.Priority,
+			PriorityClassName: conf.PriorityClassName,
 		},
 	}
 	if conf.Resources != nil {

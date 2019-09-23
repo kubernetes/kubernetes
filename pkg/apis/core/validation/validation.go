@@ -1910,9 +1910,10 @@ func ValidatePersistentVolumeClaimSpec(spec *core.PersistentVolumeClaimSpec, fld
 	storageValue, ok := spec.Resources.Requests[core.ResourceStorage]
 	if !ok {
 		allErrs = append(allErrs, field.Required(fldPath.Child("resources").Key(string(core.ResourceStorage)), ""))
+	} else if errs := ValidatePositiveQuantityValue(storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage))); len(errs) > 0 {
+		allErrs = append(allErrs, errs...)
 	} else {
 		allErrs = append(allErrs, ValidateResourceQuantityValue(string(core.ResourceStorage), storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage)))...)
-		allErrs = append(allErrs, ValidatePositiveQuantityValue(storageValue, fldPath.Child("resources").Key(string(core.ResourceStorage)))...)
 	}
 
 	if spec.StorageClassName != nil && len(*spec.StorageClassName) > 0 {

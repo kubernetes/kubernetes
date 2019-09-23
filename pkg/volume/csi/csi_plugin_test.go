@@ -620,6 +620,9 @@ func TestPluginNewMounter(t *testing.T) {
 			if csiClient == nil {
 				t.Error("mounter csiClient is nil")
 			}
+			if err != nil {
+				t.Fatal(err)
+			}
 			if csiMounter.volumeLifecycleMode != test.volumeLifecycleMode {
 				t.Error("unexpected driver mode:", csiMounter.volumeLifecycleMode)
 			}

@@ -27,15 +27,18 @@ const (
 	// sense to set sandbox level oom score, e.g. a sandbox could only be a namespace
 	// without a process.
 	// TODO: Handle infra container oom score adj in a runtime agnostic way.
-	PodInfraOOMAdj        int = -998
-	KubeletOOMScoreAdj    int = -999
-	DockerOOMScoreAdj     int = -999
+	PodInfraOOMAdj int = -998
+	// KubeletOOMScoreAdj is the OOM score adjustment for Kubelet
+	KubeletOOMScoreAdj int = -999
+	// DockerOOMScoreAdj is the OOM score adjustment for Docker
+	DockerOOMScoreAdj int = -999
+	// KubeProxyOOMScoreAdj is the OOM score adjustment for kube-proxy
 	KubeProxyOOMScoreAdj  int = -999
 	guaranteedOOMScoreAdj int = -998
 	besteffortOOMScoreAdj int = 1000
 )
 
-// GetContainerOOMAdjust returns the amount by which the OOM score of all processes in the
+// GetContainerOOMScoreAdjust returns the amount by which the OOM score of all processes in the
 // container should be adjusted.
 // The OOM score of a process is the percentage of memory it consumes
 // multiplied by 10 (barring exceptional cases) + a configurable quantity which is between -1000

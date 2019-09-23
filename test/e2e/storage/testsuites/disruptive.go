@@ -22,6 +22,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -60,8 +61,8 @@ func (s *disruptiveTestSuite) skipRedundantSuite(driver TestDriver, pattern test
 
 func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
-		config      *PerTestConfig
-		testCleanup func()
+		config        *PerTestConfig
+		driverCleanup func()
 
 		cs clientset.Interface
 		ns *v1.Namespace
@@ -86,7 +87,7 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 		l.cs = f.ClientSet
 
 		// Now do the more expensive test initialization.
-		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.config, l.driverCleanup = driver.PrepareTest(f)
 
 		if pattern.VolMode == v1.PersistentVolumeBlock && !driver.GetDriverInfo().Capabilities[CapBlock] {
 			framework.Skipf("Driver %s doesn't support %v -- skipping", driver.GetDriverInfo().Name, pattern.VolMode)
@@ -108,9 +109,9 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 			l.resource = nil
 		}
 
-		if l.testCleanup != nil {
-			l.testCleanup()
-			l.testCleanup = nil
+		if l.driverCleanup != nil {
+			l.driverCleanup()
+			l.driverCleanup = nil
 		}
 	}
 
@@ -154,7 +155,7 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 						pvcs = append(pvcs, l.resource.pvc)
 					}
 					ginkgo.By("Creating a pod with pvc")
-					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, pvcs, inlineSources, false, "", false, false, framework.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
+					l.pod, err = e2epod.CreateSecPodWithNodeSelection(l.cs, l.ns.Name, pvcs, inlineSources, false, "", false, false, e2epv.SELinuxLabel, nil, e2epod.NodeSelection{Name: l.config.ClientNodeName}, framework.PodStartTimeout)
 					framework.ExpectNoError(err, "While creating pods for kubelet restart test")
 
 					if pattern.VolMode == v1.PersistentVolumeBlock {

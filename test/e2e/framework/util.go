@@ -40,6 +40,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/net/websocket"
 	"k8s.io/klog"
 
@@ -76,8 +77,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master/ports"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
@@ -152,20 +151,8 @@ const (
 	// Use it case by case when we are sure this timeout is enough.
 	ClaimProvisionShortTimeout = 1 * time.Minute
 
-	// ClaimBindingTimeout is how long claims have to become bound.
-	ClaimBindingTimeout = 3 * time.Minute
-
 	// ClaimDeletingTimeout is How long claims have to become deleted.
 	ClaimDeletingTimeout = 3 * time.Minute
-
-	// PVReclaimingTimeout is how long PVs have to beome reclaimed.
-	PVReclaimingTimeout = 3 * time.Minute
-
-	// PVBindingTimeout is how long PVs have to become bound.
-	PVBindingTimeout = 3 * time.Minute
-
-	// PVDeletingTimeout is how long PVs have to become deleted.
-	PVDeletingTimeout = 3 * time.Minute
 
 	// RecreateNodeReadyAgainTimeout is how long a node is allowed to become "Ready" after it is recreated before
 	// the test is considered failed.
@@ -429,11 +416,6 @@ func getDefaultClusterIPFamily(c clientset.Interface) string {
 	return "ipv4"
 }
 
-// ClusterIsIPv6 returns true if the cluster is IPv6
-func ClusterIsIPv6() bool {
-	return TestContext.IPFamily == "ipv6"
-}
-
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
@@ -671,24 +653,6 @@ func WaitForDefaultServiceAccountInNamespace(c clientset.Interface, namespace st
 	return waitForServiceAccountInNamespace(c, namespace, "default", ServiceAccountProvisionTimeout)
 }
 
-// WaitForPersistentVolumePhase waits for a PersistentVolume to be in a specific phase or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumePhase(phase v1.PersistentVolumePhase, c clientset.Interface, pvName string, Poll, timeout time.Duration) error {
-	e2elog.Logf("Waiting up to %v for PersistentVolume %s to have phase %s", timeout, pvName, phase)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		pv, err := c.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})
-		if err != nil {
-			e2elog.Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
-			continue
-		}
-		if pv.Status.Phase == phase {
-			e2elog.Logf("PersistentVolume %s found and phase=%s (%v)", pvName, phase, time.Since(start))
-			return nil
-		}
-		e2elog.Logf("PersistentVolume %s found but phase is %s instead of %s.", pvName, pv.Status.Phase, phase)
-	}
-	return fmt.Errorf("PersistentVolume %s not in phase %s within %v", pvName, phase, timeout)
-}
-
 // WaitForStatefulSetReplicasReady waits for all replicas of a StatefulSet to become ready or until timeout occurs, whichever comes first.
 func WaitForStatefulSetReplicasReady(statefulSetName, ns string, c clientset.Interface, Poll, timeout time.Duration) error {
 	e2elog.Logf("Waiting up to %v for StatefulSet %s to have all replicas ready", timeout, statefulSetName)
@@ -723,43 +687,6 @@ func WaitForPersistentVolumeDeleted(c clientset.Interface, pvName string, Poll, 
 		e2elog.Logf("Get persistent volume %s in failed, ignoring for %v: %v", pvName, Poll, err)
 	}
 	return fmt.Errorf("PersistentVolume %s still exists within %v", pvName, timeout)
-}
-
-// WaitForPersistentVolumeClaimPhase waits for a PersistentVolumeClaim to be in a specific phase or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeClaimPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
-	return WaitForPersistentVolumeClaimsPhase(phase, c, ns, []string{pvcName}, Poll, timeout, true)
-}
-
-// WaitForPersistentVolumeClaimsPhase waits for any (if matchAny is true) or all (if matchAny is false) PersistentVolumeClaims
-// to be in a specific phase or until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeClaimsPhase(phase v1.PersistentVolumeClaimPhase, c clientset.Interface, ns string, pvcNames []string, Poll, timeout time.Duration, matchAny bool) error {
-	if len(pvcNames) == 0 {
-		return fmt.Errorf("Incorrect parameter: Need at least one PVC to track. Found 0")
-	}
-	e2elog.Logf("Waiting up to %v for PersistentVolumeClaims %v to have phase %s", timeout, pvcNames, phase)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		phaseFoundInAllClaims := true
-		for _, pvcName := range pvcNames {
-			pvc, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
-			if err != nil {
-				e2elog.Logf("Failed to get claim %q, retrying in %v. Error: %v", pvcName, Poll, err)
-				continue
-			}
-			if pvc.Status.Phase == phase {
-				e2elog.Logf("PersistentVolumeClaim %s found and phase=%s (%v)", pvcName, phase, time.Since(start))
-				if matchAny {
-					return nil
-				}
-			} else {
-				e2elog.Logf("PersistentVolumeClaim %s found but phase is %s instead of %s.", pvcName, pvc.Status.Phase, phase)
-				phaseFoundInAllClaims = false
-			}
-		}
-		if phaseFoundInAllClaims {
-			return nil
-		}
-	}
-	return fmt.Errorf("PersistentVolumeClaims %v not all in phase %s within %v", pvcNames, phase, timeout)
 }
 
 // findAvailableNamespaceName random namespace name starting with baseName.
@@ -878,8 +805,11 @@ func deleteNS(c clientset.Interface, dynamicClient dynamic.Interface, namespace 
 	}
 
 	// wait for namespace to delete or timeout.
+	var lastNamespace *v1.Namespace
 	err := wait.PollImmediate(2*time.Second, timeout, func() (bool, error) {
-		if _, err := c.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
+		var err error
+		lastNamespace, err = c.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{})
+		if err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
 			}
@@ -909,6 +839,9 @@ func deleteNS(c clientset.Interface, dynamicClient dynamic.Interface, namespace 
 
 	// a timeout waiting for namespace deletion happened!
 	if err != nil {
+		// namespaces now have conditions that are useful for debugging generic resources and finalizers
+		e2elog.Logf("namespace did not cleanup: %s", spew.Sdump(lastNamespace))
+
 		// some content remains in the namespace
 		if remainingContent {
 			// pods remain
@@ -1893,47 +1826,6 @@ func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
 	return nodes
 }
 
-// Node is schedulable if:
-// 1) doesn't have "unschedulable" field set
-// 2) it's Ready condition is set to true
-// 3) doesn't have NetworkUnavailable condition set to true
-func isNodeSchedulable(node *v1.Node) bool {
-	nodeReady := e2enode.IsConditionSetAsExpected(node, v1.NodeReady, true)
-	networkReady := e2enode.IsConditionUnset(node, v1.NodeNetworkUnavailable) ||
-		e2enode.IsConditionSetAsExpectedSilent(node, v1.NodeNetworkUnavailable, false)
-	return !node.Spec.Unschedulable && nodeReady && networkReady
-}
-
-// Test whether a fake pod can be scheduled on "node", given its current taints.
-func isNodeUntainted(node *v1.Node) bool {
-	fakePod := &v1.Pod{
-		TypeMeta: metav1.TypeMeta{
-			Kind:       "Pod",
-			APIVersion: "v1",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "fake-not-scheduled",
-			Namespace: "fake-not-scheduled",
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "fake-not-scheduled",
-					Image: "fake-not-scheduled",
-				},
-			},
-		},
-	}
-	nodeInfo := schedulernodeinfo.NewNodeInfo()
-	nodeInfo.SetNode(node)
-	fit, _, err := predicates.PodToleratesNodeTaints(fakePod, nil, nodeInfo)
-	if err != nil {
-		e2elog.Failf("Can't test predicates for node %s: %v", node.Name, err)
-		return false
-	}
-	return fit
-}
-
 // GetReadySchedulableNodesOrDie addresses the common use case of getting nodes you can do work on.
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
@@ -1944,7 +1836,7 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
 	// previous tests may have cause failures of some nodes. Let's skip
 	// 'Not Ready' nodes, just in case (there is no need to fail the test).
 	e2enode.Filter(nodes, func(node v1.Node) bool {
-		return isNodeSchedulable(&node) && isNodeUntainted(&node)
+		return e2enode.IsNodeSchedulable(&node) && e2enode.IsNodeUntainted(&node)
 	})
 	return nodes
 }
@@ -1954,58 +1846,11 @@ func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {
 	e2elog.Logf("Waiting up to %v for all (but %d) nodes to be schedulable", timeout, TestContext.AllowedNotReadyNodes)
 
-	var notSchedulable []*v1.Node
-	attempt := 0
-	return wait.PollImmediate(30*time.Second, timeout, func() (bool, error) {
-		attempt++
-		notSchedulable = nil
-		opts := metav1.ListOptions{
-			ResourceVersion: "0",
-			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
-		}
-		nodes, err := c.CoreV1().Nodes().List(opts)
-		if err != nil {
-			e2elog.Logf("Unexpected error listing nodes: %v", err)
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		for i := range nodes.Items {
-			node := &nodes.Items[i]
-			if _, hasMasterRoleLabel := node.ObjectMeta.Labels["node-role.kubernetes.io/master"]; hasMasterRoleLabel {
-				// Kops clusters have masters with spec.unscheduable = false and
-				// node-role.kubernetes.io/master NoSchedule taint.
-				// Don't wait for them.
-				continue
-			}
-			if !isNodeSchedulable(node) || !isNodeUntainted(node) {
-				notSchedulable = append(notSchedulable, node)
-			}
-		}
-		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
-		// to make it possible e.g. for incorrect deployment of some small percentage
-		// of nodes (which we allow in cluster validation). Some nodes that are not
-		// provisioned correctly at startup will never become ready (e.g. when something
-		// won't install correctly), so we can't expect them to be ready at any point.
-		//
-		// However, we only allow non-ready nodes with some specific reasons.
-		if len(notSchedulable) > 0 {
-			// In large clusters, log them only every 10th pass.
-			if len(nodes.Items) < largeClusterThreshold || attempt%10 == 0 {
-				e2elog.Logf("Unschedulable nodes:")
-				for i := range notSchedulable {
-					e2elog.Logf("-> %s Ready=%t Network=%t Taints=%v",
-						notSchedulable[i].Name,
-						e2enode.IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
-						e2enode.IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false),
-						notSchedulable[i].Spec.Taints)
-				}
-				e2elog.Logf("================================")
-			}
-		}
-		return len(notSchedulable) <= TestContext.AllowedNotReadyNodes, nil
-	})
+	return wait.PollImmediate(
+		30*time.Second,
+		timeout,
+		e2enode.CheckReadyForTests(c, TestContext.NonblockingTaints, TestContext.AllowedNotReadyNodes, largeClusterThreshold),
+	)
 }
 
 // GetPodSecretUpdateTimeout reuturns the timeout duration for updating pod secret.

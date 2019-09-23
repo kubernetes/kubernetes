@@ -83,7 +83,7 @@ fi
 # you are updating the os image versions, update this variable.
 # Also please update corresponding image for node e2e at:
 # https://github.com/kubernetes/kubernetes/blob/master/test/e2e_node/jenkins/image-config.yaml
-GCI_VERSION=${KUBE_GCI_VERSION:-cos-73-11647-163-0}
+GCI_VERSION=${KUBE_GCI_VERSION:-cos-rc-77-12371-44-0}
 MASTER_IMAGE=${KUBE_GCE_MASTER_IMAGE:-}
 MASTER_IMAGE_PROJECT=${KUBE_GCE_MASTER_PROJECT:-cos-cloud}
 NODE_IMAGE=${KUBE_GCE_NODE_IMAGE:-${GCI_VERSION}}
@@ -431,7 +431,7 @@ fi
 # Fluentd requirements
 # YAML exists to trigger a configuration refresh when changes are made.
 FLUENTD_GCP_YAML_VERSION="v3.2.0"
-FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-1.6.8}"
+FLUENTD_GCP_VERSION="${FLUENTD_GCP_VERSION:-1.6.17}"
 FLUENTD_GCP_MEMORY_LIMIT="${FLUENTD_GCP_MEMORY_LIMIT:-}"
 FLUENTD_GCP_CPU_REQUEST="${FLUENTD_GCP_CPU_REQUEST:-}"
 FLUENTD_GCP_MEMORY_REQUEST="${FLUENTD_GCP_MEMORY_REQUEST:-}"

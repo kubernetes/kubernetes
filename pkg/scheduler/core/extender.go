@@ -45,7 +45,7 @@ type HTTPExtender struct {
 	filterVerb       string
 	prioritizeVerb   string
 	bindVerb         string
-	weight           int
+	weight           int64
 	client           *http.Client
 	nodeCacheCapable bool
 	managedResources sets.String
@@ -112,6 +112,36 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 		managedResources: managedResources,
 		ignorable:        config.Ignorable,
 	}, nil
+}
+
+// Equal is used to check if two extenders are equal
+// ignoring the client field, exported for testing
+func Equal(e1, e2 *HTTPExtender) bool {
+	if e1.extenderURL != e2.extenderURL {
+		return false
+	}
+	if e1.preemptVerb != e2.preemptVerb {
+		return false
+	}
+	if e1.prioritizeVerb != e2.prioritizeVerb {
+		return false
+	}
+	if e1.bindVerb != e2.bindVerb {
+		return false
+	}
+	if e1.weight != e2.weight {
+		return false
+	}
+	if e1.nodeCacheCapable != e2.nodeCacheCapable {
+		return false
+	}
+	if !e1.managedResources.Equal(e2.managedResources) {
+		return false
+	}
+	if e1.ignorable != e2.ignorable {
+		return false
+	}
+	return true
 }
 
 // Name returns extenderURL to identify the extender.
@@ -321,7 +351,7 @@ func (h *HTTPExtender) Filter(
 // Prioritize based on extender implemented priority functions. Weight*priority is added
 // up for each such priority function. The returned score is added to the score computed
 // by Kubernetes scheduler. The total score is used to do the host selection.
-func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, int, error) {
+func (h *HTTPExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, int64, error) {
 	var (
 		result    schedulerapi.HostPriorityList
 		nodeList  *v1.NodeList

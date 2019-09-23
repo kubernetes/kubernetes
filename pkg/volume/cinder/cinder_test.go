@@ -202,6 +202,9 @@ func TestPlugin(t *testing.T) {
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 	}
 	provisioner, err := plug.(*cinderPlugin).newProvisionerInternal(options, &fakePDManager{0})
+	if err != nil {
+		t.Errorf("ProvisionerInternal() failed: %v", err)
+	}
 	persistentSpec, err := provisioner.Provision(nil, nil)
 	if err != nil {
 		t.Errorf("Provision() failed: %v", err)
@@ -254,6 +257,9 @@ func TestPlugin(t *testing.T) {
 		PersistentVolume: persistentSpec,
 	}
 	deleter, err := plug.(*cinderPlugin).newDeleterInternal(volSpec, &fakePDManager{0})
+	if err != nil {
+		t.Errorf("DeleterInternal() failed: %v", err)
+	}
 	err = deleter.Delete()
 	if err != nil {
 		t.Errorf("Deleter() failed: %v", err)

@@ -25,7 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -66,7 +65,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 		Bootstrap(f)
 	})
 	ginkgo.AfterEach(func() {
-		e2elog.Logf("Deleting all statefulset in namespace: %v", namespace)
+		framework.Logf("Deleting all statefulset in namespace: %v", namespace)
 		e2esset.DeleteAllStatefulSets(client, namespace)
 	})
 
@@ -117,7 +116,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 				for _, volumespec := range sspod.Spec.Volumes {
 					if volumespec.PersistentVolumeClaim != nil {
 						vSpherediskPath := getvSphereVolumePathFromClaim(client, statefulset.Namespace, volumespec.PersistentVolumeClaim.ClaimName)
-						e2elog.Logf("Waiting for Volume: %q to detach from Node: %q", vSpherediskPath, sspod.Spec.NodeName)
+						framework.Logf("Waiting for Volume: %q to detach from Node: %q", vSpherediskPath, sspod.Spec.NodeName)
 						framework.ExpectNoError(waitForVSphereDiskToDetach(vSpherediskPath, sspod.Spec.NodeName))
 					}
 				}
@@ -144,7 +143,7 @@ var _ = utils.SIGDescribe("vsphere statefulset", func() {
 			for _, volumespec := range pod.Spec.Volumes {
 				if volumespec.PersistentVolumeClaim != nil {
 					vSpherediskPath := getvSphereVolumePathFromClaim(client, statefulset.Namespace, volumespec.PersistentVolumeClaim.ClaimName)
-					e2elog.Logf("Verify Volume: %q is attached to the Node: %q", vSpherediskPath, sspod.Spec.NodeName)
+					framework.Logf("Verify Volume: %q is attached to the Node: %q", vSpherediskPath, sspod.Spec.NodeName)
 					// Verify scale up has re-attached the same volumes and not introduced new volume
 					gomega.Expect(volumesBeforeScaleDown[vSpherediskPath] == "").To(gomega.BeFalse())
 					isVolumeAttached, verifyDiskAttachedError := diskIsAttached(vSpherediskPath, sspod.Spec.NodeName)

@@ -18,7 +18,7 @@ package e2e_node
 
 import (
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/pkg/kubelet"
@@ -158,6 +158,7 @@ var _ = framework.KubeDescribe("ContainerLogPath [NodeConformance]", func() {
 
 				// get podID from created Pod
 				createdLogPod, err := podClient.Get(logPodName, metav1.GetOptions{})
+				framework.ExpectNoError(err, "Failed to get pod: %s", logPodName)
 				podNs := createdLogPod.Namespace
 				podName := createdLogPod.Name
 				podID := string(createdLogPod.UID)

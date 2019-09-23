@@ -42,7 +42,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/test/integration/framework"
 )
@@ -265,7 +265,7 @@ priorities: []
 				},
 			},
 			nil,
-			schedulerframework.NewRegistry(),
+			schedulerplugins.NewDefaultRegistry(),
 			nil,
 			[]kubeschedulerconfig.PluginConfig{},
 			scheduler.WithName(v1.DefaultSchedulerName),
@@ -336,7 +336,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 			},
 		},
 		nil,
-		schedulerframework.NewRegistry(),
+		schedulerplugins.NewDefaultRegistry(),
 		nil,
 		[]kubeschedulerconfig.PluginConfig{},
 		scheduler.WithName(v1.DefaultSchedulerName),
@@ -603,7 +603,7 @@ func TestMultiScheduler(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
-	schedulerConfigFactory2 := factory.NewConfigFactory(createConfiguratorArgsWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, schedulerframework.NewRegistry(),
+	schedulerConfigFactory2 := factory.NewConfigFactory(createConfiguratorArgsWithPodInformer(fooScheduler, clientSet2, podInformer2, informerFactory2, schedulerplugins.NewDefaultRegistry(),
 		nil, []kubeschedulerconfig.PluginConfig{}, stopCh))
 	schedulerConfig2, err := schedulerConfigFactory2.Create()
 	if err != nil {

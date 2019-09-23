@@ -36,12 +36,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
+	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	kubecontainertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
-	"k8s.io/kubernetes/pkg/version"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 
@@ -953,7 +953,7 @@ func TestReadyCondition(t *testing.T) {
 		Status: v1.NodeStatus{
 			Capacity: v1.ResourceList{
 				v1.ResourceCPU:              *resource.NewMilliQuantity(2000, resource.DecimalSI),
-				v1.ResourceMemory:           *resource.NewQuantity(10E9, resource.BinarySI),
+				v1.ResourceMemory:           *resource.NewQuantity(10e9, resource.BinarySI),
 				v1.ResourcePods:             *resource.NewQuantity(100, resource.DecimalSI),
 				v1.ResourceEphemeralStorage: *resource.NewQuantity(5000, resource.BinarySI),
 			},

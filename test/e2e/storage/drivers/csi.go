@@ -39,23 +39,27 @@ import (
 	"fmt"
 	"math/rand"
 	"strconv"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
 const (
-	// GCEPDCSIProvisionerName is the name of GCE Persistent Disk CSI provisioner
-	GCEPDCSIProvisionerName = "pd.csi.storage.gke.io"
+	// GCEPDCSIDriverName is the name of GCE Persistent Disk CSI driver
+	GCEPDCSIDriverName = "pd.csi.storage.gke.io"
 	// GCEPDCSIZoneTopologyKey is the key of GCE Persistent Disk CSI zone topology
 	GCEPDCSIZoneTopologyKey = "topology.gke.io/zone"
 )
@@ -97,6 +101,7 @@ func InitHostPathCSIDriver() testsuites.TestDriver {
 		testsuites.CapBlock:               true,
 		testsuites.CapPVCDataSource:       true,
 		testsuites.CapControllerExpansion: true,
+		testsuites.CapSingleNodeVolume:    true,
 	}
 	return initHostPathCSIDriver("csi-hostpath",
 		capabilities,
@@ -187,7 +192,7 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 	},
 		h.manifests...)
 	if err != nil {
-		e2elog.Failf("deploying %s driver: %v", h.driverInfo.Name, err)
+		framework.Failf("deploying %s driver: %v", h.driverInfo.Name, err)
 	}
 
 	return config, func() {
@@ -333,7 +338,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 	},
 		m.manifests...)
 	if err != nil {
-		e2elog.Failf("deploying csi mock driver: %v", err)
+		framework.Failf("deploying csi mock driver: %v", err)
 	}
 
 	return config, func() {
@@ -346,7 +351,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 // InitHostPathV0CSIDriver returns a variant of hostpathCSIDriver with different manifests.
 func InitHostPathV0CSIDriver() testsuites.TestDriver {
 	return initHostPathCSIDriver("csi-hostpath-v0",
-		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapMultiPODs: true},
+		map[testsuites.Capability]bool{testsuites.CapPersistence: true, testsuites.CapMultiPODs: true, testsuites.CapSingleNodeVolume: true},
 		nil, /* no volume attributes -> no ephemeral volume testing */
 		// Using the current set of rbac.yaml files is problematic here because they don't
 		// match the version of the rules that were written for the releases of external-attacher
@@ -372,7 +377,7 @@ var _ testsuites.DynamicPVTestDriver = &gcePDCSIDriver{}
 func InitGcePDCSIDriver() testsuites.TestDriver {
 	return &gcePDCSIDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        GCEPDCSIProvisionerName,
+			Name:        GCEPDCSIDriverName,
 			FeatureTag:  "[Serial]",
 			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
@@ -391,8 +396,10 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				testsuites.CapVolumeLimits: false,
+				testsuites.CapTopology:     true,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},
 		},
 	}
 }
@@ -456,7 +463,11 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 
 	cleanup, err := f.CreateFromManifests(nil, manifests...)
 	if err != nil {
-		e2elog.Failf("deploying csi gce-pd driver: %v", err)
+		framework.Failf("deploying csi gce-pd driver: %v", err)
+	}
+
+	if err = waitForCSIDriverRegistrationOnAllNodes(GCEPDCSIDriverName, f.ClientSet); err != nil {
+		framework.Failf("waiting for csi driver node registration on: %v", err)
 	}
 
 	return &testsuites.PerTestConfig{
@@ -468,4 +479,31 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 			cleanup()
 			cancelLogging()
 		}
+}
+
+func waitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Interface) error {
+	nodes := framework.GetReadySchedulableNodesOrDie(cs)
+	for _, node := range nodes.Items {
+		if err := waitForCSIDriverRegistrationOnNode(node.Name, driverName, cs); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func waitForCSIDriverRegistrationOnNode(nodeName string, driverName string, cs clientset.Interface) error {
+	const csiNodeRegisterTimeout = 1 * time.Minute
+
+	return wait.PollImmediate(10*time.Second, csiNodeRegisterTimeout, func() (bool, error) {
+		csiNode, err := cs.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
+		if err != nil && !errors.IsNotFound(err) {
+			return false, err
+		}
+		for _, driver := range csiNode.Spec.Drivers {
+			if driver.Name == driverName {
+				return true, nil
+			}
+		}
+		return false, nil
+	})
 }

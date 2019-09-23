@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -76,7 +77,7 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 	ginkgo.AfterEach(func() {
 		ginkgo.By("Deleting PVCs")
 		for _, claim := range pvclaims {
-			framework.DeletePersistentVolumeClaim(client, claim.Name, namespace)
+			e2epv.DeletePersistentVolumeClaim(client, claim.Name, namespace)
 		}
 		ginkgo.By("Deleting StorageClass")
 		err = client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
@@ -94,13 +95,13 @@ var _ = utils.SIGDescribe("Volume Operations Storm [Feature:vsphere]", func() {
 		ginkgo.By("Creating PVCs using the Storage Class")
 		count := 0
 		for count < volume_ops_scale {
-			pvclaims[count], err = framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
+			pvclaims[count], err = e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 			framework.ExpectNoError(err)
 			count++
 		}
 
 		ginkgo.By("Waiting for all claims to be in bound phase")
-		persistentvolumes, err = framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+		persistentvolumes, err = e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating pod to attach PVs to the node")

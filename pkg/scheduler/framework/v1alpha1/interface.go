@@ -188,7 +188,14 @@ type FilterPlugin interface {
 	// the given node fits the pod. If Filter doesn't return "Success",
 	// please refer scheduler/algorithm/predicates/error.go
 	// to set error message.
-	Filter(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
+	// For the node being evaluated, Filter plugins should look at the passed
+	// nodeInfo reference for this particular node's information (e.g., pods
+	// considered to be running on the node) instead of looking it up in the
+	// NodeInfoSnapshot because we don't guarantee that they will be the same.
+	// For example, during preemption, we may pass a copy of the original
+	// nodeInfo object that has some pods removed from it to evaluate the
+	// possibility of preempting them to schedule the target pod.
+	Filter(pc *PluginContext, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
 }
 
 // PostFilterPlugin is an interface for Post-filter plugin. Post-filter is an
@@ -308,10 +315,16 @@ type Framework interface {
 	// cycle is aborted.
 	RunPreFilterPlugins(pc *PluginContext, pod *v1.Pod) *Status
 
-	// RunFilterPlugins runs the set of configured filter plugins for pod on the
-	// given host. If any of these plugins returns any status other than "Success",
-	// the given node is not suitable for running the pod.
-	RunFilterPlugins(pc *PluginContext, pod *v1.Pod, nodeName string) *Status
+	// RunFilterPlugins runs the set of configured filter plugins for pod on
+	// the given node. It returns directly if any of the filter plugins
+	// return any status other than "Success". Note that for the node being
+	// evaluated, the passed nodeInfo reference could be different from the
+	// one in NodeInfoSnapshot map (e.g., pods considered to be running on
+	// the node could be different). For example, during preemption, we may
+	// pass a copy of the original nodeInfo object that has some pods
+	// removed from it to evaluate the possibility of preempting them to
+	// schedule the target pod.
+	RunFilterPlugins(pc *PluginContext, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
 
 	// RunPostFilterPlugins runs the set of configured post-filter plugins. If any
 	// of these plugins returns any status other than "Success", the given node is

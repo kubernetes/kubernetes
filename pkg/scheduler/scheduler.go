@@ -337,7 +337,7 @@ func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason s
 // schedule implements the scheduling algorithm and returns the suggested result(host,
 // evaluated nodes number,feasible nodes number).
 func (sched *Scheduler) schedule(pod *v1.Pod, pluginContext *framework.PluginContext) (core.ScheduleResult, error) {
-	result, err := sched.Algorithm.Schedule(pod, pluginContext)
+	result, err := sched.Algorithm.Schedule(pluginContext, pod)
 	if err != nil {
 		pod = pod.DeepCopy()
 		sched.recordSchedulingFailure(pod, err, v1.PodReasonUnschedulable, err.Error())
@@ -635,13 +635,8 @@ func (sched *Scheduler) scheduleOne() {
 		preBindStatus := fwk.RunPreBindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		if !preBindStatus.IsSuccess() {
 			var reason string
-			if preBindStatus.IsUnschedulable() {
-				metrics.PodScheduleFailures.Inc()
-				reason = v1.PodReasonUnschedulable
-			} else {
-				metrics.PodScheduleErrors.Inc()
-				reason = SchedulerError
-			}
+			metrics.PodScheduleErrors.Inc()
+			reason = SchedulerError
 			if forgetErr := sched.Cache().ForgetPod(assumedPod); forgetErr != nil {
 				klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
 			}

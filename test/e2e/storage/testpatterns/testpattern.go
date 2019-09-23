@@ -230,6 +230,22 @@ var (
 		VolMode:        v1.PersistentVolumeBlock,
 		AllowExpansion: true,
 	}
+
+	// Definitions for topology tests
+
+	// TopologyImmediate is TestPattern for immediate binding
+	TopologyImmediate = TestPattern{
+		Name:        "Dynamic PV (immediate binding)",
+		VolType:     DynamicPV,
+		BindingMode: storagev1.VolumeBindingImmediate,
+	}
+
+	// TopologyDelayed is TestPattern for delayed binding
+	TopologyDelayed = TestPattern{
+		Name:        "Dynamic PV (delayed binding)",
+		VolType:     DynamicPV,
+		BindingMode: storagev1.VolumeBindingWaitForFirstConsumer,
+	}
 )
 
 // NewVolTypeMap creates a map with the given TestVolTypes enabled

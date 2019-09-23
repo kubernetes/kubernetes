@@ -26,8 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -95,7 +95,7 @@ var _ = utils.SIGDescribe("Volume FStype [Feature:vsphere]", func() {
 })
 
 func invokeTestForFstype(f *framework.Framework, client clientset.Interface, namespace string, fstype string, expectedContent string) {
-	e2elog.Logf("Invoking Test for fstype: %s", fstype)
+	framework.Logf("Invoking Test for fstype: %s", fstype)
 	scParameters := make(map[string]string)
 	scParameters["fstype"] = fstype
 
@@ -110,7 +110,7 @@ func invokeTestForFstype(f *framework.Framework, client clientset.Interface, nam
 
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
-	err = framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	err = e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 	gomega.Expect(err).To(gomega.BeNil())
 }
 
@@ -133,7 +133,7 @@ func invokeTestForInvalidFstype(f *framework.Framework, client clientset.Interfa
 
 	// Detach and delete volume
 	detachVolume(f, client, pod, persistentvolumes[0].Spec.VsphereVolume.VolumePath)
-	err = framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	err = e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 	gomega.Expect(err).To(gomega.BeNil())
 
 	gomega.Expect(eventList.Items).NotTo(gomega.BeEmpty())
@@ -159,7 +159,7 @@ func createVolume(client clientset.Interface, namespace string, scParameters map
 	var pvclaims []*v1.PersistentVolumeClaim
 	pvclaims = append(pvclaims, pvclaim)
 	ginkgo.By("Waiting for claim to be in bound phase")
-	persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+	persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err)
 	return pvclaim, persistentvolumes
 }

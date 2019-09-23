@@ -36,8 +36,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/drivers"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -480,7 +480,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 				if pvcSize.Cmp(newSize) != 0 {
-					e2elog.Failf("error updating pvc size %q", pvc.Name)
+					framework.Failf("error updating pvc size %q", pvc.Name)
 				}
 				if test.expectFailure {
 					err = testsuites.WaitForResizingCondition(pvc, m.cs, csiResizingConditionWait)
@@ -572,7 +572,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 
 				pvcSize := pvc.Spec.Resources.Requests[v1.ResourceStorage]
 				if pvcSize.Cmp(newSize) != 0 {
-					e2elog.Failf("error updating pvc size %q", pvc.Name)
+					framework.Failf("error updating pvc size %q", pvc.Name)
 				}
 
 				ginkgo.By("Waiting for persistent volume resize to finish")
@@ -638,7 +638,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 		framework.ExpectNoError(err, "Failed to create class : %v", err)
 	}
 
-	claim := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+	claim := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 		ClaimSize:        t.ClaimSize,
 		StorageClassName: &(class.Name),
 		VolumeMode:       &t.VolumeMode,
@@ -647,7 +647,7 @@ func startPausePod(cs clientset.Interface, t testsuites.StorageClassTest, node e
 	framework.ExpectNoError(err, "Failed to create claim: %v", err)
 
 	pvcClaims := []*v1.PersistentVolumeClaim{claim}
-	_, err = framework.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
+	_, err = e2epv.WaitForPVClaimBoundPhase(cs, pvcClaims, framework.ClaimProvisionTimeout)
 	framework.ExpectNoError(err, "Failed waiting for PVC to be bound %v", err)
 
 	pod, err := startPausePodWithClaim(cs, claim, node, ns)
@@ -741,7 +741,7 @@ func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContai
 	if err != nil {
 		return fmt.Errorf("could not load CSI driver logs: %s", err)
 	}
-	e2elog.Logf("CSI driver logs:\n%s", log)
+	framework.Logf("CSI driver logs:\n%s", log)
 	// Find NodePublish in the logs
 	foundAttributes := sets.NewString()
 	logLines := strings.Split(log, "\n")
@@ -762,7 +762,7 @@ func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContai
 		var call MockCSICall
 		err := json.Unmarshal([]byte(line), &call)
 		if err != nil {
-			e2elog.Logf("Could not parse CSI driver log line %q: %s", line, err)
+			framework.Logf("Could not parse CSI driver log line %q: %s", line, err)
 			continue
 		}
 		switch call.Method {
@@ -774,12 +774,12 @@ func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContai
 					vv, found := call.Request.VolumeContext[k]
 					if found && v == vv {
 						foundAttributes.Insert(k)
-						e2elog.Logf("Found volume attribute %s: %s", k, v)
+						framework.Logf("Found volume attribute %s: %s", k, v)
 					}
 				}
 			}
 		case "/csi.v1.Node/NodeUnpublishVolume":
-			e2elog.Logf("Found NodeUnpublishVolume: %+v", call)
+			framework.Logf("Found NodeUnpublishVolume: %+v", call)
 			numNodeUnpublishVolume++
 		}
 	}
@@ -801,7 +801,7 @@ func checkPodLogs(cs clientset.Interface, namespace, driverPodName, driverContai
 func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 	timeout := 4 * time.Minute
 
-	e2elog.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
+	framework.Logf("waiting up to %v for CSIDriver %q", timeout, driverName)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(framework.Poll) {
 		_, err := cs.StorageV1beta1().CSIDrivers().Get(driverName, metav1.GetOptions{})
 		if !errors.IsNotFound(err) {
@@ -814,9 +814,9 @@ func waitForCSIDriver(cs clientset.Interface, driverName string) error {
 func destroyCSIDriver(cs clientset.Interface, driverName string) {
 	driverGet, err := cs.StorageV1beta1().CSIDrivers().Get(driverName, metav1.GetOptions{})
 	if err == nil {
-		e2elog.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)
+		framework.Logf("deleting %s.%s: %s", driverGet.TypeMeta.APIVersion, driverGet.TypeMeta.Kind, driverGet.ObjectMeta.Name)
 		// Uncomment the following line to get full dump of CSIDriver object
-		// e2elog.Logf("%s", framework.PrettyPrint(driverGet))
+		// framework.Logf("%s", framework.PrettyPrint(driverGet))
 		cs.StorageV1beta1().CSIDrivers().Delete(driverName, nil)
 	}
 }

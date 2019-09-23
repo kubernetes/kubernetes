@@ -92,7 +92,7 @@ func (r *ResourceAllocationPriority) PriorityMap(
 
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
-		Score: int(score),
+		Score: score,
 	}, nil
 }
 

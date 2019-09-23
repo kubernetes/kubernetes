@@ -23,8 +23,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	"k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 // phaseSeparator defines the separator to be used when concatenating nested
@@ -337,17 +335,17 @@ func (e *Runner) BindToCommand(cmd *cobra.Command) {
 			Long:    p.Long,
 			Example: p.Example,
 			Aliases: p.Aliases,
-			Run: func(cmd *cobra.Command, args []string) {
+			RunE: func(cmd *cobra.Command, args []string) error {
 				// if the phase has subphases, print the help and exits
 				if len(p.Phases) > 0 {
 					cmd.Help()
-					return
+					return nil
 				}
 
 				// overrides the command triggering the Runner using the phaseCmd
 				e.runCmd = cmd
 				e.Options.FilterPhases = []string{phaseSelector}
-				util.CheckErr(e.Run(args))
+				return e.Run(args)
 			},
 		}
 

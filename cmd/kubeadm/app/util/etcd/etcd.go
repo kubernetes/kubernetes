@@ -49,8 +49,7 @@ var addRemoveBackoff = wait.Backoff{
 
 // ClusterInterrogator is an interface to get etcd cluster related information
 type ClusterInterrogator interface {
-	ClusterAvailable() (bool, error)
-	GetClusterStatus() (map[string]*clientv3.StatusResponse, error)
+	CheckClusterHealth() error
 	GetClusterVersions() (map[string]string, error)
 	GetVersion() (string, error)
 	WaitForClusterAvailable(retries int, retryInterval time.Duration) (bool, error)
@@ -314,7 +313,7 @@ func (c *Client) GetVersion() (string, error) {
 // GetClusterVersions returns a map of the endpoints and their associated versions
 func (c *Client) GetClusterVersions() (map[string]string, error) {
 	versions := make(map[string]string)
-	statuses, err := c.GetClusterStatus()
+	statuses, err := c.getClusterStatus()
 	if err != nil {
 		return versions, err
 	}
@@ -325,17 +324,14 @@ func (c *Client) GetClusterVersions() (map[string]string, error) {
 	return versions, nil
 }
 
-// ClusterAvailable returns true if the cluster status indicates the cluster is available.
-func (c *Client) ClusterAvailable() (bool, error) {
-	_, err := c.GetClusterStatus()
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+// CheckClusterHealth returns nil for status Up or error for status Down
+func (c *Client) CheckClusterHealth() error {
+	_, err := c.getClusterStatus()
+	return err
 }
 
-// GetClusterStatus returns nil for status Up or error for status Down
-func (c *Client) GetClusterStatus() (map[string]*clientv3.StatusResponse, error) {
+// getClusterStatus returns nil for status Up (along with endpoint status response map) or error for status Down
+func (c *Client) getClusterStatus() (map[string]*clientv3.StatusResponse, error) {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   c.Endpoints,
 		DialTimeout: dialTimeout,
@@ -370,7 +366,7 @@ func (c *Client) WaitForClusterAvailable(retries int, retryInterval time.Duratio
 			time.Sleep(retryInterval)
 		}
 		klog.V(2).Infof("[etcd] attempting to see if all cluster endpoints (%s) are available %d/%d", c.Endpoints, i+1, retries)
-		resp, err := c.ClusterAvailable()
+		_, err := c.getClusterStatus()
 		if err != nil {
 			switch err {
 			case context.DeadlineExceeded:
@@ -380,7 +376,7 @@ func (c *Client) WaitForClusterAvailable(retries int, retryInterval time.Duratio
 			}
 			continue
 		}
-		return resp, nil
+		return true, nil
 	}
 	return false, errors.New("timeout waiting for etcd cluster to be available")
 }

@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"golang.org/x/net/context"
-	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -38,6 +37,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/component-base/featuregate"
 	internalapi "k8s.io/cri-api/pkg/apis"
+	"k8s.io/klog"
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
@@ -50,7 +50,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/remote"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	frameworkmetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -65,7 +64,6 @@ var kubeletAddress = flag.String("kubelet-address", "http://127.0.0.1:10255", "H
 var startServices = flag.Bool("start-services", true, "If true, start local node services")
 var stopServices = flag.Bool("stop-services", true, "If true, stop local node services after running tests")
 var busyboxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-var perlImage = imageutils.GetE2EImage(imageutils.Perl)
 
 const (
 	// Kubelet internal cgroup name for node allocatable cgroup.
@@ -335,13 +333,13 @@ func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfigura
 }
 
 func logPodEvents(f *framework.Framework) {
-	e2elog.Logf("Summary of pod events during the test:")
+	framework.Logf("Summary of pod events during the test:")
 	err := framework.ListNamespaceEvents(f.ClientSet, f.Namespace.Name)
 	framework.ExpectNoError(err)
 }
 
 func logNodeEvents(f *framework.Framework) {
-	e2elog.Logf("Summary of node events during the test:")
+	framework.Logf("Summary of node events during the test:")
 	err := framework.ListNamespaceEvents(f.ClientSet, "")
 	framework.ExpectNoError(err)
 }
@@ -362,9 +360,9 @@ func logKubeletLatencyMetrics(metricNames ...string) {
 	}
 	metric, err := frameworkmetrics.GrabKubeletMetricsWithoutProxy(framework.TestContext.NodeName+":10255", "/metrics")
 	if err != nil {
-		e2elog.Logf("Error getting kubelet metrics: %v", err)
+		framework.Logf("Error getting kubelet metrics: %v", err)
 	} else {
-		e2elog.Logf("Kubelet Metrics: %+v", e2emetrics.GetKubeletLatencyMetrics(metric, metricSet))
+		framework.Logf("Kubelet Metrics: %+v", e2emetrics.GetKubeletLatencyMetrics(metric, metricSet))
 	}
 }
 
@@ -426,7 +424,7 @@ func restartKubelet() {
 	matches := regex.FindStringSubmatch(string(stdout))
 	framework.ExpectNotEqual(len(matches), 0)
 	kube := matches[0]
-	e2elog.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
+	framework.Logf("Get running kubelet with systemctl: %v, %v", string(stdout), kube)
 	stdout, err = exec.Command("sudo", "systemctl", "restart", kube).CombinedOutput()
 	framework.ExpectNoError(err, "Failed to restart kubelet with systemctl: %v, %v", err, stdout)
 }

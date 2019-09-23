@@ -184,11 +184,12 @@ func (km *Manager) Kustomize(data []byte) ([]byte, error) {
 	json6902 := km.json6902Patches.filterByResource(resource)
 
 	// if there are no patches, for the target resources, exit
-	if len(strategicMerge)+len(json6902) == 0 {
+	patchesCnt := len(strategicMerge) + len(json6902)
+	if patchesCnt == 0 {
 		return data, nil
 	}
 
-	fmt.Printf("[kustomize] Applying %d patches to %s Resource=%s/%s\n", len(strategicMerge)+len(json6902), resource.GroupVersionKind(), resource.GetNamespace(), resource.GetName())
+	fmt.Printf("[kustomize] Applying %d patches to %s Resource=%s/%s\n", patchesCnt, resource.GroupVersionKind(), resource.GetNamespace(), resource.GetName())
 
 	// create an in memory fs to use for the kustomization
 	memFS := fs.MakeFakeFS()
@@ -207,7 +208,7 @@ func (km *Manager) Kustomize(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	name := "resource.yaml"
-	_ = memFS.WriteFile(filepath.Join(fakeDir, name), b)
+	memFS.WriteFile(filepath.Join(fakeDir, name), b)
 
 	km.kustomizationFile.Resources = []string{name}
 
@@ -219,7 +220,7 @@ func (km *Manager) Kustomize(data []byte) ([]byte, error) {
 			return nil, err
 		}
 		name := fmt.Sprintf("patch-%d.yaml", i)
-		_ = memFS.WriteFile(filepath.Join(fakeDir, name), b)
+		memFS.WriteFile(filepath.Join(fakeDir, name), b)
 
 		km.kustomizationFile.PatchesStrategicMerge = append(km.kustomizationFile.PatchesStrategicMerge, patch.StrategicMerge(name))
 	}
@@ -228,7 +229,7 @@ func (km *Manager) Kustomize(data []byte) ([]byte, error) {
 	km.kustomizationFile.PatchesJson6902 = []patch.Json6902{}
 	for i, p := range json6902 {
 		name := fmt.Sprintf("patchjson-%d.yaml", i)
-		_ = memFS.WriteFile(filepath.Join(fakeDir, name), []byte(p.Patch))
+		memFS.WriteFile(filepath.Join(fakeDir, name), []byte(p.Patch))
 
 		km.kustomizationFile.PatchesJson6902 = append(km.kustomizationFile.PatchesJson6902, patch.Json6902{Target: p.Target, Path: name})
 	}

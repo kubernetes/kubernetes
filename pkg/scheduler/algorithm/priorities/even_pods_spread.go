@@ -176,7 +176,7 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 		// debugging purpose: print the value for each node
 		// score must be pointer here, otherwise it's always 0
 		if klog.V(10) {
-			defer func(score *int, nodeName string) {
+			defer func(score *int64, nodeName string) {
 				klog.Infof("%v -> %v: EvenPodsSpreadPriority, Score: (%d)", pod.Name, nodeName, *score)
 			}(&result[i].Score, node.Name)
 		}
@@ -190,7 +190,7 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 			continue
 		}
 		fScore := float64(schedulerapi.MaxPriority) * (float64(total-t.nodeNameToPodCounts[node.Name]) / float64(maxMinDiff))
-		result[i].Score = int(fScore)
+		result[i].Score = int64(fScore)
 	}
 
 	return result, nil

@@ -35,7 +35,7 @@
         "scheme": "HTTPS",
         "host": "127.0.0.1",
         "port": {{secure_port}},
-        "path": "/healthz?exclude=etcd"
+        "path": "/healthz?exclude=etcd&exclude=kms-provider-0&exclude=kms-provider-1"
       },
       "initialDelaySeconds": {{liveness_probe_initial_delay}},
       "timeoutSeconds": 15

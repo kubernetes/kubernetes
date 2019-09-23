@@ -41,7 +41,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
-	utildbus "k8s.io/kubernetes/pkg/util/dbus"
 	utilebtables "k8s.io/kubernetes/pkg/util/ebtables"
 	utiliptables "k8s.io/kubernetes/pkg/util/iptables"
 	utilsysctl "k8s.io/kubernetes/pkg/util/sysctl"
@@ -80,10 +79,7 @@ const (
   "ipam": {
     "type": "host-local",
     "ranges": [%s],
-    "routes": [
-      { "dst": "%s" },
-      { "dst": "%s" }
-    ]
+    "routes": [%s]
   }
 }`
 )
@@ -125,9 +121,8 @@ type kubenetNetworkPlugin struct {
 
 func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
 	execer := utilexec.New()
-	dbus := utildbus.New()
-	iptInterface := utiliptables.New(execer, dbus, utiliptables.ProtocolIpv4)
-	iptInterfacev6 := utiliptables.New(execer, dbus, utiliptables.ProtocolIpv6)
+	iptInterface := utiliptables.New(execer, utiliptables.ProtocolIpv4)
+	iptInterfacev6 := utiliptables.New(execer, utiliptables.ProtocolIpv6)
 	return &kubenetNetworkPlugin{
 		podIPs:            make(map[kubecontainer.ContainerID]utilsets.String),
 		execer:            utilexec.New(),
@@ -283,7 +278,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	//setup hairpinMode
 	setHairpin := plugin.hairpinMode == kubeletconfig.HairpinVeth
 
-	json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, plugin.getRangesConfig(), zeroCIDRv4, zeroCIDRv6)
+	json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, plugin.getRangesConfig(), plugin.getRoutesConfig())
 	klog.V(4).Infof("CNI network config set to %v", json)
 	plugin.netConfig, err = libcni.ConfFromBytes([]byte(json))
 	if err != nil {
@@ -692,8 +687,11 @@ func (plugin *kubenetNetworkPlugin) addContainerToNetwork(config *libcni.Network
 	}
 
 	klog.V(3).Infof("Adding %s/%s to '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
-
-	res, err := plugin.cniConfig.AddNetwork(context.TODO(), config, rt)
+	// Because the default remote runtime request timeout is 4 min,so set slightly less than 240 seconds
+	// Todo get the timeout from parent ctx
+	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
+	defer cancelFunc()
+	res, err := plugin.cniConfig.AddNetwork(cniTimeoutCtx, config, rt)
 	if err != nil {
 		return nil, fmt.Errorf("error adding container to network: %v", err)
 	}
@@ -707,7 +705,11 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 	}
 
 	klog.V(3).Infof("Removing %s/%s from '%s' with CNI '%s' plugin and runtime: %+v", namespace, name, config.Network.Name, config.Network.Type, rt)
-	err = plugin.cniConfig.DelNetwork(context.TODO(), config, rt)
+	// Because the default remote runtime request timeout is 4 min,so set slightly less than 240 seconds
+	// Todo get the timeout from parent ctx
+	cniTimeoutCtx, cancelFunc := context.WithTimeout(context.Background(), network.CNITimeoutSec*time.Second)
+	defer cancelFunc()
+	err = plugin.cniConfig.DelNetwork(cniTimeoutCtx, config, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
 	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
@@ -842,6 +844,29 @@ func (plugin *kubenetNetworkPlugin) getRangesConfig() string {
 	//[{range}], [{range}]
 	// each range is a subnet and a gateway
 	return strings.Join(ranges[:], ",")
+}
+
+// given a n cidrs assigned to nodes,
+// create bridge routes configuration that conforms to them
+func (plugin *kubenetNetworkPlugin) getRoutesConfig() string {
+	var (
+		routes       []string
+		hasV4, hasV6 bool
+	)
+	for _, thisCIDR := range plugin.podCIDRs {
+		if thisCIDR.IP.To4() != nil {
+			hasV4 = true
+		} else {
+			hasV6 = true
+		}
+	}
+	if hasV4 {
+		routes = append(routes, fmt.Sprintf(`{"dst": "%s"}`, zeroCIDRv4))
+	}
+	if hasV6 {
+		routes = append(routes, fmt.Sprintf(`{"dst": "%s"}`, zeroCIDRv6))
+	}
+	return strings.Join(routes, ",")
 }
 
 func (plugin *kubenetNetworkPlugin) addPodIP(id kubecontainer.ContainerID, ip string) {

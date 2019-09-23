@@ -80,7 +80,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 	if len(selectors) == 0 {
 		return schedulerapi.HostPriority{
 			Host:  node.Name,
-			Score: int(0),
+			Score: 0,
 		}, nil
 	}
 
@@ -88,7 +88,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
-		Score: count,
+		Score: int64(count),
 	}, nil
 }
 
@@ -97,9 +97,9 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 // where zone information is included on the nodes, it favors nodes
 // in zones with fewer existing matching pods.
 func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result schedulerapi.HostPriorityList) error {
-	countsByZone := make(map[string]int, 10)
-	maxCountByZone := int(0)
-	maxCountByNodeName := int(0)
+	countsByZone := make(map[string]int64, 10)
+	maxCountByZone := int64(0)
+	maxCountByNodeName := int64(0)
 
 	for i := range result {
 		if result[i].Score > maxCountByNodeName {
@@ -141,10 +141,10 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 				fScore = (fScore * (1.0 - zoneWeighting)) + (zoneWeighting * zoneScore)
 			}
 		}
-		result[i].Score = int(fScore)
+		result[i].Score = int64(fScore)
 		if klog.V(10) {
 			klog.Infof(
-				"%v -> %v: SelectorSpreadPriority, Score: (%d)", pod.Name, result[i].Host, int(fScore),
+				"%v -> %v: SelectorSpreadPriority, Score: (%d)", pod.Name, result[i].Host, int64(fScore),
 			)
 		}
 	}
@@ -232,16 +232,16 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta
 
 	return schedulerapi.HostPriority{
 		Host:  node.Name,
-		Score: score,
+		Score: int64(score),
 	}, nil
 }
 
 // CalculateAntiAffinityPriorityReduce computes each node score with the same value for a particular label.
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
 func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result schedulerapi.HostPriorityList) error {
-	var numServicePods int
+	var numServicePods int64
 	var label string
-	podCounts := map[string]int{}
+	podCounts := map[string]int64{}
 	labelNodesStatus := map[string]string{}
 	maxPriorityFloat64 := float64(schedulerapi.MaxPriority)
 
@@ -261,7 +261,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, m
 		label, ok := labelNodesStatus[hostPriority.Host]
 		if !ok {
 			result[i].Host = hostPriority.Host
-			result[i].Score = int(0)
+			result[i].Score = 0
 			continue
 		}
 		// initializing to the default/max node score of maxPriority
@@ -270,7 +270,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, m
 			fScore = maxPriorityFloat64 * (float64(numServicePods-podCounts[label]) / float64(numServicePods))
 		}
 		result[i].Host = hostPriority.Host
-		result[i].Score = int(fScore)
+		result[i].Score = int64(fScore)
 	}
 
 	return nil

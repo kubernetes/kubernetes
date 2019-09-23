@@ -31,7 +31,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -95,7 +94,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		}
 		if n < 2 {
 			failing.Insert("Less than two runs succeeded; aborting.")
-			e2elog.Failf(strings.Join(failing.List(), "\n"))
+			framework.Failf(strings.Join(failing.List(), "\n"))
 		}
 		percentile := func(p int) time.Duration {
 			est := n * p / 100
@@ -104,14 +103,14 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 			}
 			return dSorted[est]
 		}
-		e2elog.Logf("Latencies: %v", dSorted)
+		framework.Logf("Latencies: %v", dSorted)
 		p50 := percentile(50)
 		p90 := percentile(90)
 		p99 := percentile(99)
-		e2elog.Logf("50 %%ile: %v", p50)
-		e2elog.Logf("90 %%ile: %v", p90)
-		e2elog.Logf("99 %%ile: %v", p99)
-		e2elog.Logf("Total sample count: %v", len(dSorted))
+		framework.Logf("50 %%ile: %v", p50)
+		framework.Logf("90 %%ile: %v", p90)
+		framework.Logf("99 %%ile: %v", p99)
+		framework.Logf("Total sample count: %v", len(dSorted))
 
 		if p50 > limitMedian {
 			failing.Insert("Median latency should be less than " + limitMedian.String())
@@ -122,7 +121,7 @@ var _ = SIGDescribe("Service endpoints latency", func() {
 		if failing.Len() > 0 {
 			errList := strings.Join(failing.List(), "\n")
 			helpfulInfo := fmt.Sprintf("\n50, 90, 99 percentiles: %v %v %v", p50, p90, p99)
-			e2elog.Failf(errList + helpfulInfo)
+			framework.Failf(errList + helpfulInfo)
 		}
 	})
 })
@@ -176,14 +175,14 @@ func runServiceLatencies(f *framework.Framework, inParallel, total int, acceptab
 	for i := 0; i < total; i++ {
 		select {
 		case e := <-errs:
-			e2elog.Logf("Got error: %v", e)
+			framework.Logf("Got error: %v", e)
 			errCount++
 		case d := <-durations:
 			output = append(output, d)
 		}
 	}
 	if errCount != 0 {
-		e2elog.Logf("Got %d errors out of %d tries", errCount, total)
+		framework.Logf("Got %d errors out of %d tries", errCount, total)
 		errRatio := float32(errCount) / float32(total)
 		if errRatio > acceptableFailureRatio {
 			return output, fmt.Errorf("error ratio %g is higher than the acceptable ratio %g", errRatio, acceptableFailureRatio)
@@ -346,13 +345,13 @@ func singleServiceLatency(f *framework.Framework, name string, q *endpointQuerie
 	if err != nil {
 		return 0, err
 	}
-	e2elog.Logf("Created: %v", gotSvc.Name)
+	framework.Logf("Created: %v", gotSvc.Name)
 
 	if e := q.request(gotSvc.Name); e == nil {
 		return 0, fmt.Errorf("Never got a result for endpoint %v", gotSvc.Name)
 	}
 	stopTime := time.Now()
 	d := stopTime.Sub(startTime)
-	e2elog.Logf("Got endpoints: %v [%v]", gotSvc.Name, d)
+	framework.Logf("Got endpoints: %v [%v]", gotSvc.Name, d)
 	return d, nil
 }

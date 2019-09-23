@@ -26,8 +26,8 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -105,11 +105,11 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 		}
 
 		iterations64 := float64(iterations)
-		e2elog.Logf("Average latency for below operations")
-		e2elog.Logf("Creating %d PVCs and waiting for bound phase: %v seconds", volumeCount, sumLatency[CreateOp]/iterations64)
-		e2elog.Logf("Creating %v Pod: %v seconds", volumeCount/volumesPerPod, sumLatency[AttachOp]/iterations64)
-		e2elog.Logf("Deleting %v Pod and waiting for disk to be detached: %v seconds", volumeCount/volumesPerPod, sumLatency[DetachOp]/iterations64)
-		e2elog.Logf("Deleting %v PVCs: %v seconds", volumeCount, sumLatency[DeleteOp]/iterations64)
+		framework.Logf("Average latency for below operations")
+		framework.Logf("Creating %d PVCs and waiting for bound phase: %v seconds", volumeCount, sumLatency[CreateOp]/iterations64)
+		framework.Logf("Creating %v Pod: %v seconds", volumeCount/volumesPerPod, sumLatency[AttachOp]/iterations64)
+		framework.Logf("Deleting %v Pod and waiting for disk to be detached: %v seconds", volumeCount/volumesPerPod, sumLatency[DetachOp]/iterations64)
+		framework.Logf("Deleting %v PVCs: %v seconds", volumeCount, sumLatency[DeleteOp]/iterations64)
 
 	})
 })
@@ -172,14 +172,14 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 		var pvclaims []*v1.PersistentVolumeClaim
 		for j := 0; j < volumesPerPod; j++ {
 			currsc := sc[((i*numPods)+j)%len(sc)]
-			pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", currsc))
+			pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", currsc))
 			framework.ExpectNoError(err)
 			pvclaims = append(pvclaims, pvclaim)
 		}
 		totalpvclaims = append(totalpvclaims, pvclaims)
 	}
 	for _, pvclaims := range totalpvclaims {
-		persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+		persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 		totalpvs = append(totalpvs, persistentvolumes)
 	}
@@ -225,7 +225,7 @@ func invokeVolumeLifeCyclePerformance(f *framework.Framework, client clientset.I
 	start = time.Now()
 	for _, pvclaims := range totalpvclaims {
 		for _, pvc := range pvclaims {
-			err = framework.DeletePersistentVolumeClaim(client, pvc.Name, namespace)
+			err = e2epv.DeletePersistentVolumeClaim(client, pvc.Name, namespace)
 			framework.ExpectNoError(err)
 		}
 	}

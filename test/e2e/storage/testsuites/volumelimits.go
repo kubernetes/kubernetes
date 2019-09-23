@@ -35,6 +35,7 @@ import (
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 )
 
@@ -148,7 +149,7 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 		// Create <limit> PVCs for one gigantic pod.
 		ginkgo.By(fmt.Sprintf("Creating %d PVC(s)", limit))
 		for i := 0; i < limit; i++ {
-			pvc := framework.MakePersistentVolumeClaim(framework.PersistentVolumeClaimConfig{
+			pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 				ClaimSize:        dDriver.GetClaimSize(),
 				StorageClassName: &l.resource.sc.Name,
 			}, l.ns.Name)
@@ -158,7 +159,7 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 		}
 
 		ginkgo.By("Creating pod to use all PVC(s)")
-		pod := e2epod.MakeSecPod(l.ns.Name, l.pvcs, nil, false, "", false, false, framework.SELinuxLabel, nil)
+		pod := e2epod.MakeSecPod(l.ns.Name, l.pvcs, nil, false, "", false, false, e2epv.SELinuxLabel, nil)
 		// Use affinity to schedule everything on the right node
 		selection := e2epod.NodeSelection{}
 		e2epod.SetAffinity(&selection, nodeName)
@@ -167,7 +168,7 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for all PVCs to get Bound")
-		l.pvNames, err = waitForAllPVCsPhase(l.cs, testSlowMultiplier*framework.PVBindingTimeout, l.pvcs)
+		l.pvNames, err = waitForAllPVCsPhase(l.cs, testSlowMultiplier*e2epv.PVBindingTimeout, l.pvcs)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for the pod Running")
@@ -175,7 +176,7 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating an extra pod with one volume to exceed the limit")
-		pod = e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, framework.SELinuxLabel, nil)
+		pod = e2epod.MakeSecPod(l.ns.Name, []*v1.PersistentVolumeClaim{l.resource.pvc}, nil, false, "", false, false, e2epv.SELinuxLabel, nil)
 		// Use affinity to schedule everything on the right node
 		e2epod.SetAffinity(&selection, nodeName)
 		pod.Spec.Affinity = selection.Affinity
@@ -223,7 +224,7 @@ func cleanupTest(cs clientset.Interface, ns string, runningPodName, unschedulabl
 	// Wait for the PVs to be deleted. It includes also pod and PVC deletion because of PVC protection.
 	// We use PVs to make sure that the test does not leave orphan PVs when a CSI driver is destroyed
 	// just after the test ends.
-	err := wait.Poll(5*time.Second, testSlowMultiplier*framework.PVDeletingTimeout, func() (bool, error) {
+	err := wait.Poll(5*time.Second, testSlowMultiplier*e2epv.PVDeletingTimeout, func() (bool, error) {
 		existing := 0
 		for _, pvName := range pvNames.UnsortedList() {
 			_, err := cs.CoreV1().PersistentVolumes().Get(pvName, metav1.GetOptions{})

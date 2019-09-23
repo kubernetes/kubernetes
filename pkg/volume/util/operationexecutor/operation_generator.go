@@ -1760,10 +1760,6 @@ func checkMountOptionSupport(og *operationGenerator, volumeToMount VolumeToMount
 // checkNodeAffinity looks at the PV node affinity, and checks if the node has the same corresponding labels
 // This ensures that we don't mount a volume that doesn't belong to this node
 func checkNodeAffinity(og *operationGenerator, volumeToMount VolumeToMount) error {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.PersistentLocalVolumes) {
-		return nil
-	}
-
 	pv := volumeToMount.VolumeSpec.PersistentVolume
 	if pv != nil {
 		nodeLabels, err := og.volumePluginMgr.Host.GetNodeLabels()

@@ -62,16 +62,17 @@ func NewCloudNodeController(
 	nodeInformer coreinformers.NodeInformer,
 	kubeClient clientset.Interface,
 	cloud cloudprovider.Interface,
-	nodeStatusUpdateFrequency time.Duration) *CloudNodeController {
+	nodeStatusUpdateFrequency time.Duration) (*CloudNodeController, error) {
 
 	eventBroadcaster := record.NewBroadcaster()
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "cloud-node-controller"})
 	eventBroadcaster.StartLogging(klog.Infof)
-	if kubeClient != nil {
-		klog.V(0).Infof("Sending events to api server.")
-		eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	} else {
-		klog.V(0).Infof("No api server defined - no events will be sent to API server.")
+
+	klog.Infof("Sending events to api server.")
+	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
+
+	if _, ok := cloud.Instances(); !ok {
+		return nil, errors.New("cloud provider does not support instances")
 	}
 
 	cnc := &CloudNodeController{
@@ -89,7 +90,7 @@ func NewCloudNodeController(
 		UpdateFunc: cnc.UpdateCloudNode,
 	})
 
-	return cnc
+	return cnc, nil
 }
 
 // This controller updates newly registered nodes with information
@@ -159,6 +160,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 	for i := range nodeAddresses {
 		if nodeAddresses[i].Type == v1.NodeHostName {
 			hostnameExists = true
+			break
 		}
 	}
 	// If hostname was not present in cloud provided addresses, use the hostname

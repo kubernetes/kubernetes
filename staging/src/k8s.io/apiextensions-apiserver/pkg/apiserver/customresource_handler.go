@@ -815,7 +815,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 			reqScope := *requestScopes[v.Name]
-			reqScope.FieldManager, err = fieldmanager.NewCRDFieldManager(
+			fm, err := fieldmanager.NewCRDFieldManager(
 				openAPIModels,
 				reqScope.Convertor,
 				reqScope.Defaulter,
@@ -826,6 +826,7 @@ func (r *crdHandler) getOrCreateServingInfoFor(uid types.UID, name string) (*crd
 			if err != nil {
 				return nil, err
 			}
+			reqScope.FieldManager = fieldmanager.NewSkipNonAppliedManager(fm, reqScope.Creater, reqScope.Kind)
 			requestScopes[v.Name] = &reqScope
 		}
 
@@ -1236,7 +1237,7 @@ func buildOpenAPIModelsForApply(staticOpenAPISpec *spec.Swagger, crd *apiextensi
 
 	specs := []*spec.Swagger{}
 	for _, v := range crd.Spec.Versions {
-		s, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: false, StripDefaults: true, StripValueValidation: true})
+		s, err := builder.BuildSwagger(crd, v.Name, builder.Options{V2: false, StripDefaults: true, StripValueValidation: true, AllowNonStructural: true})
 		if err != nil {
 			return nil, err
 		}

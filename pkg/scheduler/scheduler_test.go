@@ -153,7 +153,7 @@ type mockScheduler struct {
 	err    error
 }
 
-func (es mockScheduler) Schedule(pod *v1.Pod, pc *framework.PluginContext) (core.ScheduleResult, error) {
+func (es mockScheduler) Schedule(pc *framework.PluginContext, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
 
@@ -161,6 +161,9 @@ func (es mockScheduler) Predicates() map[string]predicates.FitPredicate {
 	return nil
 }
 func (es mockScheduler) Prioritizers() []priorities.PriorityConfig {
+	return nil
+}
+func (es mockScheduler) Extenders() []algorithm.SchedulerExtender {
 	return nil
 }
 

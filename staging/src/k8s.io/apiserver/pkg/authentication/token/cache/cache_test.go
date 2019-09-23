@@ -32,6 +32,9 @@ func TestSimpleCache(t *testing.T) {
 	testCache(newSimpleCache(4096, clock.RealClock{}), t)
 }
 
+// Note: the performance profile of this benchmark may not match that in the production.
+// When making change to SimpleCache, run test with and without concurrency to better understand the impact.
+// This is a tool to test and measure high concurrency of the cache in isolation and not to the Kubernetes usage of the Cache.
 func BenchmarkSimpleCache(b *testing.B) {
 	benchmarkCache(newSimpleCache(4096, clock.RealClock{}), b)
 }

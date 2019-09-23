@@ -160,6 +160,7 @@ aliases:
     - ahg-g
     - draveness
     - hex108
+    - alculquicondor
 
   sig-cli-maintainers:
     - adohe

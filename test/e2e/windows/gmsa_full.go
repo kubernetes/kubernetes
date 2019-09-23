@@ -52,7 +52,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -99,28 +98,28 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA Full [Slow]", 
 			deployScriptPath, err := downloadFile(gmsaWebhookDeployScriptURL)
 			defer func() { os.Remove(deployScriptPath) }()
 			if err != nil {
-				e2elog.Failf(err.Error())
+				framework.Failf(err.Error())
 			}
 
 			ginkgo.By("deploying the GMSA webhook")
 			webhookCleanUp, err := deployGmsaWebhook(f, deployScriptPath)
 			defer webhookCleanUp()
 			if err != nil {
-				e2elog.Failf(err.Error())
+				framework.Failf(err.Error())
 			}
 
 			ginkgo.By("creating the GMSA custom resource")
 			customResourceCleanup, err := createGmsaCustomResource(crdManifestContents)
 			defer customResourceCleanup()
 			if err != nil {
-				e2elog.Failf(err.Error())
+				framework.Failf(err.Error())
 			}
 
 			ginkgo.By("creating an RBAC role to grant use access to that GMSA resource")
 			rbacRoleName, rbacRoleCleanup, err := createRBACRoleForGmsa(f)
 			defer rbacRoleCleanup()
 			if err != nil {
-				e2elog.Failf(err.Error())
+				framework.Failf(err.Error())
 			}
 
 			ginkgo.By("creating a service account")
@@ -144,7 +143,7 @@ var _ = SIGDescribe("[Feature:Windows] [Feature:WindowsGMSA] GMSA Full [Slow]", 
 
 			expectedSubstr := "The command completed successfully"
 			if !strings.Contains(output, expectedSubstr) {
-				e2elog.Failf("Expected %q to contain %q", output, expectedSubstr)
+				framework.Failf("Expected %q to contain %q", output, expectedSubstr)
 			}
 		})
 	})
@@ -157,7 +156,7 @@ func findPreconfiguredGmsaNodes(c clientset.Interface) []v1.Node {
 	}
 	nodes, err := c.CoreV1().Nodes().List(nodeOpts)
 	if err != nil {
-		e2elog.Failf("Unable to list nodes: %v", err)
+		framework.Failf("Unable to list nodes: %v", err)
 	}
 	return nodes.Items
 }
@@ -211,7 +210,7 @@ func retrieveCRDManifestFileContents(f *framework.Framework, node v1.Node) strin
 	// escape quotes and backward slashes
 	output, err := runKubectlExecInNamespace(f.Namespace.Name, podName, "powershell", "Get-Content", strings.ReplaceAll(gmsaCrdManifestPath, `\`, "/"))
 	if err != nil {
-		e2elog.Failf("failed to retrieve the contents of %q on node %q: %v", gmsaCrdManifestPath, node.Name, err)
+		framework.Failf("failed to retrieve the contents of %q on node %q: %v", gmsaCrdManifestPath, node.Name, err)
 	}
 
 	// Windows to linux new lines
@@ -250,7 +249,7 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 
 	output, err := cmd.CombinedOutput()
 	if err == nil {
-		e2elog.Logf("GMSA webhook successfully deployed, output:\n%s", string(output))
+		framework.Logf("GMSA webhook successfully deployed, output:\n%s", string(output))
 	} else {
 		err = errors.Wrapf(err, "unable to deploy GMSA webhook, output:\n%s", string(output))
 	}
@@ -332,7 +331,7 @@ func createServiceAccount(f *framework.Framework) string {
 		},
 	}
 	if _, err := f.ClientSet.CoreV1().ServiceAccounts(f.Namespace.Name).Create(account); err != nil {
-		e2elog.Failf("unable to create service account %q: %v", accountName, err)
+		framework.Failf("unable to create service account %q: %v", accountName, err)
 	}
 	return accountName
 }

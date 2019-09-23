@@ -61,15 +61,12 @@ const (
 	seedContainer2 = 5000
 	seedSandbox2   = 6000
 	seedContainer3 = 7000
-	seedSandbox3   = 8000
-	seedContainer5 = 9000
 )
 
 const (
 	pName0 = "pod0"
 	pName1 = "pod1"
 	pName2 = "pod2"
-	pName3 = "pod3"
 )
 
 const (

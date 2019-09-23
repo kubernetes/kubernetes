@@ -22,11 +22,11 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -60,7 +60,7 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		scParameters = make(map[string]string)
 		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
 		if !(len(nodeList.Items) > 0) {
-			e2elog.Failf("Unable to find ready and schedulable Node")
+			framework.Failf("Unable to find ready and schedulable Node")
 		}
 	})
 
@@ -84,12 +84,12 @@ func invokeInvalidDatastoreTestNeg(client clientset.Interface, namespace string,
 	defer client.StorageV1().StorageClasses().Delete(storageclass.Name, nil)
 
 	ginkgo.By("Creating PVC using the Storage Class")
-	pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
+	pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "2Gi", storageclass))
 	framework.ExpectNoError(err)
-	defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+	defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 	ginkgo.By("Expect claim to fail provisioning volume")
-	err = framework.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
+	err = e2epv.WaitForPersistentVolumeClaimPhase(v1.ClaimBound, client, pvclaim.Namespace, pvclaim.Name, framework.Poll, 2*time.Minute)
 	framework.ExpectError(err)
 
 	eventList, err := client.CoreV1().Events(pvclaim.Namespace).List(metav1.ListOptions{})

@@ -42,6 +42,8 @@ import (
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/cli/globalflag"
 	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/version"
+	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
@@ -49,12 +51,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	plugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/util/configz"
 	utilflag "k8s.io/kubernetes/pkg/util/flag"
-	"k8s.io/kubernetes/pkg/version"
-	"k8s.io/kubernetes/pkg/version/verflag"
 )
 
 // Option configures a framework.Registry.
@@ -139,9 +140,6 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 	// Get the completed config
 	cc := c.Complete()
 
-	// To help debugging, immediately log version
-	klog.Infof("Version: %+v", version.Get())
-
 	// Apply algorithms based on feature gates.
 	// TODO: make configurable?
 	algorithmprovider.ApplyFeatureGates()
@@ -161,7 +159,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 	// To help debugging, immediately log version
 	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
 
-	registry := framework.NewRegistry()
+	registry := plugins.NewDefaultRegistry()
 	for _, option := range registryOptions {
 		if err := option(registry); err != nil {
 			return err

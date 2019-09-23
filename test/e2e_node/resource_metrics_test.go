@@ -23,7 +23,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubeletresourcemetricsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/resourcemetrics/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 
@@ -73,7 +72,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 			matchV1alpha1Expectations := gstruct.MatchAllKeys(gstruct.Keys{
 				"scrape_error": gstruct.Ignore(),
 				"node_cpu_usage_seconds_total": gstruct.MatchAllElements(nodeId, gstruct.Elements{
-					"": boundedSample(1, 1E6),
+					"": boundedSample(1, 1e6),
 				}),
 				"node_memory_working_set_bytes": gstruct.MatchAllElements(nodeId, gstruct.Elements{
 					"": boundedSample(10*volume.Mb, memoryLimit),
@@ -102,7 +101,7 @@ var _ = framework.KubeDescribe("ResourceMetricsAPI", func() {
 				return
 			}
 			if framework.TestContext.DumpLogsOnFailure {
-				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, e2elog.Logf)
+				framework.LogFailedContainers(f.ClientSet, f.Namespace.Name, framework.Logf)
 			}
 			ginkgo.By("Recording processes in system cgroups")
 			recordSystemCgroupProcesses()

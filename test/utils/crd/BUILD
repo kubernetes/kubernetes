@@ -13,7 +13,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/framework/log:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

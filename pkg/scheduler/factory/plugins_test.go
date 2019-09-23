@@ -58,13 +58,13 @@ func TestValidatePriorityConfigOverFlow(t *testing.T) {
 		expected    bool
 	}{
 		{
-			description: "one of the weights is MaxInt",
-			configs:     []priorities.PriorityConfig{{Weight: api.MaxInt}, {Weight: 5}},
+			description: "one of the weights is MaxTotalPriority(MaxInt64)",
+			configs:     []priorities.PriorityConfig{{Weight: api.MaxTotalPriority}, {Weight: 5}},
 			expected:    true,
 		},
 		{
 			description: "after multiplication with MaxPriority the weight is larger than MaxWeight",
-			configs:     []priorities.PriorityConfig{{Weight: api.MaxInt/api.MaxPriority + api.MaxPriority}, {Weight: 5}},
+			configs:     []priorities.PriorityConfig{{Weight: api.MaxWeight + api.MaxPriority}, {Weight: 5}},
 			expected:    true,
 		},
 		{

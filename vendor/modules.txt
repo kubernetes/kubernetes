@@ -558,7 +558,7 @@ github.com/hashicorp/hcl/hcl/token
 github.com/hashicorp/hcl/json/parser
 github.com/hashicorp/hcl/json/scanner
 github.com/hashicorp/hcl/json/token
-# github.com/heketi/heketi v9.0.0+incompatible => github.com/heketi/heketi v9.0.0+incompatible
+# github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible => github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
 github.com/heketi/heketi/client/api/go-client
 github.com/heketi/heketi/pkg/glusterfs/api
 github.com/heketi/heketi/pkg/utils
@@ -610,7 +610,7 @@ github.com/mattn/go-shellwords
 github.com/matttproud/golang_protobuf_extensions/pbutil
 # github.com/miekg/dns v1.1.4 => github.com/miekg/dns v1.1.4
 github.com/miekg/dns
-# github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2 => github.com/mindprince/gonvml v0.0.0-20171110221305-fee913ce8fb2
+# github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989 => github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989
 github.com/mindprince/gonvml
 # github.com/mistifyio/go-zfs v2.1.1+incompatible => github.com/mistifyio/go-zfs v2.1.1+incompatible
 github.com/mistifyio/go-zfs
@@ -1212,6 +1212,7 @@ k8s.io/apimachinery/pkg/api/validation
 k8s.io/apimachinery/pkg/api/validation/path
 k8s.io/apimachinery/pkg/apis/meta/fuzzer
 k8s.io/apimachinery/pkg/apis/meta/internalversion
+k8s.io/apimachinery/pkg/apis/meta/internalversion/scheme
 k8s.io/apimachinery/pkg/apis/meta/v1
 k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
 k8s.io/apimachinery/pkg/apis/meta/v1/unstructured/unstructuredscheme
@@ -1668,8 +1669,10 @@ k8s.io/component-base/metrics/legacyregistry
 k8s.io/component-base/metrics/prometheus/clientgo
 k8s.io/component-base/metrics/prometheus/clientgo/leaderelection
 k8s.io/component-base/metrics/prometheus/restclient
+k8s.io/component-base/metrics/prometheus/version
 k8s.io/component-base/metrics/prometheus/workqueue
 k8s.io/component-base/version
+k8s.io/component-base/version/verflag
 # k8s.io/cri-api v0.0.0 => ./staging/src/k8s.io/cri-api
 k8s.io/cri-api/pkg/apis
 k8s.io/cri-api/pkg/apis/runtime/v1alpha2
@@ -1822,7 +1825,6 @@ k8s.io/kubectl/pkg/util/storage
 k8s.io/kubectl/pkg/util/templates
 k8s.io/kubectl/pkg/util/term
 k8s.io/kubectl/pkg/validation
-k8s.io/kubectl/pkg/version
 # k8s.io/kubelet v0.0.0 => ./staging/src/k8s.io/kubelet
 k8s.io/kubelet/config/v1beta1
 # k8s.io/legacy-cloud-providers v0.0.0 => ./staging/src/k8s.io/legacy-cloud-providers

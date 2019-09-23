@@ -18,6 +18,7 @@ package kubenet
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"testing"
 
@@ -172,7 +173,7 @@ func TestTeardownCallsShaper(t *testing.T) {
 	kubenet.bandwidthShaper = fshaper
 	kubenet.hostportSyncer = hostporttest.NewFakeHostportSyncer()
 
-	mockcni.On("DelNetwork", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
+	mockcni.On("DelNetwork", mock.AnythingOfType("*context.timerCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 
 	details := make(map[string]interface{})
 	details[network.NET_PLUGIN_EVENT_POD_CIDR_CHANGE_DETAIL_CIDR] = "10.0.0.1/24"
@@ -301,7 +302,7 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 		existingContainerID := kubecontainer.BuildContainerID("docker", "123")
 		kubenet.podIPs[existingContainerID] = utilsets.NewString(tc.ip)
 
-		mockcni.On("DelNetwork", mock.AnythingOfType("*context.emptyCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
+		mockcni.On("DelNetwork", mock.AnythingOfType("*context.timerCtx"), mock.AnythingOfType("*libcni.NetworkConfig"), mock.AnythingOfType("*libcni.RuntimeConf")).Return(nil)
 
 		if err := kubenet.TearDownPod("namespace", "name", existingContainerID); err != nil {
 			t.Fatalf("Unexpected error in TearDownPod: %v", err)
@@ -309,6 +310,35 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 		// Assert that the CNI DelNetwork made it through and we didn't crash
 		// without a runtime.
 		mockcni.AssertExpectations(t)
+	}
+}
+
+func TestGetRoutesConifg(t *testing.T) {
+	for _, test := range []struct {
+		cidrs  []string
+		routes string
+	}{
+		{
+			cidrs:  []string{"10.0.0.1/24"},
+			routes: `{"dst": "0.0.0.0/0"}`,
+		},
+		{
+			cidrs:  []string{"2001:4860:4860::8888/32"},
+			routes: `{"dst": "::/0"}`,
+		},
+		{
+			cidrs:  []string{"2001:4860:4860::8888/32", "10.0.0.1/24"},
+			routes: `{"dst": "0.0.0.0/0"},{"dst": "::/0"}`,
+		},
+	} {
+		var cidrs []*net.IPNet
+		for _, c := range test.cidrs {
+			_, cidr, err := net.ParseCIDR(c)
+			assert.NoError(t, err)
+			cidrs = append(cidrs, cidr)
+		}
+		fakeKubenet := &kubenetNetworkPlugin{podCIDRs: cidrs}
+		assert.Equal(t, test.routes, fakeKubenet.getRoutesConfig())
 	}
 }
 

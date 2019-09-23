@@ -110,7 +110,6 @@ pkg/kubeapiserver
 pkg/kubeapiserver/options
 pkg/kubectl/cmd/convert
 pkg/kubectl/cmd/get
-pkg/kubelet
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
 pkg/kubelet/apis/deviceplugin/v1beta1
@@ -132,7 +131,6 @@ pkg/kubelet/lifecycle
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
-pkg/kubelet/qos
 pkg/kubelet/remote
 pkg/kubelet/stats
 pkg/kubelet/status
@@ -246,7 +244,6 @@ pkg/util/rlimit
 pkg/util/selinux
 pkg/util/sysctl/testing
 pkg/util/taints
-pkg/version/verflag
 pkg/volume
 pkg/volume/azure_dd
 pkg/volume/azure_file
@@ -490,6 +487,7 @@ staging/src/k8s.io/code-generator/cmd/lister-gen/generators
 staging/src/k8s.io/component-base/cli/flag
 staging/src/k8s.io/component-base/config/v1alpha1
 staging/src/k8s.io/component-base/featuregate
+staging/src/k8s.io/component-base/version/verflag
 staging/src/k8s.io/cri-api/pkg/apis/testing
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1
 staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1

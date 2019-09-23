@@ -82,7 +82,7 @@ func CheckLocalEtcdClusterStatus(client clientset.Interface, cfg *kubeadmapi.Clu
 	}
 
 	// Checking health state
-	_, err = etcdClient.GetClusterStatus()
+	err = etcdClient.CheckClusterHealth()
 	if err != nil {
 		return errors.Wrap(err, "etcd cluster is not healthy")
 	}

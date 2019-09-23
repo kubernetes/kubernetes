@@ -524,7 +524,7 @@ func (c *cinderVolumeUnmounter) TearDownAt(dir string) error {
 	defer c.plugin.volumeLocks.UnlockKey(c.pdName)
 
 	// Reload list of references, there might be SetUpAt finished in the meantime
-	refs, err = c.mounter.GetMountRefs(dir)
+	_, err = c.mounter.GetMountRefs(dir)
 	if err != nil {
 		klog.V(4).Infof("GetMountRefs failed: %v", err)
 		return err

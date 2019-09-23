@@ -35,7 +35,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -85,8 +84,8 @@ func (t *volumeIOTestSuite) skipRedundantSuite(driver TestDriver, pattern testpa
 
 func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
-		config      *PerTestConfig
-		testCleanup func()
+		config        *PerTestConfig
+		driverCleanup func()
 
 		resource *genericVolumeTestResource
 
@@ -110,7 +109,7 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		l = local{}
 
 		// Now do the more expensive test initialization.
-		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
 
 		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
@@ -126,9 +125,9 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 			l.resource = nil
 		}
 
-		if l.testCleanup != nil {
-			l.testCleanup()
-			l.testCleanup = nil
+		if l.driverCleanup != nil {
+			l.driverCleanup()
+			l.driverCleanup = nil
 		}
 
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
@@ -286,7 +285,7 @@ func deleteFile(pod *v1.Pod, fpath string) {
 	_, err := utils.PodExec(pod, fmt.Sprintf("rm -f %s", fpath))
 	if err != nil {
 		// keep going, the test dir will be deleted when the volume is unmounted
-		e2elog.Logf("unable to delete test file %s: %v\nerror ignored, continuing test", fpath, err)
+		framework.Logf("unable to delete test file %s: %v\nerror ignored, continuing test", fpath, err)
 	}
 }
 
@@ -318,12 +317,12 @@ func testVolumeIO(f *framework.Framework, cs clientset.Interface, config volume.
 		ginkgo.By(fmt.Sprintf("deleting client pod %q...", clientPod.Name))
 		e := e2epod.DeletePodWithWait(cs, clientPod)
 		if e != nil {
-			e2elog.Logf("client pod failed to delete: %v", e)
+			framework.Logf("client pod failed to delete: %v", e)
 			if err == nil { // delete err is returned if err is not set
 				err = e
 			}
 		} else {
-			e2elog.Logf("sleeping a bit so kubelet can unmount and detach the volume")
+			framework.Logf("sleeping a bit so kubelet can unmount and detach the volume")
 			time.Sleep(volume.PodCleanupTimeout)
 		}
 	}()

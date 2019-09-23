@@ -45,8 +45,6 @@ import (
 type Reflector struct {
 	// name identifies this reflector. By default it will be a file:line if possible.
 	name string
-	// metrics tracks basic metric information about the reflector
-	metrics *reflectorMetrics
 
 	// The type of object we expect to place in the store.
 	expectedType reflect.Type
@@ -128,9 +126,6 @@ func (r *Reflector) Run(stopCh <-chan struct{}) {
 var (
 	// nothing will ever be sent down this channel
 	neverExitWatch <-chan time.Time = make(chan time.Time)
-
-	// Used to indicate that watching stopped so that a resync could happen.
-	errorResyncRequested = errors.New("resync channel fired")
 
 	// Used to indicate that watching stopped because of a signal from the stop
 	// channel passed in from a client of the reflector.

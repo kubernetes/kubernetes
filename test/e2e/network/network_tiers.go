@@ -29,7 +29,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
@@ -54,7 +53,7 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 			e2eservice.DescribeSvc(f.Namespace.Name)
 		}
 		for _, lb := range serviceLBNames {
-			e2elog.Logf("cleaning gce resource for %s", lb)
+			framework.Logf("cleaning gce resource for %s", lb)
 			framework.TestContext.CloudConfig.Provider.CleanupServiceResources(cs, lb, framework.TestContext.CloudConfig.Region, framework.TestContext.CloudConfig.Zone)
 		}
 		//reset serviceLBNames
@@ -112,12 +111,12 @@ var _ = SIGDescribe("Services [Feature:GCEAlphaFeature][Slow]", func() {
 			if requestedAddrName != "" {
 				// Release GCE static address - this is not kube-managed and will not be automatically released.
 				if err := gceCloud.DeleteRegionAddress(requestedAddrName, gceCloud.Region()); err != nil {
-					e2elog.Logf("failed to release static IP address %q: %v", requestedAddrName, err)
+					framework.Logf("failed to release static IP address %q: %v", requestedAddrName, err)
 				}
 			}
 		}()
 		framework.ExpectNoError(err)
-		e2elog.Logf("Allocated static IP to be used by the load balancer: %q", requestedIP)
+		framework.Logf("Allocated static IP to be used by the load balancer: %q", requestedIP)
 
 		ginkgo.By("updating the Service to use the standard tier with a requested IP")
 		svc = jig.UpdateServiceOrFail(ns, svc.Name, func(svc *v1.Service) {
@@ -159,7 +158,7 @@ func waitAndVerifyLBWithTier(jig *e2eservice.TestJig, ns, svcName, existingIP st
 	// If the IP has been used by previous test, sometimes we get the lingering
 	// 404 errors even after the LB is long gone. Tolerate and retry until the
 	// the new LB is fully established since this feature is still Alpha in GCP.
-	jig.TestReachableHTTPWithRetriableErrorCodes(ingressIP, svcPort, []int{http.StatusNotFound}, checkTimeout)
+	e2eservice.TestReachableHTTPWithRetriableErrorCodes(ingressIP, svcPort, []int{http.StatusNotFound}, checkTimeout)
 
 	// Verify the network tier matches the desired.
 	svcNetTier, err := gcecloud.GetServiceNetworkTier(svc)

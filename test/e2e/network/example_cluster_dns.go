@@ -31,7 +31,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
@@ -109,7 +108,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 			framework.ExpectNoError(err, "failed to list pods in namespace: %s", ns.Name)
 			err = e2epod.PodsResponding(c, ns.Name, backendPodName, false, pods)
 			framework.ExpectNoError(err, "waiting for all pods to respond")
-			e2elog.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
+			framework.Logf("found %d backend pods responding in namespace %s", len(pods.Items), ns.Name)
 
 			err = e2eservice.WaitForServiceResponding(c, ns.Name, backendSvcName)
 			framework.ExpectNoError(err, "waiting for the service to respond")
@@ -128,7 +127,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		pods, err := c.CoreV1().Pods(namespaces[0].Name).List(options)
 
 		if err != nil || pods == nil || len(pods.Items) == 0 {
-			e2elog.Failf("no running pods found")
+			framework.Failf("no running pods found")
 		}
 		podName := pods.Items[0].Name
 

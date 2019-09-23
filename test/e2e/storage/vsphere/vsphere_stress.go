@@ -28,6 +28,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
+	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -129,14 +130,14 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 	for iterationCount := 0; iterationCount < iterations; iterationCount++ {
 		logPrefix := fmt.Sprintf("Instance: [%v], Iteration: [%v] :", instanceId, iterationCount+1)
 		ginkgo.By(fmt.Sprintf("%v Creating PVC using the Storage Class: %v", logPrefix, sc.Name))
-		pvclaim, err := framework.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "1Gi", sc))
+		pvclaim, err := e2epv.CreatePVC(client, namespace, getVSphereClaimSpecWithStorageClass(namespace, "1Gi", sc))
 		framework.ExpectNoError(err)
-		defer framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+		defer e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 
 		var pvclaims []*v1.PersistentVolumeClaim
 		pvclaims = append(pvclaims, pvclaim)
 		ginkgo.By(fmt.Sprintf("%v Waiting for claim: %v to be in bound phase", logPrefix, pvclaim.Name))
-		persistentvolumes, err := framework.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
+		persistentvolumes, err := e2epv.WaitForPVClaimBoundPhase(client, pvclaims, framework.ClaimProvisionTimeout)
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("%v Creating Pod using the claim: %v", logPrefix, pvclaim.Name))
@@ -169,7 +170,7 @@ func PerformVolumeLifeCycleInParallel(f *framework.Framework, client clientset.I
 		framework.ExpectNoError(err)
 
 		ginkgo.By(fmt.Sprintf("%v Deleting the Claim: %v", logPrefix, pvclaim.Name))
-		err = framework.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
+		err = e2epv.DeletePersistentVolumeClaim(client, pvclaim.Name, namespace)
 		framework.ExpectNoError(err)
 	}
 }

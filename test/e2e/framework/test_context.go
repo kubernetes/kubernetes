@@ -166,6 +166,9 @@ type TestContextType struct {
 
 	// The Default IP Family of the cluster ("ipv4" or "ipv6")
 	IPFamily string
+
+	// NonblockingTaints is the comma-delimeted string given by the user to specify taints which should not stop the test framework from running tests.
+	NonblockingTaints string
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
@@ -234,6 +237,11 @@ type CloudConfig struct {
 // TestContext should be used by all tests to access common context data.
 var TestContext TestContextType
 
+// ClusterIsIPv6 returns true if the cluster is IPv6
+func (tc TestContextType) ClusterIsIPv6() bool {
+	return tc.IPFamily == "ipv6"
+}
+
 // RegisterCommonFlags registers flags common to all e2e test suites.
 // The flag set can be flag.CommandLine (if desired) or a custom
 // flag set that then gets passed to viperconfig.ViperizeFlags.
@@ -283,6 +291,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.ImageServiceEndpoint, "image-service-endpoint", "", "The image service endpoint of cluster VM instances.")
 	flags.StringVar(&TestContext.DockershimCheckpointDir, "dockershim-checkpoint-dir", "/var/lib/dockershim/sandbox", "The directory for dockershim to store sandbox checkpoints.")
 	flags.StringVar(&TestContext.KubernetesAnywherePath, "kubernetes-anywhere-path", "/workspace/k8s.io/kubernetes-anywhere", "Which directory kubernetes-anywhere is installed to.")
+	flags.StringVar(&TestContext.NonblockingTaints, "non-blocking-taints", `node-role.kubernetes.io/master`, "Nodes with taints in this comma-delimited list will not block the test framework from starting tests.")
 
 	flags.BoolVar(&TestContext.ListImages, "list-images", false, "If true, will show list of images used for runnning tests.")
 }
@@ -423,6 +432,8 @@ func AfterReadingAllFlags(t *TestContextType) {
 	if t.AllowedNotReadyNodes == 0 {
 		t.AllowedNotReadyNodes = t.CloudConfig.NumNodes / 100
 	}
+
+	klog.Infof("Tolerating taints %q when considering if nodes are ready", TestContext.NonblockingTaints)
 
 	// Make sure that all test runs have a valid TestContext.CloudConfig.Provider.
 	// TODO: whether and how long this code is needed is getting discussed
