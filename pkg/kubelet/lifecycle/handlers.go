@@ -21,6 +21,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,6 +36,7 @@ import (
 
 const (
 	maxRespBodyLength = 10 * 1 << 10 // 10KB
+	defaultTimeoutOfRunInContainer = time.Second * 60
 )
 
 type HandlerRunner struct {
@@ -60,7 +62,7 @@ func (hr *HandlerRunner) Run(containerID kubecontainer.ContainerID, pod *v1.Pod,
 	case handler.Exec != nil:
 		var msg string
 		// TODO(tallclair): Pass a proper timeout value.
-		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, 0)
+		output, err := hr.commandRunner.RunInContainer(containerID, handler.Exec.Command, defaultTimeoutOfRunInContainer)
 		if err != nil {
 			msg = fmt.Sprintf("Exec lifecycle hook (%v) for Container %q in Pod %q failed - error: %v, message: %q", handler.Exec.Command, container.Name, format.Pod(pod), err, string(output))
 			klog.V(1).Infof(msg)
