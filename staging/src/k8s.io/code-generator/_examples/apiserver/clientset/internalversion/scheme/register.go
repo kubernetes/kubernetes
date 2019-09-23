@@ -25,6 +25,7 @@ import (
 	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	example "k8s.io/code-generator/_examples/apiserver/apis/example/install"
 	secondexample "k8s.io/code-generator/_examples/apiserver/apis/example2/install"
+	thirdexample "k8s.io/code-generator/_examples/apiserver/apis/example3.io/install"
 )
 
 var Scheme = runtime.NewScheme()
@@ -40,4 +41,5 @@ func init() {
 func Install(scheme *runtime.Scheme) {
 	example.Install(scheme)
 	secondexample.Install(scheme)
+	thirdexample.Install(scheme)
 }
