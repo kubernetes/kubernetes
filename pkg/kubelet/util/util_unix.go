@@ -19,13 +19,13 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
 	"path/filepath"
-	"time"
 
 	"golang.org/x/sys/unix"
 	"k8s.io/klog"
@@ -79,7 +79,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 }
 
 // GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
-func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
+func GetAddressAndDialer(endpoint string) (string, func(ctx context.Context, addr string) (net.Conn, error), error) {
 	protocol, addr, err := parseEndpointWithFallbackProtocol(endpoint, unixProtocol)
 	if err != nil {
 		return "", nil, err
@@ -91,8 +91,8 @@ func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout tim
 	return addr, dial, nil
 }
 
-func dial(addr string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout(unixProtocol, addr, timeout)
+func dial(ctx context.Context, addr string) (net.Conn, error) {
+	return (&net.Dialer{}).DialContext(ctx, unixProtocol, addr)
 }
 
 func parseEndpointWithFallbackProtocol(endpoint string, fallbackProtocol string) (protocol string, addr string, err error) {

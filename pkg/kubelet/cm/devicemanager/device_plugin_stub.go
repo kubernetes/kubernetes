@@ -162,8 +162,8 @@ func (m *Stub) Register(kubeletEndpoint, resourceName string, pluginSockDir stri
 	defer cancel()
 
 	conn, err := grpc.DialContext(ctx, kubeletEndpoint, grpc.WithInsecure(), grpc.WithBlock(),
-		grpc.WithDialer(func(addr string, timeout time.Duration) (net.Conn, error) {
-			return net.DialTimeout("unix", addr, timeout)
+		grpc.WithContextDialer(func(ctx context.Context, addr string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", addr)
 		}))
 	if err != nil {
 		return err

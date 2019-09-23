@@ -19,6 +19,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"time"
@@ -30,7 +31,7 @@ func CreateListener(endpoint string) (net.Listener, error) {
 }
 
 // GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
-func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
+func GetAddressAndDialer(endpoint string) (string, func(ctx context.Context, addr string) (net.Conn, error), error) {
 	return "", nil, fmt.Errorf("GetAddressAndDialer is unsupported in this build")
 }
 
