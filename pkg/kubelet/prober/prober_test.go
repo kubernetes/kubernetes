@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
@@ -283,7 +283,7 @@ func TestProbe(t *testing.T) {
 		for _, probeType := range [...]probeType{liveness, readiness, startup} {
 			prober := &prober{
 				refManager: kubecontainer.NewRefManager(),
-				recorder:   &record.FakeRecorder{},
+				recorder:   &events.FakeRecorder{},
 			}
 			testID := fmt.Sprintf("%d-%s", i, probeType)
 			testContainer := v1.Container{Env: test.env}

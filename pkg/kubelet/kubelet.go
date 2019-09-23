@@ -45,9 +45,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
+	toolsevents "k8s.io/client-go/tools/events"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/certificate"
 	"k8s.io/client-go/util/flowcontrol"
@@ -265,6 +267,7 @@ type Dependencies struct {
 	DynamicPluginProber     volume.DynamicPluginProber
 	TLSOptions              *server.TLSOptions
 	KubeletConfigController *kubeletconfig.Controller
+	EventBroadcaster        toolsevents.EventBroadcaster
 }
 
 // makePodSourceConfig creates a config.PodConfig from the given
@@ -775,12 +778,14 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		}
 	}
 
+	kubeDeps.EventBroadcaster = toolsevents.NewBroadcaster(&toolsevents.EventSinkImpl{Interface: klet.kubeClient.EventsV1beta1().Events("")})
+	recorder := kubeDeps.EventBroadcaster.NewRecorder(scheme.Scheme, string(klet.nodeName))
 	klet.probeManager = prober.NewManager(
 		klet.statusManager,
 		klet.livenessManager,
 		klet.runner,
 		containerRefManager,
-		kubeDeps.Recorder)
+		recorder)
 
 	tokenManager := token.NewManager(kubeDeps.KubeClient)
 

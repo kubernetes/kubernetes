@@ -24,7 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	"k8s.io/component-base/metrics"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
@@ -104,7 +104,7 @@ func NewManager(
 	livenessManager results.Manager,
 	runner kubecontainer.ContainerCommandRunner,
 	refManager *kubecontainer.RefManager,
-	recorder record.EventRecorder) Manager {
+	recorder events.EventRecorder) Manager {
 
 	prober := newProber(runner, refManager, recorder)
 	readinessManager := results.NewManager()

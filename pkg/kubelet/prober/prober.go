@@ -28,9 +28,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/kubelet/events"
+	kubeevents "k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/pkg/kubelet/prober/results"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/probe"
@@ -42,7 +42,9 @@ import (
 	"k8s.io/klog"
 )
 
-const maxProbeRetries = 3
+const (
+	maxProbeRetries = 3
+)
 
 // Prober helps to check the liveness/readiness/startup of a container.
 type prober struct {
@@ -57,7 +59,7 @@ type prober struct {
 	runner        kubecontainer.ContainerCommandRunner
 
 	refManager *kubecontainer.RefManager
-	recorder   record.EventRecorder
+	recorder   events.EventRecorder
 }
 
 // NewProber creates a Prober, it takes a command runner and
@@ -65,7 +67,7 @@ type prober struct {
 func newProber(
 	runner kubecontainer.ContainerCommandRunner,
 	refManager *kubecontainer.RefManager,
-	recorder record.EventRecorder) *prober {
+	recorder events.EventRecorder) *prober {
 
 	const followNonLocalRedirects = false
 	return &prober{
@@ -110,19 +112,19 @@ func (pb *prober) probe(probeType probeType, pod *v1.Pod, status v1.PodStatus, c
 		if err != nil {
 			klog.V(1).Infof("%s probe for %q errored: %v", probeType, ctrName, err)
 			if hasRef {
-				pb.recorder.Eventf(ref, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe errored: %v", probeType, err)
+				pb.recorder.Eventf(ref, nil, v1.EventTypeWarning, kubeevents.ContainerUnhealthy, "%s probe errored: %v", "probe", err)
 			}
 		} else { // result != probe.Success
 			klog.V(1).Infof("%s probe for %q failed (%v): %s", probeType, ctrName, result, output)
 			if hasRef {
-				pb.recorder.Eventf(ref, v1.EventTypeWarning, events.ContainerUnhealthy, "%s probe failed: %s", probeType, output)
+				pb.recorder.Eventf(ref, nil, v1.EventTypeWarning, kubeevents.ContainerUnhealthy, "%s probe failed: %s", "probe", output)
 			}
 		}
 		return results.Failure, err
 	}
 	if result == probe.Warning {
 		if ref, hasRef := pb.refManager.GetRef(containerID); hasRef {
-			pb.recorder.Eventf(ref, v1.EventTypeWarning, events.ContainerProbeWarning, "%s probe warning: %s", probeType, output)
+			pb.recorder.Eventf(ref, nil, v1.EventTypeWarning, kubeevents.ContainerProbeWarning, "%s probe warning: %s", string(probeType), output)
 		}
 		klog.V(3).Infof("%s probe for %q succeeded with a warning: %s", probeType, ctrName, output)
 	} else {

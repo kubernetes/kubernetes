@@ -636,9 +636,6 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		}
 	}
 
-	// Setup event recorder if required.
-	makeEventRecorder(kubeDeps, nodeName)
-
 	if kubeDeps.ContainerManager == nil {
 		if s.CgroupsPerQOS && s.CgroupRoot == "" {
 			klog.Info("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
@@ -720,6 +717,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 	if err := RunKubelet(s, kubeDeps, s.RunOnce); err != nil {
 		return err
 	}
+	kubeDeps.EventBroadcaster.StartRecordingToSink(stopCh)
 
 	if s.HealthzPort > 0 {
 		mux := http.NewServeMux()
