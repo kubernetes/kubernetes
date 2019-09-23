@@ -5,18 +5,20 @@ go_library(
     srcs = [
         "doc.go",
         "register.go",
-        "types.go",
+        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
+        "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/scheduler/apis/config",
+    importpath = "k8s.io/kubernetes/pkg/scheduler/apis/config/v1",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/scheduler/apis/config:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
-        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
-        "//staging/src/k8s.io/component-base/config:go_default_library",
+        "//staging/src/k8s.io/kube-scheduler/config/v1:go_default_library",
     ],
 )
 
@@ -29,15 +31,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/scheduler/apis/config/compatibility:all-srcs",
-        "//pkg/scheduler/apis/config/latest:all-srcs",
-        "//pkg/scheduler/apis/config/scheme:all-srcs",
-        "//pkg/scheduler/apis/config/v1:all-srcs",
-        "//pkg/scheduler/apis/config/v1alpha1:all-srcs",
-        "//pkg/scheduler/apis/config/validation:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
