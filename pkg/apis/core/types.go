@@ -3700,7 +3700,7 @@ type NodeSpec struct {
 	// Deprecated. Not all kubelets will set this field. Remove field after 1.13.
 	// see: https://issues.k8s.io/61966
 	// +optional
-	DoNotUse_ExternalID string
+	DoNotUseExternalID string
 }
 
 // NodeConfigSource specifies a source of node configuration. Exactly one subfield must be non-nil.
