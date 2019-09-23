@@ -312,8 +312,8 @@ func IsHTTPHeaderName(value string) []string {
 	return nil
 }
 
-const envVarNameFmt = "[-._a-zA-Z][-._a-zA-Z0-9]*"
-const envVarNameFmtErrMsg string = "a valid environment variable name must consist of alphabetic characters, digits, '_', '-', or '.', and must not start with a digit"
+const envVarNameFmt = "[^=]+"
+const envVarNameFmtErrMsg string = "a valid environment variable name must not contain '=' character"
 
 var envVarNameRegexp = regexp.MustCompile("^" + envVarNameFmt + "$")
 

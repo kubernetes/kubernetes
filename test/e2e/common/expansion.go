@@ -58,7 +58,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 						Command: []string{"sh", "-c", "env"},
 						Env: []v1.EnvVar{
 							{
-								Name:  "FOO",
+								Name:  "/\\%~*A55&&!!__F{}OO..T:E$T",
 								Value: "foo-value",
 							},
 							{
@@ -67,7 +67,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 							},
 							{
 								Name:  "FOOBAR",
-								Value: "$(FOO);;$(BAR)",
+								Value: "$(/\\%~*A55&&!!__F{}OO..T:E$T);;$(BAR)",
 							},
 						},
 					},
@@ -77,7 +77,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		}
 
 		f.TestContainerOutput("env composition", pod, 0, []string{
-			"FOO=foo-value",
+			"/\\%~*A55&&!!__F{}OO..T:E$T=foo-value",
 			"BAR=bar-value",
 			"FOOBAR=foo-value;;bar-value",
 		})
@@ -234,7 +234,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 						Image: imageutils.GetE2EImage(imageutils.BusyBox),
 						Env: []v1.EnvVar{
 							{
-								Name:  "POD_NAME",
+								Name:  "POD_NAM{E}@#$",
 								Value: "..",
 							},
 						},
@@ -242,7 +242,7 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 							{
 								Name:        "workdir1",
 								MountPath:   "/logscontainer",
-								SubPathExpr: "$(POD_NAME)",
+								SubPathExpr: "$(POD_NAM{E}@#$)",
 							},
 						},
 					},

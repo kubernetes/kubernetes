@@ -59,7 +59,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 						Command: []string{"sh", "-c", "env"},
 						Env: []v1.EnvVar{
 							{
-								Name: "SECRET_DATA",
+								Name: "0{}&&!!55__SECRET_$DATA",
 								ValueFrom: &v1.EnvVarSource{
 									SecretKeyRef: &v1.SecretKeySelector{
 										LocalObjectReference: v1.LocalObjectReference{
@@ -77,7 +77,7 @@ var _ = ginkgo.Describe("[sig-api-machinery] Secrets", func() {
 		}
 
 		f.TestContainerOutput("consume secrets", pod, 0, []string{
-			"SECRET_DATA=value-1",
+			"0{}&&!!55__SECRET_$DATA=value-1",
 		})
 	})
 

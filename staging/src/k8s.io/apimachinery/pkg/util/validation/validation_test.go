@@ -539,3 +539,30 @@ func TestIsValidSocketAddr(t *testing.T) {
 		}
 	}
 }
+
+
+
+func TestIsValidEnvVarName(t *testing.T) {
+	goodValues := []string{
+		"-", ":", "_", "a", "A", "a-", "$a",
+		"a.", "a..", "a:", "a_", "aa", "aA",
+		"a0", "a-a", "a.a", "a:a", "a_a", "aAz",
+		"a0a", "a9", "a a", "_9", ".9", "a9a",
+		"0a", "0 a",
+	}
+	for _, val := range goodValues {
+		if msgs := IsEnvVarName(val); len(msgs) != 0 {
+			t.Errorf("expected true for '%s': %v", val, msgs)
+		}
+	}
+
+	badValues := []string{
+		"", "=", "a=", "1=a", "a=b", "#%=&&",
+		"= =", "=a", "a=",
+	}
+	for _, val := range badValues {
+		if msgs := IsEnvVarName(val); len(msgs) == 0 {
+			t.Errorf("expected false for '%s'", val)
+		}
+	}
+}
