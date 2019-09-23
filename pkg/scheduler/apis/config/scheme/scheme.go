@@ -29,7 +29,7 @@ var (
 	Scheme = runtime.NewScheme()
 
 	// Codecs provides access to encoding and decoding for the scheme.
-	Codecs = serializer.NewCodecFactory(Scheme)
+	Codecs = serializer.NewCodecFactory(Scheme, serializer.EnableStrict)
 )
 
 func init() {
