@@ -126,7 +126,7 @@ func NewProcessCollector(opts ProcessCollectorOpts) Collector {
 	}
 
 	// Set up process metric collection if supported by the runtime.
-	if _, err := procfs.NewStat(); err == nil {
+	if _, err := procfs.NewDefaultFS(); err == nil {
 		c.collectFn = c.processCollect
 	} else {
 		c.collectFn = func(ch chan<- Metric) {
@@ -166,7 +166,7 @@ func (c *processCollector) processCollect(ch chan<- Metric) {
 		return
 	}
 
-	if stat, err := p.NewStat(); err == nil {
+	if stat, err := p.Stat(); err == nil {
 		ch <- MustNewConstMetric(c.cpuTotal, CounterValue, stat.CPUTime())
 		ch <- MustNewConstMetric(c.vsize, GaugeValue, float64(stat.VirtualMemory()))
 		ch <- MustNewConstMetric(c.rss, GaugeValue, float64(stat.ResidentMemory()))
@@ -185,7 +185,7 @@ func (c *processCollector) processCollect(ch chan<- Metric) {
 		c.reportError(ch, c.openFDs, err)
 	}
 
-	if limits, err := p.NewLimits(); err == nil {
+	if limits, err := p.Limits(); err == nil {
 		ch <- MustNewConstMetric(c.maxFDs, GaugeValue, float64(limits.OpenFiles))
 		ch <- MustNewConstMetric(c.maxVsize, GaugeValue, float64(limits.AddressSpace))
 	} else {
