@@ -382,7 +382,8 @@ EOF
         if [[ "${KUBE_BUILD_PULL_LATEST_IMAGES}" =~ [yY] ]]; then
             docker_build_opts+=("--pull")
         fi
-        "${DOCKER[@]}" build "${docker_build_opts[@]}" -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
+        echo "'${DOCKER[@]}' build '${docker_build_opts[@]}' -q -t '${docker_image_tag}' '${docker_build_path}' >/dev/null"
+        "${DOCKER[@]}" build "${!docker_build_opts[@]}" -q -t "${docker_image_tag}" "${docker_build_path}" >/dev/null
         # If we are building an official/alpha/beta release we want to keep
         # docker images and tag them appropriately.
         local -r release_docker_image_tag="${KUBE_DOCKER_REGISTRY-$docker_registry}/${binary_name}-${arch}:${KUBE_DOCKER_IMAGE_TAG-$docker_tag}"
