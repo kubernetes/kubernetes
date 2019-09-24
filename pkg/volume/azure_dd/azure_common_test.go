@@ -64,7 +64,6 @@ var (
 	lunStr    = "1"
 	diskPath  = "4:0:0:" + lunStr
 	devName   = "sdd"
-	lun1      = 2
 	lunStr1   = "2"
 	diskPath1 = "3:0:0:" + lunStr1
 	devName1  = "sde"
