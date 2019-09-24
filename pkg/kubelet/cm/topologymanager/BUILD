@@ -15,7 +15,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/kubelet/cm/cpumanager/topology:go_default_library",
-        "//pkg/kubelet/cm/topologymanager/socketmask:go_default_library",
+        "//pkg/kubelet/cm/topologymanager/bitmask:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
@@ -33,7 +33,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/kubelet/cm/topologymanager/socketmask:all-srcs",
+        "//pkg/kubelet/cm/topologymanager/bitmask:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
@@ -51,7 +51,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/kubelet/cm/topologymanager/socketmask:go_default_library",
+        "//pkg/kubelet/cm/topologymanager/bitmask:go_default_library",
         "//pkg/kubelet/lifecycle:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",

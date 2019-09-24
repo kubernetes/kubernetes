@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	pluginapi "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
 type mockAffinityStore struct {
@@ -51,8 +51,8 @@ func topologyHintLessThan(a topologymanager.TopologyHint, b topologymanager.Topo
 	return a.NUMANodeAffinity.IsNarrowerThan(b.NUMANodeAffinity)
 }
 
-func makeSocketMask(sockets ...int) socketmask.SocketMask {
-	mask, _ := socketmask.NewSocketMask(sockets...)
+func makeSocketMask(sockets ...int) bitmask.BitMask {
+	mask, _ := bitmask.NewBitMask(sockets...)
 	return mask
 }
 

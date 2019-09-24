@@ -14,27 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package socketmask
+package bitmask
 
 import (
 	"reflect"
 	"testing"
 )
 
-func TestNewSocketMask(t *testing.T) {
+func TestNewBitMask(t *testing.T) {
 	tcases := []struct {
 		name         string
-		socket       int
+		bit          int
 		expectedMask string
 	}{
 		{
-			name:         "New SocketMask with socket 0 set",
-			socket:       0,
+			name:         "New BitMask with bit 0 set",
+			bit:          0,
 			expectedMask: "0000000000000000000000000000000000000000000000000000000000000001",
 		},
 	}
 	for _, tc := range tcases {
-		sm, _ := NewSocketMask(0)
+		sm, _ := NewBitMask(0)
 		if sm.String() != tc.expectedMask {
 			t.Errorf("Expected mask to be %v, got %v", tc.expectedMask, sm)
 		}
@@ -44,20 +44,20 @@ func TestNewSocketMask(t *testing.T) {
 func TestAdd(t *testing.T) {
 	tcases := []struct {
 		name         string
-		firstSocket  int
-		secondSocket int
+		firstbit     int
+		secondbit    int
 		expectedMask string
 	}{
 		{
-			name:         "New SocketMask with sockets 0 and 1 set",
-			firstSocket:  0,
-			secondSocket: 1,
+			name:         "New BitMask with bits 0 and 1 set",
+			firstbit:     0,
+			secondbit:    1,
 			expectedMask: "0000000000000000000000000000000000000000000000000000000000000011",
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewSocketMask()
-		mask.Add(tc.firstSocket, tc.secondSocket)
+		mask, _ := NewBitMask()
+		mask.Add(tc.firstbit, tc.secondbit)
 		if mask.String() != tc.expectedMask {
 			t.Errorf("Expected mask to be %v, got %v", tc.expectedMask, mask)
 		}
@@ -66,23 +66,23 @@ func TestAdd(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	tcases := []struct {
-		name              string
-		firstSocketSet    int
-		secondSocketSet   int
-		firstSocketRemove int
-		expectedMask      string
+		name           string
+		firstbitset    int
+		secondbitset   int
+		firstbitRemove int
+		expectedMask   string
 	}{
 		{
-			name:              "Reset bit 1 SocketMask to 0",
-			firstSocketSet:    0,
-			secondSocketSet:   1,
-			firstSocketRemove: 0,
-			expectedMask:      "0000000000000000000000000000000000000000000000000000000000000010",
+			name:           "Reset bit 1 BitMask to 0",
+			firstbitset:    0,
+			secondbitset:   1,
+			firstbitRemove: 0,
+			expectedMask:   "0000000000000000000000000000000000000000000000000000000000000010",
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewSocketMask(tc.firstSocketSet, tc.secondSocketSet)
-		mask.Remove(tc.firstSocketRemove)
+		mask, _ := NewBitMask(tc.firstbitset, tc.secondbitset)
+		mask.Remove(tc.firstbitRemove)
 		if mask.String() != tc.expectedMask {
 			t.Errorf("Expected mask to be %v, got %v", tc.expectedMask, mask)
 		}
@@ -97,15 +97,15 @@ func TestAnd(t *testing.T) {
 		andMask       string
 	}{
 		{
-			name:          "And socket masks",
+			name:          "And bit masks",
 			firstMaskBit:  0,
 			secondMaskBit: 0,
 			andMask:       "0000000000000000000000000000000000000000000000000000000000000001",
 		},
 	}
 	for _, tc := range tcases {
-		firstMask, _ := NewSocketMask(tc.firstMaskBit)
-		secondMask, _ := NewSocketMask(tc.secondMaskBit)
+		firstMask, _ := NewBitMask(tc.firstMaskBit)
+		secondMask, _ := NewBitMask(tc.secondMaskBit)
 
 		result := And(firstMask, secondMask)
 		if result.String() != string(tc.andMask) {
@@ -127,15 +127,15 @@ func TestOr(t *testing.T) {
 		orMask        string
 	}{
 		{
-			name:          "Or socket masks",
+			name:          "Or bit masks",
 			firstMaskBit:  0,
 			secondMaskBit: 1,
 			orMask:        "0000000000000000000000000000000000000000000000000000000000000011",
 		},
 	}
 	for _, tc := range tcases {
-		firstMask, _ := NewSocketMask(tc.firstMaskBit)
-		secondMask, _ := NewSocketMask(tc.secondMaskBit)
+		firstMask, _ := NewBitMask(tc.firstMaskBit)
+		secondMask, _ := NewBitMask(tc.secondMaskBit)
 
 		result := Or(firstMask, secondMask)
 		if result.String() != string(tc.orMask) {
@@ -157,14 +157,14 @@ func TestClear(t *testing.T) {
 		clearedMask string
 	}{
 		{
-			name:        "Clear socket masks",
+			name:        "Clear bit masks",
 			firstBit:    0,
 			secondBit:   1,
 			clearedMask: "0000000000000000000000000000000000000000000000000000000000000000",
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewSocketMask(tc.firstBit, tc.secondBit)
+		mask, _ := NewBitMask(tc.firstBit, tc.secondBit)
 		mask.Clear()
 		if mask.String() != string(tc.clearedMask) {
 			t.Errorf("Expected mask to be %v, got %v", tc.clearedMask, mask)
@@ -178,12 +178,12 @@ func TestFill(t *testing.T) {
 		filledMask string
 	}{
 		{
-			name:       "Fill socket masks",
+			name:       "Fill bit masks",
 			filledMask: "1111111111111111111111111111111111111111111111111111111111111111",
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewSocketMask()
+		mask, _ := NewBitMask()
 		mask.Fill()
 		if mask.String() != string(tc.filledMask) {
 			t.Errorf("Expected mask to be %v, got %v", tc.filledMask, mask)
@@ -204,7 +204,7 @@ func TestIsEmpty(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewSocketMask(tc.maskBit)
+		mask, _ := NewBitMask(tc.maskBit)
 		empty := mask.IsEmpty()
 		if empty {
 			t.Errorf("Expected value to be %v, got %v", tc.expectedEmpty, empty)
@@ -225,7 +225,7 @@ func TestIsSet(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewSocketMask(tc.maskBit)
+		mask, _ := NewBitMask(tc.maskBit)
 		set := mask.IsSet(tc.maskBit)
 		if !set {
 			t.Errorf("Expected value to be %v, got %v", tc.expectedSet, set)
@@ -241,15 +241,15 @@ func TestIsEqual(t *testing.T) {
 		isEqual       bool
 	}{
 		{
-			name:          "Check if two socket masks are equal",
+			name:          "Check if two bit masks are equal",
 			firstMaskBit:  0,
 			secondMaskBit: 0,
 			isEqual:       true,
 		},
 	}
 	for _, tc := range tcases {
-		firstMask, _ := NewSocketMask(tc.firstMaskBit)
-		secondMask, _ := NewSocketMask(tc.secondMaskBit)
+		firstMask, _ := NewBitMask(tc.firstMaskBit)
+		secondMask, _ := NewBitMask(tc.secondMaskBit)
 		isEqual := firstMask.IsEqual(secondMask)
 		if !isEqual {
 			t.Errorf("Expected mask to be %v, got %v", tc.isEqual, isEqual)
@@ -270,7 +270,7 @@ func TestCount(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewSocketMask(tc.maskBit)
+		mask, _ := NewBitMask(tc.maskBit)
 		count := mask.Count()
 		if count != tc.expectedCount {
 			t.Errorf("Expected value to be %v, got %v", tc.expectedCount, count)
@@ -278,25 +278,25 @@ func TestCount(t *testing.T) {
 	}
 }
 
-func TestGetSockets(t *testing.T) {
+func TestGetBits(t *testing.T) {
 	tcases := []struct {
-		name            string
-		firstSocket     int
-		secondSocket    int
-		expectedSockets []int
+		name         string
+		firstbit     int
+		secondbit    int
+		expectedbits []int
 	}{
 		{
-			name:            "Get number of each socket which has been set",
-			firstSocket:     0,
-			secondSocket:    1,
-			expectedSockets: []int{0, 1},
+			name:         "Get number of each bit which has been set",
+			firstbit:     0,
+			secondbit:    1,
+			expectedbits: []int{0, 1},
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewSocketMask(tc.firstSocket, tc.secondSocket)
-		sockets := mask.GetSockets()
-		if !reflect.DeepEqual(sockets, tc.expectedSockets) {
-			t.Errorf("Expected value to be %v, got %v", tc.expectedSockets, sockets)
+		mask, _ := NewBitMask(tc.firstbit, tc.secondbit)
+		bits := mask.GetBits()
+		if !reflect.DeepEqual(bits, tc.expectedbits) {
+			t.Errorf("Expected value to be %v, got %v", tc.expectedbits, bits)
 		}
 	}
 }
@@ -334,8 +334,8 @@ func TestIsNarrowerThan(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		firstMask, _ := NewSocketMask(tc.firstMask...)
-		secondMask, _ := NewSocketMask(tc.secondMask...)
+		firstMask, _ := NewBitMask(tc.firstMask...)
+		secondMask, _ := NewBitMask(tc.secondMask...)
 		expectedFirstNarrower := firstMask.IsNarrowerThan(secondMask)
 		if expectedFirstNarrower != tc.expectedFirstNarrower {
 			t.Errorf("Expected value to be %v, got %v", tc.expectedFirstNarrower, expectedFirstNarrower)
@@ -343,47 +343,47 @@ func TestIsNarrowerThan(t *testing.T) {
 	}
 }
 
-func TestIterateSocketMasks(t *testing.T) {
+func TestIterateBitMasks(t *testing.T) {
 	tcases := []struct {
-		name       string
-		numSockets int
+		name    string
+		numbits int
 	}{
 		{
-			name:       "1 Socket",
-			numSockets: 1,
+			name:    "1 bit",
+			numbits: 1,
 		},
 		{
-			name:       "2 Sockets",
-			numSockets: 2,
+			name:    "2 bits",
+			numbits: 2,
 		},
 		{
-			name:       "4 Sockets",
-			numSockets: 4,
+			name:    "4 bits",
+			numbits: 4,
 		},
 		{
-			name:       "8 Sockets",
-			numSockets: 8,
+			name:    "8 bits",
+			numbits: 8,
 		},
 		{
-			name:       "16 Sockets",
-			numSockets: 16,
+			name:    "16 bits",
+			numbits: 16,
 		},
 	}
 	for _, tc := range tcases {
-		// Generate a list of sockets from tc.numSockets.
-		var sockets []int
-		for i := 0; i < tc.numSockets; i++ {
-			sockets = append(sockets, i)
+		// Generate a list of bits from tc.numbits.
+		var bits []int
+		for i := 0; i < tc.numbits; i++ {
+			bits = append(bits, i)
 		}
 
 		// Calculate the expected number of masks. Since we always have masks
-		// with sockets from 0..n, this is just (2^n - 1) since we want 1 mask
+		// with bits from 0..n, this is just (2^n - 1) since we want 1 mask
 		// represented by each integer between 1 and 2^n-1.
-		expectedNumMasks := (1 << uint(tc.numSockets)) - 1
+		expectedNumMasks := (1 << uint(tc.numbits)) - 1
 
 		// Iterate all masks and count them.
 		numMasks := 0
-		IterateSocketMasks(sockets, func(SocketMask) {
+		IterateBitMasks(bits, func(BitMask) {
 			numMasks++
 		})
 

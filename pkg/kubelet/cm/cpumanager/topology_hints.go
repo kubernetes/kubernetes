@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
-	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/socketmask"
+	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
 func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
@@ -76,13 +76,13 @@ func (m *manager) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request 
 	// Initialize minSocketsOnMinAffinity to include all Sockets.
 	minSocketsOnMinAffinity := m.topology.CPUDetails.Sockets().Size()
 
-	// Iterate through all combinations of socketMasks and build hints from them.
+	// Iterate through all combinations of bitmasks and build hints from them.
 	hints := []topologymanager.TopologyHint{}
-	socketmask.IterateSocketMasks(m.topology.CPUDetails.NUMANodes().ToSlice(), func(mask socketmask.SocketMask) {
+	bitmask.IterateBitMasks(m.topology.CPUDetails.NUMANodes().ToSlice(), func(mask bitmask.BitMask) {
 		// First, update minAffinitySize and minSocketsOnMinAffinity for the
 		// current request size.
-		cpusInMask := m.topology.CPUDetails.CPUsInNUMANodes(mask.GetSockets()...).Size()
-		socketsInMask := m.topology.CPUDetails.SocketsInNUMANodes(mask.GetSockets()...).Size()
+		cpusInMask := m.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
+		socketsInMask := m.topology.CPUDetails.SocketsInNUMANodes(mask.GetBits()...).Size()
 		if cpusInMask >= request && mask.Count() < minAffinitySize {
 			minAffinitySize = mask.Count()
 			if socketsInMask < minSocketsOnMinAffinity {
@@ -91,7 +91,7 @@ func (m *manager) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request 
 		}
 
 		// Then check to see if we have enough CPUs available on the current
-		// SocketMask to satisfy the CPU request.
+		// Socket bitmask to satisfy the CPU request.
 		numMatching := 0
 		for _, c := range availableCPUs.ToSlice() {
 			if mask.IsSet(m.topology.CPUDetails[c].NUMANodeID) {
@@ -104,7 +104,7 @@ func (m *manager) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request 
 			return
 		}
 
-		// Otherwise, create a new hint from the SocketMask and add it to the
+		// Otherwise, create a new hint from the socket bitmask and add it to the
 		// list of hints.  We set all hint preferences to 'false' on the first
 		// pass through.
 		hints = append(hints, topologymanager.TopologyHint{
@@ -119,7 +119,7 @@ func (m *manager) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request 
 	// with a minimal set of sockets) will be considered preferred.
 	for i := range hints {
 		if hints[i].NUMANodeAffinity.Count() == minAffinitySize {
-			nodes := hints[i].NUMANodeAffinity.GetSockets()
+			nodes := hints[i].NUMANodeAffinity.GetBits()
 			numSockets := m.topology.CPUDetails.SocketsInNUMANodes(nodes...).Size()
 			if numSockets == minSocketsOnMinAffinity {
 				hints[i].Preferred = true
