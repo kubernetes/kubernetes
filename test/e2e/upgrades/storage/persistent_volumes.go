@@ -20,7 +20,6 @@ import (
 	"k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 
@@ -75,7 +74,7 @@ func (t *PersistentVolumeUpgradeTest) Test(f *framework.Framework, done <-chan s
 func (t *PersistentVolumeUpgradeTest) Teardown(f *framework.Framework) {
 	errs := e2epv.PVPVCCleanup(f.ClientSet, f.Namespace.Name, nil, t.pvc)
 	if len(errs) > 0 {
-		e2elog.Failf("Failed to delete 1 or more PVs/PVCs. Errors: %v", utilerrors.NewAggregate(errs))
+		framework.Failf("Failed to delete 1 or more PVs/PVCs. Errors: %v", utilerrors.NewAggregate(errs))
 	}
 }
 

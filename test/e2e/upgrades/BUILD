@@ -37,7 +37,6 @@ go_library(
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/job:go_default_library",
-        "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/service:go_default_library",
         "//test/e2e/framework/statefulset:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
