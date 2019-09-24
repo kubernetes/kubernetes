@@ -13,6 +13,7 @@ go_library(
         "counter.go",
         "gauge.go",
         "histogram.go",
+        "labels.go",
         "metric.go",
         "opts.go",
         "processstarttime.go",
