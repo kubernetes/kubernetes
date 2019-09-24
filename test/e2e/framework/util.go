@@ -2643,13 +2643,6 @@ func LookForStringInLog(ns, podName, container, expectedString string, timeout t
 	})
 }
 
-// LookForStringInFile looks for the given string in a file in a specific pod container
-func LookForStringInFile(ns, podName, container, file, expectedString string, timeout time.Duration) (result string, err error) {
-	return LookForString(expectedString, timeout, func() string {
-		return RunKubectlOrDie("exec", podName, "-c", container, fmt.Sprintf("--namespace=%v", ns), "--", "cat", file)
-	})
-}
-
 // EnsureLoadBalancerResourcesDeleted ensures that cloud load balancer resources that were created
 // are actually cleaned up.  Currently only implemented for GCE/GKE.
 func EnsureLoadBalancerResourcesDeleted(ip, portRange string) error {
