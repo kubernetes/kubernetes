@@ -41,6 +41,7 @@ var buildTargets = []string{
 func BuildGo() error {
 	klog.Infof("Building k8s binaries...")
 	k8sRoot, err := utils.GetK8sRootDir()
+	klog.Infof("Current building k8s binaries under %s", k8sRoot)
 	if err != nil {
 		return fmt.Errorf("failed to locate kubernetes root directory %v", err)
 	}

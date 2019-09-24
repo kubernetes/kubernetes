@@ -25,13 +25,13 @@ import (
 	"strings"
 )
 
-// GetK8sRootDir returns the root directory for kubernetes, if present in the gopath.
+// GetK8sRootDir returns the root directory for kubernetes, if present.
 func GetK8sRootDir() (string, error) {
 	dir, err := RootDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(dir, fmt.Sprintf("%s/", "k8s.io/kubernetes")), nil
+	return filepath.Join(dir, fmt.Sprintf("%s/", "kubernetes")), nil
 }
 
 // GetCAdvisorRootDir returns the root directory for cAdvisor, if present in the gopath.
@@ -50,8 +50,11 @@ func RootDir() (string, error) {
 	path := filepath.Dir(testExec)
 
 	// Look for the kubernetes source root directory
-	if strings.Contains(path, "k8s.io/kubernetes") {
-		splitPath := strings.Split(path, "k8s.io/kubernetes")
+	if strings.Contains(path, "kubernetes") {
+		splitPath := strings.Split(path, "kubernetes")
+		if len(splitPath) < 1 {
+			return "", errors.New(fmt.Sprintf("Source root directory must be kubernetes, but result is %s", path))
+		}
 		return splitPath[0], nil
 	}
 

@@ -177,7 +177,7 @@ else
 
   # Test using the host the script was run on
   # Provided for backwards compatibility
-  go run test/e2e_node/runner/local/run_local.go \
+  go run --mod=vendor test/e2e_node/runner/local/run_local.go \
     --system-spec-name="${system_spec_name}" --extra-envs="${extra_envs}" \
     --ginkgo-flags="${ginkgoflags}" --test-flags="--container-runtime=${runtime} \
     --alsologtostderr --v 4 --report-dir=${artifacts} --node-name $(hostname) \
