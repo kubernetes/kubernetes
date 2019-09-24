@@ -503,7 +503,6 @@ type DeploymentList struct {
 // DaemonSetUpdateStrategy defines a strategy to update a daemon set.
 type DaemonSetUpdateStrategy struct {
 	// Type of daemon set update. Can be "RollingUpdate" or "OnDelete".
-	// Default is OnDelete.
 	// +optional
 	Type DaemonSetUpdateStrategyType
 
