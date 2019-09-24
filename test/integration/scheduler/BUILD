@@ -92,7 +92,6 @@ go_library(
         "//pkg/controller/disruption:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
-        "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//pkg/scheduler/framework/plugins:go_default_library",

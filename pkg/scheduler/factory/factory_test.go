@@ -37,10 +37,9 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	plugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -90,7 +89,7 @@ func TestCreateFromConfig(t *testing.T) {
 			{"name" : "PriorityOne", "weight" : 2},
 			{"name" : "PriorityTwo", "weight" : 1}		]
 	}`)
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
@@ -132,7 +131,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 		],
 		"hardPodAffinitySymmetricWeight" : 10
 	}`)
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 	factory.CreateFromConfig(policy)
@@ -152,7 +151,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	configData = []byte(`{}`)
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
@@ -178,7 +177,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 		"apiVersion" : "v1"
 	}`)
 	var policy schedulerapi.Policy
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Fatalf("Invalid configuration: %v", err)
 	}
 
@@ -215,7 +214,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 		"priorities" : []
 	}`)
 	var policy schedulerapi.Policy
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Fatalf("Invalid configuration: %v", err)
 	}
 
@@ -498,7 +497,7 @@ func newConfigFactory(client clientset.Interface, hardPodAffinitySymmetricWeight
 		stopCh,
 		plugins.NewDefaultRegistry(),
 		nil,
-		[]config.PluginConfig{},
+		[]schedulerapi.PluginConfig{},
 	})
 }
 

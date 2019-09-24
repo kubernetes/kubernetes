@@ -27,9 +27,7 @@ import (
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	"k8s.io/kubernetes/pkg/scheduler"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
@@ -1134,12 +1132,12 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		t.Run(v, func(t *testing.T) {
 			policyConfigMap := v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "scheduler-custom-policy-config"},
-				Data:       map[string]string{schedulerconfig.SchedulerPolicyConfigMapKey: tc.JSON},
+				Data:       map[string]string{schedulerapi.SchedulerPolicyConfigMapKey: tc.JSON},
 			}
 			client := fake.NewSimpleClientset(&policyConfigMap)
-			algorithmSrc := schedulerconfig.SchedulerAlgorithmSource{
-				Policy: &schedulerconfig.SchedulerPolicySource{
-					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
+			algorithmSrc := schedulerapi.SchedulerAlgorithmSource{
+				Policy: &schedulerapi.SchedulerPolicySource{
+					ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
 						Namespace: policyConfigMap.Namespace,
 						Name:      policyConfigMap.Name,
 					},
@@ -1165,7 +1163,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				make(chan struct{}),
 				schedulerframework.NewDefaultRegistry(),
 				nil,
-				[]kubeschedulerconfig.PluginConfig{},
+				[]schedulerapi.PluginConfig{},
 			)
 			if err != nil {
 				t.Fatalf("%s: Error constructing: %v", v, err)

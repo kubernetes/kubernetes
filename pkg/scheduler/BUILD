@@ -10,9 +10,8 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/scheduler/api:go_default_library",
-        "//pkg/scheduler/api/latest:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/apis/config/scheme:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/factory:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
@@ -52,7 +51,6 @@ go_test(
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities:go_default_library",
-        "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//pkg/scheduler/factory:go_default_library",

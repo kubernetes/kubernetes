@@ -1,5 +1,5 @@
 /*
-Copyright 2014 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,42 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package api
+package v1
 
 import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
-// Scheme is the default instance of runtime.Scheme to which types in the Kubernetes API are already registered.
-// TODO: remove this, scheduler should not have its own scheme.
-var Scheme = runtime.NewScheme()
+// GroupName is the group name used in this package
+const GroupName = "kubescheduler.config.k8s.io"
 
 // SchemeGroupVersion is group version used to register these objects
-// TODO this should be in the "scheduler" group
-var SchemeGroupVersion = schema.GroupVersion{Group: "", Version: runtime.APIVersionInternal}
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
 
 var (
-	// SchemeBuilder defines a SchemeBuilder object.
+	// SchemeBuilder is the scheme builder with scheme init functions to run for this API package
 	SchemeBuilder = runtime.NewSchemeBuilder(addKnownTypes)
-	// AddToScheme is used to add stored functions to scheme.
+	// AddToScheme is a global function that registers this API group & version to a scheme
 	AddToScheme = SchemeBuilder.AddToScheme
 )
 
-func init() {
-	if err := addKnownTypes(Scheme); err != nil {
-		// Programmer error.
-		panic(err)
-	}
-}
-
+// addKnownTypes registers known types to the given scheme
 func addKnownTypes(scheme *runtime.Scheme) error {
-	if err := scheme.AddIgnoredConversionType(&metav1.TypeMeta{}, &metav1.TypeMeta{}); err != nil {
-		return err
-	}
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Policy{},
 	)
+	// also register into the v1 group for API backward compatibility
+	scheme.AddKnownTypeWithName(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Policy"}, &Policy{})
 	return nil
 }

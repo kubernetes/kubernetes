@@ -22,7 +22,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
 func TestAlgorithmNameValidation(t *testing.T) {
@@ -59,12 +59,12 @@ func TestValidatePriorityConfigOverFlow(t *testing.T) {
 	}{
 		{
 			description: "one of the weights is MaxTotalPriority(MaxInt64)",
-			configs:     []priorities.PriorityConfig{{Weight: api.MaxTotalPriority}, {Weight: 5}},
+			configs:     []priorities.PriorityConfig{{Weight: schedulerapi.MaxTotalPriority}, {Weight: 5}},
 			expected:    true,
 		},
 		{
 			description: "after multiplication with MaxPriority the weight is larger than MaxWeight",
-			configs:     []priorities.PriorityConfig{{Weight: api.MaxWeight + api.MaxPriority}, {Weight: 5}},
+			configs:     []priorities.PriorityConfig{{Weight: schedulerapi.MaxWeight + schedulerapi.MaxPriority}, {Weight: 5}},
 			expected:    true,
 		},
 		{
@@ -90,13 +90,13 @@ func TestValidatePriorityConfigOverFlow(t *testing.T) {
 }
 
 func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArguments(t *testing.T) {
-	arguments := api.RequestedToCapacityRatioArguments{
-		UtilizationShape: []api.UtilizationShapePoint{
+	arguments := schedulerapi.RequestedToCapacityRatioArguments{
+		UtilizationShape: []schedulerapi.UtilizationShapePoint{
 			{Utilization: 10, Score: 1},
 			{Utilization: 30, Score: 5},
 			{Utilization: 70, Score: 2},
 		},
-		Resources: []api.ResourceSpec{
+		Resources: []schedulerapi.ResourceSpec{
 			{Name: v1.ResourceCPU},
 			{Name: v1.ResourceMemory},
 		},
@@ -116,8 +116,8 @@ func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArguments(t *testi
 }
 
 func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArgumentsNilResourceToWeightMap(t *testing.T) {
-	arguments := api.RequestedToCapacityRatioArguments{
-		UtilizationShape: []api.UtilizationShapePoint{
+	arguments := schedulerapi.RequestedToCapacityRatioArguments{
+		UtilizationShape: []schedulerapi.UtilizationShapePoint{
 			{Utilization: 10, Score: 1},
 			{Utilization: 30, Score: 5},
 			{Utilization: 70, Score: 2},
