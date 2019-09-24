@@ -47,7 +47,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"gopkg.in/gcfg.v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -63,7 +63,7 @@ import (
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/cloud-provider"
+	cloudprovider "k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	cloudvolume "k8s.io/cloud-provider/volume"
@@ -3860,21 +3860,33 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		}
 	} else {
 		klog.V(4).Infof("service %v does not need custom health checks", apiService.Name)
-		// We only configure a TCP health-check on the first port
-		var tcpHealthCheckPort int32
-		for _, listener := range listeners {
-			if listener.InstancePort == nil {
-				continue
-			}
-			tcpHealthCheckPort = int32(*listener.InstancePort)
-			break
-		}
 		annotationProtocol := strings.ToLower(annotations[ServiceAnnotationLoadBalancerBEProtocol])
 		var hcProtocol string
+		var tcpHealthCheckPort int32
 		if annotationProtocol == "https" || annotationProtocol == "ssl" {
 			hcProtocol = "SSL"
+			for _, listener := range listeners {
+				if listener.InstancePort == nil {
+					continue
+				}
+				protocol := listener.Protocol
+				if *protocol == "HTTPS" || *protocol == "SSL" {
+					tcpHealthCheckPort = int32(*listener.InstancePort)
+					break
+				}
+				if tcpHealthCheckPort == 0 {
+					return nil, fmt.Errorf("Failed to assign SSL heath check port for load balancer %v, no secure endpoint available", loadBalancerName)
+				}
+			}
 		} else {
 			hcProtocol = "TCP"
+			for _, listener := range listeners {
+				if listener.InstancePort == nil {
+					continue
+				}
+				tcpHealthCheckPort = int32(*listener.InstancePort)
+				break
+			}
 		}
 		// there must be no path on TCP health check
 		err = c.ensureLoadBalancerHealthCheck(loadBalancer, hcProtocol, tcpHealthCheckPort, "", annotations)
