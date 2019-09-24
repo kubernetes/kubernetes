@@ -3277,3 +3277,18 @@ func GetFileModeRegex(filePath string, mask *int32) string {
 
 	return fmt.Sprintf("(%s|%s)", linuxOutput, windowsOutput)
 }
+
+// PrettyPrintJSON converts metrics to JSON format.
+func PrettyPrintJSON(metrics interface{}) string {
+	output := &bytes.Buffer{}
+	if err := json.NewEncoder(output).Encode(metrics); err != nil {
+		Logf("Error building encoder: %v", err)
+		return ""
+	}
+	formatted := &bytes.Buffer{}
+	if err := json.Indent(formatted, output.Bytes(), "", "  "); err != nil {
+		Logf("Error indenting: %v", err)
+		return ""
+	}
+	return string(formatted.Bytes())
+}

@@ -33,7 +33,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	"k8s.io/kubernetes/test/e2e/system"
 )
 
@@ -74,7 +73,7 @@ func (s *ResourceUsageSummary) PrintHumanReadable() string {
 
 // PrintJSON prints resource usage summary in JSON.
 func (s *ResourceUsageSummary) PrintJSON() string {
-	return e2emetrics.PrettyPrintJSON(*s)
+	return PrettyPrintJSON(*s)
 }
 
 // SummaryKind returns string of ResourceUsageSummary
