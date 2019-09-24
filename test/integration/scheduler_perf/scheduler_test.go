@@ -38,10 +38,8 @@ import (
 )
 
 const (
-	warning3K    = 100
-	threshold3K  = 30
-	threshold30K = 30
-	threshold60K = 30
+	warning3K   = 100
+	threshold3K = 30
 )
 
 var (

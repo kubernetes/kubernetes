@@ -42,8 +42,6 @@ const (
 	monitoringTime = 20 * time.Minute
 	// The periodic reporting period.
 	reportingPeriod = 5 * time.Minute
-	// Timeout for waiting for the image prepulling to complete.
-	imagePrePullingLongTimeout = time.Minute * 8
 )
 
 type resourceTest struct {

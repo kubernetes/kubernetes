@@ -379,33 +379,6 @@ var hpaV1 = `
 }
 `
 
-var deploymentExtensions = `
-{
-  "apiVersion": "extensions/v1beta1",
-  "kind": "Deployment",
-  "metadata": {
-     "name": "test-deployment1",
-     "namespace": "default"
-  },
-  "spec": {
-    "replicas": 1,
-    "template": {
-      "metadata": {
-        "labels": {
-          "app": "nginx0"
-        }
-      },
-      "spec": {
-        "containers": [{
-          "name": "nginx",
-          "image": "k8s.gcr.io/nginx:1.7.9"
-        }]
-      }
-    }
-  }
-}
-`
-
 var deploymentApps = `
 {
   "apiVersion": "apps/v1",

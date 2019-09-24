@@ -35,9 +35,6 @@ const (
 	// considered acceptable. Once per hour is fine for now, as long as it
 	// doesn't loose too much logs.
 	maxAllowedRestartsPerHour = 1.0
-	// lastPodIngestionSlack is the amount of time to wait for the last pod's
-	// logs to be ingested by the logging agent.
-	lastPodIngestionSlack = 5 * time.Minute
 )
 
 var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackdriver [Feature:StackdriverLogging] [Soak]", func() {
