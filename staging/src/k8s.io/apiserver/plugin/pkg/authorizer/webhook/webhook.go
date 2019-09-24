@@ -189,7 +189,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 			err    error
 		)
 		webhook.WithExponentialBackoff(ctx, w.initialBackoff, func() error {
-			result, err = w.subjectAccessReview.Create(r)
+			result, err = w.subjectAccessReview.CreateContext(ctx, r)
 			return err
 		})
 		if err != nil {
@@ -265,8 +265,12 @@ type subjectAccessReviewClient struct {
 }
 
 func (t *subjectAccessReviewClient) Create(subjectAccessReview *authorization.SubjectAccessReview) (*authorization.SubjectAccessReview, error) {
+	return t.CreateContext(context.Background(), subjectAccessReview)
+}
+
+func (t *subjectAccessReviewClient) CreateContext(ctx context.Context, subjectAccessReview *authorization.SubjectAccessReview) (*authorization.SubjectAccessReview, error) {
 	result := &authorization.SubjectAccessReview{}
-	err := t.w.RestClient.Post().Body(subjectAccessReview).Do().Into(result)
+	err := t.w.RestClient.Post().Context(ctx).Body(subjectAccessReview).Do().Into(result)
 	return result, err
 }
 
