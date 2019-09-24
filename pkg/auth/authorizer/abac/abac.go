@@ -19,6 +19,7 @@ package abac
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -224,7 +225,7 @@ func resourceMatches(p abac.Policy, a authorizer.Attributes) bool {
 }
 
 // Authorize implements authorizer.Authorize
-func (pl PolicyList) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (pl PolicyList) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	for _, p := range pl {
 		if matches(*p, a) {
 			return authorizer.DecisionAllow, "", nil

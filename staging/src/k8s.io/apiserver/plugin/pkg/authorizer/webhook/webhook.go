@@ -18,6 +18,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -149,7 +150,7 @@ func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewI
 // TODO(mikedanese): We should eventually support failing closed when we
 // encounter an error. We are failing open now to preserve backwards compatible
 // behavior.
-func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
 	r := &authorization.SubjectAccessReview{}
 	if user := attr.GetUser(); user != nil {
 		r.Spec = authorization.SubjectAccessReviewSpec{
