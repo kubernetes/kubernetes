@@ -144,15 +144,16 @@ func captureStderr(f func()) (string, error) {
 	defer func() { os.Stderr = bak }()
 
 	resultCh := make(chan string)
+	var copyErr error
 	// copy the output in a separate goroutine so printing can't block indefinitely
 	go func() {
 		var buf bytes.Buffer
-		io.Copy(&buf, r)
+		_, copyErr = io.Copy(&buf, r)
 		resultCh <- buf.String()
 	}()
 
 	f()
 	w.Close()
 
-	return <-resultCh, nil
+	return <-resultCh, copyErr
 }

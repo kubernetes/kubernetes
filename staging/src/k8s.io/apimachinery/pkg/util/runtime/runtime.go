@@ -94,12 +94,12 @@ var ErrorHandlers = []func(error){
 	}).OnError,
 }
 
-// HandlerError is a method to invoke when a non-user facing piece of code cannot
-// return an error and needs to indicate it has been ignored. Invoking this method
-// is preferable to logging the error - the default behavior is to log but the
-// errors may be sent to a remote server for analysis.
+// HandleError handles an error by a list of pre-defined error handlers, including
+// logging and sending to a remote server for analysis, and thus calling this
+// function is preferable to logging the error. It is for the case when the error
+// can't be returned and has been ignored.
 func HandleError(err error) {
-	// this is sometimes called with a nil error.  We probably shouldn't fail and should do nothing instead
+	// this is sometimes called with a nil error. We should do nothing here.
 	if err == nil {
 		return
 	}
