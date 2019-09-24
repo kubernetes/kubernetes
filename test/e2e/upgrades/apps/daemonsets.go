@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/e2e/upgrades"
 )
 
@@ -81,7 +80,7 @@ func (t *DaemonSetUpgradeTest) Setup(f *framework.Framework) {
 	ginkgo.By("Creating a DaemonSet")
 	var err error
 	if t.daemonSet, err = f.ClientSet.AppsV1().DaemonSets(ns.Name).Create(t.daemonSet); err != nil {
-		e2elog.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
+		framework.Failf("unable to create test DaemonSet %s: %v", t.daemonSet.Name, err)
 	}
 
 	ginkgo.By("Waiting for DaemonSet pods to become ready")
@@ -114,7 +113,7 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 	res, err := checkRunningOnAllNodes(f, t.daemonSet.Namespace, t.daemonSet.Labels)
 	framework.ExpectNoError(err)
 	if !res {
-		e2elog.Failf("expected DaemonSet pod to be running on all nodes, it was not")
+		framework.Failf("expected DaemonSet pod to be running on all nodes, it was not")
 	}
 
 	// DaemonSet resource itself should be good
@@ -122,7 +121,7 @@ func (t *DaemonSetUpgradeTest) validateRunningDaemonSet(f *framework.Framework) 
 	res, err = checkDaemonStatus(f, t.daemonSet.Namespace, t.daemonSet.Name)
 	framework.ExpectNoError(err)
 	if !res {
-		e2elog.Failf("expected DaemonSet to be in a good state, it was not")
+		framework.Failf("expected DaemonSet to be in a good state, it was not")
 	}
 }
 
@@ -135,7 +134,7 @@ func checkRunningOnAllNodes(f *framework.Framework, namespace string, selector m
 	nodeNames := make([]string, 0)
 	for _, node := range nodeList.Items {
 		if len(node.Spec.Taints) != 0 {
-			e2elog.Logf("Ignore taints %v on Node %v for DaemonSet Pod.", node.Spec.Taints, node.Name)
+			framework.Logf("Ignore taints %v on Node %v for DaemonSet Pod.", node.Spec.Taints, node.Name)
 		}
 		// DaemonSet Pods are expected to run on all the nodes in e2e.
 		nodeNames = append(nodeNames, node.Name)
@@ -156,11 +155,11 @@ func checkDaemonPodOnNodes(f *framework.Framework, namespace string, labelSet ma
 	nodesToPodCount := make(map[string]int)
 	for _, pod := range pods {
 		if controller.IsPodActive(&pod) {
-			e2elog.Logf("Pod name: %v\t Node Name: %v", pod.Name, pod.Spec.NodeName)
+			framework.Logf("Pod name: %v\t Node Name: %v", pod.Name, pod.Spec.NodeName)
 			nodesToPodCount[pod.Spec.NodeName]++
 		}
 	}
-	e2elog.Logf("nodesToPodCount: %v", nodesToPodCount)
+	framework.Logf("nodesToPodCount: %v", nodesToPodCount)
 
 	// Ensure that exactly 1 pod is running on all nodes in nodeNames.
 	for _, nodeName := range nodeNames {
