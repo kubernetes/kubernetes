@@ -16,11 +16,14 @@ spec:
     - vpa
   versions:
   - name: v1beta1
-    served: true
+    served: false
     storage: false
   - name: v1beta2
     served: true
     storage: true
+  - name: v1
+    served: true
+    storage: false
   validation:
     # openAPIV3Schema is the schema for validating custom objects.
     openAPIV3Schema:
@@ -61,8 +64,11 @@ spec:
     - vpacheckpoint
   versions:
   - name: v1beta1
-    served: true
+    served: false
     storage: false
   - name: v1beta2
     served: true
     storage: true
+  - name: v1
+    served: true
+    storage: false
