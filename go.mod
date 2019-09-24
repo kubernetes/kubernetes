@@ -14,7 +14,7 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.2.0
 	github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534
 	github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
-	github.com/Microsoft/go-winio v0.4.11
+	github.com/Microsoft/go-winio v0.4.14
 	github.com/Microsoft/hcsshim v0.8.6
 	github.com/PuerkitoBio/purell v1.1.1
 	github.com/Rican7/retry v0.1.0 // indirect
@@ -101,7 +101,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.0 // indirect
 	github.com/opencontainers/selinux v1.2.2
 	github.com/pborman/uuid v1.2.0
-	github.com/pkg/errors v0.8.0
+	github.com/pkg/errors v0.8.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20 // indirect
 	github.com/prometheus/client_golang v0.9.4
@@ -191,7 +191,7 @@ replace (
 	github.com/GoogleCloudPlatform/k8s-cloud-provider => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534
 	github.com/JeffAshton/win_pdh => github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/MakeNowJust/heredoc => github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
-	github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.11
+	github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.14
 	github.com/Microsoft/hcsshim => github.com/Microsoft/hcsshim v0.8.6
 	github.com/NYTimes/gziphandler => github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46
 	github.com/PuerkitoBio/purell => github.com/PuerkitoBio/purell v1.1.1

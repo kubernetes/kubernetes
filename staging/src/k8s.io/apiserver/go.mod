@@ -28,6 +28,7 @@ require (
 	github.com/jonboulle/clockwork v0.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
 	github.com/pborman/uuid v1.2.0
+	github.com/pkg/errors v0.8.1 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
 	github.com/prometheus/client_golang v0.9.4
 	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
@@ -60,6 +61,7 @@ require (
 )
 
 replace (
+	github.com/pkg/errors => github.com/pkg/errors v0.8.0
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
