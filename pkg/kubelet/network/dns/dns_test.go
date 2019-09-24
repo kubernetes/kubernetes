@@ -74,6 +74,7 @@ func TestParseResolvConf(t *testing.T) {
 		{"search ", []string{}, []string{}, []string{}, false}, // search empty
 		{"search foo", []string{}, []string{"foo"}, []string{}, false},
 		{"search foo bar", []string{}, []string{"foo", "bar"}, []string{}, false},
+		{"search foo. bar", []string{}, []string{"foo", "bar"}, []string{}, false},
 		{"search foo bar bat\n", []string{}, []string{"foo", "bar", "bat"}, []string{}, false},
 		{"search foo\nsearch bar", []string{}, []string{"bar"}, []string{}, false},
 		{"nameserver 1.2.3.4\nsearch foo bar", []string{"1.2.3.4"}, []string{"foo", "bar"}, []string{}, false},

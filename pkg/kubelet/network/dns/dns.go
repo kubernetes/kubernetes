@@ -230,7 +230,11 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 			}
 		}
 		if fields[0] == "search" {
-			searches = fields[1:]
+			trimTrailingDot := []string{}
+			for _, s := range fields[1:] {
+				trimTrailingDot = append(trimTrailingDot, strings.TrimSuffix(s, "."))
+			}
+			searches = trimTrailingDot
 		}
 		if fields[0] == "options" {
 			options = fields[1:]
