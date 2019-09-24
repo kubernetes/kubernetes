@@ -20,13 +20,16 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
+	"reflect"
 	"strconv"
 	"testing"
 	"time"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 )
@@ -428,5 +431,60 @@ func TestReflectorWatchListPageSize(t *testing.T) {
 	results := s.List()
 	if len(results) != 10 {
 		t.Errorf("Expected 10 results, got %d", len(results))
+	}
+}
+
+func TestReflectorSetExpectedType(t *testing.T) {
+	obj := &unstructured.Unstructured{}
+	gvk := schema.GroupVersionKind{
+		Group:   "mygroup",
+		Version: "v1",
+		Kind:    "MyKind",
+	}
+	obj.SetGroupVersionKind(gvk)
+	testCases := map[string]struct {
+		inputType        interface{}
+		expectedTypeName string
+		expectedType     reflect.Type
+		expectedGVK      *schema.GroupVersionKind
+	}{
+		"Nil type": {
+			expectedTypeName: defaultExpectedTypeName,
+		},
+		"Normal type": {
+			inputType:        &v1.Pod{},
+			expectedTypeName: "*v1.Pod",
+			expectedType:     reflect.TypeOf(&v1.Pod{}),
+		},
+		"Unstructured type without GVK": {
+			inputType:        &unstructured.Unstructured{},
+			expectedTypeName: "*unstructured.Unstructured",
+			expectedType:     reflect.TypeOf(&unstructured.Unstructured{}),
+		},
+		"Unstructured type with GVK": {
+			inputType:        obj,
+			expectedTypeName: gvk.String(),
+			expectedType:     reflect.TypeOf(&unstructured.Unstructured{}),
+			expectedGVK:      &gvk,
+		},
+	}
+	for testName, tc := range testCases {
+		t.Run(testName, func(t *testing.T) {
+			r := &Reflector{}
+			r.setExpectedType(tc.inputType)
+			if tc.expectedType != r.expectedType {
+				t.Fatalf("Expected expectedType %v, got %v", tc.expectedType, r.expectedType)
+			}
+			if tc.expectedTypeName != r.expectedTypeName {
+				t.Fatalf("Expected expectedTypeName %v, got %v", tc.expectedTypeName, r.expectedTypeName)
+			}
+			gvkNotEqual := (tc.expectedGVK == nil) != (r.expectedGVK == nil)
+			if tc.expectedGVK != nil && r.expectedGVK != nil {
+				gvkNotEqual = *tc.expectedGVK != *r.expectedGVK
+			}
+			if gvkNotEqual {
+				t.Fatalf("Expected expectedGVK %v, got %v", tc.expectedGVK, r.expectedGVK)
+			}
+		})
 	}
 }
