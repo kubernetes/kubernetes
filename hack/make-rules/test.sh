@@ -72,6 +72,9 @@ kube::test::find_dirs() {
 KUBE_TIMEOUT=${KUBE_TIMEOUT:--timeout=120s}
 KUBE_COVER=${KUBE_COVER:-n} # set to 'y' to enable coverage collection
 KUBE_COVERMODE=${KUBE_COVERMODE:-atomic}
+# The directory to save test coverage reports to, if generating them. If unset,
+# a semi-predictable temporary directory will be used.
+KUBE_COVER_REPORT_DIR="${KUBE_COVER_REPORT_DIR:-}"
 # How many 'go test' instances to run simultaneously when running tests in
 # coverage mode.
 KUBE_COVERPROCS=${KUBE_COVERPROCS:-4}
@@ -279,7 +282,11 @@ runTests() {
 
   # Create coverage report directories.
   KUBE_TEST_API_HASH="$(echo -n "${KUBE_TEST_API//\//-}"| ${SHA1SUM} |awk '{print $1}')"
-  cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API_HASH}/$(kube::util::sortable_date)"
+  if [[ -z "${KUBE_COVER_REPORT_DIR}" ]]; then
+    cover_report_dir="/tmp/k8s_coverage/${KUBE_TEST_API_HASH}/$(kube::util::sortable_date)"
+  else
+    cover_report_dir="${KUBE_COVER_REPORT_DIR}"
+  fi
   cover_profile="coverage.out"  # Name for each individual coverage profile
   kube::log::status "Saving coverage output in '${cover_report_dir}'"
   mkdir -p "${@+${@/#/${cover_report_dir}/}}"
