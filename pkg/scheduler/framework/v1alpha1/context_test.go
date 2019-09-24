@@ -64,3 +64,11 @@ func TestPluginContextClone(t *testing.T) {
 		t.Errorf("cloned copy should not change, got %q, expected %q", v.data, data1)
 	}
 }
+
+func TestPluginContextCloneNil(t *testing.T) {
+	var pc *PluginContext
+	pcCopy := pc.Clone()
+	if pcCopy != nil {
+		t.Errorf("clone expected to be nil")
+	}
+}

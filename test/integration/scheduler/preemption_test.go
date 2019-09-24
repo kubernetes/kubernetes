@@ -27,6 +27,7 @@ import (
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -38,6 +39,9 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/plugin/pkg/admission/priority"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -66,10 +70,80 @@ func waitForNominatedNodeName(cs clientset.Interface, pod *v1.Pod) error {
 	return waitForNominatedNodeNameWithTimeout(cs, pod, wait.ForeverTestTimeout)
 }
 
+const tokenFilterName = "token-filter"
+
+type tokenFilter struct {
+	Tokens       int
+	Unresolvable bool
+}
+
+// Name returns name of the plugin.
+func (fp *tokenFilter) Name() string {
+	return tokenFilterName
+}
+
+func (fp *tokenFilter) Filter(pc *framework.PluginContext, pod *v1.Pod,
+	nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+	if fp.Tokens > 0 {
+		fp.Tokens--
+		return nil
+	}
+	status := framework.Unschedulable
+	if fp.Unresolvable {
+		status = framework.UnschedulableAndUnresolvable
+	}
+	return framework.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
+}
+
+func (fp *tokenFilter) PreFilter(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
+	return nil
+}
+
+func (fp *tokenFilter) AddPod(pc *framework.PluginContext, podToSchedule *v1.Pod,
+	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+	fp.Tokens--
+	return nil
+}
+
+func (fp *tokenFilter) RemovePod(pc *framework.PluginContext, podToSchedule *v1.Pod,
+	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+	fp.Tokens++
+	return nil
+}
+
+func (fp *tokenFilter) Updater() framework.Updater {
+	return fp
+}
+
+var _ = framework.FilterPlugin(&tokenFilter{})
+
 // TestPreemption tests a few preemption scenarios.
 func TestPreemption(t *testing.T) {
-	// Initialize scheduler.
-	context := initTest(t, "preemption")
+	// Initialize scheduler with a filter plugin.
+	var filter tokenFilter
+	registry := framework.Registry{filterPluginName: func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+		return &filter, nil
+	}}
+	plugin := &schedulerconfig.Plugins{
+		Filter: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: filterPluginName,
+				},
+			},
+		},
+		PreFilter: &schedulerconfig.PluginSet{
+			Enabled: []schedulerconfig.Plugin{
+				{
+					Name: filterPluginName,
+				},
+			},
+		},
+	}
+	context := initTestSchedulerWithOptions(t,
+		initTestMaster(t, "preemptiom", nil),
+		false, nil, registry, plugin, []schedulerconfig.PluginConfig{}, time.Second)
+
 	defer cleanupTest(t, context)
 	cs := context.clientSet
 
@@ -78,14 +152,18 @@ func TestPreemption(t *testing.T) {
 		v1.ResourceMemory: *resource.NewQuantity(100, resource.DecimalSI)},
 	}
 
+	maxTokens := 1000
 	tests := []struct {
 		description         string
 		existingPods        []*v1.Pod
 		pod                 *v1.Pod
+		initTokens          int
+		unresolvable        bool
 		preemptedPodIndexes map[int]struct{}
 	}{
 		{
 			description: "basic pod preemption",
+			initTokens:  maxTokens,
 			existingPods: []*v1.Pod{
 				initPausePod(context.clientSet, &pausePodConfig{
 					Name:      "victim-pod",
@@ -109,7 +187,60 @@ func TestPreemption(t *testing.T) {
 			preemptedPodIndexes: map[int]struct{}{0: {}},
 		},
 		{
+			description: "basic pod preemption with filter",
+			initTokens:  1,
+			existingPods: []*v1.Pod{
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "victim-pod",
+					Namespace: context.ns.Name,
+					Priority:  &lowPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					},
+				}),
+			},
+			pod: initPausePod(cs, &pausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: context.ns.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{0: {}},
+		},
+		{
+			// same as the previous test, but the filter is unresolvable.
+			description:  "basic pod preemption with unresolvable filter",
+			initTokens:   1,
+			unresolvable: true,
+			existingPods: []*v1.Pod{
+				initPausePod(context.clientSet, &pausePodConfig{
+					Name:      "victim-pod",
+					Namespace: context.ns.Name,
+					Priority:  &lowPriority,
+					Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+						v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+						v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+					},
+				}),
+			},
+			pod: initPausePod(cs, &pausePodConfig{
+				Name:      "preemptor-pod",
+				Namespace: context.ns.Name,
+				Priority:  &highPriority,
+				Resources: &v1.ResourceRequirements{Requests: v1.ResourceList{
+					v1.ResourceCPU:    *resource.NewMilliQuantity(200, resource.DecimalSI),
+					v1.ResourceMemory: *resource.NewQuantity(200, resource.DecimalSI)},
+				},
+			}),
+			preemptedPodIndexes: map[int]struct{}{},
+		},
+		{
 			description: "preemption is performed to satisfy anti-affinity",
+			initTokens:  maxTokens,
 			existingPods: []*v1.Pod{
 				initPausePod(cs, &pausePodConfig{
 					Name: "pod-0", Namespace: context.ns.Name,
@@ -173,6 +304,7 @@ func TestPreemption(t *testing.T) {
 		{
 			// This is similar to the previous case only pod-1 is high priority.
 			description: "preemption is not performed when anti-affinity is not satisfied",
+			initTokens:  maxTokens,
 			existingPods: []*v1.Pod{
 				initPausePod(cs, &pausePodConfig{
 					Name: "pod-0", Namespace: context.ns.Name,
@@ -254,6 +386,8 @@ func TestPreemption(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		filter.Tokens = test.initTokens
+		filter.Unresolvable = test.unresolvable
 		pods := make([]*v1.Pod, len(test.existingPods))
 		// Create and run existingPods.
 		for i, p := range test.existingPods {

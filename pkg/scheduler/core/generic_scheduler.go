@@ -1023,7 +1023,9 @@ func (g *genericScheduler) selectNodesForPreemption(
 		if meta != nil {
 			metaCopy = meta.ShallowCopy()
 		}
-		pods, numPDBViolations, fits := g.selectVictimsOnNode(pluginContext, pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
+		pluginContextClone := pluginContext.Clone()
+		pods, numPDBViolations, fits := g.selectVictimsOnNode(
+			pluginContextClone, pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
 		if fits {
 			resultLock.Lock()
 			victims := schedulerapi.Victims{
@@ -1116,6 +1118,10 @@ func (g *genericScheduler) selectVictimsOnNode(
 				return err
 			}
 		}
+		status := g.framework.RunPreFilterUpdaterRemovePod(pluginContext, pod, rp, nodeInfoCopy)
+		if !status.IsSuccess() {
+			return status.AsError()
+		}
 		return nil
 	}
 	addPod := func(ap *v1.Pod) error {
@@ -1124,6 +1130,10 @@ func (g *genericScheduler) selectVictimsOnNode(
 			if err := meta.AddPod(ap, nodeInfoCopy); err != nil {
 				return err
 			}
+		}
+		status := g.framework.RunPreFilterUpdaterAddPod(pluginContext, pod, ap, nodeInfoCopy)
+		if !status.IsSuccess() {
+			return status.AsError()
 		}
 		return nil
 	}

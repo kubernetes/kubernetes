@@ -53,8 +53,12 @@ func NewPluginContext() *PluginContext {
 	}
 }
 
-// Clone creates a copy of PluginContext and returns its pointer.
+// Clone creates a copy of PluginContext and returns its pointer. Clone returns
+// nil if the context being cloned is nil.
 func (c *PluginContext) Clone() *PluginContext {
+	if c == nil {
+		return nil
+	}
 	copy := NewPluginContext()
 	for k, v := range c.storage {
 		copy.Write(k, v.Clone())

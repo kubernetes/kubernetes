@@ -306,6 +306,46 @@ func (f *framework) RunPreFilterPlugins(
 	return nil
 }
 
+// RunPreFilterUpdaterAddPod calls the AddPod interface for the set of configured
+// PreFilter plugins. It returns directly if any of the plugins return any
+// status other than Success.
+func (f *framework) RunPreFilterUpdaterAddPod(pc *PluginContext, podToSchedule *v1.Pod,
+	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+	for _, pl := range f.preFilterPlugins {
+		if updater := pl.Updater(); updater != nil {
+			status := updater.AddPod(pc, podToSchedule, podToAdd, nodeInfo)
+			if !status.IsSuccess() {
+				msg := fmt.Sprintf("error while running AddPod for plugin %q while scheduling pod %q: %v",
+					pl.Name(), podToSchedule.Name, status.Message())
+				klog.Error(msg)
+				return NewStatus(Error, msg)
+			}
+		}
+	}
+
+	return nil
+}
+
+// RunPreFilterUpdaterRemovePod calls the RemovePod interface for the set of configured
+// PreFilter plugins. It returns directly if any of the plugins return any
+// status other than Success.
+func (f *framework) RunPreFilterUpdaterRemovePod(pc *PluginContext, podToSchedule *v1.Pod,
+	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+	for _, pl := range f.preFilterPlugins {
+		if updater := pl.Updater(); updater != nil {
+			status := updater.RemovePod(pc, podToSchedule, podToRemove, nodeInfo)
+			if !status.IsSuccess() {
+				msg := fmt.Sprintf("error while running RemovePod for plugin %q while scheduling pod %q: %v",
+					pl.Name(), podToSchedule.Name, status.Message())
+				klog.Error(msg)
+				return NewStatus(Error, msg)
+			}
+		}
+	}
+
+	return nil
+}
+
 // RunFilterPlugins runs the set of configured Filter plugins for pod on
 // the given node. If any of these plugins doesn't return "Success", the
 // given node is not suitable for running pod.

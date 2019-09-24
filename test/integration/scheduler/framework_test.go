@@ -326,6 +326,11 @@ func (pp *PreFilterPlugin) Name() string {
 	return prefilterPluginName
 }
 
+// Updater returns the updater interface.
+func (pp *PreFilterPlugin) Updater() framework.Updater {
+	return nil
+}
+
 // PreFilter is a test function that returns (true, nil) or errors for testing.
 func (pp *PreFilterPlugin) PreFilter(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
 	pp.numPreFilterCalled++
