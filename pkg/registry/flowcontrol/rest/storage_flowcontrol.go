@@ -38,8 +38,10 @@ import (
 	prioritylevelconfigurationstore "k8s.io/kubernetes/pkg/registry/flowcontrol/prioritylevelconfiguration/storage"
 )
 
+// PostStartHookName is the name of the post-start-hook provided by flow-control storage
 const PostStartHookName = "apiserver/bootstrap-system-flowcontrol-configuration"
 
+// RESTStorageProvider implements
 type RESTStorageProvider struct{}
 
 var _ genericapiserver.PostStartHookProvider = RESTStorageProvider{}
@@ -87,7 +89,7 @@ func (d PredefinedData) EnsurePredefinedConfiguration() genericapiserver.PostSta
 		flowcontrolClientSet := flowcontrolclient.NewForConfigOrDie(hookContext.LoopbackClientConfig)
 		// Adding system priority classes is important. If they fail to add, many critical system
 		// components may fail and cluster may break.
-		err := wait.Poll(1*time.Second, 30*time.Second, func() (done bool, err error) {
+		err := wait.PollImmediate(time.Second, 30*time.Second, func() (done bool, err error) {
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to initialize client: %v", err))
 				return false, nil
@@ -97,6 +99,7 @@ func (d PredefinedData) EnsurePredefinedConfiguration() genericapiserver.PostSta
 				_, err := flowcontrolClientSet.FlowSchemas().Get(flowSchema.Name, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
+						// TODO(yue9944882): use server-side apply to create the defaults
 						_, err := flowcontrolClientSet.FlowSchemas().Create(flowSchema)
 						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
@@ -116,6 +119,7 @@ func (d PredefinedData) EnsurePredefinedConfiguration() genericapiserver.PostSta
 				_, err := flowcontrolClientSet.PriorityLevelConfigurations().Get(priorityLevelConfiguration.Name, metav1.GetOptions{})
 				if err != nil {
 					if apierrors.IsNotFound(err) {
+						// TODO(yue9944882): use server-side apply to create the defaults
 						_, err := flowcontrolClientSet.PriorityLevelConfigurations().Create(priorityLevelConfiguration)
 						if err != nil && !apierrors.IsAlreadyExists(err) {
 							return false, err
@@ -124,7 +128,7 @@ func (d PredefinedData) EnsurePredefinedConfiguration() genericapiserver.PostSta
 						} else {
 							klog.V(3).Infof("system preset PriorityLevelConfiguration %s already exists, skipping creating", priorityLevelConfiguration.Name)
 						}
-					} else if err == nil {
+					} else {
 						// Unable to get the priority class for reasons other than "not found".
 						klog.Warningf("unable to get PriorityLevelConfiguration %v: %v. Retrying...", priorityLevelConfiguration.Name, err)
 						return false, nil

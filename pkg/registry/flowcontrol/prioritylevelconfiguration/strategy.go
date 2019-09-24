@@ -88,6 +88,7 @@ type priorityLevelConfigurationStatusStrategy struct {
 	priorityLevelConfigurationStrategy
 }
 
+// StatusStrategy is the default logic that applies when updating priority level configuration objects' status.
 var StatusStrategy = priorityLevelConfigurationStatusStrategy{Strategy}
 
 func (priorityLevelConfigurationStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

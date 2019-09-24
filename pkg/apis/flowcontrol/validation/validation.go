@@ -29,8 +29,10 @@ import (
 	"k8s.io/kubernetes/pkg/apis/flowcontrol"
 )
 
+// ValidateFlowSchemaName validates name for flow-schema.
 var ValidateFlowSchemaName = apimachineryvalidation.NameIsDNSSubdomain
 
+// ValidatePriorityLevelConfigurationName validates name for priority-level-configuration.
 var ValidatePriorityLevelConfigurationName = apimachineryvalidation.NameIsDNSSubdomain
 
 var supportedDistinguisherMethods = sets.NewString(
@@ -56,6 +58,7 @@ var supportedSubjectKinds = sets.NewString(
 	flowcontrol.GroupKind,
 )
 
+// ValidateFlowSchema validates the content of flow-schema
 func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&fs.ObjectMeta, false, ValidateFlowSchemaName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidateFlowSchemaSpec(&fs.Spec, field.NewPath("spec"))...)
@@ -63,6 +66,7 @@ func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
 	return allErrs
 }
 
+// ValidateFlowSchemaSpec validates the content of flow-schema's spec
 func ValidateFlowSchemaSpec(spec *flowcontrol.FlowSchemaSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if spec.MatchingPrecedence < 0 {
@@ -90,6 +94,7 @@ func ValidateFlowSchemaSpec(spec *flowcontrol.FlowSchemaSpec, fldPath *field.Pat
 	return allErrs
 }
 
+// ValidateFlowSchemaPolicyRuleWithSubjects validates policy-rule-with-subjects object.
 func ValidateFlowSchemaPolicyRuleWithSubjects(rule *flowcontrol.PolicyRuleWithSubjects, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(rule.Subjects) > 0 {
@@ -103,6 +108,7 @@ func ValidateFlowSchemaPolicyRuleWithSubjects(rule *flowcontrol.PolicyRuleWithSu
 	return allErrs
 }
 
+// ValidateFlowSchemaSubject validates flow-schema's subject object.
 func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if len(subject.Name) == 0 {
@@ -147,6 +153,7 @@ func ValidateFlowSchemaSubject(subject *flowcontrol.Subject, fldPath *field.Path
 	return allErrs
 }
 
+// ValidateFlowSchemaPolicyRule validates policy-rule in the flow-schema.
 func ValidateFlowSchemaPolicyRule(rule *flowcontrol.PolicyRule, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 
@@ -186,12 +193,14 @@ func ValidateFlowSchemaPolicyRule(rule *flowcontrol.PolicyRule, fldPath *field.P
 	return allErrs
 }
 
+// ValidateFlowSchemaStatus validates status for the flow-schema.
 func ValidateFlowSchemaStatus(status *flowcontrol.FlowSchemaStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	// conditions will not be validated
 	return allErrs
 }
 
+// ValidatePriorityLevelConfiguration validates priority-level-configuration.
 func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfiguration) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&pl.ObjectMeta, false, ValidatePriorityLevelConfigurationName, field.NewPath("metadata"))
 	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, pl.Name, field.NewPath("spec"))...)
@@ -199,6 +208,7 @@ func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfigurati
 	return allErrs
 }
 
+// ValidatePriorityLevelConfigurationSpec validates priority-level-configuration's spec.
 func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfigurationSpec, name string, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	if !spec.Exempt {
@@ -238,6 +248,7 @@ func ValidatePriorityLevelConfigurationSpec(spec *flowcontrol.PriorityLevelConfi
 	return allErrs
 }
 
+// ValidatePriorityLevelConfigurationStatus validates priority-level-configuration's status.
 func ValidatePriorityLevelConfigurationStatus(status *flowcontrol.PriorityLevelConfigurationStatus, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
 	// conditions will not be validated

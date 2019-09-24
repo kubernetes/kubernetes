@@ -37,6 +37,7 @@ type PriorityLevelConfigurationStorage struct {
 	Status                     *StatusREST
 }
 
+// NewStorage creates a new instance of priority-level-configuration storage.
 func NewStorage(optsGetter generic.RESTOptionsGetter) PriorityLevelConfigurationStorage {
 	priorityLevelConfigurationREST, priorityLevelConfigurationStatusREST := NewREST(optsGetter)
 

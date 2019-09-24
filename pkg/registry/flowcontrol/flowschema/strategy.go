@@ -88,6 +88,7 @@ type flowSchemaStatusStrategy struct {
 	flowSchemaStrategy
 }
 
+// StatusStrategy is the default logic that applies when updating flow-schema objects' status.
 var StatusStrategy = flowSchemaStatusStrategy{Strategy}
 
 func (flowSchemaStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
