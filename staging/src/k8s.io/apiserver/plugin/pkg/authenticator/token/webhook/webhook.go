@@ -98,7 +98,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 		err    error
 		auds   authenticator.Audiences
 	)
-	webhook.WithExponentialBackoff(w.initialBackoff, func() error {
+	webhook.WithExponentialBackoff(ctx, w.initialBackoff, func() error {
 		result, err = w.tokenReview.Create(r)
 		return err
 	})

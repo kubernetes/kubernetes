@@ -188,7 +188,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 			result *authorization.SubjectAccessReview
 			err    error
 		)
-		webhook.WithExponentialBackoff(w.initialBackoff, func() error {
+		webhook.WithExponentialBackoff(ctx, w.initialBackoff, func() error {
 			result, err = w.subjectAccessReview.Create(r)
 			return err
 		})
