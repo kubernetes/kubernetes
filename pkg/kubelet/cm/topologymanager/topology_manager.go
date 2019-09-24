@@ -67,8 +67,17 @@ type manager struct {
 	numaNodes []int
 }
 
-//HintProvider interface is to be implemented by Hint Providers
+// HintProvider is an interface for components that want to collaborate to
+// achieve globally optimal concrete resource alignment with respect to
+// NUMA locality.
 type HintProvider interface {
+	// GetTopologyHints returns a map of resource names to a list of possible
+	// concrete resource allocations in terms of NUMA locality hints. Each hint
+	// is optionally marked "preferred" and indicates the set of NUMA nodes
+	// involved in the hypothetical allocation. The topology manager calls
+	// this function for each hint provider, and merges the hints to produce
+	// a consensus "best" hint. The hint providers may subsequently query the
+	// topology manager to influence actual resource assignment.
 	GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]TopologyHint
 }
 

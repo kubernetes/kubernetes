@@ -10,7 +10,6 @@ go_library(
         "policy.go",
         "policy_none.go",
         "policy_static.go",
-        "topology_hints.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/cm/cpumanager",
     visibility = ["//visibility:public"],
