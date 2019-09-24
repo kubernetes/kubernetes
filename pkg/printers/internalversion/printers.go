@@ -19,6 +19,7 @@ package internalversion
 import (
 	"bytes"
 	"fmt"
+	"k8s.io/kubernetes/pkg/apis/flowcontrol/util"
 	"net"
 	"sort"
 	"strconv"
@@ -2138,7 +2139,7 @@ func printFlowSchema(obj *flowcontrol.FlowSchema, options printers.GenerateOptio
 
 func printFlowSchemaList(list *flowcontrol.FlowSchemaList, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
 	rows := make([]metav1beta1.TableRow, 0, len(list.Items))
-	fsSeq := make(flowcontrol.FlowSchemaSequence, len(list.Items))
+	fsSeq := make(util.FlowSchemaSequence, len(list.Items))
 	for i := range list.Items {
 		fsSeq[i] = &list.Items[i]
 	}

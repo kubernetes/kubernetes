@@ -37,6 +37,7 @@ type FlowSchemaStorage struct {
 	Status     *StatusREST
 }
 
+// NewStorage creates a new instance of flow-schema storage.
 func NewStorage(optsGetter generic.RESTOptionsGetter) FlowSchemaStorage {
 	flowSchemaREST, flowSchemaStatusREST := NewREST(optsGetter)
 

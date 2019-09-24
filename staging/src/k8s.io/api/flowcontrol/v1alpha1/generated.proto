@@ -91,9 +91,10 @@ message FlowSchemaSpec {
   // Required.
   optional PriorityLevelConfigurationReference priorityLevelConfiguration = 1;
 
-  // `matchingPrecedence` is used to choose among the FlowSchemas that match a given request.  The chosen
+  // `matchingPrecedence` is used to choose among the FlowSchemas that match a given request. The chosen
   // FlowSchema is among those with the numerically lowest (which we take to be logically highest)
   // MatchingPrecedence.  Each MatchingPrecedence value must be non-negative.
+  // Note that if the precedence is not specified or zero, it will be set to 1000 as default.
   optional int32 matchingPrecedence = 2;
 
   // `distinguisherMethod` defines how to compute the flow distinguisher for requests that match this schema.

@@ -559,6 +559,9 @@ func BuildRequestManager(s *options.ServerRunOptions, extclient clientgoclientse
 		versionedInformer,
 		extclient.FlowcontrolV1alpha1(),
 		s.GenericServerRunOptions.MaxRequestsInFlight+s.GenericServerRunOptions.MaxMutatingRequestsInFlight,
+		// This is the timeout for waiting in a queue of the fair-queuing system. It needs to be shorter than
+		// the overall timeout, which is `s.GenericServerRunOptions.RequestTimeout`. 25% of the overall timeout
+		// is an initial guess at a good fraction.
 		s.GenericServerRunOptions.RequestTimeout/4,
 		true,
 	)
