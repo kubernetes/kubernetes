@@ -43,6 +43,14 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+const (
+	// Label change message
+	labelModified    = "modified"
+	labelAdded       = "labeled"
+	labelRemoved     = "unlabeled"
+	labelNotModified = "not modified"
+)
+
 // LabelOptions have the data required to perform the label operation
 type LabelOptions struct {
 	// Filename options
@@ -258,7 +266,7 @@ func (o *LabelOptions) RunLabel() error {
 			return err
 		}
 		if o.dryrun || o.local || o.list {
-			err = labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
+			added, removed, modified, err := labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
 			if err != nil {
 				return err
 			}
@@ -266,7 +274,7 @@ func (o *LabelOptions) RunLabel() error {
 			if err != nil {
 				return err
 			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj)
+			dataChangeMsg = updateDataChangeMsg(oldData, newObj, added, removed, modified)
 			outputObj = info.Object
 		} else {
 			name, namespace := info.Name, info.Namespace
@@ -283,7 +291,8 @@ func (o *LabelOptions) RunLabel() error {
 				}
 			}
 
-			if err := labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels); err != nil {
+			added, removed, modified, err := labelFunc(obj, o.overwrite, o.resourceVersion, o.newLabels, o.removeLabels)
+			if err != nil {
 				return err
 			}
 			if err := o.Recorder.Record(obj); err != nil {
@@ -293,7 +302,7 @@ func (o *LabelOptions) RunLabel() error {
 			if err != nil {
 				return err
 			}
-			dataChangeMsg = updateDataChangeMsg(oldData, newObj)
+			dataChangeMsg = updateDataChangeMsg(oldData, newObj, added, removed, modified)
 			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newObj)
 			createdPatch := err == nil
 			if err != nil {
@@ -347,10 +356,16 @@ func (o *LabelOptions) RunLabel() error {
 	})
 }
 
-func updateDataChangeMsg(oldObj []byte, newObj []byte) string {
-	msg := "not labeled"
+func updateDataChangeMsg(oldObj []byte, newObj []byte, added bool, removed bool, modified bool) string {
+	msg := labelNotModified
 	if !reflect.DeepEqual(oldObj, newObj) {
-		msg = "labeled"
+		if modified {
+			msg = labelModified
+		} else if added {
+			msg = labelAdded
+		} else if removed {
+			msg = labelRemoved
+		}
 	}
 	return msg
 }
@@ -392,14 +407,18 @@ func parseLabels(spec []string) (map[string]string, []string, error) {
 	return labels, remove, nil
 }
 
-func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, labels map[string]string, remove []string) error {
+func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, labels map[string]string, remove []string) (bool, bool, bool, error) {
+	// added: true only when new labels are added.
+	// removed: true only when labels are removed.
+	// modified: true when labels are replaced or both added and removed happen.
+	added, removed, modified := false, false, false
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return err
+		return added, removed, modified, err
 	}
 	if !overwrite {
 		if err := validateNoOverwrites(accessor, labels); err != nil {
-			return err
+			return added, removed, modified, err
 		}
 	}
 
@@ -409,9 +428,18 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 	}
 
 	for key, value := range labels {
+		val, ok := objLabels[key]
+		if !ok {
+			added = true
+		} else if ok && val != value {
+			modified = true
+		}
 		objLabels[key] = value
 	}
 	for _, label := range remove {
+		if _, ok := objLabels[label]; ok {
+			removed = true
+		}
 		delete(objLabels, label)
 	}
 	accessor.SetLabels(objLabels)
@@ -419,5 +447,14 @@ func labelFunc(obj runtime.Object, overwrite bool, resourceVersion string, label
 	if len(resourceVersion) != 0 {
 		accessor.SetResourceVersion(resourceVersion)
 	}
-	return nil
+
+	if !modified && added && removed {
+		modified = true
+	}
+	if modified {
+		added = false
+		removed = false
+	}
+
+	return added, removed, modified, nil
 }

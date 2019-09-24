@@ -19,7 +19,7 @@ package annotate
 import (
 	"bytes"
 	"fmt"
-	"io"
+	"reflect"
 
 	jsonpatch "github.com/evanphx/json-patch"
 	"github.com/spf13/cobra"
@@ -41,10 +41,18 @@ import (
 	"k8s.io/kubectl/pkg/util/templates"
 )
 
+const (
+	// annotation change message
+	annotationModified    = "modified"
+	annotationAdded       = "annotated"
+	annotationRemoved     = "unannotated"
+	annotationNotModified = "not annotated"
+)
+
 // AnnotateOptions have the data required to perform the annotate operation
 type AnnotateOptions struct {
 	PrintFlags *genericclioptions.PrintFlags
-	PrintObj   printers.ResourcePrinterFunc
+	ToPrinter  func(string) (printers.ResourcePrinter, error)
 
 	// Filename options
 	resource.FilenameOptions
@@ -166,15 +174,13 @@ func (o *AnnotateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args [
 	o.outputFormat = cmdutil.GetFlagString(cmd, "output")
 	o.dryrun = cmdutil.GetDryRunFlag(cmd)
 
-	if o.dryrun {
-		o.PrintFlags.Complete("%s (dry run)")
-	}
-	printer, err := o.PrintFlags.ToPrinter()
-	if err != nil {
-		return err
-	}
-	o.PrintObj = func(obj runtime.Object, out io.Writer) error {
-		return printer.PrintObj(obj, out)
+	o.ToPrinter = func(operation string) (printers.ResourcePrinter, error) {
+		o.PrintFlags.NamePrintFlags.Operation = operation
+		if o.dryrun {
+			o.PrintFlags.Complete("%s (dry run)")
+		}
+
+		return o.PrintFlags.ToPrinter()
 	}
 
 	o.namespace, o.enforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
@@ -255,29 +261,38 @@ func (o AnnotateOptions) RunAnnotate() error {
 		}
 
 		var outputObj runtime.Object
+		var dataChangeMsg string
 		obj := info.Object
+		oldData, err := json.Marshal(obj)
+		if err != nil {
+			return err
+		}
 
 		if o.dryrun || o.local {
-			if err := o.updateAnnotations(obj); err != nil {
-				return err
-			}
-			outputObj = obj
-		} else {
-			name, namespace := info.Name, info.Namespace
-			oldData, err := json.Marshal(obj)
+			added, removed, modified, err := o.updateAnnotations(obj)
 			if err != nil {
-				return err
-			}
-			if err := o.Recorder.Record(info.Object); err != nil {
-				klog.V(4).Infof("error recording current command: %v", err)
-			}
-			if err := o.updateAnnotations(obj); err != nil {
 				return err
 			}
 			newData, err := json.Marshal(obj)
 			if err != nil {
 				return err
 			}
+			dataChangeMsg = updateDataChangeMsg(oldData, newData, added, removed, modified)
+			outputObj = obj
+		} else {
+			name, namespace := info.Name, info.Namespace
+			if err := o.Recorder.Record(info.Object); err != nil {
+				klog.V(4).Infof("error recording current command: %v", err)
+			}
+			added, removed, modified, err := o.updateAnnotations(obj)
+			if err != nil {
+				return err
+			}
+			newData, err := json.Marshal(obj)
+			if err != nil {
+				return err
+			}
+			dataChangeMsg = updateDataChangeMsg(oldData, newData, added, removed, modified)
 			patchBytes, err := jsonpatch.CreateMergePatch(oldData, newData)
 			createdPatch := err == nil
 			if err != nil {
@@ -301,7 +316,12 @@ func (o AnnotateOptions) RunAnnotate() error {
 			}
 		}
 
-		return o.PrintObj(outputObj, o.Out)
+		printer, err := o.ToPrinter(dataChangeMsg)
+		if err != nil {
+			return err
+		}
+
+		return printer.PrintObj(outputObj, o.Out)
 	})
 }
 
@@ -350,14 +370,18 @@ func validateNoAnnotationOverwrites(accessor metav1.Object, annotations map[stri
 }
 
 // updateAnnotations updates annotations of obj
-func (o AnnotateOptions) updateAnnotations(obj runtime.Object) error {
+func (o AnnotateOptions) updateAnnotations(obj runtime.Object) (bool, bool, bool, error) {
+	// added: true only when new labels are added.
+	// removed: true only when labels are removed.
+	// modified: true when labels are replaced or both added and removed happen.
+	added, removed, modified := false, false, false
 	accessor, err := meta.Accessor(obj)
 	if err != nil {
-		return err
+		return added, removed, modified, err
 	}
 	if !o.overwrite {
 		if err := validateNoAnnotationOverwrites(accessor, o.newAnnotations); err != nil {
-			return err
+			return added, removed, modified, err
 		}
 	}
 
@@ -367,9 +391,18 @@ func (o AnnotateOptions) updateAnnotations(obj runtime.Object) error {
 	}
 
 	for key, value := range o.newAnnotations {
+		val, ok := annotations[key]
+		if !ok {
+			added = true
+		} else if ok && val != value {
+			modified = true
+		}
 		annotations[key] = value
 	}
 	for _, annotation := range o.removeAnnotations {
+		if _, ok := annotations[annotation]; ok {
+			removed = true
+		}
 		delete(annotations, annotation)
 	}
 	accessor.SetAnnotations(annotations)
@@ -377,5 +410,28 @@ func (o AnnotateOptions) updateAnnotations(obj runtime.Object) error {
 	if len(o.resourceVersion) != 0 {
 		accessor.SetResourceVersion(o.resourceVersion)
 	}
-	return nil
+
+	if !modified && added && removed {
+		modified = true
+	}
+	if modified {
+		added = false
+		removed = false
+	}
+
+	return added, removed, modified, err
+}
+
+func updateDataChangeMsg(oldObj []byte, newObj []byte, added bool, removed bool, modified bool) string {
+	msg := annotationNotModified
+	if !reflect.DeepEqual(oldObj, newObj) {
+		if modified {
+			msg = annotationModified
+		} else if added {
+			msg = annotationAdded
+		} else if removed {
+			msg = annotationRemoved
+		}
+	}
+	return msg
 }

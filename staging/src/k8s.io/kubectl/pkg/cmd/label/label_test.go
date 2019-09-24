@@ -26,6 +26,7 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/json"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/resource"
 	"k8s.io/client-go/rest/fake"
@@ -157,13 +158,16 @@ func TestParseLabels(t *testing.T) {
 
 func TestLabelFunc(t *testing.T) {
 	tests := []struct {
-		obj       runtime.Object
-		overwrite bool
-		version   string
-		labels    map[string]string
-		remove    []string
-		expected  runtime.Object
-		expectErr bool
+		obj            runtime.Object
+		overwrite      bool
+		version        string
+		labels         map[string]string
+		remove         []string
+		expected       runtime.Object
+		expectErr      bool
+		expectModified bool
+		expectAdded    bool
+		expectRemoved  bool
 	}{
 		{
 			obj: &v1.Pod{
@@ -171,8 +175,11 @@ func TestLabelFunc(t *testing.T) {
 					Labels: map[string]string{"a": "b"},
 				},
 			},
-			labels:    map[string]string{"a": "b"},
-			expectErr: true,
+			labels:         map[string]string{"a": "b"},
+			expectErr:      true,
+			expectModified: false,
+			expectAdded:    false,
+			expectRemoved:  false,
 		},
 		{
 			obj: &v1.Pod{
@@ -187,6 +194,9 @@ func TestLabelFunc(t *testing.T) {
 					Labels: map[string]string{"a": "c"},
 				},
 			},
+			expectModified: true,
+			expectAdded:    false,
+			expectRemoved:  false,
 		},
 		{
 			obj: &v1.Pod{
@@ -200,6 +210,9 @@ func TestLabelFunc(t *testing.T) {
 					Labels: map[string]string{"a": "b", "c": "d"},
 				},
 			},
+			expectModified: false,
+			expectAdded:    true,
+			expectRemoved:  false,
 		},
 		{
 			obj: &v1.Pod{
@@ -215,6 +228,9 @@ func TestLabelFunc(t *testing.T) {
 					ResourceVersion: "2",
 				},
 			},
+			expectModified: false,
+			expectAdded:    true,
+			expectRemoved:  false,
 		},
 		{
 			obj: &v1.Pod{
@@ -229,6 +245,9 @@ func TestLabelFunc(t *testing.T) {
 					Labels: map[string]string{},
 				},
 			},
+			expectModified: false,
+			expectAdded:    false,
+			expectRemoved:  true,
 		},
 		{
 			obj: &v1.Pod{
@@ -246,6 +265,9 @@ func TestLabelFunc(t *testing.T) {
 					},
 				},
 			},
+			expectModified: true,
+			expectAdded:    false,
+			expectRemoved:  false,
 		},
 		{
 			obj: &v1.Pod{
@@ -257,10 +279,13 @@ func TestLabelFunc(t *testing.T) {
 					Labels: map[string]string{"a": "b"},
 				},
 			},
+			expectModified: false,
+			expectAdded:    true,
+			expectRemoved:  false,
 		},
 	}
 	for _, test := range tests {
-		err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
+		added, removed, modified, err := labelFunc(test.obj, test.overwrite, test.version, test.labels, test.remove)
 		if test.expectErr {
 			if err == nil {
 				t.Errorf("unexpected non-error: %v", test)
@@ -272,6 +297,160 @@ func TestLabelFunc(t *testing.T) {
 		}
 		if !reflect.DeepEqual(test.obj, test.expected) {
 			t.Errorf("expected: %v, got %v", test.expected, test.obj)
+		}
+		if test.expectModified != modified {
+			t.Errorf("expected modified: %t, got %t", test.expectModified, modified)
+		}
+		if test.expectAdded != added {
+			t.Errorf("expected added: %t, got %t", test.expectAdded, added)
+		}
+		if test.expectRemoved != removed {
+			t.Errorf("expected removed: %t, got %t", test.expectRemoved, removed)
+		}
+	}
+}
+
+func TestUpdateDataChangeMsg(t *testing.T) {
+	tests := []struct {
+		obj         runtime.Object
+		overwrite   bool
+		version     string
+		labels      map[string]string
+		remove      []string
+		expected    runtime.Object
+		modified    bool
+		added       bool
+		removed     bool
+		expectedMsg string
+	}{
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels:      map[string]string{"a": "b"},
+			modified:    false,
+			added:       false,
+			removed:     false,
+			expectedMsg: labelNotModified,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels:    map[string]string{"a": "c"},
+			overwrite: true,
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "c"},
+				},
+			},
+			modified:    true,
+			added:       false,
+			removed:     false,
+			expectedMsg: labelModified,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels: map[string]string{"c": "d"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+			modified:    false,
+			added:       true,
+			removed:     false,
+			expectedMsg: labelAdded,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels:  map[string]string{"c": "d"},
+			version: "2",
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels:          map[string]string{"a": "b", "c": "d"},
+					ResourceVersion: "2",
+				},
+			},
+			modified:    false,
+			added:       true,
+			removed:     false,
+			expectedMsg: labelAdded,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			labels: map[string]string{},
+			remove: []string{"a"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{},
+				},
+			},
+			modified:    false,
+			added:       false,
+			removed:     true,
+			expectedMsg: labelRemoved,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b", "c": "d"},
+				},
+			},
+			labels: map[string]string{"e": "f"},
+			remove: []string{"a"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"c": "d",
+						"e": "f",
+					},
+				},
+			},
+			modified:    true,
+			added:       false,
+			removed:     false,
+			expectedMsg: labelModified,
+		},
+		{
+			obj: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{},
+			},
+			labels: map[string]string{"a": "b"},
+			expected: &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"a": "b"},
+				},
+			},
+			modified:    false,
+			added:       true,
+			removed:     false,
+			expectedMsg: labelAdded,
+		},
+	}
+
+	for _, test := range tests {
+		oldData, _ := json.Marshal(test.obj)
+		newData, _ := json.Marshal(test.expected)
+		msg := updateDataChangeMsg(oldData, newData, test.added, test.removed, test.modified)
+		if test.expectedMsg != msg {
+			t.Errorf("expected msg: %s, got %s", test.expectedMsg, msg)
 		}
 	}
 }
