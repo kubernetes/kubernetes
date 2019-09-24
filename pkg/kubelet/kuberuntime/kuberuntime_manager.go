@@ -681,12 +681,13 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 	// by container garbage collector.
 	m.pruneInitContainersBeforeStart(pod, podStatus)
 
-	// We pass the value of the PRIMARY podIP down to generatePodSandboxConfig and
-	// generateContainerConfig, which in turn passes it to various other
-	// functions, in order to facilitate functionality that requires this
-	// value (hosts file and downward API) and avoid races determining
+	// We pass the value of the PRIMARY podIP and list of podIPs down to
+	// generatePodSandboxConfig and generateContainerConfig, which in turn
+	// passes it to various other functions, in order to facilitate functionality
+	// that requires this value (hosts file and downward API) and avoid races determining
 	// the pod IP in cases where a container requires restart but the
-	// podIP isn't in the status manager yet.
+	// podIP isn't in the status manager yet. The list of podIPs is used to
+	// generate the hosts file.
 	//
 	// We default to the IPs in the passed-in pod status, and overwrite them if the
 	// sandbox needs to be (re)started.
@@ -772,7 +773,8 @@ func (m *kubeGenericRuntimeManager) SyncPod(pod *v1.Pod, podStatus *kubecontaine
 		}
 
 		klog.V(4).Infof("Creating %v %+v in pod %v", typeName, container, format.Pod(pod))
-		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP); err != nil {
+		// NOTE (aramase) podIPs are populated for single stack and dual stack clusters. Send only podIPs.
+		if msg, err := m.startContainer(podSandboxID, podSandboxConfig, container, pod, podStatus, pullSecrets, podIP, podIPs); err != nil {
 			startContainerResult.Fail(err, msg)
 			// known errors that are logged in other places are logged at higher levels here to avoid
 			// repetitive log spam
