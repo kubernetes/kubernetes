@@ -238,16 +238,13 @@ type ScorePlugin interface {
 	// indicating the rank of the node. All scoring plugins must return success or
 	// the pod will be rejected.
 	Score(pc *PluginContext, p *v1.Pod, nodeName string) (int, *Status)
-}
 
-// ScoreWithNormalizePlugin is an interface that must be implemented by "score"
-// plugins that also need to normalize the node scoring results produced by the same
-// plugin's "Score" method.
-type ScoreWithNormalizePlugin interface {
-	ScorePlugin
 	// NormalizeScore is called for all node scores produced by the same plugin's "Score"
 	// method. A successful run of NormalizeScore will update the scores list and return
 	// a success status.
+	//
+	// NOTE: This function is optional, and you could implement it as a no-op by simply
+	// returning nil.
 	NormalizeScore(pc *PluginContext, p *v1.Pod, scores NodeScoreList) *Status
 }
 
