@@ -32,6 +32,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 const TestPluginName = "kubernetes.io/testPlugin"
@@ -443,6 +444,11 @@ func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath st
 		return fmt.Errorf("MountDevice called with nil volume spec")
 	}
 	return nil
+}
+
+func (attacher *testPluginAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := attacher.MountDevice(spec, devicePath, deviceMountPath)
+	return volumetypes.OperationFinished, err
 }
 
 // Detacher

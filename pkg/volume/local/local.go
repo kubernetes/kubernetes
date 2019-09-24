@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/validation"
 	"k8s.io/utils/keymutex"
 	"k8s.io/utils/mount"
@@ -368,6 +369,11 @@ func (dm *deviceMounter) MountDevice(spec *volume.Spec, devicePath string, devic
 	default:
 		return fmt.Errorf("only directory and block device are supported")
 	}
+}
+
+func (dm *deviceMounter) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := dm.MountDevice(spec, devicePath, deviceMountPath)
+	return volumetypes.OperationFinished, err
 }
 
 func getVolumeSourceFSType(spec *volume.Spec) (string, error) {

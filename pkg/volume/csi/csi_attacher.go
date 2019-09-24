@@ -341,6 +341,11 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	return nil
 }
 
+func (c *csiAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := c.MountDevice(spec, devicePath, deviceMountPath)
+	return volumetypes.OperationFinished, err
+}
+
 var _ volume.Detacher = &csiAttacher{}
 
 var _ volume.DeviceUnmounter = &csiAttacher{}

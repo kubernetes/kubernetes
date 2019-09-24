@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/legacy-cloud-providers/aws"
 )
 
@@ -248,6 +249,11 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 		}
 	}
 	return nil
+}
+
+func (attacher *awsElasticBlockStoreAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := attacher.MountDevice(spec, devicePath, deviceMountPath)
+	return volumetypes.OperationFinished, err
 }
 
 type awsElasticBlockStoreDetacher struct {

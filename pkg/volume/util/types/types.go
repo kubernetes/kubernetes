@@ -51,6 +51,23 @@ func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
 	return o.OperationFunc()
 }
 
+type OperationStatus string
+
+const (
+	// OperationFinished means volume operation has been finished
+	OperationFinished OperationStatus = "Finished"
+
+	// OperationInProgress means volume operation has been started and
+	// is in-progress. This state does not indicate if operation will succeed or fail but
+	// merely it has been started and in in-progress.
+	OperationInProgress OperationStatus = "InProgress"
+
+	// OperationStateNoChange indicates it is unchanged from previous state.
+	// This can be used to indicate transient failures for an operation which
+	// was in-progress previously.
+	OperationStateNoChange OperationStatus = "NoChange"
+)
+
 // OperationTimedOutError indicates a particular volume operation has timed out.
 type OperationTimedOutError struct {
 	msg string

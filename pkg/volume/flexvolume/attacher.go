@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 type flexVolumeAttacher struct {
@@ -95,6 +96,11 @@ func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 		return nil
 	}
 	return err
+}
+
+func (attacher *flexVolumeAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := attacher.MountDevice(spec, devicePath, deviceMountPath)
+	return volumetypes.OperationFinished, err
 }
 
 func (a *flexVolumeAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {

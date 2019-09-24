@@ -31,6 +31,8 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
+	"k8s.io/utils/keymutex"
 )
 
 type iscsiAttacher struct {
@@ -132,6 +134,11 @@ func (attacher *iscsiAttacher) MountDevice(spec *volume.Spec, devicePath string,
 		}
 	}
 	return nil
+}
+
+func (attacher *iscsiAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := attacher.MountDevice(spec, devicePath, deviceMountPath)
+	return volumetypes.OperationFinished, err
 }
 
 type iscsiDetacher struct {

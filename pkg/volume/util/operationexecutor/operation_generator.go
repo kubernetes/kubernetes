@@ -575,12 +575,12 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			}
 
 			// Mount device to global mount path
-			err = volumeDeviceMounter.MountDevice(
+			operationState, err := volumeDeviceMounter.MountDeviceWithStatusTracking(
 				volumeToMount.VolumeSpec,
 				devicePath,
 				deviceMountPath)
 			if err != nil {
-				if volumetypes.IsOperationTimeOutError(err) {
+				if operationState == volumetypes.OperationInProgress {
 					markDeviceUncertainError := actualStateOfWorld.MarkDeviceAsUncertain(volumeToMount.VolumeName, devicePath, deviceMountPath)
 					if markDeviceUncertainError != nil {
 						klog.Infof("MountVolume.MarkDeviceAsUncertain failed with %v", markDeviceUncertainError)

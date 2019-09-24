@@ -1054,6 +1054,11 @@ func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath
 	return nil
 }
 
+func (fv *FakeVolume) MountDeviceWithStatusTracking(spec *Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := fv.MountDevice(spec, devicePath, deviceMountPath)
+	return volumetypes.OperationFinished, err
+}
+
 func (fv *FakeVolume) GetMountDeviceCallCount() int {
 	fv.RLock()
 	defer fv.RUnlock()

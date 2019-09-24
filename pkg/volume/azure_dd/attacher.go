@@ -37,6 +37,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/legacy-cloud-providers/azure"
 )
 
@@ -257,6 +258,11 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 		}
 	}
 	return nil
+}
+
+func (d *azureDiskAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := d.MountDevice(spec, devicePath, deviceMountPath)
+	return volumetypes.OperationFinished, err
 }
 
 // Detach detaches disk from Azure VM.
