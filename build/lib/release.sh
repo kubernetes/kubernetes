@@ -32,11 +32,6 @@ KUBE_BUILD_HYPERKUBE=${KUBE_BUILD_HYPERKUBE:-y}
 KUBE_BUILD_CONFORMANCE=${KUBE_BUILD_CONFORMANCE:-y}
 KUBE_BUILD_PULL_LATEST_IMAGES=${KUBE_BUILD_PULL_LATEST_IMAGES:-y}
 
-# The mondo test tarball is deprecated as of Kubernetes 1.14, and the default
-# will be set to 'n' in a future release.
-# See KEP sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball
-KUBE_BUILD_MONDO_TEST_TARBALL=${KUBE_BUILD_MONDO_TEST_TARBALL:-y}
-
 # Validate a ci version
 #
 # Globals:
@@ -526,48 +521,6 @@ function kube::release::package_test_tarballs() {
 
   local portable_tarball_name="${RELEASE_TARS}/kubernetes-test-portable.tar.gz"
   kube::release::create_tarball "${portable_tarball_name}" "${release_stage}/.."
-
-  if [[ "${KUBE_BUILD_MONDO_TEST_TARBALL}" =~ [yY] ]]; then
-    kube::log::status "Building tarball: test mondo (deprecated by KEP sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball)"
-    local platform
-    for platform in "${KUBE_TEST_PLATFORMS[@]}"; do
-      local test_bins=("${KUBE_TEST_BINARIES[@]}")
-      if [[ "${platform%/*}" == "windows" ]]; then
-        test_bins=("${KUBE_TEST_BINARIES_WIN[@]}")
-      fi
-      mkdir -p "${release_stage}/platforms/${platform}"
-      # This fancy expression will expand to prepend a path
-      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-      # test_bins array.
-      cp "${test_bins[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-        "${release_stage}/platforms/${platform}"
-    done
-    for platform in "${KUBE_TEST_SERVER_PLATFORMS[@]}"; do
-      mkdir -p "${release_stage}/platforms/${platform}"
-      # This fancy expression will expand to prepend a path
-      # (${LOCAL_OUTPUT_BINPATH}/${platform}/) to every item in the
-      # KUBE_TEST_SERVER_BINARIES array.
-      cp "${KUBE_TEST_SERVER_BINARIES[@]/#/${LOCAL_OUTPUT_BINPATH}/${platform}/}" \
-        "${release_stage}/platforms/${platform}"
-    done
-
-    cat <<EOF > "${release_stage}/DEPRECATION_NOTICE"
-The mondo test tarball containing binaries for all platforms is
-DEPRECATED as of Kubernetes 1.14.
-
-Users of this tarball should migrate to using the platform-specific
-tarballs in combination with the "portable" tarball which contains
-scripts, test images, and other manifests.
-
-For more details, please see KEP
-sig-testing/20190118-breaking-apart-the-kubernetes-test-tarball.
-EOF
-
-    kube::release::clean_cruft
-
-    local package_name="${RELEASE_TARS}/kubernetes-test.tar.gz"
-    kube::release::create_tarball "${package_name}" "${release_stage}/.."
-  fi
 }
 
 # This is all the platform-independent stuff you need to run/install kubernetes.
