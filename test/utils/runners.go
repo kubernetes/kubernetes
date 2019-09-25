@@ -131,6 +131,7 @@ type RCConfig struct {
 	DNSPolicy                     *v1.DNSPolicy
 	PriorityClassName             string
 	TerminationGracePeriodSeconds *int64
+	Lifecycle                     *v1.Lifecycle
 
 	// Env vars, set the same for every pod.
 	Env map[string]string
@@ -329,10 +330,11 @@ func (config *DeploymentConfig) create() error {
 					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(nil),
 					Containers: []v1.Container{
 						{
-							Name:    config.Name,
-							Image:   config.Image,
-							Command: config.Command,
-							Ports:   []v1.ContainerPort{{ContainerPort: 80}},
+							Name:      config.Name,
+							Image:     config.Image,
+							Command:   config.Command,
+							Ports:     []v1.ContainerPort{{ContainerPort: 80}},
+							Lifecycle: config.Lifecycle,
 						},
 					},
 				},
@@ -410,10 +412,11 @@ func (config *ReplicaSetConfig) create() error {
 					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(nil),
 					Containers: []v1.Container{
 						{
-							Name:    config.Name,
-							Image:   config.Image,
-							Command: config.Command,
-							Ports:   []v1.ContainerPort{{ContainerPort: 80}},
+							Name:      config.Name,
+							Image:     config.Image,
+							Command:   config.Command,
+							Ports:     []v1.ContainerPort{{ContainerPort: 80}},
+							Lifecycle: config.Lifecycle,
 						},
 					},
 				},
@@ -483,9 +486,10 @@ func (config *JobConfig) create() error {
 					TerminationGracePeriodSeconds: config.getTerminationGracePeriodSeconds(nil),
 					Containers: []v1.Container{
 						{
-							Name:    config.Name,
-							Image:   config.Image,
-							Command: config.Command,
+							Name:      config.Name,
+							Image:     config.Image,
+							Command:   config.Command,
+							Lifecycle: config.Lifecycle,
 						},
 					},
 					RestartPolicy: v1.RestartPolicyOnFailure,
@@ -600,6 +604,7 @@ func (config *RCConfig) create() error {
 							Command:        config.Command,
 							Ports:          []v1.ContainerPort{{ContainerPort: 80}},
 							ReadinessProbe: config.ReadinessProbe,
+							Lifecycle:      config.Lifecycle,
 						},
 					},
 					DNSPolicy:                     *config.DNSPolicy,
@@ -681,6 +686,9 @@ func (config *RCConfig) applyTo(template *v1.PodTemplateSpec) {
 	}
 	if config.GpuLimit > 0 {
 		template.Spec.Containers[0].Resources.Limits["nvidia.com/gpu"] = *resource.NewQuantity(config.GpuLimit, resource.DecimalSI)
+	}
+	if config.Lifecycle != nil {
+		template.Spec.Containers[0].Lifecycle = config.Lifecycle
 	}
 	if len(config.Volumes) > 0 {
 		template.Spec.Volumes = config.Volumes
