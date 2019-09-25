@@ -18,6 +18,7 @@ package testsuites
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/onsi/ginkgo"
@@ -321,8 +322,6 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 	})
 
 	ginkgo.It("should not mount / map unused volumes in a pod", func() {
-		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
-		framework.SkipUnlessSSHKeyPresent()
 		if pattern.VolMode == v1.PersistentVolumeBlock {
 			skipBlockTest(driver)
 		}
@@ -351,10 +350,16 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		// Reload the pod to get its node
 		pod, err = l.cs.CoreV1().Pods(l.ns.Name).Get(pod.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
+		framework.ExpectNotEqual(pod.Spec.NodeName, "", "pod should be scheduled to a node")
+		node, err := l.cs.CoreV1().Nodes().Get(pod.Spec.NodeName, metav1.GetOptions{})
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Listing mounted volumes in the pod")
-		volumePaths, devicePaths, err := utils.ListPodVolumePluginDirectory(l.cs, pod)
+		hostExec := utils.NewHostExec(f)
+		defer hostExec.Cleanup()
+		volumePaths, devicePaths, err := listPodVolumePluginDirectory(hostExec, pod, node)
 		framework.ExpectNoError(err)
+
 		driverInfo := driver.GetDriverInfo()
 		volumePlugin := driverInfo.InTreePluginName
 		if len(volumePlugin) == 0 {
@@ -425,4 +430,43 @@ func swapVolumeMode(podTemplate *v1.Pod) *v1.Pod {
 		}
 	}
 	return pod
+}
+
+// listPodVolumePluginDirectory returns all volumes in /var/lib/kubelet/pods/<pod UID>/volumes/* and
+// /var/lib/kubelet/pods/<pod UID>/volumeDevices/*
+// Sample output:
+//   /var/lib/kubelet/pods/a4717a30-000a-4081-a7a8-f51adf280036/volumes/kubernetes.io~secret/default-token-rphdt
+//   /var/lib/kubelet/pods/4475b7a3-4a55-4716-9119-fd0053d9d4a6/volumeDevices/kubernetes.io~aws-ebs/pvc-5f9f80f5-c90b-4586-9966-83f91711e1c0
+func listPodVolumePluginDirectory(h utils.HostExec, pod *v1.Pod, node *v1.Node) (mounts []string, devices []string, err error) {
+	mountPath := filepath.Join("/var/lib/kubelet/pods/", string(pod.UID), "volumes")
+	devicePath := filepath.Join("/var/lib/kubelet/pods/", string(pod.UID), "volumeDevices")
+
+	mounts, err = listPodDirectory(h, mountPath, node)
+	if err != nil {
+		return nil, nil, err
+	}
+	devices, err = listPodDirectory(h, devicePath, node)
+	if err != nil {
+		return nil, nil, err
+	}
+	return mounts, devices, nil
+}
+
+func listPodDirectory(h utils.HostExec, path string, node *v1.Node) ([]string, error) {
+	// Return no error if the directory does not exist (e.g. there are no block volumes used)
+	_, err := h.IssueCommandWithResult("test ! -d "+path, node)
+	if err == nil {
+		// The directory does not exist
+		return nil, nil
+	}
+	// The directory either exists or a real error happened (e.g. "access denied").
+	// Ignore the error, "find" will hit the error again and we report it there.
+
+	// Inside /var/lib/kubelet/pods/<pod>/volumes, look for <volume_plugin>/<volume-name>, hence depth 2
+	cmd := fmt.Sprintf("find %s -mindepth 2 -maxdepth 2", path)
+	out, err := h.IssueCommandWithResult(cmd, node)
+	if err != nil {
+		return nil, fmt.Errorf("error checking directory %s on node %s: %s", path, node.Name, err)
+	}
+	return strings.Split(out, "\n"), nil
 }
