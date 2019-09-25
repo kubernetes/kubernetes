@@ -25,14 +25,12 @@ import (
 	"k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/typed"
 	"sigs.k8s.io/structured-merge-diff/value"
-	"sigs.k8s.io/yaml"
 )
 
 // TypeConverter allows you to convert from runtime.Object to
 // typed.TypedValue and the other way around.
 type TypeConverter interface {
 	ObjectToTyped(runtime.Object) (*typed.TypedValue, error)
-	YAMLToTyped([]byte) (*typed.TypedValue, error)
 	TypedToObject(*typed.TypedValue) (runtime.Object, error)
 }
 
@@ -56,11 +54,6 @@ func (DeducedTypeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue
 		return nil, err
 	}
 	return typed.DeducedParseableType.FromUnstructured(u)
-}
-
-// YAMLToTyped parses a yaml object into a TypedValue with a "deduced type".
-func (DeducedTypeConverter) YAMLToTyped(from []byte) (*typed.TypedValue, error) {
-	return typed.DeducedParseableType.FromYAML(typed.YAMLObject(from))
 }
 
 // TypedToObject transforms the typed value into a runtime.Object. That
@@ -97,21 +90,6 @@ func (c *typeConverter) ObjectToTyped(obj runtime.Object) (*typed.TypedValue, er
 		return nil, newNoCorrespondingTypeError(gvk)
 	}
 	return t.FromUnstructured(u)
-}
-
-func (c *typeConverter) YAMLToTyped(from []byte) (*typed.TypedValue, error) {
-	unstructured := &unstructured.Unstructured{Object: map[string]interface{}{}}
-
-	if err := yaml.Unmarshal(from, &unstructured.Object); err != nil {
-		return nil, fmt.Errorf("error decoding YAML: %v", err)
-	}
-
-	gvk := unstructured.GetObjectKind().GroupVersionKind()
-	t := c.parser.Type(gvk)
-	if t == nil {
-		return nil, newNoCorrespondingTypeError(gvk)
-	}
-	return t.FromYAML(typed.YAMLObject(string(from)))
 }
 
 func (c *typeConverter) TypedToObject(value *typed.TypedValue) (runtime.Object, error) {
