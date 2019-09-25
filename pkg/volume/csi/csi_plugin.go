@@ -743,7 +743,9 @@ func (p *csiPlugin) skipAttach(driver string) (bool, error) {
 
 	kletHost, ok := p.host.(volume.KubeletVolumeHost)
 	if ok {
-		kletHost.WaitForCacheSync()
+		if err := kletHost.WaitForCacheSync(); err != nil {
+			return false, err
+		}
 	}
 
 	if p.csiDriverLister == nil {
@@ -782,7 +784,9 @@ func (p *csiPlugin) supportsVolumeLifecycleMode(driver string, volumeMode storag
 	if p.csiDriverLister != nil {
 		kletHost, ok := p.host.(volume.KubeletVolumeHost)
 		if ok {
-			kletHost.WaitForCacheSync()
+			if err := kletHost.WaitForCacheSync(); err != nil {
+				return err
+			}
 		}
 
 		c, err := p.csiDriverLister.Get(driver)
