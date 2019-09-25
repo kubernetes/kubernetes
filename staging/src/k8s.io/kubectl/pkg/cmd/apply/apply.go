@@ -635,6 +635,9 @@ See http://k8s.io/docs/reference/using-api/api-concepts/#conflicts`, err)
 	}
 
 	for n := range visitedNamespaces {
+		if len(o.Namespace) != 0 && n != o.Namespace {
+			continue
+		}
 		for _, m := range namespacedRESTMappings {
 			if err := p.prune(n, m); err != nil {
 				return fmt.Errorf("error pruning namespaced object %v: %v", m.GroupVersionKind, err)
