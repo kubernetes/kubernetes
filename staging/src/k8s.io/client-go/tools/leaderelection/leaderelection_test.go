@@ -17,8 +17,10 @@ limitations under the License.
 package leaderelection
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -894,4 +896,45 @@ func TestTryAcquireOrRenewEndpointsLeases(t *testing.T) {
 // Will test leader election using configmapsleases as the resource
 func TestTryAcquireOrRenewConfigMapsLeases(t *testing.T) {
 	testTryAcquireOrRenewMultiLock(t, "configmapsleases")
+}
+
+func TestLeaderElectorRaceStress(t *testing.T) {
+	client := fake.NewSimpleClientset()
+
+	lock, err := rl.New(
+		rl.EndpointsResourceLock,
+		"foo",
+		"stress",
+		client.CoreV1(),
+		client.CoordinationV1(),
+		rl.ResourceLockConfig{
+			Identity:      "me",
+			EventRecorder: &record.FakeRecorder{},
+		},
+	)
+	if err != nil {
+		t.Error(err)
+	}
+
+	for i := 0; i < 100; i++ {
+		ctx, cancel := context.WithCancel(context.Background())
+		le, err := NewLeaderElector(LeaderElectionConfig{
+			Lock:          lock,
+			LeaseDuration: 15 * time.Second,
+			RenewDeadline: 10 * time.Second,
+			RetryPeriod:   2 * time.Second,
+			Callbacks: LeaderCallbacks{
+				OnStartedLeading: func(ctx context.Context) {},
+				OnStoppedLeading: func() {},
+			},
+		})
+		if err != nil {
+			t.Error(err)
+		}
+		go func() {
+			time.Sleep((100 * time.Microsecond) + (time.Duration(rand.Intn(1000)) * time.Microsecond))
+			cancel()
+		}()
+		le.Run(ctx)
+	}
 }
