@@ -18,6 +18,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -81,9 +82,9 @@ func newGenericWebhook(scheme *runtime.Scheme, codecFactory serializer.CodecFact
 
 // WithExponentialBackoff will retry webhookFn() up to 5 times with exponentially increasing backoff when
 // it returns an error for which apierrors.SuggestsClientDelay() or apierrors.IsInternalError() returns true.
-func (g *GenericWebhook) WithExponentialBackoff(webhookFn func() rest.Result) rest.Result {
+func (g *GenericWebhook) WithExponentialBackoff(ctx context.Context, webhookFn func() rest.Result) rest.Result {
 	var result rest.Result
-	WithExponentialBackoff(g.InitialBackoff, func() error {
+	WithExponentialBackoff(ctx, g.InitialBackoff, func() error {
 		result = webhookFn()
 		return result.Error()
 	})
@@ -92,7 +93,7 @@ func (g *GenericWebhook) WithExponentialBackoff(webhookFn func() rest.Result) re
 
 // WithExponentialBackoff will retry webhookFn() up to 5 times with exponentially increasing backoff when
 // it returns an error for which apierrors.SuggestsClientDelay() or apierrors.IsInternalError() returns true.
-func WithExponentialBackoff(initialBackoff time.Duration, webhookFn func() error) error {
+func WithExponentialBackoff(ctx context.Context, initialBackoff time.Duration, webhookFn func() error) error {
 	backoff := wait.Backoff{
 		Duration: initialBackoff,
 		Factor:   1.5,
@@ -103,6 +104,12 @@ func WithExponentialBackoff(initialBackoff time.Duration, webhookFn func() error
 	var err error
 	wait.ExponentialBackoff(backoff, func() (bool, error) {
 		err = webhookFn()
+
+		if ctx.Err() != nil {
+			// we timed out or were cancelled, we should not retry
+			return true, err
+		}
+
 		// these errors indicate a transient error that should be retried.
 		if net.IsConnectionReset(err) || apierrors.IsInternalError(err) || apierrors.IsTimeout(err) || apierrors.IsTooManyRequests(err) {
 			return false, nil

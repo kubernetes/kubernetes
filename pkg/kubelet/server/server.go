@@ -260,7 +260,7 @@ func (s *Server) InstallAuthFilter() {
 		attrs := s.auth.GetRequestAttributes(info.User, req.Request)
 
 		// Authorize
-		decision, _, err := s.auth.Authorize(attrs)
+		decision, _, err := s.auth.Authorize(req.Request.Context(), attrs)
 		if err != nil {
 			msg := fmt.Sprintf("Authorization error (user=%s, verb=%s, resource=%s, subresource=%s)", attrs.GetUser().GetName(), attrs.GetVerb(), attrs.GetResource(), attrs.GetSubresource())
 			klog.Errorf(msg, err)

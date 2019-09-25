@@ -17,16 +17,24 @@ limitations under the License.
 package v1beta1
 
 import (
+	"context"
+
 	authenticationapi "k8s.io/api/authentication/v1beta1"
 )
 
 type TokenReviewExpansion interface {
 	Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error)
+	CreateContext(ctx context.Context, tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error)
 }
 
 func (c *tokenReviews) Create(tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {
+	return c.CreateContext(context.Background(), tokenReview)
+}
+
+func (c *tokenReviews) CreateContext(ctx context.Context, tokenReview *authenticationapi.TokenReview) (result *authenticationapi.TokenReview, err error) {
 	result = &authenticationapi.TokenReview{}
 	err = c.client.Post().
+		Context(ctx).
 		Resource("tokenreviews").
 		Body(tokenReview).
 		Do().

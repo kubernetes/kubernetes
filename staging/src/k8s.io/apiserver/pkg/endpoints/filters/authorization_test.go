@@ -17,6 +17,7 @@ limitations under the License.
 package filters
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -129,7 +130,7 @@ type fakeAuthorizer struct {
 	err      error
 }
 
-func (f fakeAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (f fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	return f.decision, f.reason, f.err
 }
 
