@@ -25,13 +25,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 const (
-	scoreWithNormalizePlugin1  = "score-with-normalize-plugin-1"
-	scoreWithNormalizePlugin2  = "score-with-normalize-plugin-2"
-	scorePlugin1               = "score-plugin-1"
-	pluginNotImplementingScore = "plugin-not-implementing-score"
+	scoreWithNormalizePlugin1      = "score-with-normalize-plugin-1"
+	scoreWithNormalizePlugin2      = "score-with-normalize-plugin-2"
+	scorePlugin1                   = "score-plugin-1"
+	pluginNotImplementingScore     = "plugin-not-implementing-score"
+	preFilterPluginName            = "prefilter-plugin"
+	preFilterWithUpdaterPluginName = "prefilter-with-updater-plugin"
 )
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
@@ -103,6 +106,56 @@ type PluginNotImplementingScore struct{}
 
 func (pl *PluginNotImplementingScore) Name() string {
 	return pluginNotImplementingScore
+}
+
+// TestPreFilterPlugin only implements PreFilterPlugin interface.
+type TestPreFilterPlugin struct {
+	PreFilterCalled int
+}
+
+func (pl *TestPreFilterPlugin) Name() string {
+	return preFilterPluginName
+}
+
+func (pl *TestPreFilterPlugin) PreFilter(pc *PluginContext, p *v1.Pod) *Status {
+	pl.PreFilterCalled++
+	return nil
+}
+
+func (pl *TestPreFilterPlugin) Updater() Updater {
+	return nil
+}
+
+// TestPreFilterWithUpdatePlugin implements Add/Remove interfaces.
+type TestPreFilterWithUpdaterPlugin struct {
+	PreFilterCalled int
+	AddCalled       int
+	RemoveCalled    int
+}
+
+func (pl *TestPreFilterWithUpdaterPlugin) Name() string {
+	return preFilterWithUpdaterPluginName
+}
+
+func (pl *TestPreFilterWithUpdaterPlugin) PreFilter(pc *PluginContext, p *v1.Pod) *Status {
+	pl.PreFilterCalled++
+	return nil
+}
+
+func (pl *TestPreFilterWithUpdaterPlugin) AddPod(pc *PluginContext, podToSchedule *v1.Pod,
+	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+	pl.AddCalled++
+	return nil
+}
+
+func (pl *TestPreFilterWithUpdaterPlugin) RemovePod(pc *PluginContext, podToSchedule *v1.Pod,
+	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+	pl.RemoveCalled++
+	return nil
+}
+
+func (pl *TestPreFilterWithUpdaterPlugin) Updater() Updater {
+	return pl
 }
 
 var registry Registry = func() Registry {
@@ -363,6 +416,44 @@ func TestRunScorePlugins(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPreFilterPlugins(t *testing.T) {
+	preFilter1 := &TestPreFilterPlugin{}
+	preFilter2 := &TestPreFilterWithUpdaterPlugin{}
+	r := make(Registry)
+	r.Register(preFilterPluginName,
+		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+			return preFilter1, nil
+		})
+	r.Register(preFilterWithUpdaterPluginName,
+		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+			return preFilter2, nil
+		})
+	plugins := &config.Plugins{PreFilter: &config.PluginSet{Enabled: []config.Plugin{{Name: preFilterWithUpdaterPluginName}, {Name: preFilterPluginName}}}}
+	t.Run("TestPreFilterPlugin", func(t *testing.T) {
+		f, err := NewFramework(r, plugins, emptyArgs)
+		if err != nil {
+			t.Fatalf("Failed to create framework for testing: %v", err)
+		}
+		f.RunPreFilterPlugins(nil, nil)
+		f.RunPreFilterUpdaterAddPod(nil, nil, nil, nil)
+		f.RunPreFilterUpdaterRemovePod(nil, nil, nil, nil)
+
+		if preFilter1.PreFilterCalled != 1 {
+			t.Errorf("preFilter1 called %v, expected: 1", preFilter1.PreFilterCalled)
+		}
+		if preFilter2.PreFilterCalled != 1 {
+			t.Errorf("preFilter2 called %v, expected: 1", preFilter2.PreFilterCalled)
+		}
+		if preFilter2.AddCalled != 1 {
+			t.Errorf("AddPod called %v, expected: 1", preFilter2.AddCalled)
+		}
+		if preFilter2.RemoveCalled != 1 {
+			t.Errorf("AddPod called %v, expected: 1", preFilter2.RemoveCalled)
+		}
+	})
+
 }
 
 func buildConfigDefaultWeights(ps ...string) *config.Plugins {
