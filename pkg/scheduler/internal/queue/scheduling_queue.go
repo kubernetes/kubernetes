@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 // This file contains structures that implement scheduling queue types.
-// Scheduling queues hold pods waiting to be scheduled. This file implements a
+// Scheduling queues hold pods waiting to be scheduled. This file implements a/
 // priority queue which has two sub queues. One sub-queue holds pods that are
 // being considered for scheduling. This is called activeQ. Another queue holds
 // pods that are already tried and are determined to be unschedulable. The latter
@@ -31,11 +31,12 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ktypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -154,8 +155,8 @@ func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
 func activeQComp(podInfo1, podInfo2 interface{}) bool {
 	pInfo1 := podInfo1.(*framework.PodInfo)
 	pInfo2 := podInfo2.(*framework.PodInfo)
-	prio1 := util.GetPodPriority(pInfo1.Pod)
-	prio2 := util.GetPodPriority(pInfo2.Pod)
+	prio1 := pod.GetPodPriority(pInfo1.Pod)
+	prio2 := pod.GetPodPriority(pInfo2.Pod)
 	return (prio1 > prio2) || (prio1 == prio2 && pInfo1.Timestamp.Before(pInfo2.Timestamp))
 }
 

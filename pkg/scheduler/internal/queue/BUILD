@@ -9,6 +9,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/internal/queue",
     visibility = ["//pkg/scheduler:__subpackages__"],
     deps = [
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
