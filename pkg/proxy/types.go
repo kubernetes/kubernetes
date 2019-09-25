@@ -43,7 +43,8 @@ type Provider interface {
 // identifier for a load-balanced service.
 type ServicePortName struct {
 	types.NamespacedName
-	Port string
+	Port     string
+	Protocol v1.Protocol
 }
 
 func (spn ServicePortName) String() string {
