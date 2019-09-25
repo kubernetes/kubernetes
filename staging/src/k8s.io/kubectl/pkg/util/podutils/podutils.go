@@ -139,14 +139,15 @@ func (s ActivePods) Less(i, j int) bool {
 	}
 	// 3. Not ready < ready
 	// If only one of the pods is not ready, the not ready one is smaller
-	if IsPodReady(s[i]) != IsPodReady(s[j]) {
+	podReady := IsPodReady(s[i])
+	if podReady != IsPodReady(s[j]) {
 		return !IsPodReady(s[i])
 	}
 	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
 	// 4. Been ready for empty time < less time < more time
 	// If both pods are ready, the latest ready one is smaller
-	if IsPodReady(s[i]) && IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
+	if podReady && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
 		return afterOrZero(podReadyTime(s[i]), podReadyTime(s[j]))
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
