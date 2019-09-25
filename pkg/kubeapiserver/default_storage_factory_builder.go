@@ -116,6 +116,10 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 	storageFactory.AddCohabitatingResources(networking.Resource("ingresses"), extensions.Resource("ingresses"))
 
 	for _, override := range c.EtcdServersOverrides {
+		// Currently, the string override can include three options:
+		//   [0] group/resource (must): the group and resource type info for target resource.
+		//   [1] servers (must): the etcd servers to be replaced with.
+		//   [2] etcd-prefix (optional): the base location for a GroupResource.
 		tokens := strings.Split(override, "#")
 		apiresource := strings.Split(tokens[0], "/")
 
@@ -125,6 +129,11 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 
 		servers := strings.Split(tokens[1], ";")
 		storageFactory.SetEtcdLocation(groupResource, servers)
+
+		if len(tokens) > 2 {
+			prefix := tokens[2]
+			storageFactory.SetEtcdPrefix(groupResource, prefix)
+		}
 	}
 	if len(c.EncryptionProviderConfigFilepath) != 0 {
 		transformerOverrides, err := encryptionconfig.GetTransformerOverrides(c.EncryptionProviderConfigFilepath)

@@ -19,6 +19,7 @@ package options
 import (
 	"fmt"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -92,17 +93,26 @@ func (s *EtcdOptions) Validate() []error {
 
 	for _, override := range s.EtcdServersOverrides {
 		tokens := strings.Split(override, "#")
-		if len(tokens) != 2 {
-			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated"))
+
+		// Currently, the string override can include three options:
+		//   [0] group/resource (must): the group and resource type info for target resource.
+		//   [1] servers (must): the etcd servers to be replaced with.
+		//   [2] etcd-prefix (optional): the base location for a GroupResource.
+		if len(tokens) < 2 || len(tokens) > 3 {
+			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers#/etcd-prefix, where servers are URLs, semicolon separated, and #/etcd-prefix is optional"))
 			continue
 		}
 
 		apiresource := strings.Split(tokens[0], "/")
 		if len(apiresource) != 2 {
-			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated"))
+			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers#/etcd-prefix, where servers are URLs, semicolon separated, and #/etcd-prefix is optional"))
 			continue
 		}
 
+		if len(tokens) == 3 && !strings.HasPrefix(tokens[2], "/") && tokens[2] == path.Clean(tokens[2]) {
+			allErrors = append(allErrors, fmt.Errorf("--etcd-servers-overrides invalid, must be of format: group/resource#servers#/etcd-prefix, where servers are URLs, semicolon separated, and #/etcd-prefix is optional"))
+			continue
+		}
 	}
 
 	return allErrors

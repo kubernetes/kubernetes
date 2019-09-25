@@ -103,7 +103,7 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DefaultWatchCacheSize:   100,
 				EtcdServersOverrides:    []string{"/events/http://127.0.0.1:4002"},
 			},
-			expectErr: "--etcd-servers-overrides invalid, must be of format: group/resource#servers, where servers are URLs, semicolon separated",
+			expectErr: "--etcd-servers-overrides invalid, must be of format: group/resource#servers#/etcd-prefix, where servers are URLs, semicolon separated, and #/etcd-prefix is optional",
 		},
 		{
 			name: "test when EtcdOptions is valid",
@@ -127,6 +127,53 @@ func TestEtcdOptionsValidate(t *testing.T) {
 				DefaultWatchCacheSize:   100,
 				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002"},
 			},
+		},
+		{
+			name: "test when EtcdOptions with etcd-prefix is valid",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Type:   "etcd3",
+					Prefix: "/registry",
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+						KeyFile:    "/var/run/kubernetes/etcd.key",
+						CAFile:     "/var/run/kubernetes/etcdca.crt",
+						CertFile:   "/var/run/kubernetes/etcdce.crt",
+					},
+					CompactionInterval:    storagebackend.DefaultCompactInterval,
+					CountMetricPollPeriod: time.Minute,
+				},
+				DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
+				DeleteCollectionWorkers: 1,
+				EnableGarbageCollection: true,
+				EnableWatchCache:        true,
+				DefaultWatchCacheSize:   100,
+				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002#/overrided-registry"},
+			},
+		},
+		{
+			name: "test when EtcdOptions with etcd-prefix is invalid",
+			testOptions: &EtcdOptions{
+				StorageConfig: storagebackend.Config{
+					Type:   "etcd3",
+					Prefix: "/registry",
+					Transport: storagebackend.TransportConfig{
+						ServerList: []string{"http://127.0.0.1"},
+						KeyFile:    "/var/run/kubernetes/etcd.key",
+						CAFile:     "/var/run/kubernetes/etcdca.crt",
+						CertFile:   "/var/run/kubernetes/etcdce.crt",
+					},
+					CompactionInterval:    storagebackend.DefaultCompactInterval,
+					CountMetricPollPeriod: time.Minute,
+				},
+				DefaultStorageMediaType: "application/vnd.kubernetes.protobuf",
+				DeleteCollectionWorkers: 1,
+				EnableGarbageCollection: true,
+				EnableWatchCache:        true,
+				DefaultWatchCacheSize:   100,
+				EtcdServersOverrides:    []string{"/events#http://127.0.0.1:4002#overrided-registry"},
+			},
+			expectErr: "--etcd-servers-overrides invalid, must be of format: group/resource#servers#/etcd-prefix, where servers are URLs, semicolon separated, and #/etcd-prefix is optional",
 		},
 	}
 
