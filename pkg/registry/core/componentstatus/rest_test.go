@@ -22,15 +22,18 @@ import (
 	"strings"
 	"testing"
 
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metainternalversion "k8s.io/apimachinery/pkg/apis/meta/internalversion"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"net/http"
 	"net/url"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -59,13 +62,11 @@ func NewTestREST(resp testResponse) *REST {
 		body:   resp.data,
 		err:    resp.err,
 	}
-	return &REST{
-		GetServersToValidate: func() map[string]*Server {
+	return NewStorage(func() map[string]*Server {
 			return map[string]*Server{
 				"test1": {Addr: "testserver1", Port: 8000, Path: "/healthz", Prober: prober},
 			}
-		},
-	}
+	})
 }
 
 func createTestStatus(name string, status api.ConditionStatus, msg string, err string) *api.ComponentStatus {
@@ -180,5 +181,63 @@ func TestGet_BadName(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "Component not found: invalidname") {
 		t.Fatalf("Got unexpected error: %v", err)
+	}
+}
+
+func TestConvertToTable(t *testing.T) {
+	r := NewTestREST(testResponse{result: probe.Success, data: "ok"})
+	columns := []metav1beta1.TableColumnDefinition{
+		{Name: "Name", Type: "string", Format: "name", Description: metav1.ObjectMeta{}.SwaggerDoc()["name"]},
+		{Name: "Status", Type: "string", Description: "Status of the component conditions"},
+		{Name: "Message", Type: "string", Description: "Message of the component conditions"},
+		{Name: "Error", Type: "string", Description: "Error of the component conditions"},
+	}
+
+	componentStatus1 := createTestStatus("test1", api.ConditionUnknown, "", "fizzbuzz error")
+	componentStatus2 := createTestStatus("test2", api.ConditionTrue, "ok", "")
+
+	testCases := []struct {
+		in  runtime.Object
+		out *metav1beta1.Table
+		err bool
+	}{
+		{
+			in:  nil,
+			err: true,
+		},
+		{
+			in: &api.ComponentStatusList{},
+			out: &metav1beta1.Table{ColumnDefinitions: columns},
+		},
+		{
+			in: &api.ComponentStatusList{
+				Items: []api.ComponentStatus{
+					*componentStatus1,
+					*componentStatus2,
+				},
+			},
+			out: &metav1beta1.Table{
+				ColumnDefinitions: columns,
+				Rows: []metav1beta1.TableRow{
+					{Cells: []interface{}{"test1", "Unhealthy", "", "fizzbuzz error"}, Object: runtime.RawExtension{Object: componentStatus1}},
+					{Cells: []interface{}{"test2", "Healthy", "ok", ""}, Object: runtime.RawExtension{Object: componentStatus2}},
+				},
+			},
+		},
+	}
+
+	ctx := genericapirequest.NewDefaultContext()
+	for i, test := range testCases {
+		out, err := r.ConvertToTable(ctx, test.in, nil)
+		if err != nil {
+			if test.err {
+				continue
+			}
+			t.Errorf("%d: error: %v", i, err)
+			continue
+		}
+		if !apiequality.Semantic.DeepEqual(test.out, out) {
+			t.Errorf("%d: mismatch: %s", i, diff.ObjectReflectDiff(test.out, out))
+		}
 	}
 }

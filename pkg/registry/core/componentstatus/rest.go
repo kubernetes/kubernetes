@@ -35,23 +35,19 @@ import (
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
-	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 )
 
 type REST struct {
 	GetServersToValidate func() map[string]*Server
-	*genericregistry.Store
+	TableConvertor rest.TableConvertor
 }
 
 // NewStorage returns a new REST.
 func NewStorage(serverRetriever func() map[string]*Server) *REST {
-	store := &genericregistry.Store{
-		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
-	}
-
 	return &REST{
 		GetServersToValidate: serverRetriever,
-		Store: store,
+		TableConvertor: printerstorage.TableConvertor{TableGenerator: printers.NewTableGenerator().With(printersinternal.AddHandlers)},
 	}
 }
 
@@ -175,4 +171,8 @@ var _ rest.ShortNamesProvider = &REST{}
 // ShortNames implements the ShortNamesProvider interface. Returns a list of short names for a resource.
 func (r *REST) ShortNames() []string {
 	return []string{"cs"}
+}
+
+func (r *REST) ConvertToTable(ctx context.Context, object runtime.Object, tableOptions runtime.Object) (*metav1beta1.Table, error) {
+	return r.TableConvertor.ConvertToTable(ctx, object, tableOptions)
 }
