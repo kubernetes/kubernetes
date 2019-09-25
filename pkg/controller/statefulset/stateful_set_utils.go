@@ -24,7 +24,7 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/strategicpatch"
@@ -108,7 +108,9 @@ func identityMatches(set *apps.StatefulSet, pod *v1.Pod) bool {
 		set.Name == parent &&
 		pod.Name == getPodName(set, ordinal) &&
 		pod.Namespace == set.Namespace &&
-		pod.Labels[apps.StatefulSetPodNameLabel] == pod.Name
+		pod.Labels[apps.StatefulSetPodNameLabel] == pod.Name &&
+		pod.Labels[apps.StatefulSetPodID0Label] == strconv.Itoa(ordinal) &&
+		pod.Labels[apps.StatefulSetPodID1Label] == strconv.Itoa(ordinal+1)
 }
 
 // storageMatches returns true if pod's Volumes cover the set of PersistentVolumeClaims
@@ -365,12 +367,18 @@ func initIdentity(set *apps.StatefulSet, pod *v1.Pod) {
 // updateIdentity updates pod's name, hostname, and subdomain, and StatefulSetPodNameLabel to conform to set's name
 // and headless service.
 func updateIdentity(set *apps.StatefulSet, pod *v1.Pod) {
-	pod.Name = getPodName(set, getOrdinal(pod))
+	ordinal := getOrdinal(pod)
+	if ordinal == -1 {
+		klog.Errorf("Invalid ordinal for statefulset pod %s/%s", pod.Namespace, pod.Name)
+	}
+	pod.Name = getPodName(set, ordinal)
 	pod.Namespace = set.Namespace
 	if pod.Labels == nil {
 		pod.Labels = make(map[string]string)
 	}
 	pod.Labels[apps.StatefulSetPodNameLabel] = pod.Name
+	pod.Labels[apps.StatefulSetPodID0Label] = strconv.Itoa(ordinal)
+	pod.Labels[apps.StatefulSetPodID1Label] = strconv.Itoa(ordinal + 1)
 }
 
 // isRunningAndReady returns true if pod is in the PodRunning Phase, if it has a condition of PodReady.
