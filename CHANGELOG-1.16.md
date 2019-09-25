@@ -381,6 +381,7 @@ The main themes of this release are:
   - Aggregated discovery requests can now timeout. Aggregated API servers must complete discovery calls within 5 seconds (other requests can take longer). Use the feature gate `EnableAggregatedDiscoveryTimeout=false` to temporarily revert behavior to the previous 30 second timeout if required (the temporary `EnableAggregatedDiscoveryTimeout` feature gate will be removed in v1.17). ([#82146](https://github.com/kubernetes/kubernetes/pull/82146), [@deads2k](https://github.com/deads2k))
   - the `scheduler.alpha.kubernetes.io/critical-pod` annotation is removed. Pod priority (`spec.priorityClassName`) should be used instead to mark pods as critical. ([#80342](https://github.com/kubernetes/kubernetes/pull/80342), [@draveness](https://github.com/draveness))
   - the NormalizeScore plugin set is removed from scheduler framework config API. Use ScorePlugin only. ([#80930](https://github.com/kubernetes/kubernetes/pull/80930), [@liu-cong](https://github.com/liu-cong))
+  - the node label `alpha.service-controller.kubernetes.io/exclude-balancer` which excludes a node from cloud load balancers (using Service Type=LoadBalancer) is deprecated in favor of `node.kubernetes.io/exclude-balancer`. Support for `alpha.service-controller.kubernetes.io/exclude-balancer` will be removed in v1.18.
 
 - Features:
 
