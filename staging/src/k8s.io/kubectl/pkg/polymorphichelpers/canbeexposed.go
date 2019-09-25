@@ -25,19 +25,19 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+var exposableGK = map[schema.GroupKind]bool {
+	corev1.SchemeGroupVersion.WithKind("ReplicationController").GroupKind(): true,
+	corev1.SchemeGroupVersion.WithKind("Service").GroupKind():               true,
+	corev1.SchemeGroupVersion.WithKind("Pod").GroupKind():                   true,
+	appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind():            true,
+	appsv1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind():            true,
+	extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(): true,
+	extensionsv1beta1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind(): true,
+}
+
 // Check whether the kind of resources could be exposed
 func canBeExposed(kind schema.GroupKind) error {
-	switch kind {
-	case
-		corev1.SchemeGroupVersion.WithKind("ReplicationController").GroupKind(),
-		corev1.SchemeGroupVersion.WithKind("Service").GroupKind(),
-		corev1.SchemeGroupVersion.WithKind("Pod").GroupKind(),
-		appsv1.SchemeGroupVersion.WithKind("Deployment").GroupKind(),
-		appsv1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind(),
-		extensionsv1beta1.SchemeGroupVersion.WithKind("Deployment").GroupKind(),
-		extensionsv1beta1.SchemeGroupVersion.WithKind("ReplicaSet").GroupKind():
-		// nothing to do here
-	default:
+	if _, ok := exposableGK[kind]; !ok {
 		return fmt.Errorf("cannot expose a %s", kind)
 	}
 	return nil
