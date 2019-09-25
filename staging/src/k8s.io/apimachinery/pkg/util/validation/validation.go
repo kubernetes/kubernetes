@@ -21,10 +21,10 @@ import (
 	"math"
 	"net"
 	"regexp"
-	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	netutils "k8s.io/utils/net"
 )
 
 const qnameCharFmt string = "[A-Za-z0-9]"
@@ -409,7 +409,7 @@ func IsValidSocketAddr(value string) []string {
 		errs = append(errs, "must be a valid socket address format, (e.g. 0.0.0.0:10254 or [::]:10254)")
 		return errs
 	}
-	portInt, _ := strconv.Atoi(port)
+	portInt, _ := netutils.ParsePort(port, false)
 	errs = append(errs, IsValidPortNum(portInt)...)
 	errs = append(errs, IsValidIP(ip)...)
 	return errs

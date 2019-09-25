@@ -24,7 +24,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +32,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/pkg/probe"
+	netutils "k8s.io/utils/net"
 )
 
 const FailureCode int = -1
@@ -242,7 +242,7 @@ func TestHTTPProbeChecker(t *testing.T) {
 			if err != nil {
 				t.Errorf("case %d: unexpected error: %v", i, err)
 			}
-			_, err = strconv.Atoi(port)
+			_, err = netutils.ParsePort(port, false)
 			if err != nil {
 				t.Errorf("case %d: unexpected error: %v", i, err)
 			}

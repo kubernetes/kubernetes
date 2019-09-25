@@ -41,6 +41,7 @@ import (
 	"k8s.io/kubernetes/pkg/util/conntrack"
 	"k8s.io/kubernetes/pkg/util/iptables"
 	utilexec "k8s.io/utils/exec"
+	netutils "k8s.io/utils/net"
 )
 
 type portal struct {
@@ -433,7 +434,7 @@ func (proxier *Proxier) addServiceOnPortInternal(service proxy.ServicePortName, 
 		sock.Close()
 		return nil, err
 	}
-	portNum, err := strconv.Atoi(portStr)
+	portNum, err := netutils.ParsePort(port, false)
 	if err != nil {
 		sock.Close()
 		return nil, err

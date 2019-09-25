@@ -31,6 +31,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	netutils "k8s.io/utils/net"
 )
 
 // PortForwardProtocolV1Name is the subprotocol used for port forwarding.
@@ -93,12 +94,12 @@ func parsePorts(ports []string) ([]ForwardedPort, error) {
 			return nil, fmt.Errorf("invalid port format '%s'", portString)
 		}
 
-		localPort, err := strconv.ParseUint(localString, 10, 16)
+		localPort, err := netutils.ParsePort(localString, false)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing local port '%s': %s", localString, err)
 		}
 
-		remotePort, err := strconv.ParseUint(remoteString, 10, 16)
+		remotePort, err := netutils.ParsePort(remoteString, false)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing remote port '%s': %s", remoteString, err)
 		}
@@ -281,7 +282,7 @@ func (pf *PortForwarder) getListener(protocol string, hostname string, port *For
 	}
 	listenerAddress := listener.Addr().String()
 	host, localPort, _ := net.SplitHostPort(listenerAddress)
-	localPortUInt, err := strconv.ParseUint(localPort, 10, 16)
+	localPortUInt, err := netutils.ParsePort(localPort, false)
 
 	if err != nil {
 		fmt.Fprintf(pf.out, "Failed to forward from %s:%d -> %d\n", hostname, localPortUInt, port.Remote)

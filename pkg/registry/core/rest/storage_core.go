@@ -21,7 +21,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -65,6 +64,7 @@ import (
 	servicestore "k8s.io/kubernetes/pkg/registry/core/service/storage"
 	serviceaccountstore "k8s.io/kubernetes/pkg/registry/core/serviceaccount/storage"
 	"k8s.io/kubernetes/pkg/serviceaccount"
+	netutils "k8s.io/utils/net"
 )
 
 // LegacyRESTStorageProvider provides information needed to build RESTStorage for core, but
@@ -358,7 +358,11 @@ func (s componentStatusStorage) serversToValidate() map[string]*componentstatus.
 				klog.Errorf("Failed to split host/port: %s (%v)", etcdUrl.Host, err)
 				continue
 			}
-			port, _ = strconv.Atoi(portString)
+			port, err = netutils.ParsePort(port, false)
+			if err != nil {
+				klog.Errorf("Failed to parse port: %d", port)
+				continue
+			}
 		} else {
 			addr = etcdUrl.Host
 			port = 2379

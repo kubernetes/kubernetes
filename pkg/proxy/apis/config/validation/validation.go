@@ -30,6 +30,7 @@ import (
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeproxyconfig "k8s.io/kubernetes/pkg/proxy/apis/config"
+	netutils "k8s.io/utils/net"
 )
 
 // Validate validates the configuration of kube-proxy
@@ -212,7 +213,7 @@ func validateHostPort(input string, fldPath *field.Path) field.ErrorList {
 		allErrs = append(allErrs, field.Invalid(fldPath, hostIP, "must be a valid IP"))
 	}
 
-	if p, err := strconv.Atoi(port); err != nil {
+	if p, err := netutils.ParsePort(port, false); err != nil {
 		allErrs = append(allErrs, field.Invalid(fldPath, port, "must be a valid port"))
 	} else if p < 1 || p > 65535 {
 		allErrs = append(allErrs, field.Invalid(fldPath, port, "must be a valid port"))

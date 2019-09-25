@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -33,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/server/httplog"
 	"k8s.io/apiserver/pkg/util/wsstream"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -68,7 +68,7 @@ func NewV4Options(req *http.Request) (*V4Options, error) {
 			return nil, fmt.Errorf("query parameter %q cannot be empty", api.PortHeader)
 		}
 		for _, p := range strings.Split(portString, ",") {
-			port, err := strconv.ParseUint(p, 10, 16)
+			port, err := netutils.ParsePort(p, false)
 			if err != nil {
 				return nil, fmt.Errorf("unable to parse %q as a port: %v", portString, err)
 			}

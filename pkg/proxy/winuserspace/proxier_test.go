@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/kubernetes/pkg/proxy"
 	netshtest "k8s.io/kubernetes/pkg/util/netsh/testing"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -132,7 +133,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse: %v", err))
 	}
-	tcpServerPortValue, err := strconv.Atoi(port)
+	tcpServerPortValue, err := netutils.ParsePort(port, false)
 	if err != nil {
 		panic(fmt.Sprintf("failed to atoi(%s): %v", port, err))
 	}
@@ -147,7 +148,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse: %v", err))
 	}
-	udpServerPortValue, err := strconv.Atoi(port)
+	udpServerPortValue, err := netutils.ParsePort(port, false)
 	if err != nil {
 		panic(fmt.Sprintf("failed to atoi(%s): %v", port, err))
 	}
@@ -230,7 +231,7 @@ func getPortNum(t *testing.T, addr string) int {
 		t.Errorf("error getting port from %s", addr)
 		return 0
 	}
-	portNum, err := strconv.Atoi(portStr)
+	portNum, err := netutils.ParsePort(port, false)
 	if err != nil {
 		t.Errorf("error getting port from %s", addr)
 		return 0

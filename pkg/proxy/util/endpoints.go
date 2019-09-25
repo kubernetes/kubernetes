@@ -19,9 +19,9 @@ package util
 import (
 	"fmt"
 	"net"
-	"strconv"
 
 	"k8s.io/klog"
+	netutils "k8s.io/utils/net"
 )
 
 // IPPart returns just the IP part of an IP or IP:port or endpoint string. If the IP
@@ -55,7 +55,7 @@ func PortPart(s string) (int, error) {
 		klog.Errorf("Error parsing '%s': %v", s, err)
 		return -1, err
 	}
-	portNumber, err := strconv.Atoi(port)
+	portNumber, err := netutils.ParsePort(port, false)
 	if err != nil {
 		klog.Errorf("Error parsing '%s': %v", port, err)
 		return -1, err

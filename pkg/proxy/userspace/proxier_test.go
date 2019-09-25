@@ -25,12 +25,11 @@ import (
 	"net/url"
 	"os"
 	"reflect"
-	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -40,6 +39,7 @@ import (
 	ipttest "k8s.io/kubernetes/pkg/util/iptables/testing"
 	"k8s.io/utils/exec"
 	fakeexec "k8s.io/utils/exec/testing"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -146,7 +146,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse: %v", err))
 	}
-	tcpServerPortValue, err := strconv.Atoi(port)
+	tcpServerPortValue, err := netutils.ParsePort(port, false)
 	if err != nil {
 		panic(fmt.Sprintf("failed to atoi(%s): %v", port, err))
 	}
@@ -161,7 +161,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(fmt.Sprintf("failed to parse: %v", err))
 	}
-	udpServerPortValue, err := strconv.Atoi(port)
+	udpServerPortValue, err := netutils.ParsePort(port, false)
 	if err != nil {
 		panic(fmt.Sprintf("failed to atoi(%s): %v", port, err))
 	}

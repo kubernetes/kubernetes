@@ -25,12 +25,13 @@ import (
 
 	compute "google.golang.org/api/compute/v1"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/test/e2e/framework"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
+	netutils "k8s.io/utils/net"
 )
 
 // MakeFirewallNameForLBService return the expected firewall name for a LB service.
@@ -276,17 +277,17 @@ func toPortRange(s string) (pr portRange, err error) {
 	ports := strings.Split(protoPorts[1], "-")
 	switch len(ports) {
 	case 1:
-		v, err := strconv.Atoi(ports[0])
+		v, err := netutils.ParsePort(ports[0], false)
 		if err != nil {
 			return pr, err
 		}
 		pr.min, pr.max = v, v
 	case 2:
-		start, err := strconv.Atoi(ports[0])
+		start, err := netutils.ParsePort(ports[0], false)
 		if err != nil {
 			return pr, err
 		}
-		end, err := strconv.Atoi(ports[1])
+		end, err := netutils.ParsePort(ports[1], false)
 		if err != nil {
 			return pr, err
 		}

@@ -74,6 +74,7 @@ go_library(
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
         "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

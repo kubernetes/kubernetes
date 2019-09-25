@@ -26,6 +26,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/validation"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	netutils "k8s.io/utils/net"
 )
 
 // GetControlPlaneEndpoint returns a properly formatted endpoint for the control plane built according following rules:
@@ -115,8 +116,8 @@ func ParseHostPort(hostport string) (string, string, error) {
 // ParsePort parses a string representing a TCP port.
 // If the string is not a valid representation of a TCP port, ParsePort returns an error.
 func ParsePort(port string) (int, error) {
-	portInt, err := strconv.Atoi(port)
-	if err == nil && (1 <= portInt && portInt <= 65535) {
+	portInt, err := netutils.ParsePort(port, false)
+	if err == nil {
 		return portInt, nil
 	}
 

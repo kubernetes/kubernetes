@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	utilio "k8s.io/utils/io"
+	netutils "k8s.io/utils/net"
 )
 
 const (
@@ -92,7 +93,7 @@ func resolvePort(portReference intstr.IntOrString, container *v1.Container) (int
 		return portReference.IntValue(), nil
 	}
 	portName := portReference.StrVal
-	port, err := strconv.Atoi(portName)
+	port, err := netutils.ParsePort(portName, false)
 	if err == nil {
 		return port, nil
 	}

@@ -1849,7 +1849,8 @@ func (proxier *Proxier) syncEndpoint(svcPortName proxy.ServicePortName, onlyNode
 			klog.Errorf("Failed to parse endpoint: %v, error: %v", ep, err)
 			continue
 		}
-		portNum, err := strconv.Atoi(port)
+		// False assumes we don't allow port 0.
+		portNum, err := utilnet.ParsePort(port, false)
 		if err != nil {
 			klog.Errorf("Failed to parse endpoint port %s, error: %v", port, err)
 			continue

@@ -18,7 +18,6 @@ package v1
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -27,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	netutils "k8s.io/utils/net"
 )
 
 func AddConversionFuncs(scheme *runtime.Scheme) error {
@@ -323,7 +323,7 @@ func Convert_v1_LabelSelector_To_Map_string_To_string(in *LabelSelector, out *ma
 func Convert_Slice_string_To_Slice_int32(in *[]string, out *[]int32, s conversion.Scope) error {
 	for _, s := range *in {
 		for _, v := range strings.Split(s, ",") {
-			x, err := strconv.ParseUint(v, 10, 16)
+			x, err := netutils.ParsePort(v, false)
 			if err != nil {
 				return fmt.Errorf("cannot convert to []int32: %v", err)
 			}
