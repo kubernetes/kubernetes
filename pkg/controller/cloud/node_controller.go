@@ -176,7 +176,7 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 	// it can be found in the cloud as well (consistent with the behaviour in kubelet)
 	if nodeIP, ok := ensureNodeProvidedIPExists(node, nodeAddresses); ok {
 		if nodeIP == nil {
-			klog.Errorf("Specified Node IP not found in cloudprovider")
+			klog.Errorf("Specified Node IP not found for node %q in cloudprovider", node.Name)
 			return
 		}
 	}
@@ -191,25 +191,22 @@ func (cnc *CloudNodeController) updateNodeAddress(node *v1.Node, instances cloud
 	}
 }
 
+// UpdateCloudNode handles updating nodes registered with the cloud taint.
 func (cnc *CloudNodeController) UpdateCloudNode(_, newObj interface{}) {
-	node, ok := newObj.(*v1.Node)
-	if !ok {
-		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", newObj))
-		return
-	}
-
-	cloudTaint := getCloudTaint(node.Spec.Taints)
-	if cloudTaint == nil {
-		// The node has already been initialized so nothing to do.
-		return
-	}
-
-	cnc.initializeNode(node)
+	cnc.handleCloudNode(newObj)
 }
 
 // AddCloudNode handles initializing new nodes registered with the cloud taint.
 func (cnc *CloudNodeController) AddCloudNode(obj interface{}) {
-	node := obj.(*v1.Node)
+	cnc.handleCloudNode(obj)
+}
+
+func (cnc *CloudNodeController) handleCloudNode(obj interface{}) {
+	node, ok := obj.(*v1.Node)
+	if !ok {
+		utilruntime.HandleError(fmt.Errorf("unexpected object type: %v", obj))
+		return
+	}
 
 	cloudTaint := getCloudTaint(node.Spec.Taints)
 	if cloudTaint == nil {
