@@ -193,6 +193,13 @@ type LeaderElector struct {
 	name string
 }
 
+type acquireOrRenewResult struct {
+	newRecord    *rl.LeaderElectionRecord
+	newRawRecord []byte
+	newTime      *time.Time
+	succeeded    bool
+}
+
 // Run starts the leader election loop
 func (le *LeaderElector) Run(ctx context.Context) {
 	defer func() {
@@ -241,7 +248,8 @@ func (le *LeaderElector) acquire(ctx context.Context) bool {
 	desc := le.config.Lock.Describe()
 	klog.Infof("attempting to acquire leader lease  %v...", desc)
 	wait.JitterUntil(func() {
-		succeeded = le.tryAcquireOrRenew()
+		result := le.tryAcquireOrRenew()
+		succeeded = le.applyAcquireOrRenewResult(result)
 		le.maybeReportTransition()
 		if !succeeded {
 			klog.V(4).Infof("failed to acquire lease %v", desc)
@@ -263,17 +271,18 @@ func (le *LeaderElector) renew(ctx context.Context) {
 		timeoutCtx, timeoutCancel := context.WithTimeout(ctx, le.config.RenewDeadline)
 		defer timeoutCancel()
 		err := wait.PollImmediateUntil(le.config.RetryPeriod, func() (bool, error) {
-			done := make(chan bool, 1)
+			resultCh := make(chan acquireOrRenewResult, 1)
 			go func() {
-				defer close(done)
-				done <- le.tryAcquireOrRenew()
+				defer close(resultCh)
+				resultCh <- le.tryAcquireOrRenew()
 			}()
 
 			select {
 			case <-timeoutCtx.Done():
 				return false, fmt.Errorf("failed to tryAcquireOrRenew %s", timeoutCtx.Err())
-			case result := <-done:
-				return result, nil
+			case result := <-resultCh:
+				succeeded := le.applyAcquireOrRenewResult(result)
+				return succeeded, nil
 			}
 		}, timeoutCtx.Done())
 
@@ -312,10 +321,13 @@ func (le *LeaderElector) release() bool {
 	return true
 }
 
-// tryAcquireOrRenew tries to acquire a leader lease if it is not already acquired,
-// else it tries to renew the lease if it has already been acquired. Returns true
-// on success else returns false.
-func (le *LeaderElector) tryAcquireOrRenew() bool {
+// tryAcquireOrRenew tries to acquire a leader lease if it is not already
+// acquired, else it tries to renew the lease if it has already been acquired.
+// We should be careful not to modify any internal state here since this
+// function may be called by a concurrent goroutine. Returns both the new
+// observed record and a boolean indicating if it was successful in acquiring
+// or renewing the leader lease.
+func (le *LeaderElector) tryAcquireOrRenew() acquireOrRenewResult {
 	now := metav1.Now()
 	leaderElectionRecord := rl.LeaderElectionRecord{
 		HolderIdentity:       le.config.Lock.Identity(),
@@ -329,28 +341,30 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	if err != nil {
 		if !errors.IsNotFound(err) {
 			klog.Errorf("error retrieving resource lock %v: %v", le.config.Lock.Describe(), err)
-			return false
+			return acquireOrRenewResult{succeeded: false}
 		}
 		if err = le.config.Lock.Create(leaderElectionRecord); err != nil {
 			klog.Errorf("error initially creating leader election record: %v", err)
-			return false
+			return acquireOrRenewResult{succeeded: false}
 		}
-		le.observedRecord = leaderElectionRecord
-		le.observedTime = le.clock.Now()
-		return true
+		return acquireOrRenewResult{succeeded: true, newRecord: &leaderElectionRecord}
 	}
+
+	observedRecord := le.observedRecord
+	observedRawRecord := le.observedRawRecord
+	observedTime := le.observedTime
 
 	// 2. Record obtained, check the Identity & Time
 	if !bytes.Equal(le.observedRawRecord, oldLeaderElectionRawRecord) {
-		le.observedRecord = *oldLeaderElectionRecord
-		le.observedRawRecord = oldLeaderElectionRawRecord
-		le.observedTime = le.clock.Now()
+		observedRecord = *oldLeaderElectionRecord
+		observedRawRecord = oldLeaderElectionRawRecord
+		observedTime = le.clock.Now()
 	}
 	if len(oldLeaderElectionRecord.HolderIdentity) > 0 &&
-		le.observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
-		!le.IsLeader() {
+		observedTime.Add(le.config.LeaseDuration).After(now.Time) &&
+		observedRecord.HolderIdentity != le.config.Lock.Identity() {
 		klog.V(4).Infof("lock is held by %v and has not yet expired", oldLeaderElectionRecord.HolderIdentity)
-		return false
+		return acquireOrRenewResult{succeeded: false, newRecord: &observedRecord, newRawRecord: observedRawRecord, newTime: &observedTime}
 	}
 
 	// 3. We're going to try to update. The leaderElectionRecord is set to it's default
@@ -365,12 +379,24 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	// update the lock itself
 	if err = le.config.Lock.Update(leaderElectionRecord); err != nil {
 		klog.Errorf("Failed to update lock: %v", err)
-		return false
+		return acquireOrRenewResult{succeeded: false, newRecord: &observedRecord, newRawRecord: observedRawRecord, newTime: &observedTime}
 	}
+	return acquireOrRenewResult{succeeded: true, newRecord: &leaderElectionRecord}
+}
 
-	le.observedRecord = leaderElectionRecord
-	le.observedTime = le.clock.Now()
-	return true
+func (le *LeaderElector) applyAcquireOrRenewResult(result acquireOrRenewResult) bool {
+	if result.newRecord != nil {
+		le.observedRecord = *result.newRecord
+	}
+	if result.newRawRecord != nil {
+		le.observedRawRecord = result.newRawRecord
+	}
+	if result.newTime == nil {
+		le.observedTime = le.clock.Now()
+	} else {
+		le.observedTime = *result.newTime
+	}
+	return result.succeeded
 }
 
 func (le *LeaderElector) maybeReportTransition() {

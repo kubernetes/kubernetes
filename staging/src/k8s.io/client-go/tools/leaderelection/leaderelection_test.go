@@ -277,7 +277,9 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				observedTime:      test.observedTime,
 				clock:             clock.RealClock{},
 			}
-			if test.expectSuccess != le.tryAcquireOrRenew() {
+
+			result := le.tryAcquireOrRenew()
+			if test.expectSuccess != le.applyAcquireOrRenewResult(result) {
 				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
 			}
 
@@ -860,7 +862,9 @@ func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
 				observedTime:      test.observedTime,
 				clock:             clock.RealClock{},
 			}
-			if test.expectSuccess != le.tryAcquireOrRenew() {
+
+			result := le.tryAcquireOrRenew()
+			if test.expectSuccess != le.applyAcquireOrRenewResult(result) {
 				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
 			}
 
