@@ -51,14 +51,15 @@ var _ = SIGDescribe("Network", func() {
 	fr := framework.NewDefaultFramework("network")
 
 	ginkgo.It("should set TCP CLOSE_WAIT timeout", func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(fr.ClientSet)
-		ips := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
-
+		nodes, err := e2enode.GetBoundedReadySchedulableNodes(fr.ClientSet, 2)
+		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Skipf(
 				"Test requires >= 2 Ready nodes, but there are only %v nodes",
 				len(nodes.Items))
 		}
+
+		ips := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 
 		type NodeInfo struct {
 			node   *v1.Node
@@ -81,7 +82,7 @@ var _ = SIGDescribe("Network", func() {
 		zero := int64(0)
 
 		// Some distributions (Ubuntu 16.04 etc.) don't support the proc file.
-		_, err := e2essh.IssueSSHCommandWithResult(
+		_, err = e2essh.IssueSSHCommandWithResult(
 			"ls /proc/net/nf_conntrack",
 			framework.TestContext.Provider,
 			clientNodeInfo.node)

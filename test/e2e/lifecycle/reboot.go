@@ -134,7 +134,8 @@ var _ = SIGDescribe("Reboot [Disruptive] [Feature:Reboot]", func() {
 
 func testReboot(c clientset.Interface, rebootCmd string, hook terminationHook) {
 	// Get all nodes, and kick off the test on each.
-	nodelist := framework.GetReadySchedulableNodesOrDie(c)
+	nodelist, err := e2enode.GetReadySchedulableNodes(c)
+	framework.ExpectNoError(err, "failed to list nodes")
 	if hook != nil {
 		defer func() {
 			framework.Logf("Executing termination hook on nodes")

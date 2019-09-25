@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
 )
@@ -118,7 +119,13 @@ func waitForKubeProxyStaticPodsRunning(c clientset.Interface) error {
 			return false, nil
 		}
 
-		numberSchedulableNodes := len(framework.GetReadySchedulableNodesOrDie(c).Items)
+		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		if err != nil {
+			framework.Logf("Failed to get nodes: %v", err)
+			return false, nil
+		}
+
+		numberSchedulableNodes := len(nodes.Items)
 		numberkubeProxyPods := 0
 		for _, pod := range pods.Items {
 			if pod.Status.Phase == v1.PodRunning {
@@ -176,7 +183,13 @@ func waitForKubeProxyDaemonSetRunning(c clientset.Interface) error {
 			return false, nil
 		}
 
-		numberSchedulableNodes := len(framework.GetReadySchedulableNodesOrDie(c).Items)
+		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		if err != nil {
+			framework.Logf("Failed to get nodes: %v", err)
+			return false, nil
+		}
+
+		numberSchedulableNodes := len(nodes.Items)
 		numberkubeProxyPods := int(daemonSets.Items[0].Status.NumberAvailable)
 		if numberkubeProxyPods != numberSchedulableNodes {
 			framework.Logf("Expect %v kube-proxy DaemonSet pods running, got %v", numberSchedulableNodes, numberkubeProxyPods)

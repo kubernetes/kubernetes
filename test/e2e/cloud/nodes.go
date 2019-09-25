@@ -43,8 +43,8 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 	ginkgo.It("should be deleted on API server if it doesn't exist in the cloud provider", func() {
 		ginkgo.By("deleting a node on the cloud provider")
 
-		nodeDeleteCandidates := framework.GetReadySchedulableNodesOrDie(c)
-		nodeToDelete := nodeDeleteCandidates.Items[0]
+		nodeToDelete, err := e2enode.GetRandomReadySchedulableNode(c)
+		framework.ExpectNoError(err)
 
 		origNodes, err := e2enode.GetReadyNodesIncludingTainted(c)
 		if err != nil {
@@ -55,7 +55,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 
 		framework.Logf("Original number of ready nodes: %d", len(origNodes.Items))
 
-		err = framework.DeleteNodeOnCloudProvider(&nodeToDelete)
+		err = framework.DeleteNodeOnCloudProvider(nodeToDelete)
 		if err != nil {
 			framework.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
 		}

@@ -23,6 +23,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 
 	gin "github.com/onsi/ginkgo"
@@ -51,9 +52,9 @@ var _ = instrumentation.SIGDescribe("MetricsGrabber", func() {
 
 	gin.It("should grab all metrics from a Kubelet.", func() {
 		gin.By("Proxying to Node through the API server")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gom.Expect(nodes.Items).NotTo(gom.BeEmpty())
-		response, err := grabber.GrabFromKubelet(nodes.Items[0].Name)
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+		response, err := grabber.GrabFromKubelet(node.Name)
 		framework.ExpectNoError(err)
 		gom.Expect(response).NotTo(gom.BeEmpty())
 	})

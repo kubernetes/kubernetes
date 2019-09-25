@@ -29,6 +29,7 @@ import (
 	"k8s.io/component-base/version"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
@@ -80,7 +81,9 @@ func SetupSuite() {
 
 	// If NumNodes is not specified then auto-detect how many are scheduleable and not tainted
 	if TestContext.CloudConfig.NumNodes == DefaultNumNodes {
-		TestContext.CloudConfig.NumNodes = len(GetReadySchedulableNodesOrDie(c).Items)
+		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		ExpectNoError(err)
+		TestContext.CloudConfig.NumNodes = len(nodes.Items)
 	}
 
 	// Ensure all pods are running and ready before starting tests (otherwise,

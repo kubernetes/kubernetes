@@ -353,16 +353,6 @@ func SetInstanceTags(cloudConfig framework.CloudConfig, instanceName, zone strin
 	return resTags.Items
 }
 
-// GetNodeTags gets k8s node tag from one of the nodes
-func GetNodeTags(c clientset.Interface, cloudConfig framework.CloudConfig) []string {
-	nodes := framework.GetReadySchedulableNodesOrDie(c)
-	if len(nodes.Items) == 0 {
-		framework.Logf("GetNodeTags: Found 0 node.")
-		return []string{}
-	}
-	return GetInstanceTags(cloudConfig, nodes.Items[0].Name).Items
-}
-
 // IsGoogleAPIHTTPErrorCode returns true if the error is a google api
 // error matching the corresponding HTTP error code.
 func IsGoogleAPIHTTPErrorCode(err error, code int) bool {
