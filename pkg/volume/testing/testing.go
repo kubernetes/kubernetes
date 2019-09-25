@@ -849,6 +849,9 @@ func (fv *FakeVolume) SetUp(mounterArgs MounterArgs) error {
 
 func (fv *FakeVolume) SetUpWithStatusTracking(mounterArgs MounterArgs) (volumetypes.OperationStatus, error) {
 	err := fv.SetUp(mounterArgs)
+	if volumetypes.IsOperationTimeOutError(err) {
+		return volumetypes.OperationInProgress, err
+	}
 	return volumetypes.OperationFinished, err
 }
 
@@ -1061,6 +1064,9 @@ func (fv *FakeVolume) MountDevice(spec *Spec, devicePath string, deviceMountPath
 
 func (fv *FakeVolume) MountDeviceWithStatusTracking(spec *Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
 	err := fv.MountDevice(spec, devicePath, deviceMountPath)
+	if volumetypes.IsOperationTimeOutError(err) {
+		return volumetypes.OperationInProgress, err
+	}
 	return volumetypes.OperationFinished, err
 }
 

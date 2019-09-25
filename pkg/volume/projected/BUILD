@@ -41,6 +41,7 @@ go_library(
         "//pkg/volume/downwardapi:go_default_library",
         "//pkg/volume/secret:go_default_library",
         "//pkg/volume/util:go_default_library",
+        "//pkg/volume/util/types:go_default_library",
         "//staging/src/k8s.io/api/authentication/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
