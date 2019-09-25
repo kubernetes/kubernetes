@@ -17,6 +17,7 @@ limitations under the License.
 package credentialprovider
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"io/ioutil"
 	"os"
@@ -204,6 +205,34 @@ func TestDecodeDockerConfigFieldAuth(t *testing.T) {
 		// auth field decodes to username & password
 		{
 			input:    "Zm9vOmJhcg==",
+			username: "foo",
+			password: "bar",
+		},
+
+		// some test as before but with field not well padded
+		{
+			input:    "Zm9vOmJhcg",
+			username: "foo",
+			password: "bar",
+		},
+
+		// standard encoding (with padding)
+		{
+			input:    base64.StdEncoding.EncodeToString([]byte("foo:bar")),
+			username: "foo",
+			password: "bar",
+		},
+
+		// raw encoding (without padding)
+		{
+			input:    base64.RawStdEncoding.EncodeToString([]byte("foo:bar")),
+			username: "foo",
+			password: "bar",
+		},
+
+		// the input is encoded with encodeDockerConfigFieldAuth (standard encoding)
+		{
+			input:    encodeDockerConfigFieldAuth("foo", "bar"),
 			username: "foo",
 			password: "bar",
 		},
