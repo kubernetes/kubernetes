@@ -268,14 +268,14 @@ func filter(cmds []*cobra.Command, names ...string) []*cobra.Command {
 		if c.Hidden {
 			continue
 		}
-		skip := false
-		for _, name := range names {
-			if name == c.Name() {
-				skip = true
-				break
+		if func() bool {
+			for _, name := range names {
+				if name == c.Name() {
+					return true
+				}
 			}
-		}
-		if skip {
+			return false
+		}() {
 			continue
 		}
 		out = append(out, c)
