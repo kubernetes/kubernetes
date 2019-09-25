@@ -25,6 +25,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
@@ -60,10 +61,8 @@ type scaleSet struct {
 	// (e.g. master nodes) may not belong to any scale sets.
 	availabilitySet VMSet
 
-	vmssCache                      *timedCache
-	vmssVMCache                    *timedCache
-	nodeNameToScaleSetMappingCache *timedCache
-	availabilitySetNodesCache      *timedCache
+	vmssVMCache               *timedCache
+	availabilitySetNodesCache *timedCache
 }
 
 // newScaleSet creates a new scaleSet.
@@ -74,22 +73,12 @@ func newScaleSet(az *Cloud) (VMSet, error) {
 		availabilitySet: newAvailabilitySet(az),
 	}
 
-	ss.nodeNameToScaleSetMappingCache, err = ss.newNodeNameToScaleSetMappingCache()
-	if err != nil {
-		return nil, err
-	}
-
 	ss.availabilitySetNodesCache, err = ss.newAvailabilitySetNodesCache()
 	if err != nil {
 		return nil, err
 	}
 
-	ss.vmssCache, err = ss.newVmssCache()
-	if err != nil {
-		return nil, err
-	}
-
-	ss.vmssVMCache, err = ss.newVmssVMCache()
+	ss.vmssVMCache, err = ss.newVMSSVirtualMachinesCache()
 	if err != nil {
 		return nil, err
 	}
@@ -99,39 +88,46 @@ func newScaleSet(az *Cloud) (VMSet, error) {
 
 // getVmssVM gets virtualMachineScaleSetVM by nodeName from cache.
 // It returns cloudprovider.InstanceNotFound if node does not belong to any scale sets.
-func (ss *scaleSet) getVmssVM(nodeName string) (ssName, instanceID string, vm compute.VirtualMachineScaleSetVM, err error) {
-	instanceID, err = getScaleSetVMInstanceID(nodeName)
+func (ss *scaleSet) getVmssVM(nodeName string) (string, string, *compute.VirtualMachineScaleSetVM, error) {
+	getter := func(nodeName string) (string, string, *compute.VirtualMachineScaleSetVM, error) {
+		cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey)
+		if err != nil {
+			return "", "", nil, err
+		}
+
+		virtualMachines := cached.(*sync.Map)
+		if vm, ok := virtualMachines.Load(nodeName); ok {
+			result := vm.(*vmssVirtualMachinesEntry)
+			return result.vmssName, result.instanceID, result.virtualMachine, nil
+		}
+
+		return "", "", nil, nil
+	}
+
+	_, err := getScaleSetVMInstanceID(nodeName)
 	if err != nil {
-		return ssName, instanceID, vm, err
+		return "", "", nil, err
 	}
 
-	ssName, err = ss.getScaleSetNameByNodeName(nodeName)
+	vmssName, instanceID, vm, err := getter(nodeName)
 	if err != nil {
-		return ssName, instanceID, vm, err
+		return "", "", nil, err
+	}
+	if vm != nil {
+		return vmssName, instanceID, vm, nil
 	}
 
-	if ssName == "" {
-		return "", "", vm, cloudprovider.InstanceNotFound
-	}
-
-	resourceGroup, err := ss.GetNodeResourceGroup(nodeName)
+	klog.V(3).Infof("Couldn't find VMSS VM with nodeName %s, refreshing the cache", nodeName)
+	ss.vmssVMCache.Delete(vmssVirtualMachinesKey)
+	vmssName, instanceID, vm, err = getter(nodeName)
 	if err != nil {
-		return "", "", vm, err
+		return "", "", nil, err
 	}
 
-	klog.V(4).Infof("getVmssVM gets scaleSetName (%q) and instanceID (%q) for node %q", ssName, instanceID, nodeName)
-	key := buildVmssCacheKey(resourceGroup, ss.makeVmssVMName(ssName, instanceID))
-	cachedVM, err := ss.vmssVMCache.Get(key)
-	if err != nil {
-		return ssName, instanceID, vm, err
+	if vm == nil {
+		return "", "", nil, cloudprovider.InstanceNotFound
 	}
-
-	if cachedVM == nil {
-		klog.Errorf("Can't find node (%q) in any scale sets", nodeName)
-		return ssName, instanceID, vm, cloudprovider.InstanceNotFound
-	}
-
-	return ssName, instanceID, *(cachedVM.(*compute.VirtualMachineScaleSetVM)), nil
+	return vmssName, instanceID, vm, nil
 }
 
 // GetPowerStatusByNodeName returns the power state of the specified node.
@@ -158,20 +154,49 @@ func (ss *scaleSet) GetPowerStatusByNodeName(name string) (powerState string, er
 
 // getCachedVirtualMachineByInstanceID gets scaleSetVMInfo from cache.
 // The node must belong to one of scale sets.
-func (ss *scaleSet) getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceID string) (vm compute.VirtualMachineScaleSetVM, err error) {
-	vmName := ss.makeVmssVMName(scaleSetName, instanceID)
-	key := buildVmssCacheKey(resourceGroup, vmName)
-	cachedVM, err := ss.vmssVMCache.Get(key)
+func (ss *scaleSet) getVmssVMByInstanceID(resourceGroup, scaleSetName, instanceID string) (*compute.VirtualMachineScaleSetVM, error) {
+	getter := func() (vm *compute.VirtualMachineScaleSetVM, found bool, err error) {
+		cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey)
+		if err != nil {
+			return nil, false, err
+		}
+
+		virtualMachines := cached.(*sync.Map)
+		virtualMachines.Range(func(key, value interface{}) bool {
+			vmEntry := value.(*vmssVirtualMachinesEntry)
+			if strings.EqualFold(vmEntry.resourceGroup, resourceGroup) &&
+				strings.EqualFold(vmEntry.vmssName, scaleSetName) &&
+				strings.EqualFold(vmEntry.instanceID, instanceID) {
+				vm = vmEntry.virtualMachine
+				found = true
+				return false
+			}
+
+			return true
+		})
+
+		return vm, found, nil
+	}
+
+	vm, found, err := getter()
 	if err != nil {
-		return vm, err
+		return nil, err
+	}
+	if found {
+		return vm, nil
 	}
 
-	if cachedVM == nil {
-		klog.Errorf("couldn't find vmss virtual machine by scaleSetName (%s) and instanceID (%s)", scaleSetName, instanceID)
-		return vm, cloudprovider.InstanceNotFound
+	klog.V(3).Infof("Couldn't find VMSS VM with scaleSetName %q and instanceID %q, refreshing the cache", scaleSetName, instanceID)
+	ss.vmssVMCache.Delete(vmssVirtualMachinesKey)
+	vm, found, err = getter()
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, cloudprovider.InstanceNotFound
 	}
 
-	return *(cachedVM.(*compute.VirtualMachineScaleSetVM)), nil
+	return vm, nil
 }
 
 // GetInstanceIDByNodeName gets the cloud provider ID by node name.
@@ -463,9 +488,15 @@ func (ss *scaleSet) listScaleSets(resourceGroup string) ([]string, error) {
 		return nil, err
 	}
 
-	ssNames := make([]string, len(allScaleSets))
-	for i := range allScaleSets {
-		ssNames[i] = *(allScaleSets[i].Name)
+	ssNames := make([]string, 0)
+	for _, vmss := range allScaleSets {
+		name := *vmss.Name
+		if vmss.Sku != nil && to.Int64(vmss.Sku.Capacity) == 0 {
+			klog.V(3).Infof("Capacity of VMSS %q is 0, skipping", name)
+			continue
+		}
+
+		ssNames = append(ssNames, name)
 	}
 
 	return ssNames, nil
@@ -500,7 +531,7 @@ func (ss *scaleSet) getAgentPoolScaleSets(nodes []*v1.Node) (*[]string, error) {
 		}
 
 		nodeName := nodes[nx].Name
-		ssName, err := ss.getScaleSetNameByNodeName(nodeName)
+		ssName, _, _, err := ss.getVmssVM(nodeName)
 		if err != nil {
 			return nil, err
 		}
@@ -599,7 +630,7 @@ func (ss *scaleSet) GetPrimaryInterface(nodeName string) (network.Interface, err
 		return network.Interface{}, err
 	}
 
-	primaryInterfaceID, err := ss.getPrimaryInterfaceID(vm)
+	primaryInterfaceID, err := ss.getPrimaryInterfaceID(*vm)
 	if err != nil {
 		klog.Errorf("error: ss.GetPrimaryInterface(%s), ss.getPrimaryInterfaceID(), err=%v", nodeName, err)
 		return network.Interface{}, err
@@ -816,8 +847,9 @@ func (ss *scaleSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeNam
 	}
 
 	// Invalidate the cache since we would update it.
-	key := buildVmssCacheKey(nodeResourceGroup, ss.makeVmssVMName(ssName, instanceID))
-	defer ss.vmssVMCache.Delete(key)
+	if err = ss.deleteCacheForNode(vmName); err != nil {
+		return err
+	}
 
 	// Update vmssVM with backoff.
 	ctx, cancel := getContextWithCancel()
@@ -1094,8 +1126,9 @@ func (ss *scaleSet) ensureBackendPoolDeletedFromNode(service *v1.Service, nodeNa
 	}
 
 	// Invalidate the cache since we would update it.
-	key := buildVmssCacheKey(nodeResourceGroup, ss.makeVmssVMName(ssName, instanceID))
-	defer ss.vmssVMCache.Delete(key)
+	if err = ss.deleteCacheForNode(nodeName); err != nil {
+		return err
+	}
 
 	// Update vmssVM with backoff.
 	ctx, cancel := getContextWithCancel()
