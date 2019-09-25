@@ -283,9 +283,10 @@ func factoryInterfacePackage(basePackage string, boilerplate []byte, clientSetPa
 
 func groupPackage(basePackage string, groupVersions clientgentypes.GroupVersions, boilerplate []byte) generator.Package {
 	packagePath := filepath.Join(basePackage, groupVersions.PackageName)
+	groupPkgName := strings.Split(string(groupVersions.PackageName), ".")[0]
 
 	return &generator.DefaultPackage{
-		PackageName: groupVersions.PackageName,
+		PackageName: groupPkgName,
 		PackagePath: packagePath,
 		HeaderText:  boilerplate,
 		GeneratorFunc: func(c *generator.Context) (generators []generator.Generator) {

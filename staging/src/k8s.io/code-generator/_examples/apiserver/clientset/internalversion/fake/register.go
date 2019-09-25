@@ -26,6 +26,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	exampleinternalversion "k8s.io/code-generator/_examples/apiserver/apis/example"
 	secondexampleinternalversion "k8s.io/code-generator/_examples/apiserver/apis/example2"
+	thirdexampleinternalversion "k8s.io/code-generator/_examples/apiserver/apis/example3.io"
 )
 
 var scheme = runtime.NewScheme()
@@ -34,6 +35,7 @@ var parameterCodec = runtime.NewParameterCodec(scheme)
 var localSchemeBuilder = runtime.SchemeBuilder{
 	exampleinternalversion.AddToScheme,
 	secondexampleinternalversion.AddToScheme,
+	thirdexampleinternalversion.AddToScheme,
 }
 
 // AddToScheme adds all types of this clientset into the given scheme. This allows composition
