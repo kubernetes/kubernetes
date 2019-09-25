@@ -164,7 +164,7 @@ func (c *CRDFinalizer) sync(key string) error {
 	}
 
 	apiextensions.CRDRemoveFinalizer(crd, apiextensions.CustomResourceCleanupFinalizer)
-	crd, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
+	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {
 		// deleted or changed in the meantime, we'll get called again
 		return nil
