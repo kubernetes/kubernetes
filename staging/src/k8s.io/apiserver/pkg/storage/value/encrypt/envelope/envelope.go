@@ -42,6 +42,8 @@ type Service interface {
 	Decrypt(data []byte) ([]byte, error)
 	// Encrypt bytes to a ciphertext.
 	Encrypt(data []byte) ([]byte, error)
+	// Check the status of KMS provider.
+	Check() error
 }
 
 type envelopeTransformer struct {

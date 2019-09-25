@@ -26,11 +26,10 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog"
-
 	"google.golang.org/grpc"
-
-	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
+	kmspb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
+	"k8s.io/klog"
 )
 
 const (
@@ -45,7 +44,8 @@ const (
 
 // The gRPC implementation for envelope.Service.
 type gRPCService struct {
-	kmsClient      kmsapi.KeyManagementServiceClient
+	kmsClient      kmspb.KeyManagementServiceClient
+	healthClient   healthpb.HealthClient
 	connection     *grpc.ClientConn
 	callTimeout    time.Duration
 	mux            sync.RWMutex
@@ -84,7 +84,8 @@ func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error)
 		return nil, fmt.Errorf("failed to create connection to %s, error: %v", endpoint, err)
 	}
 
-	s.kmsClient = kmsapi.NewKeyManagementServiceClient(s.connection)
+	s.kmsClient = kmspb.NewKeyManagementServiceClient(s.connection)
+	s.healthClient = healthpb.NewHealthClient(s.connection)
 	return s, nil
 }
 
@@ -122,7 +123,7 @@ func (g *gRPCService) checkAPIVersion(ctx context.Context) error {
 		return nil
 	}
 
-	request := &kmsapi.VersionRequest{Version: kmsapiVersion}
+	request := &kmspb.VersionRequest{Version: kmsapiVersion}
 	response, err := g.kmsClient.Version(ctx, request)
 	if err != nil {
 		return fmt.Errorf("failed get version from remote KMS provider: %v", err)
@@ -141,7 +142,7 @@ func (g *gRPCService) Decrypt(cipher []byte) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), g.callTimeout)
 	defer cancel()
 
-	request := &kmsapi.DecryptRequest{Cipher: cipher, Version: kmsapiVersion}
+	request := &kmspb.DecryptRequest{Cipher: cipher, Version: kmsapiVersion}
 	response, err := g.kmsClient.Decrypt(ctx, request)
 	if err != nil {
 		return nil, err
@@ -154,12 +155,27 @@ func (g *gRPCService) Encrypt(plain []byte) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), g.callTimeout)
 	defer cancel()
 
-	request := &kmsapi.EncryptRequest{Plain: plain, Version: kmsapiVersion}
+	request := &kmspb.EncryptRequest{Plain: plain, Version: kmsapiVersion}
 	response, err := g.kmsClient.Encrypt(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 	return response.Cipher, nil
+}
+
+// Check the status of KMS provider.
+func (g *gRPCService) Check() error {
+	ctx, cancel := context.WithTimeout(context.Background(), g.callTimeout)
+	defer cancel()
+
+	resp, err := g.healthClient.Check(ctx, &healthpb.HealthCheckRequest{Service: ""})
+	if err != nil {
+		return err
+	}
+	if resp.GetStatus() != healthpb.HealthCheckResponse_SERVING {
+		return fmt.Errorf("the KMS provider is unhealthy")
+	}
+	return nil
 }
 
 func (g *gRPCService) interceptor(
@@ -171,7 +187,7 @@ func (g *gRPCService) interceptor(
 	invoker grpc.UnaryInvoker,
 	opts ...grpc.CallOption,
 ) error {
-	if !kmsapi.IsVersionCheckMethod(method) {
+	if !kmspb.IsVersionCheckMethod(method) {
 		if err := g.checkAPIVersion(ctx); err != nil {
 			return err
 		}

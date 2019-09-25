@@ -33,8 +33,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"k8s.io/apimachinery/pkg/util/wait"
-	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
+	kmspb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 	"k8s.io/klog"
 )
 
@@ -52,23 +53,26 @@ type Base64Plugin struct {
 	grpcServer         *grpc.Server
 	listener           net.Listener
 	mu                 *sync.Mutex
-	lastEncryptRequest *kmsapi.EncryptRequest
+	lastEncryptRequest *kmspb.EncryptRequest
 	inFailedState      bool
 	ver                string
 	socketPath         string
+	checkImplemented   bool
 }
 
 // NewBase64Plugin is a constructor for Base64Plugin.
 func NewBase64Plugin(socketPath string) (*Base64Plugin, error) {
 	server := grpc.NewServer()
 	result := &Base64Plugin{
-		grpcServer: server,
-		mu:         &sync.Mutex{},
-		ver:        kmsapiVersion,
-		socketPath: socketPath,
+		grpcServer:       server,
+		mu:               &sync.Mutex{},
+		ver:              kmsapiVersion,
+		socketPath:       socketPath,
+		checkImplemented: true,
 	}
 
-	kmsapi.RegisterKeyManagementServiceServer(server, result)
+	kmspb.RegisterKeyManagementServiceServer(server, result)
+	healthpb.RegisterHealthServer(server, result)
 	return result, nil
 }
 
@@ -76,7 +80,7 @@ func NewBase64Plugin(socketPath string) (*Base64Plugin, error) {
 func WaitForBase64PluginToBeUp(plugin *Base64Plugin) error {
 	var gRPCErr error
 	pollErr := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		_, gRPCErr = plugin.Encrypt(context.Background(), &kmsapi.EncryptRequest{Plain: []byte("foo")})
+		_, gRPCErr = plugin.Encrypt(context.Background(), &kmspb.EncryptRequest{Plain: []byte("foo")})
 		return gRPCErr == nil, nil
 	})
 
@@ -133,14 +137,21 @@ func (s *Base64Plugin) ExitFailedState() {
 	s.inFailedState = false
 }
 
+// CheckImplemented sets whether check is implemented.
+func (s *Base64Plugin) CheckImplemented(state bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.checkImplemented = state
+}
+
 // Version returns the version of the kms-plugin.
-func (s *Base64Plugin) Version(ctx context.Context, request *kmsapi.VersionRequest) (*kmsapi.VersionResponse, error) {
+func (s *Base64Plugin) Version(ctx context.Context, request *kmspb.VersionRequest) (*kmspb.VersionResponse, error) {
 	klog.Infof("Received request for Version: %v", request)
-	return &kmsapi.VersionResponse{Version: s.ver, RuntimeName: "testKMS", RuntimeVersion: "0.0.1"}, nil
+	return &kmspb.VersionResponse{Version: s.ver, RuntimeName: "testKMS", RuntimeVersion: "0.0.1"}, nil
 }
 
 // Decrypt performs base64 decoding of the payload of kms.DecryptRequest.
-func (s *Base64Plugin) Decrypt(ctx context.Context, request *kmsapi.DecryptRequest) (*kmsapi.DecryptResponse, error) {
+func (s *Base64Plugin) Decrypt(ctx context.Context, request *kmspb.DecryptRequest) (*kmspb.DecryptResponse, error) {
 	klog.V(3).Infof("Received Decrypt Request for DEK: %s", string(request.Cipher))
 
 	s.mu.Lock()
@@ -155,11 +166,11 @@ func (s *Base64Plugin) Decrypt(ctx context.Context, request *kmsapi.DecryptReque
 		return nil, err
 	}
 
-	return &kmsapi.DecryptResponse{Plain: buf[:n]}, nil
+	return &kmspb.DecryptResponse{Plain: buf[:n]}, nil
 }
 
 // Encrypt performs base64 encoding of the payload of kms.EncryptRequest.
-func (s *Base64Plugin) Encrypt(ctx context.Context, request *kmsapi.EncryptRequest) (*kmsapi.EncryptResponse, error) {
+func (s *Base64Plugin) Encrypt(ctx context.Context, request *kmspb.EncryptRequest) (*kmspb.EncryptResponse, error) {
 	klog.V(3).Infof("Received Encrypt Request for DEK: %x", request.Plain)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -172,5 +183,25 @@ func (s *Base64Plugin) Encrypt(ctx context.Context, request *kmsapi.EncryptReque
 	buf := make([]byte, base64.StdEncoding.EncodedLen(len(request.Plain)))
 	base64.StdEncoding.Encode(buf, request.Plain)
 
-	return &kmsapi.EncryptResponse{Cipher: buf}, nil
+	return &kmspb.EncryptResponse{Cipher: buf}, nil
+}
+
+func (s *Base64Plugin) Check(ctx context.Context, request *healthpb.HealthCheckRequest) (*healthpb.HealthCheckResponse, error) {
+	klog.V(3).Info("Received Check Request")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if !s.checkImplemented {
+		return nil, status.Error(codes.Unimplemented, "")
+	}
+
+	if s.inFailedState {
+		return &healthpb.HealthCheckResponse{Status: healthpb.HealthCheckResponse_NOT_SERVING}, nil
+	}
+
+	return &healthpb.HealthCheckResponse{Status: healthpb.HealthCheckResponse_SERVING}, nil
+}
+
+func (s *Base64Plugin) Watch(*healthpb.HealthCheckRequest, healthpb.Health_WatchServer) error {
+	return status.Error(codes.Unimplemented, "")
 }

@@ -35,7 +35,7 @@ import (
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
 	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing"
-	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
+	kmspb "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -155,7 +155,7 @@ resources:
 		t.Fatalf("expected secret to be prefixed with %s, but got %s", wantPrefix, rawEnvelope)
 	}
 
-	decryptResponse, err := pluginMock.Decrypt(context.Background(), &kmsapi.DecryptRequest{Version: kmsAPIVersion, Cipher: envelope.cipherTextDEK()})
+	decryptResponse, err := pluginMock.Decrypt(context.Background(), &kmspb.DecryptRequest{Version: kmsAPIVersion, Cipher: envelope.cipherTextDEK()})
 	if err != nil {
 		t.Fatalf("failed to decrypt DEK, %v", err)
 	}
@@ -194,36 +194,36 @@ resources:
     - secrets
     providers:
     - kms:
+       name: provider-0
+       endpoint: unix:///@kms-provider-0.sock
+    - kms:
        name: provider-1
        endpoint: unix:///@kms-provider-1.sock
-    - kms:
-       name: provider-2
-       endpoint: unix:///@kms-provider-2.sock
 `
+
+	pluginMock0, err := mock.NewBase64Plugin("@kms-provider-0.sock")
+	if err != nil {
+		t.Fatalf("failed to create mock of KMS Plugin #0: %v", err)
+	}
+
+	if err := pluginMock0.Start(); err != nil {
+		t.Fatalf("Failed to start kms-plugin, err: %v", err)
+	}
+	defer pluginMock0.CleanUp()
+	if err := mock.WaitForBase64PluginToBeUp(pluginMock0); err != nil {
+		t.Fatalf("Failed to start plugin #0, err: %v", err)
+	}
 
 	pluginMock1, err := mock.NewBase64Plugin("@kms-provider-1.sock")
 	if err != nil {
-		t.Fatalf("failed to create mock of KMS Plugin #1: %v", err)
+		t.Fatalf("Failed to create mock of KMS Plugin #1: err: %v", err)
 	}
-
 	if err := pluginMock1.Start(); err != nil {
 		t.Fatalf("Failed to start kms-plugin, err: %v", err)
 	}
 	defer pluginMock1.CleanUp()
 	if err := mock.WaitForBase64PluginToBeUp(pluginMock1); err != nil {
-		t.Fatalf("Failed to start plugin #1, err: %v", err)
-	}
-
-	pluginMock2, err := mock.NewBase64Plugin("@kms-provider-2.sock")
-	if err != nil {
-		t.Fatalf("Failed to create mock of KMS Plugin #2: err: %v", err)
-	}
-	if err := pluginMock2.Start(); err != nil {
-		t.Fatalf("Failed to start kms-plugin, err: %v", err)
-	}
-	defer pluginMock2.CleanUp()
-	if err := mock.WaitForBase64PluginToBeUp(pluginMock2); err != nil {
-		t.Fatalf("Failed to start KMS Plugin #2: err: %v", err)
+		t.Fatalf("Failed to start KMS Plugin #1: err: %v", err)
 	}
 
 	test, err := newTransformTest(t, encryptionConfig)
@@ -237,20 +237,22 @@ resources:
 
 	// Stage 1 - Since all kms-plugins are guaranteed to be up, healthz checks for:
 	// healthz/kms-provider-0 and /healthz/kms-provider-1 should be OK.
+	// Check is not implemented for provider-1
+	pluginMock1.CheckImplemented(false)
 	mustBeHealthy(t, "kms-provider-0", test.kubeAPIServer.ClientConfig)
 	mustBeHealthy(t, "kms-provider-1", test.kubeAPIServer.ClientConfig)
 
-	// Stage 2 - kms-plugin for provider-1 is down. Therefore, expect the health check for provider-1
-	// to fail, but provider-2 should still be OK
-	pluginMock1.EnterFailedState()
+	// Stage 2 - kms-plugin for provider-0 is down. Therefore, expect the health check for provider-0
+	// to fail, but provider-1 should still be OK
+	pluginMock0.EnterFailedState()
 	mustBeUnHealthy(t, "kms-provider-0", test.kubeAPIServer.ClientConfig)
 	mustBeHealthy(t, "kms-provider-1", test.kubeAPIServer.ClientConfig)
-	pluginMock1.ExitFailedState()
+	pluginMock0.ExitFailedState()
 
-	// Stage 3 - kms-plugin for provider-1 is now up. Therefore, expect the health check for provider-1
-	// to succeed now, but provider-2 is now down.
+	// Stage 3 - kms-plugin for provider-0 is now up. Therefore, expect the health check for provider-0
+	// to succeed now, but provider-1 is now down.
 	// Need to sleep since health check chases responses for 3 seconds.
-	pluginMock2.EnterFailedState()
+	pluginMock1.EnterFailedState()
 	mustBeHealthy(t, "kms-provider-0", test.kubeAPIServer.ClientConfig)
 	mustBeUnHealthy(t, "kms-provider-1", test.kubeAPIServer.ClientConfig)
 }

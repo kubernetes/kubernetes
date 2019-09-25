@@ -61,6 +61,13 @@ func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
 	return []byte(t.keyVersion + ":" + base64.StdEncoding.EncodeToString(data)), nil
 }
 
+func (t *testEnvelopeService) Check() error {
+	if t.disabled {
+		return fmt.Errorf("Envelope service was disabled")
+	}
+	return nil
+}
+
 func (t *testEnvelopeService) SetDisabledStatus(status bool) {
 	t.disabled = status
 }

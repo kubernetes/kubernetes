@@ -24,6 +24,9 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/identity:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/secretbox:go_default_library",
+        "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -39,6 +42,8 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/storage/value:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
+        "//vendor/google.golang.org/grpc/codes:go_default_library",
+        "//vendor/google.golang.org/grpc/status:go_default_library",
     ],
 )
 

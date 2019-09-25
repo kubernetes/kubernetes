@@ -41,6 +41,10 @@ import (
 	"k8s.io/apiserver/pkg/storage/value/encrypt/envelope"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/identity"
 	"k8s.io/apiserver/pkg/storage/value/encrypt/secretbox"
+	"k8s.io/klog"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -135,17 +139,26 @@ func (h *kmsPluginProbe) Check() error {
 		return h.lastResponse.err
 	}
 
-	p, err := h.Service.Encrypt([]byte("ping"))
-	if err != nil {
-		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
-		h.ttl = kmsPluginHealthzNegativeTTL
-		return fmt.Errorf("failed to perform encrypt section of the healthz check for KMS Provider %s, error: %v", h.name, err)
-	}
+	if err := h.Service.Check(); err != nil {
+		if stat, ok := status.FromError(err); !ok || stat.Code() != codes.Unimplemented {
+			h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
+			h.ttl = kmsPluginHealthzNegativeTTL
+			return fmt.Errorf("failed to perform the healthz check for KMS Provider %s, error: %v", h.name, err)
+		}
 
-	if _, err := h.Service.Decrypt(p); err != nil {
-		h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
-		h.ttl = kmsPluginHealthzNegativeTTL
-		return fmt.Errorf("failed to perform decrypt section of the healthz check for KMS Provider %s, error: %v", h.name, err)
+		klog.V(4).Infof("KMS provider does not implement grpc.health.v1.Health protocol, fallback to encrypt/decrypt check.")
+		p, err := h.Service.Encrypt([]byte("ping"))
+		if err != nil {
+			h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
+			h.ttl = kmsPluginHealthzNegativeTTL
+			return fmt.Errorf("failed to perform encrypt section of the healthz check for KMS Provider %s, error: %v", h.name, err)
+		}
+
+		if _, err := h.Service.Decrypt(p); err != nil {
+			h.lastResponse = &kmsPluginHealthzResponse{err: err, received: time.Now()}
+			h.ttl = kmsPluginHealthzNegativeTTL
+			return fmt.Errorf("failed to perform decrypt section of the healthz check for KMS Provider %s, error: %v", h.name, err)
+		}
 	}
 
 	h.lastResponse = &kmsPluginHealthzResponse{err: nil, received: time.Now()}

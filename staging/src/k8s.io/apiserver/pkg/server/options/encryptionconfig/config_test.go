@@ -28,6 +28,8 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	apiserverconfig "k8s.io/apiserver/pkg/apis/config"
@@ -78,6 +80,10 @@ func (t *testEnvelopeService) Encrypt(data []byte) ([]byte, error) {
 		return nil, t.err
 	}
 	return []byte(base64.StdEncoding.EncodeToString(data)), nil
+}
+
+func (t *testEnvelopeService) Check() error {
+	return status.Error(codes.Unimplemented, "")
 }
 
 // The factory method to create mock envelope service.
