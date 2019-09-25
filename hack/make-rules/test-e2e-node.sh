@@ -165,7 +165,7 @@ else
     echo 'No need to refresh sudo credentials'
   else
     echo 'Updating sudo credentials'
-    sudo --validate || exit 1
+    sudo -v || exit 1
   fi
 
   # Do not use any network plugin by default. User could override the flags with
