@@ -17,6 +17,7 @@ limitations under the License.
 package resourcelock
 
 import (
+	"errors"
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,24 +119,36 @@ func New(lockType string, ns string, name string, coreClient corev1.CoreV1Interf
 		Client:     coordinationClient,
 		LockConfig: rlc,
 	}
+	var lock Interface
 	switch lockType {
 	case EndpointsResourceLock:
-		return endpointsLock, nil
+		lock = endpointsLock
 	case ConfigMapsResourceLock:
-		return configmapLock, nil
+		lock = configmapLock
 	case LeasesResourceLock:
-		return leaseLock, nil
+		lock = leaseLock
 	case EndpointsLeasesResourceLock:
-		return &MultiLock{
+		lock = &MultiLock{
 			Primary:   endpointsLock,
 			Secondary: leaseLock,
-		}, nil
+		}
 	case ConfigMapsLeasesResourceLock:
-		return &MultiLock{
+		lock = &MultiLock{
 			Primary:   configmapLock,
 			Secondary: leaseLock,
-		}, nil
+		}
 	default:
 		return nil, fmt.Errorf("Invalid lock-type %s", lockType)
 	}
+	return AsSafeLock(lock)
+}
+
+func AsSafeLock(rl Interface) (Interface, error) {
+	if rl == nil {
+		return nil, errors.New("invalid nil resource lock")
+	}
+	if _, isSafeLock := rl.(*safeLock); isSafeLock {
+		return rl, nil
+	}
+	return &safeLock{base: rl}, nil
 }

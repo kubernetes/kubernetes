@@ -8,6 +8,7 @@ go_library(
         "interface.go",
         "leaselock.go",
         "multilock.go",
+        "safelock.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/client-go/tools/leaderelection/resourcelock",
     importpath = "k8s.io/client-go/tools/leaderelection/resourcelock",
