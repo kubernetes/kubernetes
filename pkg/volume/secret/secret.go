@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/volume"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // ProbeVolumePlugins is the entry point for plugin detection in a package.
@@ -177,6 +178,11 @@ func (b *secretVolumeMounter) CanMount() error {
 
 func (b *secretVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	return b.SetUpAt(b.GetPath(), mounterArgs)
+}
+
+func (b *secretVolumeMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := b.SetUp(mounterArgs)
+	return volumetypes.OperationFinished, err
 }
 
 func (b *secretVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {

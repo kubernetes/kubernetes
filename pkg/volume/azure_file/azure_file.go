@@ -36,6 +36,7 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/legacy-cloud-providers/azure"
 )
 
@@ -237,6 +238,12 @@ func (b *azureFileMounter) CanMount() error {
 // SetUp attaches the disk and bind mounts to the volume path.
 func (b *azureFileMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	return b.SetUpAt(b.GetPath(), mounterArgs)
+}
+
+// SetUp attaches the disk and bind mounts to the volume path.
+func (b *azureFileMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := b.SetUp(mounterArgs)
+	return volumetypes.OperationFinished, err
 }
 
 func (b *azureFileMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {

@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	"k8s.io/kubernetes/pkg/volume/util/recyclerclient"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/validation"
 )
 
@@ -236,6 +237,12 @@ func (b *hostPathMounter) SetUp(mounterArgs volume.MounterArgs) error {
 		return nil
 	}
 	return checkType(b.GetPath(), b.pathType, b.hu)
+}
+
+// SetUpWithStatusTracking calls setup and returns additional information about operation state
+func (b *hostPathMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := b.SetUp(mounterArgs)
+	return volumetypes.OperationFinished, err
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.

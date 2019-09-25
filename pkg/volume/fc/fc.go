@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 )
 
@@ -371,6 +372,11 @@ func (b *fcDiskMounter) CanMount() error {
 
 func (b *fcDiskMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	return b.SetUpAt(b.GetPath(), mounterArgs)
+}
+
+func (b *fcDiskMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := b.SetUp(mounterArgs)
+	return volumetypes.OperationFinished, err
 }
 
 func (b *fcDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {

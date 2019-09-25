@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/util/env"
 	"k8s.io/kubernetes/pkg/volume"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 // ProbeVolumePlugins is the primary entrypoint for volume plugins.
@@ -233,6 +234,11 @@ func (b *flockerVolumeMounter) GetPath() string {
 // SetUp bind mounts the disk global mount to the volume path.
 func (b *flockerVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	return b.SetUpAt(b.GetPath(), mounterArgs)
+}
+
+func (b *flockerVolumeMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := b.SetUp(mounterArgs)
+	return volumetypes.OperationFinished, err
 }
 
 // newFlockerClient uses environment variables and pod attributes to return a

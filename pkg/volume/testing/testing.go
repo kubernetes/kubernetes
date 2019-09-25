@@ -847,6 +847,11 @@ func (fv *FakeVolume) SetUp(mounterArgs MounterArgs) error {
 	return fv.SetUpAt(fv.getPath(), mounterArgs)
 }
 
+func (fv *FakeVolume) SetUpWithStatusTracking(mounterArgs MounterArgs) (volumetypes.OperationStatus, error) {
+	err := fv.SetUp(mounterArgs)
+	return volumetypes.OperationFinished, err
+}
+
 func (fv *FakeVolume) GetSetUpCallCount() int {
 	fv.RLock()
 	defer fv.RUnlock()

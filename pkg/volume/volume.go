@@ -130,6 +130,11 @@ type Mounter interface {
 	// accessed by the pod. This may be called more than once, so
 	// implementations must be idempotent.
 	SetUp(mounterArgs MounterArgs) error
+
+	// SetupWithStatusTracking is similar to SetUp function except it
+	// also return operation status as a return value
+	SetUpWithStatusTracking(mounterArgs MounterArgs) (volumetypes.OperationStatus, error)
+
 	// SetUpAt prepares and mounts/unpacks the volume to the
 	// specified directory path, which may or may not exist yet.
 	// The mount point and its content should be owned by

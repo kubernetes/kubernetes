@@ -479,6 +479,12 @@ func (m *localVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
 	return m.SetUpAt(m.GetPath(), mounterArgs)
 }
 
+// SetUp bind mounts the directory to the volume path
+func (m *localVolumeMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := m.SetUp(mounterArgs)
+	return volumetypes.OperationFinished, err
+}
+
 // SetUpAt bind mounts the directory to the volume path and sets up volume ownership
 func (m *localVolumeMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	m.plugin.volumeLocks.LockKey(m.globalPath)

@@ -220,37 +220,44 @@ func (c *csiAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 	return deviceMountPath, nil
 }
 
-func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (err error) {
+func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+	_, err := c.MountDeviceWithStatusTracking(spec, devicePath, deviceMountPath)
+	return err
+}
+
+func (c *csiAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
 	klog.V(4).Infof(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
+	// lets default to operation as finished state
+	opExitStatus := volumetypes.OperationFinished
 
 	if deviceMountPath == "" {
-		return errors.New(log("attacher.MountDevice failed, deviceMountPath is empty"))
+		return opExitStatus, errors.New(log("attacher.MountDevice failed, deviceMountPath is empty"))
 	}
 
 	mounted, err := isDirMounted(c.plugin, deviceMountPath)
 	if err != nil {
 		klog.Error(log("attacher.MountDevice failed while checking mount status for dir [%s]", deviceMountPath))
-		return err
+		return opExitStatus, err
 	}
 
 	if mounted {
 		klog.V(4).Info(log("attacher.MountDevice skipping mount, dir already mounted [%s]", deviceMountPath))
-		return nil
+		return opExitStatus, nil
 	}
 
 	// Setup
 	if spec == nil {
-		return errors.New(log("attacher.MountDevice failed, spec is nil"))
+		return opExitStatus, errors.New(log("attacher.MountDevice failed, spec is nil"))
 	}
 	csiSource, err := getPVSourceFromSpec(spec)
 	if err != nil {
-		return errors.New(log("attacher.MountDevice failed to get CSIPersistentVolumeSource: %v", err))
+		return opExitStatus, errors.New(log("attacher.MountDevice failed to get CSIPersistentVolumeSource: %v", err))
 	}
 
 	// Store volume metadata for UnmountDevice. Keep it around even if the
 	// driver does not support NodeStage, UnmountDevice still needs it.
 	if err = os.MkdirAll(deviceMountPath, 0750); err != nil {
-		return errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
+		return opExitStatus, errors.New(log("attacher.MountDevice failed to create dir %#v:  %v", deviceMountPath, err))
 	}
 	klog.V(4).Info(log("created target path successfully [%s]", deviceMountPath))
 	dataDir := filepath.Dir(deviceMountPath)
@@ -263,11 +270,12 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		if cleanErr := os.RemoveAll(dataDir); cleanErr != nil {
 			klog.Error(log("failed to remove dir after error [%s]: %v", dataDir, cleanErr))
 		}
-		return err
+		return opExitStatus, err
 	}
 	defer func() {
-		// Only for non-timedout errors remove the mount directory
-		if err != nil && !volumetypes.IsOperationTimeOutError(err) {
+		// Only if there was an error and volume operation was considered
+		// finished, we should remove the directory.
+		if err != nil && opExitStatus == volumetypes.OperationFinished {
 			// clean up metadata
 			klog.Errorf(log("attacher.MountDevice failed: %v", err))
 			if err := removeMountDir(c.plugin, deviceMountPath); err != nil {
@@ -279,7 +287,7 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	if c.csiClient == nil {
 		c.csiClient, err = newCsiDriverClient(csiDriverName(csiSource.Driver))
 		if err != nil {
-			return errors.New(log("attacher.MountDevice failed to create newCsiDriverClient: %v", err))
+			return opExitStatus, errors.New(log("attacher.MountDevice failed to create newCsiDriverClient: %v", err))
 		}
 	}
 	csi := c.csiClient
@@ -289,12 +297,12 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 	// Check whether "STAGE_UNSTAGE_VOLUME" is set
 	stageUnstageSet, err := csi.NodeSupportsStageUnstage(ctx)
 	if err != nil {
-		return err
+		return opExitStatus, err
 	}
 	if !stageUnstageSet {
 		klog.Infof(log("attacher.MountDevice STAGE_UNSTAGE_VOLUME capability not set. Skipping MountDevice..."))
 		// defer does *not* remove the metadata file and it's correct - UnmountDevice needs it there.
-		return nil
+		return opExitStatus, nil
 	}
 
 	// Start MountDevice
@@ -307,7 +315,9 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		if err != nil {
 			err = fmt.Errorf("fetching NodeStageSecretRef %s/%s failed: %v",
 				csiSource.NodeStageSecretRef.Namespace, csiSource.NodeStageSecretRef.Name, err)
-			return err
+			// if we failed to fetch secret then that could be a transient error
+			opExitStatus = volumetypes.OperationStateNoChange
+			return opExitStatus, err
 		}
 	}
 
@@ -334,16 +344,14 @@ func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMo
 		mountOptions)
 
 	if err != nil {
-		return err
+		if volumetypes.IsOperationTimeOutError(err) {
+			opExitStatus = volumetypes.OperationInProgress
+		}
+		return opExitStatus, err
 	}
 
 	klog.V(4).Infof(log("attacher.MountDevice successfully requested NodeStageVolume [%s]", deviceMountPath))
-	return nil
-}
-
-func (c *csiAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := c.MountDevice(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
+	return opExitStatus, err
 }
 
 var _ volume.Detacher = &csiAttacher{}
