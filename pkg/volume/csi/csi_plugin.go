@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sort"
 	"strings"
 	"time"
 
@@ -894,35 +893,30 @@ func highestSupportedVersion(versions []string) (*utilversion.Version, error) {
 		return nil, errors.New(log("CSI driver reporting empty array for supported versions"))
 	}
 
-	// Sort by lowest to highest version
-	sort.Slice(versions, func(i, j int) bool {
-		parsedVersionI, err := utilversion.ParseGeneric(versions[i])
-		if err != nil {
-			// Push bad values to the bottom
-			return true
-		}
-
-		parsedVersionJ, err := utilversion.ParseGeneric(versions[j])
-		if err != nil {
-			// Push bad values to the bottom
-			return false
-		}
-
-		return parsedVersionI.LessThan(parsedVersionJ)
-	})
-
+	var highestSupportedVersion *utilversion.Version
+	var theErr error
 	for i := len(versions) - 1; i >= 0; i-- {
-		highestSupportedVersion, err := utilversion.ParseGeneric(versions[i])
+		currentHighestVer, err := utilversion.ParseGeneric(versions[i])
 		if err != nil {
-			return nil, err
+			theErr = err
+			continue
 		}
-
-		if highestSupportedVersion.Major() <= 1 {
-			return highestSupportedVersion, nil
+		if currentHighestVer.Major() > 1 {
+			// CSI currently only has version 0.x and 1.x (see https://github.com/container-storage-interface/spec/releases).
+			// Therefore any driver claiming version 2.x+ is ignored as an unsupported versions.
+			// Future 1.x versions of CSI are supposed to be backwards compatible so this version of Kubernetes will work with any 1.x driver
+			// (or 0.x), but it may not work with 2.x drivers (because 2.x does not have to be backwards compatible with 1.x).
+			continue
+		}
+		if highestSupportedVersion == nil || highestSupportedVersion.LessThan(currentHighestVer) {
+			highestSupportedVersion = currentHighestVer
 		}
 	}
 
-	return nil, errors.New(log("None of the CSI versions reported by this driver are supported"))
+	if highestSupportedVersion != nil {
+		return highestSupportedVersion, nil
+	}
+	return nil, fmt.Errorf("None of the CSI versions (%v) reported by this driver are supported : %v", versions, theErr)
 }
 
 // Only drivers that implement CSI 0.x are allowed to use deprecated socket dir.
