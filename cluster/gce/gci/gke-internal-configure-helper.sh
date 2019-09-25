@@ -343,7 +343,7 @@ EOF
   fi
 
   # Mount /home/containerd as readonly to avoid security issues.
-  mount --bind -o ro "${CONTAINERD_HOME}" "${CONTAINERD_HOME}"
+  mount --bind -o ro,exec "${CONTAINERD_HOME}" "${CONTAINERD_HOME}"
 
   echo "Restart containerd to load the config change"
   systemctl restart containerd
