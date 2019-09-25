@@ -1,7 +1,8 @@
 # Create, Update & Delete Deployment
 
-This example program demonstrates the fundamental operations for managing on
-[Deployment][1] resources, such as `Create`, `List`, `Update` and `Delete`.
+This example program demonstrates the fundamental operations for managing
+lifecycle of [Deployment][1] resources, such as `Create`, `List`, `Update` and
+`Delete`.
 
 You can adopt the source code from this example to write programs that manage
 other types of resources through the Kubernetes API.
@@ -38,6 +39,7 @@ Running this command will execute the following operations on your cluster:
    `kubectl describe deployment demo`.
 3. **List Deployments:** This will retrieve Deployments in the `default`
    namespace and print their names and replica counts.
+   Verify with `kubectl get deployments`.
 4. **Delete Deployment:** This will delete the Deployment object and its
    dependent ReplicaSet resource. Verify with `kubectl get deployments`.
 
@@ -67,7 +69,7 @@ Deleted deployment.
 
 ## Cleanup
 
-Successfully running this program will clean the created artifacts. If you
+Successfully running this program will clean the created resources. If you
 terminate the program without completing, you can clean up the created
 deployment with:
 
