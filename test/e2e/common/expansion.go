@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -482,14 +481,14 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		cmd := "touch /volume_mount/mypath/foo/test.log"
 		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
 		if err != nil {
-			e2elog.Failf("expected to be able to write to subpath")
+			framework.Failf("expected to be able to write to subpath")
 		}
 
 		ginkgo.By("test for file in mounted path")
 		cmd = "test -f /subpath_mount/test.log"
 		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
 		if err != nil {
-			e2elog.Failf("expected to be able to verify file")
+			framework.Failf("expected to be able to verify file")
 		}
 
 		ginkgo.By("updating the annotation value")
@@ -629,13 +628,13 @@ var _ = framework.KubeDescribe("Variable Expansion", func() {
 		cmd := "test -f /volume_mount/foo/test.log"
 		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
 		if err != nil {
-			e2elog.Failf("expected to be able to verify old file exists")
+			framework.Failf("expected to be able to verify old file exists")
 		}
 
 		cmd = "test ! -f /volume_mount/newsubpath/test.log"
 		_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, cmd)
 		if err != nil {
-			e2elog.Failf("expected to be able to verify new file does not exist")
+			framework.Failf("expected to be able to verify new file does not exist")
 		}
 	})
 })
@@ -660,7 +659,7 @@ func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount
 	ginkgo.By("Failing liveness probe")
 	stdout, stderr, err := f.ExecShellInPodWithFullOutput(pod.Name, fmt.Sprintf("rm %v", volumeMount))
 
-	e2elog.Logf("Pod exec output: %v / %v", stdout, stderr)
+	framework.Logf("Pod exec output: %v / %v", stdout, stderr)
 	framework.ExpectNoError(err, "while failing liveness probe")
 
 	// Check that container has restarted
@@ -673,10 +672,10 @@ func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount
 		}
 		for _, status := range pod.Status.ContainerStatuses {
 			if status.Name == pod.Spec.Containers[0].Name {
-				e2elog.Logf("Container %v, restarts: %v", status.Name, status.RestartCount)
+				framework.Logf("Container %v, restarts: %v", status.Name, status.RestartCount)
 				restarts = status.RestartCount
 				if restarts > 0 {
-					e2elog.Logf("Container has restart count: %v", restarts)
+					framework.Logf("Container has restart count: %v", restarts)
 					return true, nil
 				}
 			}
@@ -688,7 +687,7 @@ func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount
 	// Fix liveness probe
 	ginkgo.By("Rewriting the file")
 	stdout, _, err = f.ExecShellInPodWithFullOutput(pod.Name, fmt.Sprintf("echo test-after > %v", volumeMount))
-	e2elog.Logf("Pod exec output: %v", stdout)
+	framework.Logf("Pod exec output: %v", stdout)
 	framework.ExpectNoError(err, "while rewriting the probe file")
 
 	// Wait for container restarts to stabilize
@@ -705,13 +704,13 @@ func waitForPodContainerRestart(f *framework.Framework, pod *v1.Pod, volumeMount
 				if status.RestartCount == restarts {
 					stableCount++
 					if stableCount > stableThreshold {
-						e2elog.Logf("Container restart has stabilized")
+						framework.Logf("Container restart has stabilized")
 						return true, nil
 					}
 				} else {
 					restarts = status.RestartCount
 					stableCount = 0
-					e2elog.Logf("Container has restart count: %v", restarts)
+					framework.Logf("Container has restart count: %v", restarts)
 				}
 				break
 			}

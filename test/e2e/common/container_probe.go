@@ -29,7 +29,6 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -76,10 +75,10 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		startedTime, err := GetContainerStartedTime(p, containerName)
 		framework.ExpectNoError(err)
 
-		e2elog.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
+		framework.Logf("Container started at %v, pod became ready at %v", startedTime, readyTime)
 		initialDelay := probeTestInitialDelaySeconds * time.Second
 		if readyTime.Sub(startedTime) < initialDelay {
-			e2elog.Failf("Pod became ready before it's %v initial delay", initialDelay)
+			framework.Failf("Pod became ready before it's %v initial delay", initialDelay)
 		}
 
 		restartCount := getRestartCount(p)
@@ -422,14 +421,14 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// 'Terminated' which can cause indefinite blocking.)
 	framework.ExpectNoError(e2epod.WaitForPodNotPending(f.ClientSet, ns, pod.Name),
 		fmt.Sprintf("starting pod %s in namespace %s", pod.Name, ns))
-	e2elog.Logf("Started pod %s in namespace %s", pod.Name, ns)
+	framework.Logf("Started pod %s in namespace %s", pod.Name, ns)
 
 	// Check the pod's current state and verify that restartCount is present.
 	ginkgo.By("checking the pod's current state and verifying that restartCount is present")
 	pod, err := podClient.Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, fmt.Sprintf("getting pod %s in namespace %s", pod.Name, ns))
 	initialRestartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
-	e2elog.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
+	framework.Logf("Initial restart count of pod %s is %d", pod.Name, initialRestartCount)
 
 	// Wait for the restart state to be as desired.
 	deadline := time.Now().Add(timeout)
@@ -440,10 +439,10 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 		framework.ExpectNoError(err, fmt.Sprintf("getting pod %s", pod.Name))
 		restartCount := podutil.GetExistingContainerStatus(pod.Status.ContainerStatuses, containerName).RestartCount
 		if restartCount != lastRestartCount {
-			e2elog.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
+			framework.Logf("Restart count of pod %s/%s is now %d (%v elapsed)",
 				ns, pod.Name, restartCount, time.Since(start))
 			if restartCount < lastRestartCount {
-				e2elog.Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",
+				framework.Failf("Restart count should increment monotonically: restart cont of pod %s/%s changed from %d to %d",
 					ns, pod.Name, lastRestartCount, restartCount)
 			}
 		}
@@ -459,7 +458,7 @@ func RunLivenessTest(f *framework.Framework, pod *v1.Pod, expectNumRestarts int,
 	// If we expected n restarts (n > 0), fail if we observed < n restarts.
 	if (expectNumRestarts == 0 && observedRestarts > 0) || (expectNumRestarts > 0 &&
 		int(observedRestarts) < expectNumRestarts) {
-		e2elog.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d",
+		framework.Failf("pod %s/%s - expected number of restarts: %d, found restarts: %d",
 			ns, pod.Name, expectNumRestarts, observedRestarts)
 	}
 }
