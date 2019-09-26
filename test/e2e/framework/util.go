@@ -1702,14 +1702,15 @@ func DumpAllNamespaceInfo(c clientset.Interface, namespace string) {
 	// 2. there are so many of them that working with them are mostly impossible
 	// So we dump them only if the cluster is relatively small.
 	maxNodesForDump := TestContext.MaxNodesToGather
-	if nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{}); err == nil {
-		if len(nodes.Items) <= maxNodesForDump {
-			dumpAllNodeInfo(c)
-		} else {
-			e2elog.Logf("skipping dumping cluster info - cluster too large")
-		}
-	} else {
+	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
+	if err != nil {
 		e2elog.Logf("unable to fetch node list: %v", err)
+		return
+	}
+	if len(nodes.Items) <= maxNodesForDump {
+		dumpAllNodeInfo(c, nodes)
+	} else {
+		e2elog.Logf("skipping dumping cluster info - cluster too large")
 	}
 }
 
@@ -1726,13 +1727,7 @@ func (o byFirstTimestamp) Less(i, j int) bool {
 	return o[i].FirstTimestamp.Before(&o[j].FirstTimestamp)
 }
 
-func dumpAllNodeInfo(c clientset.Interface) {
-	// It should be OK to list unschedulable Nodes here.
-	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-	if err != nil {
-		e2elog.Logf("unable to fetch node list: %v", err)
-		return
-	}
+func dumpAllNodeInfo(c clientset.Interface, nodes *v1.NodeList) {
 	names := make([]string, len(nodes.Items))
 	for ix := range nodes.Items {
 		names[ix] = nodes.Items[ix].Name
