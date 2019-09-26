@@ -27,7 +27,7 @@ import (
 //sys hcsOpenProcess(computeSystem hcsSystem, pid uint32, process *hcsProcess, result **uint16) (hr error) = vmcompute.HcsOpenProcess?
 //sys hcsCloseProcess(process hcsProcess) (hr error) = vmcompute.HcsCloseProcess?
 //sys hcsTerminateProcess(process hcsProcess, result **uint16) (hr error) = vmcompute.HcsTerminateProcess?
-//sys hcsSignalProcess(process hcsProcess, options string, result **uint16) (hr error) = vmcompute.HcsTerminateProcess?
+//sys hcsSignalProcess(process hcsProcess, options string, result **uint16) (hr error) = vmcompute.HcsSignalProcess?
 //sys hcsGetProcessInfo(process hcsProcess, processInformation *hcsProcessInformation, result **uint16) (hr error) = vmcompute.HcsGetProcessInfo?
 //sys hcsGetProcessProperties(process hcsProcess, processProperties **uint16, result **uint16) (hr error) = vmcompute.HcsGetProcessProperties?
 //sys hcsModifyProcess(process hcsProcess, settings string, result **uint16) (hr error) = vmcompute.HcsModifyProcess?
