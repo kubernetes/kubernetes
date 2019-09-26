@@ -111,6 +111,11 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 		return nil, nil, nil, errors.Wrap(err, "[upgrade/config] FATAL")
 	}
 
+	// override node name from the command line options
+	if flags.nodeName != "" {
+		cfg.NodeRegistration.Name = flags.nodeName
+	}
+
 	ignorePreflightErrorsSet, err := validation.ValidateIgnorePreflightErrors(flags.ignorePreflightErrors, cfg.NodeRegistration.IgnorePreflightErrors)
 	if err != nil {
 		return nil, nil, nil, err

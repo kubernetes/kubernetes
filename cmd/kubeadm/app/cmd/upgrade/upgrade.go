@@ -32,6 +32,7 @@ type applyPlanFlags struct {
 	kubeConfigPath            string
 	cfgPath                   string
 	featureGatesString        string
+	nodeName                  string
 	allowExperimentalUpgrades bool
 	allowRCUpgrades           bool
 	printConfig               bool
@@ -68,6 +69,7 @@ func addApplyPlanFlags(fs *pflag.FlagSet, flags *applyPlanFlags) {
 	options.AddKubeConfigFlag(fs, &flags.kubeConfigPath)
 	options.AddConfigFlag(fs, &flags.cfgPath)
 
+	fs.StringVar(&flags.nodeName, options.NodeName, flags.nodeName, "Specify the node name.")
 	fs.BoolVar(&flags.allowExperimentalUpgrades, "allow-experimental-upgrades", flags.allowExperimentalUpgrades, "Show unstable versions of Kubernetes as an upgrade alternative and allow upgrading to an alpha/beta/release candidate versions of Kubernetes.")
 	fs.BoolVar(&flags.allowRCUpgrades, "allow-release-candidate-upgrades", flags.allowRCUpgrades, "Show release candidate versions of Kubernetes as an upgrade alternative and allow upgrading to a release candidate versions of Kubernetes.")
 	fs.BoolVar(&flags.printConfig, "print-config", flags.printConfig, "Specifies whether the configuration file that will be used in the upgrade should be printed or not.")
