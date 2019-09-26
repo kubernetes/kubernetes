@@ -8,7 +8,7 @@ go 1.12
 
 require (
 	bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
-	github.com/Azure/azure-sdk-for-go v32.5.0+incompatible
+	github.com/Azure/azure-sdk-for-go v33.1.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.9.0
 	github.com/Azure/go-autorest/autorest/adal v0.5.0
 	github.com/Azure/go-autorest/autorest/to v0.2.0
@@ -176,7 +176,7 @@ require (
 replace (
 	bitbucket.org/bertimus9/systemstat => bitbucket.org/bertimus9/systemstat v0.0.0-20180207000608-0eeff89b0690
 	cloud.google.com/go => cloud.google.com/go v0.38.0
-	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v32.5.0+incompatible
+	github.com/Azure/azure-sdk-for-go => github.com/Azure/azure-sdk-for-go v33.1.0+incompatible
 	github.com/Azure/go-ansiterm => github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
 	github.com/Azure/go-autorest/autorest => github.com/Azure/go-autorest/autorest v0.9.0
 	github.com/Azure/go-autorest/autorest/adal => github.com/Azure/go-autorest/autorest/adal v0.5.0

@@ -479,3 +479,85 @@ func (client SubnetsClient) PrepareNetworkPoliciesResponder(resp *http.Response)
 	result.Response = resp
 	return
 }
+
+// UnprepareNetworkPolicies unprepares a subnet by removing network intent policies.
+// Parameters:
+// resourceGroupName - the name of the resource group.
+// virtualNetworkName - the name of the virtual network.
+// subnetName - the name of the subnet.
+// unprepareNetworkPoliciesRequestParameters - parameters supplied to unprepare subnet to remove network intent
+// policies.
+func (client SubnetsClient) UnprepareNetworkPolicies(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, unprepareNetworkPoliciesRequestParameters UnprepareNetworkPoliciesRequest) (result SubnetsUnprepareNetworkPoliciesFuture, err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/SubnetsClient.UnprepareNetworkPolicies")
+		defer func() {
+			sc := -1
+			if result.Response() != nil {
+				sc = result.Response().StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	req, err := client.UnprepareNetworkPoliciesPreparer(ctx, resourceGroupName, virtualNetworkName, subnetName, unprepareNetworkPoliciesRequestParameters)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.SubnetsClient", "UnprepareNetworkPolicies", nil, "Failure preparing request")
+		return
+	}
+
+	result, err = client.UnprepareNetworkPoliciesSender(req)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.SubnetsClient", "UnprepareNetworkPolicies", result.Response(), "Failure sending request")
+		return
+	}
+
+	return
+}
+
+// UnprepareNetworkPoliciesPreparer prepares the UnprepareNetworkPolicies request.
+func (client SubnetsClient) UnprepareNetworkPoliciesPreparer(ctx context.Context, resourceGroupName string, virtualNetworkName string, subnetName string, unprepareNetworkPoliciesRequestParameters UnprepareNetworkPoliciesRequest) (*http.Request, error) {
+	pathParameters := map[string]interface{}{
+		"resourceGroupName":  autorest.Encode("path", resourceGroupName),
+		"subnetName":         autorest.Encode("path", subnetName),
+		"subscriptionId":     autorest.Encode("path", client.SubscriptionID),
+		"virtualNetworkName": autorest.Encode("path", virtualNetworkName),
+	}
+
+	const APIVersion = "2019-06-01"
+	queryParameters := map[string]interface{}{
+		"api-version": APIVersion,
+	}
+
+	preparer := autorest.CreatePreparer(
+		autorest.AsContentType("application/json; charset=utf-8"),
+		autorest.AsPost(),
+		autorest.WithBaseURL(client.BaseURI),
+		autorest.WithPathParameters("/subscriptions/{subscriptionId}/resourceGroups/{resourceGroupName}/providers/Microsoft.Network/virtualNetworks/{virtualNetworkName}/subnets/{subnetName}/UnprepareNetworkPolicies", pathParameters),
+		autorest.WithJSON(unprepareNetworkPoliciesRequestParameters),
+		autorest.WithQueryParameters(queryParameters))
+	return preparer.Prepare((&http.Request{}).WithContext(ctx))
+}
+
+// UnprepareNetworkPoliciesSender sends the UnprepareNetworkPolicies request. The method will close the
+// http.Response Body if it receives an error.
+func (client SubnetsClient) UnprepareNetworkPoliciesSender(req *http.Request) (future SubnetsUnprepareNetworkPoliciesFuture, err error) {
+	sd := autorest.GetSendDecorators(req.Context(), azure.DoRetryWithRegistration(client.Client))
+	var resp *http.Response
+	resp, err = autorest.SendWithSender(client, req, sd...)
+	if err != nil {
+		return
+	}
+	future.Future, err = azure.NewFutureFromResponse(resp)
+	return
+}
+
+// UnprepareNetworkPoliciesResponder handles the response to the UnprepareNetworkPolicies request. The method always
+// closes the http.Response Body.
+func (client SubnetsClient) UnprepareNetworkPoliciesResponder(resp *http.Response) (result autorest.Response, err error) {
+	err = autorest.Respond(
+		resp,
+		client.ByInspecting(),
+		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusAccepted),
+		autorest.ByClosing())
+	result.Response = resp
+	return
+}
