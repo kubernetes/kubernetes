@@ -39,7 +39,7 @@ func NewResizeFs(mounter *mount.SafeFormatAndMount) *ResizeFs {
 }
 
 // Resize perform resize of file system
-func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (bool, error) {
+func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string, rescanDevice bool) (bool, error) {
 	format, err := resizefs.mounter.GetDiskFormat(devicePath)
 
 	if err != nil {
@@ -53,16 +53,18 @@ func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string) (boo
 		return false, nil
 	}
 
-	// don't fail if resolving doesn't work
-	if blockDeviceRescanPath, err := findBlockDeviceRescanPath(devicePath); err != nil {
-		klog.V(0).Infof("ResizeFS.Resize - error resolving block device path from %q: %v", devicePath, err)
-	} else {
-		klog.V(3).Infof("ResizeFS.Resize - resolved block device path from %q to %q", devicePath, blockDeviceRescanPath)
+	if rescanDevice {
+		// don't fail if resolving doesn't work
+		if blockDeviceRescanPath, err := findBlockDeviceRescanPath(devicePath); err != nil {
+			klog.V(0).Infof("ResizeFS.Resize - error resolving block device path from %q: %v", devicePath, err)
+		} else {
+			klog.V(3).Infof("ResizeFS.Resize - resolved block device path from %q to %q", devicePath, blockDeviceRescanPath)
 
-		klog.V(3).Infof("ResizeFS.Resize - polling %q block device geometry", devicePath)
-		err = ioutil.WriteFile(blockDeviceRescanPath, []byte{'1'}, 0666)
-		if err != nil {
-			klog.V(0).Infof("ResizeFS.Resize - error polling new block device geometry: %v", err)
+			klog.V(3).Infof("ResizeFS.Resize - polling %q block device geometry", devicePath)
+			err = ioutil.WriteFile(blockDeviceRescanPath, []byte{'1'}, 0666)
+			if err != nil {
+				klog.V(0).Infof("ResizeFS.Resize - error polling new block device geometry: %v", err)
+			}
 		}
 	}
 
@@ -114,5 +116,5 @@ func findBlockDeviceRescanPath(path string) (string, error) {
 	if len(parts) == 3 && strings.HasPrefix(parts[1], "dev") {
 		return filepath.EvalSymlinks(filepath.Join("/sys/block", parts[2], "device", "rescan"))
 	}
-	return "", fmt.Errorf("Illegal path for device " + devicePath)
+	return "", fmt.Errorf("illegal path for device " + devicePath)
 }

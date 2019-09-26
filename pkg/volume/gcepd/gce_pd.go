@@ -290,7 +290,7 @@ func (plugin *gcePersistentDiskPlugin) NodeExpand(resizeOptions volume.NodeResiz
 	if !fsVolume {
 		return true, nil
 	}
-	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
+	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath, false)
 	if err != nil {
 		return false, err
 	}
