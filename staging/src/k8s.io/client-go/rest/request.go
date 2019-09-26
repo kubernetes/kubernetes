@@ -1111,14 +1111,14 @@ func (r Result) Get() (runtime.Object, error) {
 	return out, nil
 }
 
-// StatusCode returns the HTTP status code of the request. (Only valid if no
-// error was returned.)
+// StatusCode sets the provided statusCode to the HTTP status code of the request.
+// (Only valid if no error was returned.)
 func (r Result) StatusCode(statusCode *int) Result {
 	*statusCode = r.statusCode
 	return r
 }
 
-// Header returns the HTTP header of the response.
+// Header sets the provided header to the HTTP header of the response
 func (r Result) Header(header *http.Header) Result {
 	*header = r.header
 	return r
