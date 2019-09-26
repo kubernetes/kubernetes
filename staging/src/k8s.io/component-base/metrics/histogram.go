@@ -46,10 +46,8 @@ type Histogram struct {
 // NewHistogram returns an object which is Histogram-like. However, nothing
 // will be measured until the histogram is registered somewhere.
 func NewHistogram(opts *HistogramOpts) *Histogram {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	h := &Histogram{
 		HistogramOpts: opts,
 		lazyMetric:    lazyMetric{},
@@ -98,10 +96,8 @@ type HistogramVec struct {
 // prometheus.HistogramVec object. However, the object returned will not measure
 // anything unless the collector is first registered, since the metric is lazily instantiated.
 func NewHistogramVec(opts *HistogramOpts, labels []string) *HistogramVec {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	v := &HistogramVec{
 		HistogramVec:   noopHistogramVec,
 		HistogramOpts:  opts,

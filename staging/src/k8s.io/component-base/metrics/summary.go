@@ -37,10 +37,8 @@ type Summary struct {
 //
 // DEPRECATED: as per the metrics overhaul KEP
 func NewSummary(opts *SummaryOpts) *Summary {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	s := &Summary{
 		SummaryOpts: opts,
 		lazyMetric:  lazyMetric{},
@@ -93,10 +91,8 @@ type SummaryVec struct {
 //
 // DEPRECATED: as per the metrics overhaul KEP
 func NewSummaryVec(opts *SummaryOpts, labels []string) *SummaryVec {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	v := &SummaryVec{
 		SummaryOpts:    opts,
 		originalLabels: labels,

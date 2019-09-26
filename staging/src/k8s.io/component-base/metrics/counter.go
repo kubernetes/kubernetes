@@ -34,10 +34,8 @@ type Counter struct {
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewCounter(opts *CounterOpts) *Counter {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	kc := &Counter{
 		CounterOpts: opts,
 		lazyMetric:  lazyMetric{},
@@ -86,10 +84,8 @@ type CounterVec struct {
 // However, the object returned will not measure anything unless the collector is first
 // registered, since the metric is lazily instantiated.
 func NewCounterVec(opts *CounterOpts, labels []string) *CounterVec {
-	// todo: handle defaulting better
-	if opts.StabilityLevel == "" {
-		opts.StabilityLevel = ALPHA
-	}
+	opts.StabilityLevel.setDefaults()
+
 	cv := &CounterVec{
 		CounterVec:     noopCounterVec,
 		CounterOpts:    opts,
