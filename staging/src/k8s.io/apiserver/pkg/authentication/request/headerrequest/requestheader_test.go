@@ -96,6 +96,20 @@ func TestRequestHeader(t *testing.T) {
 			},
 			expectedOk: true,
 		},
+		"groups comma separated": {
+			nameHeaders:  []string{"X-Remote-User"},
+			groupHeaders: []string{"X-Remote-Group"},
+			requestHeaders: http.Header{
+				"X-Remote-User":  {"Bob"},
+				"X-Remote-Group": {"one-a,one-b"},
+			},
+			expectedUser: &user.DefaultInfo{
+				Name:   "Bob",
+				Groups: []string{"one-a", "one-b"},
+				Extra:  map[string][]string{},
+			},
+			expectedOk: true,
+		},
 		"groups all matches": {
 			nameHeaders:  []string{"X-Remote-User"},
 			groupHeaders: []string{"X-Remote-Group-1", "X-Remote-Group-2"},

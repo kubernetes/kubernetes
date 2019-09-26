@@ -156,7 +156,7 @@ func allHeaderValues(h http.Header, headerNames []string) []string {
 
 		for _, headerValue := range values {
 			if len(headerValue) > 0 {
-				ret = append(ret, headerValue)
+				ret = append(ret, strings.Split(headerValue, ",")...)
 			}
 		}
 	}
