@@ -34,22 +34,21 @@ import (
 // framework is the component responsible for initializing and running scheduler
 // plugins.
 type framework struct {
-	registry                  Registry
-	nodeInfoSnapshot          *schedulernodeinfo.Snapshot
-	waitingPods               *waitingPodsMap
-	pluginNameToWeightMap     map[string]int
-	queueSortPlugins          []QueueSortPlugin
-	preFilterPlugins          []PreFilterPlugin
-	filterPlugins             []FilterPlugin
-	postFilterPlugins         []PostFilterPlugin
-	scorePlugins              []ScorePlugin
-	scoreWithNormalizePlugins []ScoreWithNormalizePlugin
-	reservePlugins            []ReservePlugin
-	preBindPlugins            []PreBindPlugin
-	bindPlugins               []BindPlugin
-	postBindPlugins           []PostBindPlugin
-	unreservePlugins          []UnreservePlugin
-	permitPlugins             []PermitPlugin
+	registry              Registry
+	nodeInfoSnapshot      *schedulernodeinfo.Snapshot
+	waitingPods           *waitingPodsMap
+	pluginNameToWeightMap map[string]int
+	queueSortPlugins      []QueueSortPlugin
+	preFilterPlugins      []PreFilterPlugin
+	filterPlugins         []FilterPlugin
+	postFilterPlugins     []PostFilterPlugin
+	scorePlugins          []ScorePlugin
+	reservePlugins        []ReservePlugin
+	preBindPlugins        []PreBindPlugin
+	bindPlugins           []BindPlugin
+	postBindPlugins       []PostBindPlugin
+	unreservePlugins      []UnreservePlugin
+	permitPlugins         []PermitPlugin
 }
 
 const (
@@ -133,7 +132,6 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	if plugins.Score != nil {
 		for _, sc := range plugins.Score.Enabled {
 			if pg, ok := pluginsMap[sc.Name]; ok {
-				// First, make sure the plugin implements ScorePlugin interface.
 				p, ok := pg.(ScorePlugin)
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend score plugin", sc.Name)
@@ -142,13 +140,6 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 					return nil, fmt.Errorf("score plugin %q is not configured with weight", p.Name())
 				}
 				f.scorePlugins = append(f.scorePlugins, p)
-
-				// Next, if the plugin also implements ScoreWithNormalizePlugin interface,
-				// add it to the normalizeScore plugin list.
-				np, ok := pg.(ScoreWithNormalizePlugin)
-				if ok {
-					f.scoreWithNormalizePlugins = append(f.scoreWithNormalizePlugins, np)
-				}
 			} else {
 				return nil, fmt.Errorf("score plugin %q does not exist", sc.Name)
 			}
@@ -422,9 +413,9 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 		return nil, NewStatus(Error, msg)
 	}
 
-	// Run NormalizeScore method for each ScoreWithNormalizePlugin in parallel.
-	workqueue.ParallelizeUntil(ctx, 16, len(f.scoreWithNormalizePlugins), func(index int) {
-		pl := f.scoreWithNormalizePlugins[index]
+	// Run NormalizeScore method for each ScorePlugin in parallel.
+	workqueue.ParallelizeUntil(ctx, 16, len(f.scorePlugins), func(index int) {
+		pl := f.scorePlugins[index]
 		nodeScoreList := pluginToNodeScores[pl.Name()]
 		status := pl.NormalizeScore(pc, pod, nodeScoreList)
 		if !status.IsSuccess() {

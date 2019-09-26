@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -39,7 +39,7 @@ const (
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
 // TestScorePlugin only implements ScorePlugin interface.
-var _ = ScoreWithNormalizePlugin(&TestScoreWithNormalizePlugin{})
+var _ = ScorePlugin(&TestScoreWithNormalizePlugin{})
 var _ = ScorePlugin(&TestScorePlugin{})
 
 func newScoreWithNormalizePlugin1(injArgs *runtime.Unknown, f FrameworkHandle) (Plugin, error) {
@@ -99,6 +99,10 @@ func (pl *TestScorePlugin) Name() string {
 
 func (pl *TestScorePlugin) Score(pc *PluginContext, p *v1.Pod, nodeName string) (int, *Status) {
 	return setScoreRes(pl.inj)
+}
+
+func (pl *TestScorePlugin) NormalizeScore(pc *PluginContext, pod *v1.Pod, scores NodeScoreList) *Status {
+	return nil
 }
 
 // PluginNotImplementingScore doesn't implement the ScorePlugin interface.
