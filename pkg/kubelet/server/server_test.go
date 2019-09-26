@@ -1069,8 +1069,8 @@ func testExecAttach(t *testing.T, verb string) {
 		"stdout with redirect":         {stdout: true, responseStatusCode: http.StatusFound, redirect: true},
 	}
 
-	for desc, test := range tests {
-		test := test
+	for desc := range tests {
+		test := tests[desc]
 		t.Run(desc, func(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
@@ -1333,8 +1333,8 @@ func TestServePortForward(t *testing.T) {
 	podNamespace := "other"
 	podName := "foo"
 
-	for desc, test := range tests {
-		test := test
+	for desc := range tests {
+		test := tests[desc]
 		t.Run(desc, func(t *testing.T) {
 			ss, err := newTestStreamingServer(0)
 			require.NoError(t, err)
