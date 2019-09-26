@@ -266,18 +266,8 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 
 	err = c.applyFSGroup(fsType, mounterArgs.FsGroup)
 	if err != nil {
-		// attempt to rollback mount.
-		fsGrpErr := fmt.Errorf("applyFSGroup failed for vol %s: %v", c.volumeID, err)
-		if unpubErr := csi.NodeUnpublishVolume(ctx, c.volumeID, dir); unpubErr != nil {
-			klog.Error(log("NodeUnpublishVolume failed for [%s]: %v", c.volumeID, unpubErr))
-			return fsGrpErr
-		}
-
-		if unmountErr := removeMountDir(c.plugin, dir); unmountErr != nil {
-			klog.Error(log("removeMountDir failed for [%s]: %v", dir, unmountErr))
-			return fsGrpErr
-		}
-		return fsGrpErr
+		// do not attempt to rollback mount.
+		return fmt.Errorf("applyFSGroup failed for vol %s: %v", c.volumeID, err)
 	}
 
 	klog.V(4).Infof(log("mounter.SetUp successfully requested NodePublish [%s]", dir))
