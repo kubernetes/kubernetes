@@ -758,81 +758,16 @@ func (nc *Controller) monitorNodeHealth() error {
 			zoneToNodeConditions[utilnode.GetZoneKey(node)] = append(zoneToNodeConditions[utilnode.GetZoneKey(node)], currentReadyCondition)
 		}
 
-		decisionTimestamp := nc.now()
 		nodeHealthData := nc.nodeHealthMap.getDeepCopy(node.Name)
 		if nodeHealthData == nil {
 			klog.Errorf("Skipping %v node processing: health data doesn't exist.", node.Name)
 			continue
 		}
 		if currentReadyCondition != nil {
-			// Check eviction timeout against decisionTimestamp
-			switch observedReadyCondition.Status {
-			case v1.ConditionFalse:
-				if nc.useTaintBasedEvictions {
-					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
-					if taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
-						taintToAdd := *NotReadyTaintTemplate
-						if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{UnreachableTaintTemplate}, node) {
-							klog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
-						}
-					} else if nc.markNodeForTainting(node) {
-						klog.V(2).Infof("Node %v is NotReady as of %v. Adding it to the Taint queue.",
-							node.Name,
-							decisionTimestamp,
-						)
-					}
-				} else {
-					if decisionTimestamp.After(nodeHealthData.readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
-						if nc.evictPods(node) {
-							klog.V(2).Infof("Node is NotReady. Adding Pods on Node %s to eviction queue: %v is later than %v + %v",
-								node.Name,
-								decisionTimestamp,
-								nodeHealthData.readyTransitionTimestamp,
-								nc.podEvictionTimeout,
-							)
-						}
-					}
-				}
-			case v1.ConditionUnknown:
-				if nc.useTaintBasedEvictions {
-					// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
-					if taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
-						taintToAdd := *UnreachableTaintTemplate
-						if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{NotReadyTaintTemplate}, node) {
-							klog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
-						}
-					} else if nc.markNodeForTainting(node) {
-						klog.V(2).Infof("Node %v is unresponsive as of %v. Adding it to the Taint queue.",
-							node.Name,
-							decisionTimestamp,
-						)
-					}
-				} else {
-					if decisionTimestamp.After(nodeHealthData.probeTimestamp.Add(nc.podEvictionTimeout)) {
-						if nc.evictPods(node) {
-							klog.V(2).Infof("Node is unresponsive. Adding Pods on Node %s to eviction queues: %v is later than %v + %v",
-								node.Name,
-								decisionTimestamp,
-								nodeHealthData.readyTransitionTimestamp,
-								nc.podEvictionTimeout-gracePeriod,
-							)
-						}
-					}
-				}
-			case v1.ConditionTrue:
-				if nc.useTaintBasedEvictions {
-					removed, err := nc.markNodeAsReachable(node)
-					if err != nil {
-						klog.Errorf("Failed to remove taints from node %v. Will retry in next iteration.", node.Name)
-					}
-					if removed {
-						klog.V(2).Infof("Node %s is healthy again, removing all taints", node.Name)
-					}
-				} else {
-					if nc.cancelPodEviction(node) {
-						klog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
-					}
-				}
+			if nc.useTaintBasedEvictions {
+				nc.processTaintBaseEviction(node, &observedReadyCondition)
+			} else {
+				nc.processNoTaintBaseEviction(node, &observedReadyCondition, gracePeriod)
 			}
 
 			// Report node event.
@@ -847,6 +782,85 @@ func (nc *Controller) monitorNodeHealth() error {
 	nc.handleDisruption(zoneToNodeConditions, nodes)
 
 	return nil
+}
+
+func (nc *Controller) processTaintBaseEviction(node *v1.Node, observedReadyCondition *v1.NodeCondition) {
+	decisionTimestamp := nc.now()
+	// Check eviction timeout against decisionTimestamp
+	switch observedReadyCondition.Status {
+	case v1.ConditionFalse:
+		// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
+		if taintutils.TaintExists(node.Spec.Taints, UnreachableTaintTemplate) {
+			taintToAdd := *NotReadyTaintTemplate
+			if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{UnreachableTaintTemplate}, node) {
+				klog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
+			}
+		} else if nc.markNodeForTainting(node) {
+			klog.V(2).Infof("Node %v is NotReady as of %v. Adding it to the Taint queue.",
+				node.Name,
+				decisionTimestamp,
+			)
+		}
+	case v1.ConditionUnknown:
+		// We want to update the taint straight away if Node is already tainted with the UnreachableTaint
+		if taintutils.TaintExists(node.Spec.Taints, NotReadyTaintTemplate) {
+			taintToAdd := *UnreachableTaintTemplate
+			if !nodeutil.SwapNodeControllerTaint(nc.kubeClient, []*v1.Taint{&taintToAdd}, []*v1.Taint{NotReadyTaintTemplate}, node) {
+				klog.Errorf("Failed to instantly swap UnreachableTaint to NotReadyTaint. Will try again in the next cycle.")
+			}
+		} else if nc.markNodeForTainting(node) {
+			klog.V(2).Infof("Node %v is unresponsive as of %v. Adding it to the Taint queue.",
+				node.Name,
+				decisionTimestamp,
+			)
+		}
+	case v1.ConditionTrue:
+		removed, err := nc.markNodeAsReachable(node)
+		if err != nil {
+			klog.Errorf("Failed to remove taints from node %v. Will retry in next iteration.", node.Name)
+		}
+		if removed {
+			klog.V(2).Infof("Node %s is healthy again, removing all taints", node.Name)
+		}
+	}
+}
+
+func (nc *Controller) processNoTaintBaseEviction(node *v1.Node, observedReadyCondition *v1.NodeCondition, gracePeriod time.Duration) {
+	decisionTimestamp := nc.now()
+	nodeHealthData := nc.nodeHealthMap.getDeepCopy(node.Name)
+	if nodeHealthData == nil {
+		klog.Errorf("Skipping %v node processing: health data doesn't exist.", node.Name)
+		return
+	}
+	// Check eviction timeout against decisionTimestamp
+	switch observedReadyCondition.Status {
+	case v1.ConditionFalse:
+		if decisionTimestamp.After(nodeHealthData.readyTransitionTimestamp.Add(nc.podEvictionTimeout)) {
+			if nc.evictPods(node) {
+				klog.V(2).Infof("Node is NotReady. Adding Pods on Node %s to eviction queue: %v is later than %v + %v",
+					node.Name,
+					decisionTimestamp,
+					nodeHealthData.readyTransitionTimestamp,
+					nc.podEvictionTimeout,
+				)
+			}
+		}
+	case v1.ConditionUnknown:
+		if decisionTimestamp.After(nodeHealthData.probeTimestamp.Add(nc.podEvictionTimeout)) {
+			if nc.evictPods(node) {
+				klog.V(2).Infof("Node is unresponsive. Adding Pods on Node %s to eviction queues: %v is later than %v + %v",
+					node.Name,
+					decisionTimestamp,
+					nodeHealthData.readyTransitionTimestamp,
+					nc.podEvictionTimeout-gracePeriod,
+				)
+			}
+		}
+	case v1.ConditionTrue:
+		if nc.cancelPodEviction(node) {
+			klog.V(2).Infof("Node %s is ready again, cancelled pod eviction", node.Name)
+		}
+	}
 }
 
 // labelNodeDisruptionExclusion is a label on nodes that controls whether they are
