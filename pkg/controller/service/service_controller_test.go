@@ -49,22 +49,15 @@ const region = "us-central"
 func newService(name string, uid types.UID, serviceType v1.ServiceType) *v1.Service {
 	return &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:       name,
-			Namespace:  "default",
-			UID:        uid,
-			SelfLink:   testapi.Default.SelfLink("services", name),
-			Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
+			Name:      name,
+			Namespace: "default",
+			UID:       uid,
+			SelfLink:  testapi.Default.SelfLink("services", name),
 		},
 		Spec: v1.ServiceSpec{
 			Type: serviceType,
 		},
 	}
-}
-
-func newServiceWithDeletionTimestamp(name string, uid types.UID, serviceType v1.ServiceType, deletionTimestamp metav1.Time) *v1.Service {
-	service := newService(name, uid, serviceType)
-	service.ObjectMeta.DeletionTimestamp = &deletionTimestamp
-	return service
 }
 
 //Wrap newService so that you don't have to call default arguments again and again.
@@ -310,30 +303,6 @@ func TestSyncLoadBalancerIfNeeded(t *testing.T) {
 			expectPatchStatus:    true,
 			expectPatchFinalizer: false,
 		},
-		{
-			desc: "service that needs cleanup but LB does not exist",
-			service: &v1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       "basic-service1",
-					Namespace:  "default",
-					SelfLink:   testapi.Default.SelfLink("services", "basic-service1"),
-					Finalizers: []string{servicehelper.LoadBalancerCleanupFinalizer},
-					DeletionTimestamp: &metav1.Time{
-						Time: time.Now(),
-					},
-				},
-				Spec: v1.ServiceSpec{
-					Ports: []v1.ServicePort{{
-						Port:     80,
-						Protocol: v1.ProtocolTCP,
-					}},
-					Type: v1.ServiceTypeLoadBalancer,
-				},
-			},
-			expectOp:            deleteLoadBalancer,
-			expectDeleteAttempt: true,
-			expectPatchStatus:   true,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -439,7 +408,6 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 	table := []struct {
 		services            []*v1.Service
 		expectedUpdateCalls []fakecloud.UpdateBalancerCall
-		shouldNotBeInCache  bool
 	}{
 		{
 			// No services present: no calls should be made.
@@ -499,39 +467,16 @@ func TestUpdateNodesInExternalLoadBalancer(t *testing.T) {
 				{Service: newService("s0", "234", v1.ServiceTypeLoadBalancer), Hosts: nodes},
 			},
 		},
-		{
-			// One service has an external load balancer but is not in the cache (it is deleted): no calls should be made.
-			services: []*v1.Service{
-				newService("s0", "567", v1.ServiceTypeLoadBalancer),
-			},
-			expectedUpdateCalls: nil,
-			shouldNotBeInCache:  true,
-		},
-		{
-			// One service has a deleteion timestamp: no calls should be made.
-			services: []*v1.Service{
-				newServiceWithDeletionTimestamp("s0", "999", v1.ServiceTypeLoadBalancer, metav1.Now()),
-			},
-			expectedUpdateCalls: nil,
-		},
 	}
 	for _, item := range table {
 		controller, cloud, _ := newController()
 
-		// Use keys array instead of cache.ListKeys() so that the order of keys is deterministic
-		keys := make([]string, 0, len(item.services))
-		for _, service := range item.services {
-			if service == nil || item.shouldNotBeInCache {
-				continue
-			}
-			key := service.GetNamespace() + "/" + service.GetName()
-			keys = append(keys, key)
-			// Manually populate cache because updateLoadBalancerHosts gets services from cache
-			svc := controller.cache.getOrCreate(key)
-			svc.state = service
-		}
+		var services []*v1.Service
+		services = append(services, item.services...)
 
-		controller.updateLoadBalancerHosts(keys, nodes)
+		if err := controller.updateLoadBalancerHosts(services, nodes); err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
 		if !reflect.DeepEqual(item.expectedUpdateCalls, cloud.UpdateCalls) {
 			t.Errorf("expected update calls mismatch, expected %+v, got %+v", item.expectedUpdateCalls, cloud.UpdateCalls)
 		}
@@ -1194,6 +1139,18 @@ func TestServiceCache(t *testing.T) {
 				svc, isKey, err := sc.GetByKey("addTest")
 				if svc == nil || isKey == false || err != nil {
 					return fmt.Errorf("Expected(non-nil, true, nil) Obtained(%v,%v,%v)", svc, isKey, err)
+				}
+				return nil
+			},
+		},
+		{
+			testName:   "allServices",
+			setCacheFn: nil, //Nothing to set
+			checkCacheFn: func() error {
+				//It should return two elements
+				svcArray := sc.allServices()
+				if len(svcArray) != 2 {
+					return fmt.Errorf("Expected(2) Obtained(%v)", len(svcArray))
 				}
 				return nil
 			},
