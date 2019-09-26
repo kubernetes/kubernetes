@@ -205,7 +205,8 @@ var _ = SIGDescribe("Networking", func() {
 			config.DialFromNode("udp", config.NodeIP, config.NodeUDPPort, config.MaxTries, config.MaxTries, sets.NewString())
 		})
 
-		ginkgo.It("should function for client IP based session affinity: http", func() {
+		// [LinuxOnly]: Windows does not support session affinity.
+		ginkgo.It("should function for client IP based session affinity: http [LinuxOnly]", func() {
 			config := framework.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, framework.ClusterHTTPPort))
 
@@ -222,7 +223,8 @@ var _ = SIGDescribe("Networking", func() {
 			}
 		})
 
-		ginkgo.It("should function for client IP based session affinity: udp", func() {
+		// [LinuxOnly]: Windows does not support session affinity.
+		ginkgo.It("should function for client IP based session affinity: udp [LinuxOnly]", func() {
 			config := framework.NewNetworkingTestConfig(f)
 			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v", config.TestContainerPod.Name, config.SessionAffinityService.Spec.ClusterIP, framework.ClusterUDPPort))
 
