@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
 	"k8s.io/kube-aggregator/pkg/apis/apiregistration"
 	kubeapiservertesting "k8s.io/kubernetes/cmd/kube-apiserver/app/testing"
 	"k8s.io/kubernetes/test/integration/etcd"
@@ -181,6 +182,8 @@ func TestOpenAPIDelegationChainPlumbing(t *testing.T) {
 	}
 }
 
+// TestOpenAPIApiextensionsOverlapProtection makes sure a user-defined CRD cannot overlap
+// the OpenAPI Path and Definition for the apiextensions API group.
 func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	server := kubeapiservertesting.StartTestServerOrDie(t, nil, nil, framework.SharedEtcd())
 	defer server.TearDownFn()
@@ -188,12 +191,9 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	crdPath, exist, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/{name}`)
+	origSpec, _, etag, err := downloadOpenAPI(apiextensionsclient.RESTClient(), "")
 	if err != nil {
-		t.Fatalf("unexpected error getting CRD OpenAPI path: %v", err)
-	}
-	if !exist {
-		t.Fatalf("unexpected error: apiextensions OpenAPI path doesn't exist")
+		t.Fatalf("unexpected error downloading OpenAPI spec: %v", err)
 	}
 
 	// Create a CRD that overlaps OpenAPI path with the CRD API
@@ -225,33 +225,31 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	etcd.CreateTestCRDs(t, apiextensionsclient, false, crd)
 
 	// Create a probe CRD foo that triggers an OpenAPI spec change
-	if err := triggerSpecUpdateWithProbeCRD(t, apiextensionsclient, "foo"); err != nil {
+	newSpec, etag, err := triggerSpecUpdateWithProbeCRD(t, apiextensionsclient, "foo", etag)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Expect the CRD path to not change
-	path, _, err := getOpenAPIPath(apiextensionsclient, `/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/{name}`)
+	crdPath := `/apis/apiextensions.k8s.io/v1beta1/customresourcedefinitions/{name}`
+	newPathBytes, err := json.Marshal(newSpec.SwaggerProps.Paths.Paths[crdPath])
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	pathBytes, err := json.Marshal(path)
+	origPathBytes, err := json.Marshal(origSpec.SwaggerProps.Paths.Paths[crdPath])
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	crdPathBytes, err := json.Marshal(crdPath)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !bytes.Equal(pathBytes, crdPathBytes) {
-		t.Fatalf("expected CRD OpenAPI path to not change, but got different results: want %q, got %q", string(crdPathBytes), string(pathBytes))
+	if !bytes.Equal(newPathBytes, origPathBytes) {
+		t.Fatalf("expected CRD OpenAPI path to not change, but got different results: want %q, got %q", string(origPathBytes), string(newPathBytes))
 	}
 
 	// Expect the orphan definition to be pruned from the spec
-	exist, err = specHasProbe(apiextensionsclient, testApiextensionsOverlapProbeString)
+	bs, err := json.Marshal(newSpec)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if exist {
+	if strings.Contains(string(bs), testApiextensionsOverlapProbeString) {
 		t.Fatalf("unexpected error: orphan definition isn't pruned")
 	}
 
@@ -284,27 +282,25 @@ func TestOpenAPIApiextensionsOverlapProtection(t *testing.T) {
 	etcd.CreateTestCRDs(t, apiextensionsclient, false, crd)
 
 	// Create a probe CRD bar that triggers an OpenAPI spec change
-	if err := triggerSpecUpdateWithProbeCRD(t, apiextensionsclient, "bar"); err != nil {
+	newSpec, etag, err = triggerSpecUpdateWithProbeCRD(t, apiextensionsclient, "bar", etag)
+	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	// Expect the apiextensions definition to not change, since the overlapping definition will get renamed.
-	apiextensionsDefinition, exist, err := getOpenAPIDefinition(apiextensionsclient, `io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition`)
+	crdDefinition := `io.k8s.apiextensions-apiserver.pkg.apis.apiextensions.v1beta1.CustomResourceDefinition`
+	bs, err = json.Marshal(newSpec.SwaggerProps.Definitions[crdDefinition])
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !exist {
-		t.Fatalf("unexpected error: apiextensions definition doesn't exist")
-	}
-	bytes, err := json.Marshal(apiextensionsDefinition)
-	if exist := strings.Contains(string(bytes), testApiextensionsOverlapProbeString); exist {
+	if strings.Contains(string(bs), testApiextensionsOverlapProbeString) {
 		t.Fatalf("unexpected error: apiextensions definition gets overlapped")
 	}
 }
 
 // triggerSpecUpdateWithProbeCRD creates a probe CRD with suffix in name, and waits until
 // the path and definition for the probe CRD show up in the OpenAPI spec
-func triggerSpecUpdateWithProbeCRD(t *testing.T, apiextensionsclient *apiextensionsclientset.Clientset, suffix string) error {
+func triggerSpecUpdateWithProbeCRD(t *testing.T, apiextensionsclient *apiextensionsclientset.Clientset, suffix, etag string) (newSpec *spec.Swagger, newEtag string, err error) {
 	// Create a probe CRD that triggers OpenAPI spec change
 	name := fmt.Sprintf("integration-test-%s-crd", suffix)
 	kind := fmt.Sprintf("Integration-test-%s-crd", suffix)
@@ -325,58 +321,44 @@ func triggerSpecUpdateWithProbeCRD(t *testing.T, apiextensionsclient *apiextensi
 	}
 	etcd.CreateTestCRDs(t, apiextensionsclient, false, crd)
 
+	var modified bool
+	newEtag = etag
 	// Expect the probe CRD path to show up in the OpenAPI spec
-	// TODO(roycaihw): expose response header in rest client and utilize etag here
-	if err := wait.Poll(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		_, exist, err := getOpenAPIPath(apiextensionsclient, fmt.Sprintf(`/apis/%s/v1/%ss/{name}`, group, name))
+	if err := wait.Poll(100*time.Millisecond, wait.ForeverTestTimeout, func() (bool, error) {
+		newSpec, modified, newEtag, err = downloadOpenAPI(apiextensionsclient.RESTClient(), newEtag)
 		if err != nil {
 			return false, err
 		}
+		if !modified {
+			return false, nil
+		}
+		_, exist := newSpec.SwaggerProps.Paths.Paths[fmt.Sprintf(`/apis/%s/v1/%ss/{name}`, group, name)]
 		return exist, nil
 	}); err != nil {
-		return fmt.Errorf("failed to observe probe CRD path in the spec: %v", err)
+		return nil, "", fmt.Errorf("failed to observe probe CRD path in the spec: %v", err)
 	}
-	return nil
+	return newSpec, newEtag, nil
 }
 
-func specHasProbe(clientset *apiextensionsclientset.Clientset, probe string) (bool, error) {
-	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
+// downloadOpenAPI downloads the OpenAPI spec from apiserver /openapi/v2 endpoint. It makes the
+// assumption that the server supports ETag.
+func downloadOpenAPI(client restclient.Interface, etag string) (returnSpec *spec.Swagger, modified bool, newEtag string, err error) {
+	var code int
+	header := http.Header{}
+	bs, err := client.Get().AbsPath("openapi", "v2").SetHeader("If-None-Match", etag).Do().
+		StatusCode(&code).Header(&header).Raw()
+	newEtag = header.Get("ETag")
 	if err != nil {
-		return false, err
-	}
-	return strings.Contains(string(bs), probe), nil
-}
-
-func getOpenAPIPath(clientset *apiextensionsclientset.Clientset, path string) (spec.PathItem, bool, error) {
-	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
-	if err != nil {
-		return spec.PathItem{}, false, err
+		if code == http.StatusNotModified {
+			return nil, false, newEtag, nil
+		}
+		return nil, false, "", err
 	}
 	s := spec.Swagger{}
 	if err := json.Unmarshal(bs, &s); err != nil {
-		return spec.PathItem{}, false, err
+		return nil, false, "", err
 	}
-	if s.SwaggerProps.Paths == nil {
-		return spec.PathItem{}, false, fmt.Errorf("unexpected empty path")
-	}
-	value, ok := s.SwaggerProps.Paths.Paths[path]
-	return value, ok, nil
-}
-
-func getOpenAPIDefinition(clientset *apiextensionsclientset.Clientset, definition string) (spec.Schema, bool, error) {
-	bs, err := clientset.RESTClient().Get().AbsPath("openapi", "v2").DoRaw()
-	if err != nil {
-		return spec.Schema{}, false, err
-	}
-	s := spec.Swagger{}
-	if err := json.Unmarshal(bs, &s); err != nil {
-		return spec.Schema{}, false, err
-	}
-	if s.SwaggerProps.Definitions == nil {
-		return spec.Schema{}, false, fmt.Errorf("unexpected empty path")
-	}
-	value, ok := s.SwaggerProps.Definitions[definition]
-	return value, ok, nil
+	return &s, true, newEtag, nil
 }
 
 // return the unique endpoint IPs
