@@ -2548,7 +2548,7 @@ function update-daemon-set-prometheus-to-sd-parameters {
 function update-event-exporter {
     local -r stackdriver_resource_model="${LOGGING_STACKDRIVER_RESOURCE_TYPES:-old}"
     sed -i -e "s@{{ exporter_sd_resource_model }}@${stackdriver_resource_model}@g" "$1"
-    sed -i -e "s@{{ exporter_sd_endpoint }}@${STACKDRIVER_TEST_ENDPOINT:-}@g" "$1"
+    sed -i -e "s@{{ exporter_sd_endpoint }}@${STACKDRIVER_ENDPOINT:-}@g" "$1"
 }
 
 function update-dashboard-controller {
