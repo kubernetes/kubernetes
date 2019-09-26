@@ -22,6 +22,7 @@ go_library(
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/sigs.k8s.io/legacyflag/pkg/legacyflag:all-srcs",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

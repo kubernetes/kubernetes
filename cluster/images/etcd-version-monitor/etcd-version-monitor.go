@@ -20,9 +20,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	goflag "flag"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -32,6 +32,7 @@ import (
 	"github.com/prometheus/common/expfmt"
 	"github.com/spf13/pflag"
 	"k8s.io/klog"
+	"sigs.k8s.io/legacyflag/pkg/legacyflag"
 )
 
 // Initialize the prometheus instrumentation and client related flags.
@@ -43,12 +44,35 @@ var (
 	scrapeTimeout        time.Duration
 )
 
-func registerFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&listenAddress, "listen-address", "localhost:9101", "Address to listen on for serving prometheus metrics")
-	fs.StringVar(&metricsPath, "metrics-path", "/metrics", "Path under which prometheus metrics are to be served")
-	fs.StringVar(&etcdVersionScrapeURI, "etcd-version-scrape-uri", "http://localhost:2379/version", "URI to scrape etcd version info")
-	fs.StringVar(&etcdMetricsScrapeURI, "etcd-metrics-scrape-uri", "http://localhost:2379/metrics", "URI to scrape etcd metrics")
-	fs.DurationVar(&scrapeTimeout, "scrape-timeout", 15*time.Second, "Timeout for trying to get stats from etcd")
+func registerFlags(fs *legacyflag.FlagSet) func() {
+	var afs []func()
+
+	{
+		v := fs.StringVar("listen-address", "localhost:9101", "Address to listen on for serving prometheus metrics")
+		afs = append(afs, func() { v.Set(&listenAddress) })
+	}
+	{
+		v := fs.StringVar("metrics-path", "/metrics", "Path under which prometheus metrics are to be served")
+		afs = append(afs, func() { v.Set(&metricsPath) })
+	}
+	{
+		v := fs.StringVar("etcd-version-scrape-uri", "http://localhost:2379/version", "URI to scrape etcd version info")
+		afs = append(afs, func() { v.Set(&etcdVersionScrapeURI) })
+	}
+	{
+		v := fs.StringVar("etcd-metrics-scrape-uri", "http://localhost:2379/metrics", "URI to scrape etcd metrics")
+		afs = append(afs, func() { v.Set(&etcdMetricsScrapeURI) })
+	}
+	{
+		v := fs.DurationVar("scrape-timeout", 15*time.Second, "Timeout for trying to get stats from etcd")
+		afs = append(afs, func() { v.Set(&scrapeTimeout) })
+	}
+
+	return func() {
+		for _, apply := range afs {
+			apply()
+		}
+	}
 }
 
 const (
@@ -386,9 +410,10 @@ func deepCopyLabelPair(lp *dto.LabelPair) *dto.LabelPair {
 
 func main() {
 	// Register the commandline flags passed to the tool.
-	registerFlags(pflag.CommandLine)
-	pflag.CommandLine.AddGoFlagSet(goflag.CommandLine)
-	pflag.Parse()
+	a := legacyflag.NewFromPFlagSet(pflag.CommandLine)
+	registerFlags := registerFlags(a)
+	a.Parse(os.Args)
+	registerFlags()
 
 	// Register the metrics we defined above with prometheus.
 	customMetricRegistry.MustRegister(etcdVersion)
