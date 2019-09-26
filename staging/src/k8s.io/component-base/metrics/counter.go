@@ -139,7 +139,7 @@ func (v *CounterVec) WithLabelValues(lvs ...string) CounterMetric {
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new Counter is created IFF the counterVec has
 // been registered to a metrics registry.
-func (v *CounterVec) With(labels prometheus.Labels) CounterMetric {
+func (v *CounterVec) With(labels map[string]string) CounterMetric {
 	if !v.IsCreated() {
 		return noop // return no-op counter
 	}
@@ -153,7 +153,7 @@ func (v *CounterVec) With(labels prometheus.Labels) CounterMetric {
 // with those of the VariableLabels in Desc. However, such inconsistent Labels
 // can never match an actual metric, so the method will always return false in
 // that case.
-func (v *CounterVec) Delete(labels prometheus.Labels) bool {
+func (v *CounterVec) Delete(labels map[string]string) bool {
 	if !v.IsCreated() {
 		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
 	}

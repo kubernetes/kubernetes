@@ -34,7 +34,7 @@ type KubeOpts struct {
 	Subsystem         string
 	Name              string
 	Help              string
-	ConstLabels       prometheus.Labels
+	ConstLabels       map[string]string
 	DeprecatedVersion string
 	deprecateOnce     sync.Once
 	annotateOnce      sync.Once
@@ -132,7 +132,7 @@ type HistogramOpts struct {
 	Subsystem         string
 	Name              string
 	Help              string
-	ConstLabels       prometheus.Labels
+	ConstLabels       map[string]string
 	Buckets           []float64
 	DeprecatedVersion string
 	deprecateOnce     sync.Once
@@ -178,7 +178,7 @@ type SummaryOpts struct {
 	Subsystem         string
 	Name              string
 	Help              string
-	ConstLabels       prometheus.Labels
+	ConstLabels       map[string]string
 	Objectives        map[float64]float64
 	MaxAge            time.Duration
 	AgeBuckets        uint32
