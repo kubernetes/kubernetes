@@ -540,8 +540,6 @@ func TestIsValidSocketAddr(t *testing.T) {
 	}
 }
 
-
-
 func TestIsValidEnvVarName(t *testing.T) {
 	goodValues := []string{
 		"-", ":", "_", "a", "A", "a-", "$a",

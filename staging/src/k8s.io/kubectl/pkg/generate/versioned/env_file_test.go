@@ -37,7 +37,10 @@ func Test_processEnvFileLine(t *testing.T) {
 			append(utf8bom, 'a', '=', 'c'), 0, "a", "c", ""},
 
 		{"the utf8bom is NOT trimmed on the second line",
-			append(utf8bom, 'a', '=', 'c'), 1, "", "", "not a valid key name"},
+			append(utf8bom, 'a', '=', 'c'), 1, "\ufeffa", "c", ""},
+
+		{"the key should not contain '='",
+			[]byte{' ', '=', '=', 'c'}, 0, "", "", "not a valid key name"},
 
 		{"no key is returned on a comment line",
 			[]byte{' ', '#', 'c'}, 0, "", "", ""},
