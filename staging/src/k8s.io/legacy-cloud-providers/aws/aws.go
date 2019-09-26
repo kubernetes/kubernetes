@@ -1404,14 +1404,35 @@ func (c *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.No
 			return nil, fmt.Errorf("error querying AWS metadata for %q: %q", "network/interfaces/macs", err)
 		}
 
+		// We want the IPs to end up in order by interface (in particular, we want eth0's
+		// IPs first), but macs isn't necessarily sorted in that order so we have to
+		// explicitly order by device-number (device-number == the "0" in "eth0").
+		macIPs := make(map[int]string)
 		for _, macID := range strings.Split(macs, "\n") {
 			if macID == "" {
 				continue
 			}
-			macPath := path.Join("network/interfaces/macs/", macID, "local-ipv4s")
-			internalIPs, err := c.metadata.GetMetadata(macPath)
+			numPath := path.Join("network/interfaces/macs/", macID, "device-number")
+			numStr, err := c.metadata.GetMetadata(numPath)
 			if err != nil {
-				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", macPath, err)
+				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", numPath, err)
+			}
+			num, err := strconv.Atoi(strings.TrimSpace(numStr))
+			if err != nil {
+				klog.Warningf("Bad device-number %q for interface %s\n", numStr, macID)
+				continue
+			}
+			ipPath := path.Join("network/interfaces/macs/", macID, "local-ipv4s")
+			macIPs[num], err = c.metadata.GetMetadata(ipPath)
+			if err != nil {
+				return nil, fmt.Errorf("error querying AWS metadata for %q: %q", ipPath, err)
+			}
+		}
+
+		for i := 0; i < len(macIPs); i++ {
+			internalIPs := macIPs[i]
+			if internalIPs == "" {
+				continue
 			}
 			for _, internalIP := range strings.Split(internalIPs, "\n") {
 				if internalIP == "" {

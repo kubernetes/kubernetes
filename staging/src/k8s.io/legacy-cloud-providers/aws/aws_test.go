@@ -580,7 +580,7 @@ func testHasNodeAddress(t *testing.T, addrs []v1.NodeAddress, addressType v1.Nod
 }
 
 func TestNodeAddresses(t *testing.T) {
-	// Note these instances have the same name
+	// Note instance0 and instance1 have the same name
 	// (we test that this produces an error)
 	var instance0 ec2.Instance
 	var instance1 ec2.Instance
@@ -696,7 +696,7 @@ func TestNodeAddressesWithMetadata(t *testing.T) {
 	instances := []*ec2.Instance{&instance}
 	awsCloud, awsServices := mockInstancesResp(&instance, instances)
 
-	awsServices.networkInterfacesMacs = []string{"0a:26:89:f3:9c:f6", "0a:77:64:c4:6a:48"}
+	awsServices.networkInterfacesMacs = []string{"0a:77:89:f3:9c:f6", "0a:26:64:c4:6a:48"}
 	awsServices.networkInterfacesPrivateIPs = [][]string{{"192.168.0.1"}, {"192.168.0.2"}}
 	addrs, err := awsCloud.NodeAddresses(context.TODO(), "")
 	if err != nil {
@@ -705,6 +705,17 @@ func TestNodeAddressesWithMetadata(t *testing.T) {
 	testHasNodeAddress(t, addrs, v1.NodeInternalIP, "192.168.0.1")
 	testHasNodeAddress(t, addrs, v1.NodeInternalIP, "192.168.0.2")
 	testHasNodeAddress(t, addrs, v1.NodeExternalIP, "2.3.4.5")
+	var index1, index2 int
+	for i, addr := range addrs {
+		if addr.Type == v1.NodeInternalIP && addr.Address == "192.168.0.1" {
+			index1 = i
+		} else if addr.Type == v1.NodeInternalIP && addr.Address == "192.168.0.2" {
+			index2 = i
+		}
+	}
+	if index1 > index2 {
+		t.Errorf("Addresses in incorrect order: %v", addrs)
+	}
 }
 
 func TestParseMetadataLocalHostname(t *testing.T) {
