@@ -83,7 +83,7 @@ Loop:
 				s <- c.CurrentStatus
 			case svc.Stop, svc.Shutdown:
 				klog.Infof("Service stopping")
-				// We need to translate this request into a signal that can be handled by the the signal handler
+				// We need to translate this request into a signal that can be handled by the signal handler
 				// handling shutdowns normally (currently apiserver/pkg/server/signal.go).
 				// If we do not do this, our main threads won't be notified of the upcoming shutdown.
 				// Since Windows services do not use any console, we cannot simply generate a CTRL_BREAK_EVENT
