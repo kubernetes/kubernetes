@@ -1921,6 +1921,8 @@ sigs.k8s.io/kustomize/pkg/transformers
 sigs.k8s.io/kustomize/pkg/transformers/config
 sigs.k8s.io/kustomize/pkg/transformers/config/defaultconfig
 sigs.k8s.io/kustomize/pkg/types
+# sigs.k8s.io/legacyflag v0.0.0-20190711104526-ba9a5f230ff1 => sigs.k8s.io/legacyflag v0.0.0-20190711104526-ba9a5f230ff1
+sigs.k8s.io/legacyflag/pkg/legacyflag
 # sigs.k8s.io/structured-merge-diff v0.0.0-20190817042607-6149e4549fca => sigs.k8s.io/structured-merge-diff v0.0.0-20190817042607-6149e4549fca
 sigs.k8s.io/structured-merge-diff/fieldpath
 sigs.k8s.io/structured-merge-diff/merge

@@ -54,4 +54,8 @@ const (
 	// KubeSchedulerPort is the default port for the scheduler status server.
 	// May be overridden by a flag at startup.
 	KubeSchedulerPort = 10259
+
+	// KubeApiServerPort is the default port for the server api.
+	// May be overridden by a flag at startup.
+	KubeApiServerPort = 443
 )

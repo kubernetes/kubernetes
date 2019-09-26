@@ -41,6 +41,7 @@ go_library(
         "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
+        "//vendor/sigs.k8s.io/legacyflag/pkg/legacyflag:all-srcs",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec/testing:go_default_library",
     ],

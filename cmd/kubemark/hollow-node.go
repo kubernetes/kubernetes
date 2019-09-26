@@ -52,6 +52,7 @@ import (
 	fakeiptables "k8s.io/kubernetes/pkg/util/iptables/testing"
 	fakesysctl "k8s.io/kubernetes/pkg/util/sysctl/testing"
 	fakeexec "k8s.io/utils/exec/testing"
+	"sigs.k8s.io/legacyflag/pkg/legacyflag"
 )
 
 type hollowNodeConfig struct {
@@ -76,17 +77,73 @@ const (
 // and make the config driven.
 var knownMorphs = sets.NewString("kubelet", "proxy")
 
-func (c *hollowNodeConfig) addFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&c.KubeconfigPath, "kubeconfig", "/kubeconfig/kubeconfig", "Path to kubeconfig file.")
-	fs.IntVar(&c.KubeletPort, "kubelet-port", ports.KubeletPort, "Port on which HollowKubelet should be listening.")
-	fs.IntVar(&c.KubeletReadOnlyPort, "kubelet-read-only-port", ports.KubeletReadOnlyPort, "Read-only port on which Kubelet is listening.")
-	fs.StringVar(&c.NodeName, "name", "fake-node", "Name of this Hollow Node.")
-	fs.IntVar(&c.ServerPort, "api-server-port", 443, "Port on which API server is listening.")
-	fs.StringVar(&c.Morph, "morph", "", fmt.Sprintf("Specifies into which Hollow component this binary should morph. Allowed values: %v", knownMorphs.List()))
-	fs.StringVar(&c.ContentType, "kube-api-content-type", "application/vnd.kubernetes.protobuf", "ContentType of requests sent to apiserver.")
-	fs.BoolVar(&c.UseRealProxier, "use-real-proxier", true, "Set to true if you want to use real proxier inside hollow-proxy.")
-	fs.DurationVar(&c.ProxierSyncPeriod, "proxier-sync-period", 30*time.Second, "Period that proxy rules are refreshed in hollow-proxy.")
-	fs.DurationVar(&c.ProxierMinSyncPeriod, "proxier-min-sync-period", 0, "Minimum period that proxy rules are refreshed in hollow-proxy.")
+// newHollowNodeConfig returns initialized hollowNodeConfig
+func newHollowNodeConfig() *hollowNodeConfig {
+	return &hollowNodeConfig{
+		KubeconfigPath:       "/kubeconfig/kubeconfig",
+		KubeletPort:          ports.KubeletPort,
+		KubeletReadOnlyPort:  ports.KubeletReadOnlyPort,
+		Morph:                "",
+		NodeName:             "fake-node",
+		ServerPort:           ports.KubeApiServerPort,
+		ContentType:          "application/vnd.kubernetes.protobuf",
+		UseRealProxier:       true,
+		ProxierSyncPeriod:    30 * time.Second,
+		ProxierMinSyncPeriod: 0,
+	}
+}
+
+func addConfigFlags(fs *legacyflag.FlagSet) func(c *hollowNodeConfig) {
+	afs := []func(o *hollowNodeConfig){}
+
+	o := newHollowNodeConfig()
+
+	{
+		v := fs.StringVar("kubeconfig", o.KubeconfigPath, "Path to kubeconfig file.")
+		afs = append(afs, func(c *hollowNodeConfig) { v.Set(&c.KubeconfigPath) })
+	}
+	{
+		v := fs.IntVar("kubelet-port", ports.KubeletPort, "Port on which HollowKubelet should be listening.")
+		afs = append(afs, func(c *hollowNodeConfig) { v.Set(&c.KubeletPort) })
+	}
+	{
+		v := fs.IntVar("kubelet-read-only-port", ports.KubeletReadOnlyPort, "Read-only port on which Kubelet is listening.")
+		afs = append(afs, func(c *hollowNodeConfig) { v.Set(&c.KubeletReadOnlyPort) })
+	}
+	{
+		v := fs.StringVar("morph", o.Morph, fmt.Sprintf("Specifies into which Hollow component this binary should morph. Allowed values: %v", knownMorphs.List()))
+		afs = append(afs, func(c *hollowNodeConfig) { v.Set(&c.Morph) })
+	}
+	{
+		v := fs.StringVar("name", o.NodeName, "Name of this Hollow Node.")
+		afs = append(afs, func(c *hollowNodeConfig) { v.Set(&c.NodeName) })
+	}
+	{
+		v := fs.IntVar("api-server-port", ports.KubeApiServerPort, "Port on which API server is listening.")
+		afs = append(afs, func(c *hollowNodeConfig) { v.Set(&c.ServerPort) })
+	}
+	{
+		v := fs.StringVar("kube-api-content-type", o.ContentType, "ContentType of requests sent to apiserver.")
+		afs = append(afs, func(c *hollowNodeConfig) { v.Set(&c.ContentType) })
+	}
+	{
+		v := fs.BoolVar("use-real-proxier", o.UseRealProxier, "Set to true if you want to use real proxier inside hollow-proxy.")
+		afs = append(afs, func(c *hollowNodeConfig) { v.Set(&c.UseRealProxier) })
+	}
+	{
+		v := fs.DurationVar("proxier-sync-period", o.ProxierSyncPeriod, "Period that proxy rules are refreshed in hollow-proxy.")
+		afs = append(afs, func(c *hollowNodeConfig) { v.Set(&c.ProxierSyncPeriod) })
+	}
+	{
+		v := fs.DurationVar("proxier-min-sync-period", o.ProxierMinSyncPeriod, "Minimum period that proxy rules are refreshed in hollow-proxy.")
+		afs = append(afs, func(c *hollowNodeConfig) { v.Set(&c.ProxierMinSyncPeriod) })
+	}
+
+	return func(o *hollowNodeConfig) {
+		for _, apply := range afs {
+			apply(o)
+		}
+	}
 }
 
 func (c *hollowNodeConfig) createClientConfigFromFile() (*restclient.Config, error) {
@@ -123,19 +180,23 @@ func main() {
 	}
 }
 
-// newControllerManagerCommand creates a *cobra.Command object with default parameters
+// newHollowNodeCommand creates a *cobra.Command object with default parameters
 func newHollowNodeCommand() *cobra.Command {
-	s := &hollowNodeConfig{}
+	options := newHollowNodeConfig()
 
 	cmd := &cobra.Command{
 		Use:  "kubemark",
 		Long: "kubemark",
 		Run: func(cmd *cobra.Command, args []string) {
 			verflag.PrintAndExitIfRequested()
-			run(s)
+			run(options)
 		},
 	}
-	s.addFlags(cmd.Flags())
+
+	a := legacyflag.NewFromPFlagSet(cmd.Flags())
+	addFlags := addConfigFlags(a)
+	a.Parse(os.Args)
+	addFlags(options)
 
 	return cmd
 }
