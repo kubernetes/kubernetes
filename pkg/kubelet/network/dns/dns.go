@@ -230,6 +230,7 @@ func parseResolvConf(reader io.Reader) (nameservers []string, searches []string,
 			}
 		}
 		if fields[0] == "search" {
+			// Strip redundant trailing dot to avoid hitting search validation limits.
 			trimTrailingDot := []string{}
 			for _, s := range fields[1:] {
 				trimTrailingDot = append(trimTrailingDot, strings.TrimSuffix(s, "."))
