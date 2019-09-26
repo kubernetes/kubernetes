@@ -205,7 +205,10 @@ func sortEncodedManagedFields(encodedManagedFields []metav1.ManagedFieldsEntry) 
 			return p.Time.Before(q.Time)
 		}
 
-		return p.Manager < q.Manager
+		if p.Manager != q.Manager {
+			return p.Manager < q.Manager
+		}
+		return p.APIVersion < q.APIVersion
 	})
 
 	return encodedManagedFields, nil

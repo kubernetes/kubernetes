@@ -369,6 +369,75 @@ func TestApplyUpdateApplyConflictForced(t *testing.T) {
 	}
 }
 
+// TestApplyGroupsManySeparateUpdates tests that when many different managers update the same object,
+// the number of managedFields entries will only grow to a certain size.
+func TestApplyGroupsManySeparateUpdates(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "admissionregistration.k8s.io/v1",
+		"kind": "ValidatingWebhookConfiguration",
+		"metadata": {
+			"name": "webhook",
+			"labels": {"applier":"true"},
+		},
+	}`)
+
+	object, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/admissionregistration.k8s.io/v1").
+		Resource("validatingwebhookconfigurations").
+		Name("webhook").
+		Param("fieldManager", "apply_test").
+		Body(obj).Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	for i := 0; i < 20; i++ {
+		unique := fmt.Sprintf("updater%v", i)
+		version := "v1"
+		if i%2 == 0 {
+			version = "v1beta1"
+		}
+		object, err = client.CoreV1().RESTClient().Patch(types.MergePatchType).
+			AbsPath("/apis/admissionregistration.k8s.io/"+version).
+			Resource("validatingwebhookconfigurations").
+			Name("webhook").
+			Param("fieldManager", unique).
+			Body([]byte(`{"metadata":{"labels":{"` + unique + `":"new"}}}`)).Do().Get()
+		if err != nil {
+			t.Fatalf("Failed to patch object: %v", err)
+		}
+	}
+
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor: %v", err)
+	}
+
+	// Expect 11 entries, because the cap for update entries is 10, and 1 apply entry
+	if actual, expected := len(accessor.GetManagedFields()), 11; actual != expected {
+		if b, err := json.MarshalIndent(object, "\t", "\t"); err == nil {
+			t.Fatalf("Object expected to contain %v entries in managedFields, but got %v:\n%v", expected, actual, string(b))
+		} else {
+			t.Fatalf("Object expected to contain %v entries in managedFields, but got %v: error marshalling object: %v", expected, actual, err)
+		}
+	}
+
+	// Expect the first entry to have the manager name "apply_test"
+	if actual, expected := accessor.GetManagedFields()[0].Manager, "apply_test"; actual != expected {
+		t.Fatalf("Expected first manager to be named %v but got %v", expected, actual)
+	}
+
+	// Expect the second entry to have the manager name "ancient-changes"
+	if actual, expected := accessor.GetManagedFields()[1].Manager, "ancient-changes"; actual != expected {
+		t.Fatalf("Expected first manager to be named %v but got %v", expected, actual)
+	}
+}
+
 // TestApplyManagedFields makes sure that managedFields api does not change
 func TestApplyManagedFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()

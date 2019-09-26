@@ -28,6 +28,11 @@ import (
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
 
+// DefaultMaxUpdateManagers defines the default maximum retained number of managedFields entries from updates
+// if the number of update managers exceeds this, the oldest entries will be merged until the number is below the maximum.
+// TODO(jennybuckley): Determine if this is really the best value. Ideally we wouldn't unnecessarily merge too many entries.
+const DefaultMaxUpdateManagers int = 10
+
 // Managed groups a fieldpath.ManagedFields together with the timestamps associated with each operation.
 type Managed interface {
 	// Fields gets the fieldpath.ManagedFields.
@@ -86,6 +91,7 @@ func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runti
 func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind) *FieldManager {
 	f = NewStripMetaManager(f)
 	f = NewBuildManagerInfoManager(f, kind.GroupVersion())
+	f = NewCapManagersManager(f, DefaultMaxUpdateManagers)
 	f = NewSkipNonAppliedManager(f, objectCreater, kind)
 	return NewFieldManager(f)
 }
