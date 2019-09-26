@@ -138,7 +138,7 @@ func (v *GaugeVec) WithLabelValues(lvs ...string) GaugeMetric {
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new GaugeMetric is created IFF the gaugeVec has
 // been registered to a metrics registry.
-func (v *GaugeVec) With(labels prometheus.Labels) GaugeMetric {
+func (v *GaugeVec) With(labels map[string]string) GaugeMetric {
 	if !v.IsCreated() {
 		return noop // return no-op gauge
 	}
@@ -152,7 +152,7 @@ func (v *GaugeVec) With(labels prometheus.Labels) GaugeMetric {
 // with those of the VariableLabels in Desc. However, such inconsistent Labels
 // can never match an actual metric, so the method will always return false in
 // that case.
-func (v *GaugeVec) Delete(labels prometheus.Labels) bool {
+func (v *GaugeVec) Delete(labels map[string]string) bool {
 	if !v.IsCreated() {
 		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
 	}

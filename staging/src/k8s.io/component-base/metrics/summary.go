@@ -140,7 +140,7 @@ func (v *SummaryVec) WithLabelValues(lvs ...string) ObserverMetric {
 // must match those of the VariableLabels in Desc). If that label map is
 // accessed for the first time, a new ObserverMetric is created IFF the summaryVec has
 // been registered to a metrics registry.
-func (v *SummaryVec) With(labels prometheus.Labels) ObserverMetric {
+func (v *SummaryVec) With(labels map[string]string) ObserverMetric {
 	if !v.IsCreated() {
 		return noop
 	}
@@ -154,7 +154,7 @@ func (v *SummaryVec) With(labels prometheus.Labels) ObserverMetric {
 // with those of the VariableLabels in Desc. However, such inconsistent Labels
 // can never match an actual metric, so the method will always return false in
 // that case.
-func (v *SummaryVec) Delete(labels prometheus.Labels) bool {
+func (v *SummaryVec) Delete(labels map[string]string) bool {
 	if !v.IsCreated() {
 		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
 	}
