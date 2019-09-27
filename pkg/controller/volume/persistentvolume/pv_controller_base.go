@@ -102,8 +102,22 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 
 	p.VolumeInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    func(obj interface{}) { controller.enqueueWork(controller.volumeQueue, obj) },
-			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(controller.volumeQueue, newObj) },
+			AddFunc: func(obj interface{}) {
+				// The cache should be update immediately when received event from informer.
+				// Update the cache item when controller/worker processing the item may cause a long latency to
+				// update the item in the cache,
+				// because the controller/worker may on heavy load state and busy with processing backlog items.
+				controller.storeVolumeUpdate(obj)
+				controller.enqueueWork(controller.volumeQueue, obj)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				// The cache should be update immediately when received event from informer.
+				// Update the cache item when controller/worker processing the item may cause a long latency to
+				// update the item in the cache,
+				// because the controller/worker may on heavy load state and busy with processing backlog items.
+				controller.storeVolumeUpdate(newObj)
+				controller.enqueueWork(controller.volumeQueue, newObj)
+			},
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(controller.volumeQueue, obj) },
 		},
 	)
@@ -112,8 +126,22 @@ func NewController(p ControllerParameters) (*PersistentVolumeController, error) 
 
 	p.ClaimInformer.Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc:    func(obj interface{}) { controller.enqueueWork(controller.claimQueue, obj) },
-			UpdateFunc: func(oldObj, newObj interface{}) { controller.enqueueWork(controller.claimQueue, newObj) },
+			AddFunc: func(obj interface{}) {
+				// The cache should be update immediately when received event from informer.
+				// Update the cache item when controller/worker processing the item may cause a long latency to
+				// update the item in the cache,
+				// because the controller/worker may on heavy load state and busy with processing backlog items.
+				controller.storeClaimUpdate(obj)
+				controller.enqueueWork(controller.claimQueue, obj)
+			},
+			UpdateFunc: func(oldObj, newObj interface{}) {
+				// The cache should be update immediately when received event from informer.
+				// Update the cache item when controller/worker processing the item may cause a long latency to
+				// update the item in the cache,
+				// because the controller/worker may on heavy load state and busy with processing backlog items.
+				controller.storeClaimUpdate(newObj)
+				controller.enqueueWork(controller.claimQueue, newObj)
+			},
 			DeleteFunc: func(obj interface{}) { controller.enqueueWork(controller.claimQueue, obj) },
 		},
 	)
