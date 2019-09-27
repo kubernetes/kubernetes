@@ -17,7 +17,7 @@ limitations under the License.
 // This file was copied from client-go/tools/cache/heap.go and modified
 // for our non thread-safe heap
 
-package util
+package heap
 
 import (
 	"testing"
@@ -44,7 +44,7 @@ func compareInts(val1 interface{}, val2 interface{}) bool {
 
 // TestHeapBasic tests Heap invariant
 func TestHeapBasic(t *testing.T) {
-	h := NewHeap(testHeapObjectKeyFunc, compareInts)
+	h := New(testHeapObjectKeyFunc, compareInts)
 	const amount = 500
 	var i int
 
@@ -67,7 +67,7 @@ func TestHeapBasic(t *testing.T) {
 
 // Tests Heap.Add and ensures that heap invariant is preserved after adding items.
 func TestHeap_Add(t *testing.T) {
-	h := NewHeap(testHeapObjectKeyFunc, compareInts)
+	h := New(testHeapObjectKeyFunc, compareInts)
 	h.Add(mkHeapObj("foo", 10))
 	h.Add(mkHeapObj("bar", 1))
 	h.Add(mkHeapObj("baz", 11))
@@ -97,7 +97,7 @@ func TestHeap_Add(t *testing.T) {
 // TestHeap_AddIfNotPresent tests Heap.AddIfNotPresent and ensures that heap
 // invariant is preserved after adding items.
 func TestHeap_AddIfNotPresent(t *testing.T) {
-	h := NewHeap(testHeapObjectKeyFunc, compareInts)
+	h := New(testHeapObjectKeyFunc, compareInts)
 	h.AddIfNotPresent(mkHeapObj("foo", 10))
 	h.AddIfNotPresent(mkHeapObj("bar", 1))
 	h.AddIfNotPresent(mkHeapObj("baz", 11))
@@ -133,7 +133,7 @@ func TestHeap_AddIfNotPresent(t *testing.T) {
 // TestHeap_Delete tests Heap.Delete and ensures that heap invariant is
 // preserved after deleting items.
 func TestHeap_Delete(t *testing.T) {
-	h := NewHeap(testHeapObjectKeyFunc, compareInts)
+	h := New(testHeapObjectKeyFunc, compareInts)
 	h.Add(mkHeapObj("foo", 10))
 	h.Add(mkHeapObj("bar", 1))
 	h.Add(mkHeapObj("bal", 31))
@@ -178,7 +178,7 @@ func TestHeap_Delete(t *testing.T) {
 // TestHeap_Update tests Heap.Update and ensures that heap invariant is
 // preserved after adding items.
 func TestHeap_Update(t *testing.T) {
-	h := NewHeap(testHeapObjectKeyFunc, compareInts)
+	h := New(testHeapObjectKeyFunc, compareInts)
 	h.Add(mkHeapObj("foo", 10))
 	h.Add(mkHeapObj("bar", 1))
 	h.Add(mkHeapObj("bal", 31))
@@ -202,7 +202,7 @@ func TestHeap_Update(t *testing.T) {
 
 // TestHeap_Get tests Heap.Get.
 func TestHeap_Get(t *testing.T) {
-	h := NewHeap(testHeapObjectKeyFunc, compareInts)
+	h := New(testHeapObjectKeyFunc, compareInts)
 	h.Add(mkHeapObj("foo", 10))
 	h.Add(mkHeapObj("bar", 1))
 	h.Add(mkHeapObj("bal", 31))
@@ -222,7 +222,7 @@ func TestHeap_Get(t *testing.T) {
 
 // TestHeap_GetByKey tests Heap.GetByKey and is very similar to TestHeap_Get.
 func TestHeap_GetByKey(t *testing.T) {
-	h := NewHeap(testHeapObjectKeyFunc, compareInts)
+	h := New(testHeapObjectKeyFunc, compareInts)
 	h.Add(mkHeapObj("foo", 10))
 	h.Add(mkHeapObj("bar", 1))
 	h.Add(mkHeapObj("bal", 31))
@@ -241,7 +241,7 @@ func TestHeap_GetByKey(t *testing.T) {
 
 // TestHeap_List tests Heap.List function.
 func TestHeap_List(t *testing.T) {
-	h := NewHeap(testHeapObjectKeyFunc, compareInts)
+	h := New(testHeapObjectKeyFunc, compareInts)
 	list := h.List()
 	if len(list) != 0 {
 		t.Errorf("expected an empty list")

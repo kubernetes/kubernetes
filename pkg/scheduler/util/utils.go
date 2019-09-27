@@ -62,6 +62,10 @@ func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 	return &metav1.Time{Time: time.Now()}
 }
 
+// lessFunc is a function that receives two items and returns true if the first
+// item should be placed before the second one when the list is sorted.
+type lessFunc = func(item1, item2 interface{}) bool
+
 // GetEarliestPodStartTime returns the earliest start time of all pods that
 // have the highest priority among all victims.
 func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
@@ -91,12 +95,8 @@ func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 // SortableList is a list that implements sort.Interface.
 type SortableList struct {
 	Items    []interface{}
-	CompFunc LessFunc
+	CompFunc lessFunc
 }
-
-// LessFunc is a function that receives two items and returns true if the first
-// item should be placed before the second one when the list is sorted.
-type LessFunc func(item1, item2 interface{}) bool
 
 var _ = sort.Interface(&SortableList{})
 
