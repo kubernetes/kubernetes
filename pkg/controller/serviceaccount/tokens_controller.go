@@ -495,7 +495,7 @@ func (e *TokensController) hasReferencedToken(serviceAccount *v1.ServiceAccount)
 
 func (e *TokensController) secretUpdateNeeded(secret *v1.Secret) (bool, bool, bool) {
 	caData := secret.Data[v1.ServiceAccountRootCAKey]
-	needsCA := len(e.rootCA) > 0 && bytes.Compare(caData, e.rootCA) != 0
+	needsCA := len(e.rootCA) > 0 && !bytes.Equal(caData, e.rootCA)
 
 	needsNamespace := len(secret.Data[v1.ServiceAccountNamespaceKey]) == 0
 

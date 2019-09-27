@@ -393,7 +393,7 @@ func TestEncryptionProviderConfigCorrect(t *testing.T) {
 			if stale != (transformer.Name != testCase.Name) {
 				t.Fatalf("%s: wrong stale information on reading using %s transformer, should be %v", testCase.Name, transformer.Name, testCase.Name == transformer.Name)
 			}
-			if bytes.Compare(untransformedData, originalText) != 0 {
+			if !bytes.Equal(untransformedData, originalText) {
 				t.Fatalf("%s: %s transformer transformed data incorrectly. Expected: %v, got %v", testCase.Name, transformer.Name, originalText, untransformedData)
 			}
 		}
