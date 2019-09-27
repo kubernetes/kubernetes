@@ -23,6 +23,7 @@ import (
 	discovery "k8s.io/api/discovery/v1alpha1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 
 	"net"
 	"strings"
@@ -38,27 +39,6 @@ const clusterCIDR = "192.168.1.0/24"
 const destinationPrefix = "192.168.2.0/24"
 const providerAddress = "10.0.0.3"
 const guid = "123ABC"
-
-type fakeHealthChecker struct {
-	services  map[types.NamespacedName]uint16
-	endpoints map[types.NamespacedName]int
-}
-
-func newFakeHealthChecker() *fakeHealthChecker {
-	return &fakeHealthChecker{
-		services:  map[types.NamespacedName]uint16{},
-		endpoints: map[types.NamespacedName]int{},
-	}
-}
-func (fake *fakeHealthChecker) SyncServices(newServices map[types.NamespacedName]uint16) error {
-	fake.services = newServices
-	return nil
-}
-
-func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
-	fake.endpoints = newEndpoints
-	return nil
-}
 
 type fakeHNS struct{}
 
@@ -126,20 +106,20 @@ func NewFakeProxier(syncPeriod time.Duration, minSyncPeriod time.Duration, clust
 		networkType: networkType,
 	}
 	proxier := &Proxier{
-		portsMap:         make(map[localPort]closeable),
-		serviceMap:       make(proxyServiceMap),
-		serviceChanges:   newServiceChangeMap(),
-		endpointsMap:     make(proxyEndpointsMap),
-		endpointsChanges: newEndpointsChangeMap(hostname),
-		clusterCIDR:      clusterCIDR,
-		hostname:         testHostName,
-		nodeIP:           nodeIP,
-		healthChecker:    newFakeHealthChecker(),
-		network:          *hnsNetworkInfo,
-		sourceVip:        sourceVip,
-		hostMac:          macAddress,
-		isDSR:            false,
-		hns:              newFakeHNS(),
+		portsMap:            make(map[localPort]closeable),
+		serviceMap:          make(proxyServiceMap),
+		serviceChanges:      newServiceChangeMap(),
+		endpointsMap:        make(proxyEndpointsMap),
+		endpointsChanges:    newEndpointsChangeMap(hostname),
+		clusterCIDR:         clusterCIDR,
+		hostname:            testHostName,
+		nodeIP:              nodeIP,
+		serviceHealthServer: healthcheck.NewFakeServiceHealthServer(),
+		network:             *hnsNetworkInfo,
+		sourceVip:           sourceVip,
+		hostMac:             macAddress,
+		isDSR:               false,
+		hns:                 newFakeHNS(),
 	}
 	return proxier
 }

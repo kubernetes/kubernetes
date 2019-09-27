@@ -79,7 +79,7 @@ func newFakeHTTPServerFactory() *fakeHTTPServerFactory {
 	return &fakeHTTPServerFactory{}
 }
 
-func (fake *fakeHTTPServerFactory) New(addr string, handler http.Handler) HTTPServer {
+func (fake *fakeHTTPServerFactory) New(addr string, handler http.Handler) httpServer {
 	return &fakeHTTPServer{
 		addr:    addr,
 		handler: handler,
@@ -119,7 +119,7 @@ func TestServer(t *testing.T) {
 	listener := newFakeListener()
 	httpFactory := newFakeHTTPServerFactory()
 
-	hcsi := NewServer("hostname", nil, listener, httpFactory)
+	hcsi := newServiceHealthServer("hostname", nil, listener, httpFactory)
 	hcs := hcsi.(*server)
 	if len(hcs.services) != 0 {
 		t.Errorf("expected 0 services, got %d", len(hcs.services))
@@ -368,7 +368,7 @@ func TestHealthzServer(t *testing.T) {
 	httpFactory := newFakeHTTPServerFactory()
 	fakeClock := clock.NewFakeClock(time.Now())
 
-	hs := newHealthzServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
+	hs := newProxierHealthServer(listener, httpFactory, fakeClock, "127.0.0.1:10256", 10*time.Second, nil, nil)
 	server := hs.httpFactory.New(hs.addr, healthzHandler{hs: hs})
 
 	// Should return 200 "OK" by default.
@@ -385,7 +385,7 @@ func TestHealthzServer(t *testing.T) {
 	testHealthzHandler(server, http.StatusOK, t)
 }
 
-func testHealthzHandler(server HTTPServer, status int, t *testing.T) {
+func testHealthzHandler(server httpServer, status int, t *testing.T) {
 	handler := server.(*fakeHTTPServer).handler
 	req, err := http.NewRequest("GET", "/healthz", nil)
 	if err != nil {

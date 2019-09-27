@@ -16,6 +16,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//pkg/proxy:go_default_library",
+        "//pkg/proxy/healthcheck:go_default_library",
         "//pkg/proxy/ipvs/testing:go_default_library",
         "//pkg/proxy/util:go_default_library",
         "//pkg/proxy/util/testing:go_default_library",
