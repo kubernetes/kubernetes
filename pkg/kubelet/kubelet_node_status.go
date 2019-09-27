@@ -30,7 +30,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
@@ -98,16 +97,8 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 		klog.Errorf("Unable to register node %q with API server: error getting existing node: %v", kl.nodeName, err)
 		return false
 	}
-	if existingNode == nil {
-		klog.Errorf("Unable to register node %q with API server: no node instance returned", kl.nodeName)
-		return false
-	}
 
 	originalNode := existingNode.DeepCopy()
-	if originalNode == nil {
-		klog.Errorf("Nil %q node object", kl.nodeName)
-		return false
-	}
 
 	klog.Infof("Node %s was previously registered", kl.nodeName)
 
@@ -118,7 +109,7 @@ func (kl *Kubelet) tryRegisterWithAPIServer(node *v1.Node) bool {
 	requiresUpdate = kl.updateDefaultLabels(node, existingNode) || requiresUpdate
 	requiresUpdate = kl.reconcileExtendedResource(node, existingNode) || requiresUpdate
 	if requiresUpdate {
-		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, existingNode); err != nil {
+		if _, _, err := nodeutil.PatchNodeStatus(kl.kubeClient.CoreV1(), kl.nodeName, originalNode, existingNode); err != nil {
 			klog.Errorf("Unable to reconcile node %q with API server: error updating node: %v", kl.nodeName, err)
 			return false
 		}
@@ -426,9 +417,6 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	}
 
 	originalNode := node.DeepCopy()
-	if originalNode == nil {
-		return fmt.Errorf("nil %q node object", kl.nodeName)
-	}
 
 	podCIDRChanged := false
 	if len(node.Spec.PodCIDRs) != 0 {
@@ -468,7 +456,7 @@ func (kl *Kubelet) tryUpdateNodeStatus(tryNumber int) error {
 	}
 
 	// Patch the current status on the API server
-	updatedNode, _, err := nodeutil.PatchNodeStatus(kl.heartbeatClient.CoreV1(), types.NodeName(kl.nodeName), originalNode, node)
+	updatedNode, _, err := nodeutil.PatchNodeStatus(kl.heartbeatClient.CoreV1(), kl.nodeName, originalNode, node)
 	if err != nil {
 		return err
 	}
