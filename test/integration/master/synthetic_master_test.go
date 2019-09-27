@@ -309,30 +309,36 @@ func TestObjectSizeResponses(t *testing.T) {
 	client := clientsetv1.NewForConfigOrDie(&restclient.Config{Host: s.URL})
 
 	const DeploymentMegabyteSize = 100000
-	const DeploymentTwoMegabyteSize = 1000000
+	const DeploymentTwoMegabyteSize = 175000
+	const DeploymentThreeMegabyteSize = 250000
 
 	expectedMsgFor1MB := `etcdserver: request is too large`
 	expectedMsgFor2MB := `rpc error: code = ResourceExhausted desc = trying to send message larger than max`
+	expectedMsgFor3MB := `Request entity too large: limit is 3145728`
 	expectedMsgForLargeAnnotation := `metadata.annotations: Too long: must have at most 262144 characters`
 
-	deployment1 := constructBody("a", DeploymentMegabyteSize, "labels", t)    // >1 MB file
-	deployment2 := constructBody("a", DeploymentTwoMegabyteSize, "labels", t) // >2 MB file
+	deployment1 := constructBody("a", DeploymentMegabyteSize, "labels", t)      // >1 MB file
+	deployment2 := constructBody("a", DeploymentTwoMegabyteSize, "labels", t)   // >2 MB file
+	deployment3 := constructBody("a", DeploymentThreeMegabyteSize, "labels", t) // >3 MB file
 
-	deployment3 := constructBody("a", DeploymentMegabyteSize, "annotations", t)
+	deployment4 := constructBody("a", DeploymentMegabyteSize, "annotations", t)
 
-	deployment4 := constructBody("sample/sample", DeploymentMegabyteSize, "finalizers", t)    // >1 MB file
-	deployment5 := constructBody("sample/sample", DeploymentTwoMegabyteSize, "finalizers", t) // >2 MB file
+	deployment5 := constructBody("sample/sample", DeploymentMegabyteSize, "finalizers", t)      // >1 MB file
+	deployment6 := constructBody("sample/sample", DeploymentTwoMegabyteSize, "finalizers", t)   // >2 MB file
+	deployment7 := constructBody("sample/sample", DeploymentThreeMegabyteSize, "finalizers", t) // >3 MB file
 
 	requests := []struct {
 		size             string
 		deploymentObject *appsv1.Deployment
 		expectedMessage  string
 	}{
-		{"1 MB", deployment1, expectedMsgFor1MB},
-		{"2 MB", deployment2, expectedMsgFor2MB},
-		{"1 MB", deployment3, expectedMsgForLargeAnnotation},
-		{"1 MB", deployment4, expectedMsgFor1MB},
-		{"2 MB", deployment5, expectedMsgFor2MB},
+		{"1 MB labels", deployment1, expectedMsgFor1MB},
+		{"2 MB labels", deployment2, expectedMsgFor2MB},
+		{"3 MB labels", deployment3, expectedMsgFor3MB},
+		{"1 MB annotations", deployment4, expectedMsgForLargeAnnotation},
+		{"1 MB finalizers", deployment5, expectedMsgFor1MB},
+		{"2 MB finalizers", deployment6, expectedMsgFor2MB},
+		{"3 MB finalizers", deployment7, expectedMsgFor3MB},
 	}
 
 	for _, r := range requests {

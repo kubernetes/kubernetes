@@ -336,6 +336,15 @@ func (p *jsonPatcher) createNewObject() (runtime.Object, error) {
 func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr error) {
 	switch p.patchType {
 	case types.JSONPatchType:
+		// sanity check potentially abusive patches
+		// TODO(liggitt): drop this once golang json parser limits stack depth (https://github.com/golang/go/issues/31789)
+		if len(p.patchBytes) > 1024*1024 {
+			v := []interface{}{}
+			if err := json.Unmarshal(p.patchBytes, v); err != nil {
+				return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch: %v", err))
+			}
+		}
+
 		patchObj, err := jsonpatch.DecodePatch(p.patchBytes)
 		if err != nil {
 			return nil, errors.NewBadRequest(err.Error())
@@ -351,6 +360,15 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr
 		}
 		return patchedJS, nil
 	case types.MergePatchType:
+		// sanity check potentially abusive patches
+		// TODO(liggitt): drop this once golang json parser limits stack depth (https://github.com/golang/go/issues/31789)
+		if len(p.patchBytes) > 1024*1024 {
+			v := map[string]interface{}{}
+			if err := json.Unmarshal(p.patchBytes, v); err != nil {
+				return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch: %v", err))
+			}
+		}
+
 		return jsonpatch.MergePatch(versionedJS, p.patchBytes)
 	default:
 		// only here as a safety net - go-restful filters content-type
