@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
@@ -35,6 +36,7 @@ const (
 	pluginNotImplementingScore        = "plugin-not-implementing-score"
 	preFilterPluginName               = "prefilter-plugin"
 	preFilterWithExtensionsPluginName = "prefilter-with-extensions-plugin"
+	duplicatePluginName               = "duplicate-plugin"
 )
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
@@ -166,12 +168,34 @@ func (pl *TestPreFilterWithExtensionsPlugin) Extensions() PreFilterExtensions {
 	return pl
 }
 
+type TestDuplicatePlugin struct {
+}
+
+func (dp *TestDuplicatePlugin) Name() string {
+	return duplicatePluginName
+}
+
+func (dp *TestDuplicatePlugin) PreFilter(pc *PluginContext, p *v1.Pod) *Status {
+	return nil
+}
+
+func (dp *TestDuplicatePlugin) Extensions() PreFilterExtensions {
+	return nil
+}
+
+var _ PreFilterPlugin = &TestDuplicatePlugin{}
+
+func newDuplicatePlugin(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
+	return &TestDuplicatePlugin{}, nil
+}
+
 var registry Registry = func() Registry {
 	r := make(Registry)
 	r.Register(scoreWithNormalizePlugin1, newScoreWithNormalizePlugin1)
 	r.Register(scoreWithNormalizePlugin2, newScoreWithNormalizePlugin2)
 	r.Register(scorePlugin1, newScorePlugin1)
 	r.Register(pluginNotImplementingScore, newPluginNotImplementingScore)
+	r.Register(duplicatePluginName, newDuplicatePlugin)
 	return r
 }()
 
@@ -236,6 +260,28 @@ func TestInitFrameworkWithScorePlugins(t *testing.T) {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
 		})
+	}
+}
+
+func TestRegisterDuplicatePluginWouldFail(t *testing.T) {
+	plugin := config.Plugin{Name: duplicatePluginName, Weight: 1}
+
+	pluginSet := config.PluginSet{
+		Enabled: []config.Plugin{
+			plugin,
+			plugin,
+		},
+	}
+	plugins := config.Plugins{}
+	plugins.PreFilter = &pluginSet
+
+	_, err := NewFramework(registry, &plugins, emptyArgs)
+	if err == nil {
+		t.Fatal("Framework initialization should fail")
+	}
+
+	if err != nil && !strings.Contains(err.Error(), "already registered") {
+		t.Fatalf("Unexpected error, got %s, expect: plugin already registered", err.Error())
 	}
 }
 
