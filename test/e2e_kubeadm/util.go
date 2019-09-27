@@ -140,10 +140,8 @@ func ExpectClusterRoleBindingWithSubjectAndRole(c clientset.Interface, name, sub
 		)),
 		"ClusterRole %q does not have %s %q as subject", name, subjectKind, subject,
 	)
-	gomega.Expect(binding.RoleRef.Name).To(
-		gomega.Equal(role),
-		"ClusterRole %q does not have %q as role", name, role,
-	)
+
+	framework.ExpectEqual(binding.RoleRef.Name, role, "ClusterRole %q does not have %q as role", name, role)
 }
 
 // ExpectSubjectHasAccessToResource expects that the subject has access to the target resource
