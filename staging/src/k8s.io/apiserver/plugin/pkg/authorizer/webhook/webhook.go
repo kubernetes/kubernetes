@@ -191,7 +191,7 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		webhook.WithExponentialBackoff(ctx, w.initialBackoff, func() error {
 			result, err = w.subjectAccessReview.CreateContext(ctx, r)
 			return err
-		})
+		}, webhook.DefaultShouldRetry)
 		if err != nil {
 			// An error here indicates bad configuration or an outage. Log for debugging.
 			klog.Errorf("Failed to make webhook authorizer request: %v", err)
