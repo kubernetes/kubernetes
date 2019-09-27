@@ -1157,8 +1157,52 @@ func TestComputePodActionsWithSidecar(t *testing.T) {
 				}
 			},
 			actions: podActions{
+				KillPod:           true,
 				SandboxID:         baseStatus.SandboxStatuses[0].Id,
 				ContainersToKill:  getKillMap(basePod, baseStatus, []int{1}),
+				ContainersToStart: []int{},
+			},
+		},
+		"Kill pod if sidecar terminates with failure": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				for i := range status.ContainerStatuses {
+					if i == 1 {
+						status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
+						status.ContainerStatuses[i].ExitCode = 1
+					}
+					status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
+					status.ContainerStatuses[i].ExitCode = 0
+				}
+			},
+			actions: podActions{
+				KillPod:           true,
+				SandboxID:         baseStatus.SandboxStatuses[0].Id,
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
+				ContainersToStart: []int{},
+			},
+		},
+		"Don't recreate sandbox when sidecar exited in failure on shutdown": {
+			mutatePodFn: func(pod *v1.Pod) {
+				pod.Spec.RestartPolicy = v1.RestartPolicyOnFailure
+			},
+			mutateStatusFn: func(status *kubecontainer.PodStatus) {
+				status.SandboxStatuses = []*runtimeapi.PodSandboxStatus{}
+				for i := range status.ContainerStatuses {
+					if i == 1 {
+						status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
+						status.ContainerStatuses[i].ExitCode = 1
+					}
+					status.ContainerStatuses[i].State = kubecontainer.ContainerStateExited
+					status.ContainerStatuses[i].ExitCode = 0
+				}
+			},
+			actions: podActions{
+				KillPod:           true,
+				SandboxID:         "",
+				ContainersToKill:  getKillMap(basePod, baseStatus, []int{}),
 				ContainersToStart: []int{},
 			},
 		},
