@@ -22,7 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 var (
@@ -60,7 +60,7 @@ func balancedResourceScorer(requested, allocable ResourceToValueMap, includeVolu
 		// Since the variance is between positive fractions, it will be positive fraction. 1-variance lets the
 		// score to be higher for node which has least variance and multiplying it with 10 provides the scaling
 		// factor needed.
-		return int64((1 - variance) * float64(schedulerapi.MaxPriority))
+		return int64((1 - variance) * float64(framework.MaxNodeScore))
 	}
 
 	// Upper and lower boundary of difference between cpuFraction and memoryFraction are -1 and 1
@@ -68,7 +68,7 @@ func balancedResourceScorer(requested, allocable ResourceToValueMap, includeVolu
 	// 0-10 with 0 representing well balanced allocation and 10 poorly balanced. Subtracting it from
 	// 10 leads to the score which also scales from 0 to 10 while 10 representing well balanced.
 	diff := math.Abs(cpuFraction - memoryFraction)
-	return int64((1 - diff) * float64(schedulerapi.MaxPriority))
+	return int64((1 - diff) * float64(framework.MaxNodeScore))
 }
 
 func fractionOfCapacity(requested, capacity int64) float64 {

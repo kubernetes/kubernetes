@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -45,7 +46,7 @@ const (
 )
 
 type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
-type priorityFunc func(pod *v1.Pod, nodes *v1.NodeList) (*schedulerapi.HostPriorityList, error)
+type priorityFunc func(pod *v1.Pod, nodes *v1.NodeList) (*framework.NodeScoreList, error)
 
 type priorityConfig struct {
 	function priorityFunc
@@ -188,8 +189,8 @@ func (e *Extender) Filter(args *schedulerapi.ExtenderArgs) (*schedulerapi.Extend
 	}, nil
 }
 
-func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (*schedulerapi.HostPriorityList, error) {
-	result := schedulerapi.HostPriorityList{}
+func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (*framework.NodeScoreList, error) {
+	result := framework.NodeScoreList{}
 	combinedScores := map[string]int64{}
 	var nodes = &v1.NodeList{Items: []v1.Node{}}
 
@@ -209,14 +210,14 @@ func (e *Extender) Prioritize(args *schedulerapi.ExtenderArgs) (*schedulerapi.Ho
 		priorityFunc := prioritizer.function
 		prioritizedList, err := priorityFunc(args.Pod, nodes)
 		if err != nil {
-			return &schedulerapi.HostPriorityList{}, err
+			return &framework.NodeScoreList{}, err
 		}
 		for _, hostEntry := range *prioritizedList {
-			combinedScores[hostEntry.Host] += hostEntry.Score * weight
+			combinedScores[hostEntry.Name] += int64(hostEntry.Score) * weight
 		}
 	}
 	for host, score := range combinedScores {
-		result = append(result, schedulerapi.HostPriority{Host: host, Score: score})
+		result = append(result, framework.NodeScore{Name: host, Score: int(score)})
 	}
 	return &result, nil
 }
@@ -247,31 +248,31 @@ func machine2_3_5Predicate(pod *v1.Pod, node *v1.Node) (bool, error) {
 	return false, nil
 }
 
-func machine2Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*schedulerapi.HostPriorityList, error) {
-	result := schedulerapi.HostPriorityList{}
+func machine2Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*framework.NodeScoreList, error) {
+	result := framework.NodeScoreList{}
 	for _, node := range nodes.Items {
 		score := 1
 		if node.Name == "machine2" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{
-			Host:  node.Name,
-			Score: int64(score),
+		result = append(result, framework.NodeScore{
+			Name:  node.Name,
+			Score: score,
 		})
 	}
 	return &result, nil
 }
 
-func machine3Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*schedulerapi.HostPriorityList, error) {
-	result := schedulerapi.HostPriorityList{}
+func machine3Prioritizer(pod *v1.Pod, nodes *v1.NodeList) (*framework.NodeScoreList, error) {
+	result := framework.NodeScoreList{}
 	for _, node := range nodes.Items {
 		score := 1
 		if node.Name == "machine3" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{
-			Host:  node.Name,
-			Score: int64(score),
+		result = append(result, framework.NodeScore{
+			Name:  node.Name,
+			Score: score,
 		})
 	}
 	return &result, nil

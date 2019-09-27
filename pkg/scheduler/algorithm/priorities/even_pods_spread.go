@@ -24,7 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 
@@ -82,8 +82,8 @@ func (t *topologySpreadConstraintsMap) initialize(pod *v1.Pod, nodes []*v1.Node)
 // Note: Symmetry is not applicable. We only weigh how incomingPod matches existingPod.
 // Whether existingPod matches incomingPod doesn't contribute to the final score.
 // This is different from the Affinity API.
-func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	result := make(schedulerapi.HostPriorityList, len(nodes))
+func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (framework.NodeScoreList, error) {
+	result := make(framework.NodeScoreList, len(nodes))
 	// return if incoming pod doesn't have soft topology spread constraints.
 	constraints := getSoftTopologySpreadConstraints(pod)
 	if len(constraints) == 0 {
@@ -171,12 +171,12 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 	maxMinDiff := total - minCount
 	for i := range nodes {
 		node := nodes[i]
-		result[i].Host = node.Name
+		result[i].Name = node.Name
 
 		// debugging purpose: print the value for each node
 		// score must be pointer here, otherwise it's always 0
 		if klog.V(10) {
-			defer func(score *int64, nodeName string) {
+			defer func(score *int, nodeName string) {
 				klog.Infof("%v -> %v: EvenPodsSpreadPriority, Score: (%d)", pod.Name, nodeName, *score)
 			}(&result[i].Score, node.Name)
 		}
@@ -186,11 +186,11 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 			continue
 		}
 		if maxMinDiff == 0 {
-			result[i].Score = schedulerapi.MaxPriority
+			result[i].Score = framework.MaxNodeScore
 			continue
 		}
-		fScore := float64(schedulerapi.MaxPriority) * (float64(total-t.nodeNameToPodCounts[node.Name]) / float64(maxMinDiff))
-		result[i].Score = int64(fScore)
+		fScore := float64(framework.MaxNodeScore) * (float64(total-t.nodeNameToPodCounts[node.Name]) / float64(maxMinDiff))
+		result[i].Score = int(fScore)
 	}
 
 	return result, nil

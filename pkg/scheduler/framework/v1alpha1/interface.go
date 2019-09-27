@@ -34,6 +34,21 @@ type Code int
 // NodeScoreList declares a list of nodes and their scores.
 type NodeScoreList []NodeScore
 
+func (n NodeScoreList) Len() int {
+	return len(n)
+}
+
+func (n NodeScoreList) Less(i, j int) bool {
+	if n[i].Score == n[j].Score {
+		return n[i].Name < n[j].Name
+	}
+	return n[i].Score < n[j].Score
+}
+
+func (n NodeScoreList) Swap(i, j int) {
+	n[i], n[j] = n[j], n[i]
+}
+
 // NodeScore is a struct with node name and score.
 type NodeScore struct {
 	Name  string

@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -101,7 +101,7 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 		existingPods []*v1.Pod
 		nodes        []*v1.Node
 		failedNodes  []*v1.Node // nodes + failedNodes = all nodes
-		want         schedulerapi.HostPriorityList
+		want         framework.NodeScoreList
 	}{
 		// Explanation on the Legend:
 		// a) X/Y means there are X matching pods on node1 and Y on node2, both nodes are candidates
@@ -120,9 +120,9 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
 			},
-			want: []schedulerapi.HostPriority{
-				{Host: "node-a", Score: 10},
-				{Host: "node-b", Score: 10},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 10},
+				{Name: "node-b", Score: 10},
 			},
 		},
 		{
@@ -142,8 +142,8 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			failedNodes: []*v1.Node{
 				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
 			},
-			want: []schedulerapi.HostPriority{
-				{Host: "node-a", Score: 10},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 10},
 			},
 		},
 		{
@@ -159,9 +159,9 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label("node", "node-b").Obj(),
 			},
-			want: []schedulerapi.HostPriority{
-				{Host: "node-a", Score: 10},
-				{Host: "node-b", Score: 10},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 10},
+				{Name: "node-b", Score: 10},
 			},
 		},
 		{
@@ -187,11 +187,11 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 				st.MakeNode().Name("node-d").Label("node", "node-d").Obj(),
 			},
 			failedNodes: []*v1.Node{},
-			want: []schedulerapi.HostPriority{
-				{Host: "node-a", Score: 6},
-				{Host: "node-b", Score: 8},
-				{Host: "node-c", Score: 10},
-				{Host: "node-d", Score: 5},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 6},
+				{Name: "node-b", Score: 8},
+				{Name: "node-c", Score: 10},
+				{Name: "node-d", Score: 5},
 			},
 		},
 		{
@@ -222,10 +222,10 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			failedNodes: []*v1.Node{
 				st.MakeNode().Name("node-y").Label("node", "node-y").Obj(),
 			},
-			want: []schedulerapi.HostPriority{
-				{Host: "node-a", Score: 5},
-				{Host: "node-b", Score: 8},
-				{Host: "node-x", Score: 10},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 5},
+				{Name: "node-b", Score: 8},
+				{Name: "node-x", Score: 10},
 			},
 		},
 		{
@@ -256,10 +256,10 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			failedNodes: []*v1.Node{
 				st.MakeNode().Name("node-y").Label("node", "node-y").Obj(),
 			},
-			want: []schedulerapi.HostPriority{
-				{Host: "node-a", Score: 2},
-				{Host: "node-b", Score: 0},
-				{Host: "node-x", Score: 10},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 2},
+				{Name: "node-b", Score: 0},
+				{Name: "node-x", Score: 10},
 			},
 		},
 		{
@@ -290,10 +290,10 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			failedNodes: []*v1.Node{
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
-			want: []schedulerapi.HostPriority{
-				{Host: "node-a", Score: 8},
-				{Host: "node-b", Score: 8},
-				{Host: "node-x", Score: 10},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 8},
+				{Name: "node-b", Score: 8},
+				{Name: "node-x", Score: 10},
 			},
 		},
 		{
@@ -324,9 +324,9 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
-			want: []schedulerapi.HostPriority{
-				{Host: "node-a", Score: 10},
-				{Host: "node-x", Score: 6},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 10},
+				{Name: "node-x", Score: 6},
 			},
 		},
 		{
@@ -361,11 +361,11 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
 			failedNodes: []*v1.Node{},
-			want: []schedulerapi.HostPriority{
-				{Host: "node-a", Score: 8},
-				{Host: "node-b", Score: 7},
-				{Host: "node-x", Score: 10},
-				{Host: "node-y", Score: 8},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 8},
+				{Name: "node-b", Score: 7},
+				{Name: "node-x", Score: 10},
+				{Name: "node-y", Score: 8},
 			},
 		},
 		{
@@ -391,11 +391,11 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
 			failedNodes: []*v1.Node{},
-			want: []schedulerapi.HostPriority{
-				{Host: "node-a", Score: 10},
-				{Host: "node-b", Score: 8},
-				{Host: "node-x", Score: 6},
-				{Host: "node-y", Score: 5},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 10},
+				{Name: "node-b", Score: 8},
+				{Name: "node-x", Score: 6},
+				{Name: "node-y", Score: 5},
 			},
 		},
 		{
@@ -423,10 +423,10 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			failedNodes: []*v1.Node{
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
-			want: []schedulerapi.HostPriority{
-				{Host: "node-a", Score: 8},
-				{Host: "node-b", Score: 6},
-				{Host: "node-x", Score: 10},
+			want: []framework.NodeScore{
+				{Name: "node-a", Score: 8},
+				{Name: "node-b", Score: 6},
+				{Name: "node-x", Score: 10},
 			},
 		},
 	}
