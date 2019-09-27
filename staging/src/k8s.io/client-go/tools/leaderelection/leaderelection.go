@@ -341,7 +341,7 @@ func (le *LeaderElector) tryAcquireOrRenew() bool {
 	}
 
 	// 2. Record obtained, check the Identity & Time
-	if bytes.Compare(le.observedRawRecord, oldLeaderElectionRawRecord) != 0 {
+	if !bytes.Equal(le.observedRawRecord, oldLeaderElectionRawRecord) {
 		le.observedRecord = *oldLeaderElectionRecord
 		le.observedRawRecord = oldLeaderElectionRawRecord
 		le.observedTime = le.clock.Now()
