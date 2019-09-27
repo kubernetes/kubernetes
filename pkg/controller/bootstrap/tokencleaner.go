@@ -202,6 +202,11 @@ func (tc *TokenCleaner) evalSecret(o interface{}) {
 			klog.V(3).Infof("Error deleting Secret: %v", err)
 		}
 	} else if ttl > 0 {
-		tc.queue.AddAfter(o, ttl)
+		key, err := controller.KeyFunc(o)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return
+		}
+		tc.queue.AddAfter(key, ttl)
 	}
 }
