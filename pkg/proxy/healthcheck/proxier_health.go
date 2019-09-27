@@ -35,12 +35,17 @@ var proxierHealthzRetryInterval = 60 * time.Second
 
 // ProxierHealthUpdater allows callers to update healthz timestamp only.
 type ProxierHealthUpdater interface {
-	UpdateTimestamp()
+	// QueuedUpdate should be called when the proxier receives a Service or Endpoints
+	// event containing information that requires updating service rules.
+	QueuedUpdate()
+
+	// Updated should be called when the proxier has successfully updated the service
+	// rules to reflect the current state.
+	Updated()
 }
 
-// ProxierHealthServer returns 200 "OK" by default. Once timestamp has been
-// updated, it verifies we don't exceed max no respond duration since
-// last update.
+// ProxierHealthServer returns 200 "OK" by default. It verifies that the delay between
+// QueuedUpdate() calls and Updated() calls never exceeds healthTimeout.
 type ProxierHealthServer struct {
 	listener    listener
 	httpFactory httpServerFactory
@@ -53,6 +58,7 @@ type ProxierHealthServer struct {
 	nodeRef       *v1.ObjectReference
 
 	lastUpdated atomic.Value
+	lastQueued  atomic.Value
 }
 
 // NewProxierHealthServer returns a proxier health http server.
@@ -72,9 +78,14 @@ func newProxierHealthServer(listener listener, httpServerFactory httpServerFacto
 	}
 }
 
-// UpdateTimestamp updates the lastUpdated timestamp.
-func (hs *ProxierHealthServer) UpdateTimestamp() {
+// Updated updates the lastUpdated timestamp.
+func (hs *ProxierHealthServer) Updated() {
 	hs.lastUpdated.Store(hs.clock.Now())
+}
+
+// QueuedUpdate updates the lastQueued timestamp.
+func (hs *ProxierHealthServer) QueuedUpdate() {
+	hs.lastQueued.Store(hs.clock.Now())
 }
 
 // Run starts the healthz http server and returns.
@@ -109,18 +120,44 @@ type healthzHandler struct {
 }
 
 func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
-	lastUpdated := time.Time{}
+	var lastQueued, lastUpdated time.Time
+	if val := h.hs.lastQueued.Load(); val != nil {
+		lastQueued = val.(time.Time)
+	}
 	if val := h.hs.lastUpdated.Load(); val != nil {
 		lastUpdated = val.(time.Time)
 	}
 	currentTime := h.hs.clock.Now()
 
+	healthy := false
+	switch {
+	case lastUpdated.IsZero():
+		// The proxy is healthy while it's starting up
+		// TODO: this makes it useless as a readinessProbe. Consider changing
+		// to only become healthy after the proxy is fully synced.
+		healthy = true
+	case lastUpdated.After(lastQueued):
+		// We've processed all updates
+		healthy = true
+	case currentTime.Sub(lastQueued) < h.hs.healthTimeout:
+		// There's an unprocessed update queued, but it's not late yet
+		healthy = true
+	}
+
 	resp.Header().Set("Content-Type", "application/json")
 	resp.Header().Set("X-Content-Type-Options", "nosniff")
-	if !lastUpdated.IsZero() && currentTime.After(lastUpdated.Add(h.hs.healthTimeout)) {
+	if !healthy {
 		resp.WriteHeader(http.StatusServiceUnavailable)
 	} else {
 		resp.WriteHeader(http.StatusOK)
+
+		// In older releases, the returned "lastUpdated" time indicated the last
+		// time the proxier sync loop ran, even if nothing had changed. To
+		// preserve compatibility, we use the same semantics: the returned
+		// lastUpdated value is "recent" if the server is healthy. The kube-proxy
+		// metrics provide more detailed information.
+		lastUpdated = currentTime
+
 	}
 	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q,"currentTime": %q}`, lastUpdated, currentTime))
 }

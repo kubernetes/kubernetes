@@ -374,13 +374,21 @@ func TestHealthzServer(t *testing.T) {
 	// Should return 200 "OK" by default.
 	testHealthzHandler(server, http.StatusOK, t)
 
-	// Should return 503 "ServiceUnavailable" if exceed max no respond duration.
-	hs.UpdateTimestamp()
+	// Should return 200 "OK" after first update
+	hs.Updated()
+	testHealthzHandler(server, http.StatusOK, t)
+
+	// Should continue to return 200 "OK" as long as no further updates are queued
+	fakeClock.Step(25 * time.Second)
+	testHealthzHandler(server, http.StatusOK, t)
+
+	// Should return 503 "ServiceUnavailable" if exceed max update-processing time
+	hs.QueuedUpdate()
 	fakeClock.Step(25 * time.Second)
 	testHealthzHandler(server, http.StatusServiceUnavailable, t)
 
-	// Should return 200 "OK" if timestamp is valid.
-	hs.UpdateTimestamp()
+	// Should return 200 "OK" after processing update
+	hs.Updated()
 	fakeClock.Step(5 * time.Second)
 	testHealthzHandler(server, http.StatusOK, t)
 }
