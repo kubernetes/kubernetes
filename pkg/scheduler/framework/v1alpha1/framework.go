@@ -108,6 +108,13 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend prefilter plugin", pf.Name)
 				}
+
+				for _, plugin := range f.preFilterPlugins {
+					if plugin.Name() == p.Name() {
+						return nil, fmt.Errorf("plugin %q already registered prefilter plugin", plugin.Name())
+					}
+				}
+
 				f.preFilterPlugins = append(f.preFilterPlugins, p)
 			} else {
 				return nil, fmt.Errorf("prefilter plugin %q does not exist", pf.Name)
@@ -122,6 +129,13 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend filter plugin", r.Name)
 				}
+
+				for _, plugin := range f.filterPlugins {
+					if plugin.Name() == p.Name() {
+						return nil, fmt.Errorf("plugin %q already registered filter plugin", plugin.Name())
+					}
+				}
+
 				f.filterPlugins = append(f.filterPlugins, p)
 			} else {
 				return nil, fmt.Errorf("filter plugin %q does not exist", r.Name)
@@ -139,6 +153,13 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				if f.pluginNameToWeightMap[p.Name()] == 0 {
 					return nil, fmt.Errorf("score plugin %q is not configured with weight", p.Name())
 				}
+
+				for _, plugin := range f.scorePlugins {
+					if plugin.Name() == p.Name() {
+						return nil, fmt.Errorf("plugin %q already registered score plugin", plugin.Name())
+					}
+				}
+
 				f.scorePlugins = append(f.scorePlugins, p)
 			} else {
 				return nil, fmt.Errorf("score plugin %q does not exist", sc.Name)
@@ -153,6 +174,13 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend reserve plugin", r.Name)
 				}
+
+				for _, plugin := range f.reservePlugins {
+					if plugin.Name() == p.Name() {
+						return nil, fmt.Errorf("plugin %q already registered reserve plugin", plugin.Name())
+					}
+				}
+
 				f.reservePlugins = append(f.reservePlugins, p)
 			} else {
 				return nil, fmt.Errorf("reserve plugin %q does not exist", r.Name)
@@ -165,11 +193,18 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[r.Name]; ok {
 				p, ok := pg.(PostFilterPlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %q does not extend post-filter plugin", r.Name)
+					return nil, fmt.Errorf("plugin %q does not extend postfilter plugin", r.Name)
 				}
+
+				for _, plugin := range f.postFilterPlugins {
+					if plugin.Name() == p.Name() {
+						return nil, fmt.Errorf("plugin %q already registered postfilter plugin", plugin.Name())
+					}
+				}
+
 				f.postFilterPlugins = append(f.postFilterPlugins, p)
 			} else {
-				return nil, fmt.Errorf("post-filter plugin %q does not exist", r.Name)
+				return nil, fmt.Errorf("postfilter plugin %q does not exist", r.Name)
 			}
 		}
 	}
@@ -179,11 +214,18 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 			if pg, ok := pluginsMap[pb.Name]; ok {
 				p, ok := pg.(PreBindPlugin)
 				if !ok {
-					return nil, fmt.Errorf("plugin %q does not extend prebind plugin", pb.Name)
+					return nil, fmt.Errorf("plugin %q does not extend pre-bind plugin", pb.Name)
 				}
+
+				for _, plugin := range f.preBindPlugins {
+					if plugin.Name() == p.Name() {
+						return nil, fmt.Errorf("plugin %q already registered pre-bind plugin", plugin.Name())
+					}
+				}
+
 				f.preBindPlugins = append(f.preBindPlugins, p)
 			} else {
-				return nil, fmt.Errorf("prebind plugin %q does not exist", pb.Name)
+				return nil, fmt.Errorf("pre-bind plugin %q does not exist", pb.Name)
 			}
 		}
 	}
@@ -195,6 +237,13 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend bind plugin", pb.Name)
 				}
+
+				for _, plugin := range f.bindPlugins {
+					if plugin.Name() == p.Name() {
+						return nil, fmt.Errorf("plugin %q already registered bind plugin", plugin.Name())
+					}
+				}
+
 				f.bindPlugins = append(f.bindPlugins, p)
 			} else {
 				return nil, fmt.Errorf("bind plugin %q does not exist", pb.Name)
@@ -209,6 +258,13 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend postbind plugin", pb.Name)
 				}
+
+				for _, plugin := range f.postBindPlugins {
+					if plugin.Name() == p.Name() {
+						return nil, fmt.Errorf("plugin %q already registered postbind plugin", plugin.Name())
+					}
+				}
+
 				f.postBindPlugins = append(f.postBindPlugins, p)
 			} else {
 				return nil, fmt.Errorf("postbind plugin %q does not exist", pb.Name)
@@ -223,6 +279,13 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend unreserve plugin", ur.Name)
 				}
+
+				for _, plugin := range f.unreservePlugins {
+					if plugin.Name() == p.Name() {
+						return nil, fmt.Errorf("plugin %q already registered unreserve plugin", plugin.Name())
+					}
+				}
+
 				f.unreservePlugins = append(f.unreservePlugins, p)
 			} else {
 				return nil, fmt.Errorf("unreserve plugin %q does not exist", ur.Name)
@@ -237,6 +300,13 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 				if !ok {
 					return nil, fmt.Errorf("plugin %q does not extend permit plugin", pr.Name)
 				}
+
+				for _, plugin := range f.permitPlugins {
+					if plugin.Name() == p.Name() {
+						return nil, fmt.Errorf("plugin %q already registered permit plugin", plugin.Name())
+					}
+				}
+
 				f.permitPlugins = append(f.permitPlugins, p)
 			} else {
 				return nil, fmt.Errorf("permit plugin %q does not exist", pr.Name)
