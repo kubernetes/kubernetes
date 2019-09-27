@@ -40,6 +40,7 @@ func TestWatchBasedManager(t *testing.T) {
 	defer server.TearDownFn()
 
 	server.ClientConfig.QPS = 10000
+	server.ClientConfig.Burst = 10000
 	client, err := kubernetes.NewForConfig(server.ClientConfig)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
