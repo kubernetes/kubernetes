@@ -398,8 +398,8 @@ func (c *podSpreadCache) addPod(addedPod, preemptorPod *v1.Pod, node *v1.Node) e
 	return c.updatePod(addedPod, preemptorPod, node, 1)
 }
 
-func (c *podSpreadCache) removePod(deletedPod, preemptorPod *v1.Pod, node *v1.Node) {
-	c.updatePod(deletedPod, preemptorPod, node, -1)
+func (c *podSpreadCache) removePod(deletedPod, preemptorPod *v1.Pod, node *v1.Node) error {
+	return c.updatePod(deletedPod, preemptorPod, node, -1)
 }
 
 func (c *podSpreadCache) updatePod(updatedPod, preemptorPod *v1.Pod, node *v1.Node, delta int32) error {
@@ -459,7 +459,9 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod, node *v1.Node) erro
 	meta.topologyPairsPotentialAffinityPods.removePod(deletedPod)
 	meta.topologyPairsPotentialAntiAffinityPods.removePod(deletedPod)
 	// Delete pod from the pod spread topology maps.
-	meta.podSpreadCache.removePod(deletedPod, meta.pod, node)
+	if err := meta.podSpreadCache.removePod(deletedPod, meta.pod, node); err != nil {
+		return err
+	}
 	// All pods in the serviceAffinityMatchingPodList are in the same namespace.
 	// So, if the namespace of the first one is not the same as the namespace of the
 	// deletedPod, we don't need to check the list, as deletedPod isn't in the list.
