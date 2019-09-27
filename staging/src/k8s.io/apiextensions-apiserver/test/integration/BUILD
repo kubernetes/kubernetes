@@ -15,6 +15,7 @@ go_test(
         "change_test.go",
         "defaulting_test.go",
         "finalization_test.go",
+        "limit_test.go",
         "objectmeta_test.go",
         "pruning_test.go",
         "registration_test.go",
