@@ -104,8 +104,8 @@ func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
 }
 
 func (c *csiMountMgr) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := c.SetUp(mounterArgs)
-	return volumetypes.OperationFinished, err
+	opExitStatus, err := c.setupUtil(c.GetPath(), mounterArgs)
+	return opExitStatus, err
 }
 
 func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {

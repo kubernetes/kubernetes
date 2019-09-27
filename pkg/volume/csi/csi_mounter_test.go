@@ -36,7 +36,9 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume"
+	fakecsi "k8s.io/kubernetes/pkg/volume/csi/fake"
 	"k8s.io/kubernetes/pkg/volume/util"
+	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
 
 var (
@@ -391,6 +393,113 @@ func TestMounterSetUpSimple(t *testing.T) {
 
 			if vol.Path != csiMounter.GetPath() {
 				t.Error("csi server may not have received NodePublishVolume call")
+			}
+		})
+	}
+}
+
+func TestMounterSetupWithStatusTracking(t *testing.T) {
+	fakeClient := fakeclient.NewSimpleClientset()
+	plug, tmpDir := newTestPlugin(t, fakeClient)
+	defer os.RemoveAll(tmpDir)
+
+	testCases := []struct {
+		name             string
+		podUID           types.UID
+		spec             func(string, []string) *volume.Spec
+		shouldFail       bool
+		exitStatus       volumetypes.OperationStatus
+		createAttachment bool
+	}{
+		{
+			name:   "setup with correct persistent volume source should result in finish exit status",
+			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			spec: func(fsType string, options []string) *volume.Spec {
+				pvSrc := makeTestPV("pv1", 20, testDriver, "vol1")
+				pvSrc.Spec.CSI.FSType = fsType
+				pvSrc.Spec.MountOptions = options
+				return volume.NewSpecFromPersistentVolume(pvSrc, false)
+			},
+			exitStatus:       volumetypes.OperationFinished,
+			createAttachment: true,
+		},
+		{
+			name:   "setup with missing attachment should result in nochange",
+			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			spec: func(fsType string, options []string) *volume.Spec {
+				return volume.NewSpecFromPersistentVolume(makeTestPV("pv3", 20, testDriver, "vol4"), false)
+			},
+			exitStatus:       volumetypes.OperationStateNoChange,
+			createAttachment: false,
+			shouldFail:       true,
+		},
+		{
+			name:   "setup with timeout errors on NodePublish",
+			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			spec: func(fsType string, options []string) *volume.Spec {
+				return volume.NewSpecFromPersistentVolume(makeTestPV("pv4", 20, testDriver, fakecsi.NodePublishTimeOut_VolumeID), false)
+			},
+			createAttachment: true,
+			exitStatus:       volumetypes.OperationInProgress,
+			shouldFail:       true,
+		},
+		{
+			name:   "setup with missing secrets should result in nochange exit",
+			podUID: types.UID(fmt.Sprintf("%08X", rand.Uint64())),
+			spec: func(fsType string, options []string) *volume.Spec {
+				pv := makeTestPV("pv5", 20, testDriver, "vol6")
+				pv.Spec.PersistentVolumeSource.CSI.NodePublishSecretRef = &api.SecretReference{
+					Name:      "foo",
+					Namespace: "default",
+				}
+				return volume.NewSpecFromPersistentVolume(pv, false)
+			},
+			exitStatus:       volumetypes.OperationStateNoChange,
+			createAttachment: true,
+			shouldFail:       true,
+		},
+	}
+
+	for _, tc := range testCases {
+		registerFakePlugin(testDriver, "endpoint", []string{"1.0.0"}, t)
+		t.Run(tc.name, func(t *testing.T) {
+			mounter, err := plug.NewMounter(
+				tc.spec("ext4", []string{}),
+				&api.Pod{ObjectMeta: meta.ObjectMeta{UID: tc.podUID, Namespace: testns}},
+				volume.VolumeOptions{},
+			)
+			if mounter == nil {
+				t.Fatal("failed to create CSI mounter")
+			}
+
+			csiMounter := mounter.(*csiMountMgr)
+			csiMounter.csiClient = setupClient(t, true)
+
+			if csiMounter.volumeLifecycleMode != storagev1beta1.VolumeLifecyclePersistent {
+				t.Fatal("unexpected volume mode: ", csiMounter.volumeLifecycleMode)
+			}
+
+			if tc.createAttachment {
+				attachID := getAttachmentName(csiMounter.volumeID, string(csiMounter.driverName), string(plug.host.GetNodeName()))
+				attachment := makeTestAttachment(attachID, "test-node", csiMounter.spec.Name())
+				_, err = csiMounter.k8s.StorageV1().VolumeAttachments().Create(attachment)
+				if err != nil {
+					t.Fatalf("failed to setup VolumeAttachment: %v", err)
+				}
+			}
+
+			opExistStatus, err := csiMounter.SetUpWithStatusTracking(volume.MounterArgs{})
+
+			if opExistStatus != tc.exitStatus {
+				t.Fatalf("expected exitStatus: %v but got %v", tc.exitStatus, opExistStatus)
+			}
+
+			if tc.shouldFail && err == nil {
+				t.Fatalf("expected failure but Setup succeeded")
+			}
+
+			if !tc.shouldFail && err != nil {
+				t.Fatalf("expected successs got mounter.Setup failed with: %v", err)
 			}
 		})
 	}

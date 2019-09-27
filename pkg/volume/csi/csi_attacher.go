@@ -309,6 +309,11 @@ func (c *csiAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePat
 	nodeName := string(c.plugin.host.GetNodeName())
 	publishContext, err := c.plugin.getPublishContext(c.k8s, csiSource.VolumeHandle, csiSource.Driver, nodeName)
 
+	if err != nil {
+		opExitStatus = volumetypes.OperationStateNoChange
+		return opExitStatus, err
+	}
+
 	nodeStageSecrets := map[string]string{}
 	if csiSource.NodeStageSecretRef != nil {
 		nodeStageSecrets, err = getCredentialsFromSecret(c.k8s, csiSource.NodeStageSecretRef)
