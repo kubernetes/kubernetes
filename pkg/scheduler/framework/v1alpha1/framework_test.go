@@ -473,10 +473,10 @@ func buildConfigWithWeights(weights map[string]int32, ps ...string) *config.Plug
 }
 
 type injectedResult struct {
-	ScoreRes     int  `json:"scoreRes,omitempty"`
-	NormalizeRes int  `json:"normalizeRes,omitempty"`
-	ScoreErr     bool `json:"scoreErr,omitempty"`
-	NormalizeErr bool `json:"normalizeErr,omitempty"`
+	ScoreRes     int   `json:"scoreRes,omitempty"`
+	NormalizeRes int64 `json:"normalizeRes,omitempty"`
+	ScoreErr     bool  `json:"scoreErr,omitempty"`
+	NormalizeErr bool  `json:"normalizeErr,omitempty"`
 }
 
 func setScoreRes(inj injectedResult) (int, *Status) {

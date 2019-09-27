@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/scheduler/api"
+	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 )
 
 // GetContainerPorts returns the used host ports of Pods: if 'port' was used, a 'port:true' pair
@@ -64,7 +64,7 @@ func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 
 // GetEarliestPodStartTime returns the earliest start time of all pods that
 // have the highest priority among all victims.
-func GetEarliestPodStartTime(victims *api.Victims) *metav1.Time {
+func GetEarliestPodStartTime(victims *extenderv1.Victims) *metav1.Time {
 	if len(victims.Pods) == 0 {
 		// should not reach here.
 		klog.Errorf("victims.Pods is empty. Should not reach here.")

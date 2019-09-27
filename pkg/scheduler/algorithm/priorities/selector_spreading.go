@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
@@ -63,11 +64,11 @@ func NewSelectorSpreadPriority(
 // It favors nodes that have fewer existing matching pods.
 // i.e. it pushes the scheduler towards a node where there's the smallest number of
 // pods which match the same service, RC,RSs or StatefulSets selectors as the pod being scheduled.
-func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
 	var selectors []labels.Selector
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return framework.NodeScore{}, fmt.Errorf("node not found")
 	}
 
 	priorityMeta, ok := meta.(*priorityMetadata)
@@ -78,16 +79,16 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 	}
 
 	if len(selectors) == 0 {
-		return schedulerapi.HostPriority{
-			Host:  node.Name,
+		return framework.NodeScore{
+			Name:  node.Name,
 			Score: 0,
 		}, nil
 	}
 
 	count := countMatchingPods(pod.Namespace, selectors, nodeInfo)
 
-	return schedulerapi.HostPriority{
-		Host:  node.Name,
+	return framework.NodeScore{
+		Name:  node.Name,
 		Score: int64(count),
 	}, nil
 }
@@ -96,7 +97,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 // based on the number of existing matching pods on the node
 // where zone information is included on the nodes, it favors nodes
 // in zones with fewer existing matching pods.
-func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result schedulerapi.HostPriorityList) error {
+func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result framework.NodeScoreList) error {
 	countsByZone := make(map[string]int64, 10)
 	maxCountByZone := int64(0)
 	maxCountByNodeName := int64(0)
@@ -105,7 +106,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 		if result[i].Score > maxCountByNodeName {
 			maxCountByNodeName = result[i].Score
 		}
-		zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
+		zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Name].Node())
 		if zoneID == "" {
 			continue
 		}
@@ -132,7 +133,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 		}
 		// If there is zone information present, incorporate it
 		if haveZones {
-			zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Host].Node())
+			zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Name].Node())
 			if zoneID != "" {
 				zoneScore := MaxPriorityFloat64
 				if maxCountByZone > 0 {
@@ -144,7 +145,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 		result[i].Score = int64(fScore)
 		if klog.V(10) {
 			klog.Infof(
-				"%v -> %v: SelectorSpreadPriority, Score: (%d)", pod.Name, result[i].Host, int64(fScore),
+				"%v -> %v: SelectorSpreadPriority, Score: (%d)", pod.Name, result[i].Name, int64(fScore),
 			)
 		}
 	}
@@ -210,12 +211,12 @@ func countMatchingPods(namespace string, selectors []labels.Selector, nodeInfo *
 
 // CalculateAntiAffinityPriorityMap spreads pods by minimizing the number of pods belonging to the same service
 // on given machine
-func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
 	var firstServiceSelector labels.Selector
 
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return framework.NodeScore{}, fmt.Errorf("node not found")
 	}
 	priorityMeta, ok := meta.(*priorityMetadata)
 	if ok {
@@ -230,15 +231,15 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta
 	}
 	score := countMatchingPods(pod.Namespace, selectors, nodeInfo)
 
-	return schedulerapi.HostPriority{
-		Host:  node.Name,
+	return framework.NodeScore{
+		Name:  node.Name,
 		Score: int64(score),
 	}, nil
 }
 
 // CalculateAntiAffinityPriorityReduce computes each node score with the same value for a particular label.
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
-func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result schedulerapi.HostPriorityList) error {
+func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result framework.NodeScoreList) error {
 	var numServicePods int64
 	var label string
 	podCounts := map[string]int64{}
@@ -247,20 +248,20 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, m
 
 	for _, hostPriority := range result {
 		numServicePods += hostPriority.Score
-		if !labels.Set(nodeNameToInfo[hostPriority.Host].Node().Labels).Has(s.label) {
+		if !labels.Set(nodeNameToInfo[hostPriority.Name].Node().Labels).Has(s.label) {
 			continue
 		}
-		label = labels.Set(nodeNameToInfo[hostPriority.Host].Node().Labels).Get(s.label)
-		labelNodesStatus[hostPriority.Host] = label
+		label = labels.Set(nodeNameToInfo[hostPriority.Name].Node().Labels).Get(s.label)
+		labelNodesStatus[hostPriority.Name] = label
 		podCounts[label] += hostPriority.Score
 	}
 
 	//score int - scale of 0-maxPriority
 	// 0 being the lowest priority and maxPriority being the highest
 	for i, hostPriority := range result {
-		label, ok := labelNodesStatus[hostPriority.Host]
+		label, ok := labelNodesStatus[hostPriority.Name]
 		if !ok {
-			result[i].Host = hostPriority.Host
+			result[i].Name = hostPriority.Name
 			result[i].Score = 0
 			continue
 		}
@@ -269,7 +270,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, m
 		if numServicePods > 0 {
 			fScore = maxPriorityFloat64 * (float64(numServicePods-podCounts[label]) / float64(numServicePods))
 		}
-		result[i].Host = hostPriority.Host
+		result[i].Name = hostPriority.Name
 		result[i].Score = int64(fScore)
 	}
 

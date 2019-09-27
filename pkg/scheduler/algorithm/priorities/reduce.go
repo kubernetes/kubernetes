@@ -18,7 +18,7 @@ package priorities
 
 import (
 	"k8s.io/api/core/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -30,7 +30,7 @@ func NormalizeReduce(maxPriority int64, reverse bool) PriorityReduceFunction {
 		_ *v1.Pod,
 		_ interface{},
 		_ map[string]*schedulernodeinfo.NodeInfo,
-		result schedulerapi.HostPriorityList) error {
+		result framework.NodeScoreList) error {
 
 		var maxCount int64
 		for i := range result {

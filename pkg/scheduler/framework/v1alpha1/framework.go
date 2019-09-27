@@ -403,7 +403,7 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 			}
 			pluginToNodeScores[pl.Name()][index] = NodeScore{
 				Name:  nodeName,
-				Score: score,
+				Score: int64(score),
 			}
 		}
 	})
@@ -439,12 +439,12 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 
 		for i, nodeScore := range nodeScoreList {
 			// return error if score plugin returns invalid score.
-			if nodeScore.Score > MaxNodeScore || nodeScore.Score < MinNodeScore {
+			if nodeScore.Score > int64(MaxNodeScore) || nodeScore.Score < int64(MinNodeScore) {
 				err := fmt.Errorf("score plugin %q returns an invalid score %v, it should in the range of [%v, %v] after normalizing", pl.Name(), nodeScore.Score, MinNodeScore, MaxNodeScore)
 				errCh.SendErrorWithCancel(err, cancel)
 				return
 			}
-			nodeScoreList[i].Score = nodeScore.Score * weight
+			nodeScoreList[i].Score = nodeScore.Score * int64(weight)
 		}
 	})
 	if err := errCh.ReceiveError(); err != nil {

@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/kubernetes/pkg/api/v1/pod"
-	"k8s.io/kubernetes/pkg/scheduler/api"
+	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 )
 
 // TestSortableList tests SortableList by storing pods in the list and sorting
@@ -209,7 +209,7 @@ func TestGetEarliestPodStartTime(t *testing.T) {
 	pod1 := newPriorityPodWithStartTime("pod1", 1, currentTime.Add(time.Second))
 	pod2 := newPriorityPodWithStartTime("pod2", 2, currentTime.Add(time.Second))
 	pod3 := newPriorityPodWithStartTime("pod3", 2, currentTime)
-	victims := &api.Victims{
+	victims := &extenderv1.Victims{
 		Pods: []*v1.Pod{pod1, pod2, pod3},
 	}
 	startTime := GetEarliestPodStartTime(victims)
@@ -220,7 +220,7 @@ func TestGetEarliestPodStartTime(t *testing.T) {
 	pod1 = newPriorityPodWithStartTime("pod1", 2, currentTime)
 	pod2 = newPriorityPodWithStartTime("pod2", 2, currentTime.Add(time.Second))
 	pod3 = newPriorityPodWithStartTime("pod3", 2, currentTime.Add(2*time.Second))
-	victims = &api.Victims{
+	victims = &extenderv1.Victims{
 		Pods: []*v1.Pod{pod1, pod2, pod3},
 	}
 	startTime = GetEarliestPodStartTime(victims)
