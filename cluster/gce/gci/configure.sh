@@ -64,7 +64,7 @@ function download-kube-env {
       -o "${tmp_kube_env}" \
       http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-env
     # Convert the yaml format file into a shell-style file.
-    eval $(${PYTHON} -c '''
+    eval "$(${PYTHON} -c '''
 import pipes,sys,yaml
 # check version of python and call methods appropriate for that version
 if sys.version_info[0] < 3:
@@ -73,7 +73,7 @@ else:
     items = yaml.load(sys.stdin, Loader=yaml.BaseLoader).items()
 for k, v in items:
     print("readonly {var}={value}".format(var=k, value=pipes.quote(str(v))))
-''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")
+''' < "${tmp_kube_env}" > "${KUBE_HOME}/kube-env")"
     rm -f "${tmp_kube_env}"
   )
 }
@@ -108,6 +108,7 @@ function download-kube-master-certs {
       -o "${tmp_kube_master_certs}" \
       http://metadata.google.internal/computeMetadata/v1/instance/attributes/kube-master-certs
     # Convert the yaml format file into a shell-style file.
+<<<<<<< HEAD
     eval $(${PYTHON} -c '''
 import pipes,sys,yaml
 # check version of python and call methods appropriate for that version
@@ -118,6 +119,13 @@ else:
 for k, v in items:
     print("readonly {var}={value}".format(var=k, value=pipes.quote(str(v))))
 ''' < "${tmp_kube_master_certs}" > "${KUBE_HOME}/kube-master-certs")
+=======
+    eval "$(python -c '''
+import pipes,sys,yaml
+for k,v in yaml.load(sys.stdin).iteritems():
+  print("readonly {var}={value}".format(var = k, value = pipes.quote(str(v))))
+''' < "${tmp_kube_master_certs}" > "${KUBE_HOME}/kube-master-certs")"
+>>>>>>> Fixes shellcheck warning in cluster/gce/gci/configure.sh
     rm -f "${tmp_kube_master_certs}"
   )
 }
@@ -126,7 +134,7 @@ function validate-hash {
   local -r file="$1"
   local -r expected="$2"
 
-  actual=$(sha1sum ${file} | awk '{ print $1 }') || true
+  actual=$(sha1sum "${file}" | awk '{ print $1 }') || true
   if [[ "${actual}" != "${expected}" ]]; then
     echo "== ${file} corrupted, sha1 ${actual} doesn't match expected ${expected} =="
     return 1
@@ -152,7 +160,7 @@ function download-or-bust {
   local -r hash="$1"
   shift 1
 
-  local -r urls=( $* )
+  local -r urls=( "$@" )
   while true; do
     for url in "${urls[@]}"; do
       local file="${url##*/}"
@@ -185,14 +193,14 @@ function is-preloaded {
 }
 
 function split-commas {
-  echo $1 | tr "," "\n"
+  echo "$1" | tr "," "\n"
 }
 
 function remount-flexvolume-directory {
   local -r flexvolume_plugin_dir=$1
-  mkdir -p $flexvolume_plugin_dir
-  mount --bind $flexvolume_plugin_dir $flexvolume_plugin_dir
-  mount -o remount,exec $flexvolume_plugin_dir
+  mkdir -p "$flexvolume_plugin_dir"
+  mount --bind "$flexvolume_plugin_dir" "$flexvolume_plugin_dir"
+  mount -o remount,exec "$flexvolume_plugin_dir"
 }
 
 function install-gci-mounter-tools {
@@ -246,8 +254,13 @@ function install-node-problem-detector {
 
 function install-cni-binaries {
   if [[ -n "${CNI_VERSION:-}" ]]; then
+<<<<<<< HEAD
       local -r cni_version="${CNI_VERSION}"
       local -r cni_sha1="${CNI_SHA1}"
+=======
+      local -r cni_tar="cni-plugins-amd64-${CNI_VERSION}.tgz"
+      local -r cni_sha1="${CNI_SHA1:-}"
+>>>>>>> Fixes shellcheck warning in cluster/gce/gci/configure.sh
   else
       local -r cni_version="${DEFAULT_CNI_VERSION}"
       local -r cni_sha1="${DEFAULT_CNI_SHA1}"
@@ -329,7 +342,10 @@ function install-kube-manifests {
   # Put kube-system pods manifests in ${KUBE_HOME}/kube-manifests/.
   local dst_dir="${KUBE_HOME}/kube-manifests"
   mkdir -p "${dst_dir}"
-  local -r manifests_tar_urls=( $(split-commas "${KUBE_MANIFESTS_TAR_URL}") )
+  kube::util::read-array manifests_tar_urls_tmp < <(split-commas "${KUBE_MANIFESTS_TAR_URL}")
+  local -r manifests_tar_urls=("${manifests_tar_urls_tmp[@]}")
+  unset manifests_tar_urls_tmp
+
   local -r manifests_tar="${manifests_tar_urls[0]##*/}"
   if [ -n "${KUBE_MANIFESTS_TAR_HASH:-}" ]; then
     local -r manifests_tar_hash="${KUBE_MANIFESTS_TAR_HASH}"
@@ -349,10 +365,10 @@ function install-kube-manifests {
   tar xzf "${KUBE_HOME}/${manifests_tar}" -C "${dst_dir}" --overwrite
   local -r kube_addon_registry="${KUBE_ADDON_REGISTRY:-k8s.gcr.io}"
   if [[ "${kube_addon_registry}" != "k8s.gcr.io" ]]; then
-    find "${dst_dir}" -name \*.yaml -or -name \*.yaml.in | \
-      xargs sed -ri "s@(image:\s.*)k8s.gcr.io@\1${kube_addon_registry}@"
-    find "${dst_dir}" -name \*.manifest -or -name \*.json | \
-      xargs sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
+    find "${dst_dir}" \( -name \*.yaml -or -name \*.yaml.in \) -print0 | \
+      xargs -0 sed -ri "s@(image:\s.*)k8s.gcr.io@\1${kube_addon_registry}@"
+    find "${dst_dir}" \(-name \*.manifest -or -name \*.json \) -print0 | \
+      xargs -0 sed -ri "s@(image\":\s+\")k8s.gcr.io@\1${kube_addon_registry}@"
   fi
   cp "${dst_dir}/kubernetes/gci-trusty/gci-configure-helper.sh" "${KUBE_BIN}/configure-helper.sh"
   cp "${dst_dir}/kubernetes/gci-trusty/configure-kubeapiserver.sh" "${KUBE_BIN}/configure-kubeapiserver.sh"
@@ -376,7 +392,8 @@ function try-load-docker-image {
   set +e
   local -r max_attempts=5
   local -i attempt_num=1
-  until timeout 30 ${LOAD_IMAGE_COMMAND:-docker load -i} "${img}"; do
+  kube::util::read-array LOAD_IMAGE_COMMAND < "docker load -i"
+  until timeout 30 "${LOAD_IMAGE_COMMAND[@]}" "${img}"; do
     if [[ "${attempt_num}" == "${max_attempts}" ]]; then
       echo "Fail to load docker image file ${img} after ${max_attempts} retries. Exit!!"
       exit 1
@@ -526,7 +543,10 @@ function ensure-container-runtime {
 # and places them into suitable directories. Files are placed in /home/kubernetes.
 function install-kube-binary-config {
   cd "${KUBE_HOME}"
-  local -r server_binary_tar_urls=( $(split-commas "${SERVER_BINARY_TAR_URL}") )
+  kube::util::read-array server_binary_tar_urls_tmp < <(split-commas "${SERVER_BINARY_TAR_URL}")
+  local -r server_binary_tar_urls=("${server_binary_tar_urls_tmp[@]}")
+  unset server_binary_tar_urls_tmp
+
   local -r server_binary_tar="${server_binary_tar_urls[0]##*/}"
   if [[ -n "${SERVER_BINARY_TAR_HASH:-}" ]]; then
     local -r server_binary_tar_hash="${SERVER_BINARY_TAR_HASH}"
