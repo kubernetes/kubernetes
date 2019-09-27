@@ -17,15 +17,16 @@ limitations under the License.
 package version
 
 // Info contains versioning information.
+// See https://github.com/kubernetes/community/blob/master/contributors/design-proposals/release/versioning.md
 // TODO: Add []string of api versions supported? It's still unclear
 // how we'll want to distribute that information.
 type Info struct {
-	Major        string `json:"major"`
-	Minor        string `json:"minor"`
-	GitVersion   string `json:"gitVersion"`
-	GitCommit    string `json:"gitCommit"`
-	GitTreeState string `json:"gitTreeState"`
-	BuildDate    string `json:"buildDate"`
+	Major        string `json:"major"`        // major version, always numeric
+	Minor        string `json:"minor"`        // minor version, numeric possibly followed by "+"
+	GitVersion   string `json:"gitVersion"`   // semantic version, vX.Y.Z possibly followed by "beta", etc.
+	GitCommit    string `json:"gitCommit"`    // sha1 from git
+	GitTreeState string `json:"gitTreeState"` // state of git tree, either "clean" or "dirty"
+	BuildDate    string `json:"buildDate"`    // build date in ISO8601 format
 	GoVersion    string `json:"goVersion"`
 	Compiler     string `json:"compiler"`
 	Platform     string `json:"platform"`
