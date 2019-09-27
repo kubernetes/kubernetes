@@ -51,6 +51,7 @@ func (o *GeneratedOperations) Run() (eventErr, detailedErr error) {
 	return o.OperationFunc()
 }
 
+// OperationStatus is used to store status of a volume operation
 type OperationStatus string
 
 const (

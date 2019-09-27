@@ -98,8 +98,8 @@ func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 	return err
 }
 
-func (attacher *flexVolumeAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.MountDevice(spec, devicePath, deviceMountPath)
+func (a *flexVolumeAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := a.MountDevice(spec, devicePath, deviceMountPath)
 	return volumetypes.OperationFinished, err
 }
 

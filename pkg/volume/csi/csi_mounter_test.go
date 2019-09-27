@@ -499,7 +499,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 			}
 
 			if !tc.shouldFail && err != nil {
-				t.Fatalf("expected successs got mounter.Setup failed with: %v", err)
+				t.Fatalf("expected success got mounter.Setup failed with: %v", err)
 			}
 		})
 	}
