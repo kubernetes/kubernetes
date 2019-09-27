@@ -53,7 +53,7 @@ func produceConfig(keys []string, producersMap map[string]ConfigProducer, args C
 }
 
 func TestRegisterConfigProducers(t *testing.T) {
-	registry := NewConfigProducerRegistry()
+	registry := NewDefaultConfigProducerRegistry()
 	testPredicateName1 := "testPredicate1"
 	testFilterName1 := "testFilter1"
 	registry.RegisterPredicate(testPredicateName1,

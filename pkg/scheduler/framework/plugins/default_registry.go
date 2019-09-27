@@ -53,8 +53,8 @@ type ConfigProducerRegistry struct {
 	PriorityToConfigProducer  map[string]ConfigProducer
 }
 
-// NewConfigProducerRegistry creates a new producer registry.
-func NewConfigProducerRegistry() *ConfigProducerRegistry {
+// NewDefaultConfigProducerRegistry creates a new producer registry.
+func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	return &ConfigProducerRegistry{
 		PredicateToConfigProducer: make(map[string]ConfigProducer),
 		PriorityToConfigProducer:  make(map[string]ConfigProducer),
