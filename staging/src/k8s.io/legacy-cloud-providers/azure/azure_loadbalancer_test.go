@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-06-01/network"
 	"github.com/Azure/go-autorest/autorest/to"
@@ -1893,5 +1894,68 @@ func TestEnsurePublicIPExists(t *testing.T) {
 			assert.Equal(t, test.expectedPIP, pip, "TestCase[%d]: %s", i, test.desc)
 		}
 		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
+	}
+}
+
+func TestShouldUpdateLoadBalancer(t *testing.T) {
+	testCases := []struct {
+		desc                   string
+		lbHasDeletionTimestamp bool
+		existsLb               bool
+		expectedOutput         bool
+	}{
+		{
+			desc:                   "should update a load balancer that does not have a deletion timestamp and exists in Azure",
+			lbHasDeletionTimestamp: false,
+			existsLb:               true,
+			expectedOutput:         true,
+		},
+		{
+			desc:                   "should not update a load balancer that is being deleted / already deleted in K8s",
+			lbHasDeletionTimestamp: true,
+			existsLb:               true,
+			expectedOutput:         false,
+		},
+		{
+			desc:                   "should not update a load balancer that does not exist in Azure",
+			lbHasDeletionTimestamp: false,
+			existsLb:               false,
+			expectedOutput:         false,
+		},
+		{
+			desc:                   "should not update a load balancer that has a deletion timestamp and does not exist in Azure",
+			lbHasDeletionTimestamp: true,
+			existsLb:               false,
+			expectedOutput:         false,
+		},
+	}
+
+	for i, test := range testCases {
+		az := getTestCloud()
+		service := getTestService("test1", v1.ProtocolTCP, nil, 80)
+		if test.lbHasDeletionTimestamp {
+			service.ObjectMeta.DeletionTimestamp = &metav1.Time{time.Now()}
+		}
+		if test.existsLb {
+			lb := network.LoadBalancer{
+				Name: to.StringPtr("lb1"),
+				LoadBalancerPropertiesFormat: &network.LoadBalancerPropertiesFormat{
+					FrontendIPConfigurations: &[]network.FrontendIPConfiguration{
+						{
+							Name: to.StringPtr("atest1"),
+							FrontendIPConfigurationPropertiesFormat: &network.FrontendIPConfigurationPropertiesFormat{
+								PublicIPAddress: &network.PublicIPAddress{ID: to.StringPtr("id1")},
+							},
+						},
+					},
+				},
+			}
+			_, err := az.LoadBalancerClient.CreateOrUpdate(context.TODO(), "rg", *lb.Name, lb, "")
+			if err != nil {
+				t.Fatalf("TestCase[%d] meets unexpected error: %v", i, err)
+			}
+		}
+		shouldUpdateLoadBalancer := az.shouldUpdateLoadBalancer(testClusterName, &service)
+		assert.Equal(t, test.expectedOutput, shouldUpdateLoadBalancer, "TestCase[%d]: %s", i, test.desc)
 	}
 }
