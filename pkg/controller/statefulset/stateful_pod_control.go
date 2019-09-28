@@ -179,7 +179,7 @@ func (spc *realStatefulPodControl) recordClaimEvent(verb string, set *apps.State
 func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.StatefulSet, pod *v1.Pod) error {
 	var errs []error
 	for _, claim := range getPersistentVolumeClaims(set, pod) {
-		_, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
+		pvc, err := spc.pvcLister.PersistentVolumeClaims(claim.Namespace).Get(claim.Name)
 		switch {
 		case apierrors.IsNotFound(err):
 			_, err := spc.client.CoreV1().PersistentVolumeClaims(claim.Namespace).Create(&claim)
@@ -192,6 +192,8 @@ func (spc *realStatefulPodControl) createPersistentVolumeClaims(set *apps.Statef
 		case err != nil:
 			errs = append(errs, fmt.Errorf("failed to retrieve PVC %s: %s", claim.Name, err))
 			spc.recordClaimEvent("create", set, pod, &claim, err)
+		case pvc.DeletionTimestamp != nil:
+			errs = append(errs, fmt.Errorf("pvc %s is to be deleted", claim.Name))
 		}
 		// TODO: Check resource requirements and accessmodes, update if necessary
 	}
