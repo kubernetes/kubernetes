@@ -38,31 +38,31 @@ func TestPackSubsets(t *testing.T) {
 	testCases := []struct {
 		name   string
 		given  []api.EndpointSubset
-		expect []api.EndpointSubset
+		expect []*api.EndpointSubset
 	}{
 		{
 			name:   "empty everything",
 			given:  []api.EndpointSubset{{Addresses: []api.EndpointAddress{}, Ports: []api.EndpointPort{}}},
-			expect: []api.EndpointSubset{},
+			expect: []*api.EndpointSubset{},
 		}, {
 			name:   "empty addresses",
 			given:  []api.EndpointSubset{{Addresses: []api.EndpointAddress{}, Ports: []api.EndpointPort{{Port: 111}}}},
-			expect: []api.EndpointSubset{},
+			expect: []*api.EndpointSubset{},
 		}, {
 			name:   "empty ports",
 			given:  []api.EndpointSubset{{Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: []api.EndpointPort{}}},
-			expect: []api.EndpointSubset{{Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: nil}},
+			expect: []*api.EndpointSubset{{Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: nil}},
 		}, {
 			name:   "empty ports",
 			given:  []api.EndpointSubset{{NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: []api.EndpointPort{}}},
-			expect: []api.EndpointSubset{{NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: nil}},
+			expect: []*api.EndpointSubset{{NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}}, Ports: nil}},
 		}, {
 			name: "one set, one ip, one port",
 			given: []api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
@@ -72,7 +72,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "beef::1:2:3:4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "beef::1:2:3:4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
@@ -82,7 +82,7 @@ func TestPackSubsets(t *testing.T) {
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
@@ -92,7 +92,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("uid-1")}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("uid-1")}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
@@ -102,7 +102,7 @@ func TestPackSubsets(t *testing.T) {
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("uid-1")}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("uid-1")}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
@@ -112,7 +112,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("")}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("")}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
@@ -122,7 +122,7 @@ func TestPackSubsets(t *testing.T) {
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("")}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("")}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
@@ -132,7 +132,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
@@ -143,7 +143,7 @@ func TestPackSubsets(t *testing.T) {
 				NotReadyAddresses: []api.EndpointAddress{{IP: "5.6.7.8"}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses:         []api.EndpointAddress{{IP: "1.2.3.4"}},
 				NotReadyAddresses: []api.EndpointAddress{{IP: "5.6.7.8"}},
 				Ports:             []api.EndpointPort{{Port: 111}},
@@ -155,7 +155,7 @@ func TestPackSubsets(t *testing.T) {
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
@@ -165,7 +165,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}, {Port: 222}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}, {Port: 222}},
 			}},
@@ -175,7 +175,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
@@ -185,7 +185,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "beef::1"}, {IP: "beef::1"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "beef::1"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
@@ -198,7 +198,7 @@ func TestPackSubsets(t *testing.T) {
 				},
 				Ports: []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &fooObjRef}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
@@ -213,7 +213,7 @@ func TestPackSubsets(t *testing.T) {
 				},
 				Ports: []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				// finding the same address twice is considered an error on input, only the first address+port
 				// reference is preserved
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: &fooObjRef}},
@@ -225,7 +225,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}, {Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
@@ -238,7 +238,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
@@ -251,7 +251,7 @@ func TestPackSubsets(t *testing.T) {
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
@@ -264,7 +264,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 222}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}, {Port: 222}},
 			}},
@@ -277,7 +277,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("uid-1")}},
 				Ports:     []api.EndpointPort{{Port: 222}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("uid-1")}},
 				Ports:     []api.EndpointPort{{Port: 111}, {Port: 222}},
 			}},
@@ -290,7 +290,7 @@ func TestPackSubsets(t *testing.T) {
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("uid-1")}},
 				Ports:             []api.EndpointPort{{Port: 222}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("uid-1")}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}, {
@@ -306,7 +306,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "5.6.7.8"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "5.6.7.8"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
@@ -319,7 +319,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("uid-2")}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{
 					{IP: "1.2.3.4", TargetRef: podRef("uid-1")},
 					{IP: "1.2.3.4", TargetRef: podRef("uid-2")},
@@ -335,7 +335,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4", TargetRef: podRef("uid-2")}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{
 					{IP: "1.2.3.4"},
 					{IP: "1.2.3.4", TargetRef: podRef("uid-2")},
@@ -357,7 +357,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{
 					{IP: "1.2.3.4"},
 					{IP: "1.2.3.4", TargetRef: podRef("uid-1")},
@@ -381,7 +381,7 @@ func TestPackSubsets(t *testing.T) {
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:             []api.EndpointPort{{Port: 111}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{
 					{IP: "5.6.7.8"},
 				},
@@ -401,7 +401,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "5.6.7.8"}},
 				Ports:     []api.EndpointPort{{Port: 222}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}, {
@@ -423,7 +423,7 @@ func TestPackSubsets(t *testing.T) {
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.5"}},
 				Ports:     []api.EndpointPort{{Port: 333}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "1.2.3.6"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}, {
@@ -445,7 +445,7 @@ func TestPackSubsets(t *testing.T) {
 				NotReadyAddresses: []api.EndpointAddress{{IP: "1.2.3.5"}},
 				Ports:             []api.EndpointPort{{Port: 333}},
 			}},
-			expect: []api.EndpointSubset{{
+			expect: []*api.EndpointSubset{{
 				Addresses: []api.EndpointAddress{{IP: "1.2.3.4"}, {IP: "1.2.3.6"}},
 				Ports:     []api.EndpointPort{{Port: 111}},
 			}, {

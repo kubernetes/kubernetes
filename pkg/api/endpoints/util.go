@@ -69,7 +69,7 @@ func RepackSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
 	}
 
 	// Next, build the N-to-M association the API wants.
-	final := []api.EndpointSubset{}
+	final := []*api.EndpointSubset{}
 	for key, ports := range addrReadyMapKeyToPorts {
 		var readyAddrs, notReadyAddrs []api.EndpointAddress
 		for addr, ready := range keyToAddrReadyMap[key] {
@@ -79,7 +79,7 @@ func RepackSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
 				notReadyAddrs = append(notReadyAddrs, *addr)
 			}
 		}
-		final = append(final, api.EndpointSubset{Addresses: readyAddrs, NotReadyAddresses: notReadyAddrs, Ports: ports})
+		final = append(final, &api.EndpointSubset{Addresses: readyAddrs, NotReadyAddresses: notReadyAddrs, Ports: ports})
 	}
 
 	// Finally, sort it.
@@ -188,15 +188,19 @@ func LessEndpointAddress(a, b *api.EndpointAddress) bool {
 
 // SortSubsets sorts an array of EndpointSubset objects in place.  For ease of
 // use it returns the input slice.
-func SortSubsets(subsets []api.EndpointSubset) []api.EndpointSubset {
+func SortSubsets(subsets []*api.EndpointSubset) []api.EndpointSubset {
 	for i := range subsets {
-		ss := &subsets[i]
+		ss := subsets[i]
 		sort.Sort(addrsByIPAndUID(ss.Addresses))
 		sort.Sort(addrsByIPAndUID(ss.NotReadyAddresses))
 		sort.Sort(portsByHash(ss.Ports))
 	}
 	sort.Sort(subsetsByHash(subsets))
-	return subsets
+	final := []api.EndpointSubset{}
+	for i := range subsets {
+		final = append(final, *subsets[i])
+	}
+	return final
 }
 
 func hashObject(hasher hash.Hash, obj interface{}) []byte {
@@ -204,7 +208,7 @@ func hashObject(hasher hash.Hash, obj interface{}) []byte {
 	return hasher.Sum(nil)
 }
 
-type subsetsByHash []api.EndpointSubset
+type subsetsByHash []*api.EndpointSubset
 
 func (sl subsetsByHash) Len() int      { return len(sl) }
 func (sl subsetsByHash) Swap(i, j int) { sl[i], sl[j] = sl[j], sl[i] }
