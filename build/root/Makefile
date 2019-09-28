@@ -222,6 +222,8 @@ define TEST_E2E_NODE_HELP_INFO
 #    Defaults to "/tmp/_artifacts/$$(date +%y%m%dT%H%M%S)".
 #  LIST_IMAGES: For REMOTE=true only. If true, don't run tests. Just output the
 #    list of available images for testing.  Defaults to false.
+#  TIMEOUT: For REMOTE=true only. How long (in golang duration format) to wait
+#    for ginkgo tests to complete. Defaults to 45m.
 #  PARALLELISM: The number of ginkgo nodes to run.  Defaults to 8.
 #  RUNTIME: Container runtime to use (eg. docker, remote).
 #    Defaults to "docker".
