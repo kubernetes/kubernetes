@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -68,39 +69,62 @@ func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string, resc
 		}
 	}
 
+	klog.V(3).Infof("ResizeFS.Resize - Detecting mounted volume filesystem size: %s", deviceMountPath)
+	oldFS := syscall.Statfs_t{}
+	err = syscall.Statfs(deviceMountPath, &oldFS)
+	if err != nil {
+		return false, fmt.Errorf("ResizeFS.Resize - Failed to detect %s filesystem size: %v", deviceMountPath, err)
+	}
+
 	klog.V(3).Infof("ResizeFS.Resize - Expanding mounted volume %s", devicePath)
 	switch format {
 	case "ext3", "ext4":
-		return resizefs.extResize(devicePath)
+		err = resizefs.extResize(devicePath)
 	case "xfs":
-		return resizefs.xfsResize(deviceMountPath)
+		err = resizefs.xfsResize(deviceMountPath)
+	default:
+		return false, fmt.Errorf("ResizeFS.Resize - resize of format %s is not supported for device %s mounted at %s", format, devicePath, deviceMountPath)
 	}
-	return false, fmt.Errorf("ResizeFS.Resize - resize of format %s is not supported for device %s mounted at %s", format, devicePath, deviceMountPath)
+
+	if err != nil {
+		return false, err
+	}
+
+	klog.V(3).Infof("ResizeFS.Resize - Detecting mounted volume filesystem size after the expanding: %s", deviceMountPath)
+	newFS := syscall.Statfs_t{}
+	err = syscall.Statfs(deviceMountPath, &newFS)
+	if err != nil {
+		return false, fmt.Errorf("ResizeFS.Resize - Failed to detect %s filesystem size after the expanding: %v", deviceMountPath, err)
+	}
+
+	oldSize := oldFS.Blocks * uint64(oldFS.Bsize)
+	newSize := newFS.Blocks * uint64(newFS.Bsize)
+	if newSize <= oldSize {
+		return false, fmt.Errorf("ResizeFS.Resize - Filesystem size was not expanded. Old size %d, new size %d", oldSize, newSize)
+	}
+
+	return true, nil
 }
 
-func (resizefs *ResizeFs) extResize(devicePath string) (bool, error) {
+func (resizefs *ResizeFs) extResize(devicePath string) error {
 	output, err := resizefs.mounter.Exec.Run("resize2fs", devicePath)
-	if err == nil {
-		klog.V(2).Infof("Device %s resized successfully", devicePath)
-		return true, nil
+	if err != nil {
+		return fmt.Errorf("resize of device %s failed: %v. resize2fs output: %s", devicePath, err, string(output))
 	}
 
-	resizeError := fmt.Errorf("resize of device %s failed: %v. resize2fs output: %s", devicePath, err, string(output))
-	return false, resizeError
-
+	klog.V(2).Infof("Device %s resized successfully", devicePath)
+	return nil
 }
 
-func (resizefs *ResizeFs) xfsResize(deviceMountPath string) (bool, error) {
+func (resizefs *ResizeFs) xfsResize(deviceMountPath string) error {
 	args := []string{"-d", deviceMountPath}
 	output, err := resizefs.mounter.Exec.Run("xfs_growfs", args...)
-
-	if err == nil {
-		klog.V(2).Infof("Device %s resized successfully", deviceMountPath)
-		return true, nil
+	if err != nil {
+		return fmt.Errorf("resize of device %s failed: %v. xfs_growfs output: %s", deviceMountPath, err, string(output))
 	}
 
-	resizeError := fmt.Errorf("resize of device %s failed: %v. xfs_growfs output: %s", deviceMountPath, err, string(output))
-	return false, resizeError
+	klog.V(2).Infof("Device %s resized successfully", deviceMountPath)
+	return nil
 }
 
 // findBlockDeviceRescanPath Find the underlaying disk for a linked path such as /dev/disk/by-path/XXXX or /dev/mapper/XXXX
