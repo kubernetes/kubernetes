@@ -19,7 +19,6 @@ package daemon
 import (
 	"fmt"
 	"reflect"
-	"sort"
 	"sync"
 	"time"
 
@@ -927,9 +926,11 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 		// If daemon pod is supposed to be running on node, but more than 1 daemon pod is running, delete the excess daemon pods.
 		// Sort the daemon pods by creation time, so the oldest is preserved.
 		if len(daemonPodsRunning) > 1 {
-			sort.Sort(podByCreationTimestampAndPhase(daemonPodsRunning))
-			for i := 1; i < len(daemonPodsRunning); i++ {
-				podsToDelete = append(podsToDelete, daemonPodsRunning[i].Name)
+			oldestPod := findOldestPod(daemonPodsRunning)
+			for i := 0; i < len(daemonPodsRunning); i++ {
+				if daemonPodsRunning[i] != oldestPod {
+					podsToDelete = append(podsToDelete, daemonPodsRunning[i].Name)
+				}
 			}
 		}
 	case !shouldContinueRunning && exists:
@@ -943,6 +944,29 @@ func (dsc *DaemonSetsController) podsShouldBeOnNode(
 	}
 
 	return nodesNeedingDaemonPods, podsToDelete, nil
+}
+
+func findOldestPod(pods []*v1.Pod) *v1.Pod {
+	if len(pods) == 0 {
+		return nil
+	}
+	oldestPod := pods[0]
+	for i := 1; i < len(pods); i++ {
+		// Scheduled Pod first
+		if len(pods[i].Spec.NodeName) != 0 && len(oldestPod.Spec.NodeName) == 0 {
+			oldestPod = pods[i]
+		}
+
+		if pods[i].CreationTimestamp.Equal(&oldestPod.CreationTimestamp) {
+			if pods[i].Name < oldestPod.Name {
+				oldestPod = pods[i]
+			}
+		}
+		if pods[i].CreationTimestamp.Before(&oldestPod.CreationTimestamp) {
+			oldestPod = pods[i]
+		}
+	}
+	return oldestPod
 }
 
 // manage manages the scheduling and running of Pods of ds on nodes.
@@ -1171,8 +1195,7 @@ func (dsc *DaemonSetsController) updateDaemonSetStatus(ds *apps.DaemonSet, nodeL
 				currentNumberScheduled++
 				// Sort the daemon pods by creation time, so that the oldest is first.
 				daemonPods, _ := nodeToDaemonPods[node.Name]
-				sort.Sort(podByCreationTimestampAndPhase(daemonPods))
-				pod := daemonPods[0]
+				pod := findOldestPod(daemonPods)
 				if podutil.IsPodReady(pod) {
 					numberReady++
 					if podutil.IsPodAvailable(pod, ds.Spec.MinReadySeconds, metav1.Now()) {
@@ -1508,27 +1531,6 @@ func Predicates(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []pred
 	}
 
 	return len(predicateFails) == 0, predicateFails, nil
-}
-
-type podByCreationTimestampAndPhase []*v1.Pod
-
-func (o podByCreationTimestampAndPhase) Len() int      { return len(o) }
-func (o podByCreationTimestampAndPhase) Swap(i, j int) { o[i], o[j] = o[j], o[i] }
-
-func (o podByCreationTimestampAndPhase) Less(i, j int) bool {
-	// Scheduled Pod first
-	if len(o[i].Spec.NodeName) != 0 && len(o[j].Spec.NodeName) == 0 {
-		return true
-	}
-
-	if len(o[i].Spec.NodeName) == 0 && len(o[j].Spec.NodeName) != 0 {
-		return false
-	}
-
-	if o[i].CreationTimestamp.Equal(&o[j].CreationTimestamp) {
-		return o[i].Name < o[j].Name
-	}
-	return o[i].CreationTimestamp.Before(&o[j].CreationTimestamp)
 }
 
 func failedPodsBackoffKey(ds *apps.DaemonSet, nodeName string) string {
