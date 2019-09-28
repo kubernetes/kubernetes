@@ -63,7 +63,9 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 	}
 
 	// Deprecated API versions are supported by us, but can only be used for migration.
-	deprecatedAPIVersions := map[string]struct{}{}
+	deprecatedAPIVersions := map[string]struct{}{
+		"kubeadm.k8s.io/v1beta1": {},
+	}
 
 	gvString := gv.String()
 
@@ -72,7 +74,7 @@ func validateSupportedVersion(gv schema.GroupVersion, allowDeprecated bool) erro
 	}
 
 	if _, present := deprecatedAPIVersions[gvString]; present && !allowDeprecated {
-		return errors.Errorf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv.String())
+		klog.Warningf("your configuration file uses a deprecated API spec: %q. Please use 'kubeadm config migrate --old-config old.yaml --new-config new.yaml', which will write the new, similar spec using a newer API version.", gv)
 	}
 
 	return nil
