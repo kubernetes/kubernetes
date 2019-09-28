@@ -35,6 +35,7 @@ import (
 	cloudvolume "k8s.io/cloud-provider/volume"
 	volerr "k8s.io/cloud-provider/volume/errors"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
+	"k8s.io/component-base/metrics"
 
 	"github.com/gophercloud/gophercloud"
 	volumeexpand "github.com/gophercloud/gophercloud/openstack/blockstorage/extensions/volumeactions"
@@ -42,8 +43,6 @@ import (
 	volumes_v2 "github.com/gophercloud/gophercloud/openstack/blockstorage/v2/volumes"
 	volumes_v3 "github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/volumeattach"
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/klog"
 )
 
@@ -745,8 +744,8 @@ func (os *OpenStack) GetLabelsForVolume(ctx context.Context, pv *v1.PersistentVo
 // recordOpenstackOperationMetric records openstack operation metrics
 func recordOpenstackOperationMetric(operation string, timeTaken float64, err error) {
 	if err != nil {
-		openstackAPIRequestErrors.With(prometheus.Labels{"request": operation}).Inc()
+		openstackAPIRequestErrors.With(metrics.Labels{"request": operation}).Inc()
 	} else {
-		openstackOperationsLatency.With(prometheus.Labels{"request": operation}).Observe(timeTaken)
+		openstackOperationsLatency.With(metrics.Labels{"request": operation}).Observe(timeTaken)
 	}
 }
