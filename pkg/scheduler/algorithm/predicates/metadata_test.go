@@ -375,7 +375,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 			existingPodsMeta1, nodeInfoMap := getMeta(st.FakePodLister(test.existingPods))
 			// Add test.addedPod to existingPodsMeta1 and make sure meta is equal to allPodsMeta
 			nodeInfo := nodeInfoMap[test.addedPod.Spec.NodeName]
-			if err := existingPodsMeta1.AddPod(test.addedPod, nodeInfo); err != nil {
+			if err := existingPodsMeta1.AddPod(test.addedPod, nodeInfo.Node()); err != nil {
 				t.Errorf("error adding pod to meta: %v", err)
 			}
 			if err := predicateMetadataEquivalent(allPodsMeta, existingPodsMeta1); err != nil {
