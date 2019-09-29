@@ -117,16 +117,13 @@ func newRuntimeClassPod(runtimeClassName string) *v1.Pod {
 }
 
 func expectPodRejection(f *framework.Framework, pod *v1.Pod) {
-	// The Node E2E doesn't run the RuntimeClass admission controller, so we expect the rejection to
-	// happen by the Kubelet.
-	if framework.TestContext.NodeE2E {
-		pod = f.PodClient().Create(pod)
-		expectSandboxFailureEvent(f, pod, fmt.Sprintf("\"%s\" not found", *pod.Spec.RuntimeClassName))
-	} else {
-		_, err := f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
-		framework.ExpectError(err, "should be forbidden")
-		gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
-	}
+	_, err := f.ClientSet.NodeV1beta1().RuntimeClasses().Get(*pod.Spec.RuntimeClassName, metav1.GetOptions{})
+	gomega.Expect(apierrs.IsNotFound(err)).To(gomega.BeTrue(), "should not exist")
+	//  the RuntimeClass admission controller enabled since 1.15
+	_, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Create(pod)
+	framework.ExpectError(err, "should be forbidden")
+	gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
+
 }
 
 // expectPodSuccess waits for the given pod to terminate successfully.
