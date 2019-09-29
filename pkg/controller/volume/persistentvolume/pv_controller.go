@@ -39,7 +39,6 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
-	csitranslation "k8s.io/csi-translation-lib"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
@@ -134,6 +133,11 @@ const createProvisionedPVRetryCount = 5
 // Interval between retries when we create a PV object for a provisioned volume.
 const createProvisionedPVInterval = 10 * time.Second
 
+// CSINameTranslator can get the CSI Driver name based on the in-tree plugin name
+type CSINameTranslator interface {
+	GetCSINameFromInTreeName(pluginName string) (string, error)
+}
+
 // PersistentVolumeController is a controller that synchronizes
 // PersistentVolumeClaims and PersistentVolumes. It starts two
 // cache.Controllers that watch PersistentVolume and PersistentVolumeClaim
@@ -200,10 +204,6 @@ type PersistentVolumeController struct {
 	createProvisionedPVRetryCount int
 	createProvisionedPVInterval   time.Duration
 
-	// For testing only: hook to intercept CSI driver name <=> Intree plugin name mapping
-	// Not used when set to nil
-	csiNameFromIntreeNameHook func(pluginName string) (string, error)
-
 	// operationTimestamps caches start timestamp of operations
 	// (currently provision + binding/deletion) for metric recording.
 	// Detailed lifecyle/key for each operation
@@ -225,6 +225,8 @@ type PersistentVolumeController struct {
 	//                 the corresponding timestamp entry will be deleted from cache
 	//     abort:      N.A.
 	operationTimestamps metrics.OperationStartTimeCache
+
+	translator CSINameTranslator
 }
 
 // syncClaim is the main controller method to decide what to do with a claim.
@@ -1355,13 +1357,6 @@ func (ctrl *PersistentVolumeController) provisionClaim(claim *v1.PersistentVolum
 	return nil
 }
 
-func (ctrl *PersistentVolumeController) getCSINameFromIntreeName(pluginName string) (string, error) {
-	if ctrl.csiNameFromIntreeNameHook != nil {
-		return ctrl.csiNameFromIntreeNameHook(pluginName)
-	}
-	return csitranslation.GetCSINameFromInTreeName(pluginName)
-}
-
 // provisionClaimOperation provisions a volume. This method is running in
 // standalone goroutine and already has all necessary locks.
 func (ctrl *PersistentVolumeController) provisionClaimOperation(
@@ -1571,7 +1566,7 @@ func (ctrl *PersistentVolumeController) provisionClaimOperationExternal(
 	provisionerName := storageClass.Provisioner
 	if plugin != nil {
 		// update the provisioner name to use the CSI in-tree name
-		provisionerName, err = ctrl.getCSINameFromIntreeName(storageClass.Provisioner)
+		provisionerName, err = ctrl.translator.GetCSINameFromInTreeName(storageClass.Provisioner)
 		if err != nil {
 			strerr := fmt.Sprintf("error getting CSI name for In tree plugin %s: %v", storageClass.Provisioner, err)
 			klog.V(2).Infof("%s", strerr)
@@ -1732,7 +1727,7 @@ func (ctrl *PersistentVolumeController) getProvisionerNameFromVolume(volume *v1.
 		return "N/A"
 	}
 	if plugin != nil {
-		provisionerName, err := ctrl.getCSINameFromIntreeName(class.Provisioner)
+		provisionerName, err := ctrl.translator.GetCSINameFromInTreeName(class.Provisioner)
 		if err == nil {
 			return provisionerName
 		}
@@ -1747,7 +1742,7 @@ func (ctrl *PersistentVolumeController) getProvisionerName(plugin vol.Provisiona
 		return plugin.GetPluginName()
 	} else if plugin != nil {
 		// get the CSI in-tree name from storage class provisioner name
-		provisionerName, err := ctrl.getCSINameFromIntreeName(storageClass.Provisioner)
+		provisionerName, err := ctrl.translator.GetCSINameFromInTreeName(storageClass.Provisioner)
 		if err != nil {
 			return "N/A"
 		}

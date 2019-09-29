@@ -32,7 +32,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
 	volerr "k8s.io/cloud-provider/volume/errors"
-	csilib "k8s.io/csi-translation-lib"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	kevents "k8s.io/kubernetes/pkg/kubelet/events"
@@ -48,6 +48,18 @@ const (
 	unknownVolumePlugin           string = "UnknownVolumePlugin"
 	unknownAttachableVolumePlugin string = "UnknownAttachableVolumePlugin"
 )
+
+// InTreeToCSITranslator contains methods required to check migratable status
+// and perform translations from InTree PVs and Inline to CSI
+type InTreeToCSITranslator interface {
+	IsPVMigratable(pv *v1.PersistentVolume) bool
+	IsInlineMigratable(vol *v1.Volume) bool
+	IsMigratableIntreePluginByName(inTreePluginName string) bool
+	GetInTreePluginNameFromSpec(pv *v1.PersistentVolume, vol *v1.Volume) (string, error)
+	GetCSINameFromInTreeName(pluginName string) (string, error)
+	TranslateInTreePVToCSI(pv *v1.PersistentVolume) (*v1.PersistentVolume, error)
+	TranslateInTreeInlineVolumeToCSI(volume *v1.Volume) (*v1.PersistentVolume, error)
+}
 
 var _ OperationGenerator = &operationGenerator{}
 
@@ -70,6 +82,8 @@ type operationGenerator struct {
 
 	// blkUtil provides volume path related operations for block volume
 	blkUtil volumepathhandler.BlockVolumePathHandler
+
+	translator InTreeToCSITranslator
 }
 
 // NewOperationGenerator is returns instance of operationGenerator
@@ -85,6 +99,7 @@ func NewOperationGenerator(kubeClient clientset.Interface,
 		recorder:                         recorder,
 		checkNodeCapabilitiesBeforeMount: checkNodeCapabilitiesBeforeMount,
 		blkUtil:                          blkUtil,
+		translator:                       csitrans.New(),
 	}
 }
 
@@ -123,6 +138,9 @@ type OperationGenerator interface {
 	// GetVolumePluginMgr returns volume plugin manager
 	GetVolumePluginMgr() *volume.VolumePluginMgr
 
+	// GetCSITranslator returns the CSI Translation Library
+	GetCSITranslator() InTreeToCSITranslator
+
 	GenerateBulkVolumeVerifyFunc(
 		map[types.NodeName][]*volume.Spec,
 		string,
@@ -153,14 +171,14 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 		}
 
 		// Migration: Must also check the Node since Attach would have been done with in-tree if node is not using Migration
-		nu, err := nodeUsingCSIPlugin(og, volumeAttached.VolumeSpec, nodeName)
+		nu, err := nodeUsingCSIPlugin(og.translator, og.volumePluginMgr, volumeAttached.VolumeSpec, nodeName)
 		if err != nil {
 			klog.Errorf(volumeAttached.GenerateErrorDetailed("VolumesAreAttached.NodeUsingCSIPlugin failed", err).Error())
 			continue
 		}
 
 		var volumePlugin volume.VolumePlugin
-		if useCSIPlugin(og.volumePluginMgr, volumeAttached.VolumeSpec) && nu {
+		if useCSIPlugin(og.translator, og.volumePluginMgr, volumeAttached.VolumeSpec) && nu {
 			// The volume represented by this spec is CSI and thus should be migrated
 			volumePlugin, err = og.volumePluginMgr.FindPluginByName(csi.CSIPluginName)
 			if err != nil || volumePlugin == nil {
@@ -168,7 +186,7 @@ func (og *operationGenerator) GenerateVolumesAreAttachedFunc(
 				continue
 			}
 
-			csiSpec, err := translateSpec(volumeAttached.VolumeSpec)
+			csiSpec, err := translateSpec(og.translator, volumeAttached.VolumeSpec)
 			if err != nil {
 				klog.Errorf(volumeAttached.GenerateErrorDetailed("VolumesAreAttached.TranslateSpec failed", err).Error())
 				continue
@@ -330,20 +348,20 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	attachVolumeFunc := func() (error, error) {
 		var attachableVolumePlugin volume.AttachableVolumePlugin
 
-		nu, err := nodeUsingCSIPlugin(og, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+		nu, err := nodeUsingCSIPlugin(og.translator, og.volumePluginMgr, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
 		if err != nil {
 			return volumeToAttach.GenerateError("AttachVolume.NodeUsingCSIPlugin failed", err)
 		}
 
 		// useCSIPlugin will check both CSIMigration and the plugin specific feature gates
-		if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
+		if useCSIPlugin(og.translator, og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
 				return volumeToAttach.GenerateError("AttachVolume.FindAttachablePluginByName failed", err)
 			}
 
-			csiSpec, err := translateSpec(volumeToAttach.VolumeSpec)
+			csiSpec, err := translateSpec(og.translator, volumeToAttach.VolumeSpec)
 			if err != nil {
 				return volumeToAttach.GenerateError("AttachVolume.TranslateSpec failed", err)
 			}
@@ -416,15 +434,15 @@ func (og *operationGenerator) GenerateAttachVolumeFunc(
 	// involves determining the plugin_name for the metric generating "CompleteFunc"
 	// during the actual "OperationFunc" and not during this generation function
 
-	nu, err := nodeUsingCSIPlugin(og, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
+	nu, err := nodeUsingCSIPlugin(og.translator, og.volumePluginMgr, volumeToAttach.VolumeSpec, volumeToAttach.NodeName)
 	if err != nil {
 		klog.Errorf("GenerateAttachVolumeFunc failed to check if node is using CSI Plugin, metric for this operation may be inaccurate: %v", err)
 	}
 
 	// Need to translate the spec here if the plugin is migrated so that the metrics
 	// emitted show the correct (migrated) plugin
-	if useCSIPlugin(og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
-		csiSpec, err := translateSpec(volumeToAttach.VolumeSpec)
+	if useCSIPlugin(og.translator, og.volumePluginMgr, volumeToAttach.VolumeSpec) && nu {
+		csiSpec, err := translateSpec(og.translator, volumeToAttach.VolumeSpec)
 		if err == nil {
 			volumeToAttach.VolumeSpec = csiSpec
 		}
@@ -456,6 +474,10 @@ func (og *operationGenerator) GetVolumePluginMgr() *volume.VolumePluginMgr {
 	return og.volumePluginMgr
 }
 
+func (og *operationGenerator) GetCSITranslator() InTreeToCSITranslator {
+	return og.translator
+}
+
 func (og *operationGenerator) GenerateDetachVolumeFunc(
 	volumeToDetach AttachedVolume,
 	verifySafeToDetach bool,
@@ -467,20 +489,20 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 
 	if volumeToDetach.VolumeSpec != nil {
 		// Get attacher plugin
-		nu, err := nodeUsingCSIPlugin(og, volumeToDetach.VolumeSpec, volumeToDetach.NodeName)
+		nu, err := nodeUsingCSIPlugin(og.translator, og.volumePluginMgr, volumeToDetach.VolumeSpec, volumeToDetach.NodeName)
 		if err != nil {
 			return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.NodeUsingCSIPlugin failed", err)
 		}
 
 		// useCSIPlugin will check both CSIMigration and the plugin specific feature gate
-		if useCSIPlugin(og.volumePluginMgr, volumeToDetach.VolumeSpec) && nu {
+		if useCSIPlugin(og.translator, og.volumePluginMgr, volumeToDetach.VolumeSpec) && nu {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
 				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.FindAttachablePluginBySpec failed", err)
 			}
 
-			csiSpec, err := translateSpec(volumeToDetach.VolumeSpec)
+			csiSpec, err := translateSpec(og.translator, volumeToDetach.VolumeSpec)
 			if err != nil {
 				return volumetypes.GeneratedOperations{}, volumeToDetach.GenerateErrorDetailed("DetachVolume.TranslateSpec failed", err)
 			}
@@ -511,7 +533,7 @@ func (og *operationGenerator) GenerateDetachVolumeFunc(
 		// TODO(dyzz): This case can't distinguish between PV and In-line which is necessary because
 		// if it was PV it may have been migrated, but the same plugin with in-line may not have been.
 		// Suggestions welcome...
-		if csilib.IsMigratableIntreePluginByName(pluginName) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
+		if og.translator.IsMigratableIntreePluginByName(pluginName) && utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 			// The volume represented by this spec is CSI and thus should be migrated
 			attachableVolumePlugin, err = og.volumePluginMgr.FindAttachablePluginByName(csi.CSIPluginName)
 			if err != nil || attachableVolumePlugin == nil {
@@ -582,8 +604,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	volumePluginName := unknownVolumePlugin
 	// Need to translate the spec here if the plugin is migrated so that the metrics
 	// emitted show the correct (migrated) plugin
-	if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
-		csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
+	if useCSIPlugin(og.translator, og.volumePluginMgr, volumeToMount.VolumeSpec) {
+		csiSpec, err := translateSpec(og.translator, volumeToMount.VolumeSpec)
 		if err == nil {
 			volumeToMount.VolumeSpec = csiSpec
 		}
@@ -601,8 +623,8 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 	mountVolumeFunc := func() (error, error) {
 
 		// Get mounter plugin
-		if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
-			csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
+		if useCSIPlugin(og.translator, og.volumePluginMgr, volumeToMount.VolumeSpec) {
+			csiSpec, err := translateSpec(og.translator, volumeToMount.VolumeSpec)
 			if err != nil {
 				return volumeToMount.GenerateError("MountVolume.TranslateSpec failed", err)
 			}
@@ -795,7 +817,7 @@ func (og *operationGenerator) GenerateUnmountVolumeFunc(
 	podsDir string) (volumetypes.GeneratedOperations, error) {
 
 	var pluginName string
-	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.volumePluginMgr, volumeToUnmount.VolumeSpec) {
+	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.translator, og.volumePluginMgr, volumeToUnmount.VolumeSpec) {
 		pluginName = csi.CSIPluginName
 	} else {
 		pluginName = volumeToUnmount.PluginName
@@ -863,9 +885,9 @@ func (og *operationGenerator) GenerateUnmountDeviceFunc(
 	hostutil hostutil.HostUtils) (volumetypes.GeneratedOperations, error) {
 
 	var pluginName string
-	if useCSIPlugin(og.volumePluginMgr, deviceToDetach.VolumeSpec) {
+	if useCSIPlugin(og.translator, og.volumePluginMgr, deviceToDetach.VolumeSpec) {
 		pluginName = csi.CSIPluginName
-		csiSpec, err := translateSpec(deviceToDetach.VolumeSpec)
+		csiSpec, err := translateSpec(og.translator, deviceToDetach.VolumeSpec)
 		if err != nil {
 			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmountDevice.TranslateSpec failed", err)
 		}
@@ -965,8 +987,8 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 
 	originalSpec := volumeToMount.VolumeSpec
 	// Translate to CSI spec if migration enabled
-	if useCSIPlugin(og.volumePluginMgr, originalSpec) {
-		csiSpec, err := translateSpec(originalSpec)
+	if useCSIPlugin(og.translator, og.volumePluginMgr, originalSpec) {
+		csiSpec, err := translateSpec(og.translator, originalSpec)
 		if err != nil {
 			return volumetypes.GeneratedOperations{}, volumeToMount.GenerateErrorDetailed("MapVolume.TranslateSpec failed", err)
 		}
@@ -1153,8 +1175,8 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 	var err error
 	// Translate to CSI spec if migration enabled
 	// And get block volume unmapper plugin
-	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.volumePluginMgr, volumeToUnmount.VolumeSpec) {
-		csiSpec, err := translateSpec(volumeToUnmount.VolumeSpec)
+	if volumeToUnmount.VolumeSpec != nil && useCSIPlugin(og.translator, og.volumePluginMgr, volumeToUnmount.VolumeSpec) {
+		csiSpec, err := translateSpec(og.translator, volumeToUnmount.VolumeSpec)
 		if err != nil {
 			return volumetypes.GeneratedOperations{}, volumeToUnmount.GenerateErrorDetailed("UnmapVolume.TranslateSpec failed", err)
 		}
@@ -1249,8 +1271,8 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 	var blockVolumePlugin volume.BlockVolumePlugin
 	var err error
 	// Translate to CSI spec if migration enabled
-	if useCSIPlugin(og.volumePluginMgr, deviceToDetach.VolumeSpec) {
-		csiSpec, err := translateSpec(deviceToDetach.VolumeSpec)
+	if useCSIPlugin(og.translator, og.volumePluginMgr, deviceToDetach.VolumeSpec) {
+		csiSpec, err := translateSpec(og.translator, deviceToDetach.VolumeSpec)
 		if err != nil {
 			return volumetypes.GeneratedOperations{}, deviceToDetach.GenerateErrorDetailed("UnmapDevice.TranslateSpec failed", err)
 		}
@@ -1564,8 +1586,8 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 	fsResizeFunc := func() (error, error) {
 		// Need to translate the spec here if the plugin is migrated so that the metrics
 		// emitted show the correct (migrated) plugin
-		if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
-			csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
+		if useCSIPlugin(og.translator, og.volumePluginMgr, volumeToMount.VolumeSpec) {
+			csiSpec, err := translateSpec(og.translator, volumeToMount.VolumeSpec)
 			if err != nil {
 				return volumeToMount.GenerateError("NodeExpandVolume.translateSpec failed", err)
 			}
@@ -1636,8 +1658,8 @@ func (og *operationGenerator) GenerateExpandInUseVolumeFunc(
 
 	// Need to translate the spec here if the plugin is migrated so that the metrics
 	// emitted show the correct (migrated) plugin
-	if useCSIPlugin(og.volumePluginMgr, volumeToMount.VolumeSpec) {
-		csiSpec, err := translateSpec(volumeToMount.VolumeSpec)
+	if useCSIPlugin(og.translator, og.volumePluginMgr, volumeToMount.VolumeSpec) {
+		csiSpec, err := translateSpec(og.translator, volumeToMount.VolumeSpec)
 		if err == nil {
 			volumeToMount.VolumeSpec = csiSpec
 		}
@@ -1796,7 +1818,7 @@ func isDeviceOpened(deviceToDetach AttachedVolume, hostUtil hostutil.HostUtils) 
 	return deviceOpened, nil
 }
 
-func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
+func useCSIPlugin(tr InTreeToCSITranslator, vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
 	// TODO(#75146) Check whether the driver is installed as well so that
 	// we can throw a better error when the driver is not installed.
 	// The error should be of the approximate form:
@@ -1804,7 +1826,7 @@ func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.CSIMigration) {
 		return false
 	}
-	if csilib.IsPVMigratable(spec.PersistentVolume) || csilib.IsInlineMigratable(spec.Volume) {
+	if tr.IsPVMigratable(spec.PersistentVolume) || tr.IsInlineMigratable(spec.Volume) {
 		migratable, err := vpm.IsPluginMigratableBySpec(spec)
 		if err == nil && migratable {
 			return true
@@ -1813,9 +1835,7 @@ func useCSIPlugin(vpm *volume.VolumePluginMgr, spec *volume.Spec) bool {
 	return false
 }
 
-func nodeUsingCSIPlugin(og OperationGenerator, spec *volume.Spec, nodeName types.NodeName) (bool, error) {
-	vpm := og.GetVolumePluginMgr()
-
+func nodeUsingCSIPlugin(tr InTreeToCSITranslator, vpm *volume.VolumePluginMgr, spec *volume.Spec, nodeName types.NodeName) (bool, error) {
 	migratable, err := vpm.IsPluginMigratableBySpec(spec)
 	if err != nil {
 		return false, err
@@ -1869,7 +1889,7 @@ func nodeUsingCSIPlugin(og OperationGenerator, spec *volume.Spec, nodeName types
 		mpaSet = sets.NewString(tok...)
 	}
 
-	pluginName, err := csilib.GetInTreePluginNameFromSpec(spec.PersistentVolume, spec.Volume)
+	pluginName, err := tr.GetInTreePluginNameFromSpec(spec.PersistentVolume, spec.Volume)
 	if err != nil {
 		return false, err
 	}
@@ -1883,7 +1903,7 @@ func nodeUsingCSIPlugin(og OperationGenerator, spec *volume.Spec, nodeName types
 
 	if isMigratedOnNode {
 		installed := false
-		driverName, err := csilib.GetCSINameFromInTreeName(pluginName)
+		driverName, err := tr.GetCSINameFromInTreeName(pluginName)
 		if err != nil {
 			return isMigratedOnNode, err
 		}
@@ -1902,19 +1922,19 @@ func nodeUsingCSIPlugin(og OperationGenerator, spec *volume.Spec, nodeName types
 
 }
 
-func translateSpec(spec *volume.Spec) (*volume.Spec, error) {
+func translateSpec(tr InTreeToCSITranslator, spec *volume.Spec) (*volume.Spec, error) {
 	var csiPV *v1.PersistentVolume
 	var err error
 	inlineVolume := false
 	if spec.PersistentVolume != nil {
 		// TranslateInTreePVToCSI will create a new PV
-		csiPV, err = csilib.TranslateInTreePVToCSI(spec.PersistentVolume)
+		csiPV, err = tr.TranslateInTreePVToCSI(spec.PersistentVolume)
 		if err != nil {
 			return nil, fmt.Errorf("failed to translate in tree pv to CSI: %v", err)
 		}
 	} else if spec.Volume != nil {
 		// TranslateInTreeInlineVolumeToCSI will create a new PV
-		csiPV, err = csilib.TranslateInTreeInlineVolumeToCSI(spec.Volume)
+		csiPV, err = tr.TranslateInTreeInlineVolumeToCSI(spec.Volume)
 		if err != nil {
 			return nil, fmt.Errorf("failed to translate in tree inline volume to CSI: %v", err)
 		}

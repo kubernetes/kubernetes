@@ -67,6 +67,7 @@ go_test(
         "//staging/src/k8s.io/component-base/featuregate:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//staging/src/k8s.io/csi-translation-lib:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
         "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",

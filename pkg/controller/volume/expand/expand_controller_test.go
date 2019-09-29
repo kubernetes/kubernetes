@@ -33,6 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	coretesting "k8s.io/client-go/testing"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	csitrans "k8s.io/csi-translation-lib"
 	csitranslationplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/controller"
 	controllervolumetesting "k8s.io/kubernetes/pkg/controller/volume/attachdetach/testing"
@@ -123,7 +124,7 @@ func TestSyncHandler(t *testing.T) {
 		if tc.storageClass != nil {
 			informerFactory.Storage().V1().StorageClasses().Informer().GetIndexer().Add(tc.storageClass)
 		}
-		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, storageClassInformer, nil, allPlugins)
+		expc, err := NewExpandController(fakeKubeClient, pvcInformer, pvInformer, storageClassInformer, nil, allPlugins, csitrans.New())
 		if err != nil {
 			t.Fatalf("error creating expand controller : %v", err)
 		}
