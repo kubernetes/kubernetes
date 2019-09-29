@@ -57,6 +57,11 @@ var updateNetworkConditionBackoff = wait.Backoff{
 	Jitter:   1.0,
 }
 
+type nodeRoutesStatuses struct {
+	mu     sync.RWMutex // protects status
+	status map[types.NodeName]map[string]bool
+}
+
 type RouteController struct {
 	routes           cloudprovider.Routes
 	kubeClient       clientset.Interface
@@ -136,9 +141,8 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 }
 
 func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.Route) error {
-	var l sync.Mutex
 	// for each node a map of podCIDRs and their created status
-	nodeRoutesStatuses := make(map[types.NodeName]map[string]bool)
+	nodeRoutesStatuses := &nodeRoutesStatuses{status: make(map[types.NodeName]map[string]bool)}
 	// routeMap maps routeTargetNode->route
 	routeMap := make(map[types.NodeName][]*cloudprovider.Route)
 	for _, route := range routes {
@@ -157,20 +161,16 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 			continue
 		}
 		nodeName := types.NodeName(node.Name)
-		l.Lock()
-		nodeRoutesStatuses[nodeName] = make(map[string]bool)
-		l.Unlock()
+		nodeRoutesStatuses.initKey(nodeName)
+
 		// for every node, for every cidr
 		for _, podCIDR := range node.Spec.PodCIDRs {
 			// we add it to our nodeCIDRs map here because add and delete go routines run at the same time
-			l.Lock()
-			nodeRoutesStatuses[nodeName][podCIDR] = false
-			l.Unlock()
+			nodeRoutesStatuses.set(nodeName, podCIDR, false)
+
 			// ignore if already created
 			if hasRoute(routeMap, nodeName, podCIDR) {
-				l.Lock()
-				nodeRoutesStatuses[nodeName][podCIDR] = true // a route for this podCIDR is already created
-				l.Unlock()
+				nodeRoutesStatuses.set(nodeName, podCIDR, true) // a route for this podCIDR is already created
 				continue
 			}
 			// if we are here, then a route needs to be created for this node
@@ -208,9 +208,8 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 							return err
 						}
 					}
-					l.Lock()
-					nodeRoutesStatuses[nodeName][route.DestinationCIDR] = true
-					l.Unlock()
+
+					nodeRoutesStatuses.set(nodeName, route.DestinationCIDR, true)
 					klog.Infof("Created route for node %s %s with hint %s after %v", nodeName, route.DestinationCIDR, nameHint, time.Since(startTime))
 					return nil
 				})
@@ -223,10 +222,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 
 	// searches our bag of node->cidrs for a match
 	nodeHasCidr := func(nodeName types.NodeName, cidr string) bool {
-		l.Lock()
-		defer l.Unlock()
-
-		nodeRoutes := nodeRoutesStatuses[nodeName]
+		nodeRoutes, _ := nodeRoutesStatuses.get(nodeName)
 		if nodeRoutes == nil {
 			return false
 		}
@@ -261,7 +257,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	// all nodes' statuses with the outcome
 	for _, node := range nodes {
 		wg.Add(1)
-		nodeRoutes := nodeRoutesStatuses[types.NodeName(node.Name)]
+		nodeRoutes, _ := nodeRoutesStatuses.get(types.NodeName(node.Name))
 		allRoutesCreated := true
 
 		if len(nodeRoutes) == 0 {
@@ -338,6 +334,27 @@ func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreate
 	}
 
 	return err
+}
+
+func (nrs *nodeRoutesStatuses) initKey(key types.NodeName) {
+	nrs.mu.Lock()
+	defer nrs.mu.Unlock()
+	nrs.status[key] = make(map[string]bool)
+}
+
+func (nrs *nodeRoutesStatuses) set(key types.NodeName, routeCIDR string, routeStatus bool) {
+	nrs.mu.Lock()
+	defer nrs.mu.Unlock()
+	if routeCIDR != "" && nrs.status[key] != nil {
+		nrs.status[key][routeCIDR] = routeStatus
+	}
+}
+
+func (nrs *nodeRoutesStatuses) get(key types.NodeName) (map[string]bool, bool) {
+	nrs.mu.RLock()
+	defer nrs.mu.RUnlock()
+	value, ok := nrs.status[key]
+	return value, ok
 }
 
 func (rc *RouteController) isResponsibleForRoute(route *cloudprovider.Route) bool {
