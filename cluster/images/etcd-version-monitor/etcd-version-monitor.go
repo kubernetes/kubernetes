@@ -26,11 +26,12 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/spf13/pflag"
+
+	"k8s.io/component-base/metrics"
 	"k8s.io/klog"
 )
 
@@ -58,15 +59,16 @@ const (
 // Initialize prometheus metrics to be exported.
 var (
 	// Register all custom metrics with a dedicated registry to keep them separate.
-	customMetricRegistry = prometheus.NewRegistry()
+	customMetricRegistry = metrics.NewKubeRegistry()
 
 	// Custom etcd version metric since etcd 3.2- does not export one.
 	// This will be replaced by https://github.com/coreos/etcd/pull/8960 in etcd 3.3.
-	etcdVersion = prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Namespace: namespace,
-			Name:      "version_info",
-			Help:      "Etcd server's binary version",
+	etcdVersion = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Namespace:      namespace,
+			Name:           "version_info",
+			Help:           "Etcd server's binary version",
+			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"binary_version"})
 
@@ -227,14 +229,14 @@ func getVersion(lastSeenBinaryVersion *string) error {
 
 	// Delete the metric for the previous version.
 	if *lastSeenBinaryVersion != "" {
-		deleted := etcdVersion.Delete(prometheus.Labels{"binary_version": *lastSeenBinaryVersion})
+		deleted := etcdVersion.Delete(metrics.Labels{"binary_version": *lastSeenBinaryVersion})
 		if !deleted {
 			return errors.New("failed to delete previous version's metric")
 		}
 	}
 
 	// Record the new version in a metric.
-	etcdVersion.With(prometheus.Labels{
+	etcdVersion.With(metrics.Labels{
 		"binary_version": version.BinaryVersion,
 	}).Set(0)
 	*lastSeenBinaryVersion = version.BinaryVersion
@@ -392,7 +394,6 @@ func main() {
 
 	// Register the metrics we defined above with prometheus.
 	customMetricRegistry.MustRegister(etcdVersion)
-	customMetricRegistry.Unregister(prometheus.NewGoCollector())
 
 	// Spawn threads for periodically scraping etcd version metrics.
 	stopCh := make(chan struct{})
