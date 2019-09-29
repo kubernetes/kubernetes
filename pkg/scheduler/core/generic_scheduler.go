@@ -597,7 +597,7 @@ func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
 		if podutil.GetPodPriority(p) >= podutil.GetPodPriority(pod) && p.UID != pod.UID {
 			nodeInfoOut.AddPod(p)
 			if metaOut != nil {
-				if err := metaOut.AddPod(p, nodeInfoOut); err != nil {
+				if err := metaOut.AddPod(p, nodeInfoOut.Node()); err != nil {
 					klog.Warningf("unable to add pod, nominated pod %s, incoming pod %s: %v", p.Name, pod.Name, err)
 				}
 			}
@@ -1128,7 +1128,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 	addPod := func(ap *v1.Pod) error {
 		nodeInfoCopy.AddPod(ap)
 		if meta != nil {
-			if err := meta.AddPod(ap, nodeInfoCopy); err != nil {
+			if err := meta.AddPod(ap, nodeInfoCopy.Node()); err != nil {
 				return err
 			}
 		}
