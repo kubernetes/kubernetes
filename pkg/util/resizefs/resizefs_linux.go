@@ -21,10 +21,14 @@ package resizefs
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"syscall"
+	"unsafe"
 
+	"golang.org/x/sys/unix"
+	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
@@ -55,6 +59,9 @@ func (resizefs *ResizeFs) Resize(resizeOptions volume.NodeResizeOptions, rescanD
 		return false, nil
 	}
 
+	checkFilsystemSize := true
+	oldFS := syscall.Statfs_t{}
+	// when rescanDevice is true, ensure that the new device geometry is updated
 	if rescanDevice {
 		// don't fail if resolving doesn't work
 		if blockDeviceRescanPath, err := findBlockDeviceRescanPath(resizeOptions.DevicePath); err != nil {
@@ -68,13 +75,34 @@ func (resizefs *ResizeFs) Resize(resizeOptions volume.NodeResizeOptions, rescanD
 				klog.V(0).Infof("ResizeFS.Resize - error polling new block device geometry: %v", err)
 			}
 		}
-	}
 
-	klog.V(3).Infof("ResizeFS.Resize - Detecting mounted volume filesystem size: %s", resizeOptions.DeviceMountPath)
-	oldFS := syscall.Statfs_t{}
-	err = syscall.Statfs(resizeOptions.DeviceMountPath, &oldFS)
-	if err != nil {
-		return false, fmt.Errorf("ResizeFS.Resize - Failed to detect %s filesystem size: %v", resizeOptions.DeviceMountPath, err)
+		// if the resizeOptions.NewSize is not zero, then verify whether the new block device size corresponds to the expected resizeOptions.NewSize
+		if !resizeOptions.NewSize.IsZero() {
+			klog.V(3).Infof("ResizeFS.Resize - Detecting %s volume size", resizeOptions.DeviceMountPath)
+			size, err := getBlockDeviceSize(resizeOptions.DevicePath)
+			if err != nil {
+				return false, err
+			}
+
+			currentSize := resource.NewQuantity(size, resource.BinarySI).ToDec()
+			klog.V(3).Infof("ResizeFS.Resize - Detected %s volume size: %d", resizeOptions.DeviceMountPath, currentSize.Value())
+			// Cmp returns 0 if the quantity is equal to y, -1 if the quantity is less than y,
+			// or 1 if the quantity is greater than y.
+			if currentSize.Cmp(resizeOptions.NewSize) < 0 {
+				return false, fmt.Errorf("current volume size is less than expected one: %d < %d", currentSize.Value(), resizeOptions.NewSize.Value())
+			}
+
+			checkFilsystemSize = false
+		}
+
+		// if the resizeOptions.NewSize is zero, then verify the FS size
+		if checkFilsystemSize {
+			klog.V(3).Infof("ResizeFS.Resize - Detecting mounted volume filesystem size: %s", resizeOptions.DeviceMountPath)
+			err = syscall.Statfs(resizeOptions.DeviceMountPath, &oldFS)
+			if err != nil {
+				return false, fmt.Errorf("ResizeFS.Resize - Failed to detect %s filesystem size: %v", resizeOptions.DeviceMountPath, err)
+			}
+		}
 	}
 
 	klog.V(3).Infof("ResizeFS.Resize - Expanding mounted volume %s", resizeOptions.DevicePath)
@@ -91,17 +119,20 @@ func (resizefs *ResizeFs) Resize(resizeOptions volume.NodeResizeOptions, rescanD
 		return false, err
 	}
 
-	klog.V(3).Infof("ResizeFS.Resize - Detecting mounted volume filesystem size after the expanding: %s", resizeOptions.DeviceMountPath)
-	newFS := syscall.Statfs_t{}
-	err = syscall.Statfs(resizeOptions.DeviceMountPath, &newFS)
-	if err != nil {
-		return false, fmt.Errorf("ResizeFS.Resize - Failed to detect %s filesystem size after the expanding: %v", resizeOptions.DeviceMountPath, err)
-	}
+	// if the resizeOptions.NewSize is zero, then verify the FS size
+	if rescanDevice && checkFilsystemSize {
+		klog.V(3).Infof("ResizeFS.Resize - Detecting mounted volume filesystem size after the expanding: %s", resizeOptions.DeviceMountPath)
+		newFS := syscall.Statfs_t{}
+		err = syscall.Statfs(resizeOptions.DeviceMountPath, &newFS)
+		if err != nil {
+			return false, fmt.Errorf("ResizeFS.Resize - Failed to detect %s filesystem size after the expanding: %v", resizeOptions.DeviceMountPath, err)
+		}
 
-	oldSize := oldFS.Blocks * uint64(oldFS.Bsize)
-	newSize := newFS.Blocks * uint64(newFS.Bsize)
-	if newSize <= oldSize {
-		return false, fmt.Errorf("ResizeFS.Resize - Filesystem size was not expanded. Old size %d, new size %d", oldSize, newSize)
+		oldSize := oldFS.Blocks * uint64(oldFS.Bsize)
+		newSize := newFS.Blocks * uint64(newFS.Bsize)
+		if newSize <= oldSize {
+			return false, fmt.Errorf("ResizeFS.Resize - Filesystem size was not expanded. Old size %d, new size %d", oldSize, newSize)
+		}
 	}
 
 	return true, nil
@@ -142,4 +173,20 @@ func findBlockDeviceRescanPath(path string) (string, error) {
 		return filepath.EvalSymlinks(filepath.Join("/sys/block", parts[2], "device", "rescan"))
 	}
 	return "", fmt.Errorf("illegal path for device " + devicePath)
+}
+
+// getBlockDeviceSize returns the size of the block device by path
+func getBlockDeviceSize(path string) (int64, error) {
+	fd, err := os.Open(path)
+	if err != nil {
+		return 0, err
+	}
+	defer fd.Close()
+
+	var devSize uint64
+	if _, _, errno := unix.Syscall(unix.SYS_IOCTL, uintptr(fd.Fd()), unix.BLKGETSIZE64, uintptr(unsafe.Pointer(&devSize))); errno != 0 {
+		return 0, fmt.Errorf("failed to get the %q block device size: %v", path, errno)
+	}
+
+	return int64(devSize), nil
 }
