@@ -139,6 +139,12 @@ const (
 	//
 	// Deprecates and removes SelfLink from ObjectMeta and ListMeta.
 	RemoveSelfLink featuregate.Feature = "RemoveSelfLink"
+
+	// owner: @hormes
+	// alpha: v1.17
+	//
+	// Enables support for request progress notify on etcd watchers.
+	RequestProgressNotify featuregate.Feature = "RequestProgressNotify"
 )
 
 func init() {
@@ -164,4 +170,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WatchBookmark:           {Default: true, PreRelease: featuregate.Beta},
 	RequestManagement:       {Default: false, PreRelease: featuregate.Alpha},
 	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
+	RequestProgressNotify:          {Default: false, PreRelease: featuregate.Alpha},
 }

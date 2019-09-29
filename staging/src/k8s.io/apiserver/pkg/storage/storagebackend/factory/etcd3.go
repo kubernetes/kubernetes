@@ -31,11 +31,8 @@ import (
 	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 
-<<<<<<< HEAD
-	utilnet "k8s.io/apimachinery/pkg/util/net"
-=======
 	"k8s.io/apimachinery/pkg/runtime"
->>>>>>> d67dc03f8c... enable progress notify event
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/egressselector"
 	"k8s.io/apiserver/pkg/storage"
@@ -220,7 +217,6 @@ func startCompactorOnce(c storagebackend.TransportConfig, interval time.Duration
 //	      metav1.ObjectMeta
 //    }
 //    This will make things simple and clear, but need an api change.
-// TODO a better way to implement it
 func newETCD3Storage(c storagebackend.Config, newFunc func() runtime.Object) (storage.Interface, DestroyFunc, error) {
 	stopCompactor, err := startCompactorOnce(c.Transport, c.CompactionInterval)
 	if err != nil {

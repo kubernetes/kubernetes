@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/storage"
@@ -43,6 +45,8 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utiltrace "k8s.io/utils/trace"
 )
+
+var requestProgressNotifyInterval = 30 * time.Second
 
 // authenticatedDataString satisfies the value.Context interface. It uses the key to
 // authenticate the stored data. This does not defend against reuse of previously
@@ -72,6 +76,7 @@ type store struct {
 	watcher       *watcher
 	pagingEnabled bool
 	leaseManager  *leaseManager
+	newFunc       func() runtime.Object
 }
 
 type objState struct {
@@ -87,7 +92,7 @@ func New(c *clientv3.Client, codec runtime.Codec, prefix string, transformer val
 	return newStore(c, pagingEnabled, codec, prefix, transformer, newFunc)
 }
 
-func newStore(c *clientv3.Client, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer) *store {
+func newStore(c *clientv3.Client, pagingEnabled bool, codec runtime.Codec, prefix string, transformer value.Transformer, newFunc func() runtime.Object) *store {
 	versioner := APIObjectVersioner{}
 	result := &store{
 		client:        c,
@@ -101,6 +106,17 @@ func newStore(c *clientv3.Client, pagingEnabled bool, codec runtime.Codec, prefi
 		pathPrefix:   path.Join("/", prefix),
 		watcher:      newWatcher(c, codec, versioner, transformer, newFunc),
 		leaseManager: newDefaultLeaseManager(c),
+		newFunc:      newFunc,
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.RequestProgressNotify) {
+		// To ensure the revision keeps up with etcd, request progress for all watcher
+		// channels on the client every 30s.
+		go wait.JitterUntil(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			err := result.client.RequestProgress(ctx)
+			klog.V(4).Infof("request progress notify for etcd watchers failed, err %v", err)
+		}, requestProgressNotifyInterval, 0.2, true, wait.NeverStop)
 	}
 	return result
 }
@@ -838,4 +854,42 @@ func notFound(key string) clientv3.Cmp {
 // getTypeName returns type name of an object for reporting purposes.
 func getTypeName(obj interface{}) string {
 	return reflect.TypeOf(obj).String()
+}
+
+// getEtcdVersion returns the major and minor version of the underlying etcd
+func (s *store) getEtcdVersion(ctx context.Context) (maj int, min int, err error) {
+	for _, ep := range s.client.Endpoints() {
+		resp, e := s.client.Status(ctx, ep)
+		if e != nil {
+			err = e
+			continue
+		}
+		vs := strings.Split(resp.Version, ".")
+		maj, min = 0, 0
+		if len(vs) >= 2 {
+			var serr error
+			if maj, serr = strconv.Atoi(vs[0]); serr != nil {
+				err = serr
+				continue
+			}
+			if min, serr = strconv.Atoi(vs[1]); serr != nil {
+				err = serr
+				continue
+			}
+		}
+		return maj, min, nil
+	}
+	return 0, 0, err
+}
+
+// requestProgressOnNewerEtcd send a `RequestProgress` if the etcd cluster does support it
+func (s *store) requestProgressOnNewerEtcd(ctx context.Context) error {
+	maj, min, err := s.getEtcdVersion(ctx)
+	if err != nil {
+		return err
+	}
+	if maj <= 3 && min < 4 {
+		return fmt.Errorf("etcd older than 3.4 does not support this feature")
+	}
+	return s.client.RequestProgress(ctx)
 }

@@ -34,7 +34,7 @@ import (
 func newStorage(t *testing.T) (*ScaleREST, *etcd3testing.EtcdTestServer, storage.Interface, factory.DestroyFunc) {
 	etcdStorage, server := registrytest.NewEtcdStorage(t, "")
 	restOptions := generic.RESTOptions{StorageConfig: etcdStorage, Decorator: generic.UndecoratedStorage, DeleteCollectionWorkers: 1, ResourcePrefix: "controllers"}
-	s, d, err := generic.NewRawStorage(etcdStorage)
+	s, d, err := generic.NewRawStorage(etcdStorage, nil)
 	if err != nil {
 		t.Fatalf("Couldn't create storage: %v", err)
 	}
