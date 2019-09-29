@@ -103,7 +103,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	// Now apply kube reserved and system reserved limits if required.
 	if nc.EnforceNodeAllocatable.Has(kubetypes.SystemReservedEnforcementKey) {
 		klog.V(2).Infof("Enforcing System reserved on cgroup %q with limits: %+v", nc.SystemReservedCgroupName, nc.SystemReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.SystemReservedCgroupName), nc.SystemReserved); err != nil {
+		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.SystemReservedCgroupName), nc.SystemReserved, kubetypes.SystemReservedEnforcementKey); err != nil {
 			message := fmt.Sprintf("Failed to enforce System Reserved Cgroup Limits on %q: %v", nc.SystemReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return fmt.Errorf(message)
@@ -112,7 +112,7 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 	}
 	if nc.EnforceNodeAllocatable.Has(kubetypes.KubeReservedEnforcementKey) {
 		klog.V(2).Infof("Enforcing kube reserved on cgroup %q with limits: %+v", nc.KubeReservedCgroupName, nc.KubeReserved)
-		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.KubeReservedCgroupName), nc.KubeReserved); err != nil {
+		if err := enforceExistingCgroup(cm.cgroupManager, cm.cgroupManager.CgroupName(nc.KubeReservedCgroupName), nc.KubeReserved, kubetypes.KubeReservedEnforcementKey); err != nil {
 			message := fmt.Sprintf("Failed to enforce Kube Reserved Cgroup Limits on %q: %v", nc.KubeReservedCgroupName, err)
 			cm.recorder.Event(nodeRef, v1.EventTypeWarning, events.FailedNodeAllocatableEnforcement, message)
 			return fmt.Errorf(message)
@@ -123,13 +123,29 @@ func (cm *containerManagerImpl) enforceNodeAllocatableCgroups() error {
 }
 
 // enforceExistingCgroup updates the limits `rl` on existing cgroup `cName` using `cgroupManager` interface.
-func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.ResourceList) error {
+func enforceExistingCgroup(cgroupManager CgroupManager, cName CgroupName, rl v1.ResourceList, enforcementKey string) error {
+	// check the existing cgroup name
+	if len(cName) == 0 {
+		switch enforcementKey {
+		case kubetypes.SystemReservedEnforcementKey:
+			message := fmt.Sprintf("the %s is enabled on enforceNodeAllocatable, both systemReserved "+
+				"and systemReservedCgroup should be designated, but systemReservedCgroup is nil.", kubetypes.SystemReservedEnforcementKey)
+			return fmt.Errorf(message)
+		case kubetypes.KubeReservedEnforcementKey:
+			message := fmt.Sprintf("the %s is enabled on enforceNodeAllocatable, both kubeReserved "+
+				"and kubeReservedCgroup should be designated, but kubeReservedCgroup is nil.", kubetypes.KubeReservedEnforcementKey)
+			return fmt.Errorf(message)
+		default:
+			return fmt.Errorf("the cgroup name can't be nill.")
+		}
+	}
+
 	cgroupConfig := &CgroupConfig{
 		Name:               cName,
 		ResourceParameters: getCgroupConfig(rl),
 	}
 	if cgroupConfig.ResourceParameters == nil {
-		return fmt.Errorf("%q cgroup is not config properly", cgroupConfig.Name)
+		return fmt.Errorf("%q cgroup is not config properly, its resource parameter is nil.", cgroupConfig.Name)
 	}
 	klog.V(4).Infof("Enforcing limits on cgroup %q with %d cpu shares, %d bytes of memory, and %d processes", cName, cgroupConfig.ResourceParameters.CpuShares, cgroupConfig.ResourceParameters.Memory, cgroupConfig.ResourceParameters.PidsLimit)
 	if !cgroupManager.Exists(cgroupConfig.Name) {
