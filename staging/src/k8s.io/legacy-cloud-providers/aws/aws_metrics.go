@@ -21,8 +21,6 @@ package aws
 import (
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -55,14 +53,14 @@ var (
 
 func recordAWSMetric(actionName string, timeTaken float64, err error) {
 	if err != nil {
-		awsAPIErrorMetric.With(prometheus.Labels{"request": actionName}).Inc()
+		awsAPIErrorMetric.With(metrics.Labels{"request": actionName}).Inc()
 	} else {
-		awsAPIMetric.With(prometheus.Labels{"request": actionName}).Observe(timeTaken)
+		awsAPIMetric.With(metrics.Labels{"request": actionName}).Observe(timeTaken)
 	}
 }
 
 func recordAWSThrottlesMetric(operation string) {
-	awsAPIThrottlesMetric.With(prometheus.Labels{"operation_name": operation}).Inc()
+	awsAPIThrottlesMetric.With(metrics.Labels{"operation_name": operation}).Inc()
 }
 
 var registerOnce sync.Once
