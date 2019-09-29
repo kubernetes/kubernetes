@@ -21,9 +21,10 @@ import (
 	"testing"
 	"time"
 
+	"net/http"
+
 	"k8s.io/apimachinery/pkg/util/clock"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
-	"net/http"
 )
 
 type fakeLock struct {
@@ -31,8 +32,8 @@ type fakeLock struct {
 }
 
 // Get is a dummy to allow us to have a fakeLock for testing.
-func (fl *fakeLock) Get() (ler *rl.LeaderElectionRecord, err error) {
-	return nil, nil
+func (fl *fakeLock) Get() (ler *rl.LeaderElectionRecord, rawRecord []byte, err error) {
+	return nil, nil, nil
 }
 
 // Create is a dummy to allow us to have a fakeLock for testing.

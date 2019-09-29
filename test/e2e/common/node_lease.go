@@ -41,9 +41,9 @@ var _ = framework.KubeDescribe("NodeLease", func() {
 	f := framework.NewDefaultFramework("node-lease-test")
 
 	ginkgo.BeforeEach(func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gomega.Expect(len(nodes.Items)).NotTo(gomega.BeZero())
-		nodeName = nodes.Items[0].ObjectMeta.Name
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+		nodeName = node.Name
 	})
 
 	ginkgo.Context("when the NodeLease feature is enabled", func() {

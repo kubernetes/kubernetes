@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/controller/daemon"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -159,9 +160,9 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.ExpectNoError(err, "error waiting for daemon pods to be running on no nodes")
 
 		ginkgo.By("Change node label to blue, check that daemon pod is launched.")
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gomega.Expect(len(nodeList.Items)).To(gomega.BeNumerically(">", 0))
-		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+		newNode, err := setDaemonSetNodeLabels(c, node.Name, nodeSelector)
 		framework.ExpectNoError(err, "error setting labels on node")
 		daemonSetLabels, _ := separateDaemonSetNodeLabels(newNode.Labels)
 		framework.ExpectEqual(len(daemonSetLabels), 1)
@@ -172,7 +173,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 
 		ginkgo.By("Update the node label to green, and wait for daemons to be unscheduled")
 		nodeSelector[daemonsetColorLabel] = "green"
-		greenNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
+		greenNode, err := setDaemonSetNodeLabels(c, node.Name, nodeSelector)
 		framework.ExpectNoError(err, "error removing labels on node")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, ds))
 		framework.ExpectNoError(err, "error waiting for daemon pod to not be running on nodes")
@@ -222,9 +223,9 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.ExpectNoError(err, "error waiting for daemon pods to be running on no nodes")
 
 		ginkgo.By("Change node label to blue, check that daemon pod is launched.")
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gomega.Expect(len(nodeList.Items)).To(gomega.BeNumerically(">", 0))
-		newNode, err := setDaemonSetNodeLabels(c, nodeList.Items[0].Name, nodeSelector)
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+		newNode, err := setDaemonSetNodeLabels(c, node.Name, nodeSelector)
 		framework.ExpectNoError(err, "error setting labels on node")
 		daemonSetLabels, _ := separateDaemonSetNodeLabels(newNode.Labels)
 		framework.ExpectEqual(len(daemonSetLabels), 1)
@@ -234,7 +235,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Remove the node label and wait for daemons to be unscheduled")
-		_, err = setDaemonSetNodeLabels(c, nodeList.Items[0].Name, map[string]string{})
+		_, err = setDaemonSetNodeLabels(c, node.Name, map[string]string{})
 		framework.ExpectNoError(err, "error removing labels on node")
 		err = wait.PollImmediate(dsRetryPeriod, dsRetryTimeout, checkRunningOnNoNodes(f, ds))
 		framework.ExpectNoError(err, "error waiting for daemon pod to not be running on nodes")
@@ -381,13 +382,14 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  rollback of updates to a DaemonSet.
 	*/
 	framework.ConformanceIt("should rollback without unnecessary restarts", func() {
-		schedulableNodes := framework.GetReadySchedulableNodesOrDie(c)
+		schedulableNodes, err := e2enode.GetReadySchedulableNodes(c)
+		framework.ExpectNoError(err)
 		gomega.Expect(len(schedulableNodes.Items)).To(gomega.BeNumerically(">", 1), "Conformance test suite needs a cluster with at least 2 nodes.")
 		framework.Logf("Create a RollingUpdate DaemonSet")
 		label := map[string]string{daemonsetNameLabel: dsName}
 		ds := newDaemonSet(dsName, image, label)
 		ds.Spec.UpdateStrategy = appsv1.DaemonSetUpdateStrategy{Type: appsv1.RollingUpdateDaemonSetStrategyType}
-		ds, err := c.AppsV1().DaemonSets(ns).Create(ds)
+		ds, err = c.AppsV1().DaemonSets(ns).Create(ds)
 		framework.ExpectNoError(err)
 
 		framework.Logf("Check that daemon pods launch on every node of the cluster")
@@ -420,7 +422,8 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 				framework.Failf("unexpected pod found, image = %s", image)
 			}
 		}
-		schedulableNodes = framework.GetReadySchedulableNodesOrDie(c)
+		schedulableNodes, err = e2enode.GetReadySchedulableNodes(c)
+		framework.ExpectNoError(err)
 		if len(schedulableNodes.Items) < 2 {
 			framework.ExpectEqual(len(existingPods), 0)
 		} else {
@@ -505,7 +508,10 @@ func separateDaemonSetNodeLabels(labels map[string]string) (map[string]string, m
 }
 
 func clearDaemonSetNodeLabels(c clientset.Interface) error {
-	nodeList := framework.GetReadySchedulableNodesOrDie(c)
+	nodeList, err := e2enode.GetReadySchedulableNodes(c)
+	if err != nil {
+		return err
+	}
 	for _, node := range nodeList.Items {
 		_, err := setDaemonSetNodeLabels(c, node.Name, map[string]string{})
 		if err != nil {

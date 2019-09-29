@@ -264,7 +264,8 @@ func (j *TestJig) CreateLoadBalancerService(namespace, serviceName string, timeo
 // GetEndpointNodes returns a map of nodenames:external-ip on which the
 // endpoints of the given Service are running.
 func (j *TestJig) GetEndpointNodes(svc *v1.Service) map[string][]string {
-	nodes := j.GetNodes(MaxNodesForEndpointsTests)
+	nodes, err := e2enode.GetBoundedReadySchedulableNodes(j.Client, MaxNodesForEndpointsTests)
+	framework.ExpectNoError(err)
 	endpoints, err := j.Client.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
 	if err != nil {
 		framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
@@ -287,27 +288,6 @@ func (j *TestJig) GetEndpointNodes(svc *v1.Service) map[string][]string {
 		}
 	}
 	return nodeMap
-}
-
-// GetNodes returns the first maxNodesForTest nodes. Useful in large clusters
-// where we don't eg: want to create an endpoint per node.
-func (j *TestJig) GetNodes(maxNodesForTest int) (nodes *v1.NodeList) {
-	nodes = framework.GetReadySchedulableNodesOrDie(j.Client)
-	if len(nodes.Items) <= maxNodesForTest {
-		maxNodesForTest = len(nodes.Items)
-	}
-	nodes.Items = nodes.Items[:maxNodesForTest]
-	return nodes
-}
-
-// GetNodesNames returns a list of names of the first maxNodesForTest nodes
-func (j *TestJig) GetNodesNames(maxNodesForTest int) []string {
-	nodes := j.GetNodes(maxNodesForTest)
-	nodesNames := []string{}
-	for _, node := range nodes.Items {
-		nodesNames = append(nodesNames, node.Name)
-	}
-	return nodesNames
 }
 
 // WaitForEndpointOnNode waits for a service endpoint on the given node.
@@ -840,7 +820,8 @@ func (j *TestJig) checkNodePortServiceReachability(namespace string, svc *v1.Ser
 	servicePorts := svc.Spec.Ports
 
 	// Consider only 2 nodes for testing
-	nodes := j.GetNodes(2)
+	nodes, err := e2enode.GetBoundedReadySchedulableNodes(j.Client, 2)
+	framework.ExpectNoError(err)
 
 	j.WaitForAvailableEndpoint(namespace, svc.Name, ServiceEndpointsTimeout)
 

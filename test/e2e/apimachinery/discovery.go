@@ -20,7 +20,6 @@ import (
 	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	"k8s.io/kubernetes/test/utils/crd"
 
 	"github.com/onsi/ginkgo"
@@ -50,7 +49,7 @@ var _ = SIGDescribe("Discovery", func() {
 		spec := testcrd.Crd.Spec
 		resources, err := testcrd.APIExtensionClient.Discovery().ServerResourcesForGroupVersion(spec.Group + "/" + spec.Versions[0].Name)
 		if err != nil {
-			e2elog.Failf("failed to find the discovery doc for %v: %v", resources, err)
+			framework.Failf("failed to find the discovery doc for %v: %v", resources, err)
 		}
 		found := false
 		var storageVersion string
@@ -69,12 +68,12 @@ var _ = SIGDescribe("Discovery", func() {
 			if r.Name == spec.Names.Plural {
 				found = true
 				if r.StorageVersionHash != expected {
-					e2elog.Failf("expected storageVersionHash of %s/%s/%s to be %s, got %s", r.Group, r.Version, r.Name, expected, r.StorageVersionHash)
+					framework.Failf("expected storageVersionHash of %s/%s/%s to be %s, got %s", r.Group, r.Version, r.Name, expected, r.StorageVersionHash)
 				}
 			}
 		}
 		if !found {
-			e2elog.Failf("didn't find resource %s in the discovery doc", spec.Names.Plural)
+			framework.Failf("didn't find resource %s in the discovery doc", spec.Names.Plural)
 		}
 	})
 })

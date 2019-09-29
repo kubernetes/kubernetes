@@ -75,7 +75,6 @@ func (e *Extender) serveHTTP(t *testing.T, w http.ResponseWriter, req *http.Requ
 		}
 
 		if strings.Contains(req.URL.Path, filter) {
-			resp := &schedulerapi.ExtenderFilterResult{}
 			resp, err := e.Filter(&args)
 			if err != nil {
 				resp.Error = err.Error()

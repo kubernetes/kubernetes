@@ -18,6 +18,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -149,7 +150,7 @@ func newWithBackoff(subjectAccessReview authorizationclient.SubjectAccessReviewI
 // TODO(mikedanese): We should eventually support failing closed when we
 // encounter an error. We are failing open now to preserve backwards compatible
 // behavior.
-func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
+func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attributes) (decision authorizer.Decision, reason string, err error) {
 	r := &authorization.SubjectAccessReview{}
 	if user := attr.GetUser(); user != nil {
 		r.Spec = authorization.SubjectAccessReviewSpec{
@@ -187,8 +188,8 @@ func (w *WebhookAuthorizer) Authorize(attr authorizer.Attributes) (decision auth
 			result *authorization.SubjectAccessReview
 			err    error
 		)
-		webhook.WithExponentialBackoff(w.initialBackoff, func() error {
-			result, err = w.subjectAccessReview.Create(r)
+		webhook.WithExponentialBackoff(ctx, w.initialBackoff, func() error {
+			result, err = w.subjectAccessReview.CreateContext(ctx, r)
 			return err
 		})
 		if err != nil {
@@ -264,8 +265,12 @@ type subjectAccessReviewClient struct {
 }
 
 func (t *subjectAccessReviewClient) Create(subjectAccessReview *authorization.SubjectAccessReview) (*authorization.SubjectAccessReview, error) {
+	return t.CreateContext(context.Background(), subjectAccessReview)
+}
+
+func (t *subjectAccessReviewClient) CreateContext(ctx context.Context, subjectAccessReview *authorization.SubjectAccessReview) (*authorization.SubjectAccessReview, error) {
 	result := &authorization.SubjectAccessReview{}
-	err := t.w.RestClient.Post().Body(subjectAccessReview).Do().Into(result)
+	err := t.w.RestClient.Post().Context(ctx).Body(subjectAccessReview).Do().Into(result)
 	return result, err
 }
 

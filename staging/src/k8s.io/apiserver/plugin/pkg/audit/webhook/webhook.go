@@ -18,6 +18,7 @@ limitations under the License.
 package webhook
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -95,7 +96,7 @@ func (b *backend) processEvents(ev ...*auditinternal.Event) error {
 	for _, e := range ev {
 		list.Items = append(list.Items, *e)
 	}
-	return b.w.WithExponentialBackoff(func() rest.Result {
+	return b.w.WithExponentialBackoff(context.Background(), func() rest.Result {
 		trace := utiltrace.New("Call Audit Events webhook",
 			utiltrace.Field{"name", b.name},
 			utiltrace.Field{"event-count", len(list.Items)})

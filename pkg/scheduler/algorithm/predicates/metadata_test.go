@@ -62,7 +62,7 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	if meta1.podBestEffort != meta2.podBestEffort {
 		return fmt.Errorf("podBestEfforts are not equal")
 	}
-	if meta1.serviceAffinityInUse != meta1.serviceAffinityInUse {
+	if meta1.serviceAffinityInUse != meta2.serviceAffinityInUse {
 		return fmt.Errorf("serviceAffinityInUses are not equal")
 	}
 	if len(meta1.podPorts) != len(meta2.podPorts) {
@@ -1696,15 +1696,6 @@ var (
 	hardSpread = v1.DoNotSchedule
 	softSpread = v1.ScheduleAnyway
 )
-
-func newPairSet(kv ...string) topologyPairSet {
-	result := make(topologyPairSet)
-	for i := 0; i < len(kv); i += 2 {
-		pair := topologyPair{key: kv[i], value: kv[i+1]}
-		result[pair] = struct{}{}
-	}
-	return result
-}
 
 // sortCriticalPaths is only served for testing purpose.
 func (c *podSpreadCache) sortCriticalPaths() {

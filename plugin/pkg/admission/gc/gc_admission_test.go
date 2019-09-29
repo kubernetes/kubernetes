@@ -40,7 +40,7 @@ import (
 
 type fakeAuthorizer struct{}
 
-func (fakeAuthorizer) Authorize(a authorizer.Attributes) (authorizer.Decision, string, error) {
+func (fakeAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (authorizer.Decision, string, error) {
 	username := a.GetUser().GetName()
 
 	if username == "non-deleter" {

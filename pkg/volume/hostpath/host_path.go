@@ -489,7 +489,9 @@ func makeDir(pathname string) error {
 // If pathname already exists, whether a file or directory, no error is returned.
 func makeFile(pathname string) error {
 	f, err := os.OpenFile(pathname, os.O_CREATE, os.FileMode(0644))
-	defer f.Close()
+	if f != nil {
+		f.Close()
+	}
 	if err != nil {
 		if !os.IsExist(err) {
 			return err

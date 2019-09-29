@@ -59,6 +59,7 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/framework/timer"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -158,14 +159,14 @@ var _ = SIGDescribe("Load capacity", func() {
 		clientset = f.ClientSet
 
 		ns = f.Namespace.Name
-		nodes := framework.GetReadySchedulableNodesOrDie(clientset)
-		nodeCount = len(nodes.Items)
-		gomega.Expect(nodeCount).NotTo(gomega.BeZero())
+
+		_, err := e2enode.GetRandomReadySchedulableNode(clientset)
+		framework.ExpectNoError(err)
 
 		// Terminating a namespace (deleting the remaining objects from it - which
 		// generally means events) can affect the current run. Thus we wait for all
 		// terminating namespace to be finally deleted before starting this test.
-		err := framework.CheckTestingNSDeletedExcept(clientset, ns)
+		err = framework.CheckTestingNSDeletedExcept(clientset, ns)
 		framework.ExpectNoError(err)
 
 		framework.ExpectNoError(e2emetrics.ResetMetrics(clientset))

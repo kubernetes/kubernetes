@@ -209,3 +209,37 @@ type PluginConfig struct {
 	// Args defines the arguments passed to the plugins at the time of initialization. Args can have arbitrary structure.
 	Args runtime.Unknown
 }
+
+///////////////////////////////////////////////////////////////////////////////
+// NOTE: The following methods are intentionally left out of the staging mirror.
+///////////////////////////////////////////////////////////////////////////////
+
+func appendPluginSet(dst *PluginSet, src *PluginSet) *PluginSet {
+	if dst == nil {
+		dst = &PluginSet{}
+	}
+	if src != nil {
+		dst.Enabled = append(dst.Enabled, src.Enabled...)
+		dst.Disabled = append(dst.Disabled, src.Disabled...)
+	}
+	return dst
+}
+
+// Append appends src Plugins to current Plugins. If a PluginSet is nil, it will
+// be created.
+func (p *Plugins) Append(src *Plugins) {
+	if p == nil || src == nil {
+		return
+	}
+	p.QueueSort = appendPluginSet(p.QueueSort, src.QueueSort)
+	p.PreFilter = appendPluginSet(p.PreFilter, src.PreFilter)
+	p.Filter = appendPluginSet(p.Filter, src.Filter)
+	p.PostFilter = appendPluginSet(p.PostFilter, src.PostFilter)
+	p.Score = appendPluginSet(p.Score, src.Score)
+	p.Reserve = appendPluginSet(p.Reserve, src.Reserve)
+	p.Permit = appendPluginSet(p.Permit, src.Permit)
+	p.PreBind = appendPluginSet(p.PreBind, src.PreBind)
+	p.Bind = appendPluginSet(p.Bind, src.Bind)
+	p.PostBind = appendPluginSet(p.PostBind, src.PostBind)
+	p.Unreserve = appendPluginSet(p.Unreserve, src.Unreserve)
+}

@@ -34,7 +34,7 @@ dependencies:
 
 
   - name: "golang"
-    version: 1.12.9
+    version: 1.12.10
     refPaths:
     - path: build/build-image/cross/Dockerfile
       match: "golang:"
@@ -79,7 +79,7 @@ dependencies:
       match: CoreDNSVersion =
 
   - name: "crictl"
-    version: 1.14.0
+    version: 1.16.1
     refPaths:
     - path: build/workspace.bzl
       match: CRI_TOOLS_VERSION =

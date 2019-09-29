@@ -1098,6 +1098,42 @@ metadata:
 
 			// Quota and limitrange are skipped for now.
 		})
+
+		ginkgo.It("should check if kubectl describe prints relevant information for cronjob", func() {
+			ginkgo.By("creating a cronjob")
+			nsFlag := fmt.Sprintf("--namespace=%v", ns)
+			cronjobYaml := commonutils.SubstituteImageName(string(readTestFileOrDie("busybox-cronjob.yaml")))
+			framework.RunKubectlOrDieInput(cronjobYaml, "create", "-f", "-", nsFlag)
+
+			ginkgo.By("waiting for cronjob to start.")
+			err := wait.PollImmediate(time.Second, time.Minute, func() (bool, error) {
+				cj, err := c.BatchV1beta1().CronJobs(ns).List(metav1.ListOptions{})
+				if err != nil {
+					return false, fmt.Errorf("Failed getting CronJob %s: %v", ns, err)
+				}
+				return len(cj.Items) > 0, nil
+			})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("verifying kubectl describe prints")
+			output := framework.RunKubectlOrDie("describe", "cronjob", "cronjob-test", nsFlag)
+			requiredStrings := [][]string{
+				{"Name:", "cronjob-test"},
+				{"Namespace:", ns},
+				{"Labels:"},
+				{"Annotations:"},
+				{"Schedule:", "*/1 * * * *"},
+				{"Concurrency Policy:", "Allow"},
+				{"Suspend:", "False"},
+				{"Successful Job History Limit:", "3"},
+				{"Failed Job History Limit:", "1"},
+				{"Starting Deadline Seconds:", "30s"},
+				{"Selector:"},
+				{"Parallelism:"},
+				{"Completions:"},
+			}
+			checkOutput(output, requiredStrings)
+		})
 	})
 
 	ginkgo.Describe("Kubectl expose", func() {

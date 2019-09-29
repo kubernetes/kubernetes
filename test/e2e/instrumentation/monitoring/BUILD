@@ -39,6 +39,7 @@ go_library(
         "//test/e2e/framework/config:go_default_library",
         "//test/e2e/framework/gpu:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
+        "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/instrumentation/common:go_default_library",
         "//test/e2e/scheduling:go_default_library",

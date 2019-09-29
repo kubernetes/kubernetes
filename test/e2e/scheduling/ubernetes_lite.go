@@ -215,12 +215,12 @@ func SpreadRCOrFail(f *framework.Framework, replicaCount int32, image string, ar
 	}()
 	// List the pods, making sure we observe all the replicas.
 	selector := labels.SelectorFromSet(labels.Set(map[string]string{"name": name}))
-	pods, err := e2epod.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicaCount)
+	_, err = e2epod.PodsCreated(f.ClientSet, f.Namespace.Name, name, replicaCount)
 	framework.ExpectNoError(err)
 
 	// Wait for all of them to be scheduled
 	ginkgo.By(fmt.Sprintf("Waiting for %d replicas of %s to be scheduled.  Selector: %v", replicaCount, name, selector))
-	pods, err = e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, selector)
+	pods, err := e2epod.WaitForPodsWithLabelScheduled(f.ClientSet, f.Namespace.Name, selector)
 	framework.ExpectNoError(err)
 
 	// Now make sure they're spread across zones

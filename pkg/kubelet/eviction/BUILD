@@ -48,6 +48,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/eviction",
     deps = [
+        "//pkg/api/v1/pod:go_default_library",
         "//pkg/api/v1/resource:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/apis/core/v1/helper/qos:go_default_library",
@@ -61,7 +62,6 @@ go_library(
         "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/scheduler/api:go_default_library",
-        "//pkg/scheduler/util:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",

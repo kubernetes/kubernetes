@@ -737,6 +737,7 @@ func (c *csiDriverClient) nodeSupportsStageUnstageV1(ctx context.Context) (bool,
 	for _, capability := range capabilities {
 		if capability.GetRpc().GetType() == csipbv1.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME {
 			stageUnstageSet = true
+			break
 		}
 	}
 	return stageUnstageSet, nil
@@ -764,6 +765,7 @@ func (c *csiDriverClient) nodeSupportsStageUnstageV0(ctx context.Context) (bool,
 	for _, capability := range capabilities {
 		if capability.GetRpc().GetType() == csipbv0.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME {
 			stageUnstageSet = true
+			break
 		}
 	}
 	return stageUnstageSet, nil

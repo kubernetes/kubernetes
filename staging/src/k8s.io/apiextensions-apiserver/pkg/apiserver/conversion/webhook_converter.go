@@ -112,16 +112,6 @@ func (f *webhookConverterFactory) NewWebhookConverter(crd *internal.CustomResour
 	}, nil
 }
 
-// hasConversionReviewVersion check whether a version is accepted by a given webhook.
-func (c *webhookConverter) hasConversionReviewVersion(v string) bool {
-	for _, b := range c.conversionReviewVersions {
-		if b == v {
-			return true
-		}
-	}
-	return false
-}
-
 // getObjectsToConvert returns a list of objects requiring conversion.
 // if obj is a list, getObjectsToConvert returns a (potentially empty) list of the items that are not already in the desired version.
 // if obj is not a list, and is already in the desired version, getObjectsToConvert returns an empty list.

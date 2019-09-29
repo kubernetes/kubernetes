@@ -30,7 +30,6 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
 )
@@ -55,24 +54,24 @@ var _ = SIGDescribe("CustomResourceDefinition Watch [Privileged:ClusterAdmin]", 
 
 			config, err := framework.LoadConfig()
 			if err != nil {
-				e2elog.Failf("failed to load config: %v", err)
+				framework.Failf("failed to load config: %v", err)
 			}
 
 			apiExtensionClient, err := clientset.NewForConfig(config)
 			if err != nil {
-				e2elog.Failf("failed to initialize apiExtensionClient: %v", err)
+				framework.Failf("failed to initialize apiExtensionClient: %v", err)
 			}
 
 			noxuDefinition := fixtures.NewNoxuV1CustomResourceDefinition(apiextensionsv1.ClusterScoped)
 			noxuDefinition, err = fixtures.CreateNewV1CustomResourceDefinition(noxuDefinition, apiExtensionClient, f.DynamicClient)
 			if err != nil {
-				e2elog.Failf("failed to create CustomResourceDefinition: %v", err)
+				framework.Failf("failed to create CustomResourceDefinition: %v", err)
 			}
 
 			defer func() {
 				err = fixtures.DeleteV1CustomResourceDefinition(noxuDefinition, apiExtensionClient)
 				if err != nil {
-					e2elog.Failf("failed to delete CustomResourceDefinition: %v", err)
+					framework.Failf("failed to delete CustomResourceDefinition: %v", err)
 				}
 			}()
 

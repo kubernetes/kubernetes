@@ -90,6 +90,10 @@ AUTHORIZATION_MODE=${AUTHORIZATION_MODE:-"Node,RBAC"}
 KUBECONFIG_TOKEN=${KUBECONFIG_TOKEN:-""}
 AUTH_ARGS=${AUTH_ARGS:-""}
 
+# WebHook Authentication and Authorization
+AUTHORIZATION_WEBHOOK_CONFIG_FILE=${AUTHORIZATION_WEBHOOK_CONFIG_FILE:-""}
+AUTHENTICATION_WEBHOOK_CONFIG_FILE=${AUTHENTICATION_WEBHOOK_CONFIG_FILE:-""}
+
 # Install a default storage class (enabled by default)
 DEFAULT_STORAGE_CLASS=${KUBE_DEFAULT_STORAGE_CLASS:-true}
 
@@ -155,12 +159,12 @@ function usage {
 # This function guesses where the existing cached binary build is for the `-O`
 # flag
 function guess_built_binary_path {
-  local hyperkube_path
-  hyperkube_path=$(kube::util::find-binary "hyperkube")
-  if [[ -z "${hyperkube_path}" ]]; then
+  local apiserver_path
+  apiserver_path=$(kube::util::find-binary "kube-apiserver")
+  if [[ -z "${apiserver_path}" ]]; then
     return
   fi
-  echo -n "$(dirname "${hyperkube_path}")"
+  echo -n "$(dirname "${apiserver_path}")"
 }
 
 ### Allow user to supply the source directory.
@@ -549,6 +553,8 @@ EOF
       --vmodule="${LOG_SPEC}" \
       --audit-policy-file="${AUDIT_POLICY_FILE}" \
       --audit-log-path="${LOG_DIR}/kube-apiserver-audit.log" \
+      --authorization-webhook-config-file="${AUTHORIZATION_WEBHOOK_CONFIG_FILE}" \
+      --authentication-token-webhook-config-file="${AUTHENTICATION_WEBHOOK_CONFIG_FILE}" \
       --cert-dir="${CERT_DIR}" \
       --client-ca-file="${CERT_DIR}/client-ca.crt" \
       --kubelet-client-certificate="${CERT_DIR}/client-kube-apiserver.crt" \

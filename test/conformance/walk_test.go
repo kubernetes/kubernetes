@@ -156,16 +156,12 @@ func TestValidateTestName(t *testing.T) {
 			"",
 		},
 		{
-			"a test case with valid tags [LinuxOnly] [NodeConformance] [Serial]",
+			"a test case with valid tags [LinuxOnly] [NodeConformance] [Serial] [Disruptive]",
 			"",
 		},
 		{
 			"a flaky test case that is invalid [Flaky]",
 			"[Flaky]",
-		},
-		{
-			"a disruptive test case that is invalid [Disruptive]",
-			"[Disruptive]",
 		},
 		{
 			"a feature test case that is invalid [Feature:Awesome]",
@@ -176,12 +172,12 @@ func TestValidateTestName(t *testing.T) {
 			"[Alpha]",
 		},
 		{
-			"a test case with multiple invalid tags [Flaky][Disruptive] [Feature:Awesome] [Alpha]",
-			"[Flaky],[Disruptive],[Feature:Awesome],[Alpha]",
+			"a test case with multiple invalid tags [Flaky] [Feature:Awesome] [Alpha]",
+			"[Flaky],[Feature:Awesome],[Alpha]",
 		},
 		{
-			"[sig-awesome] [Disruptive] a test case with valid and invalid tags [Alpha] [Serial] [Flaky]",
-			"[Disruptive],[Alpha],[Flaky]",
+			"[sig-awesome] [Alpha] [Disruptive] a test case with valid and invalid tags [Serial] [Flaky]",
+			"[Alpha],[Flaky]",
 		},
 	}
 	for i, tc := range testCases {

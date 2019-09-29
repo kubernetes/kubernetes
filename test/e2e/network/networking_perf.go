@@ -19,12 +19,12 @@ package network
 // Tests network performance using iperf or other containers.
 import (
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -53,13 +53,13 @@ func networkingIPerfTest(isIPv6 bool) {
 	}
 
 	ginkgo.It(fmt.Sprintf("should transfer ~ 1GB onto the service endpoint %v servers (maximum of %v clients)", numServer, numClient), func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
 		totalPods := len(nodes.Items)
 		// for a single service, we expect to divide bandwidth between the network.  Very crude estimate.
 		expectedBandwidth := int(float64(maxBandwidthBits) / float64(totalPods))
-		framework.ExpectNotEqual(totalPods, 0)
 		appName := "iperf-e2e"
-		_, err := f.CreateServiceForSimpleAppWithPods(
+		_, err = f.CreateServiceForSimpleAppWithPods(
 			8001,
 			8002,
 			appName,
@@ -108,15 +108,13 @@ func networkingIPerfTest(isIPv6 bool) {
 			},
 			numClient,
 		)
+		expectedCli := numClient
+		if len(nodes.Items) < expectedCli {
+			expectedCli = len(nodes.Items)
+		}
 
 		framework.Logf("Reading all perf results to stdout.")
 		framework.Logf("date,cli,cliPort,server,serverPort,id,interval,transferBits,bandwidthBits")
-
-		// Calculate expected number of clients based on total nodes.
-		expectedCli := func() int {
-			nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-			return int(math.Min(float64(len(nodes.Items)), float64(numClient)))
-		}()
 
 		// Extra 1/10 second per client.
 		iperfTimeout := smallClusterTimeout + (time.Duration(expectedCli/10) * time.Second)

@@ -43,6 +43,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
+        "context_test.go",
         "framework_test.go",
         "interface_test.go",
         "registry_test.go",
@@ -51,6 +52,7 @@ go_test(
     deps = [
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/apis/config/scheme:go_default_library",
+        "//pkg/scheduler/nodeinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

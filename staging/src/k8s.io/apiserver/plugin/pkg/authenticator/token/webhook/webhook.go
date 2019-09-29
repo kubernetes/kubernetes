@@ -98,8 +98,8 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 		err    error
 		auds   authenticator.Audiences
 	)
-	webhook.WithExponentialBackoff(w.initialBackoff, func() error {
-		result, err = w.tokenReview.Create(r)
+	webhook.WithExponentialBackoff(ctx, w.initialBackoff, func() error {
+		result, err = w.tokenReview.CreateContext(ctx, r)
 		return err
 	})
 	if err != nil {
@@ -171,7 +171,11 @@ type tokenReviewClient struct {
 }
 
 func (t *tokenReviewClient) Create(tokenReview *authentication.TokenReview) (*authentication.TokenReview, error) {
+	return t.CreateContext(context.Background(), tokenReview)
+}
+
+func (t *tokenReviewClient) CreateContext(ctx context.Context, tokenReview *authentication.TokenReview) (*authentication.TokenReview, error) {
 	result := &authentication.TokenReview{}
-	err := t.w.RestClient.Post().Body(tokenReview).Do().Into(result)
+	err := t.w.RestClient.Post().Context(ctx).Body(tokenReview).Do().Into(result)
 	return result, err
 }

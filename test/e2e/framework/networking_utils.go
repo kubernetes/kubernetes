@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
-	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -591,7 +590,8 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 	ginkgo.By("Getting node addresses")
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
-	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
+	nodeList, err := e2enode.GetReadySchedulableNodes(config.f.ClientSet)
+	ExpectNoError(err)
 	config.ExternalAddrs = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
 
 	SkipUnlessNodeCountIsAtLeast(2)
@@ -620,28 +620,11 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 	}
 }
 
-// shuffleNodes copies nodes from the specified slice into a copy in random
-// order. It returns a new slice.
-func shuffleNodes(nodes []v1.Node) []v1.Node {
-	shuffled := make([]v1.Node, len(nodes))
-	perm := rand.Perm(len(nodes))
-	for i, j := range perm {
-		shuffled[j] = nodes[i]
-	}
-	return shuffled
-}
-
 func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*v1.Pod {
 	ExpectNoError(WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
-	nodeList := GetReadySchedulableNodesOrDie(config.f.ClientSet)
-
-	// To make this test work reasonably fast in large clusters,
-	// we limit the number of NetProxyPods to no more than
-	// maxNetProxyPodsCount on random nodes.
-	nodes := shuffleNodes(nodeList.Items)
-	if len(nodes) > maxNetProxyPodsCount {
-		nodes = nodes[:maxNetProxyPodsCount]
-	}
+	nodeList, err := e2enode.GetBoundedReadySchedulableNodes(config.f.ClientSet, maxNetProxyPodsCount)
+	ExpectNoError(err)
+	nodes := nodeList.Items
 
 	// create pods, one for each node
 	createdPods := make([]*v1.Pod, 0, len(nodes))

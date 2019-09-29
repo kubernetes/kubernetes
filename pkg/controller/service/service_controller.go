@@ -72,7 +72,7 @@ const (
 
 	// labelAlphaNodeRoleExcludeBalancer specifies that the node should be
 	// exclude from load balancers created by a cloud provider. This label is deprecated and will
-	// be removed in 1.17.
+	// be removed in 1.18.
 	labelAlphaNodeRoleExcludeBalancer = "alpha.service-controller.kubernetes.io/exclude-balancer"
 
 	// serviceNodeExclusionFeature is the feature gate name that
@@ -647,7 +647,7 @@ func getNodeConditionPredicate() corelisters.NodeConditionPredicate {
 			}
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(serviceNodeExclusionFeature) {
-			// Will be removed in 1.17
+			// Will be removed in 1.18
 			if _, hasExcludeBalancerLabel := node.Labels[labelAlphaNodeRoleExcludeBalancer]; hasExcludeBalancerLabel {
 				return false
 			}

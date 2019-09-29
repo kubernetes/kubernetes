@@ -525,7 +525,7 @@ func (dc *DeploymentController) getReplicaSetsForDeployment(d *apps.Deployment) 
 //
 // It returns a map from ReplicaSet UID to a list of Pods controlled by that RS,
 // according to the Pod's ControllerRef.
-// NOTE: The pod pointers returned by this method point the the pod objects in the cache and thus
+// NOTE: The pod pointers returned by this method point the pod objects in the cache and thus
 // shouldn't be modified in any way.
 func (dc *DeploymentController) getPodMapForDeployment(d *apps.Deployment, rsList []*apps.ReplicaSet) (map[types.UID][]*v1.Pod, error) {
 	// Get all Pods that potentially belong to this Deployment.

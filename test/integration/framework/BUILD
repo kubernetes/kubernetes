@@ -67,7 +67,7 @@ go_library(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
-        "//test/e2e/framework:go_default_library",
+        "//test/e2e/framework/node:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",

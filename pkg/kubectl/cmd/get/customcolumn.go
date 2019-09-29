@@ -36,7 +36,7 @@ import (
 	utilprinters "k8s.io/kubectl/pkg/util/printers"
 )
 
-var jsonRegexp = regexp.MustCompile("^\\{\\.?([^{}]+)\\}$|^\\.?([^{}]+)$")
+var jsonRegexp = regexp.MustCompile(`^\{\.?([^{}]+)\}$|^\.?([^{}]+)$`)
 
 // RelaxedJSONPathExpression attempts to be flexible with JSONPath expressions, it accepts:
 //   * metadata.name (no leading '.' or curly braces '{...}'

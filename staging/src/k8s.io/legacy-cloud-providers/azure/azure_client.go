@@ -106,8 +106,7 @@ type VirtualMachineScaleSetsClient interface {
 
 // VirtualMachineScaleSetVMsClient defines needed functions for azure compute.VirtualMachineScaleSetVMsClient
 type VirtualMachineScaleSetVMsClient interface {
-	Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error)
-	GetInstanceView(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error)
+	Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, expand compute.InstanceViewTypes) (result compute.VirtualMachineScaleSetVM, err error)
 	List(ctx context.Context, resourceGroupName string, virtualMachineScaleSetName string, filter string, selectParameter string, expand string) (result []compute.VirtualMachineScaleSetVM, err error)
 	Update(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, parameters compute.VirtualMachineScaleSetVM, source string) (resp *http.Response, err error)
 }
@@ -1051,7 +1050,7 @@ func newAzVirtualMachineScaleSetVMsClient(config *azClientConfig) *azVirtualMach
 	}
 }
 
-func (az *azVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVM, err error) {
+func (az *azVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string, expand compute.InstanceViewTypes) (result compute.VirtualMachineScaleSetVM, err error) {
 	mc := newMetricContext("vmssvm", "get", resourceGroupName, az.client.SubscriptionID, "")
 	if !az.rateLimiterReader.TryAccept() {
 		mc.RateLimitedCount()
@@ -1064,25 +1063,7 @@ func (az *azVirtualMachineScaleSetVMsClient) Get(ctx context.Context, resourceGr
 		klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.Get(%q,%q,%q): end", resourceGroupName, VMScaleSetName, instanceID)
 	}()
 
-	result, err = az.client.Get(ctx, resourceGroupName, VMScaleSetName, instanceID)
-	mc.Observe(err)
-	return
-}
-
-func (az *azVirtualMachineScaleSetVMsClient) GetInstanceView(ctx context.Context, resourceGroupName string, VMScaleSetName string, instanceID string) (result compute.VirtualMachineScaleSetVMInstanceView, err error) {
-	mc := newMetricContext("vmssvm", "get_instance_view", resourceGroupName, az.client.SubscriptionID, "")
-	if !az.rateLimiterReader.TryAccept() {
-		mc.RateLimitedCount()
-		err = createRateLimitErr(false, "VMSSGetInstanceView")
-		return
-	}
-
-	klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.GetInstanceView(%q,%q,%q): start", resourceGroupName, VMScaleSetName, instanceID)
-	defer func() {
-		klog.V(10).Infof("azVirtualMachineScaleSetVMsClient.GetInstanceView(%q,%q,%q): end", resourceGroupName, VMScaleSetName, instanceID)
-	}()
-
-	result, err = az.client.GetInstanceView(ctx, resourceGroupName, VMScaleSetName, instanceID)
+	result, err = az.client.Get(ctx, resourceGroupName, VMScaleSetName, instanceID, expand)
 	mc.Observe(err)
 	return
 }

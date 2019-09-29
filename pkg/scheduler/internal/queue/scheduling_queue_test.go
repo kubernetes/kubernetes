@@ -35,7 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-var negPriority, lowPriority, midPriority, highPriority, veryHighPriority = int32(-100), int32(0), int32(100), int32(1000), int32(10000)
+var lowPriority, midPriority, highPriority = int32(0), int32(100), int32(1000)
 var mediumPriority = (lowPriority + highPriority) / 2
 var highPriorityPod, highPriNominatedPod, medPriorityPod, unschedulablePod = v1.Pod{
 	ObjectMeta: metav1.ObjectMeta{
@@ -157,8 +157,8 @@ type fakeFramework struct{}
 
 func (*fakeFramework) QueueSortFunc() framework.LessFunc {
 	return func(podInfo1, podInfo2 *framework.PodInfo) bool {
-		prio1 := util.GetPodPriority(podInfo1.Pod)
-		prio2 := util.GetPodPriority(podInfo2.Pod)
+		prio1 := podutil.GetPodPriority(podInfo1.Pod)
+		prio2 := podutil.GetPodPriority(podInfo2.Pod)
 		return prio1 < prio2
 	}
 }
@@ -172,6 +172,14 @@ func (*fakeFramework) RunPreFilterPlugins(pc *framework.PluginContext, pod *v1.P
 }
 
 func (*fakeFramework) RunFilterPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+	return nil
+}
+
+func (*fakeFramework) RunPreFilterUpdaterAddPod(pc *framework.PluginContext, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+	return nil
+}
+
+func (*fakeFramework) RunPreFilterUpdaterRemovePod(pc *framework.PluginContext, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	return nil
 }
 
@@ -855,7 +863,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 
 	// Add an unschedulable pod to a priority queue.
 	// This makes a situation that the pod was tried to schedule
-	// and had been determined unschedulable so far.
+	// and had been determined unschedulable so far
 	unschedulablePod := v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-pod-unscheduled",

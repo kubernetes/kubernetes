@@ -242,7 +242,7 @@ func (h *StatefulSetHistoryViewer) ViewHistory(namespace, name string, revision 
 	if len(history) <= 0 {
 		return "No rollout history found.", nil
 	}
-	revisions := make([]int64, len(history))
+	revisions := make([]int64, 0, len(history))
 	for _, revision := range history {
 		revisions = append(revisions, revision.Revision)
 	}

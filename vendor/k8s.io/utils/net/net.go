@@ -17,8 +17,11 @@ limitations under the License.
 package net
 
 import (
+	"errors"
 	"fmt"
+	"math/big"
 	"net"
+	"strconv"
 )
 
 // ParseCIDRs parses a list of cidrs and return error if any is invalid.
@@ -131,4 +134,50 @@ func IsIPv6CIDRString(cidr string) bool {
 func IsIPv6CIDR(cidr *net.IPNet) bool {
 	ip := cidr.IP
 	return IsIPv6(ip)
+}
+
+// ParsePort parses a string representing an IP port.  If the string is not a
+// valid port number, this returns an error.
+func ParsePort(port string, allowZero bool) (int, error) {
+	portInt, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
+		return 0, err
+	}
+	if portInt == 0 && !allowZero {
+		return 0, errors.New("0 is not a valid port number")
+	}
+	return int(portInt), nil
+}
+
+// BigForIP creates a big.Int based on the provided net.IP
+func BigForIP(ip net.IP) *big.Int {
+	b := ip.To4()
+	if b == nil {
+		b = ip.To16()
+	}
+	return big.NewInt(0).SetBytes(b)
+}
+
+// AddIPOffset adds the provided integer offset to a base big.Int representing a
+// net.IP
+func AddIPOffset(base *big.Int, offset int) net.IP {
+	return net.IP(big.NewInt(0).Add(base, big.NewInt(int64(offset))).Bytes())
+}
+
+// RangeSize returns the size of a range in valid addresses.
+func RangeSize(subnet *net.IPNet) int64 {
+	ones, bits := subnet.Mask.Size()
+	if bits == 32 && (bits-ones) >= 31 || bits == 128 && (bits-ones) >= 127 {
+		return 0
+	}
+	return int64(1) << uint(bits-ones)
+}
+
+// GetIndexedIP returns a net.IP that is subnet.IP + index in the contiguous IP space.
+func GetIndexedIP(subnet *net.IPNet, index int) (net.IP, error) {
+	ip := AddIPOffset(BigForIP(subnet.IP), index)
+	if !subnet.Contains(ip) {
+		return nil, fmt.Errorf("can't generate IP with index %d from subnet. subnet too small. subnet: %q", index, subnet)
+	}
+	return ip, nil
 }

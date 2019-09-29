@@ -1498,7 +1498,7 @@ type TopologyRequirement struct {
 	//   {"region": "R1", "zone": "Z3"}
 	// preferred =
 	//   {"region": "R1", "zone": "Z3"}
-	// then the the SP SHOULD first attempt to make the provisioned volume
+	// then the SP SHOULD first attempt to make the provisioned volume
 	// available from "zone" "Z3" in the "region" "R1" and fall back to
 	// "zone" "Z2" in the "region" "R1" if that is not possible.
 	//
@@ -1512,7 +1512,7 @@ type TopologyRequirement struct {
 	// preferred =
 	//   {"region": "R1", "zone": "Z4"},
 	//   {"region": "R1", "zone": "Z2"}
-	// then the the SP SHOULD first attempt to make the provisioned volume
+	// then the SP SHOULD first attempt to make the provisioned volume
 	// accessible from "zone" "Z4" in the "region" "R1" and fall back to
 	// "zone" "Z2" in the "region" "R1" if that is not possible. If that
 	// is not possible, the SP may choose between either the "zone"
@@ -1531,7 +1531,7 @@ type TopologyRequirement struct {
 	// preferred =
 	//   {"region": "R1", "zone": "Z5"},
 	//   {"region": "R1", "zone": "Z3"}
-	// then the the SP SHOULD first attempt to make the provisioned volume
+	// then the SP SHOULD first attempt to make the provisioned volume
 	// accessible from the combination of the two "zones" "Z5" and "Z3" in
 	// the "region" "R1". If that's not possible, it should fall back to
 	// a combination of "Z5" and other possibilities from the list of

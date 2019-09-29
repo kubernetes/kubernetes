@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -179,8 +180,9 @@ func disableCPUManagerInKubelet(f *framework.Framework) (oldCfg *kubeletconfig.K
 
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		return len(nodeList.Items) == 1
+		nodes, err := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectNoError(err)
+		return nodes == 1
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 	return oldCfg
@@ -231,8 +233,9 @@ func enableCPUManagerInKubelet(f *framework.Framework, cleanStateFile bool) (old
 
 	// Wait for the Kubelet to be ready.
 	gomega.Eventually(func() bool {
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		return len(nodeList.Items) == 1
+		nodes, err := e2enode.TotalReady(f.ClientSet)
+		framework.ExpectNoError(err)
+		return nodes == 1
 	}, time.Minute, time.Second).Should(gomega.BeTrue())
 
 	return oldCfg

@@ -103,7 +103,8 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			gomega.Expect(err).To(gomega.BeNil())
 
 			ginkgo.By("verify node lease exists for every nodes")
-			originalNodes := framework.GetReadySchedulableNodesOrDie(c)
+			originalNodes, err := e2enode.GetReadySchedulableNodes(c)
+			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(originalNodes.Items), framework.TestContext.CloudConfig.NumNodes)
 
 			gomega.Eventually(func() error {
@@ -128,7 +129,8 @@ var _ = SIGDescribe("[Disruptive]NodeLease", func() {
 			gomega.Expect(err).To(gomega.BeNil())
 			err = e2enode.WaitForReadyNodes(c, framework.TestContext.CloudConfig.NumNodes-1, 10*time.Minute)
 			gomega.Expect(err).To(gomega.BeNil())
-			targetNodes := framework.GetReadySchedulableNodesOrDie(c)
+			targetNodes, err := e2enode.GetReadySchedulableNodes(c)
+			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(targetNodes.Items), int(targetNumNodes))
 
 			ginkgo.By("verify node lease is deleted for the deleted node")

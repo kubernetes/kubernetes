@@ -208,7 +208,7 @@ func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *schedulernodei
 	defer cache.mu.Unlock()
 	balancedVolumesEnabled := utilfeature.DefaultFeatureGate.Enabled(features.BalanceAttachedNodeVolumes)
 
-	// Get the last generation of the the snapshot.
+	// Get the last generation of the snapshot.
 	snapshotGeneration := nodeSnapshot.Generation
 
 	// Start from the head of the NodeInfo doubly linked list and update snapshot

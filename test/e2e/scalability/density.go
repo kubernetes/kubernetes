@@ -448,7 +448,7 @@ var _ = SIGDescribe("Density", func() {
 			NumberOfPods:   totalPods,
 			Throughput:     float32(totalPods) / float32(e2eStartupTime/time.Second),
 		}
-		framework.Logf("Cluster saturation time: %s", e2emetrics.PrettyPrintJSON(saturationData))
+		framework.Logf("Cluster saturation time: %s", framework.PrettyPrintJSON(saturationData))
 
 		summaries := make([]framework.TestDataSummary, 0, 2)
 		// Verify latency metrics.

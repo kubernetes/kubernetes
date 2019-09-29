@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
@@ -85,13 +84,13 @@ func (t *EtcdUpgradeTest) Setup(f *framework.Framework) {
 			return false, nil
 		}
 		if _, err := t.listUsers(); err != nil {
-			e2elog.Logf("Service endpoint is up but isn't responding")
+			framework.Logf("Service endpoint is up but isn't responding")
 			return false, nil
 		}
 		return true, nil
 	})
 	framework.ExpectNoError(err)
-	e2elog.Logf("Service endpoint is up")
+	framework.Logf("Service endpoint is up")
 
 	ginkgo.By("Adding 2 dummy users")
 	err = t.addUser("Alice")
@@ -165,7 +164,7 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 	go wait.Until(func() {
 		writeAttempts++
 		if err := t.addUser(fmt.Sprintf("user-%d", writeAttempts)); err != nil {
-			e2elog.Logf("Unable to add user: %v", err)
+			framework.Logf("Unable to add user: %v", err)
 			mu.Lock()
 			errors[err.Error()]++
 			mu.Unlock()
@@ -177,7 +176,7 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 	wait.Until(func() {
 		users, err := t.listUsers()
 		if err != nil {
-			e2elog.Logf("Could not retrieve users: %v", err)
+			framework.Logf("Could not retrieve users: %v", err)
 			failures++
 			mu.Lock()
 			errors[err.Error()]++
@@ -187,14 +186,14 @@ func (t *EtcdUpgradeTest) Test(f *framework.Framework, done <-chan struct{}, upg
 		success++
 		lastUserCount = len(users)
 	}, 10*time.Millisecond, done)
-	e2elog.Logf("got %d users; want >=%d", lastUserCount, t.successfulWrites)
+	framework.Logf("got %d users; want >=%d", lastUserCount, t.successfulWrites)
 
 	gomega.Expect(lastUserCount >= t.successfulWrites).To(gomega.BeTrue())
 	ratio := float64(success) / float64(success+failures)
-	e2elog.Logf("Successful gets %d/%d=%v", success, success+failures, ratio)
+	framework.Logf("Successful gets %d/%d=%v", success, success+failures, ratio)
 	ratio = float64(t.successfulWrites) / float64(writeAttempts)
-	e2elog.Logf("Successful writes %d/%d=%v", t.successfulWrites, writeAttempts, ratio)
-	e2elog.Logf("Errors: %v", errors)
+	framework.Logf("Successful writes %d/%d=%v", t.successfulWrites, writeAttempts, ratio)
+	framework.Logf("Errors: %v", errors)
 	// TODO(maisem): tweak this value once we have a few test runs.
 	gomega.Expect(ratio > 0.75).To(gomega.BeTrue())
 }

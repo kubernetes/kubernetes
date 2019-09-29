@@ -22,50 +22,14 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/kubernetes/pkg/api/v1/pod"
 )
-
-// TestGetPodPriority tests GetPodPriority function.
-func TestGetPodPriority(t *testing.T) {
-	p := int32(20)
-	tests := []struct {
-		name             string
-		pod              *v1.Pod
-		expectedPriority int32
-	}{
-		{
-			name: "no priority pod resolves to static default priority",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{Containers: []v1.Container{
-					{Name: "container", Image: "image"}},
-				},
-			},
-			expectedPriority: scheduling.DefaultPriorityWhenNoDefaultClassExists,
-		},
-		{
-			name: "pod with priority resolves correctly",
-			pod: &v1.Pod{
-				Spec: v1.PodSpec{Containers: []v1.Container{
-					{Name: "container", Image: "image"}},
-					Priority: &p,
-				},
-			},
-			expectedPriority: p,
-		},
-	}
-	for _, test := range tests {
-		if GetPodPriority(test.pod) != test.expectedPriority {
-			t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
-		}
-
-	}
-}
 
 // TestSortableList tests SortableList by storing pods in the list and sorting
 // them by their priority.
 func TestSortableList(t *testing.T) {
 	higherPriority := func(pod1, pod2 interface{}) bool {
-		return GetPodPriority(pod1.(*v1.Pod)) > GetPodPriority(pod2.(*v1.Pod))
+		return pod.GetPodPriority(pod1.(*v1.Pod)) > pod.GetPodPriority(pod2.(*v1.Pod))
 	}
 	podList := SortableList{CompFunc: higherPriority}
 	// Add a few Pods with different priorities from lowest to highest priority.

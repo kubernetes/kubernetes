@@ -118,7 +118,7 @@ var _ = framework.PreFilterPlugin(&PreFilterPlugin{})
 var _ = framework.ScorePlugin(&ScorePlugin{})
 var _ = framework.FilterPlugin(&FilterPlugin{})
 var _ = framework.ScorePlugin(&ScorePlugin{})
-var _ = framework.ScoreWithNormalizePlugin(&ScoreWithNormalizePlugin{})
+var _ = framework.ScorePlugin(&ScoreWithNormalizePlugin{})
 var _ = framework.ReservePlugin(&ReservePlugin{})
 var _ = framework.PostFilterPlugin(&PostFilterPlugin{})
 var _ = framework.PreBindPlugin(&PreBindPlugin{})
@@ -160,6 +160,10 @@ func (sp *ScorePlugin) Score(pc *framework.PluginContext, p *v1.Pod, nodeName st
 		score = framework.MaxNodeScore
 	}
 	return score, nil
+}
+
+func (sp *ScorePlugin) NormalizeScore(pc *framework.PluginContext, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+	return nil
 }
 
 // Name returns name of the score plugin.
@@ -326,6 +330,11 @@ func (pp *PreFilterPlugin) Name() string {
 	return prefilterPluginName
 }
 
+// Updater returns the updater interface.
+func (pp *PreFilterPlugin) Updater() framework.Updater {
+	return nil
+}
+
 // PreFilter is a test function that returns (true, nil) or errors for testing.
 func (pp *PreFilterPlugin) PreFilter(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
 	pp.numPreFilterCalled++
@@ -449,7 +458,7 @@ func TestPreFilterPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "prefilter-plugin", nil),
-		false, nil, registry, plugins, emptyPluginConfig, false, time.Second)
+		false, nil, registry, plugins, emptyPluginConfig, time.Second)
 
 	defer cleanupTest(t, context)
 
@@ -627,7 +636,7 @@ func TestReservePlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "reserve-plugin", nil),
-		false, nil, registry, plugins, emptyPluginConfig, false, time.Second)
+		false, nil, registry, plugins, emptyPluginConfig, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -691,7 +700,7 @@ func TestPrebindPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "prebind-plugin", nil),
-		false, nil, registry, plugins, preBindPluginConfig, false, time.Second)
+		false, nil, registry, plugins, preBindPluginConfig, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -792,7 +801,7 @@ func TestUnreservePlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "unreserve-plugin", nil),
-		false, nil, registry, plugins, pluginConfig, false, time.Second)
+		false, nil, registry, plugins, pluginConfig, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -907,7 +916,7 @@ func TestBindPlugin(t *testing.T) {
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t, testContext,
-		false, nil, registry, plugins, pluginConfig, false, time.Second)
+		false, nil, registry, plugins, pluginConfig, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -1079,7 +1088,7 @@ func TestPostBindPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "postbind-plugin", nil),
-		false, nil, registry, plugins, pluginConfig, false, time.Second)
+		false, nil, registry, plugins, pluginConfig, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -1160,7 +1169,7 @@ func TestPermitPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "permit-plugin", nil),
-		false, nil, registry, plugins, pluginConfig, false, time.Second)
+		false, nil, registry, plugins, pluginConfig, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -1272,7 +1281,7 @@ func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "permit-plugin", nil),
-		false, nil, registry, plugins, pluginConfig, false, time.Second)
+		false, nil, registry, plugins, pluginConfig, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -1362,7 +1371,7 @@ func TestFilterPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "filter-plugin", nil),
-		false, nil, registry, plugin, emptyPluginConfig, false, time.Second)
+		false, nil, registry, plugin, emptyPluginConfig, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -1422,7 +1431,7 @@ func TestPostFilterPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "post-filter-plugin", nil),
-		false, nil, registry, pluginsConfig, emptyPluginConfig, false, time.Second)
+		false, nil, registry, pluginsConfig, emptyPluginConfig, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -1487,7 +1496,7 @@ func TestPreemptWithPermitPlugin(t *testing.T) {
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "preempt-with-permit-plugin", nil),
-		false, nil, registry, plugins, pluginConfig, false, time.Second)
+		false, nil, registry, plugins, pluginConfig, time.Second)
 	defer cleanupTest(t, context)
 
 	cs := context.clientSet
@@ -1558,7 +1567,7 @@ func initTestContextForScorePlugin(t *testing.T, plugins *schedulerconfig.Plugin
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "score-plugin", nil),
-		false, nil, registry, plugins, emptyPluginConfig, false, time.Second)
+		false, nil, registry, plugins, emptyPluginConfig, time.Second)
 
 	cs := context.clientSet
 	_, err := createNodes(cs, "test-node", nil, 10)

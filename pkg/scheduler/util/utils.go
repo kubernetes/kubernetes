@@ -20,10 +20,10 @@ import (
 	"sort"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/api"
 )
 
@@ -49,17 +49,6 @@ func GetPodFullName(pod *v1.Pod) string {
 	return pod.Name + "_" + pod.Namespace
 }
 
-// GetPodPriority returns priority of the given pod.
-func GetPodPriority(pod *v1.Pod) int32 {
-	if pod.Spec.Priority != nil {
-		return *pod.Spec.Priority
-	}
-	// When priority of a running pod is nil, it means it was created at a time
-	// that there was no global default priority class and the priority class
-	// name of the pod was empty. So, we resolve to the static default priority.
-	return scheduling.DefaultPriorityWhenNoDefaultClassExists
-}
-
 // GetPodStartTime returns start time of the given pod.
 func GetPodStartTime(pod *v1.Pod) *metav1.Time {
 	if pod.Status.StartTime != nil {
@@ -83,15 +72,15 @@ func GetEarliestPodStartTime(victims *api.Victims) *metav1.Time {
 	}
 
 	earliestPodStartTime := GetPodStartTime(victims.Pods[0])
-	highestPriority := GetPodPriority(victims.Pods[0])
+	maxPriority := podutil.GetPodPriority(victims.Pods[0])
 
 	for _, pod := range victims.Pods {
-		if GetPodPriority(pod) == highestPriority {
+		if podutil.GetPodPriority(pod) == maxPriority {
 			if GetPodStartTime(pod).Before(earliestPodStartTime) {
 				earliestPodStartTime = GetPodStartTime(pod)
 			}
-		} else if GetPodPriority(pod) > highestPriority {
-			highestPriority = GetPodPriority(pod)
+		} else if podutil.GetPodPriority(pod) > maxPriority {
+			maxPriority = podutil.GetPodPriority(pod)
 			earliestPodStartTime = GetPodStartTime(pod)
 		}
 	}
@@ -132,8 +121,8 @@ func (l *SortableList) Sort() {
 // It takes arguments of the type "interface{}" to be used with SortableList,
 // but expects those arguments to be *v1.Pod.
 func MoreImportantPod(pod1, pod2 interface{}) bool {
-	p1 := GetPodPriority(pod1.(*v1.Pod))
-	p2 := GetPodPriority(pod2.(*v1.Pod))
+	p1 := podutil.GetPodPriority(pod1.(*v1.Pod))
+	p2 := podutil.GetPodPriority(pod2.(*v1.Pod))
 	if p1 != p2 {
 		return p1 > p2
 	}

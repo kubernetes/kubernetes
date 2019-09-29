@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	volumeschedulingmetrics "k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics"
@@ -60,11 +58,11 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"result"})
 	// PodScheduleSuccesses counts how many pods were scheduled.
-	PodScheduleSuccesses = scheduleAttempts.With(prometheus.Labels{"result": "scheduled"})
+	PodScheduleSuccesses = scheduleAttempts.With(metrics.Labels{"result": "scheduled"})
 	// PodScheduleFailures counts how many pods could not be scheduled.
-	PodScheduleFailures = scheduleAttempts.With(prometheus.Labels{"result": "unschedulable"})
+	PodScheduleFailures = scheduleAttempts.With(metrics.Labels{"result": "unschedulable"})
 	// PodScheduleErrors counts how many pods could not be scheduled due to a scheduler error.
-	PodScheduleErrors = scheduleAttempts.With(prometheus.Labels{"result": "error"})
+	PodScheduleErrors = scheduleAttempts.With(metrics.Labels{"result": "error"})
 	SchedulingLatency = metrics.NewSummaryVec(
 		&metrics.SummaryOpts{
 			Subsystem: SchedulerSubsystem,
@@ -257,17 +255,17 @@ func Register() {
 
 // ActivePods returns the pending pods metrics with the label active
 func ActivePods() metrics.GaugeMetric {
-	return pendingPods.With(prometheus.Labels{"queue": "active"})
+	return pendingPods.With(metrics.Labels{"queue": "active"})
 }
 
 // BackoffPods returns the pending pods metrics with the label backoff
 func BackoffPods() metrics.GaugeMetric {
-	return pendingPods.With(prometheus.Labels{"queue": "backoff"})
+	return pendingPods.With(metrics.Labels{"queue": "backoff"})
 }
 
 // UnschedulablePods returns the pending pods metrics with the label unschedulable
 func UnschedulablePods() metrics.GaugeMetric {
-	return pendingPods.With(prometheus.Labels{"queue": "unschedulable"})
+	return pendingPods.With(metrics.Labels{"queue": "unschedulable"})
 }
 
 // Reset resets metrics
