@@ -198,6 +198,7 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 	if err != nil {
 		return err
 	}
+	processed := false
 	for _, crd := range crds {
 		if crd.Spec.Group != groupVersion.Group {
 			continue
@@ -216,10 +217,13 @@ func (c *crdRegistrationController) handleVersionUpdate(groupVersion schema.Grou
 					VersionPriority:      100,  // CRDs will be sorted by kube-like versions like any other APIService with the same VersionPriority
 				},
 			})
-			return nil
+			processed = true
 		}
 	}
 
+	if processed {
+		return nil
+	}
 	c.apiServiceRegistration.RemoveAPIServiceToSync(apiServiceName)
 	return nil
 }
