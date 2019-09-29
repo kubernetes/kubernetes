@@ -45,9 +45,9 @@ func TestOpenCloseHostports(t *testing.T) {
 				Namespace: "ns1",
 				Name:      "n1",
 				PortMappings: []*PortMapping{
-					{HostPort: 80, Protocol: v1.Protocol("TCP")},
-					{HostPort: 8080, Protocol: v1.Protocol("TCP")},
-					{HostPort: 443, Protocol: v1.Protocol("TCP")},
+					{HostPort: 80, Protocol: v1.ProtocolTCP},
+					{HostPort: 8080, Protocol: v1.ProtocolTCP},
+					{HostPort: 443, Protocol: v1.ProtocolTCP},
 				},
 			},
 			false,
@@ -57,7 +57,7 @@ func TestOpenCloseHostports(t *testing.T) {
 				Namespace: "ns1",
 				Name:      "n2",
 				PortMappings: []*PortMapping{
-					{HostPort: 80, Protocol: v1.Protocol("TCP")},
+					{HostPort: 80, Protocol: v1.ProtocolTCP},
 				},
 			},
 			true,
@@ -67,8 +67,8 @@ func TestOpenCloseHostports(t *testing.T) {
 				Namespace: "ns1",
 				Name:      "n3",
 				PortMappings: []*PortMapping{
-					{HostPort: 8081, Protocol: v1.Protocol("TCP")},
-					{HostPort: 8080, Protocol: v1.Protocol("TCP")},
+					{HostPort: 8081, Protocol: v1.ProtocolTCP},
+					{HostPort: 8080, Protocol: v1.ProtocolTCP},
 				},
 			},
 			true,
@@ -78,7 +78,7 @@ func TestOpenCloseHostports(t *testing.T) {
 				Namespace: "ns1",
 				Name:      "n3",
 				PortMappings: []*PortMapping{
-					{HostPort: 8081, Protocol: v1.Protocol("TCP")},
+					{HostPort: 8081, Protocol: v1.ProtocolTCP},
 				},
 			},
 			false,
@@ -88,7 +88,7 @@ func TestOpenCloseHostports(t *testing.T) {
 				Namespace: "ns1",
 				Name:      "n4",
 				PortMappings: []*PortMapping{
-					{HostPort: 7777, Protocol: v1.Protocol("STCP")},
+					{HostPort: 7777, Protocol: v1.ProtocolSCTP},
 				},
 			},
 			false,
@@ -111,7 +111,13 @@ func TestOpenCloseHostports(t *testing.T) {
 			continue
 		}
 		assert.NoError(t, err)
-		assert.EqualValues(t, len(mapping), len(tc.podPortMapping.PortMappings))
+		countSctp := 0
+		for _, pm := range tc.podPortMapping.PortMappings {
+			if pm.Protocol == v1.ProtocolSCTP {
+				countSctp += 1
+			}
+		}
+		assert.EqualValues(t, len(mapping), len(tc.podPortMapping.PortMappings)-countSctp)
 	}
 
 	// We have 4 ports: 80, 443, 8080, 8081 open now.
@@ -125,36 +131,36 @@ func TestOpenCloseHostports(t *testing.T) {
 		{
 
 			portMappings: []*PortMapping{
-				{HostPort: 80, Protocol: v1.Protocol("TCP")},
-				{HostPort: 8080, Protocol: v1.Protocol("TCP")},
-				{HostPort: 443, Protocol: v1.Protocol("TCP")},
+				{HostPort: 80, Protocol: v1.ProtocolTCP},
+				{HostPort: 8080, Protocol: v1.ProtocolTCP},
+				{HostPort: 443, Protocol: v1.ProtocolTCP},
 			},
 		},
 		{
 
 			portMappings: []*PortMapping{
-				{HostPort: 80, Protocol: v1.Protocol("TCP")},
+				{HostPort: 80, Protocol: v1.ProtocolTCP},
 			},
 		},
 		{
 			portMappings: []*PortMapping{
-				{HostPort: 8081, Protocol: v1.Protocol("TCP")},
-				{HostPort: 8080, Protocol: v1.Protocol("TCP")},
+				{HostPort: 8081, Protocol: v1.ProtocolTCP},
+				{HostPort: 8080, Protocol: v1.ProtocolTCP},
 			},
 		},
 		{
 			portMappings: []*PortMapping{
-				{HostPort: 8081, Protocol: v1.Protocol("TCP")},
+				{HostPort: 8081, Protocol: v1.ProtocolTCP},
 			},
 		},
 		{
 			portMappings: []*PortMapping{
-				{HostPort: 7070, Protocol: v1.Protocol("TCP")},
+				{HostPort: 7070, Protocol: v1.ProtocolTCP},
 			},
 		},
 		{
 			portMappings: []*PortMapping{
-				{HostPort: 7777, Protocol: v1.Protocol("SCTP")},
+				{HostPort: 7777, Protocol: v1.ProtocolSCTP},
 			},
 		},
 	}
