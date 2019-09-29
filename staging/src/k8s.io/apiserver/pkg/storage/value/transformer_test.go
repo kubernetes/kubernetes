@@ -45,7 +45,7 @@ func (t *testTransformer) TransformToStorage(to []byte, context Context) (data [
 
 func TestPrefixFrom(t *testing.T) {
 	testErr := fmt.Errorf("test error")
-	transformErr := fmt.Errorf("test error")
+	transformErr := fmt.Errorf("transform error")
 	transformers := []PrefixTransformer{
 		{Prefix: []byte("first:"), Transformer: &testTransformer{from: []byte("value1")}},
 		{Prefix: []byte("second:"), Transformer: &testTransformer{from: []byte("value2")}},
@@ -64,7 +64,7 @@ func TestPrefixFrom(t *testing.T) {
 		{[]byte("first:value"), []byte("value1"), false, nil, 0},
 		{[]byte("second:value"), []byte("value2"), true, nil, 1},
 		{[]byte("third:value"), nil, false, testErr, -1},
-		{[]byte("fails:value"), nil, true, transformErr, 2},
+		{[]byte("fails:value"), nil, false, transformErr, 2},
 		{[]byte("stale:value"), []byte("value3"), true, nil, 3},
 	}
 	for i, test := range testCases {
