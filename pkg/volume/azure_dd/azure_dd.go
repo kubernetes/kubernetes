@@ -308,7 +308,7 @@ func (plugin *azureDataDiskPlugin) NodeExpand(resizeOptions volume.NodeResizeOpt
 	if !fsVolume {
 		return true, nil
 	}
-	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath, false)
+	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions, false)
 	if err != nil {
 		return false, err
 	}

@@ -51,7 +51,7 @@ func (e *expanderDefaults) NodeExpand(rsOpt volume.NodeResizeOptions) (bool, err
 		return true, nil
 	}
 
-	_, err = util.GenericResizeFS(e.plugin.host, e.plugin.GetPluginName(), rsOpt.DevicePath, rsOpt.DeviceMountPath, false)
+	_, err = util.GenericResizeFS(e.plugin.host, e.plugin.GetPluginName(), rsOpt, false)
 	if err != nil {
 		return false, err
 	}

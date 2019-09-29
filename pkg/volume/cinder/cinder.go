@@ -322,7 +322,7 @@ func (plugin *cinderPlugin) NodeExpand(resizeOptions volume.NodeResizeOptions) (
 		return true, nil
 	}
 
-	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions.DevicePath, resizeOptions.DeviceMountPath, true)
+	_, err = util.GenericResizeFS(plugin.host, plugin.GetPluginName(), resizeOptions, true)
 	if err != nil {
 		return false, err
 	}

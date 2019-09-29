@@ -27,6 +27,7 @@ import (
 
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/volume"
 )
 
 // ResizeFs Provides support for resizing file systems
@@ -40,11 +41,11 @@ func NewResizeFs(mounter *mount.SafeFormatAndMount) *ResizeFs {
 }
 
 // Resize perform resize of file system
-func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string, rescanDevice bool) (bool, error) {
-	format, err := resizefs.mounter.GetDiskFormat(devicePath)
+func (resizefs *ResizeFs) Resize(resizeOptions volume.NodeResizeOptions, rescanDevice bool) (bool, error) {
+	format, err := resizefs.mounter.GetDiskFormat(resizeOptions.DevicePath)
 
 	if err != nil {
-		formatErr := fmt.Errorf("ResizeFS.Resize - error checking format for device %s: %v", devicePath, err)
+		formatErr := fmt.Errorf("ResizeFS.Resize - error checking format for device %s: %v", resizeOptions.DevicePath, err)
 		return false, formatErr
 	}
 
@@ -56,12 +57,12 @@ func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string, resc
 
 	if rescanDevice {
 		// don't fail if resolving doesn't work
-		if blockDeviceRescanPath, err := findBlockDeviceRescanPath(devicePath); err != nil {
-			klog.V(0).Infof("ResizeFS.Resize - error resolving block device path from %q: %v", devicePath, err)
+		if blockDeviceRescanPath, err := findBlockDeviceRescanPath(resizeOptions.DevicePath); err != nil {
+			klog.V(0).Infof("ResizeFS.Resize - error resolving block device path from %q: %v", resizeOptions.DevicePath, err)
 		} else {
-			klog.V(3).Infof("ResizeFS.Resize - resolved block device path from %q to %q", devicePath, blockDeviceRescanPath)
+			klog.V(3).Infof("ResizeFS.Resize - resolved block device path from %q to %q", resizeOptions.DevicePath, blockDeviceRescanPath)
 
-			klog.V(3).Infof("ResizeFS.Resize - polling %q block device geometry", devicePath)
+			klog.V(3).Infof("ResizeFS.Resize - polling %q block device geometry", resizeOptions.DevicePath)
 			err = ioutil.WriteFile(blockDeviceRescanPath, []byte{'1'}, 0666)
 			if err != nil {
 				klog.V(0).Infof("ResizeFS.Resize - error polling new block device geometry: %v", err)
@@ -69,32 +70,32 @@ func (resizefs *ResizeFs) Resize(devicePath string, deviceMountPath string, resc
 		}
 	}
 
-	klog.V(3).Infof("ResizeFS.Resize - Detecting mounted volume filesystem size: %s", deviceMountPath)
+	klog.V(3).Infof("ResizeFS.Resize - Detecting mounted volume filesystem size: %s", resizeOptions.DeviceMountPath)
 	oldFS := syscall.Statfs_t{}
-	err = syscall.Statfs(deviceMountPath, &oldFS)
+	err = syscall.Statfs(resizeOptions.DeviceMountPath, &oldFS)
 	if err != nil {
-		return false, fmt.Errorf("ResizeFS.Resize - Failed to detect %s filesystem size: %v", deviceMountPath, err)
+		return false, fmt.Errorf("ResizeFS.Resize - Failed to detect %s filesystem size: %v", resizeOptions.DeviceMountPath, err)
 	}
 
-	klog.V(3).Infof("ResizeFS.Resize - Expanding mounted volume %s", devicePath)
+	klog.V(3).Infof("ResizeFS.Resize - Expanding mounted volume %s", resizeOptions.DevicePath)
 	switch format {
 	case "ext3", "ext4":
-		err = resizefs.extResize(devicePath)
+		err = resizefs.extResize(resizeOptions.DevicePath)
 	case "xfs":
-		err = resizefs.xfsResize(deviceMountPath)
+		err = resizefs.xfsResize(resizeOptions.DeviceMountPath)
 	default:
-		return false, fmt.Errorf("ResizeFS.Resize - resize of format %s is not supported for device %s mounted at %s", format, devicePath, deviceMountPath)
+		return false, fmt.Errorf("ResizeFS.Resize - resize of format %s is not supported for device %s mounted at %s", format, resizeOptions.DevicePath, resizeOptions.DeviceMountPath)
 	}
 
 	if err != nil {
 		return false, err
 	}
 
-	klog.V(3).Infof("ResizeFS.Resize - Detecting mounted volume filesystem size after the expanding: %s", deviceMountPath)
+	klog.V(3).Infof("ResizeFS.Resize - Detecting mounted volume filesystem size after the expanding: %s", resizeOptions.DeviceMountPath)
 	newFS := syscall.Statfs_t{}
-	err = syscall.Statfs(deviceMountPath, &newFS)
+	err = syscall.Statfs(resizeOptions.DeviceMountPath, &newFS)
 	if err != nil {
-		return false, fmt.Errorf("ResizeFS.Resize - Failed to detect %s filesystem size after the expanding: %v", deviceMountPath, err)
+		return false, fmt.Errorf("ResizeFS.Resize - Failed to detect %s filesystem size after the expanding: %v", resizeOptions.DeviceMountPath, err)
 	}
 
 	oldSize := oldFS.Blocks * uint64(oldFS.Bsize)
