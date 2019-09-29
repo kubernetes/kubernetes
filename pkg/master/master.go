@@ -395,7 +395,9 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	}
 
 	if c.ExtraConfig.Tunneler != nil {
-		m.installTunneler(c.ExtraConfig.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes())
+		if err := m.installTunneler(c.ExtraConfig.Tunneler, corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig).Nodes()); err != nil {
+			return nil, err
+		}
 	}
 
 	m.GenericAPIServer.AddPostStartHookOrDie("ca-registration", c.ExtraConfig.ClientCARegistrationHook.PostStartHook)
@@ -421,9 +423,11 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 	return nil
 }
 
-func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface) {
+func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface) error {
 	nodeTunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
-	m.GenericAPIServer.AddHealthChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
+	if err := m.GenericAPIServer.AddHealthChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler))); err != nil {
+		return err
+	}
 	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 		Name: "apiserver_proxy_tunnel_sync_duration_seconds",
 		Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
@@ -432,6 +436,7 @@ func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient core
 		Name: "apiserver_proxy_tunnel_sync_latency_secs",
 		Help: "(Deprecated) The time since the last successful synchronization of the SSH tunnels for proxy requests.",
 	}, func() float64 { return float64(nodeTunneler.SecondsSinceSync()) })
+	return nil
 }
 
 // RESTStorageProvider is a factory type for REST storage.
@@ -463,7 +468,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 		if postHookProvider, ok := restStorageBuilder.(genericapiserver.PostStartHookProvider); ok {
 			name, hook, err := postHookProvider.PostStartHook()
 			if err != nil {
-				klog.Fatalf("Error building PostStartHook: %v", err)
+				return fmt.Errorf("Error building PostStartHook: %v", err)
 			}
 			m.GenericAPIServer.AddPostStartHookOrDie(name, hook)
 		}
