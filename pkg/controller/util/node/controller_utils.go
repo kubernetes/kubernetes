@@ -44,32 +44,26 @@ import (
 // DeletePods will delete all pods from master running on given node,
 // and return true if any pods were deleted, or were found pending
 // deletion.
-func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore appsv1listers.DaemonSetLister) (bool, error) {
+func DeletePods(kubeClient clientset.Interface, pods []v1.Pod, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore appsv1listers.DaemonSetLister) (bool, error) {
 	remaining := false
-	selector := fields.OneTermEqualSelector(api.PodHostField, nodeName).String()
-	options := metav1.ListOptions{FieldSelector: selector}
-	pods, err := kubeClient.CoreV1().Pods(metav1.NamespaceAll).List(options)
 	var updateErrList []error
 
-	if err != nil {
-		return remaining, err
-	}
-
-	if len(pods.Items) > 0 {
+	if len(pods) > 0 {
 		RecordNodeEvent(recorder, nodeName, nodeUID, v1.EventTypeNormal, "DeletingAllPods", fmt.Sprintf("Deleting all Pods from Node %v.", nodeName))
 	}
 
-	for _, pod := range pods.Items {
+	for i := range pods {
+		pod := &pods[i]
 		// Defensive check, also needed for tests.
 		if pod.Spec.NodeName != nodeName {
 			continue
 		}
 
 		// Set reason and message in the pod object.
-		if _, err = SetPodTerminationReason(kubeClient, &pod, nodeName); err != nil {
+		if _, err := SetPodTerminationReason(kubeClient, pod, nodeName); err != nil {
 			if apierrors.IsConflict(err) {
 				updateErrList = append(updateErrList,
-					fmt.Errorf("update status failed for pod %q: %v", format.Pod(&pod), err))
+					fmt.Errorf("update status failed for pod %q: %v", format.Pod(pod), err))
 				continue
 			}
 		}
@@ -79,13 +73,13 @@ func DeletePods(kubeClient clientset.Interface, recorder record.EventRecorder, n
 			continue
 		}
 		// if the pod is managed by a daemonset, ignore it
-		_, err := daemonStore.GetPodDaemonSets(&pod)
-		if err == nil { // No error means at least one daemonset was found
+		if _, err := daemonStore.GetPodDaemonSets(pod); err == nil {
+			// No error means at least one daemonset was found
 			continue
 		}
 
 		klog.V(2).Infof("Starting deletion of pod %v/%v", pod.Namespace, pod.Name)
-		recorder.Eventf(&pod, v1.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
+		recorder.Eventf(pod, v1.EventTypeNormal, "NodeControllerEviction", "Marking for deletion Pod %s from Node %s", pod.Name, nodeName)
 		if err := kubeClient.CoreV1().Pods(pod.Namespace).Delete(pod.Name, nil); err != nil {
 			return false, err
 		}
