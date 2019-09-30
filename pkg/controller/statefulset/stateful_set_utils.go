@@ -34,10 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 
-// maxUpdateRetries is the maximum number of retries used for update conflict resolution prior to failure
-const maxUpdateRetries = 10
-
-// been attempted and we need to back off
 var patchCodec = scheme.Codecs.LegacyCodec(apps.SchemeGroupVersion)
 
 // overlappingStatefulSets sorts a list of StatefulSets by creation timestamp, using their names as a tie breaker.

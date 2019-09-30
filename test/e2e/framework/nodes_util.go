@@ -338,13 +338,13 @@ func (k *NodeKiller) Run(stopCh <-chan struct{}) {
 }
 
 func (k *NodeKiller) pickNodes() []v1.Node {
-	nodes := GetReadySchedulableNodesOrDie(k.client)
+	nodes, err := e2enode.GetReadySchedulableNodes(k.client)
+	ExpectNoError(err)
 	numNodes := int(k.config.FailureRatio * float64(len(nodes.Items)))
-	shuffledNodes := shuffleNodes(nodes.Items)
-	if len(shuffledNodes) > numNodes {
-		return shuffledNodes[:numNodes]
-	}
-	return shuffledNodes
+
+	nodes, err = e2enode.GetBoundedReadySchedulableNodes(k.client, numNodes)
+	ExpectNoError(err)
+	return nodes.Items
 }
 
 func (k *NodeKiller) kill(nodes []v1.Node) {

@@ -869,6 +869,74 @@ func PossibleExpressRoutePortsEncapsulationValues() []ExpressRoutePortsEncapsula
 	return []ExpressRoutePortsEncapsulation{Dot1Q, QinQ}
 }
 
+// FirewallPolicyFilterRuleActionType enumerates the values for firewall policy filter rule action type.
+type FirewallPolicyFilterRuleActionType string
+
+const (
+	// FirewallPolicyFilterRuleActionTypeAlert ...
+	FirewallPolicyFilterRuleActionTypeAlert FirewallPolicyFilterRuleActionType = "Alert "
+	// FirewallPolicyFilterRuleActionTypeAllow ...
+	FirewallPolicyFilterRuleActionTypeAllow FirewallPolicyFilterRuleActionType = "Allow"
+	// FirewallPolicyFilterRuleActionTypeDeny ...
+	FirewallPolicyFilterRuleActionTypeDeny FirewallPolicyFilterRuleActionType = "Deny"
+)
+
+// PossibleFirewallPolicyFilterRuleActionTypeValues returns an array of possible values for the FirewallPolicyFilterRuleActionType const type.
+func PossibleFirewallPolicyFilterRuleActionTypeValues() []FirewallPolicyFilterRuleActionType {
+	return []FirewallPolicyFilterRuleActionType{FirewallPolicyFilterRuleActionTypeAlert, FirewallPolicyFilterRuleActionTypeAllow, FirewallPolicyFilterRuleActionTypeDeny}
+}
+
+// FirewallPolicyNatRuleActionType enumerates the values for firewall policy nat rule action type.
+type FirewallPolicyNatRuleActionType string
+
+const (
+	// DNAT ...
+	DNAT FirewallPolicyNatRuleActionType = "DNAT"
+	// SNAT ...
+	SNAT FirewallPolicyNatRuleActionType = "SNAT"
+)
+
+// PossibleFirewallPolicyNatRuleActionTypeValues returns an array of possible values for the FirewallPolicyNatRuleActionType const type.
+func PossibleFirewallPolicyNatRuleActionTypeValues() []FirewallPolicyNatRuleActionType {
+	return []FirewallPolicyNatRuleActionType{DNAT, SNAT}
+}
+
+// FirewallPolicyRuleConditionApplicationProtocolType enumerates the values for firewall policy rule condition
+// application protocol type.
+type FirewallPolicyRuleConditionApplicationProtocolType string
+
+const (
+	// FirewallPolicyRuleConditionApplicationProtocolTypeHTTP ...
+	FirewallPolicyRuleConditionApplicationProtocolTypeHTTP FirewallPolicyRuleConditionApplicationProtocolType = "Http"
+	// FirewallPolicyRuleConditionApplicationProtocolTypeHTTPS ...
+	FirewallPolicyRuleConditionApplicationProtocolTypeHTTPS FirewallPolicyRuleConditionApplicationProtocolType = "Https"
+)
+
+// PossibleFirewallPolicyRuleConditionApplicationProtocolTypeValues returns an array of possible values for the FirewallPolicyRuleConditionApplicationProtocolType const type.
+func PossibleFirewallPolicyRuleConditionApplicationProtocolTypeValues() []FirewallPolicyRuleConditionApplicationProtocolType {
+	return []FirewallPolicyRuleConditionApplicationProtocolType{FirewallPolicyRuleConditionApplicationProtocolTypeHTTP, FirewallPolicyRuleConditionApplicationProtocolTypeHTTPS}
+}
+
+// FirewallPolicyRuleConditionNetworkProtocol enumerates the values for firewall policy rule condition network
+// protocol.
+type FirewallPolicyRuleConditionNetworkProtocol string
+
+const (
+	// FirewallPolicyRuleConditionNetworkProtocolAny ...
+	FirewallPolicyRuleConditionNetworkProtocolAny FirewallPolicyRuleConditionNetworkProtocol = "Any"
+	// FirewallPolicyRuleConditionNetworkProtocolICMP ...
+	FirewallPolicyRuleConditionNetworkProtocolICMP FirewallPolicyRuleConditionNetworkProtocol = "ICMP"
+	// FirewallPolicyRuleConditionNetworkProtocolTCP ...
+	FirewallPolicyRuleConditionNetworkProtocolTCP FirewallPolicyRuleConditionNetworkProtocol = "TCP"
+	// FirewallPolicyRuleConditionNetworkProtocolUDP ...
+	FirewallPolicyRuleConditionNetworkProtocolUDP FirewallPolicyRuleConditionNetworkProtocol = "UDP"
+)
+
+// PossibleFirewallPolicyRuleConditionNetworkProtocolValues returns an array of possible values for the FirewallPolicyRuleConditionNetworkProtocol const type.
+func PossibleFirewallPolicyRuleConditionNetworkProtocolValues() []FirewallPolicyRuleConditionNetworkProtocol {
+	return []FirewallPolicyRuleConditionNetworkProtocol{FirewallPolicyRuleConditionNetworkProtocolAny, FirewallPolicyRuleConditionNetworkProtocolICMP, FirewallPolicyRuleConditionNetworkProtocolTCP, FirewallPolicyRuleConditionNetworkProtocolUDP}
+}
+
 // FlowLogFormatType enumerates the values for flow log format type.
 type FlowLogFormatType string
 
@@ -1450,6 +1518,40 @@ const (
 // PossibleRouteNextHopTypeValues returns an array of possible values for the RouteNextHopType const type.
 func PossibleRouteNextHopTypeValues() []RouteNextHopType {
 	return []RouteNextHopType{RouteNextHopTypeInternet, RouteNextHopTypeNone, RouteNextHopTypeVirtualAppliance, RouteNextHopTypeVirtualNetworkGateway, RouteNextHopTypeVnetLocal}
+}
+
+// RuleConditionType enumerates the values for rule condition type.
+type RuleConditionType string
+
+const (
+	// RuleConditionTypeApplicationRuleCondition ...
+	RuleConditionTypeApplicationRuleCondition RuleConditionType = "ApplicationRuleCondition"
+	// RuleConditionTypeFirewallPolicyRuleCondition ...
+	RuleConditionTypeFirewallPolicyRuleCondition RuleConditionType = "FirewallPolicyRuleCondition"
+	// RuleConditionTypeNetworkRuleCondition ...
+	RuleConditionTypeNetworkRuleCondition RuleConditionType = "NetworkRuleCondition"
+)
+
+// PossibleRuleConditionTypeValues returns an array of possible values for the RuleConditionType const type.
+func PossibleRuleConditionTypeValues() []RuleConditionType {
+	return []RuleConditionType{RuleConditionTypeApplicationRuleCondition, RuleConditionTypeFirewallPolicyRuleCondition, RuleConditionTypeNetworkRuleCondition}
+}
+
+// RuleType enumerates the values for rule type.
+type RuleType string
+
+const (
+	// RuleTypeFirewallPolicyFilterRule ...
+	RuleTypeFirewallPolicyFilterRule RuleType = "FirewallPolicyFilterRule"
+	// RuleTypeFirewallPolicyNatRule ...
+	RuleTypeFirewallPolicyNatRule RuleType = "FirewallPolicyNatRule"
+	// RuleTypeFirewallPolicyRule ...
+	RuleTypeFirewallPolicyRule RuleType = "FirewallPolicyRule"
+)
+
+// PossibleRuleTypeValues returns an array of possible values for the RuleType const type.
+func PossibleRuleTypeValues() []RuleType {
+	return []RuleType{RuleTypeFirewallPolicyFilterRule, RuleTypeFirewallPolicyNatRule, RuleTypeFirewallPolicyRule}
 }
 
 // SecurityRuleAccess enumerates the values for security rule access.
@@ -3595,10 +3697,10 @@ type ApplicationGatewayOnDemandProbe struct {
 	PickHostNameFromBackendHTTPSettings *bool `json:"pickHostNameFromBackendHttpSettings,omitempty"`
 	// Match - Criterion for classifying a healthy probe response.
 	Match *ApplicationGatewayProbeHealthResponseMatch `json:"match,omitempty"`
-	// BackendPoolName - Name of backend pool of application gateway to which probe request will be sent.
-	BackendPoolName *string `json:"backendPoolName,omitempty"`
-	// BackendHTTPSettingName - Name of backend http setting of application gateway to be used for test probe.
-	BackendHTTPSettingName *string `json:"backendHttpSettingName,omitempty"`
+	// BackendAddressPool - Reference of backend pool of application gateway to which probe request will be sent.
+	BackendAddressPool *SubResource `json:"backendAddressPool,omitempty"`
+	// BackendHTTPSettings - Reference of backend http setting of application gateway to be used for test probe.
+	BackendHTTPSettings *SubResource `json:"backendHttpSettings,omitempty"`
 }
 
 // ApplicationGatewayPathRule path rule of URL path map of an application gateway.
@@ -4883,6 +4985,77 @@ type ApplicationGatewayWebApplicationFirewallConfiguration struct {
 	FileUploadLimitInMb *int32 `json:"fileUploadLimitInMb,omitempty"`
 	// Exclusions - The exclusion list.
 	Exclusions *[]ApplicationGatewayFirewallExclusion `json:"exclusions,omitempty"`
+}
+
+// ApplicationRuleCondition rule condition of type application.
+type ApplicationRuleCondition struct {
+	// SourceAddresses - List of source IP addresses for this rule.
+	SourceAddresses *[]string `json:"sourceAddresses,omitempty"`
+	// DestinationAddresses - List of destination IP addresses or Service Tags.
+	DestinationAddresses *[]string `json:"destinationAddresses,omitempty"`
+	// Protocols - Array of Application Protocols.
+	Protocols *[]FirewallPolicyRuleConditionApplicationProtocol `json:"protocols,omitempty"`
+	// TargetFqdns - List of FQDNs for this rule condition.
+	TargetFqdns *[]string `json:"targetFqdns,omitempty"`
+	// FqdnTags - List of FQDN Tags for this rule condition.
+	FqdnTags *[]string `json:"fqdnTags,omitempty"`
+	// Name - Name of the rule condition.
+	Name *string `json:"name,omitempty"`
+	// Description - Description of the rule condition.
+	Description *string `json:"description,omitempty"`
+	// RuleConditionType - Possible values include: 'RuleConditionTypeFirewallPolicyRuleCondition', 'RuleConditionTypeApplicationRuleCondition', 'RuleConditionTypeNetworkRuleCondition'
+	RuleConditionType RuleConditionType `json:"ruleConditionType,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for ApplicationRuleCondition.
+func (arc ApplicationRuleCondition) MarshalJSON() ([]byte, error) {
+	arc.RuleConditionType = RuleConditionTypeApplicationRuleCondition
+	objectMap := make(map[string]interface{})
+	if arc.SourceAddresses != nil {
+		objectMap["sourceAddresses"] = arc.SourceAddresses
+	}
+	if arc.DestinationAddresses != nil {
+		objectMap["destinationAddresses"] = arc.DestinationAddresses
+	}
+	if arc.Protocols != nil {
+		objectMap["protocols"] = arc.Protocols
+	}
+	if arc.TargetFqdns != nil {
+		objectMap["targetFqdns"] = arc.TargetFqdns
+	}
+	if arc.FqdnTags != nil {
+		objectMap["fqdnTags"] = arc.FqdnTags
+	}
+	if arc.Name != nil {
+		objectMap["name"] = arc.Name
+	}
+	if arc.Description != nil {
+		objectMap["description"] = arc.Description
+	}
+	if arc.RuleConditionType != "" {
+		objectMap["ruleConditionType"] = arc.RuleConditionType
+	}
+	return json.Marshal(objectMap)
+}
+
+// AsApplicationRuleCondition is the BasicFirewallPolicyRuleCondition implementation for ApplicationRuleCondition.
+func (arc ApplicationRuleCondition) AsApplicationRuleCondition() (*ApplicationRuleCondition, bool) {
+	return &arc, true
+}
+
+// AsRuleCondition is the BasicFirewallPolicyRuleCondition implementation for ApplicationRuleCondition.
+func (arc ApplicationRuleCondition) AsRuleCondition() (*RuleCondition, bool) {
+	return nil, false
+}
+
+// AsFirewallPolicyRuleCondition is the BasicFirewallPolicyRuleCondition implementation for ApplicationRuleCondition.
+func (arc ApplicationRuleCondition) AsFirewallPolicyRuleCondition() (*FirewallPolicyRuleCondition, bool) {
+	return nil, false
+}
+
+// AsBasicFirewallPolicyRuleCondition is the BasicFirewallPolicyRuleCondition implementation for ApplicationRuleCondition.
+func (arc ApplicationRuleCondition) AsBasicFirewallPolicyRuleCondition() (BasicFirewallPolicyRuleCondition, bool) {
+	return &arc, true
 }
 
 // ApplicationSecurityGroup an application security group in a resource group.
@@ -6923,6 +7096,18 @@ type AzureFirewallPropertiesFormat struct {
 	ProvisioningState ProvisioningState `json:"provisioningState,omitempty"`
 	// ThreatIntelMode - The operation mode for Threat Intelligence. Possible values include: 'AzureFirewallThreatIntelModeAlert', 'AzureFirewallThreatIntelModeDeny', 'AzureFirewallThreatIntelModeOff'
 	ThreatIntelMode AzureFirewallThreatIntelMode `json:"threatIntelMode,omitempty"`
+	// VirtualHub - The virtualHub to which the firewall belongs.
+	VirtualHub *SubResource `json:"virtualHub,omitempty"`
+	// FirewallPolicy - The firewallPolicy associated with this azure firewall.
+	FirewallPolicy *SubResource `json:"firewallPolicy,omitempty"`
+	// HubIPAddresses - READ-ONLY; IP addresses associated with AzureFirewall.
+	HubIPAddresses *HubIPAddresses `json:"hubIpAddresses,omitempty"`
+}
+
+// AzureFirewallPublicIPAddress public IP Address associated with azure firewall.
+type AzureFirewallPublicIPAddress struct {
+	// Address - Public IP Address value.
+	Address *string `json:"address,omitempty"`
 }
 
 // AzureFirewallRCAction properties of the AzureFirewallRCAction.
@@ -13374,6 +13559,1139 @@ type ExpressRouteServiceProviderPropertiesFormat struct {
 	ProvisioningState *string `json:"provisioningState,omitempty"`
 }
 
+// FirewallPoliciesCreateOrUpdateFuture an abstraction for monitoring and retrieving the results of a
+// long-running operation.
+type FirewallPoliciesCreateOrUpdateFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *FirewallPoliciesCreateOrUpdateFuture) Result(client FirewallPoliciesClient) (fp FirewallPolicy, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.FirewallPoliciesCreateOrUpdateFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("network.FirewallPoliciesCreateOrUpdateFuture")
+		return
+	}
+	sender := autorest.DecorateSender(client, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	if fp.Response.Response, err = future.GetResult(sender); err == nil && fp.Response.Response.StatusCode != http.StatusNoContent {
+		fp, err = client.CreateOrUpdateResponder(fp.Response.Response)
+		if err != nil {
+			err = autorest.NewErrorWithError(err, "network.FirewallPoliciesCreateOrUpdateFuture", "Result", fp.Response.Response, "Failure responding to request")
+		}
+	}
+	return
+}
+
+// FirewallPoliciesDeleteFuture an abstraction for monitoring and retrieving the results of a long-running
+// operation.
+type FirewallPoliciesDeleteFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *FirewallPoliciesDeleteFuture) Result(client FirewallPoliciesClient) (ar autorest.Response, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.FirewallPoliciesDeleteFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("network.FirewallPoliciesDeleteFuture")
+		return
+	}
+	ar.Response = future.Response()
+	return
+}
+
+// FirewallPolicy firewallPolicy Resource.
+type FirewallPolicy struct {
+	autorest.Response `json:"-"`
+	// FirewallPolicyPropertiesFormat - Properties of the firewall policy.
+	*FirewallPolicyPropertiesFormat `json:"properties,omitempty"`
+	// Etag - READ-ONLY; Gets a unique read-only string that changes whenever the resource is updated.
+	Etag *string `json:"etag,omitempty"`
+	// ID - Resource ID.
+	ID *string `json:"id,omitempty"`
+	// Name - READ-ONLY; Resource name.
+	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; Resource type.
+	Type *string `json:"type,omitempty"`
+	// Location - Resource location.
+	Location *string `json:"location,omitempty"`
+	// Tags - Resource tags.
+	Tags map[string]*string `json:"tags"`
+}
+
+// MarshalJSON is the custom marshaler for FirewallPolicy.
+func (fp FirewallPolicy) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if fp.FirewallPolicyPropertiesFormat != nil {
+		objectMap["properties"] = fp.FirewallPolicyPropertiesFormat
+	}
+	if fp.ID != nil {
+		objectMap["id"] = fp.ID
+	}
+	if fp.Location != nil {
+		objectMap["location"] = fp.Location
+	}
+	if fp.Tags != nil {
+		objectMap["tags"] = fp.Tags
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for FirewallPolicy struct.
+func (fp *FirewallPolicy) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var firewallPolicyPropertiesFormat FirewallPolicyPropertiesFormat
+				err = json.Unmarshal(*v, &firewallPolicyPropertiesFormat)
+				if err != nil {
+					return err
+				}
+				fp.FirewallPolicyPropertiesFormat = &firewallPolicyPropertiesFormat
+			}
+		case "etag":
+			if v != nil {
+				var etag string
+				err = json.Unmarshal(*v, &etag)
+				if err != nil {
+					return err
+				}
+				fp.Etag = &etag
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				fp.ID = &ID
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				fp.Name = &name
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				fp.Type = &typeVar
+			}
+		case "location":
+			if v != nil {
+				var location string
+				err = json.Unmarshal(*v, &location)
+				if err != nil {
+					return err
+				}
+				fp.Location = &location
+			}
+		case "tags":
+			if v != nil {
+				var tags map[string]*string
+				err = json.Unmarshal(*v, &tags)
+				if err != nil {
+					return err
+				}
+				fp.Tags = tags
+			}
+		}
+	}
+
+	return nil
+}
+
+// FirewallPolicyFilterRule firewall Policy Filter Rule
+type FirewallPolicyFilterRule struct {
+	// Action - The action type of a Filter rule
+	Action *FirewallPolicyFilterRuleAction `json:"action,omitempty"`
+	// RuleConditions - Collection of rule conditions used by a rule.
+	RuleConditions *[]BasicFirewallPolicyRuleCondition `json:"ruleConditions,omitempty"`
+	// Name - Name of the Rule
+	Name *string `json:"name,omitempty"`
+	// Priority - Priority of the Firewall Policy Rule resource.
+	Priority *int32 `json:"priority,omitempty"`
+	// RuleType - Possible values include: 'RuleTypeFirewallPolicyRule', 'RuleTypeFirewallPolicyNatRule', 'RuleTypeFirewallPolicyFilterRule'
+	RuleType RuleType `json:"ruleType,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for FirewallPolicyFilterRule.
+func (fpfr FirewallPolicyFilterRule) MarshalJSON() ([]byte, error) {
+	fpfr.RuleType = RuleTypeFirewallPolicyFilterRule
+	objectMap := make(map[string]interface{})
+	if fpfr.Action != nil {
+		objectMap["action"] = fpfr.Action
+	}
+	if fpfr.RuleConditions != nil {
+		objectMap["ruleConditions"] = fpfr.RuleConditions
+	}
+	if fpfr.Name != nil {
+		objectMap["name"] = fpfr.Name
+	}
+	if fpfr.Priority != nil {
+		objectMap["priority"] = fpfr.Priority
+	}
+	if fpfr.RuleType != "" {
+		objectMap["ruleType"] = fpfr.RuleType
+	}
+	return json.Marshal(objectMap)
+}
+
+// AsFirewallPolicyNatRule is the BasicFirewallPolicyRule implementation for FirewallPolicyFilterRule.
+func (fpfr FirewallPolicyFilterRule) AsFirewallPolicyNatRule() (*FirewallPolicyNatRule, bool) {
+	return nil, false
+}
+
+// AsFirewallPolicyFilterRule is the BasicFirewallPolicyRule implementation for FirewallPolicyFilterRule.
+func (fpfr FirewallPolicyFilterRule) AsFirewallPolicyFilterRule() (*FirewallPolicyFilterRule, bool) {
+	return &fpfr, true
+}
+
+// AsFirewallPolicyRule is the BasicFirewallPolicyRule implementation for FirewallPolicyFilterRule.
+func (fpfr FirewallPolicyFilterRule) AsFirewallPolicyRule() (*FirewallPolicyRule, bool) {
+	return nil, false
+}
+
+// AsBasicFirewallPolicyRule is the BasicFirewallPolicyRule implementation for FirewallPolicyFilterRule.
+func (fpfr FirewallPolicyFilterRule) AsBasicFirewallPolicyRule() (BasicFirewallPolicyRule, bool) {
+	return &fpfr, true
+}
+
+// UnmarshalJSON is the custom unmarshaler for FirewallPolicyFilterRule struct.
+func (fpfr *FirewallPolicyFilterRule) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "action":
+			if v != nil {
+				var action FirewallPolicyFilterRuleAction
+				err = json.Unmarshal(*v, &action)
+				if err != nil {
+					return err
+				}
+				fpfr.Action = &action
+			}
+		case "ruleConditions":
+			if v != nil {
+				ruleConditions, err := unmarshalBasicFirewallPolicyRuleConditionArray(*v)
+				if err != nil {
+					return err
+				}
+				fpfr.RuleConditions = &ruleConditions
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				fpfr.Name = &name
+			}
+		case "priority":
+			if v != nil {
+				var priority int32
+				err = json.Unmarshal(*v, &priority)
+				if err != nil {
+					return err
+				}
+				fpfr.Priority = &priority
+			}
+		case "ruleType":
+			if v != nil {
+				var ruleType RuleType
+				err = json.Unmarshal(*v, &ruleType)
+				if err != nil {
+					return err
+				}
+				fpfr.RuleType = ruleType
+			}
+		}
+	}
+
+	return nil
+}
+
+// FirewallPolicyFilterRuleAction properties of the FirewallPolicyFilterRuleAction.
+type FirewallPolicyFilterRuleAction struct {
+	// Type - The type of action. Possible values include: 'FirewallPolicyFilterRuleActionTypeAllow', 'FirewallPolicyFilterRuleActionTypeDeny', 'FirewallPolicyFilterRuleActionTypeAlert'
+	Type FirewallPolicyFilterRuleActionType `json:"type,omitempty"`
+}
+
+// FirewallPolicyListResult response for ListFirewallPolicies API service call.
+type FirewallPolicyListResult struct {
+	autorest.Response `json:"-"`
+	// Value - List of Firewall Policies in a resource group.
+	Value *[]FirewallPolicy `json:"value,omitempty"`
+	// NextLink - URL to get the next set of results.
+	NextLink *string `json:"nextLink,omitempty"`
+}
+
+// FirewallPolicyListResultIterator provides access to a complete listing of FirewallPolicy values.
+type FirewallPolicyListResultIterator struct {
+	i    int
+	page FirewallPolicyListResultPage
+}
+
+// NextWithContext advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+func (iter *FirewallPolicyListResultIterator) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/FirewallPolicyListResultIterator.NextWithContext")
+		defer func() {
+			sc := -1
+			if iter.Response().Response.Response != nil {
+				sc = iter.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	iter.i++
+	if iter.i < len(iter.page.Values()) {
+		return nil
+	}
+	err = iter.page.NextWithContext(ctx)
+	if err != nil {
+		iter.i--
+		return err
+	}
+	iter.i = 0
+	return nil
+}
+
+// Next advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (iter *FirewallPolicyListResultIterator) Next() error {
+	return iter.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the enumeration should be started or is not yet complete.
+func (iter FirewallPolicyListResultIterator) NotDone() bool {
+	return iter.page.NotDone() && iter.i < len(iter.page.Values())
+}
+
+// Response returns the raw server response from the last page request.
+func (iter FirewallPolicyListResultIterator) Response() FirewallPolicyListResult {
+	return iter.page.Response()
+}
+
+// Value returns the current value or a zero-initialized value if the
+// iterator has advanced beyond the end of the collection.
+func (iter FirewallPolicyListResultIterator) Value() FirewallPolicy {
+	if !iter.page.NotDone() {
+		return FirewallPolicy{}
+	}
+	return iter.page.Values()[iter.i]
+}
+
+// Creates a new instance of the FirewallPolicyListResultIterator type.
+func NewFirewallPolicyListResultIterator(page FirewallPolicyListResultPage) FirewallPolicyListResultIterator {
+	return FirewallPolicyListResultIterator{page: page}
+}
+
+// IsEmpty returns true if the ListResult contains no values.
+func (fplr FirewallPolicyListResult) IsEmpty() bool {
+	return fplr.Value == nil || len(*fplr.Value) == 0
+}
+
+// firewallPolicyListResultPreparer prepares a request to retrieve the next set of results.
+// It returns nil if no more results exist.
+func (fplr FirewallPolicyListResult) firewallPolicyListResultPreparer(ctx context.Context) (*http.Request, error) {
+	if fplr.NextLink == nil || len(to.String(fplr.NextLink)) < 1 {
+		return nil, nil
+	}
+	return autorest.Prepare((&http.Request{}).WithContext(ctx),
+		autorest.AsJSON(),
+		autorest.AsGet(),
+		autorest.WithBaseURL(to.String(fplr.NextLink)))
+}
+
+// FirewallPolicyListResultPage contains a page of FirewallPolicy values.
+type FirewallPolicyListResultPage struct {
+	fn   func(context.Context, FirewallPolicyListResult) (FirewallPolicyListResult, error)
+	fplr FirewallPolicyListResult
+}
+
+// NextWithContext advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+func (page *FirewallPolicyListResultPage) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/FirewallPolicyListResultPage.NextWithContext")
+		defer func() {
+			sc := -1
+			if page.Response().Response.Response != nil {
+				sc = page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	next, err := page.fn(ctx, page.fplr)
+	if err != nil {
+		return err
+	}
+	page.fplr = next
+	return nil
+}
+
+// Next advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (page *FirewallPolicyListResultPage) Next() error {
+	return page.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the page enumeration should be started or is not yet complete.
+func (page FirewallPolicyListResultPage) NotDone() bool {
+	return !page.fplr.IsEmpty()
+}
+
+// Response returns the raw server response from the last page request.
+func (page FirewallPolicyListResultPage) Response() FirewallPolicyListResult {
+	return page.fplr
+}
+
+// Values returns the slice of values for the current page or nil if there are no values.
+func (page FirewallPolicyListResultPage) Values() []FirewallPolicy {
+	if page.fplr.IsEmpty() {
+		return nil
+	}
+	return *page.fplr.Value
+}
+
+// Creates a new instance of the FirewallPolicyListResultPage type.
+func NewFirewallPolicyListResultPage(getNextPage func(context.Context, FirewallPolicyListResult) (FirewallPolicyListResult, error)) FirewallPolicyListResultPage {
+	return FirewallPolicyListResultPage{fn: getNextPage}
+}
+
+// FirewallPolicyNatRule firewall Policy NAT Rule
+type FirewallPolicyNatRule struct {
+	// Action - The action type of a Nat rule, SNAT or DNAT
+	Action *FirewallPolicyNatRuleAction `json:"action,omitempty"`
+	// TranslatedAddress - The translated address for this NAT rule.
+	TranslatedAddress *string `json:"translatedAddress,omitempty"`
+	// TranslatedPort - The translated port for this NAT rule.
+	TranslatedPort *string `json:"translatedPort,omitempty"`
+	// RuleCondition - The match conditions for incoming traffic
+	RuleCondition BasicFirewallPolicyRuleCondition `json:"ruleCondition,omitempty"`
+	// Name - Name of the Rule
+	Name *string `json:"name,omitempty"`
+	// Priority - Priority of the Firewall Policy Rule resource.
+	Priority *int32 `json:"priority,omitempty"`
+	// RuleType - Possible values include: 'RuleTypeFirewallPolicyRule', 'RuleTypeFirewallPolicyNatRule', 'RuleTypeFirewallPolicyFilterRule'
+	RuleType RuleType `json:"ruleType,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for FirewallPolicyNatRule.
+func (fpnr FirewallPolicyNatRule) MarshalJSON() ([]byte, error) {
+	fpnr.RuleType = RuleTypeFirewallPolicyNatRule
+	objectMap := make(map[string]interface{})
+	if fpnr.Action != nil {
+		objectMap["action"] = fpnr.Action
+	}
+	if fpnr.TranslatedAddress != nil {
+		objectMap["translatedAddress"] = fpnr.TranslatedAddress
+	}
+	if fpnr.TranslatedPort != nil {
+		objectMap["translatedPort"] = fpnr.TranslatedPort
+	}
+	objectMap["ruleCondition"] = fpnr.RuleCondition
+	if fpnr.Name != nil {
+		objectMap["name"] = fpnr.Name
+	}
+	if fpnr.Priority != nil {
+		objectMap["priority"] = fpnr.Priority
+	}
+	if fpnr.RuleType != "" {
+		objectMap["ruleType"] = fpnr.RuleType
+	}
+	return json.Marshal(objectMap)
+}
+
+// AsFirewallPolicyNatRule is the BasicFirewallPolicyRule implementation for FirewallPolicyNatRule.
+func (fpnr FirewallPolicyNatRule) AsFirewallPolicyNatRule() (*FirewallPolicyNatRule, bool) {
+	return &fpnr, true
+}
+
+// AsFirewallPolicyFilterRule is the BasicFirewallPolicyRule implementation for FirewallPolicyNatRule.
+func (fpnr FirewallPolicyNatRule) AsFirewallPolicyFilterRule() (*FirewallPolicyFilterRule, bool) {
+	return nil, false
+}
+
+// AsFirewallPolicyRule is the BasicFirewallPolicyRule implementation for FirewallPolicyNatRule.
+func (fpnr FirewallPolicyNatRule) AsFirewallPolicyRule() (*FirewallPolicyRule, bool) {
+	return nil, false
+}
+
+// AsBasicFirewallPolicyRule is the BasicFirewallPolicyRule implementation for FirewallPolicyNatRule.
+func (fpnr FirewallPolicyNatRule) AsBasicFirewallPolicyRule() (BasicFirewallPolicyRule, bool) {
+	return &fpnr, true
+}
+
+// UnmarshalJSON is the custom unmarshaler for FirewallPolicyNatRule struct.
+func (fpnr *FirewallPolicyNatRule) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "action":
+			if v != nil {
+				var action FirewallPolicyNatRuleAction
+				err = json.Unmarshal(*v, &action)
+				if err != nil {
+					return err
+				}
+				fpnr.Action = &action
+			}
+		case "translatedAddress":
+			if v != nil {
+				var translatedAddress string
+				err = json.Unmarshal(*v, &translatedAddress)
+				if err != nil {
+					return err
+				}
+				fpnr.TranslatedAddress = &translatedAddress
+			}
+		case "translatedPort":
+			if v != nil {
+				var translatedPort string
+				err = json.Unmarshal(*v, &translatedPort)
+				if err != nil {
+					return err
+				}
+				fpnr.TranslatedPort = &translatedPort
+			}
+		case "ruleCondition":
+			if v != nil {
+				ruleCondition, err := unmarshalBasicFirewallPolicyRuleCondition(*v)
+				if err != nil {
+					return err
+				}
+				fpnr.RuleCondition = ruleCondition
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				fpnr.Name = &name
+			}
+		case "priority":
+			if v != nil {
+				var priority int32
+				err = json.Unmarshal(*v, &priority)
+				if err != nil {
+					return err
+				}
+				fpnr.Priority = &priority
+			}
+		case "ruleType":
+			if v != nil {
+				var ruleType RuleType
+				err = json.Unmarshal(*v, &ruleType)
+				if err != nil {
+					return err
+				}
+				fpnr.RuleType = ruleType
+			}
+		}
+	}
+
+	return nil
+}
+
+// FirewallPolicyNatRuleAction properties of the FirewallPolicyNatRuleAction.
+type FirewallPolicyNatRuleAction struct {
+	// Type - The type of action. Possible values include: 'DNAT', 'SNAT'
+	Type FirewallPolicyNatRuleActionType `json:"type,omitempty"`
+}
+
+// FirewallPolicyPropertiesFormat firewall Policy definition
+type FirewallPolicyPropertiesFormat struct {
+	// RuleGroups - READ-ONLY; List of references to FirewallPolicyRuleGroups
+	RuleGroups *[]SubResource `json:"ruleGroups,omitempty"`
+	// ProvisioningState - The provisioning state of the resource. Possible values include: 'Succeeded', 'Updating', 'Deleting', 'Failed'
+	ProvisioningState ProvisioningState `json:"provisioningState,omitempty"`
+	// BasePolicy - The parent firewall policy from which rules are inherited.
+	BasePolicy *SubResource `json:"basePolicy,omitempty"`
+	// Firewalls - READ-ONLY; List of references to Azure Firewalls that this Firewall Policy is associated with
+	Firewalls *[]SubResource `json:"firewalls,omitempty"`
+	// ChildPolicies - READ-ONLY; List of references to Child Firewall Policies
+	ChildPolicies *[]SubResource `json:"childPolicies,omitempty"`
+	// ThreatIntelMode - The operation mode for Threat Intelligence. Possible values include: 'AzureFirewallThreatIntelModeAlert', 'AzureFirewallThreatIntelModeDeny', 'AzureFirewallThreatIntelModeOff'
+	ThreatIntelMode AzureFirewallThreatIntelMode `json:"threatIntelMode,omitempty"`
+}
+
+// BasicFirewallPolicyRule properties of the rule.
+type BasicFirewallPolicyRule interface {
+	AsFirewallPolicyNatRule() (*FirewallPolicyNatRule, bool)
+	AsFirewallPolicyFilterRule() (*FirewallPolicyFilterRule, bool)
+	AsFirewallPolicyRule() (*FirewallPolicyRule, bool)
+}
+
+// FirewallPolicyRule properties of the rule.
+type FirewallPolicyRule struct {
+	// Name - Name of the Rule
+	Name *string `json:"name,omitempty"`
+	// Priority - Priority of the Firewall Policy Rule resource.
+	Priority *int32 `json:"priority,omitempty"`
+	// RuleType - Possible values include: 'RuleTypeFirewallPolicyRule', 'RuleTypeFirewallPolicyNatRule', 'RuleTypeFirewallPolicyFilterRule'
+	RuleType RuleType `json:"ruleType,omitempty"`
+}
+
+func unmarshalBasicFirewallPolicyRule(body []byte) (BasicFirewallPolicyRule, error) {
+	var m map[string]interface{}
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return nil, err
+	}
+
+	switch m["ruleType"] {
+	case string(RuleTypeFirewallPolicyNatRule):
+		var fpnr FirewallPolicyNatRule
+		err := json.Unmarshal(body, &fpnr)
+		return fpnr, err
+	case string(RuleTypeFirewallPolicyFilterRule):
+		var fpfr FirewallPolicyFilterRule
+		err := json.Unmarshal(body, &fpfr)
+		return fpfr, err
+	default:
+		var fpr FirewallPolicyRule
+		err := json.Unmarshal(body, &fpr)
+		return fpr, err
+	}
+}
+func unmarshalBasicFirewallPolicyRuleArray(body []byte) ([]BasicFirewallPolicyRule, error) {
+	var rawMessages []*json.RawMessage
+	err := json.Unmarshal(body, &rawMessages)
+	if err != nil {
+		return nil, err
+	}
+
+	fprArray := make([]BasicFirewallPolicyRule, len(rawMessages))
+
+	for index, rawMessage := range rawMessages {
+		fpr, err := unmarshalBasicFirewallPolicyRule(*rawMessage)
+		if err != nil {
+			return nil, err
+		}
+		fprArray[index] = fpr
+	}
+	return fprArray, nil
+}
+
+// MarshalJSON is the custom marshaler for FirewallPolicyRule.
+func (fpr FirewallPolicyRule) MarshalJSON() ([]byte, error) {
+	fpr.RuleType = RuleTypeFirewallPolicyRule
+	objectMap := make(map[string]interface{})
+	if fpr.Name != nil {
+		objectMap["name"] = fpr.Name
+	}
+	if fpr.Priority != nil {
+		objectMap["priority"] = fpr.Priority
+	}
+	if fpr.RuleType != "" {
+		objectMap["ruleType"] = fpr.RuleType
+	}
+	return json.Marshal(objectMap)
+}
+
+// AsFirewallPolicyNatRule is the BasicFirewallPolicyRule implementation for FirewallPolicyRule.
+func (fpr FirewallPolicyRule) AsFirewallPolicyNatRule() (*FirewallPolicyNatRule, bool) {
+	return nil, false
+}
+
+// AsFirewallPolicyFilterRule is the BasicFirewallPolicyRule implementation for FirewallPolicyRule.
+func (fpr FirewallPolicyRule) AsFirewallPolicyFilterRule() (*FirewallPolicyFilterRule, bool) {
+	return nil, false
+}
+
+// AsFirewallPolicyRule is the BasicFirewallPolicyRule implementation for FirewallPolicyRule.
+func (fpr FirewallPolicyRule) AsFirewallPolicyRule() (*FirewallPolicyRule, bool) {
+	return &fpr, true
+}
+
+// AsBasicFirewallPolicyRule is the BasicFirewallPolicyRule implementation for FirewallPolicyRule.
+func (fpr FirewallPolicyRule) AsBasicFirewallPolicyRule() (BasicFirewallPolicyRule, bool) {
+	return &fpr, true
+}
+
+// BasicFirewallPolicyRuleCondition properties of a rule.
+type BasicFirewallPolicyRuleCondition interface {
+	AsApplicationRuleCondition() (*ApplicationRuleCondition, bool)
+	AsRuleCondition() (*RuleCondition, bool)
+	AsFirewallPolicyRuleCondition() (*FirewallPolicyRuleCondition, bool)
+}
+
+// FirewallPolicyRuleCondition properties of a rule.
+type FirewallPolicyRuleCondition struct {
+	// Name - Name of the rule condition.
+	Name *string `json:"name,omitempty"`
+	// Description - Description of the rule condition.
+	Description *string `json:"description,omitempty"`
+	// RuleConditionType - Possible values include: 'RuleConditionTypeFirewallPolicyRuleCondition', 'RuleConditionTypeApplicationRuleCondition', 'RuleConditionTypeNetworkRuleCondition'
+	RuleConditionType RuleConditionType `json:"ruleConditionType,omitempty"`
+}
+
+func unmarshalBasicFirewallPolicyRuleCondition(body []byte) (BasicFirewallPolicyRuleCondition, error) {
+	var m map[string]interface{}
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return nil, err
+	}
+
+	switch m["ruleConditionType"] {
+	case string(RuleConditionTypeApplicationRuleCondition):
+		var arc ApplicationRuleCondition
+		err := json.Unmarshal(body, &arc)
+		return arc, err
+	case string(RuleConditionTypeNetworkRuleCondition):
+		var rc RuleCondition
+		err := json.Unmarshal(body, &rc)
+		return rc, err
+	default:
+		var fprc FirewallPolicyRuleCondition
+		err := json.Unmarshal(body, &fprc)
+		return fprc, err
+	}
+}
+func unmarshalBasicFirewallPolicyRuleConditionArray(body []byte) ([]BasicFirewallPolicyRuleCondition, error) {
+	var rawMessages []*json.RawMessage
+	err := json.Unmarshal(body, &rawMessages)
+	if err != nil {
+		return nil, err
+	}
+
+	fprcArray := make([]BasicFirewallPolicyRuleCondition, len(rawMessages))
+
+	for index, rawMessage := range rawMessages {
+		fprc, err := unmarshalBasicFirewallPolicyRuleCondition(*rawMessage)
+		if err != nil {
+			return nil, err
+		}
+		fprcArray[index] = fprc
+	}
+	return fprcArray, nil
+}
+
+// MarshalJSON is the custom marshaler for FirewallPolicyRuleCondition.
+func (fprc FirewallPolicyRuleCondition) MarshalJSON() ([]byte, error) {
+	fprc.RuleConditionType = RuleConditionTypeFirewallPolicyRuleCondition
+	objectMap := make(map[string]interface{})
+	if fprc.Name != nil {
+		objectMap["name"] = fprc.Name
+	}
+	if fprc.Description != nil {
+		objectMap["description"] = fprc.Description
+	}
+	if fprc.RuleConditionType != "" {
+		objectMap["ruleConditionType"] = fprc.RuleConditionType
+	}
+	return json.Marshal(objectMap)
+}
+
+// AsApplicationRuleCondition is the BasicFirewallPolicyRuleCondition implementation for FirewallPolicyRuleCondition.
+func (fprc FirewallPolicyRuleCondition) AsApplicationRuleCondition() (*ApplicationRuleCondition, bool) {
+	return nil, false
+}
+
+// AsRuleCondition is the BasicFirewallPolicyRuleCondition implementation for FirewallPolicyRuleCondition.
+func (fprc FirewallPolicyRuleCondition) AsRuleCondition() (*RuleCondition, bool) {
+	return nil, false
+}
+
+// AsFirewallPolicyRuleCondition is the BasicFirewallPolicyRuleCondition implementation for FirewallPolicyRuleCondition.
+func (fprc FirewallPolicyRuleCondition) AsFirewallPolicyRuleCondition() (*FirewallPolicyRuleCondition, bool) {
+	return &fprc, true
+}
+
+// AsBasicFirewallPolicyRuleCondition is the BasicFirewallPolicyRuleCondition implementation for FirewallPolicyRuleCondition.
+func (fprc FirewallPolicyRuleCondition) AsBasicFirewallPolicyRuleCondition() (BasicFirewallPolicyRuleCondition, bool) {
+	return &fprc, true
+}
+
+// FirewallPolicyRuleConditionApplicationProtocol properties of the application rule protocol.
+type FirewallPolicyRuleConditionApplicationProtocol struct {
+	// ProtocolType - Protocol type. Possible values include: 'FirewallPolicyRuleConditionApplicationProtocolTypeHTTP', 'FirewallPolicyRuleConditionApplicationProtocolTypeHTTPS'
+	ProtocolType FirewallPolicyRuleConditionApplicationProtocolType `json:"protocolType,omitempty"`
+	// Port - Port number for the protocol, cannot be greater than 64000.
+	Port *int32 `json:"port,omitempty"`
+}
+
+// FirewallPolicyRuleGroup rule Group resource
+type FirewallPolicyRuleGroup struct {
+	autorest.Response `json:"-"`
+	// FirewallPolicyRuleGroupProperties - The properties of the firewall policy rule group.
+	*FirewallPolicyRuleGroupProperties `json:"properties,omitempty"`
+	// Name - Gets name of the resource that is unique within a resource group. This name can be used to access the resource.
+	Name *string `json:"name,omitempty"`
+	// Etag - READ-ONLY; Gets a unique read-only string that changes whenever the resource is updated.
+	Etag *string `json:"etag,omitempty"`
+	// Type - READ-ONLY; Rule Group type.
+	Type *string `json:"type,omitempty"`
+	// ID - Resource ID.
+	ID *string `json:"id,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for FirewallPolicyRuleGroup.
+func (fprg FirewallPolicyRuleGroup) MarshalJSON() ([]byte, error) {
+	objectMap := make(map[string]interface{})
+	if fprg.FirewallPolicyRuleGroupProperties != nil {
+		objectMap["properties"] = fprg.FirewallPolicyRuleGroupProperties
+	}
+	if fprg.Name != nil {
+		objectMap["name"] = fprg.Name
+	}
+	if fprg.ID != nil {
+		objectMap["id"] = fprg.ID
+	}
+	return json.Marshal(objectMap)
+}
+
+// UnmarshalJSON is the custom unmarshaler for FirewallPolicyRuleGroup struct.
+func (fprg *FirewallPolicyRuleGroup) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "properties":
+			if v != nil {
+				var firewallPolicyRuleGroupProperties FirewallPolicyRuleGroupProperties
+				err = json.Unmarshal(*v, &firewallPolicyRuleGroupProperties)
+				if err != nil {
+					return err
+				}
+				fprg.FirewallPolicyRuleGroupProperties = &firewallPolicyRuleGroupProperties
+			}
+		case "name":
+			if v != nil {
+				var name string
+				err = json.Unmarshal(*v, &name)
+				if err != nil {
+					return err
+				}
+				fprg.Name = &name
+			}
+		case "etag":
+			if v != nil {
+				var etag string
+				err = json.Unmarshal(*v, &etag)
+				if err != nil {
+					return err
+				}
+				fprg.Etag = &etag
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				fprg.Type = &typeVar
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				fprg.ID = &ID
+			}
+		}
+	}
+
+	return nil
+}
+
+// FirewallPolicyRuleGroupListResult response for ListFirewallPolicyRuleGroups API service call.
+type FirewallPolicyRuleGroupListResult struct {
+	autorest.Response `json:"-"`
+	// Value - List of FirewallPolicyRuleGroups in a FirewallPolicy.
+	Value *[]FirewallPolicyRuleGroup `json:"value,omitempty"`
+	// NextLink - URL to get the next set of results.
+	NextLink *string `json:"nextLink,omitempty"`
+}
+
+// FirewallPolicyRuleGroupListResultIterator provides access to a complete listing of
+// FirewallPolicyRuleGroup values.
+type FirewallPolicyRuleGroupListResultIterator struct {
+	i    int
+	page FirewallPolicyRuleGroupListResultPage
+}
+
+// NextWithContext advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+func (iter *FirewallPolicyRuleGroupListResultIterator) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/FirewallPolicyRuleGroupListResultIterator.NextWithContext")
+		defer func() {
+			sc := -1
+			if iter.Response().Response.Response != nil {
+				sc = iter.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	iter.i++
+	if iter.i < len(iter.page.Values()) {
+		return nil
+	}
+	err = iter.page.NextWithContext(ctx)
+	if err != nil {
+		iter.i--
+		return err
+	}
+	iter.i = 0
+	return nil
+}
+
+// Next advances to the next value.  If there was an error making
+// the request the iterator does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (iter *FirewallPolicyRuleGroupListResultIterator) Next() error {
+	return iter.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the enumeration should be started or is not yet complete.
+func (iter FirewallPolicyRuleGroupListResultIterator) NotDone() bool {
+	return iter.page.NotDone() && iter.i < len(iter.page.Values())
+}
+
+// Response returns the raw server response from the last page request.
+func (iter FirewallPolicyRuleGroupListResultIterator) Response() FirewallPolicyRuleGroupListResult {
+	return iter.page.Response()
+}
+
+// Value returns the current value or a zero-initialized value if the
+// iterator has advanced beyond the end of the collection.
+func (iter FirewallPolicyRuleGroupListResultIterator) Value() FirewallPolicyRuleGroup {
+	if !iter.page.NotDone() {
+		return FirewallPolicyRuleGroup{}
+	}
+	return iter.page.Values()[iter.i]
+}
+
+// Creates a new instance of the FirewallPolicyRuleGroupListResultIterator type.
+func NewFirewallPolicyRuleGroupListResultIterator(page FirewallPolicyRuleGroupListResultPage) FirewallPolicyRuleGroupListResultIterator {
+	return FirewallPolicyRuleGroupListResultIterator{page: page}
+}
+
+// IsEmpty returns true if the ListResult contains no values.
+func (fprglr FirewallPolicyRuleGroupListResult) IsEmpty() bool {
+	return fprglr.Value == nil || len(*fprglr.Value) == 0
+}
+
+// firewallPolicyRuleGroupListResultPreparer prepares a request to retrieve the next set of results.
+// It returns nil if no more results exist.
+func (fprglr FirewallPolicyRuleGroupListResult) firewallPolicyRuleGroupListResultPreparer(ctx context.Context) (*http.Request, error) {
+	if fprglr.NextLink == nil || len(to.String(fprglr.NextLink)) < 1 {
+		return nil, nil
+	}
+	return autorest.Prepare((&http.Request{}).WithContext(ctx),
+		autorest.AsJSON(),
+		autorest.AsGet(),
+		autorest.WithBaseURL(to.String(fprglr.NextLink)))
+}
+
+// FirewallPolicyRuleGroupListResultPage contains a page of FirewallPolicyRuleGroup values.
+type FirewallPolicyRuleGroupListResultPage struct {
+	fn     func(context.Context, FirewallPolicyRuleGroupListResult) (FirewallPolicyRuleGroupListResult, error)
+	fprglr FirewallPolicyRuleGroupListResult
+}
+
+// NextWithContext advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+func (page *FirewallPolicyRuleGroupListResultPage) NextWithContext(ctx context.Context) (err error) {
+	if tracing.IsEnabled() {
+		ctx = tracing.StartSpan(ctx, fqdn+"/FirewallPolicyRuleGroupListResultPage.NextWithContext")
+		defer func() {
+			sc := -1
+			if page.Response().Response.Response != nil {
+				sc = page.Response().Response.Response.StatusCode
+			}
+			tracing.EndSpan(ctx, sc, err)
+		}()
+	}
+	next, err := page.fn(ctx, page.fprglr)
+	if err != nil {
+		return err
+	}
+	page.fprglr = next
+	return nil
+}
+
+// Next advances to the next page of values.  If there was an error making
+// the request the page does not advance and the error is returned.
+// Deprecated: Use NextWithContext() instead.
+func (page *FirewallPolicyRuleGroupListResultPage) Next() error {
+	return page.NextWithContext(context.Background())
+}
+
+// NotDone returns true if the page enumeration should be started or is not yet complete.
+func (page FirewallPolicyRuleGroupListResultPage) NotDone() bool {
+	return !page.fprglr.IsEmpty()
+}
+
+// Response returns the raw server response from the last page request.
+func (page FirewallPolicyRuleGroupListResultPage) Response() FirewallPolicyRuleGroupListResult {
+	return page.fprglr
+}
+
+// Values returns the slice of values for the current page or nil if there are no values.
+func (page FirewallPolicyRuleGroupListResultPage) Values() []FirewallPolicyRuleGroup {
+	if page.fprglr.IsEmpty() {
+		return nil
+	}
+	return *page.fprglr.Value
+}
+
+// Creates a new instance of the FirewallPolicyRuleGroupListResultPage type.
+func NewFirewallPolicyRuleGroupListResultPage(getNextPage func(context.Context, FirewallPolicyRuleGroupListResult) (FirewallPolicyRuleGroupListResult, error)) FirewallPolicyRuleGroupListResultPage {
+	return FirewallPolicyRuleGroupListResultPage{fn: getNextPage}
+}
+
+// FirewallPolicyRuleGroupProperties properties of the rule group.
+type FirewallPolicyRuleGroupProperties struct {
+	// Priority - Priority of the Firewall Policy Rule Group resource.
+	Priority *int32 `json:"priority,omitempty"`
+	// Rules - Group of Firewall Policy rules.
+	Rules *[]BasicFirewallPolicyRule `json:"rules,omitempty"`
+	// ProvisioningState - The provisioning state of the resource. Possible values include: 'Succeeded', 'Updating', 'Deleting', 'Failed'
+	ProvisioningState ProvisioningState `json:"provisioningState,omitempty"`
+}
+
+// UnmarshalJSON is the custom unmarshaler for FirewallPolicyRuleGroupProperties struct.
+func (fprgp *FirewallPolicyRuleGroupProperties) UnmarshalJSON(body []byte) error {
+	var m map[string]*json.RawMessage
+	err := json.Unmarshal(body, &m)
+	if err != nil {
+		return err
+	}
+	for k, v := range m {
+		switch k {
+		case "priority":
+			if v != nil {
+				var priority int32
+				err = json.Unmarshal(*v, &priority)
+				if err != nil {
+					return err
+				}
+				fprgp.Priority = &priority
+			}
+		case "rules":
+			if v != nil {
+				rules, err := unmarshalBasicFirewallPolicyRuleArray(*v)
+				if err != nil {
+					return err
+				}
+				fprgp.Rules = &rules
+			}
+		case "provisioningState":
+			if v != nil {
+				var provisioningState ProvisioningState
+				err = json.Unmarshal(*v, &provisioningState)
+				if err != nil {
+					return err
+				}
+				fprgp.ProvisioningState = provisioningState
+			}
+		}
+	}
+
+	return nil
+}
+
+// FirewallPolicyRuleGroupsCreateOrUpdateFuture an abstraction for monitoring and retrieving the results of
+// a long-running operation.
+type FirewallPolicyRuleGroupsCreateOrUpdateFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *FirewallPolicyRuleGroupsCreateOrUpdateFuture) Result(client FirewallPolicyRuleGroupsClient) (fprg FirewallPolicyRuleGroup, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.FirewallPolicyRuleGroupsCreateOrUpdateFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("network.FirewallPolicyRuleGroupsCreateOrUpdateFuture")
+		return
+	}
+	sender := autorest.DecorateSender(client, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	if fprg.Response.Response, err = future.GetResult(sender); err == nil && fprg.Response.Response.StatusCode != http.StatusNoContent {
+		fprg, err = client.CreateOrUpdateResponder(fprg.Response.Response)
+		if err != nil {
+			err = autorest.NewErrorWithError(err, "network.FirewallPolicyRuleGroupsCreateOrUpdateFuture", "Result", fprg.Response.Response, "Failure responding to request")
+		}
+	}
+	return
+}
+
+// FirewallPolicyRuleGroupsDeleteFuture an abstraction for monitoring and retrieving the results of a
+// long-running operation.
+type FirewallPolicyRuleGroupsDeleteFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *FirewallPolicyRuleGroupsDeleteFuture) Result(client FirewallPolicyRuleGroupsClient) (ar autorest.Response, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.FirewallPolicyRuleGroupsDeleteFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("network.FirewallPolicyRuleGroupsDeleteFuture")
+		return
+	}
+	ar.Response = future.Response()
+	return
+}
+
 // FlowLogFormatParameters parameters that define the flow log format.
 type FlowLogFormatParameters struct {
 	// Type - The file type of flow log. Possible values include: 'JSON'
@@ -13651,6 +14969,14 @@ type HTTPHeader struct {
 	Name *string `json:"name,omitempty"`
 	// Value - The value in HTTP header.
 	Value *string `json:"value,omitempty"`
+}
+
+// HubIPAddresses IP addresses associated with azure firewall.
+type HubIPAddresses struct {
+	// PublicIPAddresses - List of Public IP addresses associated with azure firewall.
+	PublicIPAddresses *[]AzureFirewallPublicIPAddress `json:"publicIPAddresses,omitempty"`
+	// PrivateIPAddress - Private IP Address associated with azure firewall.
+	PrivateIPAddress *string `json:"privateIPAddress,omitempty"`
 }
 
 // HubVirtualNetworkConnection hubVirtualNetworkConnection Resource.
@@ -21115,7 +22441,7 @@ type PrivateEndpoint struct {
 	autorest.Response `json:"-"`
 	// PrivateEndpointProperties - Properties of the private endpoint.
 	*PrivateEndpointProperties `json:"properties,omitempty"`
-	// Etag - Gets a unique read-only string that changes whenever the resource is updated.
+	// Etag - A unique read-only string that changes whenever the resource is updated.
 	Etag *string `json:"etag,omitempty"`
 	// ID - Resource ID.
 	ID *string `json:"id,omitempty"`
@@ -21235,6 +22561,10 @@ type PrivateEndpointConnection struct {
 	*PrivateEndpointConnectionProperties `json:"properties,omitempty"`
 	// Name - The name of the resource that is unique within a resource group. This name can be used to access the resource.
 	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; The resource type.
+	Type *string `json:"type,omitempty"`
+	// Etag - READ-ONLY; A unique read-only string that changes whenever the resource is updated.
+	Etag *string `json:"etag,omitempty"`
 	// ID - Resource ID.
 	ID *string `json:"id,omitempty"`
 }
@@ -21281,6 +22611,24 @@ func (pec *PrivateEndpointConnection) UnmarshalJSON(body []byte) error {
 				}
 				pec.Name = &name
 			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				pec.Type = &typeVar
+			}
+		case "etag":
+			if v != nil {
+				var etag string
+				err = json.Unmarshal(*v, &etag)
+				if err != nil {
+					return err
+				}
+				pec.Etag = &etag
+			}
 		case "id":
 			if v != nil {
 				var ID string
@@ -21302,6 +22650,8 @@ type PrivateEndpointConnectionProperties struct {
 	PrivateEndpoint *PrivateEndpoint `json:"privateEndpoint,omitempty"`
 	// PrivateLinkServiceConnectionState - A collection of information about the state of the connection between service consumer and provider.
 	PrivateLinkServiceConnectionState *PrivateLinkServiceConnectionState `json:"privateLinkServiceConnectionState,omitempty"`
+	// ProvisioningState - The provisioning state of the private endpoint connection. Possible values include: 'Succeeded', 'Updating', 'Deleting', 'Failed'
+	ProvisioningState ProvisioningState `json:"provisioningState,omitempty"`
 }
 
 // PrivateEndpointListResult response for the ListPrivateEndpoints API service call.
@@ -21456,8 +22806,8 @@ type PrivateEndpointProperties struct {
 	Subnet *Subnet `json:"subnet,omitempty"`
 	// NetworkInterfaces - READ-ONLY; Gets an array of references to the network interfaces created for this private endpoint.
 	NetworkInterfaces *[]Interface `json:"networkInterfaces,omitempty"`
-	// ProvisioningState - READ-ONLY; The provisioning state of the private endpoint. Possible values are: 'Updating', 'Deleting', and 'Failed'.
-	ProvisioningState *string `json:"provisioningState,omitempty"`
+	// ProvisioningState - The provisioning state of the private endpoint. Possible values include: 'Succeeded', 'Updating', 'Deleting', 'Failed'
+	ProvisioningState ProvisioningState `json:"provisioningState,omitempty"`
 	// PrivateLinkServiceConnections - A grouping of information about the connection to the remote resource.
 	PrivateLinkServiceConnections *[]PrivateLinkServiceConnection `json:"privateLinkServiceConnections,omitempty"`
 	// ManualPrivateLinkServiceConnections - A grouping of information about the connection to the remote resource. Used when the network admin does not have access to approve connections to the remote resource.
@@ -21521,7 +22871,7 @@ type PrivateLinkService struct {
 	autorest.Response `json:"-"`
 	// PrivateLinkServiceProperties - Properties of the private link service.
 	*PrivateLinkServiceProperties `json:"properties,omitempty"`
-	// Etag - Gets a unique read-only string that changes whenever the resource is updated.
+	// Etag - A unique read-only string that changes whenever the resource is updated.
 	Etag *string `json:"etag,omitempty"`
 	// ID - Resource ID.
 	ID *string `json:"id,omitempty"`
@@ -21640,6 +22990,10 @@ type PrivateLinkServiceConnection struct {
 	*PrivateLinkServiceConnectionProperties `json:"properties,omitempty"`
 	// Name - The name of the resource that is unique within a resource group. This name can be used to access the resource.
 	Name *string `json:"name,omitempty"`
+	// Type - READ-ONLY; The resource type.
+	Type *string `json:"type,omitempty"`
+	// Etag - READ-ONLY; A unique read-only string that changes whenever the resource is updated.
+	Etag *string `json:"etag,omitempty"`
 	// ID - Resource ID.
 	ID *string `json:"id,omitempty"`
 }
@@ -21686,6 +23040,24 @@ func (plsc *PrivateLinkServiceConnection) UnmarshalJSON(body []byte) error {
 				}
 				plsc.Name = &name
 			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				plsc.Type = &typeVar
+			}
+		case "etag":
+			if v != nil {
+				var etag string
+				err = json.Unmarshal(*v, &etag)
+				if err != nil {
+					return err
+				}
+				plsc.Etag = &etag
+			}
 		case "id":
 			if v != nil {
 				var ID string
@@ -21703,6 +23075,8 @@ func (plsc *PrivateLinkServiceConnection) UnmarshalJSON(body []byte) error {
 
 // PrivateLinkServiceConnectionProperties properties of the PrivateLinkServiceConnection.
 type PrivateLinkServiceConnectionProperties struct {
+	// ProvisioningState - The provisioning state of the private link service connection. Possible values include: 'Succeeded', 'Updating', 'Deleting', 'Failed'
+	ProvisioningState ProvisioningState `json:"provisioningState,omitempty"`
 	// PrivateLinkServiceID - The resource id of private link service.
 	PrivateLinkServiceID *string `json:"privateLinkServiceId,omitempty"`
 	// GroupIds - The ID(s) of the group(s) obtained from the remote resource that this private endpoint should connect to.
@@ -21730,6 +23104,12 @@ type PrivateLinkServiceIPConfiguration struct {
 	*PrivateLinkServiceIPConfigurationProperties `json:"properties,omitempty"`
 	// Name - The name of private link service ip configuration.
 	Name *string `json:"name,omitempty"`
+	// Etag - READ-ONLY; A unique read-only string that changes whenever the resource is updated.
+	Etag *string `json:"etag,omitempty"`
+	// Type - READ-ONLY; The resource type.
+	Type *string `json:"type,omitempty"`
+	// ID - Resource ID.
+	ID *string `json:"id,omitempty"`
 }
 
 // MarshalJSON is the custom marshaler for PrivateLinkServiceIPConfiguration.
@@ -21740,6 +23120,9 @@ func (plsic PrivateLinkServiceIPConfiguration) MarshalJSON() ([]byte, error) {
 	}
 	if plsic.Name != nil {
 		objectMap["name"] = plsic.Name
+	}
+	if plsic.ID != nil {
+		objectMap["id"] = plsic.ID
 	}
 	return json.Marshal(objectMap)
 }
@@ -21771,6 +23154,33 @@ func (plsic *PrivateLinkServiceIPConfiguration) UnmarshalJSON(body []byte) error
 				}
 				plsic.Name = &name
 			}
+		case "etag":
+			if v != nil {
+				var etag string
+				err = json.Unmarshal(*v, &etag)
+				if err != nil {
+					return err
+				}
+				plsic.Etag = &etag
+			}
+		case "type":
+			if v != nil {
+				var typeVar string
+				err = json.Unmarshal(*v, &typeVar)
+				if err != nil {
+					return err
+				}
+				plsic.Type = &typeVar
+			}
+		case "id":
+			if v != nil {
+				var ID string
+				err = json.Unmarshal(*v, &ID)
+				if err != nil {
+					return err
+				}
+				plsic.ID = &ID
+			}
 		}
 	}
 
@@ -21785,10 +23195,10 @@ type PrivateLinkServiceIPConfigurationProperties struct {
 	PrivateIPAllocationMethod IPAllocationMethod `json:"privateIPAllocationMethod,omitempty"`
 	// Subnet - The reference of the subnet resource.
 	Subnet *Subnet `json:"subnet,omitempty"`
-	// PublicIPAddress - The reference of the public IP resource.
-	PublicIPAddress *PublicIPAddress `json:"publicIPAddress,omitempty"`
-	// ProvisioningState - Gets the provisioning state of the public IP resource. Possible values are: 'Updating', 'Deleting', and 'Failed'.
-	ProvisioningState *string `json:"provisioningState,omitempty"`
+	// Primary - Whether the ip configuration is primary or not.
+	Primary *bool `json:"primary,omitempty"`
+	// ProvisioningState - The provisioning state of the private link service ip configuration. Possible values include: 'Succeeded', 'Updating', 'Deleting', 'Failed'
+	ProvisioningState ProvisioningState `json:"provisioningState,omitempty"`
 	// PrivateIPAddressVersion - Available from Api-Version 2016-03-30 onwards, it represents whether the specific ipconfiguration is IPv4 or IPv6. Default is taken as IPv4. Possible values include: 'IPv4', 'IPv6'
 	PrivateIPAddressVersion IPVersion `json:"privateIPAddressVersion,omitempty"`
 }
@@ -21947,8 +23357,8 @@ type PrivateLinkServiceProperties struct {
 	IPConfigurations *[]PrivateLinkServiceIPConfiguration `json:"ipConfigurations,omitempty"`
 	// NetworkInterfaces - READ-ONLY; Gets an array of references to the network interfaces created for this private link service.
 	NetworkInterfaces *[]Interface `json:"networkInterfaces,omitempty"`
-	// ProvisioningState - READ-ONLY; The provisioning state of the private link service. Possible values are: 'Updating', 'Succeeded', and 'Failed'.
-	ProvisioningState *string `json:"provisioningState,omitempty"`
+	// ProvisioningState - The provisioning state of the private link service. Possible values include: 'Succeeded', 'Updating', 'Deleting', 'Failed'
+	ProvisioningState ProvisioningState `json:"provisioningState,omitempty"`
 	// PrivateEndpointConnections - An array of list about connections to the private endpoint.
 	PrivateEndpointConnections *[]PrivateEndpointConnection `json:"privateEndpointConnections,omitempty"`
 	// Visibility - The visibility list of the private link service.
@@ -23283,6 +24693,8 @@ type PublicIPPrefixPropertiesFormat struct {
 	IPPrefix *string `json:"ipPrefix,omitempty"`
 	// PublicIPAddresses - The list of all referenced PublicIPAddresses.
 	PublicIPAddresses *[]ReferencedPublicIPAddress `json:"publicIPAddresses,omitempty"`
+	// LoadBalancerFrontendIPConfiguration - READ-ONLY; The reference to load balancer frontend IP configuration associated with the public IP prefix.
+	LoadBalancerFrontendIPConfiguration *SubResource `json:"loadBalancerFrontendIpConfiguration,omitempty"`
 	// ResourceGUID - The resource GUID property of the public IP prefix resource.
 	ResourceGUID *string `json:"resourceGuid,omitempty"`
 	// ProvisioningState - The provisioning state of the Public IP prefix resource. Possible values are: 'Updating', 'Deleting', and 'Failed'.
@@ -24790,6 +26202,72 @@ func (future *RouteTablesUpdateTagsFuture) Result(client RouteTablesClient) (rt 
 		}
 	}
 	return
+}
+
+// RuleCondition rule condition of type network
+type RuleCondition struct {
+	// IPProtocols - Array of FirewallPolicyRuleConditionNetworkProtocols.
+	IPProtocols *[]FirewallPolicyRuleConditionNetworkProtocol `json:"ipProtocols,omitempty"`
+	// SourceAddresses - List of source IP addresses for this rule.
+	SourceAddresses *[]string `json:"sourceAddresses,omitempty"`
+	// DestinationAddresses - List of destination IP addresses or Service Tags.
+	DestinationAddresses *[]string `json:"destinationAddresses,omitempty"`
+	// DestinationPorts - List of destination ports.
+	DestinationPorts *[]string `json:"destinationPorts,omitempty"`
+	// Name - Name of the rule condition.
+	Name *string `json:"name,omitempty"`
+	// Description - Description of the rule condition.
+	Description *string `json:"description,omitempty"`
+	// RuleConditionType - Possible values include: 'RuleConditionTypeFirewallPolicyRuleCondition', 'RuleConditionTypeApplicationRuleCondition', 'RuleConditionTypeNetworkRuleCondition'
+	RuleConditionType RuleConditionType `json:"ruleConditionType,omitempty"`
+}
+
+// MarshalJSON is the custom marshaler for RuleCondition.
+func (rc RuleCondition) MarshalJSON() ([]byte, error) {
+	rc.RuleConditionType = RuleConditionTypeNetworkRuleCondition
+	objectMap := make(map[string]interface{})
+	if rc.IPProtocols != nil {
+		objectMap["ipProtocols"] = rc.IPProtocols
+	}
+	if rc.SourceAddresses != nil {
+		objectMap["sourceAddresses"] = rc.SourceAddresses
+	}
+	if rc.DestinationAddresses != nil {
+		objectMap["destinationAddresses"] = rc.DestinationAddresses
+	}
+	if rc.DestinationPorts != nil {
+		objectMap["destinationPorts"] = rc.DestinationPorts
+	}
+	if rc.Name != nil {
+		objectMap["name"] = rc.Name
+	}
+	if rc.Description != nil {
+		objectMap["description"] = rc.Description
+	}
+	if rc.RuleConditionType != "" {
+		objectMap["ruleConditionType"] = rc.RuleConditionType
+	}
+	return json.Marshal(objectMap)
+}
+
+// AsApplicationRuleCondition is the BasicFirewallPolicyRuleCondition implementation for RuleCondition.
+func (rc RuleCondition) AsApplicationRuleCondition() (*ApplicationRuleCondition, bool) {
+	return nil, false
+}
+
+// AsRuleCondition is the BasicFirewallPolicyRuleCondition implementation for RuleCondition.
+func (rc RuleCondition) AsRuleCondition() (*RuleCondition, bool) {
+	return &rc, true
+}
+
+// AsFirewallPolicyRuleCondition is the BasicFirewallPolicyRuleCondition implementation for RuleCondition.
+func (rc RuleCondition) AsFirewallPolicyRuleCondition() (*FirewallPolicyRuleCondition, bool) {
+	return nil, false
+}
+
+// AsBasicFirewallPolicyRuleCondition is the BasicFirewallPolicyRuleCondition implementation for RuleCondition.
+func (rc RuleCondition) AsBasicFirewallPolicyRuleCondition() (BasicFirewallPolicyRuleCondition, bool) {
+	return &rc, true
 }
 
 // SecurityGroup networkSecurityGroup resource.
@@ -26709,6 +28187,29 @@ func (future *SubnetsPrepareNetworkPoliciesFuture) Result(client SubnetsClient) 
 	return
 }
 
+// SubnetsUnprepareNetworkPoliciesFuture an abstraction for monitoring and retrieving the results of a
+// long-running operation.
+type SubnetsUnprepareNetworkPoliciesFuture struct {
+	azure.Future
+}
+
+// Result returns the result of the asynchronous operation.
+// If the operation has not completed it will return an error.
+func (future *SubnetsUnprepareNetworkPoliciesFuture) Result(client SubnetsClient) (ar autorest.Response, err error) {
+	var done bool
+	done, err = future.DoneWithContext(context.Background(), client)
+	if err != nil {
+		err = autorest.NewErrorWithError(err, "network.SubnetsUnprepareNetworkPoliciesFuture", "Result", future.Response(), "Polling failure")
+		return
+	}
+	if !done {
+		err = azure.NewAsyncOpIncompleteError("network.SubnetsUnprepareNetworkPoliciesFuture")
+		return
+	}
+	ar.Response = future.Response()
+	return
+}
+
 // SubResource reference to another subresource.
 type SubResource struct {
 	// ID - Resource ID.
@@ -26907,6 +28408,12 @@ type TunnelConnectionHealth struct {
 	EgressBytesTransferred *int64 `json:"egressBytesTransferred,omitempty"`
 	// LastConnectionEstablishedUtcTime - READ-ONLY; The time at which connection was established in Utc format.
 	LastConnectionEstablishedUtcTime *string `json:"lastConnectionEstablishedUtcTime,omitempty"`
+}
+
+// UnprepareNetworkPoliciesRequest details of UnprepareNetworkPolicies for Subnet.
+type UnprepareNetworkPoliciesRequest struct {
+	// ServiceName - The name of the service for which subnet is being unprepared for.
+	ServiceName *string `json:"serviceName,omitempty"`
 }
 
 // Usage describes network resource usage.

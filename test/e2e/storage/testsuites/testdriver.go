@@ -157,6 +157,7 @@ const (
 	CapNodeExpansion       Capability = "nodeExpansion"       // support volume expansion for node
 	CapVolumeLimits        Capability = "volumeLimits"        // support volume limits (can be *very* slow)
 	CapSingleNodeVolume    Capability = "singleNodeVolume"    // support volume that can run on single node (like hostpath)
+	CapTopology            Capability = "topology"            // support topology
 )
 
 // DriverInfo represents static information about a TestDriver.
@@ -183,6 +184,12 @@ type DriverInfo struct {
 	// [Optional] List of access modes required for provisioning, defaults to
 	// RWO if unset
 	RequiredAccessModes []v1.PersistentVolumeAccessMode
+	// [Optional] List of topology keys driver supports
+	TopologyKeys []string
+	// [Optional] Number of allowed topologies the driver requires.
+	// Only relevant if TopologyKeys is set. Defaults to 1.
+	// Example: multi-zonal disk requires at least 2 allowed topologies.
+	NumAllowedTopologies int
 }
 
 // PerTestConfig represents parameters that control test execution.

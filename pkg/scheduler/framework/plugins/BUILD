@@ -1,4 +1,4 @@
-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
@@ -6,6 +6,7 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins/noop:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
     ],
@@ -27,4 +28,14 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["default_registry_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//pkg/scheduler/apis/config:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
+    ],
 )

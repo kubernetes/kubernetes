@@ -73,8 +73,8 @@ func (t *volumeModeTestSuite) skipRedundantSuite(driver TestDriver, pattern test
 
 func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
-		config      *PerTestConfig
-		testCleanup func()
+		config        *PerTestConfig
+		driverCleanup func()
 
 		cs clientset.Interface
 		ns *v1.Namespace
@@ -103,7 +103,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		l.cs = f.ClientSet
 
 		// Now do the more expensive test initialization.
-		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.config, l.driverCleanup = driver.PrepareTest(f)
 		l.intreeOps, l.migratedOps = getMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName)
 	}
 
@@ -169,9 +169,9 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 	cleanup := func() {
 		l.cleanupResource()
 
-		if l.testCleanup != nil {
-			l.testCleanup()
-			l.testCleanup = nil
+		if l.driverCleanup != nil {
+			l.driverCleanup()
+			l.driverCleanup = nil
 		}
 
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)

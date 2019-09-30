@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/workqueue"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
@@ -144,6 +145,9 @@ type ScheduleAlgorithm interface {
 	// Prioritizers returns a slice of priority config. This is exposed for
 	// testing.
 	Prioritizers() []priorities.PriorityConfig
+	// Extenders returns a slice of extender config. This is exposed for
+	// testing.
+	Extenders() []algorithm.SchedulerExtender
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -278,6 +282,10 @@ func (g *genericScheduler) Prioritizers() []priorities.PriorityConfig {
 // functions. It is exposed for testing only.
 func (g *genericScheduler) Predicates() map[string]predicates.FitPredicate {
 	return g.predicates
+}
+
+func (g *genericScheduler) Extenders() []algorithm.SchedulerExtender {
+	return g.extenders
 }
 
 // selectHost takes a prioritized list of nodes and then picks one
@@ -427,9 +435,9 @@ func (g *genericScheduler) getLowerPriorityNominatedPods(pod *v1.Pod, nodeName s
 	}
 
 	var lowerPriorityPods []*v1.Pod
-	podPriority := util.GetPodPriority(pod)
+	podPriority := podutil.GetPodPriority(pod)
 	for _, p := range pods {
-		if util.GetPodPriority(p) < podPriority {
+		if podutil.GetPodPriority(p) < podPriority {
 			lowerPriorityPods = append(lowerPriorityPods, p)
 		}
 	}
@@ -586,10 +594,10 @@ func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
 	nodeInfoOut := nodeInfo.Clone()
 	podsAdded := false
 	for _, p := range nominatedPods {
-		if util.GetPodPriority(p) >= util.GetPodPriority(pod) && p.UID != pod.UID {
+		if podutil.GetPodPriority(p) >= podutil.GetPodPriority(pod) && p.UID != pod.UID {
 			nodeInfoOut.AddPod(p)
 			if metaOut != nil {
-				if err := metaOut.AddPod(p, nodeInfoOut); err != nil {
+				if err := metaOut.AddPod(p, nodeInfoOut.Node()); err != nil {
 					klog.Warningf("unable to add pod, nominated pod %s, incoming pod %s: %v", p.Name, pod.Name, err)
 				}
 			}
@@ -905,7 +913,7 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 		node := minNodes1[i]
 		victims := nodesToVictims[node]
 		// highestPodPriority is the highest priority among the victims on this node.
-		highestPodPriority := util.GetPodPriority(victims.Pods[0])
+		highestPodPriority := podutil.GetPodPriority(victims.Pods[0])
 		if highestPodPriority < minHighestPriority {
 			minHighestPriority = highestPodPriority
 			lenNodes2 = 0
@@ -931,7 +939,7 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*schedulerapi.Victims)
 			// needed so that a node with a few pods with negative priority is not
 			// picked over a node with a smaller number of pods with the same negative
 			// priority (and similar scenarios).
-			sumPriorities += int64(util.GetPodPriority(pod)) + int64(math.MaxInt32+1)
+			sumPriorities += int64(podutil.GetPodPriority(pod)) + int64(math.MaxInt32+1)
 		}
 		if sumPriorities < minSumPriorities {
 			minSumPriorities = sumPriorities
@@ -1016,7 +1024,9 @@ func (g *genericScheduler) selectNodesForPreemption(
 		if meta != nil {
 			metaCopy = meta.ShallowCopy()
 		}
-		pods, numPDBViolations, fits := g.selectVictimsOnNode(pluginContext, pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
+		pluginContextClone := pluginContext.Clone()
+		pods, numPDBViolations, fits := g.selectVictimsOnNode(
+			pluginContextClone, pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
 		if fits {
 			resultLock.Lock()
 			victims := schedulerapi.Victims{
@@ -1109,22 +1119,30 @@ func (g *genericScheduler) selectVictimsOnNode(
 				return err
 			}
 		}
+		status := g.framework.RunPreFilterUpdaterRemovePod(pluginContext, pod, rp, nodeInfoCopy)
+		if !status.IsSuccess() {
+			return status.AsError()
+		}
 		return nil
 	}
 	addPod := func(ap *v1.Pod) error {
 		nodeInfoCopy.AddPod(ap)
 		if meta != nil {
-			if err := meta.AddPod(ap, nodeInfoCopy); err != nil {
+			if err := meta.AddPod(ap, nodeInfoCopy.Node()); err != nil {
 				return err
 			}
+		}
+		status := g.framework.RunPreFilterUpdaterAddPod(pluginContext, pod, ap, nodeInfoCopy)
+		if !status.IsSuccess() {
+			return status.AsError()
 		}
 		return nil
 	}
 	// As the first step, remove all the lower priority pods from the node and
 	// check if the given pod can be scheduled.
-	podPriority := util.GetPodPriority(pod)
+	podPriority := podutil.GetPodPriority(pod)
 	for _, p := range nodeInfoCopy.Pods() {
-		if util.GetPodPriority(p) < podPriority {
+		if podutil.GetPodPriority(p) < podPriority {
 			potentialVictims.Items = append(potentialVictims.Items, p)
 			if err := removePod(p); err != nil {
 				return nil, 0, false
@@ -1229,9 +1247,9 @@ func podEligibleToPreemptOthers(pod *v1.Pod, nodeNameToInfo map[string]*schedule
 	nomNodeName := pod.Status.NominatedNodeName
 	if len(nomNodeName) > 0 {
 		if nodeInfo, found := nodeNameToInfo[nomNodeName]; found {
-			podPriority := util.GetPodPriority(pod)
+			podPriority := podutil.GetPodPriority(pod)
 			for _, p := range nodeInfo.Pods() {
-				if p.DeletionTimestamp != nil && util.GetPodPriority(p) < podPriority {
+				if p.DeletionTimestamp != nil && podutil.GetPodPriority(p) < podPriority {
 					// There is a terminating pod on the nominated node.
 					return false
 				}

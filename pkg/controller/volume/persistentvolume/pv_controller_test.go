@@ -30,6 +30,7 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
+	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 	pvtesting "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/testing"
@@ -438,6 +439,7 @@ func TestDelayBindingMode(t *testing.T) {
 	classInformer := informerFactory.Storage().V1().StorageClasses()
 	ctrl := &PersistentVolumeController{
 		classLister: classInformer.Lister(),
+		translator:  csitrans.New(),
 	}
 
 	for _, class := range classes {

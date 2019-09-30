@@ -39,6 +39,7 @@ import (
 	"k8s.io/component-base/logs"
 	_ "k8s.io/component-base/metrics/prometheus/restclient" // for client metric registration
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
+	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
@@ -140,6 +141,9 @@ func newHollowNodeCommand() *cobra.Command {
 }
 
 func run(config *hollowNodeConfig) {
+	// To help debugging, immediately log version
+	klog.Infof("Version: %+v", version.Get())
+
 	if !knownMorphs.Has(config.Morph) {
 		klog.Fatalf("Unknown morph: %v. Allowed values: %v", config.Morph, knownMorphs.List())
 	}

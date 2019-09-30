@@ -125,7 +125,7 @@ func TestOperationGenerator_GenerateUnmapVolumeFunc_PluginName(t *testing.T) {
 			// csi plugin looks a file that contains some information about the volume,
 			// and GenerateUnmapVolumeFuncfails if csi plugin can't find that file.
 			// So the reason for calling plugin.NewBlockVolumeMapper for csi enabled case is creating that file.
-			csiSpec, err := translateSpec(volumeToUnmount.VolumeSpec)
+			csiSpec, err := translateSpec(operationGenerator.GetCSITranslator(), volumeToUnmount.VolumeSpec)
 			if err != nil {
 				t.Fatalf("Can't translate volume to CSI")
 			}

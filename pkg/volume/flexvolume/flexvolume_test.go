@@ -74,59 +74,6 @@ exit 1
 echo -n $@ &> {{.OutputFile}}
 `
 
-const execScriptTempl2 = `#!/usr/bin/env bash
-if [ "$1" == "init" -a $# -eq 1 ]; then
-  echo -n '{
-    "status": "Success"
-  }'
-  exit 0
-fi
-
-if [ "$1" == "getvolumename" -a $# -eq 2 ]; then
-  echo -n '{
-    "status": "Success",
-    "volumeName": "fakevolume"
-  }'
-  exit 0
-elif [ "$1" == "mount" -a $# -eq 4 ]; then
-  PATH=$2
-  /bin/mkdir -p $PATH
-  if [ $? -ne 0 ]; then
-    echo -n '{
-      "status": "Failure",
-      "reason": "Failed to create $PATH"
-    }'
-    exit 1
-  fi
-  echo -n '{
-    "status": "Success"
-  }'
-  exit 0
-elif [ "$1" == "unmount" -a $# -eq 2 ]; then
-  PATH=$2
-  /bin/rm -r $PATH
-  if [ $? -ne 0 ]; then
-    echo -n '{
-      "status": "Failure",
-      "reason": "Failed to cleanup $PATH"
-    }'
-    exit 1
-  fi
-  echo -n '{
-    "status": "Success"
-  }'
-  exit 0
-fi
-
-echo -n '{
-  "status": "Not Supported"
-}'
-exit 1
-
-# Direct the arguments to a file to be tested against later
-echo -n $@ &> {{.OutputFile}}
-`
-
 func installPluginUnderTest(t *testing.T, vendorName, plugName, tmpDir string, execScriptTempl string, execTemplateData *map[string]interface{}) {
 	vendoredName := plugName
 	if vendorName != "" {

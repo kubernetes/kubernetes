@@ -492,7 +492,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				framework.SkipUnlessSSHKeyPresent()
 				ginkgo.By("choose a node - we will block all network traffic on this node")
 				var podOpts metav1.ListOptions
-				nodes := framework.GetReadySchedulableNodesOrDie(c)
+				nodes, err := e2enode.GetReadySchedulableNodes(c)
+				framework.ExpectNoError(err)
 				e2enode.Filter(nodes, func(node v1.Node) bool {
 					if !e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false

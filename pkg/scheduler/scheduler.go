@@ -181,7 +181,7 @@ func New(client clientset.Interface,
 	registry framework.Registry,
 	plugins *kubeschedulerconfig.Plugins,
 	pluginConfig []kubeschedulerconfig.PluginConfig,
-	opts ...func(o *schedulerOptions)) (*Scheduler, error) {
+	opts ...Option) (*Scheduler, error) {
 
 	options := defaultSchedulerOptions
 	for _, opt := range opts {

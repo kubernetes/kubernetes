@@ -61,8 +61,8 @@ func (s *disruptiveTestSuite) skipRedundantSuite(driver TestDriver, pattern test
 
 func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpatterns.TestPattern) {
 	type local struct {
-		config      *PerTestConfig
-		testCleanup func()
+		config        *PerTestConfig
+		driverCleanup func()
 
 		cs clientset.Interface
 		ns *v1.Namespace
@@ -87,7 +87,7 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 		l.cs = f.ClientSet
 
 		// Now do the more expensive test initialization.
-		l.config, l.testCleanup = driver.PrepareTest(f)
+		l.config, l.driverCleanup = driver.PrepareTest(f)
 
 		if pattern.VolMode == v1.PersistentVolumeBlock && !driver.GetDriverInfo().Capabilities[CapBlock] {
 			framework.Skipf("Driver %s doesn't support %v -- skipping", driver.GetDriverInfo().Name, pattern.VolMode)
@@ -109,9 +109,9 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 			l.resource = nil
 		}
 
-		if l.testCleanup != nil {
-			l.testCleanup()
-			l.testCleanup = nil
+		if l.driverCleanup != nil {
+			l.driverCleanup()
+			l.driverCleanup = nil
 		}
 	}
 

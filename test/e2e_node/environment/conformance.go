@@ -144,6 +144,10 @@ func dns() error {
 	}
 
 	kubecmd, err := exec.Command("ps", "aux").CombinedOutput()
+	if err != nil {
+		// Executing ps aux shouldn't have failed
+		panic(err)
+	}
 
 	// look for the dns flag and parse the value
 	dns := dnsRegex.FindStringSubmatch(string(kubecmd))

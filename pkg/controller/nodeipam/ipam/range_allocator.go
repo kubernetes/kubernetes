@@ -346,7 +346,7 @@ func (r *rangeAllocator) updateCIDRsAllocation(data nodeReservedCIDRs) error {
 	if len(node.Spec.PodCIDRs) != 0 {
 		klog.Errorf("Node %v already has a CIDR allocated %v. Releasing the new one.", node.Name, node.Spec.PodCIDRs)
 		for idx, cidr := range data.allocatedCIDRs {
-			if releaseErr := r.cidrSets[idx].Release(cidr); err != nil {
+			if releaseErr := r.cidrSets[idx].Release(cidr); releaseErr != nil {
 				klog.Errorf("Error when releasing CIDR idx:%v value: %v err:%v", idx, cidr, releaseErr)
 			}
 		}

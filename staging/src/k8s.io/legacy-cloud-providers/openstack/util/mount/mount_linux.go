@@ -1132,7 +1132,7 @@ func doSafeMakeDir(pathname string, base string, perm os.FileMode) error {
 			return fmt.Errorf("cannot create directory %s: %s", currentPath, err)
 		}
 		// Dive into the created directory
-		childFD, err := syscall.Openat(parentFD, dir, nofollowFlags, 0)
+		childFD, err = syscall.Openat(parentFD, dir, nofollowFlags, 0)
 		if err != nil {
 			return fmt.Errorf("cannot open %s: %s", currentPath, err)
 		}

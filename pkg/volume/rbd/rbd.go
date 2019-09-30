@@ -72,7 +72,6 @@ const (
 	rbdDefaultAdminId              = "admin"
 	rbdDefaultAdminSecretNamespace = "default"
 	rbdDefaultPool                 = "rbd"
-	rbdDefaultUserId               = rbdDefaultAdminId
 )
 
 func getPath(uid types.UID, volName string, host volume.VolumeHost) string {

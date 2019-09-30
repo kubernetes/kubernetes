@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 // RealVersion turns a version constants into a version string deployable on
@@ -86,7 +87,10 @@ func CheckMasterVersion(c clientset.Interface, want string) error {
 
 // CheckNodesVersions validates the nodes versions
 func CheckNodesVersions(cs clientset.Interface, want string) error {
-	l := framework.GetReadySchedulableNodesOrDie(cs)
+	l, err := e2enode.GetReadySchedulableNodes(cs)
+	if err != nil {
+		return err
+	}
 	for _, n := range l.Items {
 		// We do prefix trimming and then matching because:
 		// want   looks like:  0.19.3-815-g50e67d4

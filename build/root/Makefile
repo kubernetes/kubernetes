@@ -238,6 +238,8 @@ define TEST_E2E_NODE_HELP_INFO
 #    run tests against.  Defaults to "".
 #  DELETE_INSTANCES: For REMOTE=true only.  Delete any instances created as
 #    part of this test run.  Defaults to false.
+#  PREEMPTIBLE_INSTANCES: For REMOTE=true only.  Mark created gce instances
+#    as preemptible.  Defaults to false.
 #  ARTIFACTS: For REMOTE=true only.  Local directory to scp test artifacts into
 #    from the remote hosts.  Defaults to "/tmp/_artifacts".
 #  REPORT: For REMOTE=false only.  Local directory to write juntil xml results

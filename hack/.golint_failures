@@ -25,7 +25,6 @@ pkg/apis/batch/validation
 pkg/apis/certificates
 pkg/apis/certificates/v1beta1
 pkg/apis/certificates/validation
-pkg/apis/core
 pkg/apis/core/helper/qos
 pkg/apis/core/v1
 pkg/apis/core/v1/helper
@@ -131,7 +130,6 @@ pkg/kubelet/lifecycle
 pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/pod/testing
 pkg/kubelet/preemption
-pkg/kubelet/qos
 pkg/kubelet/remote
 pkg/kubelet/stats
 pkg/kubelet/status

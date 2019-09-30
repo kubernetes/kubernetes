@@ -37,7 +37,7 @@ import (
 // PredicateMetadata interface represents anything that can access a predicate metadata.
 type PredicateMetadata interface {
 	ShallowCopy() PredicateMetadata
-	AddPod(addedPod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) error
+	AddPod(addedPod *v1.Pod, node *v1.Node) error
 	RemovePod(deletedPod *v1.Pod, node *v1.Node) error
 }
 
@@ -350,8 +350,10 @@ func NodeLabelsMatchSpreadConstraints(nodeLabels map[string]string, constraints 
 
 // returns a pointer to a new topologyPairsMaps
 func newTopologyPairsMaps() *topologyPairsMaps {
-	return &topologyPairsMaps{topologyPairToPods: make(map[topologyPair]podSet),
-		podToTopologyPairs: make(map[string]topologyPairSet)}
+	return &topologyPairsMaps{
+		topologyPairToPods: make(map[topologyPair]podSet),
+		podToTopologyPairs: make(map[string]topologyPairSet),
+	}
 }
 
 func (m *topologyPairsMaps) addTopologyPair(pair topologyPair, pod *v1.Pod) {
@@ -398,8 +400,8 @@ func (c *podSpreadCache) addPod(addedPod, preemptorPod *v1.Pod, node *v1.Node) e
 	return c.updatePod(addedPod, preemptorPod, node, 1)
 }
 
-func (c *podSpreadCache) removePod(deletedPod, preemptorPod *v1.Pod, node *v1.Node) {
-	c.updatePod(deletedPod, preemptorPod, node, -1)
+func (c *podSpreadCache) removePod(deletedPod, preemptorPod *v1.Pod, node *v1.Node) error {
+	return c.updatePod(deletedPod, preemptorPod, node, -1)
 }
 
 func (c *podSpreadCache) updatePod(updatedPod, preemptorPod *v1.Pod, node *v1.Node, delta int32) error {
@@ -459,7 +461,9 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod, node *v1.Node) erro
 	meta.topologyPairsPotentialAffinityPods.removePod(deletedPod)
 	meta.topologyPairsPotentialAntiAffinityPods.removePod(deletedPod)
 	// Delete pod from the pod spread topology maps.
-	meta.podSpreadCache.removePod(deletedPod, meta.pod, node)
+	if err := meta.podSpreadCache.removePod(deletedPod, meta.pod, node); err != nil {
+		return err
+	}
 	// All pods in the serviceAffinityMatchingPodList are in the same namespace.
 	// So, if the namespace of the first one is not the same as the namespace of the
 	// deletedPod, we don't need to check the list, as deletedPod isn't in the list.
@@ -478,18 +482,18 @@ func (meta *predicateMetadata) RemovePod(deletedPod *v1.Pod, node *v1.Node) erro
 	return nil
 }
 
-// AddPod changes predicateMetadata assuming that `newPod` is added to the
+// AddPod changes predicateMetadata assuming that the given `addedPod` is added to the
 // system.
-func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) error {
+func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, node *v1.Node) error {
 	addedPodFullName := schedutil.GetPodFullName(addedPod)
 	if addedPodFullName == schedutil.GetPodFullName(meta.pod) {
 		return fmt.Errorf("addedPod and meta.pod must not be the same")
 	}
-	if nodeInfo.Node() == nil {
-		return fmt.Errorf("invalid node in nodeInfo")
+	if node == nil {
+		return fmt.Errorf("node not found")
 	}
 	// Add matching anti-affinity terms of the addedPod to the map.
-	topologyPairsMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(meta.pod, addedPod, nodeInfo.Node())
+	topologyPairsMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(meta.pod, addedPod, node)
 	if err != nil {
 		return err
 	}
@@ -498,14 +502,13 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulernodei
 	affinity := meta.pod.Spec.Affinity
 	podNodeName := addedPod.Spec.NodeName
 	if affinity != nil && len(podNodeName) > 0 {
-		podNode := nodeInfo.Node()
 		// It is assumed that when the added pod matches affinity of the meta.pod, all the terms must match,
 		// this should be changed when the implementation of targetPodMatchesAffinityOfPod/podMatchesAffinityTermProperties
 		// is changed
 		if targetPodMatchesAffinityOfPod(meta.pod, addedPod) {
 			affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)
 			for _, term := range affinityTerms {
-				if topologyValue, ok := podNode.Labels[term.TopologyKey]; ok {
+				if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
 					pair := topologyPair{key: term.TopologyKey, value: topologyValue}
 					meta.topologyPairsPotentialAffinityPods.addTopologyPair(pair, addedPod)
 				}
@@ -514,7 +517,7 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulernodei
 		if targetPodMatchesAntiAffinityOfPod(meta.pod, addedPod) {
 			antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity)
 			for _, term := range antiAffinityTerms {
-				if topologyValue, ok := podNode.Labels[term.TopologyKey]; ok {
+				if topologyValue, ok := node.Labels[term.TopologyKey]; ok {
 					pair := topologyPair{key: term.TopologyKey, value: topologyValue}
 					meta.topologyPairsPotentialAntiAffinityPods.addTopologyPair(pair, addedPod)
 				}
@@ -523,7 +526,7 @@ func (meta *predicateMetadata) AddPod(addedPod *v1.Pod, nodeInfo *schedulernodei
 	}
 	// Update meta.podSpreadCache if meta.pod has hard spread constraints
 	// and addedPod matches that
-	if err := meta.podSpreadCache.addPod(addedPod, meta.pod, nodeInfo.Node()); err != nil {
+	if err := meta.podSpreadCache.addPod(addedPod, meta.pod, node); err != nil {
 		return err
 	}
 

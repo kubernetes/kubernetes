@@ -460,12 +460,18 @@ func (s unstructuredJSONScheme) decodeToList(data []byte, list *UnstructuredList
 	return nil
 }
 
-type JSONFallbackEncoder struct {
-	runtime.Encoder
+type jsonFallbackEncoder struct {
+	encoder runtime.Encoder
 }
 
-func (c JSONFallbackEncoder) Encode(obj runtime.Object, w io.Writer) error {
-	err := c.Encoder.Encode(obj, w)
+func NewJSONFallbackEncoder(encoder runtime.Encoder) runtime.Encoder {
+	return &jsonFallbackEncoder{
+		encoder: encoder,
+	}
+}
+
+func (c *jsonFallbackEncoder) Encode(obj runtime.Object, w io.Writer) error {
+	err := c.encoder.Encode(obj, w)
 	if runtime.IsNotRegisteredError(err) {
 		switch obj.(type) {
 		case *Unstructured, *UnstructuredList:

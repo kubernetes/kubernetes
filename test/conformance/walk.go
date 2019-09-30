@@ -44,7 +44,7 @@ var (
 	totalConfTests, totalLegacyTests, missingComments int
 
 	// If a test name contains any of these tags, it is ineligble for promotion to conformance
-	regexIneligibleTags = regexp.MustCompile(`\[(Alpha|Disruptive|Feature:[^\]]+|Flaky)\]`)
+	regexIneligibleTags = regexp.MustCompile(`\[(Alpha|Feature:[^\]]+|Flaky)\]`)
 )
 
 const regexDescribe = "Describe|KubeDescribe|SIGDescribe"

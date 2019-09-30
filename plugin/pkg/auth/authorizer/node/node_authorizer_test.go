@@ -17,6 +17,7 @@ limitations under the License.
 package node
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"runtime/pprof"
@@ -414,7 +415,7 @@ func TestAuthorizer(t *testing.T) {
 			} else {
 				authz.features = tc.features
 			}
-			decision, _, _ := authz.Authorize(tc.attrs)
+			decision, _, _ := authz.Authorize(context.Background(), tc.attrs)
 			if decision != tc.expect {
 				t.Errorf("expected %v, got %v", tc.expect, decision)
 			}
@@ -504,13 +505,13 @@ func TestAuthorizerSharedResources(t *testing.T) {
 		)
 
 		if len(tc.Secret) > 0 {
-			decision, _, err = authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
+			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: tc.Secret})
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
 			}
 		} else if len(tc.ConfigMap) > 0 {
-			decision, _, err = authz.Authorize(authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
+			decision, _, err = authz.Authorize(context.Background(), authorizer.AttributesRecord{User: tc.User, ResourceRequest: true, Verb: "get", Resource: "configmaps", Namespace: "ns1", Name: tc.ConfigMap})
 			if err != nil {
 				t.Errorf("%d: unexpected error: %v", i, err)
 				continue
@@ -527,7 +528,7 @@ func TestAuthorizerSharedResources(t *testing.T) {
 	{
 		node3SharedSecretGet := authorizer.AttributesRecord{User: node3, ResourceRequest: true, Verb: "get", Resource: "secrets", Namespace: "ns1", Name: "shared-all"}
 
-		decision, _, err := authz.Authorize(node3SharedSecretGet)
+		decision, _, err := authz.Authorize(context.Background(), node3SharedSecretGet)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -539,7 +540,7 @@ func TestAuthorizerSharedResources(t *testing.T) {
 		pod3.Spec.Volumes = nil
 		g.AddPod(pod3)
 
-		decision, _, err = authz.Authorize(node3SharedSecretGet)
+		decision, _, err = authz.Authorize(context.Background(), node3SharedSecretGet)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -833,7 +834,7 @@ func BenchmarkAuthorization(b *testing.B) {
 				b.SetParallelism(5000)
 				b.RunParallel(func(pb *testing.PB) {
 					for pb.Next() {
-						decision, _, _ := authz.Authorize(tc.attrs)
+						decision, _, _ := authz.Authorize(context.Background(), tc.attrs)
 						if decision != tc.expect {
 							b.Errorf("expected %v, got %v", tc.expect, decision)
 						}

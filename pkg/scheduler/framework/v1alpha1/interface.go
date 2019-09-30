@@ -165,6 +165,18 @@ type QueueSortPlugin interface {
 	Less(*PodInfo, *PodInfo) bool
 }
 
+// Updater is an interface that is included in plugins that allow specifying
+// callbacks to make incremental updates to its supposedly pre-calculated
+// state.
+type Updater interface {
+	// AddPod is called by the framework while trying to evaluate the impact
+	// of adding podToAdd to the node while scheduling podToSchedule.
+	AddPod(pc *PluginContext, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
+	// RemovePod is called by the framework while trying to evaluate the impact
+	// of removing podToRemove from the node while scheduling podToSchedule.
+	RemovePod(pc *PluginContext, podToSchedule *v1.Pod, podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
+}
+
 // PreFilterPlugin is an interface that must be implemented by "prefilter" plugins.
 // These plugins are called at the beginning of the scheduling cycle.
 type PreFilterPlugin interface {
@@ -172,6 +184,13 @@ type PreFilterPlugin interface {
 	// PreFilter is called at the beginning of the scheduling cycle. All PreFilter
 	// plugins must return success or the pod will be rejected.
 	PreFilter(pc *PluginContext, p *v1.Pod) *Status
+	// Updater returns an updater if the plugin implements one, or nil if it
+	// does not. A Pre-filter plugin can provide an updater to incrementally
+	// modify its pre-processed info. The framework guarantees that the updater
+	// AddPod/RemovePod functions will only be called after PreFilter,
+	// possibly on a cloned PluginContext, and may call those functions more than
+	// once before calling Filter again on a specific node.
+	Updater() Updater
 }
 
 // FilterPlugin is an interface for Filter plugins. These plugins are called at the
@@ -219,16 +238,13 @@ type ScorePlugin interface {
 	// indicating the rank of the node. All scoring plugins must return success or
 	// the pod will be rejected.
 	Score(pc *PluginContext, p *v1.Pod, nodeName string) (int, *Status)
-}
 
-// ScoreWithNormalizePlugin is an interface that must be implemented by "score"
-// plugins that also need to normalize the node scoring results produced by the same
-// plugin's "Score" method.
-type ScoreWithNormalizePlugin interface {
-	ScorePlugin
 	// NormalizeScore is called for all node scores produced by the same plugin's "Score"
 	// method. A successful run of NormalizeScore will update the scores list and return
 	// a success status.
+	//
+	// NOTE: This function is optional, and you could implement it as a no-op by simply
+	// returning nil.
 	NormalizeScore(pc *PluginContext, p *v1.Pod, scores NodeScoreList) *Status
 }
 
@@ -325,6 +341,16 @@ type Framework interface {
 	// removed from it to evaluate the possibility of preempting them to
 	// schedule the target pod.
 	RunFilterPlugins(pc *PluginContext, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
+
+	// RunPreFilterUpdaterAddPod calls the AddPod interface for the set of configured
+	// PreFilter plugins. It returns directly if any of the plugins return any
+	// status other than Success.
+	RunPreFilterUpdaterAddPod(pc *PluginContext, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
+
+	// RunPreFilterUpdaterRemovePod calls the RemovePod interface for the set of configured
+	// PreFilter plugins. It returns directly if any of the plugins return any
+	// status other than Success.
+	RunPreFilterUpdaterRemovePod(pc *PluginContext, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status
 
 	// RunPostFilterPlugins runs the set of configured post-filter plugins. If any
 	// of these plugins returns any status other than "Success", the given node is

@@ -39,9 +39,9 @@ var _ = SIGDescribe("Ports Security Check [Feature:KubeletSecurity]", func() {
 	var nodeName string
 
 	ginkgo.BeforeEach(func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gomega.Expect(len(nodes.Items)).NotTo(gomega.BeZero())
-		node = &nodes.Items[0]
+		var err error
+		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
 		nodeName = node.Name
 	})
 

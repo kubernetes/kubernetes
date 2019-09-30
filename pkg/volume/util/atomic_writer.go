@@ -304,7 +304,7 @@ func shouldWriteFile(path string, content []byte) (bool, error) {
 		return false, err
 	}
 
-	return (bytes.Compare(content, contentOnFs) != 0), nil
+	return !bytes.Equal(content, contentOnFs), nil
 }
 
 // pathsToRemove walks the current version of the data directory and

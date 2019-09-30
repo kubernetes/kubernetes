@@ -55,10 +55,9 @@ func (s *BuiltInAuthorizationOptions) Validate() []error {
 		allErrors = append(allErrors, fmt.Errorf("at least one authorization-mode must be passed"))
 	}
 
-	allowedModes := sets.NewString(authzmodes.AuthorizationModeChoices...)
 	modes := sets.NewString(s.Modes...)
 	for _, mode := range s.Modes {
-		if !allowedModes.Has(mode) {
+		if !authzmodes.IsValidAuthorizationMode(mode) {
 			allErrors = append(allErrors, fmt.Errorf("authorization-mode %q is not a valid mode", mode))
 		}
 		if mode == authzmodes.ModeABAC {

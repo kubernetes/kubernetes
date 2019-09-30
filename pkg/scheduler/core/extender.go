@@ -114,6 +114,36 @@ func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerEx
 	}, nil
 }
 
+// Equal is used to check if two extenders are equal
+// ignoring the client field, exported for testing
+func Equal(e1, e2 *HTTPExtender) bool {
+	if e1.extenderURL != e2.extenderURL {
+		return false
+	}
+	if e1.preemptVerb != e2.preemptVerb {
+		return false
+	}
+	if e1.prioritizeVerb != e2.prioritizeVerb {
+		return false
+	}
+	if e1.bindVerb != e2.bindVerb {
+		return false
+	}
+	if e1.weight != e2.weight {
+		return false
+	}
+	if e1.nodeCacheCapable != e2.nodeCacheCapable {
+		return false
+	}
+	if !e1.managedResources.Equal(e2.managedResources) {
+		return false
+	}
+	if e1.ignorable != e2.ignorable {
+		return false
+	}
+	return true
+}
+
 // Name returns extenderURL to identify the extender.
 func (h *HTTPExtender) Name() string {
 	return h.extenderURL

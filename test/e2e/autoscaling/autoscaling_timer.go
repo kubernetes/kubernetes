@@ -62,7 +62,8 @@ var _ = SIGDescribe("[Feature:ClusterSizeAutoscalingScaleUp] [Slow] Autoscaling"
 				}
 
 				// Make sure all nodes are schedulable, otherwise we are in some kind of a problem state.
-				nodes = framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+				nodes, err = e2enode.GetReadySchedulableNodes(f.ClientSet)
+				framework.ExpectNoError(err)
 				schedulableCount := len(nodes.Items)
 				framework.ExpectEqual(schedulableCount, nodeGroupSize, "not all nodes are schedulable")
 			})

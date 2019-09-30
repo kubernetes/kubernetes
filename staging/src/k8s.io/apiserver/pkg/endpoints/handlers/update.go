@@ -210,7 +210,7 @@ func withAuthorization(validate rest.ValidateObjectFunc, a authorizer.Authorizer
 			return errors.NewInternalError(fmt.Errorf("no authorizer provided, unable to authorize a create on update"))
 		}
 		once.Do(func() {
-			authorizerDecision, authorizerReason, authorizerErr = a.Authorize(attributes)
+			authorizerDecision, authorizerReason, authorizerErr = a.Authorize(ctx, attributes)
 		})
 		// an authorizer like RBAC could encounter evaluation errors and still allow the request, so authorizer decision is checked before error here.
 		if authorizerDecision == authorizer.DecisionAllow {

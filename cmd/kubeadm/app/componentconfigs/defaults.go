@@ -58,7 +58,7 @@ const (
 
 // DefaultKubeProxyConfiguration assigns default values for the kube-proxy ComponentConfig
 func DefaultKubeProxyConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
-	externalproxycfg := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
+	externalproxycfg := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{FeatureGates: make(map[string]bool)}
 	kind := "KubeProxyConfiguration"
 
 	// Do a roundtrip to the external version for defaulting

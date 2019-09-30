@@ -85,7 +85,6 @@ var _ = SIGDescribe("DNS", func() {
 	// [LinuxOnly]: As Windows currently does not support resolving PQDNs.
 	ginkgo.It("should resolve DNS of partial qualified names for the cluster [LinuxOnly]", func() {
 		// All the names we need to be able to resolve.
-		// TODO: Spin up a separate test service and test that dns works for that service.
 		namesToResolve := []string{
 			"kubernetes.default",
 			"kubernetes.default.svc",
@@ -179,8 +178,13 @@ var _ = SIGDescribe("DNS", func() {
 		validateDNSResults(f, pod, append(wheezyFileNames, jessieFileNames...))
 	})
 
-	// [LinuxOnly]: As Windows currently does not support resolving PQDNs.
-	ginkgo.It("should resolve DNS of partial qualified names for services [LinuxOnly]", func() {
+	/*
+		Release: v1.17
+		Testname: DNS, PQDN for services
+		Description: Create a headless service and normal service. Both the services MUST be able to resolve partial qualified DNS entries of their service endpoints by serving A records and SRV records.
+		[LinuxOnly]: As Windows currently does not support resolving PQDNs.
+	*/
+	framework.ConformanceIt("should resolve DNS of partial qualified names for services [LinuxOnly]", func() {
 		// Create a test headless service.
 		ginkgo.By("Creating a test headless service")
 		testServiceSelector := map[string]string{
@@ -206,7 +210,6 @@ var _ = SIGDescribe("DNS", func() {
 		}()
 
 		// All the names we need to be able to resolve.
-		// TODO: Create more endpoints and ensure that multiple A records are returned
 		// for headless service.
 		namesToResolve := []string{
 			fmt.Sprintf("%s", headlessService.Name),
@@ -393,7 +396,13 @@ var _ = SIGDescribe("DNS", func() {
 		validateTargetedProbeOutput(f, pod3, []string{wheezyFileName, jessieFileName}, svc.Spec.ClusterIP)
 	})
 
-	ginkgo.It("should support configurable pod DNS nameservers", func() {
+	/*
+		Release: v1.17
+		Testname: DNS, custom dnsConfig
+		Description: Create a Pod with DNSPolicy as None and custom DNS configuration, specifying nameservers and search path entries.
+		Pod creation MUST be successful and provided DNS configuration MUST be configured in the Pod.
+	*/
+	framework.ConformanceIt("should support configurable pod DNS nameservers", func() {
 		ginkgo.By("Creating a pod with dnsPolicy=None and customized dnsConfig...")
 		testServerIP := "1.1.1.1"
 		testSearchPath := "resolv.conf.local"

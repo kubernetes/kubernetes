@@ -10,6 +10,8 @@ go_library(
         "dedicatedhosts.go",
         "disks.go",
         "galleries.go",
+        "galleryapplications.go",
+        "galleryapplicationversions.go",
         "galleryimages.go",
         "galleryimageversions.go",
         "images.go",

@@ -24,7 +24,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
-// NodeFieldSelectorKeys is a map that: the key are node field selector keys; the values are
+// NodeFieldSelectorKeys is a map that: the keys are node field selector keys; the values are
 // the functions to get the value of the node field.
 var NodeFieldSelectorKeys = map[string]func(*v1.Node) string{
 	schedulerapi.NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
@@ -62,7 +62,7 @@ type ServiceLister interface {
 type ControllerLister interface {
 	// Lists all the replication controllers
 	List(labels.Selector) ([]*v1.ReplicationController, error)
-	// Gets the services for the given pod
+	// Gets the replication controller for the given pod
 	GetPodControllers(*v1.Pod) ([]*v1.ReplicationController, error)
 }
 
@@ -74,7 +74,7 @@ type ReplicaSetLister interface {
 
 // PDBLister interface represents anything that can list PodDisruptionBudget objects.
 type PDBLister interface {
-	// List() returns a list of PodDisruptionBudgets matching the selector.
+	// List all the PodDisruptionBudgets matching the selector
 	List(labels.Selector) ([]*policyv1beta1.PodDisruptionBudget, error)
 }
 

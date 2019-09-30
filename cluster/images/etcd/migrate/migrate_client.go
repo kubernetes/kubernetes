@@ -216,7 +216,7 @@ func (e *CombinedEtcdClient) AttachLease(leaseDuration time.Duration) error {
 		if err != nil {
 			klog.Errorf("Error while attaching lease to: %s", string(kv.Key))
 		}
-		if bytes.Compare(putResp.PrevKv.Value, kv.Value) != 0 {
+		if !bytes.Equal(putResp.PrevKv.Value, kv.Value) {
 			return fmt.Errorf("concurrent access to key detected when setting lease on %s, expected previous value of %s but got %s",
 				kv.Key, kv.Value, putResp.PrevKv.Value)
 		}

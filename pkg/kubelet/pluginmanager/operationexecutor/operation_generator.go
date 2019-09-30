@@ -23,9 +23,10 @@ package operationexecutor
 import (
 	"context"
 	"fmt"
-	"k8s.io/klog"
 	"net"
 	"time"
+
+	"k8s.io/klog"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"

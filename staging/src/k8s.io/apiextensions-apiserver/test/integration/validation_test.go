@@ -582,8 +582,7 @@ spec:
 
 	// create CRDs
 	t.Logf("Creating CRD %s", crd.Name)
-	crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd)
-	if err != nil {
+	if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Create(crd); err != nil {
 		t.Fatalf("unexpected create error: %v", err)
 	}
 
@@ -613,8 +612,7 @@ spec:
 			t.Fatalf("unexpected get error: %v", err)
 		}
 		crd.Spec.Validation = nil
-		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
-		if apierrors.IsConflict(err) {
+		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd); apierrors.IsConflict(err) {
 			continue
 		}
 		if err != nil {
@@ -647,8 +645,7 @@ spec:
 			t.Fatalf("unexpected get error: %v", err)
 		}
 		crd.Spec.Validation = &apiextensionsv1beta1.CustomResourceValidation{OpenAPIV3Schema: origSchema}
-		crd, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd)
-		if apierrors.IsConflict(err) {
+		if _, err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Update(crd); apierrors.IsConflict(err) {
 			continue
 		}
 		if err != nil {

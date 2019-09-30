@@ -25,6 +25,7 @@ import (
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/admission"
 	cloudprovider "k8s.io/cloud-provider"
 	cloudvolume "k8s.io/cloud-provider/volume"
@@ -32,6 +33,7 @@ import (
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	persistentvolume "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	kubeapiserveradmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
@@ -110,42 +112,11 @@ func (l *persistentVolumeLabel) Admit(ctx context.Context, a admission.Attribute
 		return nil
 	}
 
-	var volumeLabels map[string]string
-	if volume.Spec.AWSElasticBlockStore != nil {
-		labels, err := l.findAWSEBSLabels(volume)
-		if err != nil {
-			return admission.NewForbidden(a, fmt.Errorf("error querying AWS EBS volume %s: %v", volume.Spec.AWSElasticBlockStore.VolumeID, err))
-		}
-		volumeLabels = labels
+	volumeLabels, err := l.findVolumeLabels(volume)
+	if err != nil {
+		return admission.NewForbidden(a, err)
 	}
-	if volume.Spec.GCEPersistentDisk != nil {
-		labels, err := l.findGCEPDLabels(volume)
-		if err != nil {
-			return admission.NewForbidden(a, fmt.Errorf("error querying GCE PD volume %s: %v", volume.Spec.GCEPersistentDisk.PDName, err))
-		}
-		volumeLabels = labels
-	}
-	if volume.Spec.AzureDisk != nil {
-		labels, err := l.findAzureDiskLabels(volume)
-		if err != nil {
-			return admission.NewForbidden(a, fmt.Errorf("error querying AzureDisk volume %s: %v", volume.Spec.AzureDisk.DiskName, err))
-		}
-		volumeLabels = labels
-	}
-	if volume.Spec.Cinder != nil {
-		labels, err := l.findCinderDiskLabels(volume)
-		if err != nil {
-			return admission.NewForbidden(a, fmt.Errorf("error querying Cinder volume %s: %v", volume.Spec.Cinder.VolumeID, err))
-		}
-		volumeLabels = labels
-	}
-	if volume.Spec.VsphereVolume != nil {
-		labels, err := l.findVsphereVolumeLabels(volume)
-		if err != nil {
-			return admission.NewForbidden(a, fmt.Errorf("error querying vSphere Volume %s: %v", volume.Spec.VsphereVolume.VolumePath, err))
-		}
-		volumeLabels = labels
-	}
+
 	requirements := make([]api.NodeSelectorRequirement, 0)
 	if len(volumeLabels) != 0 {
 		if volume.Labels == nil {
@@ -195,6 +166,58 @@ func (l *persistentVolumeLabel) Admit(ctx context.Context, a admission.Attribute
 	}
 
 	return nil
+}
+
+func (l *persistentVolumeLabel) findVolumeLabels(volume *api.PersistentVolume) (map[string]string, error) {
+	existingLabels := volume.Labels
+
+	// All cloud providers set only these two labels.
+	domain, domainOK := existingLabels[v1.LabelZoneFailureDomain]
+	region, regionOK := existingLabels[v1.LabelZoneRegion]
+	isDynamicallyProvisioned := metav1.HasAnnotation(volume.ObjectMeta, persistentvolume.AnnDynamicallyProvisioned)
+	if isDynamicallyProvisioned && domainOK && regionOK {
+		// PV already has all the labels and we can trust the dynamic provisioning that it provided correct values.
+		return map[string]string{
+			v1.LabelZoneFailureDomain: domain,
+			v1.LabelZoneRegion:        region,
+		}, nil
+	}
+
+	// Either missing labels or we don't trust the user provided correct values.
+	switch {
+	case volume.Spec.AWSElasticBlockStore != nil:
+		labels, err := l.findAWSEBSLabels(volume)
+		if err != nil {
+			return nil, fmt.Errorf("error querying AWS EBS volume %s: %v", volume.Spec.AWSElasticBlockStore.VolumeID, err)
+		}
+		return labels, nil
+	case volume.Spec.GCEPersistentDisk != nil:
+		labels, err := l.findGCEPDLabels(volume)
+		if err != nil {
+			return nil, fmt.Errorf("error querying GCE PD volume %s: %v", volume.Spec.GCEPersistentDisk.PDName, err)
+		}
+		return labels, nil
+	case volume.Spec.AzureDisk != nil:
+		labels, err := l.findAzureDiskLabels(volume)
+		if err != nil {
+			return nil, fmt.Errorf("error querying AzureDisk volume %s: %v", volume.Spec.AzureDisk.DiskName, err)
+		}
+		return labels, nil
+	case volume.Spec.Cinder != nil:
+		labels, err := l.findCinderDiskLabels(volume)
+		if err != nil {
+			return nil, fmt.Errorf("error querying Cinder volume %s: %v", volume.Spec.Cinder.VolumeID, err)
+		}
+		return labels, nil
+	case volume.Spec.VsphereVolume != nil:
+		labels, err := l.findVsphereVolumeLabels(volume)
+		if err != nil {
+			return nil, fmt.Errorf("error querying vSphere Volume %s: %v", volume.Spec.VsphereVolume.VolumePath, err)
+		}
+		return labels, nil
+	}
+	// Unrecognized volume, do not add any labels
+	return nil, nil
 }
 
 func (l *persistentVolumeLabel) findAWSEBSLabels(volume *api.PersistentVolume) (map[string]string, error) {

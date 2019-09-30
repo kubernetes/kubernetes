@@ -58,8 +58,8 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 		framework.SkipUnlessSSHKeyPresent()
 
 		ginkgo.By("Getting all nodes and their SSH-able IP addresses")
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		framework.ExpectNotEqual(len(nodes.Items), 0)
+		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
 		hosts := []string{}
 		for _, node := range nodes.Items {
 			for _, addr := range node.Status.Addresses {

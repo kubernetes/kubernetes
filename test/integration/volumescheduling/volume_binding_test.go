@@ -511,7 +511,6 @@ func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, n
 
 	pods := []*v1.Pod{}
 	pvcs := []*v1.PersistentVolumeClaim{}
-	pvs := []*v1.PersistentVolume{}
 
 	// Create PVs for the first node
 	for i := 0; i < numPVsFirstNode; i++ {
@@ -519,7 +518,6 @@ func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, n
 		if pv, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
 			t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 		}
-		pvs = append(pvs, pv)
 	}
 
 	// Create 1 PV per Node for the remaining nodes
@@ -528,7 +526,6 @@ func testVolumeBindingWithAffinity(t *testing.T, anti bool, numNodes, numPods, n
 		if pv, err := config.client.CoreV1().PersistentVolumes().Create(pv); err != nil {
 			t.Fatalf("Failed to create PersistentVolume %q: %v", pv.Name, err)
 		}
-		pvs = append(pvs, pv)
 	}
 
 	// Create pods

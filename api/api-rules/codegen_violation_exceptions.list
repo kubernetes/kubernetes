@@ -28,6 +28,7 @@ API rule violation: list_type_missing,k8s.io/apimachinery/pkg/runtime,RawExtensi
 API rule violation: list_type_missing,k8s.io/apimachinery/pkg/runtime,Unknown,Raw
 API rule violation: list_type_missing,k8s.io/code-generator/_examples/apiserver/apis/example/v1,TestTypeList,Items
 API rule violation: list_type_missing,k8s.io/code-generator/_examples/apiserver/apis/example2/v1,TestTypeList,Items
+API rule violation: list_type_missing,k8s.io/code-generator/_examples/apiserver/apis/example3.io/v1,TestTypeList,Items
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,APIResourceList,APIResources
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,Duration,Duration
 API rule violation: names_match,k8s.io/apimachinery/pkg/apis/meta/v1,InternalEvent,Object
@@ -40,3 +41,4 @@ API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,ContentT
 API rule violation: names_match,k8s.io/apimachinery/pkg/runtime,Unknown,Raw
 API rule violation: names_match,k8s.io/code-generator/_examples/apiserver/apis/example/v1,TestTypeStatus,Blah
 API rule violation: names_match,k8s.io/code-generator/_examples/apiserver/apis/example2/v1,TestTypeStatus,Blah
+API rule violation: names_match,k8s.io/code-generator/_examples/apiserver/apis/example3.io/v1,TestTypeStatus,Blah

@@ -25,6 +25,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -317,7 +318,7 @@ func PickIP(c clientset.Interface) (string, error) {
 
 // GetPublicIps returns a public IP list of nodes.
 func GetPublicIps(c clientset.Interface) ([]string, error) {
-	nodes, err := GetReadySchedulableNodesOrDie(c)
+	nodes, err := GetReadySchedulableNodes(c)
 	if err != nil {
 		return nil, fmt.Errorf("get schedulable and ready nodes error: %s", err)
 	}
@@ -329,23 +330,55 @@ func GetPublicIps(c clientset.Interface) ([]string, error) {
 	return ips, nil
 }
 
-// GetReadySchedulableNodesOrDie addresses the common use case of getting nodes you can do work on.
+// GetReadySchedulableNodes addresses the common use case of getting nodes you can do work on.
 // 1) Needs to be schedulable.
 // 2) Needs to be ready.
 // If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
+// If there are no nodes that are both ready and schedulable, this will return an error.
 // TODO: remove references in framework/util.go.
-// TODO: remove "OrDie" suffix.
-func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList, err error) {
+func GetReadySchedulableNodes(c clientset.Interface) (nodes *v1.NodeList, err error) {
 	nodes, err = checkWaitListSchedulableNodes(c)
 	if err != nil {
 		return nil, fmt.Errorf("listing schedulable nodes error: %s", err)
 	}
-	// previous tests may have cause failures of some nodes. Let's skip
-	// 'Not Ready' nodes, just in case (there is no need to fail the test).
 	Filter(nodes, func(node v1.Node) bool {
 		return IsNodeSchedulable(&node) && IsNodeUntainted(&node)
 	})
+	if len(nodes.Items) == 0 {
+		return nil, fmt.Errorf("there are currently no ready, schedulable nodes in the cluster")
+	}
 	return nodes, nil
+}
+
+// GetBoundedReadySchedulableNodes is like GetReadySchedulableNodes except that it returns
+// at most maxNodes nodes. Use this to keep your test case from blowing up when run on a
+// large cluster.
+func GetBoundedReadySchedulableNodes(c clientset.Interface, maxNodes int) (nodes *v1.NodeList, err error) {
+	nodes, err = GetReadySchedulableNodes(c)
+	if err != nil {
+		return nil, err
+	}
+	if len(nodes.Items) > maxNodes {
+		shuffled := make([]v1.Node, maxNodes)
+		perm := rand.Perm(len(nodes.Items))
+		for i, j := range perm {
+			if j < len(shuffled) {
+				shuffled[j] = nodes.Items[i]
+			}
+		}
+		nodes.Items = shuffled
+	}
+	return nodes, nil
+}
+
+// GetRandomReadySchedulableNode gets a single randomly-selected node which is available for
+// running pods on. If there are no available nodes it will return an error.
+func GetRandomReadySchedulableNode(c clientset.Interface) (*v1.Node, error) {
+	nodes, err := GetReadySchedulableNodes(c)
+	if err != nil {
+		return nil, err
+	}
+	return &nodes.Items[rand.Intn(len(nodes.Items))], nil
 }
 
 // GetReadyNodesIncludingTainted returns all ready nodes, even those which are tainted.

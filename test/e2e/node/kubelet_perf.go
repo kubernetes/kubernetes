@@ -27,7 +27,7 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -43,8 +43,6 @@ const (
 	monitoringTime = 20 * time.Minute
 	// The periodic reporting period.
 	reportingPeriod = 5 * time.Minute
-	// Timeout for waiting for the image prepulling to complete.
-	imagePrePullingLongTimeout = time.Minute * 8
 )
 
 type resourceTest struct {
@@ -201,7 +199,8 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 	var rm *e2ekubelet.ResourceMonitor
 
 	ginkgo.BeforeEach(func() {
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
+		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {
 			nodeNames.Insert(node.Name)
@@ -285,7 +284,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 // If an error occurs, nothing will be printed.
 func printPerfData(p *perftype.PerfData) {
 	// Notice that we must make sure the perftype.PerfResultEnd is in a new line.
-	if str := e2emetrics.PrettyPrintJSON(p); str != "" {
+	if str := framework.PrettyPrintJSON(p); str != "" {
 		framework.Logf("%s %s\n%s", perftype.PerfResultTag, str, perftype.PerfResultEnd)
 	}
 }

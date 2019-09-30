@@ -49,7 +49,6 @@ filegroup(
         ":package-srcs",
         "//vendor/github.com/Microsoft/hcsshim/hcn:all-srcs",
         "//vendor/github.com/Microsoft/hcsshim/internal/cni:all-srcs",
-        "//vendor/github.com/Microsoft/hcsshim/internal/guestrequest:all-srcs",
         "//vendor/github.com/Microsoft/hcsshim/internal/guid:all-srcs",
         "//vendor/github.com/Microsoft/hcsshim/internal/hcs:all-srcs",
         "//vendor/github.com/Microsoft/hcsshim/internal/hcserror:all-srcs",

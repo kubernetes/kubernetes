@@ -106,7 +106,7 @@ func (v *legacyValidator) Validate(tokenData string, public *jwt.Claims, private
 			klog.V(4).Infof("Token is deleted and awaiting removal: %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
 			return nil, errors.New("Token has been invalidated")
 		}
-		if bytes.Compare(secret.Data[v1.ServiceAccountTokenKey], []byte(tokenData)) != 0 {
+		if !bytes.Equal(secret.Data[v1.ServiceAccountTokenKey], []byte(tokenData)) {
 			klog.V(4).Infof("Token contents no longer matches %s/%s for service account %s/%s", namespace, secretName, namespace, serviceAccountName)
 			return nil, errors.New("Token does not match server's copy")
 		}

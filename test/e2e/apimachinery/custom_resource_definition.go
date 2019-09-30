@@ -32,7 +32,6 @@ import (
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 )
 
 var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin]", func() {
@@ -116,7 +115,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 				}
 				framework.ExpectNotEqual(expected, nil)
 				if !equality.Semantic.DeepEqual(actual.Spec, expected.Spec) {
-					e2elog.Failf("Expected CustomResourceDefinition in list with name %s to match crd created with same name, but got different specs:\n%s",
+					framework.Failf("Expected CustomResourceDefinition in list with name %s to match crd created with same name, but got different specs:\n%s",
 						actual.Name, diff.ObjectReflectDiff(expected.Spec, actual.Spec))
 				}
 			}
@@ -161,7 +160,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 				framework.ExpectNoError(err, "getting CustomResourceDefinition status")
 				status := unstructuredToCRD(u)
 				if !equality.Semantic.DeepEqual(status.Spec, crd.Spec) {
-					e2elog.Failf("Expected CustomResourceDefinition Spec to match status sub-resource Spec, but got:\n%s", diff.ObjectReflectDiff(status.Spec, crd.Spec))
+					framework.Failf("Expected CustomResourceDefinition Spec to match status sub-resource Spec, but got:\n%s", diff.ObjectReflectDiff(status.Spec, crd.Spec))
 				}
 				status.Status.Conditions = append(status.Status.Conditions, updateCondition)
 				updated, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().UpdateStatus(status)
@@ -267,5 +266,5 @@ func expectCondition(conditions []v1.CustomResourceDefinitionCondition, expected
 			return
 		}
 	}
-	e2elog.Failf("Condition %#v not found in conditions %#v", expected, conditions)
+	framework.Failf("Condition %#v not found in conditions %#v", expected, conditions)
 }

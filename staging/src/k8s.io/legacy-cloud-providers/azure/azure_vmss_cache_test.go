@@ -19,8 +19,11 @@ limitations under the License.
 package azure
 
 import (
+	"context"
+	"sync"
 	"testing"
 
+	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -66,4 +69,46 @@ func TestExtractVmssVMName(t *testing.T) {
 		assert.Equal(t, c.expectedScaleSet, ssName, c.description)
 		assert.Equal(t, c.expectedInstanceID, instanceID, c.description)
 	}
+}
+
+func TestVMSSVMCache(t *testing.T) {
+	vmssName := "vmss"
+	vmList := []string{"vmssee6c2000000", "vmssee6c2000001", "vmssee6c2000002"}
+	ss, err := newTestScaleSet(vmssName, "", 0, vmList)
+	assert.NoError(t, err)
+
+	// validate getting VMSS VM via cache.
+	virtualMachines, err := ss.VirtualMachineScaleSetVMsClient.List(
+		context.Background(), "rg", "vmss", "", "", "")
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(virtualMachines))
+	for i := range virtualMachines {
+		vm := virtualMachines[i]
+		vmName := to.String(vm.OsProfile.ComputerName)
+		ssName, instanceID, realVM, err := ss.getVmssVM(vmName)
+		assert.NoError(t, err)
+		assert.Equal(t, "vmss", ssName)
+		assert.Equal(t, to.String(vm.InstanceID), instanceID)
+		assert.Equal(t, &vm, realVM)
+	}
+
+	// validate deleteCacheForNode().
+	vm := virtualMachines[0]
+	vmName := to.String(vm.OsProfile.ComputerName)
+	err = ss.deleteCacheForNode(vmName)
+	assert.NoError(t, err)
+
+	// the VM should be removed from cache after deleteCacheForNode().
+	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey)
+	assert.NoError(t, err)
+	cachedVirtualMachines := cached.(*sync.Map)
+	_, ok := cachedVirtualMachines.Load(vmName)
+	assert.Equal(t, false, ok)
+
+	// the VM should be get back after another cache refresh.
+	ssName, instanceID, realVM, err := ss.getVmssVM(vmName)
+	assert.NoError(t, err)
+	assert.Equal(t, "vmss", ssName)
+	assert.Equal(t, to.String(vm.InstanceID), instanceID)
+	assert.Equal(t, &vm, realVM)
 }

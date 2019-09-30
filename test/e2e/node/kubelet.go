@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -270,18 +271,10 @@ var _ = SIGDescribe("kubelet", func() {
 			// nodes we observe initially.
 			nodeLabels = make(map[string]string)
 			nodeLabels["kubelet_cleanup"] = "true"
-			nodes := framework.GetReadySchedulableNodesOrDie(c)
-			numNodes = len(nodes.Items)
-			framework.ExpectNotEqual(numNodes, 0)
+			nodes, err := e2enode.GetBoundedReadySchedulableNodes(c, maxNodesToCheck)
+			framework.ExpectNoError(err)
 			nodeNames = sets.NewString()
-			// If there are a lot of nodes, we don't want to use all of them
-			// (if there are 1000 nodes in the cluster, starting 10 pods/node
-			// will take ~10 minutes today). And there is also deletion phase.
-			// Instead, we choose at most 10 nodes.
-			if numNodes > maxNodesToCheck {
-				numNodes = maxNodesToCheck
-			}
-			for i := 0; i < numNodes; i++ {
+			for i := 0; i < len(nodes.Items); i++ {
 				nodeNames.Insert(nodes.Items[i].Name)
 			}
 			for nodeName := range nodeNames {

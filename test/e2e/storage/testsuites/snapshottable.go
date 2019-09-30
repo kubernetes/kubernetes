@@ -101,8 +101,8 @@ func (s *snapshottableTestSuite) defineTests(driver TestDriver, pattern testpatt
 		dc := f.DynamicClient
 
 		// Now do the more expensive test initialization.
-		config, testCleanup := driver.PrepareTest(f)
-		defer testCleanup()
+		config, driverCleanup := driver.PrepareTest(f)
+		defer driverCleanup()
 
 		vsc := sDriver.GetSnapshotClass(config)
 		class := dDriver.GetDynamicProvisionStorageClass(config, "")

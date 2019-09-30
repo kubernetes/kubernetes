@@ -23,6 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -85,9 +86,8 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// propagated to the right places.
 
 		// Pick a node where all pods will run.
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		framework.ExpectNotEqual(len(nodes.Items), 0, "No available nodes for scheduling")
-		node := &nodes.Items[0]
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
 
 		// Fail the test if the namespace is not set. We expect that the
 		// namespace is unique and we might delete user data if it's not.
@@ -139,7 +139,7 @@ var _ = SIGDescribe("Mount propagation", func() {
 		// The host mounts one tmpfs to testdir/host and puts a file there so we
 		// can check mount propagation from the host to pods.
 		cmd := fmt.Sprintf("sudo mkdir %[1]q/host; sudo mount -t tmpfs e2e-mount-propagation-host %[1]q/host; echo host > %[1]q/host/file", hostDir)
-		err := e2essh.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
+		err = e2essh.IssueSSHCommand(cmd, framework.TestContext.Provider, node)
 		framework.ExpectNoError(err)
 
 		defer func() {
