@@ -17,6 +17,7 @@ limitations under the License.
 package nodelifecycle
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -27,6 +28,8 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -67,6 +70,20 @@ type nodeLifecycleController struct {
 	daemonSetInformer appsinformers.DaemonSetInformer
 }
 
+func getPodsAssignedToNode(c *fake.Clientset) func(nodeName string) ([]v1.Pod, error) {
+	return func(nodeName string) ([]v1.Pod, error) {
+		selector := fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
+		pods, err := c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
+			FieldSelector: selector.String(),
+			LabelSelector: labels.Everything().String(),
+		})
+		if err != nil {
+			return []v1.Pod{}, fmt.Errorf("failed to get Pods assigned to node %v", nodeName)
+		}
+		return pods.Items, nil
+	}
+}
+
 // doEviction does the fake eviction and returns the status of eviction operation.
 func (nc *nodeLifecycleController) doEviction(fakeNodeHandler *testutil.FakeNodeHandler) bool {
 	var podEvicted bool
@@ -74,7 +91,7 @@ func (nc *nodeLifecycleController) doEviction(fakeNodeHandler *testutil.FakeNode
 	for _, zone := range zones {
 		nc.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 			uid, _ := value.UID.(string)
-			nodeutil.DeletePods(fakeNodeHandler, nc.recorder, value.Value, uid, nc.daemonSetStore)
+			nodeutil.DeletePods(fakeNodeHandler, nc.recorder, value.Value, uid, nc.daemonSetStore, getPodsAssignedToNode(fakeNodeHandler.Clientset))
 			return true, 0
 		})
 	}
@@ -167,6 +184,11 @@ func newNodeLifecycleControllerFromClient(
 	nc.podInformerSynced = alwaysReady
 	nc.nodeInformerSynced = alwaysReady
 	nc.daemonSetInformerSynced = alwaysReady
+
+	fakeNodeHandler, ok := kubeClient.(*testutil.FakeNodeHandler)
+	if ok {
+		nc.getPodsAssignedToNode = getPodsAssignedToNode(fakeNodeHandler.Clientset)
+	}
 
 	return &nodeLifecycleController{nc, leaseInformer, nodeInformer, daemonSetInformer}, nil
 }
@@ -675,7 +697,7 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 			if _, ok := nodeController.zonePodEvictor[zone]; ok {
 				nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 					nodeUID, _ := value.UID.(string)
-					nodeutil.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister())
+					nodeutil.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister(), getPodsAssignedToNode(item.fakeNodeHandler.Clientset))
 					return true, 0
 				})
 			} else {
@@ -827,7 +849,7 @@ func TestPodStatusChange(t *testing.T) {
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 				nodeUID, _ := value.UID.(string)
-				nodeutil.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetStore)
+				nodeutil.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetStore, getPodsAssignedToNode(item.fakeNodeHandler.Clientset))
 				return true, 0
 			})
 		}
