@@ -26,7 +26,7 @@ import (
 var (
 	defaultRegistry = metrics.NewKubeRegistry()
 	// DefaultGatherer exposes the global registry gatherer
-	DefaultGatherer prometheus.Gatherer = defaultRegistry
+	DefaultGatherer metrics.Gatherer = defaultRegistry
 )
 
 func init() {
