@@ -22,6 +22,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/hugepagehandler"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 )
 
@@ -35,6 +36,7 @@ type InternalContainerLifecycle interface {
 type internalContainerLifecycleImpl struct {
 	cpuManager      cpumanager.Manager
 	topologyManager topologymanager.Manager
+	hugepageHandler hugepagehandler.Handler
 }
 
 func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, container *v1.Container, containerID string) error {
@@ -44,6 +46,9 @@ func (i *internalContainerLifecycleImpl) PreStartContainer(pod *v1.Pod, containe
 			return err
 		}
 	}
+
+	i.hugepageHandler.AddContainer(pod, container, containerID)
+
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.TopologyManager) {
 		err := i.topologyManager.AddContainer(pod, containerID)
 		if err != nil {

@@ -34,6 +34,7 @@ import (
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/cadvisor"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager"
+	"k8s.io/kubernetes/pkg/kubelet/cm/hugepagehandler"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -162,7 +163,7 @@ func (cm *containerManagerImpl) UpdatePluginResources(*schedulernodeinfo.NodeInf
 }
 
 func (cm *containerManagerImpl) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), topologymanager.NewFakeManager()}
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), topologymanager.NewFakeManager(), hugepagehandler.NewFakeHandler()}
 }
 
 func (cm *containerManagerImpl) GetPodCgroupRoot() string {
