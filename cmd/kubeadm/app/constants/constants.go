@@ -225,6 +225,12 @@ const (
 	// KubeProxyConfigMapKey specifies in what ConfigMap key the component config of kube-proxy should be stored
 	KubeProxyConfigMapKey = "config.conf"
 
+	// AddonInstallerConfigMap specifies in what ConfigMap in the kube-system namespace the addon-installer configuration should be stored
+	AddonInstallerConfigMap = "addon-installer"
+
+	// AddonInstallerConfigMapKey specifies in what ConfigMap key the component config of addon-installer should be stored
+	AddonInstallerConfigMapKey = "config.conf"
+
 	// KubeletBaseConfigurationConfigMapPrefix specifies in what ConfigMap in the kube-system namespace the initial remote configuration of kubelet should be stored
 	KubeletBaseConfigurationConfigMapPrefix = "kubelet-config-"
 

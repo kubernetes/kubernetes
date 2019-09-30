@@ -17,6 +17,8 @@ limitations under the License.
 package phases
 
 import (
+	"os"
+
 	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
@@ -24,8 +26,11 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
+
+	addoninstall "sigs.k8s.io/addon-operators/installer/install"
 )
 
 var (
@@ -37,6 +42,10 @@ var (
 	kubeProxyAddonLongDesc = cmdutil.LongDesc(`
 		Install the kube-proxy addon components via the API server.
 		`)
+
+	addonInstallerLongDesc = cmdutil.LongDesc(`
+		Install addons from an AddonInstallerConfiguration via the API server.
+		`)  // TODO: add documentation / link
 )
 
 // NewAddonPhase returns the addon Cobra command
@@ -66,6 +75,13 @@ func NewAddonPhase() workflow.Phase {
 				InheritFlags: getAddonPhaseFlags("kube-proxy"),
 				Run:          runKubeProxyAddon,
 			},
+			{
+				Name:         "installer",
+				Short:        "Install addons from an AddonInstallerConfiguration",
+				Long:         addonInstallerLongDesc,
+				InheritFlags: getAddonPhaseFlags("installer"),
+				Run:          runAddonInstaller,
+			},
 		},
 	}
 }
@@ -89,6 +105,9 @@ func runCoreDNSAddon(c workflow.RunData) error {
 	if err != nil {
 		return err
 	}
+	if features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.AddonInstaller) {
+		return nil
+	}
 	return dnsaddon.EnsureDNSAddon(&cfg.ClusterConfiguration, client)
 }
 
@@ -97,6 +116,9 @@ func runKubeProxyAddon(c workflow.RunData) error {
 	cfg, client, err := getInitData(c)
 	if err != nil {
 		return err
+	}
+	if features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.AddonInstaller) {
+		return nil
 	}
 	return proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client)
 }
@@ -123,5 +145,54 @@ func getAddonPhaseFlags(name string) []string {
 			options.NetworkingServiceSubnet,
 		)
 	}
+	if name == "all" || name == "installer" {
+		// TODO
+		// flags = append(flags,
+		// 	options.AddonInstallerDryRun
+		// )
+	}
 	return flags
+}
+
+// runAddonInstaller executes the addon-installer
+func runAddonInstaller(c workflow.RunData) error {
+	// cfg, client, err := getInitData(c)
+	cfg, _, err := getInitData(c)
+	// TODO: getAddonInstallerFromConfigMap
+	if err != nil {
+		return err
+	}
+	if features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.AddonInstaller) {
+		installCfg := cfg.ClusterConfiguration.ComponentConfigs.AddonInstaller
+		if installCfg == nil {
+			return errors.New("addoninstaller phase invoked with nil AddonInstaller ComponentConfig")
+		}
+		r := addoninstall.Runtime{
+			Config: installCfg,
+			Stdout: os.Stdout,
+			Stderr: os.Stderr,
+		}
+		// sigs := make(chan os.Signal, 1)
+		// signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+		// go func() {
+		// 	errs := r.HandleSignal(<-sigs)
+		// 	for _, err := range errs {
+		// 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		// 	}
+		// }()
+
+		err = r.CheckDeps()
+		if err != nil {
+			return err
+		}
+		err = r.CheckConfig()
+		if err != nil {
+			return err
+		}
+		err = r.InstallAddons()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

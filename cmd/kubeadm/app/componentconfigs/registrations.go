@@ -26,6 +26,9 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+
+	addoninstallerconfig "sigs.k8s.io/addon-operators/installer/pkg/apis/config"
+	addoninstallerconfigv1alpha1scheme "sigs.k8s.io/addon-operators/installer/pkg/apis/config/v1alpha1"
 )
 
 // AddToSchemeFunc is a function that adds known types and API GroupVersions to a scheme
@@ -76,8 +79,10 @@ func unmarshalObject(obj runtime.Object, fileContent []byte) error {
 const (
 	// KubeletConfigurationKind is the kind for the kubelet ComponentConfig
 	KubeletConfigurationKind RegistrationKind = "KubeletConfiguration"
-	// KubeProxyConfigurationKind is the kind for the kubelet ComponentConfig
+	// KubeProxyConfigurationKind is the kind for the kube-proxy ComponentConfig
 	KubeProxyConfigurationKind RegistrationKind = "KubeProxyConfiguration"
+	// AddonInstallerConfigurationKind is the kind for the addon-installer ComponentConfig
+	AddonInstallerConfigurationKind RegistrationKind = "AddonInstallerConfiguration"
 )
 
 // RegistrationKind is a string type to ensure not any string can be a key in the Registrations map
@@ -126,6 +131,30 @@ var Known Registrations = map[RegistrationKind]Registration{
 			return ok
 		},
 		GetFromConfigMap: GetFromKubeletConfigMap,
+	},
+	AddonInstallerConfigurationKind: {
+		MarshalGroupVersion: addoninstallerconfigv1alpha1scheme.SchemeGroupVersion,
+		AddToSchemeFuncs:    []AddToSchemeFunc{addoninstallerconfig.AddToScheme, addoninstallerconfigv1alpha1scheme.AddToScheme},
+		DefaulterFunc: func(internalcfg *kubeadmapi.ClusterConfiguration) {
+			// TODO: implement DefaultAddonInstallerConfiguration ?
+			return
+		},
+		ValidateFunc: func(internalcfg *kubeadmapi.ClusterConfiguration, fldPath *field.Path) field.ErrorList {
+			// TODO: implement ValidateAddonInstallerConfiguration ?
+			return field.ErrorList{}
+		},
+		EmptyValue: &addoninstallerconfig.AddonInstallerConfiguration{},
+		GetFromInternalConfig: func(cfg *kubeadmapi.ClusterConfiguration) (runtime.Object, bool) {
+			return cfg.ComponentConfigs.AddonInstaller, cfg.ComponentConfigs.AddonInstaller != nil
+		},
+		SetToInternalConfig: func(obj runtime.Object, cfg *kubeadmapi.ClusterConfiguration) bool {
+			addonInstallerConfig, ok := obj.(*addoninstallerconfig.AddonInstallerConfiguration)
+			if ok {
+				cfg.ComponentConfigs.AddonInstaller = addonInstallerConfig
+			}
+			return ok
+		},
+		GetFromConfigMap: GetFromAddonInstallerConfigMap,
 	},
 }
 

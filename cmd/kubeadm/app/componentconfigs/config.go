@@ -18,6 +18,7 @@ package componentconfigs
 
 import (
 	"github.com/pkg/errors"
+	addoninstallerconfig "sigs.k8s.io/addon-operators/installer/pkg/apis/config"
 	"k8s.io/klog"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -84,6 +85,39 @@ func GetFromKubeProxyConfigMap(client clientset.Interface, version *version.Vers
 	// Decodes the Config map dat into the internal component config
 	obj := &kubeproxyconfigv1alpha1.KubeProxyConfiguration{}
 	err = unmarshalObject(obj, []byte(kubeproxyConfigData))
+	if err != nil {
+		return nil, err
+	}
+
+	return obj, nil
+}
+
+// GetFromAddonInstallerConfigMap returns the pointer to the ComponentConfig API object read from the addon-installer
+// ConfigMap map stored in the cluster
+func GetFromAddonInstallerConfigMap(client clientset.Interface, version *version.Version) (runtime.Object, error) {
+
+	// Read the ConfigMap from the cluster
+	addoninstallerCfg, err := apiclient.GetConfigMapWithRetry(client, metav1.NamespaceSystem, kubeadmconstants.AddonInstallerConfigMap)
+	if err != nil {
+		// The addon-installer config map may be non-existent, because the user has decided to manage it by themselves
+		// or to use other proxy solution. It may also be forbidden - if the addon-installer phase was skipped we have neither
+		// the config map, nor the RBAC rules allowing join access to it.
+		if apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
+			klog.Warningf("Warning: No addon-installer config is loaded. Continuing without it: %v", err)
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	addoninstallerConfigData, ok := addoninstallerCfg.Data[kubeadmconstants.AddonInstallerConfigMapKey]
+	if !ok {
+		return nil, errors.Errorf("unexpected error when reading %s ConfigMap: %s key value pair missing",
+			kubeadmconstants.AddonInstallerConfigMap, kubeadmconstants.AddonInstallerConfigMapKey)
+	}
+
+	// Decodes the Config map dat into the internal component config
+	obj := &addoninstallerconfig.AddonInstallerConfiguration{}
+	err = unmarshalObject(obj, []byte(addoninstallerConfigData))
 	if err != nil {
 		return nil, err
 	}
