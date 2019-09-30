@@ -422,6 +422,69 @@ func TestEncryptionProviderConfigNoEndpointForKMS(t *testing.T) {
 	}
 }
 
+func TestKMSConfigEndpoint(t *testing.T) {
+	testCases := []struct {
+		desc    string
+		config  string
+		wantErr string
+	}{
+		{
+			desc: "valid endpoint",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: unix:///tmp/testprovider.sock
+`,
+		},
+		{
+			desc: "no endpoint",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+`,
+			wantErr: "remote KMS provider can't use empty string as endpoint",
+		},
+		{
+			desc: "not a unix socket endpoint",
+			config: `kind: EncryptionConfiguration
+apiVersion: apiserver.config.k8s.io/v1
+resources:
+  - resources:
+    - secrets
+    providers:
+    - kms:
+        name: foo
+        endpoint: /tmp/testprovider.sock
+`,
+			wantErr: `unsupported scheme "" for remote KMS provider`,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.desc, func(t *testing.T) {
+			// mocking envelopeServiceFactory to sense the value of the supplied timeout.
+			envelopeServiceFactory = func(endpoint string, callTimeout time.Duration) (envelope.Service, error) {
+				return newMockEnvelopeService(endpoint, callTimeout)
+			}
+
+			// mocked envelopeServiceFactory is called during ParseEncryptionConfiguration.
+			if _, err := ParseEncryptionConfiguration(strings.NewReader(tt.config)); err != nil && !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("unable to parse yaml\n%s\nerror: %v", tt.config, err)
+			}
+		})
+	}
+}
+
 func TestKMSConfigTimeout(t *testing.T) {
 	testCases := []struct {
 		desc    string

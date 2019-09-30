@@ -357,52 +357,18 @@ func destroyService(service Service) {
 }
 
 func getSocketName() string {
-	return fmt.Sprintf("unix:///@%s.sock", uuid.NewUUID())
-}
-
-// Test all those invalid configuration for KMS provider.
-func TestInvalidConfiguration(t *testing.T) {
-	t.Parallel()
-	// Start a test gRPC server.
-	f, err := startFakeKMSProvider(kmsapiVersion, getSocketName())
-	if err != nil {
-		t.Fatalf("failed to start test KMS provider server, error: %v", err)
-	}
-	defer f.Stop()
-
-	invalidConfigs := []struct {
-		name       string
-		apiVersion string
-		endpoint   string
-	}{
-		{"emptyConfiguration", kmsapiVersion, ""},
-		{"invalidScheme", kmsapiVersion, "tcp://localhost:6060"},
-	}
-
-	for _, testCase := range invalidConfigs {
-		t.Run(testCase.name, func(t *testing.T) {
-			f.apiVersion = testCase.apiVersion
-			_, err := NewGRPCService(testCase.endpoint, 1*time.Second)
-			if err == nil {
-				t.Fatalf("should fail to create envelope service for %s.", testCase.name)
-			}
-		})
-	}
+	return fmt.Sprintf("@%s.sock", uuid.NewUUID())
 }
 
 // Start the gRPC server that listens on unix socket.
 func startFakeKMSProvider(version, endpoint string) (*fakeKMSPlugin, error) {
-	sockFile, err := parseEndpoint(endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse endpoint:%q, error %v", endpoint, err)
-	}
-	listener, err := net.Listen(unixProtocol, sockFile)
+	listener, err := net.Listen(unixProtocol, endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to listen on the unix socket, error: %v", err)
 	}
 
 	s := grpc.NewServer()
-	f := &fakeKMSPlugin{apiVersion: version, server: s, sockFile: sockFile}
+	f := &fakeKMSPlugin{apiVersion: version, server: s, sockFile: endpoint}
 	kmsapi.RegisterKeyManagementServiceServer(s, f)
 	go s.Serve(listener)
 	return f, nil

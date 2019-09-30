@@ -24,7 +24,9 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -112,7 +114,12 @@ func getKMSPluginProbes(reader io.Reader) ([]*kmsPluginProbe, error) {
 					timeout = p.KMS.Timeout.Duration
 				}
 
-				s, err := envelope.NewGRPCService(p.KMS.Endpoint, timeout)
+				addr, err := parseEndpoint(p.KMS.Endpoint)
+				if err != nil {
+					return nil, err
+				}
+
+				s, err := envelope.NewGRPCService(addr, timeout)
 				if err != nil {
 					return nil, fmt.Errorf("could not configure KMS-Plugin's probe %q, error: %v", p.KMS.Name, err)
 				}
@@ -276,9 +283,10 @@ func GetPrefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]val
 				return nil, fmt.Errorf("more than one provider specified in a single element, should split into different list elements")
 			}
 
-			// Ensure the endpoint is provided.
-			if len(provider.KMS.Endpoint) == 0 {
-				return nil, fmt.Errorf("remote KMS provider can't use empty string as endpoint")
+			// Ensure the endpoint is provided and in the expected format.
+			addr, err := parseEndpoint(provider.KMS.Endpoint)
+			if err != nil {
+				return nil, err
 			}
 
 			timeout := kmsPluginConnectionTimeout
@@ -290,7 +298,7 @@ func GetPrefixTransformers(config *apiserverconfig.ResourceConfiguration) ([]val
 			}
 
 			// Get gRPC client service with endpoint.
-			envelopeService, err := envelopeServiceFactory(provider.KMS.Endpoint, timeout)
+			envelopeService, err := envelopeServiceFactory(addr, timeout)
 			if err != nil {
 				return nil, fmt.Errorf("could not configure KMS plugin %q, error: %v", provider.KMS.Name, err)
 			}
@@ -425,4 +433,30 @@ func getEnvelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, enve
 		Transformer: envelopeTransformer,
 		Prefix:      []byte(prefix + config.Name + ":"),
 	}, nil
+}
+
+// parseEndpoint parses the endpoint to extract schema, host or path.
+func parseEndpoint(endpoint string) (string, error) {
+	if len(endpoint) == 0 {
+		return "", fmt.Errorf("remote KMS provider can't use empty string as endpoint")
+	}
+
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", fmt.Errorf("invalid endpoint %q for remote KMS provider, error: %v", endpoint, err)
+	}
+
+	if u.Scheme != "unix" {
+		return "", fmt.Errorf("unsupported scheme %q for remote KMS provider", u.Scheme)
+	}
+
+	// Linux abstract namespace socket - no physical file required
+	// Warning: Linux Abstract sockets have not concept of ACL (unlike traditional file based sockets).
+	// However, Linux Abstract sockets are subject to Linux networking namespace, so will only be accessible to
+	// containers within the same pod (unless host networking is used).
+	if strings.HasPrefix(u.Path, "/@") {
+		return strings.TrimPrefix(u.Path, "/"), nil
+	}
+
+	return u.Path, nil
 }

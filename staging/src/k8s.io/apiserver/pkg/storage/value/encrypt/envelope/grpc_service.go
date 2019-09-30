@@ -21,8 +21,6 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -53,13 +51,8 @@ type gRPCService struct {
 }
 
 // NewGRPCService returns an envelope.Service which use gRPC to communicate the remote KMS provider.
-func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error) {
-	klog.V(4).Infof("Configure KMS provider with endpoint: %s", endpoint)
-
-	addr, err := parseEndpoint(endpoint)
-	if err != nil {
-		return nil, err
-	}
+func NewGRPCService(addr string, callTimeout time.Duration) (Service, error) {
+	klog.V(4).Infof("Configure KMS provider with addr: %s", addr)
 
 	connection, err := grpc.Dial(addr, grpc.WithInsecure(), grpc.WithDefaultCallOptions(grpc.FailFast(false)), grpc.WithDialer(
 		func(string, time.Duration) (net.Conn, error) {
@@ -74,7 +67,7 @@ func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error)
 		}))
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create connection to %s, error: %v", endpoint, err)
+		return nil, fmt.Errorf("failed to create connection to %s, error: %v", addr, err)
 	}
 
 	kmsClient := kmsapi.NewKeyManagementServiceClient(connection)
@@ -83,32 +76,6 @@ func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error)
 		connection:  connection,
 		callTimeout: callTimeout,
 	}, nil
-}
-
-// Parse the endpoint to extract schema, host or path.
-func parseEndpoint(endpoint string) (string, error) {
-	if len(endpoint) == 0 {
-		return "", fmt.Errorf("remote KMS provider can't use empty string as endpoint")
-	}
-
-	u, err := url.Parse(endpoint)
-	if err != nil {
-		return "", fmt.Errorf("invalid endpoint %q for remote KMS provider, error: %v", endpoint, err)
-	}
-
-	if u.Scheme != unixProtocol {
-		return "", fmt.Errorf("unsupported scheme %q for remote KMS provider", u.Scheme)
-	}
-
-	// Linux abstract namespace socket - no physical file required
-	// Warning: Linux Abstract sockets have not concept of ACL (unlike traditional file based sockets).
-	// However, Linux Abstract sockets are subject to Linux networking namespace, so will only be accessible to
-	// containers within the same pod (unless host networking is used).
-	if strings.HasPrefix(u.Path, "/@") {
-		return strings.TrimPrefix(u.Path, "/"), nil
-	}
-
-	return u.Path, nil
 }
 
 func (g *gRPCService) checkAPIVersion(ctx context.Context) error {
