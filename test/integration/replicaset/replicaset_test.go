@@ -17,6 +17,7 @@ limitations under the License.
 package replicaset
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http/httptest"
 	"reflect"
@@ -204,6 +205,10 @@ func scaleRS(t *testing.T, c clientset.Interface, rs *apps.ReplicaSet, replicas 
 		*rs.Spec.Replicas = replicas
 	})
 	waitRSStable(t, c, rs)
+
+	if len(rs.ObjectMeta.GetManagedFields()) == 0 {
+		t.Fatalf("Expected managed fields to exist on rs %s", rs.ObjectMeta.Name)
+	}
 }
 
 func updatePod(t *testing.T, podClient typedv1.PodInterface, podName string, updateFunc func(*v1.Pod)) *v1.Pod {
@@ -365,6 +370,59 @@ func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *a
 	}
 	if *newRS.Spec.Replicas != replicas {
 		t.Fatalf(".Spec.Replicas of rs %s does not match its scale subresource: expected %d, got %d", rs.Name, replicas, *newRS.Spec.Replicas)
+	}
+
+	mf := (*newRS).ObjectMeta.GetManagedFields()
+	assertOwnership(t, mf, "this-is-the-cool-field-manager", []string{"spec", "replicas"})
+}
+
+func getManagedFieldsEntry(managedFields []metav1.ManagedFieldsEntry, fieldManager string) (metav1.ManagedFieldsEntry, error) {
+	// TODO(hoegaarden): What if there are more entries for the same manager?
+	for _, mf := range managedFields {
+		if mf.Manager == fieldManager {
+			return mf, nil
+		}
+	}
+
+	return metav1.ManagedFieldsEntry{}, fmt.Errorf("Managed field for manager '%s' not found in %v", fieldManager, managedFields)
+}
+
+// temporary, to have a nicer target to run the test: `go generate -run test ./test/...`
+//go:generate go test . --run TestRSScaleSubresource
+func assertOwnership(t *testing.T, managedFields []metav1.ManagedFieldsEntry, fieldManager string, path []string) {
+	entry, err := getManagedFieldsEntry(managedFields, fieldManager)
+	if err != nil {
+		t.Fatalf("Could not find a managed field entry: %v", err)
+	}
+
+	var data map[string]interface{}
+	err = json.Unmarshal(entry.FieldsV1.Raw, &data)
+	if err != nil {
+		t.Fatalf("Expected json.Unmarshal of a v1.FieldsV1 not to error: %v, %v", data, err)
+	}
+
+	checkPath(t, data, path)
+}
+
+func checkPath(t *testing.T, data map[string]interface{}, path []string) {
+	currentPath := path
+	currentData := data
+
+	for {
+		if len(currentPath) < 1 {
+			return
+		}
+
+		value, ok := currentData["f:"+currentPath[0]]
+		if !ok {
+			t.Fatalf("Could not find '%s' in '%s'", currentPath[0], data)
+		}
+
+		currentPath = currentPath[1:]
+		currentData, ok = value.(map[string]interface{})
+		if !ok {
+			t.Fatalf("Could not cast '%v'", value)
+		}
 	}
 }
 

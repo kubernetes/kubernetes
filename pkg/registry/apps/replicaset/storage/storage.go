@@ -42,6 +42,10 @@ import (
 	"k8s.io/kubernetes/pkg/registry/apps/replicaset"
 )
 
+// replicasFieldManager is the name that for the fieldmanager that should be set for
+// the `spec.Replicas` when a RS is scaled via the scale subresource.
+const replicasFieldManager = "this-is-the-cool-field-manager"
+
 // ReplicaSetStorage includes dummy storage for ReplicaSets and for Scale subresource.
 type ReplicaSetStorage struct {
 	ReplicaSet *REST
@@ -202,8 +206,18 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), scale.Name, errs)
 	}
 
-	rs.Spec.Replicas = scale.Spec.Replicas
 	rs.ResourceVersion = scale.ResourceVersion
+
+	rs.Spec.Replicas = scale.Spec.Replicas
+	rs.ObjectMeta.SetManagedFields(append(rs.ObjectMeta.GetManagedFields(), metav1.ManagedFieldsEntry{
+		Manager:    replicasFieldManager,
+		Operation:  metav1.ManagedFieldsOperationApply,
+		FieldsType: "FieldsV1",
+		FieldsV1: &metav1.FieldsV1{
+			[]byte(`{"f:spec":{"f:replicas":{}}}`), // lovely! ❤
+		},
+	}))
+
 	obj, _, err = r.store.Update(
 		ctx,
 		rs.Name,
