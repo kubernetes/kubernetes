@@ -25,12 +25,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/util/dryrun"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	appsv1beta1 "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
 	appsv1beta2 "k8s.io/kubernetes/pkg/apis/apps/v1beta2"
@@ -43,6 +45,7 @@ import (
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	printerstorage "k8s.io/kubernetes/pkg/printers/storage"
 	"k8s.io/kubernetes/pkg/registry/apps/deployment"
+	"sigs.k8s.io/structured-merge-diff/fieldpath"
 )
 
 // DeploymentStorage includes dummy storage for Deployments and for Scale subresource.
@@ -295,6 +298,11 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 
 	if errs := autoscalingvalidation.ValidateScale(scale); len(errs) > 0 {
 		return nil, false, errors.NewInvalid(autoscaling.Kind("Scale"), name, errs)
+	}
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
+		// TODO: update field manager?
+		fieldpath.MakePathOrDie("spec", "replicas")
 	}
 
 	deployment.Spec.Replicas = scale.Spec.Replicas

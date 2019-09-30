@@ -514,6 +514,76 @@ func TestApplyManagedFields(t *testing.T) {
 	}
 }
 
+func TestApplyOnScale(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+		},
+		"spec": {
+			"replicas": 1,
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Param("fieldManager", "apply_test").
+		Body(obj).Do().Get()
+
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	var scaleReplicas int32 = 5
+	// var scaleManager = "TODO"
+
+	scale, err := client.AppsV1().Deployments("default").GetScale("deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get scale: %v", err)
+	}
+	scale.Spec.Replicas = scaleReplicas
+	_, err = client.AppsV1().Deployments("default").UpdateScale("deployment", scale)
+	if err != nil {
+		t.Fatalf("Failed to scale deployment: %v", err)
+	}
+
+	deployment, err := client.AppsV1().Deployments("default").Get("deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	if *deployment.Spec.Replicas != scaleReplicas {
+		t.Fatalf("Expected to scale replicas to %v, but got object: \n%#v", scaleReplicas, deployment)
+	}
+}
+
 // TestApplyRemovesEmptyManagedFields there are no empty managers in managedFields
 func TestApplyRemovesEmptyManagedFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
