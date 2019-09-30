@@ -499,6 +499,8 @@ filegroup(
         "//vendor/k8s.io/utils/pointer:all-srcs",
         "//vendor/k8s.io/utils/strings:all-srcs",
         "//vendor/k8s.io/utils/trace:all-srcs",
+        "//vendor/sigs.k8s.io/addon-operators/installer/install:all-srcs",
+        "//vendor/sigs.k8s.io/addon-operators/installer/pkg/apis/config:all-srcs",
         "//vendor/sigs.k8s.io/kustomize/pkg/commands/build:all-srcs",
         "//vendor/sigs.k8s.io/kustomize/pkg/constants:all-srcs",
         "//vendor/sigs.k8s.io/kustomize/pkg/expansion:all-srcs",

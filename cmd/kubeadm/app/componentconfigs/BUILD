@@ -32,6 +32,8 @@ go_library(
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
+        "//vendor/sigs.k8s.io/addon-operators/installer/pkg/apis/config:go_default_library",
+        "//vendor/sigs.k8s.io/addon-operators/installer/pkg/apis/config/v1alpha1:go_default_library",
     ],
 )
 

@@ -1906,6 +1906,10 @@ k8s.io/utils/path
 k8s.io/utils/pointer
 k8s.io/utils/strings
 k8s.io/utils/trace
+# sigs.k8s.io/addon-operators/installer v0.0.0-20190720181930-201f9679dfe0 => github.com/stealthybox/addon-operators/installer v0.0.0-20190720181930-201f9679dfe0
+sigs.k8s.io/addon-operators/installer/install
+sigs.k8s.io/addon-operators/installer/pkg/apis/config
+sigs.k8s.io/addon-operators/installer/pkg/apis/config/v1alpha1
 # sigs.k8s.io/kustomize v2.0.3+incompatible => sigs.k8s.io/kustomize v2.0.3+incompatible
 sigs.k8s.io/kustomize/pkg/commands/build
 sigs.k8s.io/kustomize/pkg/constants

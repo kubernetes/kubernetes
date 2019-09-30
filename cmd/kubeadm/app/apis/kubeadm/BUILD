@@ -28,6 +28,7 @@ go_library(
         "//staging/src/k8s.io/kube-proxy/config/v1alpha1:go_default_library",
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
+        "//vendor/sigs.k8s.io/addon-operators/installer/pkg/apis/config:go_default_library",
     ],
 )
 
