@@ -20,9 +20,9 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/component-base/metrics"
 	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -69,9 +69,9 @@ type worker struct {
 
 	// proberResultsMetricLabels holds the labels attached to this worker
 	// for the ProberResults metric by result.
-	proberResultsSuccessfulMetricLabels prometheus.Labels
-	proberResultsFailedMetricLabels     prometheus.Labels
-	proberResultsUnknownMetricLabels    prometheus.Labels
+	proberResultsSuccessfulMetricLabels metrics.Labels
+	proberResultsFailedMetricLabels     metrics.Labels
+	proberResultsUnknownMetricLabels    metrics.Labels
 }
 
 // Creates and starts a new probe worker.
@@ -104,7 +104,7 @@ func newWorker(
 		w.initialValue = results.Failure
 	}
 
-	basicMetricLabels := prometheus.Labels{
+	basicMetricLabels := metrics.Labels{
 		"probe_type": w.probeType.String(),
 		"container":  w.container.Name,
 		"pod":        w.pod.Name,
@@ -284,8 +284,8 @@ func (w *worker) doProbe() (keepGoing bool) {
 	return true
 }
 
-func deepCopyPrometheusLabels(m prometheus.Labels) prometheus.Labels {
-	ret := make(prometheus.Labels, len(m))
+func deepCopyPrometheusLabels(m metrics.Labels) metrics.Labels {
+	ret := make(metrics.Labels, len(m))
 	for k, v := range m {
 		ret[k] = v
 	}
