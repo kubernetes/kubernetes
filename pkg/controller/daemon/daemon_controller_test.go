@@ -765,9 +765,9 @@ func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
 		manager.dsStore.Add(ds)
 		switch strategy.Type {
 		case apps.OnDeleteDaemonSetStrategyType:
-			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 2)
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 		case apps.RollingUpdateDaemonSetStrategyType:
-			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 		default:
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 		}
@@ -797,17 +797,9 @@ func TestInsufficientCapacityNodeDaemonDoesNotUnscheduleRunningPod(t *testing.T)
 			manager.dsStore.Add(ds)
 			switch strategy.Type {
 			case apps.OnDeleteDaemonSetStrategyType:
-				if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
-					syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 2)
-				} else {
-					syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
-				}
+				syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 			case apps.RollingUpdateDaemonSetStrategyType:
-				if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
-					syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
-				} else {
-					syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
-				}
+				syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 			default:
 				t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 			}
@@ -873,11 +865,11 @@ func TestSufficientCapacityWithTerminatedPodsDaemonLaunchesPod(t *testing.T) {
 	}{
 		{
 			strategy:       newOnDeleteStrategy(),
-			expectedEvents: 1,
+			expectedEvents: 0,
 		},
 		{
 			strategy:       newRollbackStrategy(),
-			expectedEvents: 2,
+			expectedEvents: 0,
 		},
 	}
 
@@ -915,11 +907,11 @@ func TestSufficientCapacityNodeDaemonLaunchesPod(t *testing.T) {
 	}{
 		{
 			strategy:       newOnDeleteStrategy(),
-			expectedEvents: 1,
+			expectedEvents: 0,
 		},
 		{
 			strategy:       newRollbackStrategy(),
-			expectedEvents: 2,
+			expectedEvents: 0,
 		},
 	}
 
@@ -1835,9 +1827,9 @@ func TestInsufficientCapacityNodeDaemonLaunchesCriticalPod(t *testing.T) {
 		manager.dsStore.Add(ds)
 		switch strategy.Type {
 		case apps.OnDeleteDaemonSetStrategyType:
-			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 2)
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 		case apps.RollingUpdateDaemonSetStrategyType:
-			syncAndValidateDaemonSets(t, manager, ds, podControl, 0, 0, 3)
+			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 		default:
 			t.Fatalf("unexpected UpdateStrategy %+v", strategy)
 		}
@@ -1950,23 +1942,6 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 				shouldContinueRunning: true,
 			},
 			{
-				predicateName: "InsufficientResourceError",
-				ds: &apps.DaemonSet{
-					Spec: apps.DaemonSetSpec{
-						Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
-						Template: v1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
-								Labels: simpleDaemonSetLabel,
-							},
-							Spec: resourcePodSpec("", "200M", "0.5"),
-						},
-					},
-				},
-				wantToRun:             true,
-				shouldCreate:          shouldCreate,
-				shouldContinueRunning: true,
-			},
-			{
 				predicateName: "ErrPodNotMatchHostName",
 				ds: &apps.DaemonSet{
 					Spec: apps.DaemonSetSpec{
@@ -2017,35 +1992,7 @@ func TestNodeShouldRunDaemonPod(t *testing.T) {
 				shouldCreate:          shouldCreate,
 				shouldContinueRunning: shouldContinueRunning,
 			},
-			{
-				predicateName: "InsufficientResourceError",
-				podsOnNode: []*v1.Pod{
-					{
-						Spec: v1.PodSpec{
-							Containers: []v1.Container{{
-								Ports: []v1.ContainerPort{{
-									HostPort: 666,
-								}},
-								Resources: resourceContainerSpec("50M", "0.5"),
-							}},
-						},
-					},
-				},
-				ds: &apps.DaemonSet{
-					Spec: apps.DaemonSetSpec{
-						Selector: &metav1.LabelSelector{MatchLabels: simpleDaemonSetLabel},
-						Template: v1.PodTemplateSpec{
-							ObjectMeta: metav1.ObjectMeta{
-								Labels: simpleDaemonSetLabel,
-							},
-							Spec: resourcePodSpec("", "100M", "0.5"),
-						},
-					},
-				},
-				wantToRun:             true,
-				shouldCreate:          shouldCreate, // This is because we don't care about the resource constraints any more and let default scheduler handle it.
-				shouldContinueRunning: true,
-			},
+
 			{
 				predicateName: "ShouldRunDaemonPod",
 				podsOnNode: []*v1.Pod{
@@ -2288,45 +2235,6 @@ func TestUpdateNode(t *testing.T) {
 				ds:              newDaemonSet("ds"),
 				shouldEnqueue:   true,
 				expectedCreates: func() int { return 0 },
-			},
-			{
-				test:    "Node Allocatable changed",
-				oldNode: newNode("node1", nil),
-				newNode: func() *v1.Node {
-					node := newNode("node1", nil)
-					node.Status.Allocatable = allocatableResources("200M", "200m")
-					return node
-				}(),
-				ds: func() *apps.DaemonSet {
-					ds := newDaemonSet("ds")
-					ds.Spec.Template.Spec = resourcePodSpecWithoutNodeName("200M", "200m")
-					return ds
-				}(),
-				expectedEventsFunc: func(strategyType apps.DaemonSetUpdateStrategyType) int {
-					switch strategyType {
-					case apps.OnDeleteDaemonSetStrategyType:
-						if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
-							return 2
-						}
-						return 0
-					case apps.RollingUpdateDaemonSetStrategyType:
-						if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
-							return 3
-						}
-						return 0
-					default:
-						t.Fatalf("unexpected UpdateStrategy %+v", strategyType)
-					}
-					return 0
-				},
-				shouldEnqueue: !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods),
-				expectedCreates: func() int {
-					if !utilfeature.DefaultFeatureGate.Enabled(features.ScheduleDaemonSetPods) {
-						return 0
-					} else {
-						return 1
-					}
-				},
 			},
 		}
 		for _, c := range cases {

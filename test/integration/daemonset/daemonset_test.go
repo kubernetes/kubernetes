@@ -439,31 +439,6 @@ func validateDaemonSetStatus(
 	}
 }
 
-func validateFailedPlacementEvent(eventClient corev1client.EventInterface, t *testing.T) {
-	if err := wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		eventList, err := eventClient.List(metav1.ListOptions{})
-		if err != nil {
-			return false, err
-		}
-		if len(eventList.Items) == 0 {
-			return false, nil
-		}
-		if len(eventList.Items) > 1 {
-			t.Errorf("Expected 1 event got %d", len(eventList.Items))
-		}
-		event := eventList.Items[0]
-		if event.Type != v1.EventTypeWarning {
-			t.Errorf("Event type expected %s got %s", v1.EventTypeWarning, event.Type)
-		}
-		if event.Reason != daemon.FailedPlacementReason {
-			t.Errorf("Event reason expected %s got %s", daemon.FailedPlacementReason, event.Reason)
-		}
-		return true, nil
-	}); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func updateDS(t *testing.T, dsClient appstyped.DaemonSetInterface, dsName string, updateFunc func(*apps.DaemonSet)) *apps.DaemonSet {
 	var ds *apps.DaemonSet
 	if err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
@@ -689,46 +664,6 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 
 		validateDaemonSetPodsAndMarkReady(podClient, podInformer, 1, t)
 		validateDaemonSetStatus(dsClient, ds.Name, 1, t)
-	})
-}
-
-// When ScheduleDaemonSetPods is disabled, DaemonSets should not launch onto nodes with insufficient capacity.
-// Look for TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled, we don't need this test anymore.
-func TestInsufficientCapacityNodeDaemonDoesNotLaunchPod(t *testing.T) {
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.ScheduleDaemonSetPods, false)()
-	forEachStrategy(t, func(t *testing.T, strategy *apps.DaemonSetUpdateStrategy) {
-		server, closeFn, dc, informers, clientset := setup(t)
-		defer closeFn()
-		ns := framework.CreateTestingNamespace("insufficient-capacity", server, t)
-		defer framework.DeleteTestingNamespace(ns, server, t)
-
-		dsClient := clientset.AppsV1().DaemonSets(ns.Name)
-		nodeClient := clientset.CoreV1().Nodes()
-		eventClient := clientset.CoreV1().Events(ns.Namespace)
-
-		stopCh := make(chan struct{})
-		defer close(stopCh)
-
-		informers.Start(stopCh)
-		go dc.Run(5, stopCh)
-
-		ds := newDaemonSet("foo", ns.Name)
-		ds.Spec.Template.Spec = resourcePodSpec("node-with-limited-memory", "120M", "75m")
-		ds.Spec.UpdateStrategy = *strategy
-		_, err := dsClient.Create(ds)
-		if err != nil {
-			t.Fatalf("Failed to create DaemonSet: %v", err)
-		}
-		defer cleanupDaemonSets(t, clientset, ds)
-
-		node := newNode("node-with-limited-memory", nil)
-		node.Status.Allocatable = allocatableResources("100M", "200m")
-		_, err = nodeClient.Create(node)
-		if err != nil {
-			t.Fatalf("Failed to create node: %v", err)
-		}
-
-		validateFailedPlacementEvent(eventClient, t)
 	})
 }
 

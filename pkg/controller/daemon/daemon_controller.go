@@ -1352,15 +1352,12 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.
 		return false, false, false, err
 	}
 
-	// TODO(k82cn): When 'ScheduleDaemonSetPods' upgrade to beta or GA, remove unnecessary check on failure reason,
-	//              e.g. InsufficientResourceError; and simplify "wantToRun, shouldSchedule, shouldContinueRunning"
+	// TODO(k82cn): When 'ScheduleDaemonSetPods' upgrade to beta or GA, remove unnecessary check on failure reason;
+	//              and simplify "wantToRun, shouldSchedule, shouldContinueRunning"
 	//              into one result, e.g. selectedNode.
-	var insufficientResourceErr error
 	for _, r := range reasons {
 		klog.V(4).Infof("DaemonSet Predicates failed on node %s for ds '%s/%s' for reason: %v", node.Name, ds.ObjectMeta.Namespace, ds.ObjectMeta.Name, r.GetReason())
 		switch reason := r.(type) {
-		case *predicates.InsufficientResourceError:
-			insufficientResourceErr = reason
 		case *predicates.PredicateFailureError:
 			var emitEvent bool
 			// we try to partition predicates into two partitions here: intentional on the part of the operator and not.
@@ -1411,12 +1408,6 @@ func (dsc *DaemonSetsController) nodeShouldRunDaemonPod(node *v1.Node, ds *apps.
 				dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, reason.GetReason())
 			}
 		}
-	}
-	// only emit this event if insufficient resource is the only thing
-	// preventing the daemon pod from scheduling
-	if shouldSchedule && insufficientResourceErr != nil {
-		dsc.eventRecorder.Eventf(ds, v1.EventTypeWarning, FailedPlacementReason, "failed to place pod on %q: %s", node.ObjectMeta.Name, insufficientResourceErr.Error())
-		shouldSchedule = false
 	}
 	return
 }
