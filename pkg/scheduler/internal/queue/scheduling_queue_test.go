@@ -19,16 +19,17 @@ package queue
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	dto "github.com/prometheus/client_model/go"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/testutil"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
@@ -1250,10 +1251,11 @@ func TestPendingPodsMetric(t *testing.T) {
 		pInfos = append(pInfos, p)
 	}
 	tests := []struct {
-		name       string
-		operations []operation
-		operands   [][]*framework.PodInfo
-		expected   []int64
+		name        string
+		operations  []operation
+		operands    [][]*framework.PodInfo
+		metricsName string
+		wants       string
 	}{
 		{
 			name: "add pods to activeQ and unschedulableQ",
@@ -1265,7 +1267,14 @@ func TestPendingPodsMetric(t *testing.T) {
 				pInfos[:30],
 				pInfos[30:],
 			},
-			expected: []int64{30, 0, 20},
+			metricsName: "scheduler_pending_pods",
+			wants: `
+# HELP scheduler_pending_pods [ALPHA] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
+# TYPE scheduler_pending_pods gauge
+scheduler_pending_pods{queue="active"} 30
+scheduler_pending_pods{queue="backoff"} 0
+scheduler_pending_pods{queue="unschedulable"} 20
+`,
 		},
 		{
 			name: "add pods to all kinds of queues",
@@ -1281,7 +1290,14 @@ func TestPendingPodsMetric(t *testing.T) {
 				pInfos[15:40],
 				pInfos[40:],
 			},
-			expected: []int64{15, 25, 10},
+			metricsName: "scheduler_pending_pods",
+			wants: `
+# HELP scheduler_pending_pods [ALPHA] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
+# TYPE scheduler_pending_pods gauge
+scheduler_pending_pods{queue="active"} 15
+scheduler_pending_pods{queue="backoff"} 25
+scheduler_pending_pods{queue="unschedulable"} 10
+`,
 		},
 		{
 			name: "add pods to unschedulableQ and then move all to activeQ",
@@ -1293,7 +1309,14 @@ func TestPendingPodsMetric(t *testing.T) {
 				pInfos[:total],
 				{nil},
 			},
-			expected: []int64{int64(total), 0, 0},
+			metricsName: "scheduler_pending_pods",
+			wants: `
+# HELP scheduler_pending_pods [ALPHA] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
+# TYPE scheduler_pending_pods gauge
+scheduler_pending_pods{queue="active"} 50
+scheduler_pending_pods{queue="backoff"} 0
+scheduler_pending_pods{queue="unschedulable"} 0
+`,
 		},
 		{
 			name: "make some pods subject to backoff, add pods to unschedulableQ, and then move all to activeQ",
@@ -1307,7 +1330,14 @@ func TestPendingPodsMetric(t *testing.T) {
 				pInfos[:total],
 				{nil},
 			},
-			expected: []int64{int64(total - 20), 20, 0},
+			metricsName: "scheduler_pending_pods",
+			wants: `
+# HELP scheduler_pending_pods [ALPHA] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
+# TYPE scheduler_pending_pods gauge
+scheduler_pending_pods{queue="active"} 30
+scheduler_pending_pods{queue="backoff"} 20
+scheduler_pending_pods{queue="unschedulable"} 0
+`,
 		},
 		{
 			name: "make some pods subject to backoff, add pods to unschedulableQ/activeQ, move all to activeQ, and finally flush backoffQ",
@@ -1325,7 +1355,14 @@ func TestPendingPodsMetric(t *testing.T) {
 				{nil},
 				{nil},
 			},
-			expected: []int64{int64(total), 0, 0},
+			metricsName: "scheduler_pending_pods",
+			wants: `
+# HELP scheduler_pending_pods [ALPHA] Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.
+# TYPE scheduler_pending_pods gauge
+scheduler_pending_pods{queue="active"} 50
+scheduler_pending_pods{queue="backoff"} 0
+scheduler_pending_pods{queue="unschedulable"} 0
+`,
 		},
 	}
 
@@ -1345,30 +1382,8 @@ func TestPendingPodsMetric(t *testing.T) {
 				}
 			}
 
-			var activeNum, backoffNum, unschedulableNum float64
-			metricProto := &dto.Metric{}
-			if err := metrics.ActivePods().Write(metricProto); err != nil {
-				t.Errorf("error writing ActivePods metric: %v", err)
-			}
-			activeNum = metricProto.Gauge.GetValue()
-			if int64(activeNum) != test.expected[0] {
-				t.Errorf("ActivePods: Expected %v, got %v", test.expected[0], activeNum)
-			}
-
-			if err := metrics.BackoffPods().Write(metricProto); err != nil {
-				t.Errorf("error writing BackoffPods metric: %v", err)
-			}
-			backoffNum = metricProto.Gauge.GetValue()
-			if int64(backoffNum) != test.expected[1] {
-				t.Errorf("BackoffPods: Expected %v, got %v", test.expected[1], backoffNum)
-			}
-
-			if err := metrics.UnschedulablePods().Write(metricProto); err != nil {
-				t.Errorf("error writing UnschedulablePods metric: %v", err)
-			}
-			unschedulableNum = metricProto.Gauge.GetValue()
-			if int64(unschedulableNum) != test.expected[2] {
-				t.Errorf("UnschedulablePods: Expected %v, got %v", test.expected[2], unschedulableNum)
+			if err := testutil.GatherAndCompare(metrics.GetGather(), strings.NewReader(test.wants), test.metricsName); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

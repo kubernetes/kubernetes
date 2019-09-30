@@ -253,6 +253,11 @@ func Register() {
 	})
 }
 
+// GetGather returns the gatherer. It used by test case outside current package.
+func GetGather() metrics.Gatherer {
+	return legacyregistry.DefaultGatherer
+}
+
 // ActivePods returns the pending pods metrics with the label active
 func ActivePods() metrics.GaugeMetric {
 	return pendingPods.With(metrics.Labels{"queue": "active"})
