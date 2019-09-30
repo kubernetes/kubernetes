@@ -78,19 +78,21 @@ func (t *azureDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume *v1.Vol
 				CSI: &v1.CSIPersistentVolumeSource{
 					Driver:           AzureDiskDriverName,
 					VolumeHandle:     azureSource.DataDiskURI,
-					ReadOnly:         *azureSource.ReadOnly,
-					FSType:           *azureSource.FSType,
 					VolumeAttributes: map[string]string{azureDiskKind: "Managed"},
 				},
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 		},
 	}
+	if azureSource.ReadOnly != nil {
+		pv.Spec.PersistentVolumeSource.CSI.ReadOnly = *azureSource.ReadOnly
+	}
 
-	if *azureSource.CachingMode != "" {
+	if azureSource.CachingMode != nil && *azureSource.CachingMode != "" {
 		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskCachingMode] = string(*azureSource.CachingMode)
 	}
-	if *azureSource.FSType != "" {
+	if azureSource.FSType != nil {
+		pv.Spec.PersistentVolumeSource.CSI.FSType = *azureSource.FSType
 		pv.Spec.PersistentVolumeSource.CSI.VolumeAttributes[azureDiskFSType] = *azureSource.FSType
 	}
 	if azureSource.Kind != nil {
