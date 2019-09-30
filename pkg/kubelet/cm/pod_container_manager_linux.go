@@ -157,16 +157,22 @@ func (m *podContainerManagerImpl) tryKillingCgroupProcesses(podCgroup CgroupName
 	var errlist []error
 	// os.Kill often errors out,
 	// We try killing all the pids multiple times
+	removed := map[int]bool{}
 	for i := 0; i < 5; i++ {
 		if i != 0 {
 			klog.V(3).Infof("Attempt %v failed to kill all unwanted process. Retyring", i)
 		}
 		errlist = []error{}
 		for _, pid := range pidsToKill {
+			if _, ok := removed[pid]; ok {
+				continue
+			}
 			klog.V(3).Infof("Attempt to kill process with pid: %v", pid)
 			if err := m.killOnePid(pid); err != nil {
 				klog.V(3).Infof("failed to kill process with pid: %v", pid)
 				errlist = append(errlist, err)
+			} else {
+				removed[pid] = true
 			}
 		}
 		if len(errlist) == 0 {
