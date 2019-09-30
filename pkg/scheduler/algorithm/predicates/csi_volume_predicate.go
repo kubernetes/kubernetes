@@ -67,7 +67,7 @@ func NewCSIMaxVolumeLimitPredicate(
 	return c.attachableLimitPredicate
 }
 
-func (c *CSIMaxVolumeLimitChecker) getVolumeLimits(nodeInfo *schedulernodeinfo.NodeInfo, csiNode *storagev1beta1.CSINode) map[v1.ResourceName]int64 {
+func getVolumeLimits(nodeInfo *schedulernodeinfo.NodeInfo, csiNode *storagev1beta1.CSINode) map[v1.ResourceName]int64 {
 	// TODO: stop getting values from Node object in v1.18
 	nodeVolumeLimits := nodeInfo.VolumeLimits()
 	if csiNode != nil {
@@ -117,7 +117,7 @@ func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
 	}
 
 	// If the node doesn't have volume limits, the predicate will always be true
-	nodeVolumeLimits := c.getVolumeLimits(nodeInfo, csiNode)
+	nodeVolumeLimits := getVolumeLimits(nodeInfo, csiNode)
 	if len(nodeVolumeLimits) == 0 {
 		return true, nil, nil
 	}
