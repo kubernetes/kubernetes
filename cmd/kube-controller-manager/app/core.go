@@ -37,6 +37,7 @@ import (
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	csitrans "k8s.io/csi-translation-lib"
+	genericcontrollermanager "k8s.io/kubernetes/cmd/controller-manager/app"
 	"k8s.io/kubernetes/pkg/controller"
 	cloudcontroller "k8s.io/kubernetes/pkg/controller/cloud"
 	endpointcontroller "k8s.io/kubernetes/pkg/controller/endpoint"
@@ -91,25 +92,9 @@ func startNodeIpamController(ctx ControllerContext) (http.Handler, bool, error) 
 		return nil, false, nil
 	}
 
-	// failure: bad cidrs in config
-	clusterCIDRs, dualStack, err := processCIDRs(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
+	clusterCIDRs, err := genericcontrollermanager.ParseClusterCIDRs(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
 	if err != nil {
 		return nil, false, err
-	}
-
-	// failure: more than one cidr and dual stack is not enabled
-	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
-		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack feature is not enabled", len(clusterCIDRs))
-	}
-
-	// failure: more than one cidr but they are not configured as dual stack
-	if len(clusterCIDRs) > 1 && !dualStack {
-		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and they are not configured as dual stack (at least one from each IPFamily", len(clusterCIDRs))
-	}
-
-	// failure: more than cidrs is not allowed even with dual stack
-	if len(clusterCIDRs) > 2 {
-		return nil, false, fmt.Errorf("len of clusters is:%v > more than max allowed of 2", len(clusterCIDRs))
 	}
 
 	// service cidr processing
@@ -212,6 +197,12 @@ func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
 		klog.Infof("Will not configure cloud provider routes for allocate-node-cidrs: %v, configure-cloud-routes: %v.", ctx.ComponentConfig.KubeCloudShared.AllocateNodeCIDRs, ctx.ComponentConfig.KubeCloudShared.ConfigureCloudRoutes)
 		return nil, false, nil
 	}
+
+	clusterCIDRs, err := genericcontrollermanager.ParseClusterCIDRs(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
+	if err != nil {
+		return nil, false, err
+	}
+
 	if ctx.Cloud == nil {
 		klog.Warning("configure-cloud-routes is set, but no cloud provider specified. Will not configure cloud provider routes.")
 		return nil, false, nil
@@ -220,27 +211,6 @@ func startRouteController(ctx ControllerContext) (http.Handler, bool, error) {
 	if !ok {
 		klog.Warning("configure-cloud-routes is set, but cloud provider does not support routes. Will not configure cloud provider routes.")
 		return nil, false, nil
-	}
-
-	// failure: bad cidrs in config
-	clusterCIDRs, dualStack, err := processCIDRs(ctx.ComponentConfig.KubeCloudShared.ClusterCIDR)
-	if err != nil {
-		return nil, false, err
-	}
-
-	// failure: more than one cidr and dual stack is not enabled
-	if len(clusterCIDRs) > 1 && !utilfeature.DefaultFeatureGate.Enabled(kubefeatures.IPv6DualStack) {
-		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and dualstack feature is not enabled", len(clusterCIDRs))
-	}
-
-	// failure: more than one cidr but they are not configured as dual stack
-	if len(clusterCIDRs) > 1 && !dualStack {
-		return nil, false, fmt.Errorf("len of ClusterCIDRs==%v and they are not configured as dual stack (at least one from each IPFamily", len(clusterCIDRs))
-	}
-
-	// failure: more than cidrs is not allowed even with dual stack
-	if len(clusterCIDRs) > 2 {
-		return nil, false, fmt.Errorf("length of clusterCIDRs is:%v more than max allowed of 2", len(clusterCIDRs))
 	}
 
 	routeController := routecontroller.New(routes,
@@ -513,23 +483,4 @@ func startTTLAfterFinishedController(ctx ControllerContext) (http.Handler, bool,
 		ctx.ClientBuilder.ClientOrDie("ttl-after-finished-controller"),
 	).Run(int(ctx.ComponentConfig.TTLAfterFinishedController.ConcurrentTTLSyncs), ctx.Stop)
 	return nil, true, nil
-}
-
-// processCIDRs is a helper function that works on a comma separated cidrs and returns
-// a list of typed cidrs
-// a flag if cidrs represents a dual stack
-// error if failed to parse any of the cidrs
-func processCIDRs(cidrsList string) ([]*net.IPNet, bool, error) {
-	cidrsSplit := strings.Split(strings.TrimSpace(cidrsList), ",")
-
-	cidrs, err := netutils.ParseCIDRs(cidrsSplit)
-	if err != nil {
-		return nil, false, err
-	}
-
-	// if cidrs has an error then the previous call will fail
-	// safe to ignore error checking on next call
-	dualstack, _ := netutils.IsDualStackCIDRs(cidrs)
-
-	return cidrs, dualstack, nil
 }
