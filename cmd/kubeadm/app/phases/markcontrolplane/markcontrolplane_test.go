@@ -24,7 +24,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
@@ -138,14 +138,9 @@ func TestMarkControlPlane(t *testing.T) {
 			s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 
-				if req.URL.Path != "/api/v1/nodes/"+hostname {
-					t.Errorf("MarkControlPlane(%s): request for unexpected HTTP resource: %v", tc.name, req.URL.Path)
-					http.Error(w, "", http.StatusNotFound)
-					return
-				}
-
 				switch req.Method {
 				case "GET":
+				case "POST":
 				case "PATCH":
 					patchRequest = toString(req.Body)
 				default:
