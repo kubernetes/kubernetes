@@ -72,7 +72,7 @@ func TestStaticPolicyStart(t *testing.T) {
 			description: "non-corrupted state",
 			topo:        topoDualSocketHT,
 			stAssignments: state.ContainerCPUAssignments{
-				"0": cpuset.NewCPUSet(0),
+				"container0": cpuset.NewCPUSet(0),
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expCSet:         cpuset.NewCPUSet(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
@@ -89,7 +89,7 @@ func TestStaticPolicyStart(t *testing.T) {
 			description:     "reserved cores 0 & 6 are not present in available cpuset",
 			topo:            topoDualSocketHT,
 			numReservedCPUs: 2,
-			stAssignments:   state.ContainerCPUAssignments{},
+			stAssignments:   state.ContainerCPUAssignments{"container0": cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11)},
 			stDefaultCPUSet: cpuset.NewCPUSet(0, 1),
 			expPanic:        true,
 		},
@@ -103,24 +103,26 @@ func TestStaticPolicyStart(t *testing.T) {
 			expPanic:        true,
 		},
 		{
-			description: "core 12 is not present in topology but is in state cpuset",
+			description: "core 12 is not present in topology but is in state cpuset, reset state",
 			topo:        topoDualSocketHT,
 			stAssignments: state.ContainerCPUAssignments{
 				"0": cpuset.NewCPUSet(0, 1, 2),
 				"1": cpuset.NewCPUSet(3, 4),
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(5, 6, 7, 8, 9, 10, 11, 12),
-			expPanic:        true,
+			expPanic:        false,
+			expCSet:         cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 		{
-			description: "core 11 is present in topology but is not in state cpuset",
+			description: "core 11 is present in topology but is not in state cpuset, reset state",
 			topo:        topoDualSocketHT,
 			stAssignments: state.ContainerCPUAssignments{
 				"0": cpuset.NewCPUSet(0, 1, 2),
 				"1": cpuset.NewCPUSet(3, 4),
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(5, 6, 7, 8, 9, 10),
-			expPanic:        true,
+			expPanic:        false,
+			expCSet:         cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 	}
 	for _, testCase := range testCases {
@@ -877,7 +879,7 @@ func TestStaticPolicyStartWithResvList(t *testing.T) {
 			numReservedCPUs: 2,
 			reserved:        cpuset.NewCPUSet(0, 1),
 			stAssignments:   state.ContainerCPUAssignments{},
-			stDefaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5),
+			stDefaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expPanic:        true,
 		},
 		{

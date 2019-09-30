@@ -122,9 +122,37 @@ func (p *staticPolicy) Name() string {
 }
 
 func (p *staticPolicy) Start(s state.State) {
+	p.refreshCPUSet(s)
 	if err := p.validateState(s); err != nil {
 		klog.Errorf("[cpumanager] static policy invalid state: %s\n", err.Error())
 		panic("[cpumanager] - please drain node and remove policy state file")
+	}
+}
+
+func (p *staticPolicy) refreshCPUSet(s state.State) {
+	// 1. Handle the case that more CPU cores were added during kubelet restart, eg, user changes the VM spec
+	topo := p.topology
+	assignments := s.GetCPUAssignments()
+	preCPUSet := s.GetDefaultCPUSet().Union(assignments.CPUSet())
+	preCPUSet = preCPUSet.Union(p.reserved)
+	numCPUs := preCPUSet.Size()
+	if topo.NumCPUs != numCPUs {
+		if topo.NumCPUs > numCPUs {
+			// Adding more CPUs is always safe, and cpu manager is supposed
+			// to be able to allocate cpu for all existing containers
+			klog.Infof("CPU topology has changed and more CPUs were added, "+
+				"previous CPUs: %d, current CPUs: %d", numCPUs, topo.NumCPUs)
+		} else {
+			// Shrinking the CPUs is somehow error-prune, some containers may
+			// not able to start up due to insufficient CPUs
+			// we allow for kubelet startup so that user are able to remove failed
+			// container instead of manipulating the cpu manager state file
+			klog.Warningf("CPU topology has changed and some CPUs were removed"+
+				"some containers may failed to startup, previous CPUs: %d, current CPUs: %d", numCPUs, topo.NumCPUs)
+		}
+		klog.Infof("clearing cpu manager state file due to CPU topology changed.")
+		s.ClearState()
+		s.SetDefaultCPUSet(topo.CPUDetails.CPUs())
 	}
 }
 

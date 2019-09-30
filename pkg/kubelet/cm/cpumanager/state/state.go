@@ -32,6 +32,15 @@ func (as ContainerCPUAssignments) Clone() ContainerCPUAssignments {
 	return ret
 }
 
+// CPUSet merges the assignments into a cpuset
+func (as ContainerCPUAssignments) CPUSet() cpuset.CPUSet {
+	assignedCpuset := cpuset.NewCPUSet()
+	for _, cs := range as {
+		assignedCpuset = assignedCpuset.Union(cs)
+	}
+	return assignedCpuset
+}
+
 // Reader interface used to read current cpu/pod assignment state
 type Reader interface {
 	GetCPUSet(containerID string) (cpuset.CPUSet, bool)
