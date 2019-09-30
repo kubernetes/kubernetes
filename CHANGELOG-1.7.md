@@ -571,8 +571,6 @@ filename | sha256 hash
 * fix azure disk storage account init issue ([#55927](https://github.com/kubernetes/kubernetes/pull/55927), [@andyzhangx](https://github.com/andyzhangx))
 * Fixes a bug where if an error was returned that was not an `autorest.DetailedError` we would return `"not found", nil` which caused nodes to go to `NotReady` state. ([#57484](https://github.com/kubernetes/kubernetes/pull/57484), [@brendandburns](https://github.com/brendandburns))
 * Retry 'connection refused' errors when setting up clusters on GCE. ([#57394](https://github.com/kubernetes/kubernetes/pull/57394), [@mborsz](https://github.com/mborsz))
-* Retry 'connection refused' errors when setting up clusters on GCE. ([#57394](https://github.com/kubernetes/kubernetes/pull/57394), [@mborsz](https://github.com/mborsz))
-* Retry 'connection refused' errors when setting up clusters on GCE. ([#57394](https://github.com/kubernetes/kubernetes/pull/57394), [@mborsz](https://github.com/mborsz))
 * Fix a problem of not respecting TerminationGracePeriodSeconds of the Pods created by DaemonSet controller. ([#51279](https://github.com/kubernetes/kubernetes/pull/51279), [@kow3ns](https://github.com/kow3ns))
 * BUG FIX: Check both name and ports for azure health probes ([#56918](https://github.com/kubernetes/kubernetes/pull/56918), [@feiskyer](https://github.com/feiskyer))
 * Provides compatibility of fields SizeLimit in types.EmptyDirVolumeSource since v1.7.8 ([#56505](https://github.com/kubernetes/kubernetes/pull/56505), [@yue9944882](https://github.com/yue9944882))
