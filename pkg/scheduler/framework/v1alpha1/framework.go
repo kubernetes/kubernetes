@@ -297,14 +297,14 @@ func (f *framework) RunPreFilterPlugins(
 	return nil
 }
 
-// RunPreFilterUpdaterAddPod calls the AddPod interface for the set of configured
+// RunPreFilterExtensionAddPod calls the AddPod interface for the set of configured
 // PreFilter plugins. It returns directly if any of the plugins return any
 // status other than Success.
-func (f *framework) RunPreFilterUpdaterAddPod(pc *PluginContext, podToSchedule *v1.Pod,
+func (f *framework) RunPreFilterExtensionAddPod(pc *PluginContext, podToSchedule *v1.Pod,
 	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	for _, pl := range f.preFilterPlugins {
-		if updater := pl.Updater(); updater != nil {
-			status := updater.AddPod(pc, podToSchedule, podToAdd, nodeInfo)
+		if extensions := pl.Extensions(); extensions != nil {
+			status := extensions.AddPod(pc, podToSchedule, podToAdd, nodeInfo)
 			if !status.IsSuccess() {
 				msg := fmt.Sprintf("error while running AddPod for plugin %q while scheduling pod %q: %v",
 					pl.Name(), podToSchedule.Name, status.Message())
@@ -317,14 +317,14 @@ func (f *framework) RunPreFilterUpdaterAddPod(pc *PluginContext, podToSchedule *
 	return nil
 }
 
-// RunPreFilterUpdaterRemovePod calls the RemovePod interface for the set of configured
+// RunPreFilterExtensionRemovePod calls the RemovePod interface for the set of configured
 // PreFilter plugins. It returns directly if any of the plugins return any
 // status other than Success.
-func (f *framework) RunPreFilterUpdaterRemovePod(pc *PluginContext, podToSchedule *v1.Pod,
+func (f *framework) RunPreFilterExtensionRemovePod(pc *PluginContext, podToSchedule *v1.Pod,
 	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	for _, pl := range f.preFilterPlugins {
-		if updater := pl.Updater(); updater != nil {
-			status := updater.RemovePod(pc, podToSchedule, podToRemove, nodeInfo)
+		if extension := pl.Extensions(); extension != nil {
+			status := extension.RemovePod(pc, podToSchedule, podToRemove, nodeInfo)
 			if !status.IsSuccess() {
 				msg := fmt.Sprintf("error while running RemovePod for plugin %q while scheduling pod %q: %v",
 					pl.Name(), podToSchedule.Name, status.Message())
@@ -417,11 +417,13 @@ func (f *framework) RunScorePlugins(pc *PluginContext, pod *v1.Pod, nodes []*v1.
 	workqueue.ParallelizeUntil(ctx, 16, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
 		nodeScoreList := pluginToNodeScores[pl.Name()]
-		status := pl.NormalizeScore(pc, pod, nodeScoreList)
-		if !status.IsSuccess() {
-			err := fmt.Errorf("normalize score plugin %q failed with error %v", pl.Name(), status.Message())
-			errCh.SendErrorWithCancel(err, cancel)
-			return
+		if extensions := pl.Extensions(); extensions != nil {
+			status := extensions.NormalizeScore(pc, pod, nodeScoreList)
+			if !status.IsSuccess() {
+				err := fmt.Errorf("normalize score plugin %q failed with error %v", pl.Name(), status.Message())
+				errCh.SendErrorWithCancel(err, cancel)
+				return
+			}
 		}
 	})
 	if err := errCh.ReceiveError(); err != nil {
