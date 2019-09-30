@@ -2130,6 +2130,7 @@ function create-node-template() {
   local template_name="$1"
   local metadata_values="$4"
   local os="$5"
+  local machine_type="$6"
 
   # First, ensure the template doesn't exist.
   # TODO(zmerlynn): To make this really robust, we need to parse the output and
@@ -2216,7 +2217,7 @@ function create-node-template() {
     if ! ${gcloud} compute instance-templates create \
       "${template_name}" \
       --project "${PROJECT}" \
-      --machine-type "${NODE_SIZE}" \
+      --machine-type "${machine_type}" \
       --boot-disk-type "${NODE_DISK_TYPE}" \
       --boot-disk-size "${NODE_DISK_SIZE}" \
       ${node_image_flags} \
@@ -3068,6 +3069,10 @@ function create-nodes-template() {
   local windows_template_name="${WINDOWS_NODE_INSTANCE_PREFIX}-template"
   create-linux-node-instance-template $linux_template_name
   create-windows-node-instance-template $windows_template_name "${scope_flags[*]}"
+  if [[ -n "${ADDITIONAL_MACHINE_TYPE:-}" ]]; then
+    local linux_extra_template_name="${NODE_INSTANCE_PREFIX}-extra-template"
+    create-linux-node-instance-template $linux_extra_template_name "${ADDITIONAL_MACHINE_TYPE}"
+  fi
 }
 
 # Assumes:
@@ -3096,13 +3101,38 @@ function set_num_migs() {
 # - ZONE
 function create-linux-nodes() {
   local template_name="${NODE_INSTANCE_PREFIX}-template"
+  local extra_template_name="${NODE_INSTANCE_PREFIX}-extra-template"
 
-  if [[ -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
-    local -r nodes="${NUM_NODES}"
-  else
+  local nodes="${NUM_NODES}"
+  if [[ ! -z "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
     echo "Creating a special node for heapster with machine-type ${HEAPSTER_MACHINE_TYPE}"
     create-heapster-node
-    local -r nodes=$(( NUM_NODES - 1 ))
+    nodes=$(( nodes - 1 ))
+  fi
+
+  if [[ -n "${ADDITIONAL_MACHINE_TYPE:-}" && "${NUM_ADDITIONAL_NODES:-}" -gt 0 ]]; then
+    local num_additional="${NUM_ADDITIONAL_NODES}"
+    if [[ "${NUM_ADDITIONAL_NODES:-}" -gt "${nodes}" ]]; then
+      echo "Capping NUM_ADDITIONAL_NODES to ${nodes}"
+      num_additional="${nodes}"
+    fi
+    if [[ "${num_additional:-}" -gt 0 ]]; then
+      echo "Creating ${num_additional} special nodes with machine-type ${ADDITIONAL_MACHINE_TYPE}"
+      local extra_group_name="${NODE_INSTANCE_PREFIX}-extra"
+      gcloud compute instance-groups managed \
+          create "${extra_group_name}" \
+          --project "${PROJECT}" \
+          --zone "${ZONE}" \
+          --base-instance-name "${extra_group_name}" \
+          --size "${num_additional}" \
+          --template "${extra_template_name}" || true;
+      gcloud compute instance-groups managed wait-until-stable \
+          "${extra_group_name}" \
+          --zone "${ZONE}" \
+          --project "${PROJECT}" \
+          --timeout "${MIG_WAIT_UNTIL_STABLE_TIMEOUT}" || true
+      nodes=$(( nodes - $num_additional ))
+    fi
   fi
 
   local instances_left=${nodes}
@@ -3414,13 +3444,15 @@ function kube-down() {
 
     local all_instance_groups=(${INSTANCE_GROUPS[@]:-} ${WINDOWS_INSTANCE_GROUPS[@]:-})
     for group in ${all_instance_groups[@]:-}; do
-      if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
-        gcloud compute instance-groups managed delete \
-          --project "${PROJECT}" \
-          --quiet \
-          --zone "${ZONE}" \
-          "${group}" &
-      fi
+      {
+        if gcloud compute instance-groups managed describe "${group}" --project "${PROJECT}" --zone "${ZONE}" &>/dev/null; then
+          gcloud compute instance-groups managed delete \
+            --project "${PROJECT}" \
+            --quiet \
+            --zone "${ZONE}" \
+            "${group}"
+        fi
+      } &
     done
 
     # Wait for last batch of jobs
@@ -3429,13 +3461,20 @@ function kube-down() {
     }
 
     for template in ${templates[@]:-}; do
-      if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
-        gcloud compute instance-templates delete \
-          --project "${PROJECT}" \
-          --quiet \
-          "${template}"
-      fi
+      {
+        if gcloud compute instance-templates describe --project "${PROJECT}" "${template}" &>/dev/null; then
+          gcloud compute instance-templates delete \
+            --project "${PROJECT}" \
+            --quiet \
+            "${template}"
+        fi
+      } &
     done
+
+    # Wait for last batch of jobs
+    kube::util::wait-for-jobs || {
+      echo -e "Failed to delete instance template(s)." >&2
+    }
 
     # Delete the special heapster node (if it exists).
     if [[ -n "${HEAPSTER_MACHINE_TYPE:-}" ]]; then
@@ -3717,7 +3756,7 @@ function set-replica-name() {
 #
 # $1: project
 function get-template() {
-  local linux_filter="${NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?"
+  local linux_filter="${NODE_INSTANCE_PREFIX}-(extra-)?template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?"
   local windows_filter="${WINDOWS_NODE_INSTANCE_PREFIX}-template(-(${KUBE_RELEASE_VERSION_DASHED_REGEX}|${KUBE_CI_VERSION_DASHED_REGEX}))?"
 
   gcloud compute instance-templates list \
