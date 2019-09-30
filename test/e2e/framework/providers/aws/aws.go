@@ -99,6 +99,29 @@ func (p *Provider) CreatePD(zone string) (string, error) {
 	request.AvailabilityZone = aws.String(zone)
 	request.Size = aws.Int64(10)
 	request.VolumeType = aws.String(awscloud.DefaultVolumeType)
+
+	// We need to tag the volume so that locked-down IAM configurations can still mount it
+	if framework.TestContext.CloudConfig.ClusterTag != "" {
+		clusterID := framework.TestContext.CloudConfig.ClusterTag
+
+		legacyTag := &ec2.Tag{
+			Key:   aws.String(awscloud.TagNameKubernetesClusterLegacy),
+			Value: aws.String(clusterID),
+		}
+
+		newTag := &ec2.Tag{
+			Key:   aws.String(awscloud.TagNameKubernetesClusterPrefix + clusterID),
+			Value: aws.String(awscloud.ResourceLifecycleOwned),
+		}
+
+		tagSpecification := &ec2.TagSpecification{
+			ResourceType: aws.String(ec2.ResourceTypeVolume),
+			Tags:         []*ec2.Tag{legacyTag, newTag},
+		}
+
+		request.TagSpecifications = append(request.TagSpecifications, tagSpecification)
+	}
+
 	response, err := client.CreateVolume(request)
 	if err != nil {
 		return "", err
