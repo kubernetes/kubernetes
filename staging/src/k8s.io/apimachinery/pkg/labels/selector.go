@@ -128,7 +128,7 @@ type Requirement struct {
 // (4) If the operator is Exists or DoesNotExist, the value set must be empty.
 // (5) If the operator is Gt or Lt, the values set must contain only one value, which will be interpreted as an integer.
 // (6) The key is invalid due to its length, or sequence
-//     of characters. See validateLabelKey for more details.
+// of characters. See validateLabelKey for more details.
 //
 // The empty string is a valid value in the input values set.
 func NewRequirement(key string, op selection.Operator, vals []string) (*Requirement, error) {
