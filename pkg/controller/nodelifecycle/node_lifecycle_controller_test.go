@@ -91,7 +91,11 @@ func (nc *nodeLifecycleController) doEviction(fakeNodeHandler *testutil.FakeNode
 	for _, zone := range zones {
 		nc.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 			uid, _ := value.UID.(string)
-			nodeutil.DeletePods(fakeNodeHandler, nc.recorder, value.Value, uid, nc.daemonSetStore)
+			pods, err := listPodsFromNode(fakeNodeHandler, value.Value)
+			if err != nil {
+				return false, 0
+			}
+			nodeutil.DeletePods(fakeNodeHandler, pods, nc.recorder, value.Value, uid, nc.daemonSetStore)
 			return true, 0
 		})
 	}
@@ -693,7 +697,11 @@ func TestMonitorNodeHealthEvictPods(t *testing.T) {
 			if _, ok := nodeController.zonePodEvictor[zone]; ok {
 				nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 					nodeUID, _ := value.UID.(string)
-					nodeutil.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister())
+					pods, err := listPodsFromNode(item.fakeNodeHandler, value.Value)
+					if err != nil {
+						t.Errorf("unexpected error: %v", err)
+					}
+					nodeutil.DeletePods(item.fakeNodeHandler, pods, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetInformer.Lister())
 					return true, 0
 				})
 			} else {
@@ -846,7 +854,11 @@ func TestPodStatusChange(t *testing.T) {
 		for _, zone := range zones {
 			nodeController.zonePodEvictor[zone].Try(func(value scheduler.TimedValue) (bool, time.Duration) {
 				nodeUID, _ := value.UID.(string)
-				nodeutil.DeletePods(item.fakeNodeHandler, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetStore)
+				pods, err := listPodsFromNode(item.fakeNodeHandler, value.Value)
+				if err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				nodeutil.DeletePods(item.fakeNodeHandler, pods, nodeController.recorder, value.Value, nodeUID, nodeController.daemonSetStore)
 				return true, 0
 			})
 		}
