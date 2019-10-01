@@ -859,13 +859,30 @@ func (j *TestJig) CheckServiceReachability(namespace string, svc *v1.Service, po
 	}
 }
 
-// CreateServicePods creates a replication controller with the label same as service
+// CreateServicePods creates a replication controller with the label same as service. Service listens to HTTP.
 func (j *TestJig) CreateServicePods(c clientset.Interface, ns string, replica int) {
 	config := testutils.RCConfig{
 		Client:       c,
 		Name:         j.Name,
 		Image:        framework.ServeHostnameImage,
 		Command:      []string{"/agnhost", "serve-hostname"},
+		Namespace:    ns,
+		Labels:       j.Labels,
+		PollInterval: 3 * time.Second,
+		Timeout:      framework.PodReadyBeforeTimeout,
+		Replicas:     replica,
+	}
+	err := framework.RunRC(config)
+	framework.ExpectNoError(err, "Replica must be created")
+}
+
+// CreateTCPUDPServicePods creates a replication controller with the label same as service. Service listens to TCP and UDP.
+func (j *TestJig) CreateTCPUDPServicePods(c clientset.Interface, ns string, replica int) {
+	config := testutils.RCConfig{
+		Client:       c,
+		Name:         j.Name,
+		Image:        framework.ServeHostnameImage,
+		Command:      []string{"/agnhost", "serve-hostname", "--http=false", "--tcp", "--udp"},
 		Namespace:    ns,
 		Labels:       j.Labels,
 		PollInterval: 3 * time.Second,

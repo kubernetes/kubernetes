@@ -932,11 +932,12 @@ var _ = SIGDescribe("Services", func() {
 
 	/*
 		Testname: Service, update NodePort, same port different protocol
-		Description: Create a service of type ClusterIP to accept TCP requests. Service creation MUST be successful by assigning ClusterIP to the service.
-		When service type is updated to NodePort to support two protocols i.e. TCP and UDP for same assigned service port 80, service update MUST be successful by allocating two NodePorts to the service.
-		TODO: Test Service reachability, good to include this check in Conformance perspective.
+		Description: Create a service to accept TCP requests. By default, created service MUST be of type ClusterIP and an ClusterIP MUST be assigned to the service.
+		When service type is updated to NodePort supporting TCP protocol, it MUST be reachable on nodeIP over allocated NodePort to serve TCP requests.
+		When this NodePort service is updated to use two protocols i.e. TCP and UDP for same assigned service port 80, service update MUST be successful by allocating two NodePorts to the service and
+		service MUST be able to serve both TCP and UDP requests over same service port 80.
 	*/
-	ginkgo.It("should be able to update NodePorts with two same port numbers but different protocols", func() {
+	ginkgo.It("should be able to update service type to NodePort listening on same port number but different protocols", func() {
 		serviceName := "nodeport-update-service"
 		ns := f.Namespace.Name
 		jig := e2eservice.NewTestJig(cs, serviceName)
@@ -949,36 +950,50 @@ var _ = SIGDescribe("Services", func() {
 			framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 		}()
 		jig.SanityCheckService(tcpService, v1.ServiceTypeClusterIP)
-		svcPort := int(tcpService.Spec.Ports[0].Port)
-		framework.Logf("service port TCP: %d", svcPort)
+		framework.Logf("Service Port TCP: %v", tcpService.Spec.Ports[0].Port)
 
-		// Change the services to NodePort and add a UDP port.
-		ginkgo.By("changing the TCP service to type=NodePort and add a UDP port")
-		newService := jig.UpdateServiceOrFail(ns, tcpService.Name, func(s *v1.Service) {
+		ginkgo.By("changing the TCP service to type=NodePort")
+		nodePortService := jig.UpdateServiceOrFail(ns, tcpService.Name, func(s *v1.Service) {
 			s.Spec.Type = v1.ServiceTypeNodePort
 			s.Spec.Ports = []v1.ServicePort{
 				{
-					Name:     "tcp-port",
-					Port:     80,
-					Protocol: v1.ProtocolTCP,
-				},
-				{
-					Name:     "udp-port",
-					Port:     80,
-					Protocol: v1.ProtocolUDP,
+					Name:       "tcp-port",
+					Port:       80,
+					Protocol:   v1.ProtocolTCP,
+					TargetPort: intstr.FromInt(9376),
 				},
 			}
 		})
-		jig.SanityCheckService(newService, v1.ServiceTypeNodePort)
-		if len(newService.Spec.Ports) != 2 {
-			framework.Failf("new service should have two Ports")
-		}
-		for _, port := range newService.Spec.Ports {
-			if port.NodePort == 0 {
-				framework.Failf("new service failed to allocate NodePort for Port %s", port.Name)
-			}
 
-			framework.Logf("new service allocates NodePort %d for Port %s", port.NodePort, port.Name)
+		jig.CreateTCPUDPServicePods(cs, ns, 2)
+		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
+		jig.CheckServiceReachability(ns, nodePortService, execPod)
+
+		ginkgo.By("Updating NodePort service to listen TCP and UDP based requests over same Port")
+		nodePortService = jig.UpdateServiceOrFail(ns, tcpService.Name, func(s *v1.Service) {
+			s.Spec.Type = v1.ServiceTypeNodePort
+			s.Spec.Ports = []v1.ServicePort{
+				{
+					Name:       "tcp-port",
+					Port:       80,
+					Protocol:   v1.ProtocolTCP,
+					TargetPort: intstr.FromInt(9376),
+				},
+				{
+					Name:       "udp-port",
+					Port:       80,
+					Protocol:   v1.ProtocolUDP,
+					TargetPort: intstr.FromInt(9376),
+				},
+			}
+		})
+		jig.CheckServiceReachability(ns, nodePortService, execPod)
+		nodePortCounts := len(nodePortService.Spec.Ports)
+		framework.ExpectEqual(nodePortCounts, 2, "updated service should have two Ports but found %d Ports", nodePortCounts)
+
+		for _, port := range nodePortService.Spec.Ports {
+			framework.ExpectNotEqual(port.NodePort, 0, "NodePort service failed to allocate NodePort for Port %s", port.Name)
+			framework.Logf("NodePort service allocates NodePort: %d for Port: %s over Protocol: %s", port.NodePort, port.Name, port.Protocol)
 		}
 	})
 
@@ -1131,59 +1146,6 @@ var _ = SIGDescribe("Services", func() {
 		execPod := e2epod.CreateExecPodOrFail(cs, ns, "execpod", nil)
 		jig.CheckServiceReachability(ns, externalNameService, execPod)
 
-	})
-
-	/*
-		Testname: Service, NodePort, same port different protocols
-		Description: Create a service of type NodePort listening on port 53 for two protocols TCP and UDP.
-		Service creation MUST be successful by assigning a ClusterIP and two unique nodePorts for each protocol, making service reachable on every node's IP and nodePort.
-		TODO: Test Service reachability, good to include this check in Conformance perspective.
-	*/
-	ginkgo.It("should use same NodePort with same port but different protocols", func() {
-		serviceName := "nodeports"
-		ns := f.Namespace.Name
-
-		t := e2eservice.NewServerTest(cs, ns, serviceName)
-		defer func() {
-			defer ginkgo.GinkgoRecover()
-			errs := t.Cleanup()
-			if len(errs) != 0 {
-				framework.Failf("errors in cleanup: %v", errs)
-			}
-		}()
-
-		ginkgo.By("creating service " + serviceName + " with same NodePort but different protocols in namespace " + ns)
-		service := &v1.Service{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      t.ServiceName,
-				Namespace: t.Namespace,
-			},
-			Spec: v1.ServiceSpec{
-				Selector: t.Labels,
-				Type:     v1.ServiceTypeNodePort,
-				Ports: []v1.ServicePort{
-					{
-						Name:     "tcp-port",
-						Port:     53,
-						Protocol: v1.ProtocolTCP,
-					},
-					{
-						Name:     "udp-port",
-						Port:     53,
-						Protocol: v1.ProtocolUDP,
-					},
-				},
-			},
-		}
-		result, err := t.CreateService(service)
-		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
-
-		if len(result.Spec.Ports) != 2 {
-			framework.Failf("got unexpected len(Spec.Ports) for new service: %v", result)
-		}
-		if result.Spec.Ports[0].NodePort != result.Spec.Ports[1].NodePort {
-			framework.Failf("should use same NodePort for new service: %v", result)
-		}
 	})
 
 	ginkgo.It("should prevent NodePort collisions", func() {
