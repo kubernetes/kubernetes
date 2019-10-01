@@ -49,6 +49,7 @@ go_library(
         "//test/e2e/framework/volume:go_default_library",
         "//test/e2e/perftype:go_default_library",
         "//test/e2e/scheduling:go_default_library",
+        "//test/e2e/storage/utils:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
