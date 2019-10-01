@@ -1120,7 +1120,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 				return err
 			}
 		}
-		status := g.framework.RunPreFilterUpdaterRemovePod(pluginContext, pod, rp, nodeInfoCopy)
+		status := g.framework.RunPreFilterExtensionRemovePod(pluginContext, pod, rp, nodeInfoCopy)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
@@ -1133,7 +1133,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 				return err
 			}
 		}
-		status := g.framework.RunPreFilterUpdaterAddPod(pluginContext, pod, ap, nodeInfoCopy)
+		status := g.framework.RunPreFilterExtensionAddPod(pluginContext, pod, ap, nodeInfoCopy)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
