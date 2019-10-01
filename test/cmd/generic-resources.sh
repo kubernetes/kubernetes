@@ -445,7 +445,7 @@ run_recursive_resources_tests() {
   # Post-condition: busybox0 & busybox1 should error as they are RC's, and since busybox2 is malformed, it should error
   kube::test::if_has_string "${output_message}" "Object 'Kind' is missing"
   kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox0" resuming is not supported'
-  kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox0" resuming is not supported'
+  kube::test::if_has_string "${output_message}" 'replicationcontrollers "busybox1" resuming is not supported'
   # Clean up
   ! kubectl delete -f hack/testdata/recursive/rc --recursive "${kube_flags[@]}" --grace-period=0 --force
   sleep 1
