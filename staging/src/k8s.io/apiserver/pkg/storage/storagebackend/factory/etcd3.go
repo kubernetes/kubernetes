@@ -26,9 +26,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/pkg/transport"
-	grpcprom "github.com/grpc-ecosystem/go-grpc-prometheus"
 	"google.golang.org/grpc"
 
 	utilnet "k8s.io/apimachinery/pkg/util/net"
@@ -97,9 +97,9 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 
 func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) {
 	tlsInfo := transport.TLSInfo{
-		CertFile: c.CertFile,
-		KeyFile:  c.KeyFile,
-		CAFile:   c.CAFile,
+		CertFile:      c.CertFile,
+		KeyFile:       c.KeyFile,
+		TrustedCAFile: c.TrustedCAFile,
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {
@@ -107,7 +107,7 @@ func newETCD3Client(c storagebackend.TransportConfig) (*clientv3.Client, error) 
 	}
 	// NOTE: Client relies on nil tlsConfig
 	// for non-secure connections, update the implicit variable
-	if len(c.CertFile) == 0 && len(c.KeyFile) == 0 && len(c.CAFile) == 0 {
+	if len(c.CertFile) == 0 && len(c.KeyFile) == 0 && len(c.TrustedCAFile) == 0 {
 		tlsConfig = nil
 	}
 	networkContext := egressselector.Etcd.AsNetworkContext()

@@ -140,9 +140,9 @@ func TestInvalidObjectMetaInStorage(t *testing.T) {
 		t.Fatal(err)
 	}
 	tlsInfo := transport.TLSInfo{
-		CertFile: restOptions.StorageConfig.Transport.CertFile,
-		KeyFile:  restOptions.StorageConfig.Transport.KeyFile,
-		CAFile:   restOptions.StorageConfig.Transport.CAFile,
+		CertFile:      restOptions.StorageConfig.Transport.CertFile,
+		KeyFile:       restOptions.StorageConfig.Transport.KeyFile,
+		TrustedCAFile: restOptions.StorageConfig.Transport.TrustedCAFile,
 	}
 	tlsConfig, err := tlsInfo.ClientConfig()
 	if err != nil {

@@ -26,6 +26,7 @@ go_library(
         "//vendor/github.com/coreos/etcd/pkg/testutil:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
         "//vendor/github.com/coreos/etcd/pkg/types:go_default_library",
+        "//vendor/go.uber.org/zap:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

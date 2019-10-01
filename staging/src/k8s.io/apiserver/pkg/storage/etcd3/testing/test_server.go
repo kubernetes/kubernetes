@@ -42,6 +42,7 @@ import (
 	"go.etcd.io/etcd/pkg/testutil"
 	"go.etcd.io/etcd/pkg/transport"
 	"go.etcd.io/etcd/pkg/types"
+	"go.uber.org/zap"
 	"k8s.io/klog"
 )
 
@@ -85,9 +86,9 @@ func newSecuredLocalListener(t *testing.T, certFile, keyFile, caFile string) net
 		t.Fatal(err)
 	}
 	tlsInfo := transport.TLSInfo{
-		CertFile: certFile,
-		KeyFile:  keyFile,
-		CAFile:   caFile,
+		CertFile:      certFile,
+		KeyFile:       keyFile,
+		TrustedCAFile: caFile,
 	}
 	tlscfg, err := tlsInfo.ServerConfig()
 	if err != nil {
@@ -103,9 +104,9 @@ func newSecuredLocalListener(t *testing.T, certFile, keyFile, caFile string) net
 // newHTTPTransport create a new tls-based transport.
 func newHTTPTransport(t *testing.T, certFile, keyFile, caFile string) etcd.CancelableTransport {
 	tlsInfo := transport.TLSInfo{
-		CertFile: certFile,
-		KeyFile:  keyFile,
-		CAFile:   caFile,
+		CertFile:      certFile,
+		KeyFile:       keyFile,
+		TrustedCAFile: caFile,
 	}
 	tr, err := transport.NewTransport(tlsInfo, time.Second)
 	if err != nil {
@@ -194,7 +195,7 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 	}
 	m.s.SyncTicker = time.NewTicker(500 * time.Millisecond)
 	m.s.Start()
-	m.raftHandler = &testutil.PauseableHandler{Next: etcdhttp.NewPeerHandler(m.s)}
+	m.raftHandler = &testutil.PauseableHandler{Next: etcdhttp.NewPeerHandler(zap.NewExample(), m.s)}
 	for _, ln := range m.PeerListeners {
 		hs := &httptest.Server{
 			Listener: ln,
@@ -206,7 +207,7 @@ func (m *EtcdTestServer) launch(t *testing.T) error {
 	for _, ln := range m.ClientListeners {
 		hs := &httptest.Server{
 			Listener: ln,
-			Config:   &http.Server{Handler: v2http.NewClientHandler(m.s, m.ServerConfig.ReqTimeout())},
+			Config:   &http.Server{Handler: v2http.NewClientHandler(zap.NewExample(), m.s, m.ServerConfig.ReqTimeout())},
 		}
 		hs.Start()
 		m.hss = append(m.hss, hs)
