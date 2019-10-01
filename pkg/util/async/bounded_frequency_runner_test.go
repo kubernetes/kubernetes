@@ -24,14 +24,20 @@ import (
 
 // Track calls to the managed function.
 type receiver struct {
-	lock sync.Mutex
-	run  bool
+	lock    sync.Mutex
+	run     bool
+	retryFn func()
 }
 
 func (r *receiver) F() {
 	r.lock.Lock()
 	defer r.lock.Unlock()
 	r.run = true
+
+	if r.retryFn != nil {
+		r.retryFn()
+		r.retryFn = nil
+	}
 }
 
 func (r *receiver) reset() bool {
@@ -40,6 +46,12 @@ func (r *receiver) reset() bool {
 	was := r.run
 	r.run = false
 	return was
+}
+
+func (r *receiver) setRetryFn(retryFn func()) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+	r.retryFn = retryFn
 }
 
 // A single change event in the fake timer.
@@ -106,6 +118,13 @@ func (ft *fakeTimer) Now() time.Time {
 	return ft.now
 }
 
+func (ft *fakeTimer) Remaining() time.Duration {
+	ft.lock.Lock()
+	defer ft.lock.Unlock()
+
+	return ft.timeout.Sub(ft.now)
+}
+
 func (ft *fakeTimer) Since(t time.Time) time.Duration {
 	ft.lock.Lock()
 	defer ft.lock.Unlock()
@@ -166,6 +185,12 @@ func waitForReset(name string, t *testing.T, timer *fakeTimer, obj *receiver, ex
 
 func waitForRun(name string, t *testing.T, timer *fakeTimer, obj *receiver) {
 	waitForReset(name, t, timer, obj, true, maxInterval)
+}
+
+func waitForRunWithRetry(name string, t *testing.T, timer *fakeTimer, obj *receiver, expectNext time.Duration) {
+	// It will first get reset as with a normal run, and then get set again
+	waitForRun(name, t, timer, obj)
+	waitForReset(name, t, timer, obj, false, expectNext)
 }
 
 func waitForDefer(name string, t *testing.T, timer *fakeTimer, obj *receiver, expectNext time.Duration) {
@@ -329,6 +354,89 @@ func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
 
 	// Wait for maxInterval
 	timer.advance(10 * time.Second) // abs=15000ms, rel=10000ms
+	waitForRun("maxInterval", t, timer, obj)
+
+	// Clean up.
+	stop <- struct{}{}
+}
+
+func Test_BoundedFrequencyRunnerRetryAfter(t *testing.T) {
+	obj := &receiver{}
+	timer := newFakeTimer()
+	runner := construct("test-runner", obj.F, minInterval, maxInterval, 1, timer)
+	stop := make(chan struct{})
+
+	var upd timerUpdate
+
+	// Start.
+	go runner.Loop(stop)
+	upd = <-timer.updated // wait for initial time to be set to max
+	checkTimer("init", t, upd, true, maxInterval)
+	checkReceiver("init", t, obj, false)
+
+	// Run once, immediately, and queue a retry
+	// rel=0ms
+	obj.setRetryFn(func() { runner.RetryAfter(5 * time.Second) })
+	runner.Run()
+	waitForRunWithRetry("first run", t, timer, obj, 5*time.Second)
+
+	// Nothing happens...
+	timer.advance(time.Second) // rel=1000ms
+	waitForNothing("minInterval, nothing queued", t, timer, obj)
+
+	// After retryInterval, function is called
+	timer.advance(4 * time.Second) // rel=5000ms
+	waitForRun("retry", t, timer, obj)
+
+	// Run again, before minInterval expires.
+	timer.advance(499 * time.Millisecond) // rel=499ms
+	runner.Run()
+	waitForDefer("too soon after retry", t, timer, obj, 501*time.Millisecond)
+
+	// Do the deferred run, queue another retry after it returns
+	timer.advance(501 * time.Millisecond) // rel=1000ms
+	runner.RetryAfter(5 * time.Second)
+	waitForRunWithRetry("second run", t, timer, obj, 5*time.Second)
+
+	// Wait for minInterval to pass
+	timer.advance(time.Second) // rel=1000ms
+	waitForNothing("minInterval, nothing queued", t, timer, obj)
+
+	// Now do another run
+	runner.Run()
+	waitForRun("third run", t, timer, obj)
+
+	// Retry was cancelled because we already ran
+	timer.advance(4 * time.Second)
+	waitForNothing("retry cancelled", t, timer, obj)
+
+	// Run, queue a retry from a goroutine
+	obj.setRetryFn(func() {
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			runner.RetryAfter(5 * time.Second)
+		}()
+	})
+	runner.Run()
+	waitForRunWithRetry("fourth run", t, timer, obj, 5*time.Second)
+
+	// Call Run again before minInterval passes
+	timer.advance(100 * time.Millisecond) // rel=100ms
+	runner.Run()
+	waitForDefer("too soon after fourth run", t, timer, obj, 900*time.Millisecond)
+
+	// Deferred run will run after minInterval passes
+	timer.advance(900 * time.Millisecond) // rel=1000ms
+	waitForRun("fifth run", t, timer, obj)
+
+	// Retry was cancelled because we already ran
+	timer.advance(4 * time.Second) // rel=4s since run, 5s since RetryAfter
+	waitForNothing("retry cancelled", t, timer, obj)
+
+	// Rerun happens after maxInterval
+	timer.advance(5 * time.Second) // rel=9s since run, 10s since RetryAfter
+	waitForNothing("premature", t, timer, obj)
+	timer.advance(time.Second) // rel=10s since run
 	waitForRun("maxInterval", t, timer, obj)
 
 	// Clean up.
