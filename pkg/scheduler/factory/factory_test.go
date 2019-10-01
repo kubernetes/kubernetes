@@ -634,7 +634,7 @@ func (t *TestPlugin) Score(pc *framework.PluginContext, p *v1.Pod, nodeName stri
 	return 1, nil
 }
 
-func (t *TestPlugin) NormalizeScore(pc *framework.PluginContext, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+func (t *TestPlugin) Extensions() framework.ScoreExtensions {
 	return nil
 }
 
