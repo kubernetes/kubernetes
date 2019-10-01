@@ -17,7 +17,10 @@ limitations under the License.
 package phases
 
 import (
+	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/pkg/errors"
 
@@ -37,14 +40,17 @@ var (
 	coreDNSAddonLongDesc = cmdutil.LongDesc(`
 		Install the CoreDNS addon components via the API server.
 		Please note that although the DNS server is deployed, it will not be scheduled until CNI is installed.
+		This phase does not run when ClusterConfiguration.FeatureGates.AddonInstaller is true.
 		`)
 
 	kubeProxyAddonLongDesc = cmdutil.LongDesc(`
 		Install the kube-proxy addon components via the API server.
+		This phase does not run when ClusterConfiguration.FeatureGates.AddonInstaller is true.
 		`)
 
 	addonInstallerLongDesc = cmdutil.LongDesc(`
 		Install addons from an AddonInstallerConfiguration via the API server.
+		This phase only runs when ClusterConfiguration.FeatureGates.AddonInstaller is true.
 		`)  // TODO: add documentation / link
 )
 
@@ -86,22 +92,23 @@ func NewAddonPhase() workflow.Phase {
 	}
 }
 
-func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, error) {
+func getInitData(c workflow.RunData) (*kubeadmapi.InitConfiguration, clientset.Interface, bool, error) {
 	data, ok := c.(InitData)
 	if !ok {
-		return nil, nil, errors.New("addon phase invoked with an invalid data struct")
+		return nil, nil, true, errors.New("addon phase invoked with an invalid data struct")
 	}
 	cfg := data.Cfg()
+	dryRun := data.DryRun()
 	client, err := data.Client()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, dryRun, err
 	}
-	return cfg, client, err
+	return cfg, client, dryRun, err
 }
 
 // runCoreDNSAddon installs CoreDNS addon to a Kubernetes cluster
 func runCoreDNSAddon(c workflow.RunData) error {
-	cfg, client, err := getInitData(c)
+	cfg, client, _, err := getInitData(c)
 	if err != nil {
 		return err
 	}
@@ -113,7 +120,7 @@ func runCoreDNSAddon(c workflow.RunData) error {
 
 // runKubeProxyAddon installs KubeProxy addon to a Kubernetes cluster
 func runKubeProxyAddon(c workflow.RunData) error {
-	cfg, client, err := getInitData(c)
+	cfg, client, _, err := getInitData(c)
 	if err != nil {
 		return err
 	}
@@ -140,25 +147,26 @@ func getAddonPhaseFlags(name string) []string {
 	}
 	if name == "all" || name == "coredns" {
 		flags = append(flags,
-			options.FeatureGatesString,
 			options.NetworkingDNSDomain,
 			options.NetworkingServiceSubnet,
 		)
 	}
-	if name == "all" || name == "installer" {
-		// TODO
-		// flags = append(flags,
-		// 	options.AddonInstallerDryRun
-		// )
+	if name == "coredns" || name == "installer" {
+		flags = append(flags,
+			options.FeatureGatesString,
+		)
+	}
+	if name == "installer" {
+		flags = append(flags,
+			options.DryRun,
+		)
 	}
 	return flags
 }
 
 // runAddonInstaller executes the addon-installer
 func runAddonInstaller(c workflow.RunData) error {
-	// cfg, client, err := getInitData(c)
-	cfg, _, err := getInitData(c)
-	// TODO: getAddonInstallerFromConfigMap
+	cfg, _, dryRun, err := getInitData(c)
 	if err != nil {
 		return err
 	}
@@ -167,19 +175,32 @@ func runAddonInstaller(c workflow.RunData) error {
 		if installCfg == nil {
 			return errors.New("addoninstaller phase invoked with nil AddonInstaller ComponentConfig")
 		}
+
+		// Override the AddonInstallerConfiguration dryRun field with the kubeadm dryRun runtime value.
+		// Note that this makes the dryRun field of any user-specified ComponentConfig file meaningless when used /w kubeadm.
+		// It's possible to make kubeadm dry-run different from the addon-installer dry-run with legacyFlag style logic,
+		// but that requires more work and my not make sense.
+		if installCfg.DryRun != dryRun {
+			fmt.Fprintf(os.Stderr, "[addon installer] WARNING: overriding AddonInstallerConfiguration with dryRun: %t\n", dryRun)
+			installCfg.DryRun = dryRun
+		}
+
+		// TODO: getAddonInstallerFromConfigMap
+		// TODO: diff addons and prune ones that are no longer declared
+
 		r := addoninstall.Runtime{
 			Config: installCfg,
 			Stdout: os.Stdout,
 			Stderr: os.Stderr,
 		}
-		// sigs := make(chan os.Signal, 1)
-		// signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-		// go func() {
-		// 	errs := r.HandleSignal(<-sigs)
-		// 	for _, err := range errs {
-		// 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		// 	}
-		// }()
+		sigs := make(chan os.Signal, 1)
+		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+		go func() {
+			errs := r.HandleSignal(<-sigs)
+			for _, err := range errs {
+				fmt.Fprintf(os.Stderr, "[addon installer] ERROR: %v\n", err)
+			}
+		}()
 
 		err = r.CheckDeps()
 		if err != nil {
