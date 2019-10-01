@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"
+	utilsnet "k8s.io/utils/net"
 )
 
 // HandlerRunner runs a lifecycle handler for a container.
@@ -319,16 +320,28 @@ func MakePortMappings(container *v1.Container) (ports []PortMapping) {
 			HostIP:        p.HostIP,
 		}
 
+		// We need to determine the address family this entry applies to. We do this to ensure
+		// duplicate containerPort / protocol rules work across different address families.
+		// https://github.com/kubernetes/kubernetes/issues/82373
+		family := "any"
+		if p.HostIP != "" {
+			if utilsnet.IsIPv6String(p.HostIP) {
+				family = "v6"
+			} else {
+				family = "v4"
+			}
+		}
+
 		// We need to create some default port name if it's not specified, since
-		// this is necessary for rkt.
-		// http://issue.k8s.io/7710
+		// this is necessary for the dockershim CNI driver.
+		// https://github.com/kubernetes/kubernetes/pull/82374#issuecomment-529496888
 		if p.Name == "" {
-			pm.Name = fmt.Sprintf("%s-%s:%d", container.Name, p.Protocol, p.ContainerPort)
+			pm.Name = fmt.Sprintf("%s-%s-%s:%d", container.Name, family, p.Protocol, p.ContainerPort)
 		} else {
 			pm.Name = fmt.Sprintf("%s-%s", container.Name, p.Name)
 		}
 
-		// Protect against exposing the same protocol-port more than once in a container.
+		// Protect against a port name being used more than once in a container.
 		if _, ok := names[pm.Name]; ok {
 			klog.Warningf("Port name conflicted, %q is defined more than once", pm.Name)
 			continue
