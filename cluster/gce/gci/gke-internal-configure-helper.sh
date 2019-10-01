@@ -327,6 +327,7 @@ EOF
     cp "${GVISOR_CONTAINERD_SHIM_PATH}" "${containerd_opt_path}/bin"
     # gvisor_platform is the platform to use for gvisor.
     local -r gvisor_platform="${GVISOR_PLATFORM:-"ptrace"}"
+    local -r gvisor_net_raw="${GVISOR_NET_RAW:-"true"}"
     local -r sandbox_root="${CONTAINERD_SANDBOX_RUNTIME_ROOT:-"/run/containerd/runsc"}"
     # shim_config_path is the path of gvisor-containerd-shim config file.
     local -r shim_config_path="${GVISOR_CONTAINERD_SHIM_CONFIG_PATH:-"${sandbox_root}/config.toml"}"
@@ -336,6 +337,7 @@ binary_name = "${CONTAINERD_SANDBOX_RUNTIME_ENGINE:-}"
 root = "${sandbox_root}"
 [runsc_config]
   platform = "${gvisor_platform}"
+  net-raw = "${gvisor_net_raw}"
 EOF
     if [[ "${gvisor_platform}" == "xemu" ]]; then
       insmod "${CONTAINERD_HOME}/xemu.ko"
