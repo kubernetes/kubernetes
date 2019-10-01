@@ -754,17 +754,25 @@ func (c *Cacher) Count(pathPrefix string) (int64, error) {
 	return c.storage.Count(pathPrefix)
 }
 
-func (c *Cacher) triggerValues(event *watchCacheEvent) ([]string, bool) {
+// baseObjectThreadUnsafe omits locking for cachingObject.
+func baseObjectThreadUnsafe(object runtime.Object) runtime.Object {
+	if co, ok := object.(*cachingObject); ok {
+		return co.object
+	}
+	return object
+}
+
+func (c *Cacher) triggerValuesThreadUnsafe(event *watchCacheEvent) ([]string, bool) {
 	if c.indexedTrigger == nil {
 		return nil, false
 	}
 
 	result := make([]string, 0, 2)
-	result = append(result, c.indexedTrigger.indexerFunc(event.Object))
+	result = append(result, c.indexedTrigger.indexerFunc(baseObjectThreadUnsafe(event.Object)))
 	if event.PrevObject == nil {
 		return result, true
 	}
-	prevTriggerValue := c.indexedTrigger.indexerFunc(event.PrevObject)
+	prevTriggerValue := c.indexedTrigger.indexerFunc(baseObjectThreadUnsafe(event.PrevObject))
 	if result[0] != prevTriggerValue {
 		result = append(result, prevTriggerValue)
 	}
@@ -892,7 +900,10 @@ func (c *Cacher) startDispatchingBookmarkEvents() {
 // startDispatching chooses watchers potentially interested in a given event
 // a marks dispatching as true.
 func (c *Cacher) startDispatching(event *watchCacheEvent) {
-	triggerValues, supported := c.triggerValues(event)
+	// It is safe to call triggerValuesThreadUnsafe here, because at this
+	// point only this thread can access this event (we create a separate
+	// watchCacheEvent for every dispatch).
+	triggerValues, supported := c.triggerValuesThreadUnsafe(event)
 
 	c.Lock()
 	defer c.Unlock()
@@ -1165,7 +1176,7 @@ func (c *cacheWatcher) add(event *watchCacheEvent, timer *time.Timer) bool {
 		// This means that we couldn't send event to that watcher.
 		// Since we don't want to block on it infinitely,
 		// we simply terminate it.
-		klog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", reflect.TypeOf(event.Object).String())
+		klog.V(1).Infof("Forcing watcher close due to unresponsiveness: %v", c.objectType.String())
 		c.forget()
 	}
 
@@ -1193,6 +1204,25 @@ func (c *cacheWatcher) nextBookmarkTime(now time.Time) (time.Time, bool) {
 	return c.deadline.Add(-2 * time.Second), true
 }
 
+func getEventObject(object runtime.Object) runtime.Object {
+	if _, ok := object.(runtime.CacheableObject); ok {
+		// It is safe to return without deep-copy, because the underlying
+		// object was already deep-copied during construction.
+		return object
+	}
+	return object.DeepCopyObject()
+}
+
+func updateResourceVersionIfNeeded(object runtime.Object, versioner storage.Versioner, resourceVersion uint64) {
+	if _, ok := object.(*cachingObject); ok {
+		// We assume that for cachingObject resourceVersion was already propagated before.
+		return
+	}
+	if err := versioner.UpdateObject(object, resourceVersion); err != nil {
+		utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", resourceVersion, object, err))
+	}
+}
+
 func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event {
 	if event.Type == watch.Bookmark {
 		return &watch.Event{Type: watch.Bookmark, Object: event.Object.DeepCopyObject()}
@@ -1210,15 +1240,13 @@ func (c *cacheWatcher) convertToWatchEvent(event *watchCacheEvent) *watch.Event 
 
 	switch {
 	case curObjPasses && !oldObjPasses:
-		return &watch.Event{Type: watch.Added, Object: event.Object.DeepCopyObject()}
+		return &watch.Event{Type: watch.Added, Object: getEventObject(event.Object)}
 	case curObjPasses && oldObjPasses:
-		return &watch.Event{Type: watch.Modified, Object: event.Object.DeepCopyObject()}
+		return &watch.Event{Type: watch.Modified, Object: getEventObject(event.Object)}
 	case !curObjPasses && oldObjPasses:
 		// return a delete event with the previous object content, but with the event's resource version
-		oldObj := event.PrevObject.DeepCopyObject()
-		if err := c.versioner.UpdateObject(oldObj, event.ResourceVersion); err != nil {
-			utilruntime.HandleError(fmt.Errorf("failure to version api object (%d) %#v: %v", event.ResourceVersion, oldObj, err))
-		}
+		oldObj := getEventObject(event.PrevObject)
+		updateResourceVersionIfNeeded(oldObj, c.versioner, event.ResourceVersion)
 		return &watch.Event{Type: watch.Deleted, Object: oldObj}
 	}
 

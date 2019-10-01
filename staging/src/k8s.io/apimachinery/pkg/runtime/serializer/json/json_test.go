@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	runtimetesting "k8s.io/apimachinery/pkg/runtime/testing"
 	"k8s.io/apimachinery/pkg/util/diff"
 )
 
@@ -454,6 +455,15 @@ func TestDecode(t *testing.T) {
 			t.Errorf("%d: unexpected object:\n%s", i, diff.ObjectGoPrintSideBySide(test.expectedObject, obj))
 		}
 	}
+}
+
+func TestCacheableObject(t *testing.T) {
+	gvk := schema.GroupVersionKind{Group: "group", Version: "version", Kind: "MockCacheableObject"}
+	creater := &mockCreater{obj: &runtimetesting.MockCacheableObject{}}
+	typer := &mockTyper{gvk: &gvk}
+	serializer := json.NewSerializer(json.DefaultMetaFactory, creater, typer, false)
+
+	runtimetesting.CacheableObjectTest(t, serializer)
 }
 
 type mockCreater struct {

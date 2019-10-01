@@ -17,12 +17,14 @@ limitations under the License.
 package versioning
 
 import (
+	"encoding/json"
 	"io"
 	"reflect"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/klog"
 )
 
 // NewDefaultingCodecForScheme is a convenience method for callers that are using a scheme.
@@ -62,6 +64,8 @@ func NewCodec(
 		encodeVersion: encodeVersion,
 		decodeVersion: decodeVersion,
 
+		identifier: identifier(encodeVersion, encoder),
+
 		originalSchemeName: originalSchemeName,
 	}
 	return internal
@@ -78,8 +82,28 @@ type codec struct {
 	encodeVersion runtime.GroupVersioner
 	decodeVersion runtime.GroupVersioner
 
+	identifier runtime.Identifier
+
 	// originalSchemeName is optional, but when filled in it holds the name of the scheme from which this codec originates
 	originalSchemeName string
+}
+
+// identifier computes Identifier of Encoder based on codec parameters.
+func identifier(encodeGV runtime.GroupVersioner, encoder runtime.Encoder) runtime.Identifier {
+	result := map[string]string{
+		"name": "versioning",
+	}
+	if encodeGV != nil {
+		result["encodeGV"] = encodeGV.Identifier()
+	}
+	if encoder != nil {
+		result["encoder"] = string(encoder.Identifier())
+	}
+	identifier, err := json.Marshal(result)
+	if err != nil {
+		klog.Fatalf("Failed marshaling identifier for codec: %v", err)
+	}
+	return runtime.Identifier(identifier)
 }
 
 // Decode attempts a decode of the object, then tries to convert it to the internal version. If into is provided and the decoding is
@@ -172,6 +196,13 @@ func (c *codec) Decode(data []byte, defaultGVK *schema.GroupVersionKind, into ru
 // Encode ensures the provided object is output in the appropriate group and version, invoking
 // conversion if necessary. Unversioned objects (according to the ObjectTyper) are output as is.
 func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
+	if co, ok := obj.(runtime.CacheableObject); ok {
+		return co.CacheEncode(c.Identifier(), c.doEncode, w)
+	}
+	return c.doEncode(obj, w)
+}
+
+func (c *codec) doEncode(obj runtime.Object, w io.Writer) error {
 	switch obj := obj.(type) {
 	case *runtime.Unknown:
 		return c.encoder.Encode(obj, w)
@@ -229,4 +260,9 @@ func (c *codec) Encode(obj runtime.Object, w io.Writer) error {
 
 	// Conversion is responsible for setting the proper group, version, and kind onto the outgoing object
 	return c.encoder.Encode(out, w)
+}
+
+// Identifier implements runtime.Encoder interface.
+func (c *codec) Identifier() runtime.Identifier {
+	return c.identifier
 }

@@ -55,7 +55,14 @@ func (dynamicCodec) Decode(data []byte, gvk *schema.GroupVersionKind, obj runtim
 }
 
 func (dynamicCodec) Encode(obj runtime.Object, w io.Writer) error {
+	// There is no need to handle runtime.CacheableObject, as we only
+	// fallback to other encoders here.
 	return unstructured.UnstructuredJSONScheme.Encode(obj, w)
+}
+
+// Identifier implements runtime.Encoder interface.
+func (dynamicCodec) Identifier() runtime.Identifier {
+	return unstructured.UnstructuredJSONScheme.Identifier()
 }
 
 // UnstructuredPlusDefaultContentConfig returns a rest.ContentConfig for dynamic types.  It includes enough codecs to act as a "normal"

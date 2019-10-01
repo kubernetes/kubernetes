@@ -190,6 +190,10 @@ func (c *fakeCodec) Encode(obj runtime.Object, stream io.Writer) error {
 	return nil
 }
 
+func (c *fakeCodec) Identifier() runtime.Identifier {
+	return runtime.Identifier("fake")
+}
+
 type fakeRoundTripper struct{}
 
 func (r *fakeRoundTripper) RoundTrip(*http.Request) (*http.Response, error) {

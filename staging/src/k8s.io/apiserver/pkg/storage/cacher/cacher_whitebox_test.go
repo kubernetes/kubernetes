@@ -20,12 +20,14 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	goruntime "runtime"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -265,7 +267,7 @@ func newTestCacher(s storage.Interface, cap int) (*Cacher, storage.Versioner, er
 		Versioner:      testVersioner{},
 		ResourcePrefix: prefix,
 		KeyFunc:        func(obj runtime.Object) (string, error) { return storage.NamespaceKeyFunc(prefix, obj) },
-		GetAttrsFunc:   func(obj runtime.Object) (labels.Set, fields.Set, error) { return nil, nil, nil },
+		GetAttrsFunc:   storage.DefaultNamespaceScopedAttr,
 		NewFunc:        func() runtime.Object { return &example.Pod{} },
 		NewListFunc:    func() runtime.Object { return &example.PodList{} },
 		Codec:          codecs.LegacyCodec(examplev1.SchemeGroupVersion),
@@ -452,7 +454,7 @@ func TestWatcherNotGoingBackInTime(t *testing.T) {
 				shouldContinue = false
 				break
 			}
-			rv, err := testVersioner{}.ParseResourceVersion(event.Object.(*examplev1.Pod).ResourceVersion)
+			rv, err := testVersioner{}.ParseResourceVersion(event.Object.(metaRuntimeInterface).GetResourceVersion())
 			if err != nil {
 				t.Errorf("unexpected parsing error: %v", err)
 			} else {
@@ -703,7 +705,7 @@ func testCacherSendBookmarkEvents(t *testing.T, watchCacheEnabled, allowWatchBoo
 			}
 			rv, err := cacher.versioner.ObjectResourceVersion(event.Object)
 			if err != nil {
-				t.Errorf("failed to parse resource version from %#v", event.Object)
+				t.Errorf("failed to parse resource version from %#v: %v", event.Object, err)
 			}
 			if event.Type == watch.Bookmark {
 				if !expectedBookmarks {
@@ -905,4 +907,108 @@ func TestDispatchEventWillNotBeBlockedByTimedOutWatcher(t *testing.T) {
 	if eventsCount != totalPods {
 		t.Errorf("watcher is blocked by slower one (count: %d)", eventsCount)
 	}
+}
+
+func verifyEvents(t *testing.T, w watch.Interface, events []watch.Event) {
+	_, _, line, _ := goruntime.Caller(1)
+	for _, expectedEvent := range events {
+		select {
+		case event := <-w.ResultChan():
+			if e, a := expectedEvent.Type, event.Type; e != a {
+				t.Logf("(called from line %d)", line)
+				t.Errorf("Expected: %s, got: %s", e, a)
+			}
+			object := event.Object
+			if co, ok := object.(runtime.CacheableObject); ok {
+				object = co.GetObject()
+			}
+			if e, a := expectedEvent.Object, object; !apiequality.Semantic.DeepEqual(e, a) {
+				t.Logf("(called from line %d)", line)
+				t.Errorf("Expected: %#v, got: %#v", e, a)
+			}
+		case <-time.After(wait.ForeverTestTimeout):
+			t.Logf("(called from line %d)", line)
+			t.Errorf("Timed out waiting for an event")
+		}
+	}
+}
+
+func TestCachingDeleteEvents(t *testing.T) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage, 1000)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+
+	fooPredicate := storage.SelectionPredicate{
+		Label: labels.SelectorFromSet(map[string]string{"foo": "true"}),
+		Field: fields.Everything(),
+	}
+	barPredicate := storage.SelectionPredicate{
+		Label: labels.SelectorFromSet(map[string]string{"bar": "true"}),
+		Field: fields.Everything(),
+	}
+
+	createWatch := func(pred storage.SelectionPredicate) watch.Interface {
+		w, err := cacher.Watch(context.TODO(), "pods/ns", "999", pred)
+		if err != nil {
+			t.Fatalf("Failed to create watch: %v", err)
+		}
+		return w
+	}
+
+	allEventsWatcher := createWatch(storage.Everything)
+	defer allEventsWatcher.Stop()
+	fooEventsWatcher := createWatch(fooPredicate)
+	defer fooEventsWatcher.Stop()
+	barEventsWatcher := createWatch(barPredicate)
+	defer barEventsWatcher.Stop()
+
+	makePod := func(labels map[string]string, rv string) *examplev1.Pod {
+		return &examplev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            "pod",
+				Namespace:       "ns",
+				Labels:          labels,
+				ResourceVersion: rv,
+			},
+		}
+	}
+	pod1 := makePod(map[string]string{"foo": "true", "bar": "true"}, "1001")
+	pod2 := makePod(map[string]string{"foo": "true"}, "1002")
+	pod3 := makePod(map[string]string{}, "1003")
+	pod4 := makePod(map[string]string{}, "1004")
+	pod1DeletedAt2 := pod1.DeepCopyObject().(*examplev1.Pod)
+	pod1DeletedAt2.ResourceVersion = "1002"
+	pod2DeletedAt3 := pod2.DeepCopyObject().(*examplev1.Pod)
+	pod2DeletedAt3.ResourceVersion = "1003"
+
+	allEvents := []watch.Event{
+		{Type: watch.Added, Object: pod1.DeepCopy()},
+		{Type: watch.Modified, Object: pod2.DeepCopy()},
+		{Type: watch.Modified, Object: pod3.DeepCopy()},
+		{Type: watch.Deleted, Object: pod4.DeepCopy()},
+	}
+	fooEvents := []watch.Event{
+		{Type: watch.Added, Object: pod1.DeepCopy()},
+		{Type: watch.Modified, Object: pod2.DeepCopy()},
+		{Type: watch.Deleted, Object: pod2DeletedAt3.DeepCopy()},
+	}
+	barEvents := []watch.Event{
+		{Type: watch.Added, Object: pod1.DeepCopy()},
+		{Type: watch.Deleted, Object: pod1DeletedAt2.DeepCopy()},
+	}
+
+	cacher.watchCache.Add(pod1)
+	cacher.watchCache.Update(pod2)
+	cacher.watchCache.Update(pod3)
+	cacher.watchCache.Delete(pod4)
+
+	verifyEvents(t, allEventsWatcher, allEvents)
+	verifyEvents(t, fooEventsWatcher, fooEvents)
+	verifyEvents(t, barEventsWatcher, barEvents)
 }
