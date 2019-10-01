@@ -495,6 +495,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 		allErrs = append(allErrs, err)
 	}
 	printWithKind := multipleGVKsRequested(infos)
+	allClusterScoped := clusterScopedRequested(infos)
 
 	objs := make([]runtime.Object, len(infos))
 	for ix := range infos {
@@ -578,10 +579,10 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	w.Flush()
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
-		if !o.AllNamespaces {
-			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found in %s namespace.", o.Namespace))
-		} else {
+		if o.AllNamespaces || allClusterScoped {
 			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found"))
+		} else {
+			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found in %s namespace.", o.Namespace))
 		}
 	}
 	return utilerrors.NewAggregate(allErrs)
@@ -833,6 +834,15 @@ func shouldGetNewPrinterForMapping(printer printers.ResourcePrinter, lastMapping
 
 func cmdSpecifiesOutputFmt(cmd *cobra.Command) bool {
 	return cmdutil.GetFlagString(cmd, "output") != ""
+}
+
+func clusterScopedRequested(infos []*resource.Info) bool {
+	for _, info := range infos {
+		if info.Mapping.Scope.Name() != meta.RESTScopeNameRoot {
+			return false
+		}
+	}
+	return true
 }
 
 func multipleGVKsRequested(infos []*resource.Info) bool {
