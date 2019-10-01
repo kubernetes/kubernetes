@@ -36,9 +36,9 @@ var (
 	// ErrVolumeZoneConflict is used for NoVolumeZoneConflict predicate error.
 	ErrVolumeZoneConflict = newPredicateFailureError("NoVolumeZoneConflict", "node(s) had no available volume zone")
 	// ErrNodeSelectorNotMatch is used for MatchNodeSelector predicate error.
-	ErrNodeSelectorNotMatch = newPredicateFailureError("MatchNodeSelector", "node(s) didn't match node selector")
+	ErrNodeSelectorNotMatch = newPredicateFailureError("NodeSelectorNotMatch", "node(s) didn't match node selector")
 	// ErrPodAffinityNotMatch is used for MatchInterPodAffinity predicate error.
-	ErrPodAffinityNotMatch = newPredicateFailureError("MatchInterPodAffinity", "node(s) didn't match pod affinity/anti-affinity")
+	ErrPodAffinityNotMatch = newPredicateFailureError("InterPodAffinityNotMatch", "node(s) didn't match pod affinity/anti-affinity")
 	// ErrPodAffinityRulesNotMatch is used for PodAffinityRulesNotMatch predicate error.
 	ErrPodAffinityRulesNotMatch = newPredicateFailureError("PodAffinityRulesNotMatch", "node(s) didn't match pod affinity rules")
 	// ErrPodAntiAffinityRulesNotMatch is used for PodAntiAffinityRulesNotMatch predicate error.
@@ -48,13 +48,13 @@ var (
 	// ErrTaintsTolerationsNotMatch is used for PodToleratesNodeTaints predicate error.
 	ErrTaintsTolerationsNotMatch = newPredicateFailureError("PodToleratesNodeTaints", "node(s) had taints that the pod didn't tolerate")
 	// ErrPodNotMatchHostName is used for HostName predicate error.
-	ErrPodNotMatchHostName = newPredicateFailureError("HostName", "node(s) didn't match the requested hostname")
+	ErrPodNotMatchHostName = newPredicateFailureError("HostNameNotMatch", "node(s) didn't match the requested hostname")
 	// ErrPodNotFitsHostPorts is used for PodFitsHostPorts predicate error.
 	ErrPodNotFitsHostPorts = newPredicateFailureError("PodFitsHostPorts", "node(s) didn't have free ports for the requested pod ports")
 	// ErrNodeLabelPresenceViolated is used for CheckNodeLabelPresence predicate error.
 	ErrNodeLabelPresenceViolated = newPredicateFailureError("CheckNodeLabelPresence", "node(s) didn't have the requested labels")
 	// ErrServiceAffinityViolated is used for CheckServiceAffinity predicate error.
-	ErrServiceAffinityViolated = newPredicateFailureError("CheckServiceAffinity", "node(s) didn't match service affinity")
+	ErrServiceAffinityViolated = newPredicateFailureError("CheckServiceAffinityNotMatch", "node(s) didn't match service affinity")
 	// ErrMaxVolumeCountExceeded is used for MaxVolumeCount predicate error.
 	ErrMaxVolumeCountExceeded = newPredicateFailureError("MaxVolumeCount", "node(s) exceed max volume count")
 	// ErrNodeUnderMemoryPressure is used for NodeUnderMemoryPressure predicate error.
