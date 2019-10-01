@@ -438,16 +438,16 @@ func getEnvelopePrefixTransformer(config *apiserverconfig.KMSConfiguration, enve
 // parseEndpoint parses the endpoint to extract schema, host or path.
 func parseEndpoint(endpoint string) (string, error) {
 	if len(endpoint) == 0 {
-		return "", fmt.Errorf("remote KMS provider can't use empty string as endpoint")
+		return "", fmt.Errorf("invalid empty Resources[].KMS.Endpoint in encryption configuration for KMS provider")
 	}
 
 	u, err := url.Parse(endpoint)
 	if err != nil {
-		return "", fmt.Errorf("invalid endpoint %q for remote KMS provider, error: %v", endpoint, err)
+		return "", fmt.Errorf("invalid Resources[].KMS.Endpoint %q in encryption configuration for KMS provider, error: %v", endpoint, err)
 	}
 
 	if u.Scheme != "unix" {
-		return "", fmt.Errorf("unsupported scheme %q for remote KMS provider", u.Scheme)
+		return "", fmt.Errorf("invalid Resources[].KMS.Endpoint in encryption configuration, only only 'unix' scheme is currently supported, but %q was supplied", u.Scheme)
 	}
 
 	// Linux abstract namespace socket - no physical file required

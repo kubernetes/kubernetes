@@ -452,7 +452,7 @@ resources:
     - kms:
         name: foo
 `,
-			wantErr: "remote KMS provider can't use empty string as endpoint",
+			wantErr: "invalid empty Resources[].KMS.Endpoint in encryption configuration for KMS provider",
 		},
 		{
 			desc: "not a unix socket endpoint",
@@ -466,7 +466,7 @@ resources:
         name: foo
         endpoint: /tmp/testprovider.sock
 `,
-			wantErr: `unsupported scheme "" for remote KMS provider`,
+			wantErr: `invalid Resources[].KMS.Endpoint in encryption configuration, only only 'unix' scheme is currently supported, but "" was supplied`,
 		},
 	}
 
