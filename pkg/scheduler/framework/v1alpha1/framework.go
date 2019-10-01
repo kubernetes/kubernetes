@@ -323,8 +323,8 @@ func (f *framework) RunPreFilterExtensionAddPod(pc *PluginContext, podToSchedule
 func (f *framework) RunPreFilterExtensionRemovePod(pc *PluginContext, podToSchedule *v1.Pod,
 	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	for _, pl := range f.preFilterPlugins {
-		if extension := pl.Extensions(); extension != nil {
-			status := extension.RemovePod(pc, podToSchedule, podToRemove, nodeInfo)
+		if extensions := pl.Extensions(); extensions != nil {
+			status := extensions.RemovePod(pc, podToSchedule, podToRemove, nodeInfo)
 			if !status.IsSuccess() {
 				msg := fmt.Sprintf("error while running RemovePod for plugin %q while scheduling pod %q: %v",
 					pl.Name(), podToSchedule.Name, status.Message())

@@ -230,6 +230,8 @@ type PostFilterPlugin interface {
 	PostFilter(pc *PluginContext, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status
 }
 
+// ScoreExtensions is an interface that is included in plugins that allow specifying
+// callbacks to make additional change to the score list.
 type ScoreExtensions interface {
 	// NormalizeScore is called for all node scores produced by the same plugin's "Score"
 	// method. A successful run of NormalizeScore will update the scores list and return
