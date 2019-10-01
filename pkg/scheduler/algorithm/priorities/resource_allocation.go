@@ -25,7 +25,7 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -50,13 +50,13 @@ var DefaultRequestedRatioResources = ResourceToWeightMap{v1.ResourceMemory: 1, v
 func (r *ResourceAllocationPriority) PriorityMap(
 	pod *v1.Pod,
 	meta interface{},
-	nodeInfo *schedulernodeinfo.NodeInfo) (schedulerapi.HostPriority, error) {
+	nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
 	node := nodeInfo.Node()
 	if node == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("node not found")
+		return framework.NodeScore{}, fmt.Errorf("node not found")
 	}
 	if r.resourceToWeightMap == nil {
-		return schedulerapi.HostPriority{}, fmt.Errorf("resources not found")
+		return framework.NodeScore{}, fmt.Errorf("resources not found")
 	}
 	requested := make(ResourceToValueMap, len(r.resourceToWeightMap))
 	allocatable := make(ResourceToValueMap, len(r.resourceToWeightMap))
@@ -90,8 +90,8 @@ func (r *ResourceAllocationPriority) PriorityMap(
 		}
 	}
 
-	return schedulerapi.HostPriority{
-		Host:  node.Name,
+	return framework.NodeScore{
+		Name:  node.Name,
 		Score: score,
 	}, nil
 }

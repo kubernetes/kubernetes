@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -41,7 +42,7 @@ import (
 )
 
 type fitPredicate func(pod *v1.Pod, node *v1.Node) (bool, error)
-type priorityFunc func(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, error)
+type priorityFunc func(pod *v1.Pod, nodes []*v1.Node) (*framework.NodeScoreList, error)
 
 type priorityConfig struct {
 	function priorityFunc
@@ -74,42 +75,42 @@ func machine2PredicateExtender(pod *v1.Pod, node *v1.Node) (bool, error) {
 	return false, nil
 }
 
-func errorPrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, error) {
-	return &schedulerapi.HostPriorityList{}, fmt.Errorf("Some error")
+func errorPrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.NodeScoreList, error) {
+	return &framework.NodeScoreList{}, fmt.Errorf("Some error")
 }
 
-func machine1PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, error) {
-	result := schedulerapi.HostPriorityList{}
+func machine1PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.NodeScoreList, error) {
+	result := framework.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
 		if node.Name == "machine1" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int64(score)})
+		result = append(result, framework.NodeScore{Name: node.Name, Score: int64(score)})
 	}
 	return &result, nil
 }
 
-func machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, error) {
-	result := schedulerapi.HostPriorityList{}
+func machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.NodeScoreList, error) {
+	result := framework.NodeScoreList{}
 	for _, node := range nodes {
 		score := 1
 		if node.Name == "machine2" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int64(score)})
+		result = append(result, framework.NodeScore{Name: node.Name, Score: int64(score)})
 	}
 	return &result, nil
 }
 
-func machine2Prioritizer(_ *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	result := []schedulerapi.HostPriority{}
+func machine2Prioritizer(_ *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (framework.NodeScoreList, error) {
+	result := []framework.NodeScore{}
 	for _, node := range nodes {
 		score := 1
 		if node.Name == "machine2" {
 			score = 10
 		}
-		result = append(result, schedulerapi.HostPriority{Host: node.Name, Score: int64(score)})
+		result = append(result, framework.NodeScore{Name: node.Name, Score: int64(score)})
 	}
 	return result, nil
 }
@@ -142,10 +143,10 @@ func (f *FakeExtender) SupportsPreemption() bool {
 
 func (f *FakeExtender) ProcessPreemption(
 	pod *v1.Pod,
-	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
+	nodeToVictims map[*v1.Node]*extenderv1.Victims,
 	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
-) (map[*v1.Node]*schedulerapi.Victims, error) {
-	nodeToVictimsCopy := map[*v1.Node]*schedulerapi.Victims{}
+) (map[*v1.Node]*extenderv1.Victims, error) {
+	nodeToVictimsCopy := map[*v1.Node]*extenderv1.Victims{}
 	// We don't want to change the original nodeToVictims
 	for k, v := range nodeToVictims {
 		// In real world implementation, extender's user should have their own way to get node object
@@ -271,13 +272,13 @@ func (f *FakeExtender) runPredicate(pod *v1.Pod, node *v1.Node) (bool, error) {
 	return fits, nil
 }
 
-func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) ([]*v1.Node, schedulerapi.FailedNodesMap, error) {
+func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) ([]*v1.Node, extenderv1.FailedNodesMap, error) {
 	filtered := []*v1.Node{}
-	failedNodesMap := schedulerapi.FailedNodesMap{}
+	failedNodesMap := extenderv1.FailedNodesMap{}
 	for _, node := range nodes {
 		fits, err := f.runPredicate(pod, node)
 		if err != nil {
-			return []*v1.Node{}, schedulerapi.FailedNodesMap{}, err
+			return []*v1.Node{}, extenderv1.FailedNodesMap{}, err
 		}
 		if fits {
 			filtered = append(filtered, node)
@@ -293,8 +294,8 @@ func (f *FakeExtender) Filter(pod *v1.Pod, nodes []*v1.Node, nodeNameToInfo map[
 	return filtered, failedNodesMap, nil
 }
 
-func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.HostPriorityList, int64, error) {
-	result := schedulerapi.HostPriorityList{}
+func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*extenderv1.HostPriorityList, int64, error) {
+	result := extenderv1.HostPriorityList{}
 	combinedScores := map[string]int64{}
 	for _, prioritizer := range f.prioritizers {
 		weight := prioritizer.weight
@@ -304,14 +305,14 @@ func (f *FakeExtender) Prioritize(pod *v1.Pod, nodes []*v1.Node) (*schedulerapi.
 		priorityFunc := prioritizer.function
 		prioritizedList, err := priorityFunc(pod, nodes)
 		if err != nil {
-			return &schedulerapi.HostPriorityList{}, 0, err
+			return &extenderv1.HostPriorityList{}, 0, err
 		}
 		for _, hostEntry := range *prioritizedList {
-			combinedScores[hostEntry.Host] += hostEntry.Score * weight
+			combinedScores[hostEntry.Name] += hostEntry.Score * weight
 		}
 	}
 	for host, score := range combinedScores {
-		result = append(result, schedulerapi.HostPriority{Host: host, Score: score})
+		result = append(result, extenderv1.HostPriority{Host: host, Score: score})
 	}
 	return &result, f.weight, nil
 }

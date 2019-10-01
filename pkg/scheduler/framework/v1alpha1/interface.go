@@ -37,7 +37,7 @@ type NodeScoreList []NodeScore
 // NodeScore is a struct with node name and score.
 type NodeScore struct {
 	Name  string
-	Score int
+	Score int64
 }
 
 // PluginToNodeScores declares a map from plugin name to its NodeScoreList.

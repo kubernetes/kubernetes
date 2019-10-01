@@ -27,6 +27,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -215,7 +216,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 		pod          *v1.Pod
 		pods         []*v1.Pod
 		nodes        []*v1.Node
-		expectedList schedulerapi.HostPriorityList
+		expectedList framework.NodeScoreList
 		name         string
 	}{
 		{
@@ -232,7 +233,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			*/
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: schedulerapi.MaxPriority}},
 			name:         "nothing scheduled, nothing requested",
 		},
 		{
@@ -249,7 +250,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			*/
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 7}, {Host: "machine2", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 7}, {Name: "machine2", Score: schedulerapi.MaxPriority}},
 			name:         "nothing scheduled, resources requested, differently sized machines",
 		},
 		{
@@ -266,7 +267,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			*/
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: schedulerapi.MaxPriority}, {Host: "machine2", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: schedulerapi.MaxPriority}},
 			name:         "no resources requested, pods scheduled",
 			pods: []*v1.Pod{
 				{Spec: machine1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
@@ -289,7 +290,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			*/
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 4}, {Host: "machine2", Score: 6}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 4}, {Name: "machine2", Score: 6}},
 			name:         "no resources requested, pods scheduled with resources",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
@@ -312,7 +313,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			*/
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 6}, {Host: "machine2", Score: 9}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 6}, {Name: "machine2", Score: 9}},
 			name:         "resources requested, pods scheduled with resources",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly},
@@ -333,7 +334,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			*/
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 6}, {Host: "machine2", Score: 6}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 6}, {Name: "machine2", Score: 6}},
 			name:         "resources requested, pods scheduled with resources, differently sized machines",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly},
@@ -354,7 +355,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			*/
 			pod:          &v1.Pod{Spec: cpuOnly},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "requested resources exceed node capacity",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly},
@@ -364,7 +365,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 		{
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 0, 0), makeNode("machine2", 0, 0)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine1", Score: 0}, {Host: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 0}},
 			name:         "zero node resources, pods scheduled with resources",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly},
@@ -388,7 +389,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 				},
 			},
 			nodes:        []*v1.Node{makeNode("machine3", 3500, 40000), makeNode("machine4", 4000, 10000)},
-			expectedList: []schedulerapi.HostPriority{{Host: "machine3", Score: 8}, {Host: "machine4", Score: 9}},
+			expectedList: []framework.NodeScore{{Name: "machine3", Score: 8}, {Name: "machine4", Score: 9}},
 			name:         "Include volume count on a node for balanced resource allocation",
 			pods: []*v1.Pod{
 				{Spec: cpuAndMemory3},

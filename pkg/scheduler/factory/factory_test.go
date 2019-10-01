@@ -42,7 +42,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
-	config "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -239,8 +240,8 @@ func PredicateFunc(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *sch
 	return true, nil, nil
 }
 
-func PriorityFunc(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (schedulerapi.HostPriorityList, error) {
-	return []schedulerapi.HostPriority{}, nil
+func PriorityFunc(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (framework.NodeScoreList, error) {
+	return []framework.NodeScore{}, nil
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
@@ -523,9 +524,9 @@ func (f *fakeExtender) IsIgnorable() bool {
 
 func (f *fakeExtender) ProcessPreemption(
 	pod *v1.Pod,
-	nodeToVictims map[*v1.Node]*schedulerapi.Victims,
+	nodeToVictims map[*v1.Node]*extenderv1.Victims,
 	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
-) (map[*v1.Node]*schedulerapi.Victims, error) {
+) (map[*v1.Node]*extenderv1.Victims, error) {
 	return nil, nil
 }
 
@@ -537,14 +538,14 @@ func (f *fakeExtender) Filter(
 	pod *v1.Pod,
 	nodes []*v1.Node,
 	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
-) (filteredNodes []*v1.Node, failedNodesMap schedulerapi.FailedNodesMap, err error) {
+) (filteredNodes []*v1.Node, failedNodesMap extenderv1.FailedNodesMap, err error) {
 	return nil, nil, nil
 }
 
 func (f *fakeExtender) Prioritize(
 	pod *v1.Pod,
 	nodes []*v1.Node,
-) (hostPriorities *schedulerapi.HostPriorityList, weight int64, err error) {
+) (hostPriorities *extenderv1.HostPriorityList, weight int64, err error) {
 	return nil, 0, nil
 }
 
