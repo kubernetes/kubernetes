@@ -35,6 +35,7 @@ import (
 	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
+	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -54,6 +55,12 @@ const (
 	SchedulerError = "SchedulerError"
 )
 
+// podConditionUpdater updates the condition of a pod based on the passed
+// PodCondition
+type podConditionUpdater interface {
+	update(pod *v1.Pod, podCondition *v1.PodCondition) error
+}
+
 // Scheduler watches for new unscheduled pods. It attempts to find
 // nodes that they fit on and writes bindings back to the api server.
 type Scheduler struct {
@@ -66,7 +73,7 @@ type Scheduler struct {
 	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
-	PodConditionUpdater factory.PodConditionUpdater
+	podConditionUpdater podConditionUpdater
 	// PodPreemptor is used to evict pods and update 'NominatedNode' field of
 	// the preemptor pod.
 	PodPreemptor factory.PodPreemptor
@@ -247,7 +254,7 @@ func New(client clientset.Interface,
 
 	// Create the scheduler.
 	sched := NewFromConfig(config)
-
+	sched.podConditionUpdater = &podConditionUpdaterImpl{client}
 	AddAllEventHandlers(sched, options.schedulerName, nodeInformer, podInformer, pvInformer, pvcInformer, serviceInformer, storageClassInformer, csiNodeInformer)
 	return sched, nil
 }
@@ -292,20 +299,19 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *kubeschedule
 func NewFromConfig(config *factory.Config) *Scheduler {
 	metrics.Register()
 	return &Scheduler{
-		SchedulerCache:      config.SchedulerCache,
-		Algorithm:           config.Algorithm,
-		GetBinder:           config.GetBinder,
-		PodConditionUpdater: config.PodConditionUpdater,
-		PodPreemptor:        config.PodPreemptor,
-		Framework:           config.Framework,
-		NextPod:             config.NextPod,
-		WaitForCacheSync:    config.WaitForCacheSync,
-		Error:               config.Error,
-		Recorder:            config.Recorder,
-		StopEverything:      config.StopEverything,
-		VolumeBinder:        config.VolumeBinder,
-		DisablePreemption:   config.DisablePreemption,
-		SchedulingQueue:     config.SchedulingQueue,
+		SchedulerCache:    config.SchedulerCache,
+		Algorithm:         config.Algorithm,
+		GetBinder:         config.GetBinder,
+		PodPreemptor:      config.PodPreemptor,
+		Framework:         config.Framework,
+		NextPod:           config.NextPod,
+		WaitForCacheSync:  config.WaitForCacheSync,
+		Error:             config.Error,
+		Recorder:          config.Recorder,
+		StopEverything:    config.StopEverything,
+		VolumeBinder:      config.VolumeBinder,
+		DisablePreemption: config.DisablePreemption,
+		SchedulingQueue:   config.SchedulingQueue,
 	}
 }
 
@@ -324,7 +330,7 @@ func (sched *Scheduler) Run() {
 func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason string, message string) {
 	sched.Error(pod, err)
 	sched.Recorder.Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", message)
-	if err := sched.PodConditionUpdater.Update(pod, &v1.PodCondition{
+	if err := sched.podConditionUpdater.update(pod, &v1.PodCondition{
 		Type:    v1.PodScheduled,
 		Status:  v1.ConditionFalse,
 		Reason:  reason,
@@ -668,6 +674,19 @@ func (sched *Scheduler) scheduleOne() {
 			fwk.RunPostBindPlugins(pluginContext, assumedPod, scheduleResult.SuggestedHost)
 		}
 	}()
+}
+
+type podConditionUpdaterImpl struct {
+	Client clientset.Interface
+}
+
+func (p *podConditionUpdaterImpl) update(pod *v1.Pod, condition *v1.PodCondition) error {
+	klog.V(3).Infof("Updating pod condition for %s/%s to (%s==%s, Reason=%s)", pod.Namespace, pod.Name, condition.Type, condition.Status, condition.Reason)
+	if podutil.UpdatePodCondition(&pod.Status, condition) {
+		_, err := p.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
+		return err
+	}
+	return nil
 }
 
 // nodeResourceString returns a string representation of node resources.
