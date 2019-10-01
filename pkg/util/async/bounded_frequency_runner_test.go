@@ -52,16 +52,17 @@ type timerUpdate struct {
 type fakeTimer struct {
 	c chan time.Time
 
-	lock   sync.Mutex
-	now    time.Time
-	active bool
+	lock    sync.Mutex
+	now     time.Time
+	timeout time.Time
+	active  bool
 
 	updated chan timerUpdate
 }
 
 func newFakeTimer() *fakeTimer {
 	ft := &fakeTimer{
-		now:     time.Date(2000, 0, 0, 0, 0, 0, 0, time.UTC),
+		now:     time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC),
 		c:       make(chan time.Time),
 		updated: make(chan timerUpdate),
 	}
@@ -78,6 +79,7 @@ func (ft *fakeTimer) Reset(in time.Duration) bool {
 
 	was := ft.active
 	ft.active = true
+	ft.timeout = ft.now.Add(in)
 	ft.updated <- timerUpdate{
 		active: true,
 		next:   in,
@@ -112,9 +114,7 @@ func (ft *fakeTimer) Since(t time.Time) time.Duration {
 }
 
 func (ft *fakeTimer) Sleep(d time.Duration) {
-	ft.lock.Lock()
-	defer ft.lock.Unlock()
-
+	// ft.advance grabs ft.lock
 	ft.advance(d)
 }
 
@@ -124,15 +124,10 @@ func (ft *fakeTimer) advance(d time.Duration) {
 	defer ft.lock.Unlock()
 
 	ft.now = ft.now.Add(d)
-}
-
-// send a timer tick.
-func (ft *fakeTimer) tick() {
-	ft.lock.Lock()
-	defer ft.lock.Unlock()
-
-	ft.active = false
-	ft.c <- ft.now
+	if ft.active && !ft.now.Before(ft.timeout) {
+		ft.active = false
+		ft.c <- ft.timeout
+	}
 }
 
 // return the calling line number (for printing)
@@ -177,6 +172,17 @@ func waitForDefer(name string, t *testing.T, timer *fakeTimer, obj *receiver, ex
 	waitForReset(name, t, timer, obj, false, expectNext)
 }
 
+func waitForNothing(name string, t *testing.T, timer *fakeTimer, obj *receiver) {
+	select {
+	case <-timer.c:
+		t.Fatalf("%s: unexpected timer tick", name)
+	case upd := <-timer.updated:
+		t.Fatalf("%s: unexpected timer update %v", name, upd)
+	default:
+	}
+	checkReceiver(name, t, obj, false)
+}
+
 func Test_BoundedFrequencyRunnerNoBurst(t *testing.T) {
 	obj := &receiver{}
 	timer := newFakeTimer()
@@ -206,13 +212,11 @@ func Test_BoundedFrequencyRunnerNoBurst(t *testing.T) {
 	runner.Run()
 	waitForDefer("still too soon after first", t, timer, obj, 1*time.Millisecond)
 
-	// Run again, once minInterval has passed (race with timer).
+	// Do the deferred run
 	timer.advance(1 * time.Millisecond) // rel=1000ms
-	runner.Run()
 	waitForRun("second run", t, timer, obj)
 
-	// Run again, before minInterval expires.
-	// rel=0ms
+	// Try again immediately
 	runner.Run()
 	waitForDefer("too soon after second", t, timer, obj, 1*time.Second)
 
@@ -221,30 +225,30 @@ func Test_BoundedFrequencyRunnerNoBurst(t *testing.T) {
 	runner.Run()
 	waitForDefer("still too soon after second", t, timer, obj, 999*time.Millisecond)
 
-	// Let the timer tick prematurely.
+	// Ensure that we don't run again early
 	timer.advance(998 * time.Millisecond) // rel=999ms
-	timer.tick()
-	waitForDefer("premature tick", t, timer, obj, 1*time.Millisecond)
+	waitForNothing("premature", t, timer, obj)
 
-	// Let the timer tick.
+	// Do the deferred run
 	timer.advance(1 * time.Millisecond) // rel=1000ms
-	timer.tick()
-	waitForRun("first tick", t, timer, obj)
+	waitForRun("third run", t, timer, obj)
 
-	// Let the timer tick.
-	timer.advance(10 * time.Second) // rel=10000ms
-	timer.tick()
-	waitForRun("second tick", t, timer, obj)
+	// Let minInterval pass, but there are no runs queued
+	timer.advance(1 * time.Second) // rel=1000ms
+	waitForNothing("minInterval", t, timer, obj)
+
+	// Let maxInterval pass
+	timer.advance(9 * time.Second) // rel=10000ms
+	waitForRun("maxInterval", t, timer, obj)
 
 	// Run again, before minInterval expires.
 	timer.advance(1 * time.Millisecond) // rel=1ms
 	runner.Run()
-	waitForDefer("too soon after tick", t, timer, obj, 999*time.Millisecond)
+	waitForDefer("too soon after maxInterval run", t, timer, obj, 999*time.Millisecond)
 
-	// Let the timer tick.
+	// Let minInterval pass
 	timer.advance(999 * time.Millisecond) // rel=1000ms
-	timer.tick()
-	waitForRun("third tick", t, timer, obj)
+	waitForRun("fourth run", t, timer, obj)
 
 	// Clean up.
 	stop <- struct{}{}
@@ -289,8 +293,10 @@ func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
 	runner.Run()
 	waitForDefer("too soon after second 3", t, timer, obj, 500*time.Millisecond)
 
-	// Run again, once burst has replenished.
+	// Advance timer enough to replenish bursts, but not enough to be minInterval
+	// after the last run
 	timer.advance(499 * time.Millisecond) // abs=1000ms, rel=999ms
+	waitForNothing("not minInterval", t, timer, obj)
 	runner.Run()
 	waitForRun("third run", t, timer, obj)
 
@@ -304,9 +310,8 @@ func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
 	runner.Run()
 	waitForDefer("too soon after third 2", t, timer, obj, 1*time.Millisecond)
 
-	// Run again, once burst has replenished.
+	// Advance and do the deferred run
 	timer.advance(1 * time.Millisecond) // abs=2000ms, rel=1000ms
-	runner.Run()
 	waitForRun("fourth run", t, timer, obj)
 
 	// Run again, once burst has fully replenished.
@@ -318,15 +323,13 @@ func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
 	runner.Run()
 	waitForDefer("too soon after sixth", t, timer, obj, 1*time.Second)
 
-	// Let the timer tick.
+	// Wait until minInterval after the last run
 	timer.advance(1 * time.Second) // abs=5000ms, rel=1000ms
-	timer.tick()
-	waitForRun("first tick", t, timer, obj)
+	waitForRun("seventh run", t, timer, obj)
 
-	// Let the timer tick.
+	// Wait for maxInterval
 	timer.advance(10 * time.Second) // abs=15000ms, rel=10000ms
-	timer.tick()
-	waitForRun("second tick", t, timer, obj)
+	waitForRun("maxInterval", t, timer, obj)
 
 	// Clean up.
 	stop <- struct{}{}
