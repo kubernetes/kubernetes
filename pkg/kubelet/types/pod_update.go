@@ -142,10 +142,26 @@ func (sp SyncPodType) String() string {
 	}
 }
 
-// IsCriticalPod returns true if the pod bears the critical pod annotation key or if pod's priority is greater than
-// or equal to SystemCriticalPriority. Both the default scheduler and the kubelet use this function
-// to make admission and scheduling decisions.
+// IsMirrorPod returns true if the passed Pod is a Mirror Pod.
+func IsMirrorPod(pod *v1.Pod) bool {
+	_, ok := pod.Annotations[ConfigMirrorAnnotationKey]
+	return ok
+}
+
+// IsStaticPod returns true if the pod is a static pod.
+func IsStaticPod(pod *v1.Pod) bool {
+	source, err := GetPodSource(pod)
+	return err == nil && source != ApiserverSource
+}
+
+// IsCriticalPod returns true if pod's priority is greater than or equal to SystemCriticalPriority.
 func IsCriticalPod(pod *v1.Pod) bool {
+	if IsStaticPod(pod) {
+		return true
+	}
+	if IsMirrorPod(pod) {
+		return true
+	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.PodPriority) {
 		if pod.Spec.Priority != nil && IsCriticalPodBasedOnPriority(*pod.Spec.Priority) {
 			return true
@@ -189,11 +205,7 @@ func IsCritical(ns string, annotations map[string]string) bool {
 	}
 	return false
 }
-
 // IsCriticalPodBasedOnPriority checks if the given pod is a critical pod based on priority resolved from pod Spec.
 func IsCriticalPodBasedOnPriority(priority int32) bool {
-	if priority >= scheduling.SystemCriticalPriority {
-		return true
-	}
-	return false
+	return priority >= scheduling.SystemCriticalPriority
 }

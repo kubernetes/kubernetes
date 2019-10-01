@@ -537,7 +537,7 @@ func TestStaticPod(t *testing.T) {
 
 	t.Logf("Create the mirror pod")
 	m.podManager.AddPod(mirrorPod)
-	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
+	assert.True(t, kubetypes.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
 	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), kubetypes.ResolvedPodUID(staticPod.UID))
 
 	t.Logf("Should be able to get the mirror pod status from status manager")
@@ -805,8 +805,8 @@ func TestDoNotDeleteMirrorPods(t *testing.T) {
 	m.podManager.AddPod(staticPod)
 	m.podManager.AddPod(mirrorPod)
 	t.Logf("Verify setup.")
-	assert.True(t, kubepod.IsStaticPod(staticPod), "SetUp error: staticPod")
-	assert.True(t, kubepod.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
+	assert.True(t, kubetypes.IsStaticPod(staticPod), "SetUp error: staticPod")
+	assert.True(t, kubetypes.IsMirrorPod(mirrorPod), "SetUp error: mirrorPod")
 	assert.Equal(t, m.podManager.TranslatePodUID(mirrorPod.UID), kubetypes.ResolvedPodUID(staticPod.UID))
 
 	status := getRandomPodStatus()

@@ -2039,7 +2039,7 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 		// the apiserver and no action (other than cleanup) is required.
 		kl.podManager.AddPod(pod)
 
-		if kubepod.IsMirrorPod(pod) {
+		if kubetypes.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
@@ -2074,7 +2074,7 @@ func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 			kl.dnsConfigurer.CheckLimitsForResolvConf()
 		}
 		kl.podManager.UpdatePod(pod)
-		if kubepod.IsMirrorPod(pod) {
+		if kubetypes.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}
@@ -2091,7 +2091,7 @@ func (kl *Kubelet) HandlePodRemoves(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	for _, pod := range pods {
 		kl.podManager.DeletePod(pod)
-		if kubepod.IsMirrorPod(pod) {
+		if kubetypes.IsMirrorPod(pod) {
 			kl.handleMirrorPod(pod, start)
 			continue
 		}

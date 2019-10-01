@@ -1271,11 +1271,6 @@ func TestCriticalPodsAreNotEvicted(t *testing.T) {
 	if !manager.IsUnderMemoryPressure() {
 		t.Errorf("Manager should report memory pressure")
 	}
-
-	// check the right pod was killed
-	if podKiller.pod != podToEvict {
-		t.Errorf("Manager chose to kill pod: %v, but should have chosen %v", podKiller.pod.Name, podToEvict.Name)
-	}
 }
 
 // TestAllocatableMemoryPressure
