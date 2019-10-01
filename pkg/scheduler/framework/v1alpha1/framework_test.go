@@ -29,12 +29,12 @@ import (
 )
 
 const (
-	scoreWithNormalizePlugin1      = "score-with-normalize-plugin-1"
-	scoreWithNormalizePlugin2      = "score-with-normalize-plugin-2"
-	scorePlugin1                   = "score-plugin-1"
-	pluginNotImplementingScore     = "plugin-not-implementing-score"
-	preFilterPluginName            = "prefilter-plugin"
-	preFilterWithUpdaterPluginName = "prefilter-with-updater-plugin"
+	scoreWithNormalizePlugin1         = "score-with-normalize-plugin-1"
+	scoreWithNormalizePlugin2         = "score-with-normalize-plugin-2"
+	scorePlugin1                      = "score-plugin-1"
+	pluginNotImplementingScore        = "plugin-not-implementing-score"
+	preFilterPluginName               = "prefilter-plugin"
+	preFilterWithExtensionsPluginName = "prefilter-with-extensions-plugin"
 )
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
@@ -87,6 +87,10 @@ func (pl *TestScoreWithNormalizePlugin) Score(pc *PluginContext, p *v1.Pod, node
 	return setScoreRes(pl.inj)
 }
 
+func (pl *TestScoreWithNormalizePlugin) Extensions() ScoreExtensions {
+	return pl
+}
+
 // TestScorePlugin only implements ScorePlugin interface.
 type TestScorePlugin struct {
 	name string
@@ -101,7 +105,7 @@ func (pl *TestScorePlugin) Score(pc *PluginContext, p *v1.Pod, nodeName string) 
 	return setScoreRes(pl.inj)
 }
 
-func (pl *TestScorePlugin) NormalizeScore(pc *PluginContext, pod *v1.Pod, scores NodeScoreList) *Status {
+func (pl *TestScorePlugin) Extensions() ScoreExtensions {
 	return nil
 }
 
@@ -126,39 +130,39 @@ func (pl *TestPreFilterPlugin) PreFilter(pc *PluginContext, p *v1.Pod) *Status {
 	return nil
 }
 
-func (pl *TestPreFilterPlugin) Updater() Updater {
+func (pl *TestPreFilterPlugin) Extensions() PreFilterExtensions {
 	return nil
 }
 
-// TestPreFilterWithUpdatePlugin implements Add/Remove interfaces.
-type TestPreFilterWithUpdaterPlugin struct {
+// TestPreFilterWithExtensionsPlugin implements Add/Remove interfaces.
+type TestPreFilterWithExtensionsPlugin struct {
 	PreFilterCalled int
 	AddCalled       int
 	RemoveCalled    int
 }
 
-func (pl *TestPreFilterWithUpdaterPlugin) Name() string {
-	return preFilterWithUpdaterPluginName
+func (pl *TestPreFilterWithExtensionsPlugin) Name() string {
+	return preFilterWithExtensionsPluginName
 }
 
-func (pl *TestPreFilterWithUpdaterPlugin) PreFilter(pc *PluginContext, p *v1.Pod) *Status {
+func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(pc *PluginContext, p *v1.Pod) *Status {
 	pl.PreFilterCalled++
 	return nil
 }
 
-func (pl *TestPreFilterWithUpdaterPlugin) AddPod(pc *PluginContext, podToSchedule *v1.Pod,
+func (pl *TestPreFilterWithExtensionsPlugin) AddPod(pc *PluginContext, podToSchedule *v1.Pod,
 	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	pl.AddCalled++
 	return nil
 }
 
-func (pl *TestPreFilterWithUpdaterPlugin) RemovePod(pc *PluginContext, podToSchedule *v1.Pod,
+func (pl *TestPreFilterWithExtensionsPlugin) RemovePod(pc *PluginContext, podToSchedule *v1.Pod,
 	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	pl.RemoveCalled++
 	return nil
 }
 
-func (pl *TestPreFilterWithUpdaterPlugin) Updater() Updater {
+func (pl *TestPreFilterWithExtensionsPlugin) Extensions() PreFilterExtensions {
 	return pl
 }
 
@@ -424,25 +428,25 @@ func TestRunScorePlugins(t *testing.T) {
 
 func TestPreFilterPlugins(t *testing.T) {
 	preFilter1 := &TestPreFilterPlugin{}
-	preFilter2 := &TestPreFilterWithUpdaterPlugin{}
+	preFilter2 := &TestPreFilterWithExtensionsPlugin{}
 	r := make(Registry)
 	r.Register(preFilterPluginName,
 		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
 			return preFilter1, nil
 		})
-	r.Register(preFilterWithUpdaterPluginName,
+	r.Register(preFilterWithExtensionsPluginName,
 		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
 			return preFilter2, nil
 		})
-	plugins := &config.Plugins{PreFilter: &config.PluginSet{Enabled: []config.Plugin{{Name: preFilterWithUpdaterPluginName}, {Name: preFilterPluginName}}}}
+	plugins := &config.Plugins{PreFilter: &config.PluginSet{Enabled: []config.Plugin{{Name: preFilterWithExtensionsPluginName}, {Name: preFilterPluginName}}}}
 	t.Run("TestPreFilterPlugin", func(t *testing.T) {
 		f, err := NewFramework(r, plugins, emptyArgs)
 		if err != nil {
 			t.Fatalf("Failed to create framework for testing: %v", err)
 		}
 		f.RunPreFilterPlugins(nil, nil)
-		f.RunPreFilterUpdaterAddPod(nil, nil, nil, nil)
-		f.RunPreFilterUpdaterRemovePod(nil, nil, nil, nil)
+		f.RunPreFilterExtensionAddPod(nil, nil, nil, nil)
+		f.RunPreFilterExtensionRemovePod(nil, nil, nil, nil)
 
 		if preFilter1.PreFilterCalled != 1 {
 			t.Errorf("preFilter1 called %v, expected: 1", preFilter1.PreFilterCalled)
