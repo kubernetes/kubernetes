@@ -16,4 +16,5 @@ replace (
 	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
+	k8s.io/gengo => github.com/wk8/gengo v0.0.0-20191001015530-73ff7e40e4d8d96c736cc6ae3fd7f3997f6c70a6
 )

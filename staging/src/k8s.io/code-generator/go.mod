@@ -15,7 +15,7 @@ require (
 	golang.org/x/tools v0.0.0-20190621195816-6e04913cbbac // indirect
 	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 	gonum.org/v1/netlib v0.0.0-20190331212654-76723241ea4e // indirect
-	k8s.io/gengo v0.0.0-20190822140433-26a664648505
+	k8s.io/gengo v0.0.0-20191001015530-73ff7e40e4d8d96c736cc6ae3fd7f3997f6c70a6
 	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20190816220812-743ec37842bf
 )
@@ -26,4 +26,5 @@ replace (
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
 	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
 	k8s.io/code-generator => ../code-generator
+	k8s.io/gengo => github.com/wk8/gengo v0.0.0-20191001015530-73ff7e40e4d8d96c736cc6ae3fd7f3997f6c70a6
 )

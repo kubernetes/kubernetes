@@ -479,6 +479,7 @@ filegroup(
         "//vendor/honnef.co/go/tools/unused:all-srcs",
         "//vendor/honnef.co/go/tools/version:all-srcs",
         "//vendor/k8s.io/gengo/args:all-srcs",
+        "//vendor/k8s.io/gengo/examples/conversion-gen/generators:all-srcs",
         "//vendor/k8s.io/gengo/examples/deepcopy-gen/generators:all-srcs",
         "//vendor/k8s.io/gengo/examples/defaulter-gen/generators:all-srcs",
         "//vendor/k8s.io/gengo/examples/import-boss/generators:all-srcs",

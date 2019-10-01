@@ -23,4 +23,5 @@ replace (
 	k8s.io/client-go => ../client-go
 	k8s.io/cloud-provider => ../cloud-provider
 	k8s.io/csi-translation-lib => ../csi-translation-lib
+	k8s.io/gengo => github.com/wk8/gengo v0.0.0-20191001015530-73ff7e40e4d8d96c736cc6ae3fd7f3997f6c70a6
 )

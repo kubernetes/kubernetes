@@ -17,6 +17,7 @@ limitations under the License.
 package generator
 
 import (
+	"go/token"
 	"strings"
 
 	"k8s.io/klog"
@@ -57,6 +58,11 @@ func golangTrackerLocalName(tracker namer.ImportTracker, t types.Name) string {
 		if _, found := tracker.PathOf(name); found {
 			// This name collides with some other package
 			continue
+		}
+
+		// If the import name is a Go keyword, prefix with an underscore.
+		if token.Lookup(name).IsKeyword() {
+			name = "_" + name
 		}
 		return name
 	}

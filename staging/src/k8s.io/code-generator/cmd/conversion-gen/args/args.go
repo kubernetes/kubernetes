@@ -19,8 +19,8 @@ package args
 import (
 	"fmt"
 
-	"github.com/spf13/pflag"
 	"k8s.io/gengo/args"
+	"k8s.io/gengo/examples/conversion-gen/generators"
 )
 
 // DefaultBasePeerDirs are the peer-dirs nearly everybody will use, i.e. those coming from
@@ -31,28 +31,10 @@ var DefaultBasePeerDirs = []string{
 	"k8s.io/apimachinery/pkg/runtime",
 }
 
-// CustomArgs is used by the gengo framework to pass args specific to this generator.
-type CustomArgs struct {
-	// Base peer dirs which nearly everybody will use, i.e. outside of Kubernetes core. Peer dirs
-	// are declared to make the generator pick up manually written conversion funcs from external
-	// packages.
-	BasePeerDirs []string
-
-	// Custom peer dirs which are application specific. Peer dirs are declared to make the
-	// generator pick up manually written conversion funcs from external packages.
-	ExtraPeerDirs []string
-
-	// SkipUnsafe indicates whether to generate unsafe conversions to improve the efficiency
-	// of these operations. The unsafe operation is a direct pointer assignment via unsafe
-	// (within the allowed uses of unsafe) and is equivalent to a proposed Golang change to
-	// allow structs that are identical to be assigned to each other.
-	SkipUnsafe bool
-}
-
 // NewDefaults returns default arguments for the generator.
-func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
+func NewDefaults() (*args.GeneratorArgs, *generators.CustomArgs) {
 	genericArgs := args.Default().WithoutDefaultFlagParsing()
-	customArgs := &CustomArgs{
+	customArgs := &generators.CustomArgs{
 		BasePeerDirs: DefaultBasePeerDirs,
 		SkipUnsafe:   false,
 	}
@@ -61,19 +43,9 @@ func NewDefaults() (*args.GeneratorArgs, *CustomArgs) {
 	return genericArgs, customArgs
 }
 
-// AddFlags add the generator flags to the flag set.
-func (ca *CustomArgs) AddFlags(fs *pflag.FlagSet) {
-	pflag.CommandLine.StringSliceVar(&ca.BasePeerDirs, "base-peer-dirs", ca.BasePeerDirs,
-		"Comma-separated list of apimachinery import paths which are considered, after tag-specified peers, for conversions. Only change these if you have very good reasons.")
-	pflag.CommandLine.StringSliceVar(&ca.ExtraPeerDirs, "extra-peer-dirs", ca.ExtraPeerDirs,
-		"Application specific comma-separated list of import paths which are considered, after tag-specified peers and base-peer-dirs, for conversions.")
-	pflag.CommandLine.BoolVar(&ca.SkipUnsafe, "skip-unsafe", ca.SkipUnsafe,
-		"If true, will not generate code using unsafe pointer conversions; resulting code may be slower.")
-}
-
 // Validate checks the given arguments.
 func Validate(genericArgs *args.GeneratorArgs) error {
-	_ = genericArgs.CustomArgs.(*CustomArgs)
+	_ = genericArgs.CustomArgs.(*generators.CustomArgs)
 
 	if len(genericArgs.OutputFileBaseName) == 0 {
 		return fmt.Errorf("output file base name cannot be empty")
