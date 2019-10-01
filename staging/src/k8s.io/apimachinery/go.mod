@@ -22,7 +22,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
 	github.com/onsi/ginkgo v1.10.1 // indirect
-	github.com/onsi/gomega v1.5.0 // indirect
+	github.com/onsi/gomega v1.7.0 // indirect
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.3.0
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
