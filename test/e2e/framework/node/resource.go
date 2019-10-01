@@ -241,7 +241,8 @@ func GetPortURL(client clientset.Interface, ns, name string, svcPort int) (strin
 		for _, address := range node.Status.Addresses {
 			if address.Type == v1.NodeExternalIP {
 				if address.Address != "" {
-					return fmt.Sprintf("http://%v:%v", address.Address, nodePort), nil
+					host := net.JoinHostPort(address.Address, fmt.Sprint(nodePort))
+					return fmt.Sprintf("http://%s", host), nil
 				}
 			}
 		}

@@ -18,6 +18,7 @@ go_library(
         "//pkg/scheduler/api/validation:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/core:go_default_library",
+        "//pkg/scheduler/framework/plugins:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/cache/debugger:go_default_library",
@@ -65,6 +66,7 @@ go_test(
         "//pkg/scheduler/api/latest:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins:go_default_library",
+        "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
@@ -79,6 +81,7 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

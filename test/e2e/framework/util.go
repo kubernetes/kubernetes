@@ -40,7 +40,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"golang.org/x/net/websocket"
 	"k8s.io/klog"
 
@@ -62,7 +61,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
@@ -75,10 +73,8 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/controller"
-	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/master/ports"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -192,6 +188,9 @@ var (
 	// For parsing Kubectl version for version-skewed testing.
 	gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
 
+	// ProvidersWithSSH are those providers where each node is accessible with SSH
+	ProvidersWithSSH = []string{"gce", "gke", "aws", "local"}
+
 	// ServeHostnameImage is a serve hostname image name.
 	ServeHostnameImage = imageutils.GetE2EImage(imageutils.Agnhost)
 )
@@ -216,132 +215,6 @@ func nowStamp() string {
 
 func log(level string, format string, args ...interface{}) {
 	fmt.Fprintf(ginkgo.GinkgoWriter, nowStamp()+": "+level+": "+format+"\n", args...)
-}
-
-func skipInternalf(caller int, format string, args ...interface{}) {
-	msg := fmt.Sprintf(format, args...)
-	log("INFO", msg)
-	ginkgowrapper.Skip(msg, caller+1)
-}
-
-// Skipf skips with information about why the test is being skipped.
-func Skipf(format string, args ...interface{}) {
-	skipInternalf(1, format, args...)
-}
-
-// SkipUnlessNodeCountIsAtLeast skips if the number of nodes is less than the minNodeCount.
-func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
-	if TestContext.CloudConfig.NumNodes < minNodeCount {
-		skipInternalf(1, "Requires at least %d nodes (not %d)", minNodeCount, TestContext.CloudConfig.NumNodes)
-	}
-}
-
-// SkipUnlessNodeCountIsAtMost skips if the number of nodes is greater than the maxNodeCount.
-func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
-	if TestContext.CloudConfig.NumNodes > maxNodeCount {
-		skipInternalf(1, "Requires at most %d nodes (not %d)", maxNodeCount, TestContext.CloudConfig.NumNodes)
-	}
-}
-
-// SkipUnlessAtLeast skips if the value is less than the minValue.
-func SkipUnlessAtLeast(value int, minValue int, message string) {
-	if value < minValue {
-		skipInternalf(1, message)
-	}
-}
-
-// SkipIfProviderIs skips if the provider is included in the unsupportedProviders.
-func SkipIfProviderIs(unsupportedProviders ...string) {
-	if ProviderIs(unsupportedProviders...) {
-		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, TestContext.Provider)
-	}
-}
-
-// SkipUnlessLocalEphemeralStorageEnabled skips if the LocalStorageCapacityIsolation is not enabled.
-func SkipUnlessLocalEphemeralStorageEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		skipInternalf(1, "Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
-	}
-}
-
-// SkipUnlessSSHKeyPresent skips if no SSH key is found.
-func SkipUnlessSSHKeyPresent() {
-	if _, err := e2essh.GetSigner(TestContext.Provider); err != nil {
-		skipInternalf(1, "No SSH Key for provider %s: '%v'", TestContext.Provider, err)
-	}
-}
-
-// SkipUnlessProviderIs skips if the provider is not included in the supportedProviders.
-func SkipUnlessProviderIs(supportedProviders ...string) {
-	if !ProviderIs(supportedProviders...) {
-		skipInternalf(1, "Only supported for providers %v (not %s)", supportedProviders, TestContext.Provider)
-	}
-}
-
-// SkipUnlessMultizone skips if the cluster does not have multizone.
-func SkipUnlessMultizone(c clientset.Interface) {
-	zones, err := GetClusterZones(c)
-	if err != nil {
-		skipInternalf(1, "Error listing cluster zones")
-	}
-	if zones.Len() <= 1 {
-		skipInternalf(1, "Requires more than one zone")
-	}
-}
-
-// SkipIfMultizone skips if the cluster has multizone.
-func SkipIfMultizone(c clientset.Interface) {
-	zones, err := GetClusterZones(c)
-	if err != nil {
-		skipInternalf(1, "Error listing cluster zones")
-	}
-	if zones.Len() > 1 {
-		skipInternalf(1, "Requires at most one zone")
-	}
-}
-
-// SkipUnlessPrometheusMonitoringIsEnabled skips if the prometheus monitoring is not enabled.
-func SkipUnlessPrometheusMonitoringIsEnabled(supportedMonitoring ...string) {
-	if !TestContext.EnablePrometheusMonitoring {
-		skipInternalf(1, "Skipped because prometheus monitoring is not enabled")
-	}
-}
-
-// SkipUnlessMasterOSDistroIs skips if the master OS distro is not included in the supportedMasterOsDistros.
-func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
-	if !MasterOSDistroIs(supportedMasterOsDistros...) {
-		skipInternalf(1, "Only supported for master OS distro %v (not %s)", supportedMasterOsDistros, TestContext.MasterOSDistro)
-	}
-}
-
-// SkipUnlessNodeOSDistroIs skips if the node OS distro is not included in the supportedNodeOsDistros.
-func SkipUnlessNodeOSDistroIs(supportedNodeOsDistros ...string) {
-	if !NodeOSDistroIs(supportedNodeOsDistros...) {
-		skipInternalf(1, "Only supported for node OS distro %v (not %s)", supportedNodeOsDistros, TestContext.NodeOSDistro)
-	}
-}
-
-// SkipIfNodeOSDistroIs skips if the node OS distro is included in the unsupportedNodeOsDistros.
-func SkipIfNodeOSDistroIs(unsupportedNodeOsDistros ...string) {
-	if NodeOSDistroIs(unsupportedNodeOsDistros...) {
-		skipInternalf(1, "Not supported for node OS distro %v (is %s)", unsupportedNodeOsDistros, TestContext.NodeOSDistro)
-	}
-}
-
-// SkipUnlessTaintBasedEvictionsEnabled skips if the TaintBasedEvictions is not enabled.
-func SkipUnlessTaintBasedEvictionsEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions) {
-		skipInternalf(1, "Only supported when %v feature is enabled", features.TaintBasedEvictions)
-	}
-}
-
-// SkipIfContainerRuntimeIs skips if the container runtime is included in the runtimes.
-func SkipIfContainerRuntimeIs(runtimes ...string) {
-	for _, containerRuntime := range runtimes {
-		if containerRuntime == TestContext.ContainerRuntime {
-			skipInternalf(1, "Not supported under container runtime %s", containerRuntime)
-		}
-	}
 }
 
 // RunIfContainerRuntimeIs runs if the container runtime is included in the runtimes.
@@ -498,9 +371,6 @@ func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVers
 		Failf("Unexpected error getting %v: %v", gvr, err)
 	}
 }
-
-// ProvidersWithSSH are those providers where each node is accessible with SSH
-var ProvidersWithSSH = []string{"gce", "gke", "aws", "local"}
 
 // WaitForDaemonSets for all daemonsets in the given namespace to be ready
 // (defined as all but 'allowedNotReadyNodes' pods associated with that
@@ -793,193 +663,6 @@ func CheckTestingNSDeletedExcept(c clientset.Interface, skip string) error {
 		}
 	}
 	return fmt.Errorf("Waiting for terminating namespaces to be deleted timed out")
-}
-
-// deleteNS deletes the provided namespace, waits for it to be completely deleted, and then checks
-// whether there are any pods remaining in a non-terminating state.
-func deleteNS(c clientset.Interface, dynamicClient dynamic.Interface, namespace string, timeout time.Duration) error {
-	startTime := time.Now()
-	if err := c.CoreV1().Namespaces().Delete(namespace, nil); err != nil {
-		return err
-	}
-
-	// wait for namespace to delete or timeout.
-	var lastNamespace *v1.Namespace
-	err := wait.PollImmediate(2*time.Second, timeout, func() (bool, error) {
-		var err error
-		lastNamespace, err = c.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{})
-		if err != nil {
-			if apierrs.IsNotFound(err) {
-				return true, nil
-			}
-			Logf("Error while waiting for namespace to be terminated: %v", err)
-			return false, nil
-		}
-		return false, nil
-	})
-
-	// verify there is no more remaining content in the namespace
-	remainingContent, cerr := hasRemainingContent(c, dynamicClient, namespace)
-	if cerr != nil {
-		return cerr
-	}
-
-	// if content remains, let's dump information about the namespace, and system for flake debugging.
-	remainingPods := 0
-	missingTimestamp := 0
-	if remainingContent {
-		// log information about namespace, and set of namespaces in api server to help flake detection
-		logNamespace(c, namespace)
-		logNamespaces(c, namespace)
-
-		// if we can, check if there were pods remaining with no timestamp.
-		remainingPods, missingTimestamp, _ = e2epod.CountRemainingPods(c, namespace)
-	}
-
-	// a timeout waiting for namespace deletion happened!
-	if err != nil {
-		// namespaces now have conditions that are useful for debugging generic resources and finalizers
-		Logf("namespace did not cleanup: %s", spew.Sdump(lastNamespace))
-
-		// some content remains in the namespace
-		if remainingContent {
-			// pods remain
-			if remainingPods > 0 {
-				if missingTimestamp != 0 {
-					// pods remained, but were not undergoing deletion (namespace controller is probably culprit)
-					return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v, pods missing deletion timestamp: %v", namespace, err, remainingPods, missingTimestamp)
-				}
-				// but they were all undergoing deletion (kubelet is probably culprit, check NodeLost)
-				return fmt.Errorf("namespace %v was not deleted with limit: %v, pods remaining: %v", namespace, err, remainingPods)
-			}
-			// other content remains (namespace controller is probably screwed up)
-			return fmt.Errorf("namespace %v was not deleted with limit: %v, namespaced content other than pods remain", namespace, err)
-		}
-		// no remaining content, but namespace was not deleted (namespace controller is probably wedged)
-		return fmt.Errorf("namespace %v was not deleted with limit: %v, namespace is empty but is not yet removed", namespace, err)
-	}
-	Logf("namespace %v deletion completed in %s", namespace, time.Since(startTime))
-	return nil
-}
-
-// logNamespaces logs the number of namespaces by phase
-// namespace is the namespace the test was operating against that failed to delete so it can be grepped in logs
-func logNamespaces(c clientset.Interface, namespace string) {
-	namespaceList, err := c.CoreV1().Namespaces().List(metav1.ListOptions{})
-	if err != nil {
-		Logf("namespace: %v, unable to list namespaces: %v", namespace, err)
-		return
-	}
-
-	numActive := 0
-	numTerminating := 0
-	for _, namespace := range namespaceList.Items {
-		if namespace.Status.Phase == v1.NamespaceActive {
-			numActive++
-		} else {
-			numTerminating++
-		}
-	}
-	Logf("namespace: %v, total namespaces: %v, active: %v, terminating: %v", namespace, len(namespaceList.Items), numActive, numTerminating)
-}
-
-// logNamespace logs detail about a namespace
-func logNamespace(c clientset.Interface, namespace string) {
-	ns, err := c.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{})
-	if err != nil {
-		if apierrs.IsNotFound(err) {
-			Logf("namespace: %v no longer exists", namespace)
-			return
-		}
-		Logf("namespace: %v, unable to get namespace due to error: %v", namespace, err)
-		return
-	}
-	Logf("namespace: %v, DeletionTimetamp: %v, Finalizers: %v, Phase: %v", ns.Name, ns.DeletionTimestamp, ns.Spec.Finalizers, ns.Status.Phase)
-}
-
-// isDynamicDiscoveryError returns true if the error is a group discovery error
-// only for groups expected to be created/deleted dynamically during e2e tests
-func isDynamicDiscoveryError(err error) bool {
-	if !discovery.IsGroupDiscoveryFailedError(err) {
-		return false
-	}
-	discoveryErr := err.(*discovery.ErrGroupDiscoveryFailed)
-	for gv := range discoveryErr.Groups {
-		switch gv.Group {
-		case "mygroup.example.com":
-			// custom_resource_definition
-			// garbage_collector
-		case "wardle.k8s.io":
-			// aggregator
-		case "metrics.k8s.io":
-			// aggregated metrics server add-on, no persisted resources
-		default:
-			Logf("discovery error for unexpected group: %#v", gv)
-			return false
-		}
-	}
-	return true
-}
-
-// hasRemainingContent checks if there is remaining content in the namespace via API discovery
-func hasRemainingContent(c clientset.Interface, dynamicClient dynamic.Interface, namespace string) (bool, error) {
-	// some tests generate their own framework.Client rather than the default
-	// TODO: ensure every test call has a configured dynamicClient
-	if dynamicClient == nil {
-		return false, nil
-	}
-
-	// find out what content is supported on the server
-	// Since extension apiserver is not always available, e.g. metrics server sometimes goes down,
-	// add retry here.
-	resources, err := waitForServerPreferredNamespacedResources(c.Discovery(), 30*time.Second)
-	if err != nil {
-		return false, err
-	}
-	resources = discovery.FilteredBy(discovery.SupportsAllVerbs{Verbs: []string{"list", "delete"}}, resources)
-	groupVersionResources, err := discovery.GroupVersionResources(resources)
-	if err != nil {
-		return false, err
-	}
-
-	// TODO: temporary hack for https://github.com/kubernetes/kubernetes/issues/31798
-	ignoredResources := sets.NewString("bindings")
-
-	contentRemaining := false
-
-	// dump how many of resource type is on the server in a log.
-	for gvr := range groupVersionResources {
-		// get a client for this group version...
-		dynamicClient := dynamicClient.Resource(gvr).Namespace(namespace)
-		if err != nil {
-			// not all resource types support list, so some errors here are normal depending on the resource type.
-			Logf("namespace: %s, unable to get client - gvr: %v, error: %v", namespace, gvr, err)
-			continue
-		}
-		// get the api resource
-		apiResource := metav1.APIResource{Name: gvr.Resource, Namespaced: true}
-		if ignoredResources.Has(gvr.Resource) {
-			Logf("namespace: %s, resource: %s, ignored listing per whitelist", namespace, apiResource.Name)
-			continue
-		}
-		unstructuredList, err := dynamicClient.List(metav1.ListOptions{})
-		if err != nil {
-			// not all resources support list, so we ignore those
-			if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
-				continue
-			}
-			// skip unavailable servers
-			if apierrs.IsServiceUnavailable(err) {
-				continue
-			}
-			return false, err
-		}
-		if len(unstructuredList.Items) > 0 {
-			Logf("namespace: %s, resource: %s, items remaining: %v", namespace, apiResource.Name, len(unstructuredList.Items))
-			contentRemaining = true
-		}
-	}
-	return contentRemaining, nil
 }
 
 // ContainerInitInvariant checks for an init containers are initialized and invariant on both older and newer.
@@ -3178,28 +2861,6 @@ func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
 		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
 	}
 	return &ds, nil
-}
-
-// waitForServerPreferredNamespacedResources waits until server preferred namespaced resources could be successfully discovered.
-// TODO: Fix https://github.com/kubernetes/kubernetes/issues/55768 and remove the following retry.
-func waitForServerPreferredNamespacedResources(d discovery.DiscoveryInterface, timeout time.Duration) ([]*metav1.APIResourceList, error) {
-	Logf("Waiting up to %v for server preferred namespaced resources to be successfully discovered", timeout)
-	var resources []*metav1.APIResourceList
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		var err error
-		resources, err = d.ServerPreferredNamespacedResources()
-		if err == nil || isDynamicDiscoveryError(err) {
-			return true, nil
-		}
-		if !discovery.IsGroupDiscoveryFailedError(err) {
-			return false, err
-		}
-		Logf("Error discoverying server preferred namespaced resources: %v, retrying in %v.", err, Poll)
-		return false, nil
-	}); err != nil {
-		return nil, err
-	}
-	return resources, nil
 }
 
 // WaitForPersistentVolumeClaimDeleted waits for a PersistentVolumeClaim to be removed from the system until timeout occurs, whichever comes first.

@@ -24,7 +24,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -101,7 +100,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		)
 
 		if namespace2, err = f.CreateNamespace("secret-namespace", nil); err != nil {
-			e2elog.Failf("unable to create new namespace %s: %v", namespace2.Name, err)
+			framework.Failf("unable to create new namespace %s: %v", namespace2.Name, err)
 		}
 
 		secret2 := secretForTest(namespace2.Name, secret2Name)
@@ -109,7 +108,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 			"this_should_not_match_content_of_other_secret": []byte("similarly_this_should_not_match_content_of_other_secret\n"),
 		}
 		if secret2, err = f.ClientSet.CoreV1().Secrets(namespace2.Name).Create(secret2); err != nil {
-			e2elog.Failf("unable to create test secret %s: %v", secret2.Name, err)
+			framework.Failf("unable to create test secret %s: %v", secret2.Name, err)
 		}
 		doSecretE2EWithoutMapping(f, nil /* default mode */, secret2.Name, nil, nil)
 	})
@@ -135,7 +134,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 		var err error
 		if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
-			e2elog.Failf("unable to create test secret %s: %v", secret.Name, err)
+			framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 		}
 
 		pod := &v1.Pod{
@@ -246,12 +245,12 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", deleteSecret.Name))
 		var err error
 		if deleteSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(deleteSecret); err != nil {
-			e2elog.Failf("unable to create test secret %s: %v", deleteSecret.Name, err)
+			framework.Failf("unable to create test secret %s: %v", deleteSecret.Name, err)
 		}
 
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", updateSecret.Name))
 		if updateSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(updateSecret); err != nil {
-			e2elog.Failf("unable to create test secret %s: %v", updateSecret.Name, err)
+			framework.Failf("unable to create test secret %s: %v", updateSecret.Name, err)
 		}
 
 		pod := &v1.Pod{
@@ -360,7 +359,7 @@ var _ = ginkgo.Describe("[sig-storage] Secrets", func() {
 
 		ginkgo.By(fmt.Sprintf("Creating secret with name %s", createSecret.Name))
 		if createSecret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(createSecret); err != nil {
-			e2elog.Failf("unable to create test secret %s: %v", createSecret.Name, err)
+			framework.Failf("unable to create test secret %s: %v", createSecret.Name, err)
 		}
 
 		ginkgo.By("waiting to observe update in volume")
@@ -416,7 +415,7 @@ func doSecretE2EWithoutMapping(f *framework.Framework, defaultMode *int32, secre
 	ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 	var err error
 	if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
-		e2elog.Failf("unable to create test secret %s: %v", secret.Name, err)
+		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
 
 	pod := &v1.Pod{
@@ -485,7 +484,7 @@ func doSecretE2EWithMapping(f *framework.Framework, mode *int32) {
 	ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 	var err error
 	if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
-		e2elog.Failf("unable to create test secret %s: %v", secret.Name, err)
+		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
 
 	pod := &v1.Pod{
@@ -603,7 +602,7 @@ func createNonOptionalSecretPodWithSecret(f *framework.Framework, volumeMountPat
 	ginkgo.By(fmt.Sprintf("Creating secret with name %s", secret.Name))
 	var err error
 	if secret, err = f.ClientSet.CoreV1().Secrets(f.Namespace.Name).Create(secret); err != nil {
-		e2elog.Failf("unable to create test secret %s: %v", secret.Name, err)
+		framework.Failf("unable to create test secret %s: %v", secret.Name, err)
 	}
 	//creating a pod with secret object, with the key which is not present in secret object.
 	pod := &v1.Pod{

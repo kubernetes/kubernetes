@@ -242,7 +242,7 @@ var _ = SIGDescribe("Network", func() {
 				Containers: []v1.Container{
 					{
 						Name:  "boom-server",
-						Image: "gcr.io/kubernetes-e2e-test-images/regression-issue-74839-amd64:1.0",
+						Image: imageutils.GetE2EImage(imageutils.RegressionIssue74839),
 						Ports: []v1.ContainerPort{
 							{
 								ContainerPort: 9000, // Default port exposed by boom-server
