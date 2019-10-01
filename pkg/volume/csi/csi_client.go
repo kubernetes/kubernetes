@@ -928,6 +928,8 @@ func (c *csiDriverClient) nodeGetVolumeStatsV1(
 		Inodes:     resource.NewQuantity(int64(0), resource.BinarySI),
 		InodesFree: resource.NewQuantity(int64(0), resource.BinarySI),
 	}
+	bytesSet := false
+	inodesSet := false
 	for _, usage := range usages {
 		if usage == nil {
 			continue
@@ -935,13 +937,21 @@ func (c *csiDriverClient) nodeGetVolumeStatsV1(
 		unit := usage.GetUnit()
 		switch unit {
 		case csipbv1.VolumeUsage_BYTES:
+			if bytesSet {
+				klog.V(4).Info(log("volume usage bytes %v would be overwritten", metrics))
+			}
 			metrics.Available = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
 			metrics.Capacity = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
 			metrics.Used = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
+			bytesSet = true
 		case csipbv1.VolumeUsage_INODES:
+			if inodesSet {
+				klog.V(4).Info(log("volume usage inodes %v would be overwritten", metrics))
+			}
 			metrics.InodesFree = resource.NewQuantity(usage.GetAvailable(), resource.BinarySI)
 			metrics.Inodes = resource.NewQuantity(usage.GetTotal(), resource.BinarySI)
 			metrics.InodesUsed = resource.NewQuantity(usage.GetUsed(), resource.BinarySI)
+			inodesSet = true
 		default:
 			klog.Errorf("unknown key %s in usage", unit.String())
 		}
