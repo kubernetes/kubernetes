@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 
 	"k8s.io/klog"
@@ -362,25 +361,5 @@ func (m *csiBlockMapper) TearDownDevice(globalMapPath, devicePath string) error 
 		}
 	}
 
-	dataDir := getVolumeDeviceDataDir(m.specName, m.plugin.host)
-
-	// remove ~/${pv}/data/vol_data.json first, then remove the other dir.
-	volDataFile := path.Join(dataDir, volDataFileName)
-	err = os.Remove(volDataFile)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	// remove ~/${pv}/data
-	err = os.Remove(dataDir)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-
-	// remove ~/${pv}
-	pvPath := filepath.Dir(dataDir)
-	err = os.Remove(pvPath)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
 	return nil
 }
