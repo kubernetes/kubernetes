@@ -42,7 +42,8 @@ func BindFlags(l *componentbaseconfig.LeaderElectionConfiguration, fs *pflag.Fla
 		"of a leadership. This is only applicable if leader election is enabled.")
 	fs.StringVar(&l.ResourceLock, "leader-elect-resource-lock", l.ResourceLock, ""+
 		"The type of resource object that is used for locking during "+
-		"leader election. Supported options are `endpoints` (default) and `configmaps`.")
+		"leader election. Supported options are 'endpoints', 'configmaps', "+
+		"'leases', 'endpointsleases' and 'configmapsleases'.")
 	fs.StringVar(&l.ResourceName, "leader-elect-resource-name", l.ResourceName, ""+
 		"The name of resource object that is used for locking during "+
 		"leader election.")
