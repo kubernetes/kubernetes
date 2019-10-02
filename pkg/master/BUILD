@@ -53,7 +53,6 @@ go_library(
         "//pkg/registry/coordination/rest:go_default_library",
         "//pkg/registry/core/rangeallocation:go_default_library",
         "//pkg/registry/core/rest:go_default_library",
-        "//pkg/registry/core/service/ipallocator:go_default_library",
         "//pkg/registry/core/service/ipallocator/controller:go_default_library",
         "//pkg/registry/core/service/portallocator/controller:go_default_library",
         "//pkg/registry/discovery/rest:go_default_library",
@@ -128,6 +127,8 @@ go_library(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/integer:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 
