@@ -22,7 +22,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/types"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -32,7 +31,6 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	nodepkg "k8s.io/kubernetes/pkg/util/node"
@@ -110,19 +108,13 @@ func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 	return updatedPod, nil
 }
 
-// MarkAllPodsNotReady updates ready status of all pods running on
+// MarkPodsNotReady updates ready status of given pods running on
 // given node from master return true if success
-func MarkAllPodsNotReady(kubeClient clientset.Interface, node *v1.Node) error {
-	nodeName := node.Name
+func MarkPodsNotReady(kubeClient clientset.Interface, pods []v1.Pod, nodeName string) error {
 	klog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
-	opts := metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, nodeName).String()}
-	pods, err := kubeClient.CoreV1().Pods(metav1.NamespaceAll).List(opts)
-	if err != nil {
-		return err
-	}
 
 	errMsg := []string{}
-	for _, pod := range pods.Items {
+	for _, pod := range pods {
 		// Defensive check, also needed for tests.
 		if pod.Spec.NodeName != nodeName {
 			continue
