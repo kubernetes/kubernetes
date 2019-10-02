@@ -30,7 +30,7 @@ require (
 	golang.org/x/text v0.3.2 // indirect
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
 	gopkg.in/inf.v0 v0.9.0
-	gopkg.in/yaml.v2 v2.2.2
+	gopkg.in/yaml.v2 v2.2.4
 	k8s.io/klog v0.4.0
 	k8s.io/kube-openapi v0.0.0-20190816220812-743ec37842bf
 	sigs.k8s.io/yaml v1.1.0
