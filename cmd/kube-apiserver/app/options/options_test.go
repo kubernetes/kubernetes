@@ -115,6 +115,7 @@ func TestAddFlags(t *testing.T) {
 		"--request-timeout=2m",
 		"--storage-backend=etcd3",
 		"--service-cluster-ip-range=192.168.128.0/17",
+		"--kubernetes-service-cluster-ip=192.168.128.5",
 	}
 	fs.Parse(args)
 
@@ -122,6 +123,7 @@ func TestAddFlags(t *testing.T) {
 	expected := &ServerRunOptions{
 		ServiceNodePortRange:   kubeoptions.DefaultServiceNodePortRange,
 		ServiceClusterIPRanges: (&net.IPNet{IP: net.ParseIP("192.168.128.0"), Mask: net.CIDRMask(17, 32)}).String(),
+		APIServerServiceIP:     net.IPv4(192, 168, 128, 5),
 		MasterCount:            5,
 		EndpointReconcilerType: string(reconcilers.LeaseEndpointReconcilerType),
 		AllowPrivileged:        false,

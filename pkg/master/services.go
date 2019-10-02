@@ -31,7 +31,8 @@ import (
 // setting service ip range to the default value in kubeoptions.DefaultServiceIPCIDR
 // for now until the default is removed per the deprecation timeline guidelines.
 // Returns service ip range, api server service IP, and an error
-func ServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, net.IP, error) {
+func ServiceIPRange(passedServiceClusterIPRange net.IPNet, passedAPIServiceClusterIP net.IP) (net.IPNet, net.IP, error) {
+	var err error
 	serviceClusterIPRange := passedServiceClusterIPRange
 	if passedServiceClusterIPRange.IP == nil {
 		klog.Warningf("No CIDR for service cluster IPs specified. Default value which was %s is deprecated and will be removed in future releases. Please specify it using --service-cluster-ip-range on kube-apiserver.", kubeoptions.DefaultServiceIPCIDR.String())
@@ -43,12 +44,16 @@ func ServiceIPRange(passedServiceClusterIPRange net.IPNet) (net.IPNet, net.IP, e
 		return net.IPNet{}, net.IP{}, fmt.Errorf("the service cluster IP range must be at least %d IP addresses", 8)
 	}
 
-	// Select the first valid IP from ServiceClusterIPRange to use as the GenericAPIServer service IP.
-	apiServerServiceIP, err := utilnet.GetIndexedIP(&serviceClusterIPRange, 1)
-	if err != nil {
-		return net.IPNet{}, net.IP{}, err
+	if passedAPIServiceClusterIP == nil {
+		// Select the first valid IP from ServiceClusterIPRange to use as the GenericAPIServer service IP.
+		passedAPIServiceClusterIP, err = utilnet.GetIndexedIP(&serviceClusterIPRange, 1)
+		if err != nil {
+			return net.IPNet{}, net.IP{}, err
+		}
+	} else if !serviceClusterIPRange.Contains(passedAPIServiceClusterIP) {
+		return net.IPNet{}, net.IP{}, fmt.Errorf("the service cluster IP must be in the range of %s", serviceClusterIPRange)
 	}
-	klog.V(4).Infof("Setting service IP to %q (read-write).", apiServerServiceIP)
+	klog.V(4).Infof("Setting service IP to %q (read-write).", passedAPIServiceClusterIP)
 
-	return serviceClusterIPRange, apiServerServiceIP, nil
+	return serviceClusterIPRange, passedAPIServiceClusterIP, nil
 }

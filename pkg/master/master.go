@@ -283,15 +283,10 @@ func (c *Config) Complete() CompletedConfig {
 		&c.ExtraConfig,
 	}
 
-	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(cfg.ExtraConfig.ServiceIPRange)
+	var err error
+	cfg.ExtraConfig.ServiceIPRange, cfg.ExtraConfig.APIServerServiceIP, err = ServiceIPRange(cfg.ExtraConfig.ServiceIPRange, cfg.ExtraConfig.APIServerServiceIP)
 	if err != nil {
 		klog.Fatalf("Error determining service IP ranges: %v", err)
-	}
-	if cfg.ExtraConfig.ServiceIPRange.IP == nil {
-		cfg.ExtraConfig.ServiceIPRange = serviceIPRange
-	}
-	if cfg.ExtraConfig.APIServerServiceIP == nil {
-		cfg.ExtraConfig.APIServerServiceIP = apiServerServiceIP
 	}
 
 	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: cfg.GenericConfig.ExternalAddress}
