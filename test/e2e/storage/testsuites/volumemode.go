@@ -275,7 +275,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 	}
 
 	ginkgo.It("should fail to use a volume in a pod with mismatched mode [Slow]", func() {
-		skipBlockTest(driver)
+		skipTestIfBlockNotSupported(driver)
 		init()
 		l.genericVolumeTestResource = *createGenericVolumeTestResource(driver, l.config, pattern)
 		defer cleanup()
@@ -324,7 +324,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		framework.SkipUnlessSSHKeyPresent()
 		if pattern.VolMode == v1.PersistentVolumeBlock {
-			skipBlockTest(driver)
+			skipTestIfBlockNotSupported(driver)
 		}
 		init()
 		l.genericVolumeTestResource = *createGenericVolumeTestResource(driver, l.config, pattern)
