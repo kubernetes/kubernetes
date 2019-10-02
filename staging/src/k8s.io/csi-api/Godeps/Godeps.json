@@ -144,7 +144,7 @@
 		},
 		{
 			"ImportPath": "gopkg.in/yaml.v2",
-			"Rev": "5420a8b6744d3b0345ab293f6fcba19c978f1183"
+			"Rev": "f221b8435cfb71e54062f6c6e99e9ade30b124d5"
 		},
 		{
 			"ImportPath": "k8s.io/api/admissionregistration/v1beta1",
