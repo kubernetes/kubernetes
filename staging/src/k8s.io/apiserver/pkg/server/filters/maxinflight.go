@@ -178,7 +178,7 @@ func WithMaxInFlightLimit(
 						}
 					}
 				}
-				metrics.Record(r, requestInfo, metrics.APIServerComponent, "", http.StatusTooManyRequests, 0, 0)
+				metrics.RecordRequestError(r, requestInfo, metrics.APIServerComponent, http.StatusTooManyRequests)
 				tooManyRequests(r, w)
 			}
 		}
