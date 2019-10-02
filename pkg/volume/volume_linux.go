@@ -42,6 +42,8 @@ func SetVolumeOwnership(mounter Mounter, fsGroup *int64) error {
 		return nil
 	}
 
+	klog.Warningf("Setting volume ownership for %s and fsGroup set. If the volume has a lot of files then setting volume ownership could be slow, see https://github.com/kubernetes/kubernetes/issues/69699", mounter.GetPath())
+
 	return filepath.Walk(mounter.GetPath(), func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

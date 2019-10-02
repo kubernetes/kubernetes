@@ -382,8 +382,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	notMnt, err := b.mounter.IsLikelyNotMountPoint(dir)
 	klog.V(4).Infof("GCE PersistentDisk set up: Dir (%s) PD name (%q) Mounted (%t) Error (%v), ReadOnly (%t)", dir, b.pdName, !notMnt, err, b.readOnly)
 	if err != nil && !os.IsNotExist(err) {
-		klog.Errorf("cannot validate mount point: %s %v", dir, err)
-		return err
+		return fmt.Errorf("cannot validate mount point: %s %v", dir, err)
 	}
 	if !notMnt {
 		return nil
@@ -392,8 +391,7 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	if runtime.GOOS != "windows" {
 		// in windows, we will use mklink to mount, will MkdirAll in Mount func
 		if err := os.MkdirAll(dir, 0750); err != nil {
-			klog.Errorf("mkdir failed on disk %s (%v)", dir, err)
-			return err
+			return fmt.Errorf("mkdir failed on disk %s (%v)", dir, err)
 		}
 	}
 
@@ -412,35 +410,32 @@ func (b *gcePersistentDiskMounter) SetUpAt(dir string, mounterArgs volume.Mounte
 	if err != nil {
 		notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 		if mntErr != nil {
-			klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
-			return err
+			return fmt.Errorf("failed to mount: %v. Cleanup IsLikelyNotMountPoint check failed: %v", err, mntErr)
 		}
 		if !notMnt {
 			if mntErr = b.mounter.Unmount(dir); mntErr != nil {
-				klog.Errorf("Failed to unmount: %v", mntErr)
-				return err
+				return fmt.Errorf("failed to mount: %v. Cleanup failed to unmount: %v", err, mntErr)
 			}
 			notMnt, mntErr := b.mounter.IsLikelyNotMountPoint(dir)
 			if mntErr != nil {
-				klog.Errorf("IsLikelyNotMountPoint check failed: %v", mntErr)
-				return err
+				return fmt.Errorf("failed to mount: %v. Cleanup IsLikelyNotMountPoint check failed: %v", err, mntErr)
 			}
 			if !notMnt {
 				// This is very odd, we don't expect it.  We'll try again next sync loop.
-				klog.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop.", dir)
-				return err
+				return fmt.Errorf("%s is still mounted, despite call to unmount().  Will try again next sync loop", dir)
 			}
 		}
-		os.Remove(dir)
-		klog.Errorf("Mount of disk %s failed: %v", dir, err)
-		return err
+		mntErr = os.Remove(dir)
+		if mntErr != nil {
+			return fmt.Errorf("failed to mount: %v. Cleanup os Remove(%s) failed: %v", err, dir, mntErr)
+		}
+
+		return fmt.Errorf("mount of disk %s failed: %v", dir, err)
 	}
 
 	if !b.readOnly {
 		volume.SetVolumeOwnership(b, mounterArgs.FsGroup)
 	}
-
-	klog.V(4).Infof("Successfully mounted %s", dir)
 	return nil
 }
 
