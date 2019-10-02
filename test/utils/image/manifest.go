@@ -241,7 +241,7 @@ func initImageConfigs() map[int]Config {
 	configs[Mounttest] = Config{e2eRegistry, "mounttest", "1.0"}
 	configs[MounttestUser] = Config{e2eRegistry, "mounttest-user", "1.0"}
 	configs[Nautilus] = Config{e2eRegistry, "nautilus", "1.0"}
-	configs[NFSProvisioner] = Config{quayIncubator, "nfs-provisioner", "v2.2.0-k8s1.12"}
+	configs[NFSProvisioner] = Config{quayIncubator, "nfs-provisioner", "v2.2.2"}
 	configs[Nginx] = Config{dockerLibraryRegistry, "nginx", "1.14-alpine"}
 	configs[NginxNew] = Config{dockerLibraryRegistry, "nginx", "1.15-alpine"}
 	configs[Nonewprivs] = Config{e2eRegistry, "nonewprivs", "1.0"}
