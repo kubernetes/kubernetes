@@ -25,11 +25,10 @@
       }
     },
     "command": [
-      "/usr/local/bin/kube-controller-manager"
-    ],
-    "args": [
-      {{params}}
-    ],
+                 "/bin/sh",
+                 "-c",
+                 "exec /usr/local/bin/kube-controller-manager {{params}} 1>>/var/log/kube-controller-manager.log 2>&1"
+               ],
     {{container_env}}
     "livenessProbe": {
       "httpGet": {
