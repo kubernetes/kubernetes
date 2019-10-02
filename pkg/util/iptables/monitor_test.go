@@ -41,6 +41,9 @@ type monitorFakeExec struct {
 	sync.Mutex
 
 	tables map[string]sets.String
+
+	block      bool
+	wasBlocked bool
 }
 
 func newMonitorFakeExec() *monitorFakeExec {
@@ -49,6 +52,22 @@ func newMonitorFakeExec() *monitorFakeExec {
 	tables["filter"] = sets.NewString()
 	tables["nat"] = sets.NewString()
 	return &monitorFakeExec{tables: tables}
+}
+
+func (mfe *monitorFakeExec) blockIPTables(block bool) {
+	mfe.Lock()
+	defer mfe.Unlock()
+
+	mfe.block = block
+}
+
+func (mfe *monitorFakeExec) getWasBlocked() bool {
+	mfe.Lock()
+	defer mfe.Unlock()
+
+	wasBlocked := mfe.wasBlocked
+	mfe.wasBlocked = false
+	return wasBlocked
 }
 
 func (mfe *monitorFakeExec) Command(cmd string, args ...string) exec.Cmd {
@@ -94,6 +113,12 @@ func (mfc *monitorFakeCmd) CombinedOutput() ([]byte, error) {
 	table := mfc.mfe.tables[tableName]
 	if table == nil {
 		return []byte{}, fmt.Errorf("no such table %q", tableName)
+	}
+
+	// For ease-of-testing reasons, blockIPTables blocks create and list, but not delete
+	if mfc.mfe.block && op != opDeleteChain {
+		mfc.mfe.wasBlocked = true
+		return []byte{}, exec.CodeExitError{Code: 4, Err: fmt.Errorf("could not get xtables.lock, etc")}
 	}
 
 	switch op {
@@ -199,8 +224,17 @@ func TestIPTablesMonitor(t *testing.T) {
 		t.Errorf("got unexpected number of reloads after partial flush: %v", err)
 	}
 
-	// If we delete the last chain, it should reload now
+	// Now ensure that "iptables -L" will get an error about the xtables.lock, and
+	// delete the last chain. The monitor should not reload, because it can't actually
+	// tell if the chain was deleted or not.
+	mfe.blockIPTables(true)
 	ipt.DeleteChain(TableNAT, canary)
+	if err := waitForBlocked(mfe); err != nil {
+		t.Errorf("failed waiting for monitor to be blocked from monitoring: %v", err)
+	}
+
+	// After unblocking the monitor, it should now reload
+	mfe.blockIPTables(false)
 
 	if err := waitForReloads(&reloads, 2); err != nil {
 		t.Errorf("got unexpected number of reloads after slow flush: %v", err)
@@ -213,11 +247,40 @@ func TestIPTablesMonitor(t *testing.T) {
 	close(stopCh)
 
 	if err := waitForNoReload(&reloads, 2); err != nil {
-		t.Errorf("got unexpected number of reloads after partial flush: %v", err)
+		t.Errorf("got unexpected number of reloads after stop: %v", err)
 	}
 	if !ensureNoChains(mfe) {
 		t.Errorf("canaries still exist after stopping monitor")
 	}
+
+	// If we create a new monitor while the iptables lock is held, it will
+	// retry creating canaries until it succeeds
+
+	stopCh = make(chan struct{})
+	_ = mfe.getWasBlocked()
+	mfe.blockIPTables(true)
+	go ipt.Monitor(canary, tables, func() {
+		if !ensureNoChains(mfe) {
+			t.Errorf("reload called while canaries still exist")
+		}
+		atomic.AddUint32(&reloads, 1)
+	}, 100*time.Millisecond, stopCh)
+
+	// Monitor should not have created canaries yet
+	if !ensureNoChains(mfe) {
+		t.Errorf("canary created while iptables blocked")
+	}
+
+	if err := waitForBlocked(mfe); err != nil {
+		t.Errorf("failed waiting for monitor to fail creating canaries: %v", err)
+	}
+
+	mfe.blockIPTables(false)
+	if err := waitForChains(mfe, canary, tables); err != nil {
+		t.Errorf("failed to create iptables canaries: %v", err)
+	}
+
+	close(stopCh)
 }
 
 func waitForChains(mfe *monitorFakeExec, canary Chain, tables []Table) error {
@@ -265,4 +328,11 @@ func waitForNoReload(reloads *uint32, expected uint32) error {
 		return fmt.Errorf("expected %d, got %d", expected, got)
 	}
 	return nil
+}
+
+func waitForBlocked(mfe *monitorFakeExec) error {
+	return utilwait.PollImmediate(100*time.Millisecond, time.Second, func() (bool, error) {
+		blocked := mfe.getWasBlocked()
+		return blocked, nil
+	})
 }
