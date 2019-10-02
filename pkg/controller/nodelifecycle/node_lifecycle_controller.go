@@ -34,6 +34,7 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -51,6 +52,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
+	apicore "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
@@ -673,7 +675,12 @@ func (nc *Controller) doEvictionPass() {
 				klog.Warningf("Failed to get Node %v from the nodeLister: %v", value.Value, err)
 			}
 			nodeUID, _ := value.UID.(string)
-			remaining, err := nodeutil.DeletePods(nc.kubeClient, nc.recorder, value.Value, nodeUID, nc.daemonSetStore)
+			pods, err := listPodsFromNode(nc.kubeClient, value.Value)
+			if err != nil {
+				utilruntime.HandleError(fmt.Errorf("unable to list pods from node %q: %v", value.Value, err))
+				return false, 0
+			}
+			remaining, err := nodeutil.DeletePods(nc.kubeClient, pods, nc.recorder, value.Value, nodeUID, nc.daemonSetStore)
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to evict node %q: %v", value.Value, err))
 				return false, 0
@@ -691,6 +698,16 @@ func (nc *Controller) doEvictionPass() {
 			return true, 0
 		})
 	}
+}
+
+func listPodsFromNode(kubeClient clientset.Interface, nodeName string) ([]v1.Pod, error) {
+	selector := fields.OneTermEqualSelector(apicore.PodHostField, nodeName).String()
+	options := metav1.ListOptions{FieldSelector: selector}
+	pods, err := kubeClient.CoreV1().Pods(metav1.NamespaceAll).List(options)
+	if err != nil {
+		return nil, err
+	}
+	return pods.Items, nil
 }
 
 // monitorNodeHealth verifies node health are constantly updated by kubelet, and
@@ -773,7 +790,12 @@ func (nc *Controller) monitorNodeHealth() error {
 			// Report node event.
 			if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
 				nodeutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
-				if err = nodeutil.MarkAllPodsNotReady(nc.kubeClient, node); err != nil {
+				pods, err := listPodsFromNode(nc.kubeClient, node.Name)
+				if err != nil {
+					utilruntime.HandleError(fmt.Errorf("Unable to list pods from node %v: %v", node.Name, err))
+					continue
+				}
+				if err = nodeutil.MarkPodsNotReady(nc.kubeClient, pods, node.Name); err != nil {
 					utilruntime.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
 				}
 			}
