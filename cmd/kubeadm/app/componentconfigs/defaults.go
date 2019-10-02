@@ -113,7 +113,7 @@ func DefaultKubeletConfiguration(internalcfg *kubeadmapi.ClusterConfiguration) {
 	}
 
 	clusterDNS := ""
-	dnsIP, err := constants.GetDNSIP(internalcfg.Networking.ServiceSubnet)
+	dnsIP, err := constants.GetDNSIP(internalcfg.Networking.ServiceSubnet, features.Enabled(internalcfg.FeatureGates, features.IPv6DualStack))
 	if err != nil {
 		clusterDNS = kubeadmapiv1beta2.DefaultClusterDNSIP
 	} else {
