@@ -43,12 +43,13 @@ func (f *fakeObjectCreater) New(_ schema.GroupVersionKind) (runtime.Object, erro
 }
 
 func TestNoUpdateBeforeFirstApply(t *testing.T) {
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
-	f.fieldManager = fieldmanager.NewSkipNonAppliedManager(
-		f.fieldManager,
-		&fakeObjectCreater{gvk: schema.GroupVersionKind{Version: "v1", Kind: "Pod"}},
-		schema.GroupVersionKind{},
-	)
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"), func(m fieldmanager.Manager) fieldmanager.Manager {
+		return fieldmanager.NewSkipNonAppliedManager(
+			m,
+			&fakeObjectCreater{gvk: schema.GroupVersionKind{Version: "v1", Kind: "Pod"}},
+			schema.GroupVersionKind{},
+		)
+	})
 
 	appliedObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
 	if err := yaml.Unmarshal([]byte(`{
@@ -68,7 +69,7 @@ func TestNoUpdateBeforeFirstApply(t *testing.T) {
 		t.Fatalf("error decoding YAML: %v", err)
 	}
 
-	if err := f.Apply(appliedObj, "fieldmanager_test_apply", false); err != nil {
+	if err := f.Apply(appliedObj, "fieldmanager_test_apply", "", false); err != nil {
 		t.Fatalf("failed to update object: %v", err)
 	}
 
@@ -82,12 +83,13 @@ func TestNoUpdateBeforeFirstApply(t *testing.T) {
 }
 
 func TestUpdateBeforeFirstApply(t *testing.T) {
-	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"))
-	f.fieldManager = fieldmanager.NewSkipNonAppliedManager(
-		f.fieldManager,
-		&fakeObjectCreater{gvk: schema.GroupVersionKind{Version: "v1", Kind: "Pod"}},
-		schema.GroupVersionKind{},
-	)
+	f := NewTestFieldManager(schema.FromAPIVersionAndKind("v1", "Pod"), func(m fieldmanager.Manager) fieldmanager.Manager {
+		return fieldmanager.NewSkipNonAppliedManager(
+			m,
+			&fakeObjectCreater{gvk: schema.GroupVersionKind{Version: "v1", Kind: "Pod"}},
+			schema.GroupVersionKind{},
+		)
+	})
 
 	updatedObj := &corev1.Pod{}
 	updatedObj.Kind = "Pod"
@@ -120,7 +122,7 @@ func TestUpdateBeforeFirstApply(t *testing.T) {
 		t.Fatalf("error decoding YAML: %v", err)
 	}
 
-	err := f.Apply(appliedObj, "fieldmanager_test_apply", false)
+	err := f.Apply(appliedObj, "fieldmanager_test_apply", "", false)
 	apiStatus, _ := err.(apierrors.APIStatus)
 	if err == nil || !apierrors.IsConflict(err) || len(apiStatus.Status().Details.Causes) != 1 {
 		t.Fatalf("Expecting to get one conflict but got %v", err)
@@ -134,7 +136,7 @@ func TestUpdateBeforeFirstApply(t *testing.T) {
 		t.Fatalf("Expecting conflict message to contain %q but got %q: %v", e, a, err)
 	}
 
-	if err := f.Apply(appliedObj, "fieldmanager_test_apply", true); err != nil {
+	if err := f.Apply(appliedObj, "fieldmanager_test_apply", "", true); err != nil {
 		t.Fatalf("failed to update object: %v", err)
 	}
 

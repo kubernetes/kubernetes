@@ -393,6 +393,17 @@ run_kubectl_server_side_apply_tests() {
   # clean-up
   kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
 
+  ## kubectl apply upgrade
+  # Pre-Condition: no POD exists
+  kube::test::get_object_assert pods "{{range.items}}{{${id_field:?}}}:{{end}}" ''
+
+  # test upgrade from client-side apply to server-side apply
+  kubectl apply -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
+  kubectl apply --server-side -f hack/testdata/pod-apply.yaml "${kube_flags[@]:?}"
+
+  # clean-up
+  kubectl delete -f hack/testdata/pod.yaml "${kube_flags[@]:?}"
+
   ## kubectl apply dry-run on CR
   # Create CRD
   kubectl "${kube_flags_with_token[@]}" create -f - << __EOF__

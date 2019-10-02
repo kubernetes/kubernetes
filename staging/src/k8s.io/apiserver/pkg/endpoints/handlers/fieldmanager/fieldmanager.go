@@ -17,18 +17,22 @@ limitations under the License.
 package fieldmanager
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
 	"k8s.io/klog/v2"
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/v3/fieldpath"
+	"sigs.k8s.io/structured-merge-diff/v3/merge"
 )
 
 // DefaultMaxUpdateManagers defines the default maximum retained number of managedFields entries from updates
@@ -66,44 +70,60 @@ type Manager interface {
 // FieldManager updates the managed fields and merge applied
 // configurations.
 type FieldManager struct {
-	fieldManager Manager
+	fieldManager    Manager
+	typeConverter   internal.TypeConverter
+	objectConverter runtime.ObjectConvertor
+	groupVersion    schema.GroupVersion
 }
 
 // NewFieldManager creates a new FieldManager that decodes, manages, then re-encodes managedFields
 // on update and apply requests.
-func NewFieldManager(f Manager) *FieldManager {
-	return &FieldManager{f}
+func NewFieldManager(f Manager, typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, groupVersion schema.GroupVersion) *FieldManager {
+	return &FieldManager{f, typeConverter, objectConverter, groupVersion}
 }
 
 // NewDefaultFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
 func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion) (*FieldManager, error) {
-	f, err := NewStructuredMergeManager(models, objectConverter, objectDefaulter, kind.GroupVersion(), hub)
+	typeConverter, err := internal.NewTypeConverter(models, false)
+	if err != nil {
+		return nil, err
+	}
+
+	f, err := NewStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)
 	}
-	return newDefaultFieldManager(f, objectCreater, kind), nil
+	return newDefaultFieldManager(f, typeConverter, objectConverter, objectCreater, kind), nil
 }
 
 // NewDefaultCRDFieldManager creates a new FieldManager specifically for
 // CRDs. This allows for the possibility of fields which are not defined
 // in models, as well as having no models defined at all.
 func NewDefaultCRDFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion, preserveUnknownFields bool) (_ *FieldManager, err error) {
-	f, err := NewCRDStructuredMergeManager(models, objectConverter, objectDefaulter, kind.GroupVersion(), hub, preserveUnknownFields)
+	var typeConverter internal.TypeConverter = internal.DeducedTypeConverter{}
+	if models != nil {
+		typeConverter, err = internal.NewTypeConverter(models, preserveUnknownFields)
+		if err != nil {
+			return nil, err
+		}
+	}
+	f, err := NewCRDStructuredMergeManager(typeConverter, objectConverter, objectDefaulter, kind.GroupVersion(), hub, preserveUnknownFields)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)
 	}
-	return newDefaultFieldManager(f, objectCreater, kind), nil
+	return newDefaultFieldManager(f, typeConverter, objectConverter, objectCreater, kind), nil
 }
 
 // newDefaultFieldManager is a helper function which wraps a Manager with certain default logic.
-func newDefaultFieldManager(f Manager, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind) *FieldManager {
+func newDefaultFieldManager(f Manager, typeConverter internal.TypeConverter, objectConverter runtime.ObjectConvertor, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind) *FieldManager {
 	f = NewStripMetaManager(f)
 	f = NewManagedFieldsUpdater(f)
 	f = NewBuildManagerInfoManager(f, kind.GroupVersion())
 	f = NewCapManagersManager(f, DefaultMaxUpdateManagers)
 	f = NewProbabilisticSkipNonAppliedManager(f, objectCreater, kind, DefaultTrackOnCreateProbability)
-	return NewFieldManager(f)
+
+	return NewFieldManager(f, typeConverter, objectConverter, kind.GroupVersion())
 }
 
 // Update is used when the object has already been merged (non-apply
@@ -185,7 +205,7 @@ func isResetManagedFields(managedFields []metav1.ManagedFieldsEntry) bool {
 
 // Apply is used when server-side apply is called, as it merges the
 // object and updates the managed fields.
-func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string, force bool) (object runtime.Object, err error) {
+func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string, userAgent string, force bool) (object runtime.Object, err error) {
 	// If the object doesn't have metadata, apply isn't allowed.
 	accessor, err := meta.Accessor(liveObj)
 	if err != nil {
@@ -200,7 +220,17 @@ func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string,
 
 	internal.RemoveObjectManagedFields(liveObj)
 
-	if object, managed, err = f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force); err != nil {
+	if userAgent == "kubectl" {
+		// Upgrade the client-side apply annotation
+		// only if the apply is from kubectl
+		object, managed, err = f.ApplyUsingLastAppliedAnnotation(liveObj, appliedObj, managed, manager, force)
+	} else {
+		object, managed, err = f.fieldManager.Apply(liveObj, appliedObj, managed, manager, force)
+	}
+	if err != nil {
+		if conflicts, ok := err.(merge.Conflicts); ok {
+			return nil, internal.NewConflictError(conflicts)
+		}
 		return nil, err
 	}
 
@@ -209,4 +239,102 @@ func (f *FieldManager) Apply(liveObj, appliedObj runtime.Object, manager string,
 	}
 
 	return object, nil
+}
+
+// ApplyUsingLastAppliedAnnotation will Apply and consider the last-applied annotation
+// for upgrading an object managed by client-side apply to server-side apply
+// without conflicts
+func (f *FieldManager) ApplyUsingLastAppliedAnnotation(liveObj runtime.Object, newObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
+	newLiveObj, newManaged, newErr := f.fieldManager.Apply(liveObj, newObj, managed, manager, force)
+
+	// Check if we have conflicts
+	if newErr == nil {
+		return newLiveObj, newManaged, newErr
+	}
+	conflicts, ok := newErr.(merge.Conflicts)
+	if !ok {
+		return newLiveObj, newManaged, newErr
+	}
+	conflictSet := conflictsToSet(conflicts)
+
+	// Check if conflicts are allowed due to client-side apply,
+	// and if so, then force apply
+	allowedConflictSet, err := f.allowedConflictsFromLastApplied(liveObj)
+	if err != nil {
+		return newLiveObj, newManaged, newErr
+	}
+	if !conflictSet.Difference(allowedConflictSet).Empty() {
+		return newLiveObj, newManaged, newErr
+	}
+	return f.fieldManager.Apply(liveObj, newObj, managed, manager, true)
+}
+
+func (f *FieldManager) allowedConflictsFromLastApplied(liveObj runtime.Object) (*fieldpath.Set, error) {
+	var accessor, err = meta.Accessor(liveObj)
+	if err != nil {
+		panic(fmt.Sprintf("couldn't get accessor: %v", err))
+	}
+
+	// If there is no client-side apply annotation, then there is nothing to do
+	var annotations = accessor.GetAnnotations()
+	if annotations == nil {
+		return nil, fmt.Errorf("no last applied annotation")
+	}
+	var lastApplied, ok = annotations[corev1.LastAppliedConfigAnnotation]
+	if !ok || lastApplied == "" {
+		return nil, fmt.Errorf("no last applied annotation")
+	}
+
+	liveObjVersioned, err := f.objectConverter.ConvertToVersion(liveObj, f.groupVersion)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert live obj to versioned: %v", err)
+	}
+
+	liveObjTyped, err := f.typeConverter.ObjectToTyped(liveObjVersioned)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert live obj to typed: %v", err)
+	}
+
+	var lastAppliedObj = &unstructured.Unstructured{Object: map[string]interface{}{}}
+	err = json.Unmarshal([]byte(lastApplied), lastAppliedObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode last applied obj: %v in '%s'", err, lastApplied)
+	}
+
+	if lastAppliedObj.GetAPIVersion() != f.groupVersion.String() {
+		return nil, fmt.Errorf("expected version of last applied to match live object '%s', but got '%s': %v", f.groupVersion.String(), lastAppliedObj.GetAPIVersion(), err)
+	}
+
+	lastAppliedObjTyped, err := f.typeConverter.ObjectToTyped(lastAppliedObj)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert last applied to typed: %v", err)
+	}
+
+	lastAppliedObjFieldSet, err := lastAppliedObjTyped.ToFieldSet()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create fieldset for last applied object: %v", err)
+	}
+
+	comparison, err := lastAppliedObjTyped.Compare(liveObjTyped)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compare last applied object and live object: %v", err)
+	}
+
+	// Remove fields in last applied that are different or missing in
+	// the live object
+	lastAppliedObjFieldSet = lastAppliedObjFieldSet.
+		Difference(comparison.Modified).
+		Difference(comparison.Added).
+		Difference(comparison.Removed)
+
+	return lastAppliedObjFieldSet, nil
+}
+
+// TODO: replace with merge.Conflicts.ToSet()
+func conflictsToSet(conflicts merge.Conflicts) *fieldpath.Set {
+	conflictSet := fieldpath.NewSet()
+	for _, conflict := range []merge.Conflict(conflicts) {
+		conflictSet.Insert(conflict.Path)
+	}
+	return conflictSet
 }

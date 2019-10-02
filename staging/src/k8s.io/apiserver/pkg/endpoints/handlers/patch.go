@@ -421,6 +421,7 @@ type applyPatcher struct {
 	creater      runtime.ObjectCreater
 	kind         schema.GroupVersionKind
 	fieldManager *fieldmanager.FieldManager
+	userAgent    string
 }
 
 func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Object, error) {
@@ -437,7 +438,7 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
 	}
 
-	return p.fieldManager.Apply(obj, patchObj, p.options.FieldManager, force)
+	return p.fieldManager.Apply(obj, patchObj, p.options.FieldManager, prefixFromUserAgent(p.userAgent), force)
 }
 
 func (p *applyPatcher) createNewObject() (runtime.Object, error) {
@@ -569,6 +570,7 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 			options:      p.options,
 			creater:      p.creater,
 			kind:         p.kind,
+			userAgent:    p.userAgent,
 		}
 		p.forceAllowCreate = true
 	default:
