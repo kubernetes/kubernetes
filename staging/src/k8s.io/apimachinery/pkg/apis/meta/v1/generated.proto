@@ -432,7 +432,8 @@ message ListOptions {
   optional string resourceVersion = 4;
 
   // Timeout for the list/watch call.
-  // This limits the duration of the call, regardless of any activity or inactivity.
+  // This limits the duration of the call on the server-side, regardless of any activity or inactivity.
+  // This timeout don't change the client timeout.
   // +optional
   optional int64 timeoutSeconds = 5;
 

@@ -366,7 +366,8 @@ type ListOptions struct {
 	// +optional
 	ResourceVersion string `json:"resourceVersion,omitempty" protobuf:"bytes,4,opt,name=resourceVersion"`
 	// Timeout for the list/watch call.
-	// This limits the duration of the call, regardless of any activity or inactivity.
+	// This limits the duration of the call on the server-side, regardless of any activity or inactivity.
+	// This timeout don't change the client timeout.
 	// +optional
 	TimeoutSeconds *int64 `json:"timeoutSeconds,omitempty" protobuf:"varint,5,opt,name=timeoutSeconds"`
 

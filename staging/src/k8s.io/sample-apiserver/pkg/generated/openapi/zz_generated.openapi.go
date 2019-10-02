@@ -1072,7 +1072,7 @@ func schema_pkg_apis_meta_v1_ListOptions(ref common.ReferenceCallback) common.Op
 					},
 					"timeoutSeconds": {
 						SchemaProps: spec.SchemaProps{
-							Description: "Timeout for the list/watch call. This limits the duration of the call, regardless of any activity or inactivity.",
+							Description: "Timeout for the list/watch call. This limits the duration of the call on the server-side, regardless of any activity or inactivity. This timeout don't change the client timeout.",
 							Type:        []string{"integer"},
 							Format:      "int64",
 						},
