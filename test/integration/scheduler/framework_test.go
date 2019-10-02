@@ -157,7 +157,7 @@ func (sp *ScorePlugin) Score(pc *framework.PluginContext, p *v1.Pod, nodeName st
 	if sp.numScoreCalled == 1 {
 		// The first node is scored the highest, the rest is scored lower.
 		sp.highScoreNode = nodeName
-		score = framework.MaxNodeScore
+		score = int(framework.MaxNodeScore)
 	}
 	return score, nil
 }

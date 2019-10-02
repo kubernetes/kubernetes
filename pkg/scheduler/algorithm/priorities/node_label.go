@@ -19,9 +19,8 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -51,12 +50,12 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta i
 	}
 
 	exists := labels.Set(node.Labels).Has(n.label)
-	score := 0
+	score := int64(0)
 	if (exists && n.presence) || (!exists && !n.presence) {
-		score = schedulerapi.MaxPriority
+		score = framework.MaxNodeScore
 	}
 	return framework.NodeScore{
 		Name:  node.Name,
-		Score: int64(score),
+		Score: score,
 	}, nil
 }

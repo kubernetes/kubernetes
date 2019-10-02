@@ -20,12 +20,13 @@ import (
 	"errors"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // ValidatePolicy checks for errors in the Config
@@ -34,7 +35,7 @@ func ValidatePolicy(policy schedulerapi.Policy) error {
 	var validationErrors []error
 
 	for _, priority := range policy.Priorities {
-		if priority.Weight <= 0 || priority.Weight >= schedulerapi.MaxWeight {
+		if priority.Weight <= 0 || priority.Weight >= framework.MaxWeight {
 			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
 		}
 	}

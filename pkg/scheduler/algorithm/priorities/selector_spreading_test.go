@@ -21,9 +21,8 @@ import (
 	"testing"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
@@ -67,14 +66,14 @@ func TestSelectorSpreadPriority(t *testing.T) {
 		{
 			pod:          new(v1.Pod),
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "nothing scheduled",
 		},
 		{
 			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods:         []*v1.Pod{{Spec: zone1Spec}},
 			nodes:        []string{"machine1", "machine2"},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "no services",
 		},
 		{
@@ -82,7 +81,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			pods:         []*v1.Pod{{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}}},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "different services",
 		},
 		{
@@ -93,7 +92,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
 			name:         "two pods, one service pod",
 		},
 		{
@@ -107,7 +106,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
 			name:         "five pods, one service pod in no namespace",
 		},
 		{
@@ -120,7 +119,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault}}},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
 			name:         "four pods, one service pod in default namespace",
 		},
 		{
@@ -134,7 +133,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: metav1.ObjectMeta{Namespace: "ns1"}}},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
 			name:         "five pods, one service pod in specific namespace",
 		},
 		{
@@ -417,12 +416,12 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		{
 			pod: new(v1.Pod),
 			expectedList: []framework.NodeScore{
-				{Name: nodeMachine1Zone1, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine1Zone2, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine2Zone2, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine1Zone3, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine2Zone3, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine3Zone3, Score: schedulerapi.MaxPriority},
+				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
+				{Name: nodeMachine1Zone2, Score: framework.MaxNodeScore},
+				{Name: nodeMachine2Zone2, Score: framework.MaxNodeScore},
+				{Name: nodeMachine1Zone3, Score: framework.MaxNodeScore},
+				{Name: nodeMachine2Zone3, Score: framework.MaxNodeScore},
+				{Name: nodeMachine3Zone3, Score: framework.MaxNodeScore},
 			},
 			name: "nothing scheduled",
 		},
@@ -430,12 +429,12 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			pod:  buildPod("", labels1, nil),
 			pods: []*v1.Pod{buildPod(nodeMachine1Zone1, nil, nil)},
 			expectedList: []framework.NodeScore{
-				{Name: nodeMachine1Zone1, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine1Zone2, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine2Zone2, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine1Zone3, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine2Zone3, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine3Zone3, Score: schedulerapi.MaxPriority},
+				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
+				{Name: nodeMachine1Zone2, Score: framework.MaxNodeScore},
+				{Name: nodeMachine2Zone2, Score: framework.MaxNodeScore},
+				{Name: nodeMachine1Zone3, Score: framework.MaxNodeScore},
+				{Name: nodeMachine2Zone3, Score: framework.MaxNodeScore},
+				{Name: nodeMachine3Zone3, Score: framework.MaxNodeScore},
 			},
 			name: "no services",
 		},
@@ -444,12 +443,12 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			pods:     []*v1.Pod{buildPod(nodeMachine1Zone1, labels2, nil)},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
 			expectedList: []framework.NodeScore{
-				{Name: nodeMachine1Zone1, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine1Zone2, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine2Zone2, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine1Zone3, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine2Zone3, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine3Zone3, Score: schedulerapi.MaxPriority},
+				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
+				{Name: nodeMachine1Zone2, Score: framework.MaxNodeScore},
+				{Name: nodeMachine2Zone2, Score: framework.MaxNodeScore},
+				{Name: nodeMachine1Zone3, Score: framework.MaxNodeScore},
+				{Name: nodeMachine2Zone3, Score: framework.MaxNodeScore},
+				{Name: nodeMachine3Zone3, Score: framework.MaxNodeScore},
 			},
 			name: "different services",
 		},
@@ -461,12 +460,12 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
-				{Name: nodeMachine1Zone1, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine1Zone2, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine2Zone2, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine1Zone3, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine2Zone3, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine3Zone3, Score: schedulerapi.MaxPriority},
+				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
+				{Name: nodeMachine1Zone2, Score: framework.MaxNodeScore},
+				{Name: nodeMachine2Zone2, Score: framework.MaxNodeScore},
+				{Name: nodeMachine1Zone3, Score: framework.MaxNodeScore},
+				{Name: nodeMachine2Zone3, Score: framework.MaxNodeScore},
+				{Name: nodeMachine3Zone3, Score: framework.MaxNodeScore},
 			},
 			name: "two pods, 0 matching",
 		},
@@ -478,12 +477,12 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
-				{Name: nodeMachine1Zone1, Score: schedulerapi.MaxPriority},
+				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
 				{Name: nodeMachine1Zone2, Score: 0}, // Already have pod on machine
 				{Name: nodeMachine2Zone2, Score: 3}, // Already have pod in zone
-				{Name: nodeMachine1Zone3, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine2Zone3, Score: schedulerapi.MaxPriority},
-				{Name: nodeMachine3Zone3, Score: schedulerapi.MaxPriority},
+				{Name: nodeMachine1Zone3, Score: framework.MaxNodeScore},
+				{Name: nodeMachine2Zone3, Score: framework.MaxNodeScore},
+				{Name: nodeMachine3Zone3, Score: framework.MaxNodeScore},
 			},
 			name: "two pods, 1 matching (in z2)",
 		},
@@ -498,7 +497,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
-				{Name: nodeMachine1Zone1, Score: schedulerapi.MaxPriority},
+				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
 				{Name: nodeMachine1Zone2, Score: 0}, // Pod on node
 				{Name: nodeMachine2Zone2, Score: 0}, // Pod on node
 				{Name: nodeMachine1Zone3, Score: 6}, // Pod in zone
@@ -561,12 +560,12 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				// We would probably prefer to see a bigger gap between putting a second
 				// pod on m1.z2 and putting a pod on m2.z2, but the ordering is correct.
 				// This is also consistent with what we have already.
-				{Name: nodeMachine1Zone1, Score: schedulerapi.MaxPriority}, // No pods in zone
-				{Name: nodeMachine1Zone2, Score: 5},                        // Pod on node
-				{Name: nodeMachine2Zone2, Score: 6},                        // Pod in zone
-				{Name: nodeMachine1Zone3, Score: 0},                        // Two pods on node
-				{Name: nodeMachine2Zone3, Score: 3},                        // Pod in zone
-				{Name: nodeMachine3Zone3, Score: 3},                        // Pod in zone
+				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore}, // No pods in zone
+				{Name: nodeMachine1Zone2, Score: 5},                      // Pod on node
+				{Name: nodeMachine2Zone2, Score: 6},                      // Pod in zone
+				{Name: nodeMachine1Zone3, Score: 0},                      // Two pods on node
+				{Name: nodeMachine2Zone3, Score: 3},                      // Pod in zone
+				{Name: nodeMachine3Zone3, Score: 3},                      // Pod in zone
 			},
 			name: "Replication controller spreading (z1=0, z2=1, z3=2)",
 		},
@@ -646,8 +645,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 		{
 			pod:   new(v1.Pod),
 			nodes: labeledNodes,
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: schedulerapi.MaxPriority}, {Name: "machine12", Score: schedulerapi.MaxPriority},
-				{Name: "machine21", Score: schedulerapi.MaxPriority}, {Name: "machine22", Score: schedulerapi.MaxPriority},
+			expectedList: []framework.NodeScore{{Name: "machine11", Score: framework.MaxNodeScore}, {Name: "machine12", Score: framework.MaxNodeScore},
+				{Name: "machine21", Score: framework.MaxNodeScore}, {Name: "machine22", Score: framework.MaxNodeScore},
 				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
 			name: "nothing scheduled",
 		},
@@ -655,8 +654,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			pod:   &v1.Pod{ObjectMeta: metav1.ObjectMeta{Labels: labels1}},
 			pods:  []*v1.Pod{{Spec: zone1Spec}},
 			nodes: labeledNodes,
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: schedulerapi.MaxPriority}, {Name: "machine12", Score: schedulerapi.MaxPriority},
-				{Name: "machine21", Score: schedulerapi.MaxPriority}, {Name: "machine22", Score: schedulerapi.MaxPriority},
+			expectedList: []framework.NodeScore{{Name: "machine11", Score: framework.MaxNodeScore}, {Name: "machine12", Score: framework.MaxNodeScore},
+				{Name: "machine21", Score: framework.MaxNodeScore}, {Name: "machine22", Score: framework.MaxNodeScore},
 				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
 			name: "no services",
 		},
@@ -665,8 +664,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			pods:     []*v1.Pod{{Spec: zone1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}}},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"key": "value"}}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: schedulerapi.MaxPriority}, {Name: "machine12", Score: schedulerapi.MaxPriority},
-				{Name: "machine21", Score: schedulerapi.MaxPriority}, {Name: "machine22", Score: schedulerapi.MaxPriority},
+			expectedList: []framework.NodeScore{{Name: "machine11", Score: framework.MaxNodeScore}, {Name: "machine12", Score: framework.MaxNodeScore},
+				{Name: "machine21", Score: framework.MaxNodeScore}, {Name: "machine22", Score: framework.MaxNodeScore},
 				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
 			name: "different services",
 		},
@@ -679,7 +678,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 			},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: schedulerapi.MaxPriority}, {Name: "machine12", Score: schedulerapi.MaxPriority},
+			expectedList: []framework.NodeScore{{Name: "machine11", Score: framework.MaxNodeScore}, {Name: "machine12", Score: framework.MaxNodeScore},
 				{Name: "machine21", Score: 0}, {Name: "machine22", Score: 0},
 				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
 			name: "three pods, one service pod",
@@ -709,7 +708,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}, ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceDefault}}},
 			expectedList: []framework.NodeScore{{Name: "machine11", Score: 0}, {Name: "machine12", Score: 0},
-				{Name: "machine21", Score: schedulerapi.MaxPriority}, {Name: "machine22", Score: schedulerapi.MaxPriority},
+				{Name: "machine21", Score: framework.MaxNodeScore}, {Name: "machine22", Score: framework.MaxNodeScore},
 				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
 			name: "three service label match pods in different namespaces",
 		},

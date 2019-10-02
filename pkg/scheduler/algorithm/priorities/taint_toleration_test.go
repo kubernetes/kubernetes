@@ -20,9 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -79,7 +78,7 @@ func TestTaintAndToleration(t *testing.T) {
 				}}),
 			},
 			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: schedulerapi.MaxPriority},
+				{Name: "nodeA", Score: framework.MaxNodeScore},
 				{Name: "nodeB", Score: 0},
 			},
 		},
@@ -121,9 +120,9 @@ func TestTaintAndToleration(t *testing.T) {
 				}),
 			},
 			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: schedulerapi.MaxPriority},
-				{Name: "nodeB", Score: schedulerapi.MaxPriority},
-				{Name: "nodeC", Score: schedulerapi.MaxPriority},
+				{Name: "nodeA", Score: framework.MaxNodeScore},
+				{Name: "nodeB", Score: framework.MaxNodeScore},
+				{Name: "nodeC", Score: framework.MaxNodeScore},
 			},
 		},
 		// the count of taints on a node that are not tolerated by pod, matters.
@@ -157,7 +156,7 @@ func TestTaintAndToleration(t *testing.T) {
 				}),
 			},
 			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: schedulerapi.MaxPriority},
+				{Name: "nodeA", Score: framework.MaxNodeScore},
 				{Name: "nodeB", Score: 5},
 				{Name: "nodeC", Score: 0},
 			},
@@ -200,8 +199,8 @@ func TestTaintAndToleration(t *testing.T) {
 				}),
 			},
 			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: schedulerapi.MaxPriority},
-				{Name: "nodeB", Score: schedulerapi.MaxPriority},
+				{Name: "nodeA", Score: framework.MaxNodeScore},
+				{Name: "nodeB", Score: framework.MaxNodeScore},
 				{Name: "nodeC", Score: 0},
 			},
 		},
@@ -221,7 +220,7 @@ func TestTaintAndToleration(t *testing.T) {
 				}),
 			},
 			expectedList: []framework.NodeScore{
-				{Name: "nodeA", Score: schedulerapi.MaxPriority},
+				{Name: "nodeA", Score: framework.MaxNodeScore},
 				{Name: "nodeB", Score: 0},
 			},
 		},

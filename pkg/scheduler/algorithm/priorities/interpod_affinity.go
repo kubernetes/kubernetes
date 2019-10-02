@@ -20,13 +20,12 @@ import (
 	"context"
 	"sync/atomic"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -225,7 +224,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	for i, node := range nodes {
 		fScore := float64(0)
 		if maxMinDiff > 0 {
-			fScore = float64(schedulerapi.MaxPriority) * (float64(pm.counts[i]-minCount) / float64(maxCount-minCount))
+			fScore = float64(framework.MaxNodeScore) * (float64(pm.counts[i]-minCount) / float64(maxCount-minCount))
 		}
 		result = append(result, framework.NodeScore{Name: node.Name, Score: int64(fScore)})
 		if klog.V(10) {

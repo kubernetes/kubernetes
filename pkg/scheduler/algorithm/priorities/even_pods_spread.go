@@ -21,10 +21,9 @@ import (
 	"math"
 	"sync/atomic"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -187,10 +186,10 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 			continue
 		}
 		if maxMinDiff == 0 {
-			result[i].Score = schedulerapi.MaxPriority
+			result[i].Score = framework.MaxNodeScore
 			continue
 		}
-		fScore := float64(schedulerapi.MaxPriority) * (float64(total-t.nodeNameToPodCounts[node.Name]) / float64(maxMinDiff))
+		fScore := float64(framework.MaxNodeScore) * (float64(total-t.nodeNameToPodCounts[node.Name]) / float64(maxMinDiff))
 		result[i].Score = int64(fScore)
 	}
 

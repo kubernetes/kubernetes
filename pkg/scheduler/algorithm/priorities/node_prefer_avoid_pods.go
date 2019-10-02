@@ -19,10 +19,9 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -50,13 +49,13 @@ func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, node
 		}
 	}
 	if controllerRef == nil {
-		return framework.NodeScore{Name: node.Name, Score: schedulerapi.MaxPriority}, nil
+		return framework.NodeScore{Name: node.Name, Score: framework.MaxNodeScore}, nil
 	}
 
 	avoids, err := v1helper.GetAvoidPodsFromNodeAnnotations(node.Annotations)
 	if err != nil {
 		// If we cannot get annotation, assume it's schedulable there.
-		return framework.NodeScore{Name: node.Name, Score: schedulerapi.MaxPriority}, nil
+		return framework.NodeScore{Name: node.Name, Score: framework.MaxNodeScore}, nil
 	}
 	for i := range avoids.PreferAvoidPods {
 		avoid := &avoids.PreferAvoidPods[i]
@@ -64,5 +63,5 @@ func CalculateNodePreferAvoidPodsPriorityMap(pod *v1.Pod, meta interface{}, node
 			return framework.NodeScore{Name: node.Name, Score: 0}, nil
 		}
 	}
-	return framework.NodeScore{Name: node.Name, Score: schedulerapi.MaxPriority}, nil
+	return framework.NodeScore{Name: node.Name, Score: framework.MaxNodeScore}, nil
 }

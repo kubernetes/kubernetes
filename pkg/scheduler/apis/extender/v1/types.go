@@ -17,8 +17,16 @@ limitations under the License.
 package v1
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+)
+
+const (
+	// MinExtenderPriority defines the min priority value for extender.
+	MinExtenderPriority int = 0
+
+	// MaxExtenderPriority defines the max priority value for extender.
+	MaxExtenderPriority int = 10
 )
 
 // ExtenderPreemptionResult represents the result returned by preemption phase of extender.

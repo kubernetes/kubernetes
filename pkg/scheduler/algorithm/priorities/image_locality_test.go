@@ -22,9 +22,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/util/parsers"
@@ -159,7 +158,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			// Score: 0 (10M/2 < 23M, min-threshold)
 			pod:          &v1.Pod{Spec: testMinMax},
 			nodes:        []*v1.Node{makeImageNode("machine1", node403002000), makeImageNode("machine2", node25010)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}},
 			name:         "if exceed limit, use limit",
 		},
 		{

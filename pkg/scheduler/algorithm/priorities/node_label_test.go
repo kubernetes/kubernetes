@@ -20,9 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -55,7 +54,7 @@ func TestNewNodeLabelPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: schedulerapi.MaxPriority}, {Name: "machine3", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}, {Name: "machine3", Score: framework.MaxNodeScore}},
 			label:        "baz",
 			presence:     false,
 			name:         "no match found, presence false",
@@ -66,7 +65,7 @@ func TestNewNodeLabelPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
 			label:        "foo",
 			presence:     true,
 			name:         "one match found, presence true",
@@ -77,7 +76,7 @@ func TestNewNodeLabelPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: schedulerapi.MaxPriority}, {Name: "machine3", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: framework.MaxNodeScore}, {Name: "machine3", Score: framework.MaxNodeScore}},
 			label:        "foo",
 			presence:     false,
 			name:         "one match found, presence false",
@@ -88,7 +87,7 @@ func TestNewNodeLabelPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: schedulerapi.MaxPriority}, {Name: "machine3", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: framework.MaxNodeScore}, {Name: "machine3", Score: framework.MaxNodeScore}},
 			label:        "bar",
 			presence:     true,
 			name:         "two matches found, presence true",
@@ -99,7 +98,7 @@ func TestNewNodeLabelPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
 			label:        "bar",
 			presence:     false,
 			name:         "two matches found, presence false",

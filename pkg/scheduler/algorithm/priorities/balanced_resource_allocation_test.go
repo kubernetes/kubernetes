@@ -26,7 +26,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/kubernetes/pkg/features"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -233,7 +232,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			*/
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "nothing scheduled, nothing requested",
 		},
 		{
@@ -250,7 +249,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			*/
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 7}, {Name: "machine2", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 7}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "nothing scheduled, resources requested, differently sized machines",
 		},
 		{
@@ -267,7 +266,7 @@ func TestBalancedResourceAllocation(t *testing.T) {
 			*/
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: schedulerapi.MaxPriority}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "no resources requested, pods scheduled",
 			pods: []*v1.Pod{
 				{Spec: machine1Spec, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},

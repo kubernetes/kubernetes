@@ -19,10 +19,9 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -123,21 +122,21 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 
 	maxCountByNodeNameFloat64 := float64(maxCountByNodeName)
 	maxCountByZoneFloat64 := float64(maxCountByZone)
-	MaxPriorityFloat64 := float64(schedulerapi.MaxPriority)
+	MaxNodeScoreFloat64 := float64(framework.MaxNodeScore)
 
 	for i := range result {
 		// initializing to the default/max node score of maxPriority
-		fScore := MaxPriorityFloat64
+		fScore := MaxNodeScoreFloat64
 		if maxCountByNodeName > 0 {
-			fScore = MaxPriorityFloat64 * (float64(maxCountByNodeName-result[i].Score) / maxCountByNodeNameFloat64)
+			fScore = MaxNodeScoreFloat64 * (float64(maxCountByNodeName-result[i].Score) / maxCountByNodeNameFloat64)
 		}
 		// If there is zone information present, incorporate it
 		if haveZones {
 			zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Name].Node())
 			if zoneID != "" {
-				zoneScore := MaxPriorityFloat64
+				zoneScore := MaxNodeScoreFloat64
 				if maxCountByZone > 0 {
-					zoneScore = MaxPriorityFloat64 * (float64(maxCountByZone-countsByZone[zoneID]) / maxCountByZoneFloat64)
+					zoneScore = MaxNodeScoreFloat64 * (float64(maxCountByZone-countsByZone[zoneID]) / maxCountByZoneFloat64)
 				}
 				fScore = (fScore * (1.0 - zoneWeighting)) + (zoneWeighting * zoneScore)
 			}
@@ -244,7 +243,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, m
 	var label string
 	podCounts := map[string]int64{}
 	labelNodesStatus := map[string]string{}
-	maxPriorityFloat64 := float64(schedulerapi.MaxPriority)
+	maxPriorityFloat64 := float64(framework.MaxNodeScore)
 
 	for _, hostPriority := range result {
 		numServicePods += hostPriority.Score
