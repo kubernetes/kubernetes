@@ -20,11 +20,11 @@ package v1alpha1
 
 import (
 	"errors"
+	"math"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -71,10 +71,16 @@ const (
 
 const (
 	// MaxNodeScore is the maximum score a Score plugin is expected to return.
-	MaxNodeScore int = schedulerapi.MaxPriority
+	MaxNodeScore int64 = 10
 
 	// MinNodeScore is the minimum score a Score plugin is expected to return.
-	MinNodeScore int = 0
+	MinNodeScore int64 = 0
+
+	// MaxTotalScore is the maximum total score.
+	MaxTotalScore int64 = math.MaxInt64
+
+	// MaxWeight defines the max weight value.
+	MaxWeight int64 = MaxTotalScore / MaxNodeScore
 )
 
 // Status indicates the result of running a plugin. It consists of a code and a

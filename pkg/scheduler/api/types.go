@@ -17,7 +17,6 @@ limitations under the License.
 package api
 
 import (
-	"math"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -25,12 +24,6 @@ import (
 )
 
 const (
-	// MaxTotalPriority defines the max total priority value.
-	MaxTotalPriority = int64(math.MaxInt64)
-	// MaxPriority defines the max priority value.
-	MaxPriority = 10
-	// MaxWeight defines the max weight value.
-	MaxWeight = MaxTotalPriority / MaxPriority
 	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
 	// that once found feasible, the scheduler stops looking for more nodes.
 	DefaultPercentageOfNodesToScore = 50

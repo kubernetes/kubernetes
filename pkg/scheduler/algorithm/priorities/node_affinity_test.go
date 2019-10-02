@@ -20,9 +20,8 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -147,7 +146,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: label3}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 0}, {Name: "machine3", Score: 0}},
 			name:         "only machine1 matches the preferred scheduling requirements of pod",
 		},
 		{
@@ -161,7 +160,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: label5}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 1}, {Name: "machine5", Score: schedulerapi.MaxPriority}, {Name: "machine2", Score: 3}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 1}, {Name: "machine5", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 3}},
 			name:         "all machines matches the preferred scheduling requirements of pod but with different priorities ",
 		},
 	}

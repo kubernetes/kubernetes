@@ -51,44 +51,6 @@ func TestAlgorithmNameValidation(t *testing.T) {
 	}
 }
 
-func TestValidatePriorityConfigOverFlow(t *testing.T) {
-	tests := []struct {
-		description string
-		configs     []priorities.PriorityConfig
-		expected    bool
-	}{
-		{
-			description: "one of the weights is MaxTotalPriority(MaxInt64)",
-			configs:     []priorities.PriorityConfig{{Weight: api.MaxTotalPriority}, {Weight: 5}},
-			expected:    true,
-		},
-		{
-			description: "after multiplication with MaxPriority the weight is larger than MaxWeight",
-			configs:     []priorities.PriorityConfig{{Weight: api.MaxWeight + api.MaxPriority}, {Weight: 5}},
-			expected:    true,
-		},
-		{
-			description: "normal weights",
-			configs:     []priorities.PriorityConfig{{Weight: 10000}, {Weight: 5}},
-			expected:    false,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.description, func(t *testing.T) {
-			err := validateSelectedConfigs(test.configs)
-			if test.expected {
-				if err == nil {
-					t.Errorf("Expected Overflow")
-				}
-			} else {
-				if err != nil {
-					t.Errorf("Did not expect an overflow")
-				}
-			}
-		})
-	}
-}
-
 func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArguments(t *testing.T) {
 	arguments := api.RequestedToCapacityRatioArguments{
 		UtilizationShape: []api.UtilizationShapePoint{

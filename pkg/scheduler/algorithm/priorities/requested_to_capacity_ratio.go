@@ -21,7 +21,7 @@ import (
 	"math"
 
 	"k8s.io/klog"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
 // FunctionShape represents shape of scoring function.
@@ -45,7 +45,7 @@ const (
 	minUtilization = 0
 	maxUtilization = 100
 	minScore       = 0
-	maxScore       = schedulerapi.MaxPriority
+	maxScore       = framework.MaxNodeScore
 )
 
 // NewFunctionShape creates instance of FunctionShape in a safe way performing all
