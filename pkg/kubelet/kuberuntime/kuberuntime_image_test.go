@@ -91,13 +91,19 @@ func TestImageStats(t *testing.T) {
 	assert.NoError(t, err)
 
 	const imageSize = 64
-	fakeImageService.SetFakeImageSize(imageSize)
-	images := []string{"1111", "2222", "3333"}
-	fakeImageService.SetFakeImages(images)
+	const countImages int = 3
+
+	fakeFilesystemUsages := make([]*runtimeapi.FilesystemUsage, countImages)
+
+	for i := 0; i < countImages; i++ {
+		fakeFilesystemUsages = append(fakeFilesystemUsages, &runtimeapi.FilesystemUsage{UsedBytes: &runtimeapi.UInt64Value{Value: imageSize}})
+	}
+
+	fakeImageService.SetFakeFilesystemUsage(fakeFilesystemUsages)
 
 	actualStats, err := fakeManager.ImageStats()
 	assert.NoError(t, err)
-	expectedStats := &kubecontainer.ImageStats{TotalStorageBytes: imageSize * uint64(len(images))}
+	expectedStats := &kubecontainer.ImageStats{TotalStorageBytes: imageSize * uint64(countImages)}
 	assert.Equal(t, expectedStats, actualStats)
 }
 

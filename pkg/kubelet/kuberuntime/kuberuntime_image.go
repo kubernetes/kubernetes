@@ -125,18 +125,15 @@ func (m *kubeGenericRuntimeManager) RemoveImage(image kubecontainer.ImageSpec) e
 }
 
 // ImageStats returns the statistics of the image.
-// Notice that current logic doesn't really work for images which share layers (e.g. docker image),
-// this is a known issue, and we'll address this by getting imagefs stats directly from CRI.
-// TODO: Get imagefs stats directly from CRI.
 func (m *kubeGenericRuntimeManager) ImageStats() (*kubecontainer.ImageStats, error) {
-	allImages, err := m.imageService.ListImages(nil)
+	filesystemUsages, err := m.imageService.ImageFsInfo()
 	if err != nil {
-		klog.Errorf("ListImages failed: %v", err)
+		klog.Errorf("Fetching Filesystem Usage Information from CRI failed: %v", err)
 		return nil, err
 	}
 	stats := &kubecontainer.ImageStats{}
-	for _, img := range allImages {
-		stats.TotalStorageBytes += img.Size_
+	for _, filesystemUsage := range filesystemUsages {
+		stats.TotalStorageBytes += filesystemUsage.GetUsedBytes().GetValue()
 	}
 	return stats, nil
 }
