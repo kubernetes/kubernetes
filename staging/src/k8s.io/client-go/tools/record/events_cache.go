@@ -100,15 +100,19 @@ type EventSourceObjectSpamFilter struct {
 
 	// clock is used to allow for testing over a time interval
 	clock clock.Clock
+
+	// rate limiter
+	rateLimiter flowcontrol.RateLimiter
 }
 
 // NewEventSourceObjectSpamFilter allows burst events from a source about an object with the specified qps refill.
 func NewEventSourceObjectSpamFilter(lruCacheSize, burst int, qps float32, clock clock.Clock) *EventSourceObjectSpamFilter {
 	return &EventSourceObjectSpamFilter{
 		cache: lru.New(lruCacheSize),
-		burst: burst,
-		qps:   qps,
-		clock: clock,
+		burst:       burst,
+		qps:         qps,
+		clock:       clock,
+		rateLimiter: flowcontrol.NewTokenBucketRateLimiterWithClock(qps, burst, clock),
 	}
 }
 
@@ -135,7 +139,7 @@ func (f *EventSourceObjectSpamFilter) Filter(event *v1.Event) bool {
 
 	// verify we have a rate limiter for this record
 	if record.rateLimiter == nil {
-		record.rateLimiter = flowcontrol.NewTokenBucketRateLimiterWithClock(f.qps, f.burst, f.clock)
+		record.rateLimiter = f.rateLimiter
 	}
 
 	// ensure we have available rate
