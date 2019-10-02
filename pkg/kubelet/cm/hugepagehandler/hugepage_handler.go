@@ -102,7 +102,9 @@ func (m *handler) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 		})
 	}
 
-	err := m.updateContainerHugepageLimit(containerID, hugepageLimits)
+	if err := m.updateContainerHugepageLimit(containerID, hugepageLimits); err != nil {
+	    return fmt.Errorf("[hugepagehandler] AddContainer error: %v", err)
+	}
 	if err != nil {
 		klog.Errorf("[hugepagehandler] AddContainer error: %v", err)
 	}
