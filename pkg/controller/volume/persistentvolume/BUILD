@@ -26,6 +26,7 @@ go_library(
         "//pkg/util/goroutinemap/exponentialbackoff:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/volume:go_default_library",
+        "//pkg/volume/csimigration:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//pkg/volume/util/recyclerclient:go_default_library",
         "//pkg/volume/util/subpath:go_default_library",

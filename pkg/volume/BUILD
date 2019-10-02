@@ -87,6 +87,7 @@ filegroup(
         "//pkg/volume/cinder:all-srcs",
         "//pkg/volume/configmap:all-srcs",
         "//pkg/volume/csi:all-srcs",
+        "//pkg/volume/csimigration:all-srcs",
         "//pkg/volume/downwardapi:all-srcs",
         "//pkg/volume/emptydir:all-srcs",
         "//pkg/volume/fc:all-srcs",

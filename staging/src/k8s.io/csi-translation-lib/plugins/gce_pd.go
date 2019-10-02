@@ -209,6 +209,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume
 		am = v1.ReadWriteOnce
 	}
 
+	fsMode := v1.PersistentVolumeFilesystem
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			// A.K.A InnerVolumeSpecName required to match for Unmount
@@ -227,6 +228,7 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume
 				},
 			},
 			AccessModes: []v1.PersistentVolumeAccessMode{am},
+			VolumeMode:  &fsMode,
 		},
 	}, nil
 }
