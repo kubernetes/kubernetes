@@ -393,7 +393,6 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
 				testsuites.CapMultiPODs:   true,
-				testsuites.CapBlock:       true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
 				testsuites.CapVolumeLimits: false,
