@@ -145,8 +145,11 @@ func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.Names
 				continue
 			}
 
-			svcPortName := ServicePortName{NamespacedName: serviceNN}
-			svcPortName.Port = *port.Name
+			svcPortName := ServicePortName{
+				NamespacedName: serviceNN,
+				Port:           *port.Name,
+				Protocol:       *port.Protocol,
+			}
 
 			endpointInfoBySP[svcPortName] = cache.addEndpointsByIP(serviceNN, int(*port.Port), endpointInfoBySP[svcPortName], sliceInfo.Endpoints)
 		}

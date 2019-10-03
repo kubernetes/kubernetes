@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"testing"
 
+	"k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -41,12 +42,12 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80), utilpointer.Int32Ptr(443)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
-				makeServicePortName("ns1", "svc1", "port-0"): {
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false},
 				},
-				makeServicePortName("ns1", "svc1", "port-1"): {
+				makeServicePortName("ns1", "svc1", "port-1", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.1:443", IsLocal: false},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:443", IsLocal: true},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:443", IsLocal: false},
@@ -60,7 +61,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 2, 3, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
-				makeServicePortName("ns1", "svc1", "port-0"): {
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:80"},
@@ -79,7 +80,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 4, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
-				makeServicePortName("ns1", "svc1", "port-0"): {
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:80"},
@@ -98,7 +99,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 10, 6, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
-				makeServicePortName("ns1", "svc1", "port-0"): {
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.10:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:80"},
@@ -127,7 +128,7 @@ func TestEndpointsMapFromESC(t *testing.T) {
 				generateEndpointSlice("svc1", "ns2", 3, 3, 999, []string{}, []*int32{utilpointer.Int32Ptr(80)}),
 			},
 			expectedMap: map[ServicePortName][]*BaseEndpointInfo{
-				makeServicePortName("ns1", "svc1", "port-0"): {
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					&BaseEndpointInfo{Endpoint: "10.0.1.1:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.2:80"},
 					&BaseEndpointInfo{Endpoint: "10.0.1.3:80"},
@@ -148,13 +149,15 @@ func TestEndpointsMapFromESC(t *testing.T) {
 	}
 
 	for name, tc := range testCases {
-		esCache := NewEndpointSliceCache(tc.hostname, nil, nil, nil)
+		t.Run(name, func(t *testing.T) {
+			esCache := NewEndpointSliceCache(tc.hostname, nil, nil, nil)
 
-		for _, endpointSlice := range tc.endpointSlices {
-			esCache.Update(endpointSlice)
-		}
+			for _, endpointSlice := range tc.endpointSlices {
+				esCache.Update(endpointSlice)
+			}
 
-		compareEndpointsMapsStr(t, name, esCache.EndpointsMap(tc.namespacedName), tc.expectedMap)
+			compareEndpointsMapsStr(t, esCache.EndpointsMap(tc.namespacedName), tc.expectedMap)
+		})
 	}
 }
 
@@ -172,7 +175,7 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 				generateEndpointSlice("svc1", "ns1", 1, 3, 999, []string{"host1", "host2"}, []*int32{utilpointer.Int32Ptr(80)}),
 			},
 			expectedMap: spToEndpointMap{
-				{NamespacedName: types.NamespacedName{Name: "svc1", Namespace: "ns1"}, Port: "port-0"}: {
+				makeServicePortName("ns1", "svc1", "port-0", v1.ProtocolTCP): {
 					"10.0.1.1": &BaseEndpointInfo{Endpoint: "10.0.1.1:80", IsLocal: false},
 					"10.0.1.2": &BaseEndpointInfo{Endpoint: "10.0.1.2:80", IsLocal: true},
 					"10.0.1.3": &BaseEndpointInfo{Endpoint: "10.0.1.3:80", IsLocal: false},
@@ -198,6 +201,8 @@ func TestEndpointInfoByServicePort(t *testing.T) {
 
 func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, offset, numEndpoints, unreadyMod int, hosts []string, portNums []*int32) *discovery.EndpointSlice {
 	ipAddressType := discovery.AddressTypeIP
+	tcpProtocol := v1.ProtocolTCP
+
 	endpointSlice := &discovery.EndpointSlice{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%d", serviceName, sliceNum),
@@ -211,8 +216,9 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 
 	for i, portNum := range portNums {
 		endpointSlice.Ports = append(endpointSlice.Ports, discovery.EndpointPort{
-			Name: utilpointer.StringPtr(fmt.Sprintf("port-%d", i)),
-			Port: portNum,
+			Name:     utilpointer.StringPtr(fmt.Sprintf("port-%d", i)),
+			Port:     portNum,
+			Protocol: &tcpProtocol,
 		})
 	}
 

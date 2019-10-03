@@ -299,7 +299,7 @@ func (sct *ServiceChangeTracker) serviceToServiceMap(service *v1.Service) Servic
 	serviceMap := make(ServiceMap)
 	for i := range service.Spec.Ports {
 		servicePort := &service.Spec.Ports[i]
-		svcPortName := ServicePortName{NamespacedName: svcName, Port: servicePort.Name}
+		svcPortName := ServicePortName{NamespacedName: svcName, Port: servicePort.Name, Protocol: servicePort.Protocol}
 		baseSvcInfo := sct.newBaseServiceInfo(servicePort, service)
 		if sct.makeServiceInfo != nil {
 			serviceMap[svcPortName] = sct.makeServiceInfo(servicePort, service, baseSvcInfo)
