@@ -228,7 +228,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			}
 
 			if (kubeletConfig.KubeletCgroups != "" && kubeletConfig.KubeReservedCgroup != "") && (strings.Index(kubeletConfig.KubeletCgroups, kubeletConfig.KubeReservedCgroup) != 0) {
-				klog.InfoS("unsupported configuration:KubeletCgroups is not within KubeReservedCgroup")
+				klog.InfoS("Unsupported configuration:KubeletCgroups is not within KubeReservedCgroup")
 			}
 
 			// use dynamic kubelet config, if enabled
@@ -276,7 +276,7 @@ HTTP server: The kubelet can also listen for HTTP and respond to a simple API
 			kubeletDeps.KubeletConfigController = kubeletConfigController
 
 			if err := checkPermissions(); err != nil {
-				klog.ErrorS(err, "kubelet running with insufficient permissions")
+				klog.ErrorS(err, "Kubelet running with insufficient permissions")
 			}
 			// set up signal context here in order to be reused by kubelet and docker shim
 			ctx := genericapiserver.SetupSignalContext()

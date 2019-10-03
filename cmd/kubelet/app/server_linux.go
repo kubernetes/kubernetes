@@ -34,9 +34,9 @@ func watchForLockfileContention(path string, done chan struct{}) error {
 	go func() {
 		select {
 		case ev := <-watcher.Event:
-			klog.InfoS("inotify event", "event", ev)
+			klog.InfoS("Inotify event", "event", ev)
 		case err = <-watcher.Error:
-			klog.ErrorS(err, "inotify watcher error")
+			klog.ErrorS(err, "Inotify watcher error")
 		}
 		close(done)
 	}()
