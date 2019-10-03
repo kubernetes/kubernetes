@@ -86,6 +86,16 @@ spec:
         - containerPort: 9300
           name: transport
           protocol: TCP
+        livenessProbe:
+          tcpSocket:
+            port: transport
+          initialDelaySeconds: 5
+          timeoutSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: transport
+          initialDelaySeconds: 5
+          timeoutSeconds: 10
         volumeMounts:
         - name: elasticsearch-logging
           mountPath: /data
