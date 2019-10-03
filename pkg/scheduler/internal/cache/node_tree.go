@@ -90,7 +90,9 @@ func (nt *NodeTree) addNode(n *v1.Node) {
 		nt.zones = append(nt.zones, zone)
 		nt.tree[zone] = &nodeArray{nodes: []string{n.Name}, lastIndex: 0}
 	}
-	klog.V(2).Infof("Added node %q in group %q to NodeTree", n.Name, zone)
+	// Using \"%v\" instead of %q, because %q can't help printing
+	// the null character(\x00) in string
+	klog.V(2).Infof("Added node %q in group \"%v\" to NodeTree", n.Name, zone)
 	nt.numNodes++
 }
 
@@ -110,7 +112,9 @@ func (nt *NodeTree) removeNode(n *v1.Node) error {
 				if len(na.nodes) == 0 {
 					nt.removeZone(zone)
 				}
-				klog.V(2).Infof("Removed node %q in group %q from NodeTree", n.Name, zone)
+				// Using \"%v\" instead of %q, because %q can't help printing
+				// the null character(\x00) in string
+				klog.V(2).Infof("Removed node %q in group \"%v\" from NodeTree", n.Name, zone)
 				nt.numNodes--
 				return nil
 			}
