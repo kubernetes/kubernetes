@@ -24,26 +24,26 @@ type fakeData struct {
 	data string
 }
 
-func (f *fakeData) Clone() ContextData {
+func (f *fakeData) Clone() StateData {
 	copy := &fakeData{
 		data: f.data,
 	}
 	return copy
 }
 
-func TestPluginContextClone(t *testing.T) {
-	var key ContextKey = "key"
+func TestCycleStateClone(t *testing.T) {
+	var key StateKey = "key"
 	data1 := "value1"
 	data2 := "value2"
 
-	pc := NewPluginContext()
+	state := NewCycleState()
 	originalValue := &fakeData{
 		data: data1,
 	}
-	pc.Write(key, originalValue)
-	pcCopy := pc.Clone()
+	state.Write(key, originalValue)
+	stateCopy := state.Clone()
 
-	valueCopy, err := pcCopy.Read(key)
+	valueCopy, err := stateCopy.Read(key)
 	if err != nil {
 		t.Errorf("failed to read copied value: %v", err)
 	}
@@ -52,7 +52,7 @@ func TestPluginContextClone(t *testing.T) {
 	}
 
 	originalValue.data = data2
-	original, err := pc.Read(key)
+	original, err := state.Read(key)
 	if err != nil {
 		t.Errorf("failed to read original value: %v", err)
 	}
@@ -65,10 +65,10 @@ func TestPluginContextClone(t *testing.T) {
 	}
 }
 
-func TestPluginContextCloneNil(t *testing.T) {
-	var pc *PluginContext
-	pcCopy := pc.Clone()
-	if pcCopy != nil {
+func TestCycleStateCloneNil(t *testing.T) {
+	var state *CycleState
+	stateCopy := state.Clone()
+	if stateCopy != nil {
 		t.Errorf("clone expected to be nil")
 	}
 }

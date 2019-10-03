@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "context.go",
+        "cycle_state.go",
         "framework.go",
         "interface.go",
         "registry.go",
@@ -43,7 +43,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
-        "context_test.go",
+        "cycle_state_test.go",
         "framework_test.go",
         "interface_test.go",
         "registry_test.go",

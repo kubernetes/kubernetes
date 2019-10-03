@@ -631,7 +631,7 @@ func (t *TestPlugin) Name() string {
 	return t.name
 }
 
-func (t *TestPlugin) Score(pc *framework.PluginContext, p *v1.Pod, nodeName string) (int, *framework.Status) {
+func (t *TestPlugin) Score(state *framework.CycleState, p *v1.Pod, nodeName string) (int, *framework.Status) {
 	return 1, nil
 }
 
@@ -639,7 +639,7 @@ func (t *TestPlugin) Extensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (t *TestPlugin) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+func (t *TestPlugin) Filter(state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	return nil
 }
 

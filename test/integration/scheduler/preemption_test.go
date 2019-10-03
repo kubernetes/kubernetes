@@ -85,7 +85,7 @@ func (fp *tokenFilter) Name() string {
 	return tokenFilterName
 }
 
-func (fp *tokenFilter) Filter(pc *framework.PluginContext, pod *v1.Pod,
+func (fp *tokenFilter) Filter(state *framework.CycleState, pod *v1.Pod,
 	nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	if fp.Tokens > 0 {
 		fp.Tokens--
@@ -98,17 +98,17 @@ func (fp *tokenFilter) Filter(pc *framework.PluginContext, pod *v1.Pod,
 	return framework.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
 }
 
-func (fp *tokenFilter) PreFilter(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
+func (fp *tokenFilter) PreFilter(state *framework.CycleState, pod *v1.Pod) *framework.Status {
 	return nil
 }
 
-func (fp *tokenFilter) AddPod(pc *framework.PluginContext, podToSchedule *v1.Pod,
+func (fp *tokenFilter) AddPod(state *framework.CycleState, podToSchedule *v1.Pod,
 	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	fp.Tokens--
 	return nil
 }
 
-func (fp *tokenFilter) RemovePod(pc *framework.PluginContext, podToSchedule *v1.Pod,
+func (fp *tokenFilter) RemovePod(state *framework.CycleState, podToSchedule *v1.Pod,
 	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	fp.Tokens++
 	return nil

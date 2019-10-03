@@ -17,7 +17,7 @@ limitations under the License.
 package noop
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -41,7 +41,7 @@ func (n Filter) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (n Filter) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (n Filter) Filter(state *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	return nil
 }
 
