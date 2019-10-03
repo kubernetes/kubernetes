@@ -66,6 +66,13 @@ type postStartHookEntry struct {
 	done chan struct{}
 }
 
+type PostStartHookConfigEntry struct {
+	hook PostStartHookFunc
+	// originatingStack holds the stack that registered postStartHooks. This allows us to show a more helpful message
+	// for duplicate registration.
+	originatingStack string
+}
+
 type preShutdownHookEntry struct {
 	hook PreShutdownHookFunc
 }
@@ -76,9 +83,10 @@ func (s *GenericAPIServer) AddPostStartHook(name string, hook PostStartHookFunc)
 		return fmt.Errorf("missing name")
 	}
 	if hook == nil {
-		return nil
+		return fmt.Errorf("hook func may not be nil: %q", name)
 	}
 	if s.disabledPostStartHooks.Has(name) {
+		klog.V(1).Infof("skipping %q because it was explicitly disabled", name)
 		return nil
 	}
 
