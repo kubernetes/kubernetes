@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"io"
 	"reflect"
+	"runtime/debug"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -90,6 +91,7 @@ type codec struct {
 
 // identifier computes Identifier of Encoder based on codec parameters.
 func identifier(encodeGV runtime.GroupVersioner, encoder runtime.Encoder) runtime.Identifier {
+	klog.Errorf("RRR identifier: %s", string(debug.Stack()))
 	result := map[string]string{
 		"name": "versioning",
 	}
