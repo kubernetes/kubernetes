@@ -22,7 +22,7 @@ import (
 	"k8s.io/api/core/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	ref "k8s.io/client-go/tools/reference"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
 )
 

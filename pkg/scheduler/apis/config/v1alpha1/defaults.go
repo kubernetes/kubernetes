@@ -25,7 +25,7 @@ import (
 	kubeschedulerconfigv1alpha1 "k8s.io/kube-scheduler/config/v1alpha1"
 
 	// this package shouldn't really depend on other k8s.io/kubernetes code
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/master/ports"
 )
 

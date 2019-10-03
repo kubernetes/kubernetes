@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	core "k8s.io/client-go/testing"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/internal-api/apis/core/helper"
 )
 
 func newTokenSecret(tokenID, tokenSecret string) *v1.Secret {

@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/util/maps"
 )

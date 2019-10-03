@@ -31,7 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/klog"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1helper "k8s.io/internal-api/apis/core/v1/helper"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/controller/volume/scheduling/metrics"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"

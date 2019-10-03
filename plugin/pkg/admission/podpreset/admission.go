@@ -36,9 +36,9 @@ import (
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	settingsv1alpha1listers "k8s.io/client-go/listers/settings/v1alpha1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/pods"
-	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	api "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/core/pods"
+	apiscorev1 "k8s.io/internal-api/apis/core/v1"
 )
 
 const (

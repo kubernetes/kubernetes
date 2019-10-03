@@ -27,9 +27,9 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/apis/storage/validation"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/apis/storage"
+	"k8s.io/internal-api/apis/storage/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 

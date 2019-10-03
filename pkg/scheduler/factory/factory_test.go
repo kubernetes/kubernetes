@@ -37,7 +37,7 @@ import (
 	fakeV1 "k8s.io/client-go/kubernetes/typed/core/v1/fake"
 	clienttesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
+	apitesting "k8s.io/internal-api/api/testing"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"

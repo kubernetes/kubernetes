@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/util/httpstream"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 )
 
 func TestHTTPStreamReceived(t *testing.T) {

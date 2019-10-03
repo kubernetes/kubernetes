@@ -27,7 +27,7 @@ import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/apiserver/pkg/registry/rest"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 )
 
 // Registry is an interface for things that know how to store endpoints.

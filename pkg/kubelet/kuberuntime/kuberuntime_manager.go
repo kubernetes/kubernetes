@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/cm"

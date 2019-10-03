@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"k8s.io/api/core/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 )
 
 type ContainerFailures struct {

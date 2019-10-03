@@ -31,7 +31,7 @@ import (
 
 	apps "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/history"
 )
 

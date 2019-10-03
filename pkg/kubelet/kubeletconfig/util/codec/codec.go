@@ -20,12 +20,12 @@ import (
 	"fmt"
 
 	// ensure the core apis are installed
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	_ "k8s.io/internal-api/apis/core/install"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/pkg/kubelet/apis/config/scheme"
 )

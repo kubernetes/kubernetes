@@ -19,8 +19,8 @@ package selinux
 import (
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/v1"
+	api "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/core/v1"
 	"reflect"
 	"strings"
 	"testing"

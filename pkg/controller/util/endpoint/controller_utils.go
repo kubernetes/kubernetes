@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 )
 

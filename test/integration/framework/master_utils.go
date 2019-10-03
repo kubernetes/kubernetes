@@ -48,7 +48,7 @@ import (
 	"k8s.io/component-base/version"
 	"k8s.io/klog"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/generated/openapi"
 	"k8s.io/kubernetes/pkg/kubeapiserver"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"

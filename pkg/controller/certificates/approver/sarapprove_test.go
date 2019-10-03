@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/fake"
 	testclient "k8s.io/client-go/testing"
-	k8s_certificates_v1beta1 "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	k8s_certificates_v1beta1 "k8s.io/internal-api/apis/certificates/v1beta1"
 )
 
 func TestHasKubeletUsages(t *testing.T) {

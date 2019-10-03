@@ -25,8 +25,8 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
+	api "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/core/helper"
 )
 
 const (

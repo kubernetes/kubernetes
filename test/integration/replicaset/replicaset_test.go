@@ -38,7 +38,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/retry"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/replicaset"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutil "k8s.io/kubernetes/test/utils"

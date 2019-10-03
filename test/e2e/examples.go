@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 	commonutils "k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"

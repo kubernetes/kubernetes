@@ -29,11 +29,11 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/pod"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/apps/validation"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/api/pod"
+	"k8s.io/internal-api/apis/apps"
+	"k8s.io/internal-api/apis/apps/validation"
+	corevalidation "k8s.io/internal-api/apis/core/validation"
 )
 
 // daemonSetStrategy implements verification logic for daemon sets.

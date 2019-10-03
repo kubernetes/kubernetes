@@ -18,7 +18,7 @@ package capabilities
 
 import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 )
 
 // Strategy defines the interface for all cap constraint strategies.

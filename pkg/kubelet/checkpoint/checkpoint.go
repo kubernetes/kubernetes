@@ -23,7 +23,7 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager/checksum"
 )

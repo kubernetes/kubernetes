@@ -42,7 +42,7 @@ import (
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersions[0].String() is changed
 	// to "v1"?
 
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	_ "k8s.io/internal-api/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	containertest "k8s.io/kubernetes/pkg/kubelet/container/testing"

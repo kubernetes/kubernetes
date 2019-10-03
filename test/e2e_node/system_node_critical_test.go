@@ -24,7 +24,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	kubeapi "k8s.io/kubernetes/pkg/apis/core"
+	kubeapi "k8s.io/internal-api/apis/core"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	evictionapi "k8s.io/kubernetes/pkg/kubelet/eviction/api"
 	"k8s.io/kubernetes/test/e2e/framework"

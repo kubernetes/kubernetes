@@ -47,7 +47,7 @@ import (
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/gengo/examples/set-gen/sets"
 	"k8s.io/kubectl/pkg/cmd/util"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/printers"
 	printersinternal "k8s.io/kubernetes/pkg/printers/internalversion"
 	"k8s.io/kubernetes/test/integration/framework"

@@ -22,8 +22,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	podutil "k8s.io/internal-api/api/v1/pod"
+	corev1 "k8s.io/internal-api/apis/core/v1"
 	"k8s.io/kubernetes/pkg/kubelet/util/manager"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

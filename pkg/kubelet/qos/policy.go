@@ -18,7 +18,7 @@ package qos
 
 import (
 	v1 "k8s.io/api/core/v1"
-	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	v1qos "k8s.io/internal-api/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 

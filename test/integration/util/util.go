@@ -25,7 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 
 	// import DefaultProvider

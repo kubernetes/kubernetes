@@ -30,7 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 )

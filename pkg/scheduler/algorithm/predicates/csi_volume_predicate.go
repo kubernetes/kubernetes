@@ -25,7 +25,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1helper "k8s.io/internal-api/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"

@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
-	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
+	appsinternal "k8s.io/internal-api/apis/apps"
 	deploymentutil "k8s.io/kubernetes/pkg/controller/deployment/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"

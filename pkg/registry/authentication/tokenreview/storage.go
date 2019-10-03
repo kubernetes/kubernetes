@@ -29,7 +29,7 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/apis/authentication"
+	"k8s.io/internal-api/apis/authentication"
 )
 
 var badAuthenticatorAuds = apierrors.NewInternalError(errors.New("error validating audiences"))

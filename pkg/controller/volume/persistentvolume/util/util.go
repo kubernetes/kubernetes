@@ -29,7 +29,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/client-go/tools/reference"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1helper "k8s.io/internal-api/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )

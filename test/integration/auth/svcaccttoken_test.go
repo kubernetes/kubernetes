@@ -42,7 +42,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/keyutil"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/core"
 	serviceaccountgetter "k8s.io/kubernetes/pkg/controller/serviceaccount"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"

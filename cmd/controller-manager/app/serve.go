@@ -29,7 +29,7 @@ import (
 	"k8s.io/apiserver/pkg/server/routes"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/component-base/metrics/legacyregistry"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/util/configz"
 )
 

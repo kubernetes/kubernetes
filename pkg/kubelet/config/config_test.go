@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/checkpoint"
 	"k8s.io/kubernetes/pkg/kubelet/checkpointmanager"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"

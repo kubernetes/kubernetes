@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/v1/util"
+	storageutil "k8s.io/internal-api/apis/storage/v1/util"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"

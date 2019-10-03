@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	ref "k8s.io/client-go/tools/reference"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/internal-api/api/testapi"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/volume/util"

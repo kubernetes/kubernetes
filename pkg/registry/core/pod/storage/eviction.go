@@ -34,8 +34,8 @@ import (
 	"k8s.io/apiserver/pkg/util/dryrun"
 	policyclient "k8s.io/client-go/kubernetes/typed/policy/v1beta1"
 	"k8s.io/client-go/util/retry"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/policy"
+	api "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/policy"
 )
 
 const (

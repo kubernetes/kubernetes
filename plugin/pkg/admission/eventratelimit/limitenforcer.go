@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/util/flowcontrol"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	eventratelimitapi "k8s.io/kubernetes/plugin/pkg/admission/eventratelimit/apis/eventratelimit"
 )
 

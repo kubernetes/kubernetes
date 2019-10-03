@@ -23,8 +23,8 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	nodeinternal "k8s.io/kubernetes/pkg/apis/node"
+	"k8s.io/internal-api/api/legacyscheme"
+	nodeinternal "k8s.io/internal-api/apis/node"
 	runtimeclassstorage "k8s.io/kubernetes/pkg/registry/node/runtimeclass/storage"
 )
 

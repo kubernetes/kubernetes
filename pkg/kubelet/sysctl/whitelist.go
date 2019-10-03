@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/kubernetes/pkg/apis/core/validation"
-	policyvalidation "k8s.io/kubernetes/pkg/apis/policy/validation"
+	"k8s.io/internal-api/apis/core/validation"
+	policyvalidation "k8s.io/internal-api/apis/policy/validation"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 

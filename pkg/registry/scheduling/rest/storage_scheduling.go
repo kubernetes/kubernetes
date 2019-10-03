@@ -32,11 +32,11 @@ import (
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	schedulingclient "k8s.io/client-go/kubernetes/typed/scheduling/v1beta1"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
-	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
-	schedulingapiv1alpha1 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
-	schedulingapiv1beta1 "k8s.io/kubernetes/pkg/apis/scheduling/v1beta1"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/apis/scheduling"
+	schedulingapiv1 "k8s.io/internal-api/apis/scheduling/v1"
+	schedulingapiv1alpha1 "k8s.io/internal-api/apis/scheduling/v1alpha1"
+	schedulingapiv1beta1 "k8s.io/internal-api/apis/scheduling/v1beta1"
 	priorityclassstore "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass/storage"
 )
 

@@ -40,7 +40,7 @@ import (
 	fakecloud "k8s.io/cloud-provider/fake"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/internal-api/api/testapi"
 	"k8s.io/kubernetes/pkg/controller"
 )
 

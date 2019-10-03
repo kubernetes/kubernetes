@@ -30,7 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	cloudprovider "k8s.io/cloud-provider"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	persistentvolume "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"
 )
 

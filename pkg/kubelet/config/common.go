@@ -27,16 +27,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
+	api "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/core/helper"
 
 	// TODO: remove this import if
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
 	// to "v1"?
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/internal-api/api/legacyscheme"
+	_ "k8s.io/internal-api/apis/core/install"
+	k8s_api_v1 "k8s.io/internal-api/apis/core/v1"
+	"k8s.io/internal-api/apis/core/validation"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/util/hash"
 

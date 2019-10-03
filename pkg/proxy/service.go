@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	apiservice "k8s.io/kubernetes/pkg/api/v1/service"
+	apiservice "k8s.io/internal-api/api/v1/service"
 	"k8s.io/kubernetes/pkg/proxy/metrics"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	utilnet "k8s.io/utils/net"

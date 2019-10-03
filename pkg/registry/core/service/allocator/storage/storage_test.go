@@ -23,7 +23,7 @@ import (
 
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )

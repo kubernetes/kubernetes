@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
+	batchinternal "k8s.io/internal-api/apis/batch"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"

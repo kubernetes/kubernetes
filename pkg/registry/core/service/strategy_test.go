@@ -27,8 +27,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	api "k8s.io/internal-api/apis/core"
+	_ "k8s.io/internal-api/apis/core/install"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"

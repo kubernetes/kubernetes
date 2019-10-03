@@ -41,7 +41,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/klog"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1helper "k8s.io/internal-api/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 

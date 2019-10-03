@@ -25,10 +25,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
-	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
-	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
+	appsinternal "k8s.io/internal-api/apis/apps"
+	batchinternal "k8s.io/internal-api/apis/batch"
+	api "k8s.io/internal-api/apis/core"
+	extensionsinternal "k8s.io/internal-api/apis/extensions"
 )
 
 func deleteResource(c clientset.Interface, kind schema.GroupKind, namespace, name string, options *metav1.DeleteOptions) error {

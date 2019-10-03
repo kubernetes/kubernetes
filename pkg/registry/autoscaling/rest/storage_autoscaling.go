@@ -23,9 +23,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	autoscalingapiv2beta2 "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta2"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/apis/autoscaling"
+	autoscalingapiv2beta2 "k8s.io/internal-api/apis/autoscaling/v2beta2"
 	horizontalpodautoscalerstore "k8s.io/kubernetes/pkg/registry/autoscaling/horizontalpodautoscaler/storage"
 )
 

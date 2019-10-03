@@ -34,7 +34,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/internal-api/api/testapi"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 

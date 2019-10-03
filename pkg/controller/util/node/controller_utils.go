@@ -31,7 +31,7 @@ import (
 	"k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	appsv1listers "k8s.io/client-go/listers/apps/v1"
-	utilpod "k8s.io/kubernetes/pkg/api/v1/pod"
+	utilpod "k8s.io/internal-api/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	nodepkg "k8s.io/kubernetes/pkg/util/node"

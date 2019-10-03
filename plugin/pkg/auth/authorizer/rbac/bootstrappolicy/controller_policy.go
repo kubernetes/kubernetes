@@ -24,7 +24,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	rbacv1helpers "k8s.io/internal-api/apis/rbac/v1"
 	"k8s.io/kubernetes/pkg/features"
 )
 

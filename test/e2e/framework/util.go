@@ -70,7 +70,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	watchtools "k8s.io/client-go/tools/watch"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/master/ports"

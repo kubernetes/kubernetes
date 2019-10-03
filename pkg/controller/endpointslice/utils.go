@@ -30,9 +30,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/klog"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/discovery/validation"
+	podutil "k8s.io/internal-api/api/v1/pod"
+	api "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/discovery/validation"
 	"k8s.io/kubernetes/pkg/util/hash"
 )
 

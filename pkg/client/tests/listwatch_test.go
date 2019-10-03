@@ -34,7 +34,7 @@ import (
 	. "k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
 	utiltesting "k8s.io/client-go/util/testing"
-	"k8s.io/kubernetes/pkg/api/testapi"
+	"k8s.io/internal-api/api/testapi"
 )
 
 func parseSelectorOrDie(s string) fields.Selector {

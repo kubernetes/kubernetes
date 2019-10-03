@@ -34,7 +34,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/authentication/user"
 	v1 "k8s.io/client-go/tools/clientcmd/api/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 
 	"fmt"
 	"io/ioutil"
@@ -42,7 +42,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
+	_ "k8s.io/internal-api/apis/imagepolicy/install"
 )
 
 const defaultConfigTmplJSON = `

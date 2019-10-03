@@ -21,7 +21,7 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/klog"
-	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	v1qos "k8s.io/internal-api/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"

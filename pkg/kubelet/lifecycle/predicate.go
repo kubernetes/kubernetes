@@ -22,7 +22,7 @@ import (
 	"k8s.io/klog"
 
 	"k8s.io/api/core/v1"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1helper "k8s.io/internal-api/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"

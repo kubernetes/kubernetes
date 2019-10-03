@@ -39,7 +39,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	cloudprovider "k8s.io/cloud-provider"
 	volerr "k8s.io/cloud-provider/volume/errors"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1helper "k8s.io/internal-api/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/controller/volume/persistentvolume/metrics"
 	pvutil "k8s.io/kubernetes/pkg/controller/volume/persistentvolume/util"

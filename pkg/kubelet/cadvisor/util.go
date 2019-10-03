@@ -23,7 +23,7 @@ import (
 	cadvisorapi2 "github.com/google/cadvisor/info/v2"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1helper "k8s.io/internal-api/apis/core/v1/helper"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 )
 

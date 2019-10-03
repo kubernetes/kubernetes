@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/apps"
+	api "k8s.io/internal-api/apis/core"
 )
 
 const (

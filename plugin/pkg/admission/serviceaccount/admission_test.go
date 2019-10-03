@@ -34,7 +34,7 @@ import (
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/component-base/featuregate"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubelet "k8s.io/kubernetes/pkg/kubelet/types"

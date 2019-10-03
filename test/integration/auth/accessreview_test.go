@@ -30,8 +30,8 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/api/testapi"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 

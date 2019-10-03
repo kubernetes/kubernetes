@@ -30,9 +30,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
-	v1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
+	api "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/scheduling"
+	v1 "k8s.io/internal-api/apis/scheduling/v1"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/features"
 )

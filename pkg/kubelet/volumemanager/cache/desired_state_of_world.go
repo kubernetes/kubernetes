@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	apiv1resource "k8s.io/kubernetes/pkg/api/v1/resource"
+	apiv1resource "k8s.io/internal-api/api/v1/resource"
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/operationexecutor"

@@ -36,7 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/util/workqueue"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"

@@ -24,8 +24,8 @@ import (
 	"k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	podutil "k8s.io/internal-api/api/v1/pod"
+	v1helper "k8s.io/internal-api/apis/core/v1/helper"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 

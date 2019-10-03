@@ -36,8 +36,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	api "k8s.io/internal-api/apis/core"
+	v1 "k8s.io/internal-api/apis/core/v1"
 )
 
 func getComputeResourceList(cpu, memory string) api.ResourceList {

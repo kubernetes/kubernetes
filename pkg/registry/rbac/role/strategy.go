@@ -23,9 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/validation"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/apis/rbac"
+	"k8s.io/internal-api/apis/rbac/validation"
 )
 
 // strategy implements behavior for Roles

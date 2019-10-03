@@ -21,8 +21,8 @@ import (
 
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/autoscaling"
+	api "k8s.io/internal-api/apis/core"
 	// Ensure that autoscaling/v1 package is initialized.
 	_ "k8s.io/api/autoscaling/v1"
 	"k8s.io/apimachinery/pkg/fields"

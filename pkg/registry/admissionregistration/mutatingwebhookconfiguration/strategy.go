@@ -25,9 +25,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration/validation"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/apis/admissionregistration"
+	"k8s.io/internal-api/apis/admissionregistration/validation"
 )
 
 // mutatingWebhookConfigurationStrategy implements verification logic for mutatingWebhookConfiguration.

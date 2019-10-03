@@ -39,8 +39,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	corev1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
-	podutil "k8s.io/kubernetes/pkg/api/pod"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	podutil "k8s.io/internal-api/api/pod"
+	api "k8s.io/internal-api/apis/core"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
 )

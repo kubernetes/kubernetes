@@ -22,7 +22,7 @@ import (
 	"testing"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	rbacv1helpers "k8s.io/internal-api/apis/rbac/v1"
 )
 
 func TestCompactRules(t *testing.T) {

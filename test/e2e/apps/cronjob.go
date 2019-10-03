@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
+	batchinternal "k8s.io/internal-api/apis/batch"
 	"k8s.io/kubernetes/pkg/controller/job"
 	"k8s.io/kubernetes/test/e2e/framework"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"

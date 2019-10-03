@@ -22,11 +22,11 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	apitesting "k8s.io/internal-api/api/testing"
+	api "k8s.io/internal-api/apis/core"
 
 	// install all api groups for testing
-	_ "k8s.io/kubernetes/pkg/api/testapi"
+	_ "k8s.io/internal-api/api/testapi"
 )
 
 func TestControllerStrategy(t *testing.T) {

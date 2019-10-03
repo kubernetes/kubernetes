@@ -24,7 +24,7 @@ import (
 
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/util/feature"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )

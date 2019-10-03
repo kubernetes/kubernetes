@@ -19,7 +19,7 @@ package ipallocator
 import (
 	"errors"
 	"fmt"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/service/allocator"
 	"math/big"
 	"net"

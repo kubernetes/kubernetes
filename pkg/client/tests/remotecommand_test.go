@@ -38,8 +38,8 @@ import (
 	restclient "k8s.io/client-go/rest"
 	remoteclient "k8s.io/client-go/tools/remotecommand"
 	"k8s.io/client-go/transport/spdy"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/api/legacyscheme"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/kubelet/server/remotecommand"
 )
 

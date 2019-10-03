@@ -23,8 +23,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	"k8s.io/internal-api/apis/rbac"
+	rbacv1helpers "k8s.io/internal-api/apis/rbac/v1"
 )
 
 // Registry is an interface for things that know how to store ClusterRoles.

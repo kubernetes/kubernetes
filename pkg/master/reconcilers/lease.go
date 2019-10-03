@@ -37,7 +37,7 @@ import (
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage"
-	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
+	endpointsv1 "k8s.io/internal-api/api/v1/endpoints"
 )
 
 // Leases is an interface which assists in managing the set of active masters

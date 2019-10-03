@@ -42,9 +42,9 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
-	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
-	appsconversion "k8s.io/kubernetes/pkg/apis/apps/v1"
-	apiv1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	appsinternal "k8s.io/internal-api/apis/apps"
+	appsconversion "k8s.io/internal-api/apis/apps/v1"
+	apiv1 "k8s.io/internal-api/apis/core/v1"
 	"k8s.io/kubernetes/pkg/controller"
 )
 

@@ -27,7 +27,7 @@ import (
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 )
 
 const (

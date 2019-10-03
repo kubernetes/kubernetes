@@ -37,7 +37,7 @@ import (
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 )
 
 func TestFinalized(t *testing.T) {

@@ -25,12 +25,12 @@ import (
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	apitesting "k8s.io/kubernetes/pkg/api/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	apitesting "k8s.io/internal-api/api/testing"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 
 	// install all api groups for testing
-	_ "k8s.io/kubernetes/pkg/api/testapi"
+	_ "k8s.io/internal-api/api/testapi"
 )
 
 func TestSelectableFieldLabelConversions(t *testing.T) {

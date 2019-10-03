@@ -30,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/diff"
-	admissionfuzzer "k8s.io/kubernetes/pkg/apis/admission/fuzzer"
+	admissionfuzzer "k8s.io/internal-api/apis/admission/fuzzer"
 )
 
 func TestConvertAdmissionRequestToV1(t *testing.T) {

@@ -32,7 +32,7 @@ import (
 	audittruncate "k8s.io/apiserver/plugin/pkg/audit/truncate"
 	restclient "k8s.io/client-go/rest"
 	cliflag "k8s.io/component-base/cli/flag"
-	kapi "k8s.io/kubernetes/pkg/apis/core"
+	kapi "k8s.io/internal-api/apis/core"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"
 	"k8s.io/kubernetes/pkg/master/reconcilers"

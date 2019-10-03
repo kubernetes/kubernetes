@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
 
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	corev1 "k8s.io/internal-api/apis/core/v1"
 
 	"github.com/stretchr/testify/assert"
 )

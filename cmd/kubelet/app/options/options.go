@@ -31,7 +31,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/kubelet/config/v1beta1"
-	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"

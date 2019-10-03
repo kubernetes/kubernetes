@@ -40,7 +40,7 @@ import (
 	ccmconfigv1alpha1 "k8s.io/kubernetes/cmd/cloud-controller-manager/app/apis/config/v1alpha1"
 	cloudcontrollerconfig "k8s.io/kubernetes/cmd/cloud-controller-manager/app/config"
 	cmoptions "k8s.io/kubernetes/cmd/controller-manager/app/options"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/master/ports"
 

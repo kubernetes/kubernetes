@@ -22,8 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/networking"
+	api "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/networking"
 )
 
 func newIngress() networking.Ingress {

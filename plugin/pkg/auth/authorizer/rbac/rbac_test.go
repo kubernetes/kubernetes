@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	rbacv1helpers "k8s.io/internal-api/apis/rbac/v1"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy"
 )

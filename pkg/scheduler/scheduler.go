@@ -35,7 +35,7 @@ import (
 	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"

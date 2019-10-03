@@ -45,9 +45,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/util/workqueue"
-	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
+	batchinternal "k8s.io/internal-api/apis/batch"
+	api "k8s.io/internal-api/apis/core"
+	extensionsinternal "k8s.io/internal-api/apis/extensions"
 
 	"k8s.io/klog"
 )

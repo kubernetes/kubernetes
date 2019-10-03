@@ -28,7 +28,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/klog"
-	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
+	v1qos "k8s.io/internal-api/apis/core/v1/helper/qos"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 )
 

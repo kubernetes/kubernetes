@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/apis/node"
+	"k8s.io/internal-api/apis/node"
 	"k8s.io/kubernetes/pkg/registry/node/runtimeclass"
 )
 

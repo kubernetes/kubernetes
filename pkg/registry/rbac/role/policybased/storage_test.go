@@ -28,8 +28,8 @@ import (
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
+	"k8s.io/internal-api/apis/rbac"
+	_ "k8s.io/internal-api/apis/rbac/install"
 	"k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 

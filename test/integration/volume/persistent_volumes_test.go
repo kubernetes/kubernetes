@@ -35,7 +35,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	ref "k8s.io/client-go/tools/reference"
 	fakecloud "k8s.io/cloud-provider/fake"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	persistentvolumecontroller "k8s.io/kubernetes/pkg/controller/volume/persistentvolume"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"

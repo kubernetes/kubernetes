@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	authorizationapi "k8s.io/internal-api/apis/authorization"
 )
 
 func TestResourceAttributesFrom(t *testing.T) {

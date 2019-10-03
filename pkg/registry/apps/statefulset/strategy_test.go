@@ -22,8 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/apps"
+	api "k8s.io/internal-api/apis/core"
 )
 
 func TestStatefulSetStrategy(t *testing.T) {

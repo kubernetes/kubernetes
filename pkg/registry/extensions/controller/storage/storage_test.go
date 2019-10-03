@@ -26,8 +26,8 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/storage/storagebackend/factory"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/autoscaling"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 

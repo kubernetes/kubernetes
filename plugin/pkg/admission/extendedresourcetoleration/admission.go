@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/core/helper"
 )
 
 // PluginName indicates name of admission plugin.

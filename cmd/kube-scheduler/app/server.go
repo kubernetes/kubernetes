@@ -47,7 +47,7 @@ import (
 	"k8s.io/klog"
 	schedulerserverconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
 	"k8s.io/kubernetes/cmd/kube-scheduler/app/options"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"

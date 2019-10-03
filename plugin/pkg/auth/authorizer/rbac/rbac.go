@@ -30,7 +30,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	rbaclisters "k8s.io/client-go/listers/rbac/v1"
-	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	rbacv1helpers "k8s.io/internal-api/apis/rbac/v1"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )
 

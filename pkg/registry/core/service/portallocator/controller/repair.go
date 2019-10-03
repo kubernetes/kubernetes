@@ -29,8 +29,8 @@ import (
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/api/legacyscheme"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/registry/core/rangeallocation"
 	"k8s.io/kubernetes/pkg/registry/core/service/portallocator"
 )

@@ -38,7 +38,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	apiregistrationv1 "k8s.io/kube-aggregator/pkg/apis/apiregistration/v1"
 	aggregatorclient "k8s.io/kube-aggregator/pkg/client/clientset_generated/clientset"
-	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	rbacv1helpers "k8s.io/internal-api/apis/rbac/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"

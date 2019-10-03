@@ -33,7 +33,7 @@ import (
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	bootstrapsecretutil "k8s.io/cluster-bootstrap/util/secrets"
 	"k8s.io/klog"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )

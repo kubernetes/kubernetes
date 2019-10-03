@@ -26,7 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	core "k8s.io/kubernetes/pkg/apis/core"
+	core "k8s.io/internal-api/apis/core"
 	podtolerationrestriction "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
 )
 

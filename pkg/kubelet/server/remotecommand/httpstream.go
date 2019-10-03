@@ -32,7 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/util/wsstream"
 	"k8s.io/client-go/tools/remotecommand"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 
 	"k8s.io/klog"
 )

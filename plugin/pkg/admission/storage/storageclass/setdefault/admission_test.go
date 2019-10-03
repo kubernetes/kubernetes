@@ -27,8 +27,8 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
 	"k8s.io/client-go/informers"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
+	api "k8s.io/internal-api/apis/core"
+	storageutil "k8s.io/internal-api/apis/storage/util"
 	"k8s.io/kubernetes/pkg/controller"
 )
 

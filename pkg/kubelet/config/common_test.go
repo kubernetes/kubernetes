@@ -26,10 +26,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/api/testapi"
+	"k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/core/validation"
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 

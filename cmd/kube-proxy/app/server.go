@@ -57,7 +57,7 @@ import (
 	"k8s.io/component-base/version/verflag"
 	"k8s.io/klog"
 	"k8s.io/kube-proxy/config/v1alpha1"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/kubelet/qos"
 	"k8s.io/kubernetes/pkg/master/ports"

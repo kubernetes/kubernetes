@@ -26,7 +26,7 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/client-go/kubernetes/fake"
 	core "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 )
 
 // newAllowEscalatingExec returns `admission.Interface` that allows execution on

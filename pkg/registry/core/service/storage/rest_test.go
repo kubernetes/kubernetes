@@ -40,8 +40,8 @@ import (
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	"k8s.io/apiserver/pkg/util/dryrun"
 
-	"k8s.io/kubernetes/pkg/api/service"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/api/service"
+	api "k8s.io/internal-api/apis/core"
 	endpointstore "k8s.io/kubernetes/pkg/registry/core/endpoint/storage"
 	podstore "k8s.io/kubernetes/pkg/registry/core/pod/storage"
 	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"

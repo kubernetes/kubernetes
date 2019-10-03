@@ -30,9 +30,9 @@ import (
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
 	storagev1listers "k8s.io/client-go/listers/storage/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
-	storageutil "k8s.io/kubernetes/pkg/apis/storage/util"
+	api "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/core/helper"
+	storageutil "k8s.io/internal-api/apis/storage/util"
 )
 
 const (

@@ -24,8 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/record"
-	kubeapi "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
+	kubeapi "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/scheduling"
 )
 
 const (

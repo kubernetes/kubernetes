@@ -37,11 +37,11 @@ import (
 	"k8s.io/apiserver/pkg/admission"
 	"k8s.io/apiserver/pkg/util/webhook"
 	"k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/api/legacyscheme"
+	api "k8s.io/internal-api/apis/core"
 
 	// install the clientgo image policy API for use with api registry
-	_ "k8s.io/kubernetes/pkg/apis/imagepolicy/install"
+	_ "k8s.io/internal-api/apis/imagepolicy/install"
 )
 
 // PluginName indicates name of admission plugin.

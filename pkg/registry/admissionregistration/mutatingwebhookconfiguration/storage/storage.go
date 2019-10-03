@@ -20,7 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/internal-api/apis/admissionregistration"
 	"k8s.io/kubernetes/pkg/registry/admissionregistration/mutatingwebhookconfiguration"
 )
 

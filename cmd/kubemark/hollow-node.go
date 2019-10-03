@@ -41,7 +41,7 @@ import (
 	_ "k8s.io/component-base/metrics/prometheus/version"    // for version metric registration
 	"k8s.io/component-base/version"
 	"k8s.io/component-base/version/verflag"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/features"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"

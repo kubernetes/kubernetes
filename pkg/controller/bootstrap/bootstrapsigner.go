@@ -36,7 +36,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	bootstrapapi "k8s.io/cluster-bootstrap/token/api"
 	jws "k8s.io/cluster-bootstrap/token/jws"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/util/metrics"
 )
 

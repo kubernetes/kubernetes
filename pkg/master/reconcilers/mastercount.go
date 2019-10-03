@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/klog"
-	endpointsv1 "k8s.io/kubernetes/pkg/api/v1/endpoints"
+	endpointsv1 "k8s.io/internal-api/api/v1/endpoints"
 )
 
 // masterCountEndpointReconciler reconciles endpoints based on a specified expected number of

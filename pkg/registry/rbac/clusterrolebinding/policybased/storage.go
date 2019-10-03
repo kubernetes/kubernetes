@@ -26,9 +26,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	"k8s.io/apiserver/pkg/registry/rest"
-	kapihelper "k8s.io/kubernetes/pkg/apis/core/helper"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	rbacv1helpers "k8s.io/kubernetes/pkg/apis/rbac/v1"
+	kapihelper "k8s.io/internal-api/apis/core/helper"
+	"k8s.io/internal-api/apis/rbac"
+	rbacv1helpers "k8s.io/internal-api/apis/rbac/v1"
 	rbacregistry "k8s.io/kubernetes/pkg/registry/rbac"
 	rbacregistryvalidation "k8s.io/kubernetes/pkg/registry/rbac/validation"
 )

@@ -34,9 +34,9 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	nodev1beta1listers "k8s.io/client-go/listers/node/v1beta1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	node "k8s.io/kubernetes/pkg/apis/node"
-	nodev1beta1 "k8s.io/kubernetes/pkg/apis/node/v1beta1"
+	api "k8s.io/internal-api/apis/core"
+	node "k8s.io/internal-api/apis/node"
+	nodev1beta1 "k8s.io/internal-api/apis/node/v1beta1"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/util/tolerations"
 )

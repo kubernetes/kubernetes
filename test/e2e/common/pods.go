@@ -37,7 +37,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"

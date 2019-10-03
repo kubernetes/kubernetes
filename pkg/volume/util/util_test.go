@@ -27,7 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	_ "k8s.io/internal-api/apis/core/install"
 	"k8s.io/kubernetes/pkg/features"
 
 	"reflect"

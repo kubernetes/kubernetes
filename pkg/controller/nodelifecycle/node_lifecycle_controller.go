@@ -52,7 +52,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
-	apicore "k8s.io/kubernetes/pkg/apis/core"
+	apicore "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"

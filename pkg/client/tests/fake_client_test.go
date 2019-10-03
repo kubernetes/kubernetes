@@ -23,7 +23,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientsetfake "k8s.io/client-go/kubernetes/fake"
 
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	_ "k8s.io/internal-api/apis/core/install"
 )
 
 func TestFakeClientSetFiltering(t *testing.T) {

@@ -24,9 +24,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/node"
-	"k8s.io/kubernetes/pkg/apis/node/validation"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/apis/node"
+	"k8s.io/internal-api/apis/node/validation"
 	"k8s.io/kubernetes/pkg/features"
 )
 

@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
-	"k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/internal-api/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/proxy"
 	"k8s.io/kubernetes/pkg/proxy/config"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"

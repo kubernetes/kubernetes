@@ -24,7 +24,7 @@ import (
 	"strings"
 
 	"k8s.io/api/core/v1"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 )
 
 // getNestedMountpoints returns a list of mountpoint directories that should be created

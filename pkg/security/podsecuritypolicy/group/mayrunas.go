@@ -21,7 +21,7 @@ import (
 
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 )
 
 // mayRunAs implements the GroupStrategy interface.

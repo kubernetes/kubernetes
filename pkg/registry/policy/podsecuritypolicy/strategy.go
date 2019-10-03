@@ -23,10 +23,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/registry/rest"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	psputil "k8s.io/kubernetes/pkg/api/podsecuritypolicy"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/policy/validation"
+	"k8s.io/internal-api/api/legacyscheme"
+	psputil "k8s.io/internal-api/api/podsecuritypolicy"
+	"k8s.io/internal-api/apis/policy"
+	"k8s.io/internal-api/apis/policy/validation"
 )
 
 // strategy implements behavior for PodSecurityPolicy objects

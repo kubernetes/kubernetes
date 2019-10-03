@@ -74,7 +74,7 @@ import (
 	"k8s.io/client-go/informers"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeoptions "k8s.io/kubernetes/pkg/kubeapiserver/options"
 	kubeletclient "k8s.io/kubernetes/pkg/kubelet/client"

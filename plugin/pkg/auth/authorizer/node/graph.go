@@ -20,8 +20,8 @@ import (
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
-	pvutil "k8s.io/kubernetes/pkg/api/v1/persistentvolume"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	pvutil "k8s.io/internal-api/api/v1/persistentvolume"
+	podutil "k8s.io/internal-api/api/v1/pod"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph"
 	"k8s.io/kubernetes/third_party/forked/gonum/graph/simple"
 )

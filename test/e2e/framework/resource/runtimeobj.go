@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	clientset "k8s.io/client-go/kubernetes"
-	appsinternal "k8s.io/kubernetes/pkg/apis/apps"
-	batchinternal "k8s.io/kubernetes/pkg/apis/batch"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	extensionsinternal "k8s.io/kubernetes/pkg/apis/extensions"
+	appsinternal "k8s.io/internal-api/apis/apps"
+	batchinternal "k8s.io/internal-api/apis/batch"
+	api "k8s.io/internal-api/apis/core"
+	extensionsinternal "k8s.io/internal-api/apis/extensions"
 )
 
 // GetRuntimeObjectForKind returns a runtime.Object based on its GroupKind,

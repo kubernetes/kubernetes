@@ -20,7 +20,7 @@ import (
 	"testing"
 
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/internal-api/apis/core/helper"
 )
 
 func binding(roleRef rbacv1.RoleRef, subjects []rbacv1.Subject) *rbacv1.ClusterRoleBinding {

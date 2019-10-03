@@ -37,9 +37,9 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/apps"
+	"k8s.io/internal-api/apis/autoscaling"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/registry/registrytest"
 )
 

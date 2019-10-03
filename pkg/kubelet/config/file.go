@@ -29,7 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/cache"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	utilio "k8s.io/utils/io"
 )

@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apiserver/pkg/admission"
 	admissiontesting "k8s.io/apiserver/pkg/admission/testing"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
+	"k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/core/helper"
 )
 
 func TestAdmit(t *testing.T) {

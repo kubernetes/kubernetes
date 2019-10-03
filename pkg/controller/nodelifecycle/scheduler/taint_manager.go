@@ -34,8 +34,8 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/apis/core/helper"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	"k8s.io/internal-api/apis/core/helper"
+	v1helper "k8s.io/internal-api/apis/core/v1/helper"
 
 	"k8s.io/klog"
 )

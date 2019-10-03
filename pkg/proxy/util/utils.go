@@ -28,7 +28,7 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
-	helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	helper "k8s.io/internal-api/apis/core/v1/helper"
 	utilnet "k8s.io/utils/net"
 
 	"k8s.io/klog"

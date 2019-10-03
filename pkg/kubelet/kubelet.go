@@ -54,7 +54,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	internalapi "k8s.io/cri-api/pkg/apis"
 	"k8s.io/klog"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfiginternal "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	pluginwatcherapi "k8s.io/kubernetes/pkg/kubelet/apis/pluginregistration/v1"

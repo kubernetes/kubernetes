@@ -27,10 +27,10 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	autoscalingvalidation "k8s.io/kubernetes/pkg/apis/autoscaling/validation"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/extensions"
+	"k8s.io/internal-api/apis/autoscaling"
+	autoscalingvalidation "k8s.io/internal-api/apis/autoscaling/validation"
+	api "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/extensions"
 	controllerstore "k8s.io/kubernetes/pkg/registry/core/replicationcontroller/storage"
 )
 

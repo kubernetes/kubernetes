@@ -29,9 +29,9 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/apiserver/pkg/registry/rest"
-	authenticationapi "k8s.io/kubernetes/pkg/apis/authentication"
-	authenticationvalidation "k8s.io/kubernetes/pkg/apis/authentication/validation"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	authenticationapi "k8s.io/internal-api/apis/authentication"
+	authenticationvalidation "k8s.io/internal-api/apis/authentication/validation"
+	api "k8s.io/internal-api/apis/core"
 	token "k8s.io/kubernetes/pkg/serviceaccount"
 )
 

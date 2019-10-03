@@ -31,7 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/record"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
-	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	podutil "k8s.io/internal-api/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
 	hashutil "k8s.io/kubernetes/pkg/util/hash"
 	"k8s.io/kubernetes/third_party/forked/golang/expansion"

@@ -40,7 +40,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	"k8s.io/klog"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
+	v1helper "k8s.io/internal-api/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	volutil "k8s.io/kubernetes/pkg/volume/util"

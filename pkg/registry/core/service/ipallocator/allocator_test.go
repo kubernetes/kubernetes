@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 )
 
 func TestAllocate(t *testing.T) {

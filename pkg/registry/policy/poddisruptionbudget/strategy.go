@@ -23,9 +23,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/policy"
-	"k8s.io/kubernetes/pkg/apis/policy/validation"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/apis/policy"
+	"k8s.io/internal-api/apis/policy/validation"
 )
 
 // podDisruptionBudgetStrategy implements verification logic for PodDisruptionBudgets.

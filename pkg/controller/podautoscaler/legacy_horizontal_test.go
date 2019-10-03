@@ -41,7 +41,7 @@ import (
 	restclient "k8s.io/client-go/rest"
 	scalefake "k8s.io/client-go/scale/fake"
 	core "k8s.io/client-go/testing"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	"k8s.io/internal-api/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/podautoscaler/metrics"
 
@@ -50,9 +50,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	_ "k8s.io/kubernetes/pkg/apis/apps/install"
-	_ "k8s.io/kubernetes/pkg/apis/autoscaling/install"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	_ "k8s.io/internal-api/apis/apps/install"
+	_ "k8s.io/internal-api/apis/autoscaling/install"
+	_ "k8s.io/internal-api/apis/core/install"
 )
 
 func (w fakeResponseWrapper) DoRaw() ([]byte, error) {

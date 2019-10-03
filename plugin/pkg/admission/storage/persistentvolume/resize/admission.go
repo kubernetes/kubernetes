@@ -25,8 +25,8 @@ import (
 	genericadmissioninitializer "k8s.io/apiserver/pkg/admission/initializer"
 	"k8s.io/client-go/informers"
 	storagev1listers "k8s.io/client-go/listers/storage/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apihelper "k8s.io/kubernetes/pkg/apis/core/helper"
+	api "k8s.io/internal-api/apis/core"
+	apihelper "k8s.io/internal-api/apis/core/helper"
 )
 
 const (

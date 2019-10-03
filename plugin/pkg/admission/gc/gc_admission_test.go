@@ -34,7 +34,7 @@ import (
 	fakediscovery "k8s.io/client-go/discovery/fake"
 	"k8s.io/client-go/restmapper"
 	coretesting "k8s.io/client-go/testing"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 	kubeadmission "k8s.io/kubernetes/pkg/kubeapiserver/admission"
 )
 
