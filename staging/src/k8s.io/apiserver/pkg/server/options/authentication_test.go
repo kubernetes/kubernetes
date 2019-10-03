@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	"k8s.io/apiserver/pkg/server"
 	openapicommon "k8s.io/kube-openapi/pkg/common"
 )
@@ -37,27 +38,27 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 		{
 			name: "test when ClientCAFile is nil",
 			testOptions: &RequestHeaderAuthenticationOptions{
-				UsernameHeaders:     []string{"x-remote-user"},
-				GroupHeaders:        []string{"x-remote-group"},
-				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
-				AllowedNames:        []string{"kube-aggregator"},
+				UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
+				GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
+				ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
+				AllowedNames:        headerrequest.StaticStringSlice{"kube-aggregator"},
 			},
 		},
 		{
 			name: "test when ClientCAFile is not nil",
 			testOptions: &RequestHeaderAuthenticationOptions{
 				ClientCAFile:        "testdata/root.pem",
-				UsernameHeaders:     []string{"x-remote-user"},
-				GroupHeaders:        []string{"x-remote-group"},
-				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
-				AllowedNames:        []string{"kube-aggregator"},
+				UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
+				GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
+				ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
+				AllowedNames:        headerrequest.StaticStringSlice{"kube-aggregator"},
 			},
 			expectConfig: &authenticatorfactory.RequestHeaderConfig{
-				UsernameHeaders:     []string{"x-remote-user"},
-				GroupHeaders:        []string{"x-remote-group"},
-				ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+				UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
+				GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
+				ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
 				VerifyOptionFn:      nil, // this is nil because you can't compare functions
-				AllowedClientNames:  []string{"kube-aggregator"},
+				AllowedClientNames:  headerrequest.StaticStringSlice{"kube-aggregator"},
 			},
 		},
 	}
