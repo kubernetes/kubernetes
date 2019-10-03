@@ -151,8 +151,6 @@ type TestContextType struct {
 	NodeTestContextType
 	// Monitoring solution that is used in current cluster.
 	ClusterMonitoringMode string
-	// Separate Prometheus monitoring deployed in cluster
-	EnablePrometheusMonitoring bool
 
 	// Indicates what path the kubernetes-anywhere is installed on
 	KubernetesAnywherePath string
@@ -313,7 +311,6 @@ func RegisterClusterFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.MasterOSDistro, "master-os-distro", "debian", "The OS distribution of cluster master (debian, ubuntu, gci, coreos, or custom).")
 	flags.StringVar(&TestContext.NodeOSDistro, "node-os-distro", "debian", "The OS distribution of cluster VM instances (debian, ubuntu, gci, coreos, or custom).")
 	flags.StringVar(&TestContext.ClusterMonitoringMode, "cluster-monitoring-mode", "standalone", "The monitoring solution that is used in the cluster.")
-	flags.BoolVar(&TestContext.EnablePrometheusMonitoring, "prometheus-monitoring", false, "Separate Prometheus monitoring deployed in cluster.")
 	flags.StringVar(&TestContext.ClusterDNSDomain, "dns-domain", "cluster.local", "The DNS Domain of the cluster.")
 
 	// TODO: Flags per provider?  Rename gce-project/gce-zone?
