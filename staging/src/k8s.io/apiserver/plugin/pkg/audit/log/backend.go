@@ -44,18 +44,18 @@ var AllowedFormats = []string{
 }
 
 type backend struct {
-	out          io.Writer
-	format       string
-	groupVersion schema.GroupVersion
+	out     io.Writer
+	format  string
+	encoder runtime.Encoder
 }
 
 var _ audit.Backend = &backend{}
 
 func NewBackend(out io.Writer, format string, groupVersion schema.GroupVersion) audit.Backend {
 	return &backend{
-		out:          out,
-		format:       format,
-		groupVersion: groupVersion,
+		out:     out,
+		format:  format,
+		encoder: audit.Codecs.LegacyCodec(groupVersion),
 	}
 }
 
@@ -73,7 +73,7 @@ func (b *backend) logEvent(ev *auditinternal.Event) bool {
 	case FormatLegacy:
 		line = audit.EventString(ev) + "\n"
 	case FormatJson:
-		bs, err := runtime.Encode(audit.Codecs.LegacyCodec(b.groupVersion), ev)
+		bs, err := runtime.Encode(b.encoder, ev)
 		if err != nil {
 			audit.HandlePluginError(PluginName, err, ev)
 			return false
