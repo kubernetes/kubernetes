@@ -226,16 +226,6 @@ func gvkWithDefaults(actual, defaultGVK schema.GroupVersionKind) schema.GroupVer
 // On success or most errors, the method will return the calculated schema kind.
 // The gvk calculate priority will be originalData > default gvk > into
 func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, into runtime.Object) (runtime.Object, *schema.GroupVersionKind, error) {
-	if versioned, ok := into.(*runtime.VersionedObjects); ok {
-		into = versioned.Last()
-		obj, actual, err := s.Decode(originalData, gvk, into)
-		if err != nil {
-			return nil, actual, err
-		}
-		versioned.Objects = []runtime.Object{obj}
-		return versioned, actual, nil
-	}
-
 	data := originalData
 	if s.options.Yaml {
 		altered, err := yaml.YAMLToJSON(data)

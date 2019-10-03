@@ -415,12 +415,6 @@ func (s unstructuredJSONScheme) decodeInto(data []byte, obj runtime.Object) erro
 		return s.decodeToUnstructured(data, x)
 	case *UnstructuredList:
 		return s.decodeToList(data, x)
-	case *runtime.VersionedObjects:
-		o, err := s.decode(data)
-		if err == nil {
-			x.Objects = []runtime.Object{o}
-		}
-		return err
 	default:
 		return json.Unmarshal(data, x)
 	}
