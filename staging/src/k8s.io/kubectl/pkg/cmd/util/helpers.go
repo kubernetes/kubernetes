@@ -405,6 +405,8 @@ func AddJsonFilenameFlag(flags *pflag.FlagSet, value *[]string, usage string) {
 // AddKustomizeFlag adds kustomize flag to a command
 func AddKustomizeFlag(flags *pflag.FlagSet, value *string) {
 	flags.StringVarP(value, "kustomize", "k", *value, "Process the kustomization directory. This flag can't be used together with -f or -R.")
+	var annotations []string
+	flags.SetAnnotation("kustomize", cobra.BashCompSubdirsInDir, annotations)
 }
 
 // AddDryRunFlag adds dry-run flag to a command. Usually used by mutations.

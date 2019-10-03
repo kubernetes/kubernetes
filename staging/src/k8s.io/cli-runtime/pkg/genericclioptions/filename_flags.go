@@ -75,5 +75,7 @@ func (o *FileNameFlags) AddFlags(flags *pflag.FlagSet) {
 	if o.Kustomize != nil {
 		flags.StringVarP(o.Kustomize, "kustomize", "k", *o.Kustomize,
 			"Process a kustomization directory. This flag can't be used together with -f or -R.")
+		var annotations []string
+		flags.SetAnnotation("kustomize", cobra.BashCompSubdirsInDir, annotations)
 	}
 }
