@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"io"
 	"reflect"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -88,21 +89,34 @@ type codec struct {
 	originalSchemeName string
 }
 
+var identifiersMap sync.Map
+
+type codecIdentifier struct {
+	EncodeGV string `json:"encodeGV,omitempty"`
+	Encoder  string `json:"encoder,omitempty"`
+	Name     string `json:"name,omitempty"`
+}
+
 // identifier computes Identifier of Encoder based on codec parameters.
 func identifier(encodeGV runtime.GroupVersioner, encoder runtime.Encoder) runtime.Identifier {
-	result := map[string]string{
-		"name": "versioning",
+	result := codecIdentifier{
+		Name: "versioning",
 	}
+
 	if encodeGV != nil {
-		result["encodeGV"] = encodeGV.Identifier()
+		result.EncodeGV = encodeGV.Identifier()
 	}
 	if encoder != nil {
-		result["encoder"] = string(encoder.Identifier())
+		result.Encoder = string(encoder.Identifier())
+	}
+	if id, ok := identifiersMap.Load(result); ok {
+		return id.(runtime.Identifier)
 	}
 	identifier, err := json.Marshal(result)
 	if err != nil {
 		klog.Fatalf("Failed marshaling identifier for codec: %v", err)
 	}
+	identifiersMap.Store(result, runtime.Identifier(identifier))
 	return runtime.Identifier(identifier)
 }
 
