@@ -16,8 +16,8 @@ limitations under the License.
 
 package master
 
-// These imports are the API groups the API server will support.
 import (
+	// These imports are the API groups the API server will support.
 	_ "k8s.io/kubernetes/pkg/apis/admission/install"
 	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"

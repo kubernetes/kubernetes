@@ -137,7 +137,6 @@ pkg/kubelet/status/testing
 pkg/kubelet/sysctl
 pkg/kubelet/types
 pkg/kubemark
-pkg/master
 pkg/master/controller/crdregistration
 pkg/master/tunneler
 pkg/proxy/apis/config

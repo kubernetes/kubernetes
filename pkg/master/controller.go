@@ -131,11 +131,13 @@ func (c *completedConfig) NewBootstrapController(legacyRESTStorage corerest.Lega
 	}
 }
 
+// PostStartHook initiates the core controller loops that must exist for bootstrapping.
 func (c *Controller) PostStartHook(hookContext genericapiserver.PostStartHookContext) error {
 	c.Start()
 	return nil
 }
 
+// PreShutdownHook triggers the actions needed to shut down the API Server cleanly.
 func (c *Controller) PreShutdownHook() error {
 	c.Stop()
 	return nil
@@ -171,6 +173,7 @@ func (c *Controller) Start() {
 	c.runner.Start()
 }
 
+// Stop cleans up this API Servers endpoint reconciliation leases so another master can take over more quickly.
 func (c *Controller) Stop() {
 	if c.runner != nil {
 		c.runner.Stop()
@@ -279,7 +282,7 @@ func createEndpointPortSpec(endpointPort int, endpointPortName string, extraEndp
 	return endpointPorts
 }
 
-// CreateMasterServiceIfNeeded will create the specified service if it
+// CreateOrUpdateMasterServiceIfNeeded will create the specified service if it
 // doesn't already exist.
 func (c *Controller) CreateOrUpdateMasterServiceIfNeeded(serviceName string, serviceIP net.IP, servicePorts []corev1.ServicePort, serviceType corev1.ServiceType, reconcile bool) error {
 	if s, err := c.ServiceClient.Services(metav1.NamespaceDefault).Get(serviceName, metav1.GetOptions{}); err == nil {
