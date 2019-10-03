@@ -23,7 +23,6 @@ go_test(
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
-        "//pkg/scheduler/framework/plugins:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

@@ -41,6 +41,7 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
+	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -116,11 +117,15 @@ func (sched *Scheduler) Cache() internalcache.Cache {
 }
 
 type schedulerOptions struct {
-	schedulerName                  string
-	hardPodAffinitySymmetricWeight int32
-	disablePreemption              bool
-	percentageOfNodesToScore       int32
-	bindTimeoutSeconds             int64
+	schedulerName                   string
+	hardPodAffinitySymmetricWeight  int32
+	disablePreemption               bool
+	percentageOfNodesToScore        int32
+	bindTimeoutSeconds              int64
+	frameworkRegistry               framework.Registry
+	frameworkConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry
+	frameworkPlugins                *kubeschedulerconfig.Plugins
+	frameworkPluginConfig           []kubeschedulerconfig.PluginConfig
 }
 
 // Option configures a Scheduler
@@ -161,12 +166,51 @@ func WithBindTimeoutSeconds(bindTimeoutSeconds int64) Option {
 	}
 }
 
+// WithFrameworkRegistry sets the framework registry.
+func WithFrameworkRegistry(registry framework.Registry) Option {
+	return func(o *schedulerOptions) {
+		o.frameworkRegistry = registry
+	}
+}
+
+// WithFrameworkConfigProducerRegistry sets the framework plugin producer registry.
+func WithFrameworkConfigProducerRegistry(registry *frameworkplugins.ConfigProducerRegistry) Option {
+	return func(o *schedulerOptions) {
+		o.frameworkConfigProducerRegistry = registry
+	}
+}
+
+// WithFrameworkPlugins sets the plugins that the framework should be configured with.
+func WithFrameworkPlugins(plugins *kubeschedulerconfig.Plugins) Option {
+	return func(o *schedulerOptions) {
+		o.frameworkPlugins = plugins
+	}
+}
+
+// WithFrameworkPluginConfig sets the PluginConfig slice that the framework should be configured with.
+func WithFrameworkPluginConfig(pluginConfig []kubeschedulerconfig.PluginConfig) Option {
+	return func(o *schedulerOptions) {
+		o.frameworkPluginConfig = pluginConfig
+	}
+}
+
 var defaultSchedulerOptions = schedulerOptions{
-	schedulerName:                  v1.DefaultSchedulerName,
-	hardPodAffinitySymmetricWeight: v1.DefaultHardPodAffinitySymmetricWeight,
-	disablePreemption:              false,
-	percentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
-	bindTimeoutSeconds:             BindTimeoutSeconds,
+	schedulerName:                   v1.DefaultSchedulerName,
+	hardPodAffinitySymmetricWeight:  v1.DefaultHardPodAffinitySymmetricWeight,
+	disablePreemption:               false,
+	percentageOfNodesToScore:        schedulerapi.DefaultPercentageOfNodesToScore,
+	bindTimeoutSeconds:              BindTimeoutSeconds,
+	frameworkRegistry:               frameworkplugins.NewDefaultRegistry(),
+	frameworkConfigProducerRegistry: frameworkplugins.NewDefaultConfigProducerRegistry(),
+	// The plugins and pluginConfig options are currently nil because we currently don't have
+	// "default" plugins. All plugins that we run through the framework currently come from two
+	// sources: 1) specified in component config, in which case those two options should be
+	// set using their corresponding With* functions, 2) predicate/priority-mapped plugins, which
+	// pluginConfigProducerRegistry contains a mapping for and produces their configurations.
+	// TODO(ahg-g) Once predicates and priorities are migrated to natively run as plugins, the
+	// below two parameters will be populated accordingly.
+	frameworkPlugins:      nil,
+	frameworkPluginConfig: nil,
 }
 
 // New returns a Scheduler
@@ -185,9 +229,6 @@ func New(client clientset.Interface,
 	recorder events.EventRecorder,
 	schedulerAlgorithmSource kubeschedulerconfig.SchedulerAlgorithmSource,
 	stopCh <-chan struct{},
-	registry framework.Registry,
-	plugins *kubeschedulerconfig.Plugins,
-	pluginConfig []kubeschedulerconfig.PluginConfig,
 	opts ...Option) (*Scheduler, error) {
 
 	options := defaultSchedulerOptions
@@ -212,9 +253,10 @@ func New(client clientset.Interface,
 		DisablePreemption:              options.disablePreemption,
 		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
 		BindTimeoutSeconds:             options.bindTimeoutSeconds,
-		Registry:                       registry,
-		Plugins:                        plugins,
-		PluginConfig:                   pluginConfig,
+		Registry:                       options.frameworkRegistry,
+		PluginConfigProducerRegistry:   options.frameworkConfigProducerRegistry,
+		Plugins:                        options.frameworkPlugins,
+		PluginConfig:                   options.frameworkPluginConfig,
 	})
 	var config *factory.Config
 	source := schedulerAlgorithmSource

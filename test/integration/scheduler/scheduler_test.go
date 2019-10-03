@@ -41,7 +41,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-	schedulerplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -265,9 +264,6 @@ priorities: []
 				},
 			},
 			nil,
-			schedulerplugins.NewDefaultRegistry(),
-			nil,
-			[]kubeschedulerconfig.PluginConfig{},
 			scheduler.WithName(v1.DefaultSchedulerName),
 			scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 			scheduler.WithBindTimeoutSeconds(defaultBindTimeout),
@@ -336,9 +332,6 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 			},
 		},
 		nil,
-		schedulerplugins.NewDefaultRegistry(),
-		nil,
-		[]kubeschedulerconfig.PluginConfig{},
 		scheduler.WithName(v1.DefaultSchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(v1.DefaultHardPodAffinitySymmetricWeight),
 		scheduler.WithBindTimeoutSeconds(defaultBindTimeout))
@@ -596,7 +589,7 @@ func TestMultiScheduler(t *testing.T) {
 	}
 
 	// 5. create and start a scheduler with name "foo-scheduler"
-	context = initTestSchedulerWithOptions(t, context, true, nil, schedulerplugins.NewDefaultRegistry(), nil, []kubeschedulerconfig.PluginConfig{}, time.Second, scheduler.WithName(fooScheduler))
+	context = initTestSchedulerWithOptions(t, context, true, nil, time.Second, scheduler.WithName(fooScheduler))
 
 	//	6. **check point-2**:
 	//		- testPodWithAnnotationFitsFoo should be scheduled

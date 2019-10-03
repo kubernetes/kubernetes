@@ -59,11 +59,9 @@ import (
 
 var (
 	emptyPluginRegistry = framework.Registry{}
-	// emptyPluginConfig is an empty plugin config used in tests.
-	emptyPluginConfig []kubeschedulerconfig.PluginConfig
 	// emptyFramework is an empty framework used in tests.
 	// Note: If the test runs in goroutine, please don't use this variable to avoid a race condition.
-	emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, emptyPluginConfig)
+	emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, nil)
 )
 
 type fakeBinder struct {
@@ -178,7 +176,6 @@ func TestSchedulerCreation(t *testing.T) {
 	testSource := "testProvider"
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
 
-	defaultBindTimeout := int64(30)
 	factory.RegisterFitPredicate("PredicateOne", PredicateOne)
 	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
 	factory.RegisterAlgorithmProvider(testSource, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
@@ -200,10 +197,7 @@ func TestSchedulerCreation(t *testing.T) {
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
-		emptyPluginRegistry,
-		nil,
-		emptyPluginConfig,
-		WithBindTimeoutSeconds(defaultBindTimeout))
+	)
 
 	if err != nil {
 		t.Fatalf("Failed to create scheduler: %v", err)

@@ -56,8 +56,6 @@ import (
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-	schedulerplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -142,8 +140,7 @@ func initTestScheduler(
 	policy *schedulerapi.Policy,
 ) *testContext {
 	// Pod preemption is enabled by default scheduler configuration.
-	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, schedulerplugins.NewDefaultRegistry(),
-		nil, []schedulerconfig.PluginConfig{}, time.Second)
+	return initTestSchedulerWithOptions(t, context, setPodInformer, policy, time.Second)
 }
 
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
@@ -153,9 +150,6 @@ func initTestSchedulerWithOptions(
 	context *testContext,
 	setPodInformer bool,
 	policy *schedulerapi.Policy,
-	pluginRegistry schedulerframework.Registry,
-	plugins *schedulerconfig.Plugins,
-	pluginConfig []schedulerconfig.PluginConfig,
 	resyncPeriod time.Duration,
 	opts ...scheduler.Option,
 ) *testContext {
@@ -204,9 +198,6 @@ func initTestSchedulerWithOptions(
 		recorder,
 		algorithmSrc,
 		context.stopCh,
-		pluginRegistry,
-		plugins,
-		pluginConfig,
 		opts...,
 	)
 
@@ -273,7 +264,6 @@ func initTest(t *testing.T, nsPrefix string) *testContext {
 func initTestDisablePreemption(t *testing.T, nsPrefix string) *testContext {
 	return initTestSchedulerWithOptions(
 		t, initTestMaster(t, nsPrefix, nil), true, nil,
-		schedulerplugins.NewDefaultRegistry(), nil, []schedulerconfig.PluginConfig{},
 		time.Second, scheduler.WithPreemptionDisabled(true))
 }
 

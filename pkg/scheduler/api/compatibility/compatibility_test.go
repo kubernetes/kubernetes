@@ -32,7 +32,6 @@ import (
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/factory"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 )
 
 func TestCompatibility_v1_Scheduler(t *testing.T) {
@@ -1163,9 +1162,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				nil,
 				algorithmSrc,
 				make(chan struct{}),
-				schedulerframework.NewDefaultRegistry(),
-				nil,
-				[]kubeschedulerconfig.PluginConfig{},
 			)
 			if err != nil {
 				t.Fatalf("%s: Error constructing: %v", v, err)

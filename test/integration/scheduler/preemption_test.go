@@ -38,12 +38,15 @@ import (
 	restclient "k8s.io/client-go/rest"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
-	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
+	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/plugin/pkg/admission/priority"
 	testutils "k8s.io/kubernetes/test/utils"
+
+	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 
 	"k8s.io/klog"
 )
@@ -121,10 +124,12 @@ var _ = framework.FilterPlugin(&tokenFilter{})
 func TestPreemption(t *testing.T) {
 	// Initialize scheduler with a filter plugin.
 	var filter tokenFilter
-	registry := framework.Registry{filterPluginName: func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
+	registry := frameworkplugins.NewDefaultRegistry()
+
+	registry.Register(filterPluginName, func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
 		return &filter, nil
-	}}
-	plugin := &schedulerconfig.Plugins{
+	})
+	plugins := &schedulerconfig.Plugins{
 		Filter: &schedulerconfig.PluginSet{
 			Enabled: []schedulerconfig.Plugin{
 				{
@@ -142,7 +147,9 @@ func TestPreemption(t *testing.T) {
 	}
 	context := initTestSchedulerWithOptions(t,
 		initTestMaster(t, "preemptiom", nil),
-		false, nil, registry, plugin, []schedulerconfig.PluginConfig{}, time.Second)
+		false, nil, time.Second,
+		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithFrameworkRegistry(registry))
 
 	defer cleanupTest(t, context)
 	cs := context.clientSet

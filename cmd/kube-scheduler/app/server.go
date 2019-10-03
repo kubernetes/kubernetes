@@ -182,14 +182,15 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 		cc.Recorder,
 		cc.ComponentConfig.AlgorithmSource,
 		stopCh,
-		registry,
-		cc.ComponentConfig.Plugins,
-		cc.ComponentConfig.PluginConfig,
 		scheduler.WithName(cc.ComponentConfig.SchedulerName),
 		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
-		scheduler.WithBindTimeoutSeconds(*cc.ComponentConfig.BindTimeoutSeconds))
+		scheduler.WithBindTimeoutSeconds(*cc.ComponentConfig.BindTimeoutSeconds),
+		scheduler.WithFrameworkRegistry(registry),
+		scheduler.WithFrameworkPlugins(cc.ComponentConfig.Plugins),
+		scheduler.WithFrameworkPluginConfig(cc.ComponentConfig.PluginConfig),
+	)
 	if err != nil {
 		return err
 	}
