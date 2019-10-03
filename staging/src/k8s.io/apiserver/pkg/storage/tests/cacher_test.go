@@ -323,7 +323,9 @@ func TestList(t *testing.T) {
 	}
 }
 
-func TestInfiniteList(t *testing.T) {
+// TestTooLargeResourceVersionList ensures that a list request for a resource version higher than available
+// in the watch cache completes (does not wait indefinitely) and results in a ResourceVersionTooLarge error.
+func TestTooLargeResourceVersionList(t *testing.T) {
 	server, etcdStorage := newEtcdTestStorage(t, etcd3testing.PathPrefix())
 	defer server.Terminate(t)
 	cacher, v, err := newTestCacher(etcdStorage, 10)
@@ -346,6 +348,9 @@ func TestInfiniteList(t *testing.T) {
 	err = cacher.List(context.TODO(), "pods/ns", listRV, storage.Everything, result)
 	if !errors.IsTimeout(err) {
 		t.Errorf("Unexpected error: %v", err)
+	}
+	if !storage.IsTooLargeResourceVersion(err) {
+		t.Errorf("expected 'Too large resource version' cause in error but got: %v", err)
 	}
 }
 
