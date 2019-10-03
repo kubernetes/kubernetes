@@ -36,8 +36,10 @@ var (
 // FSInfo returns (available bytes, byte capacity, byte usage, total inodes, inodes free, inode usage, error)
 // for the filesystem that path resides upon.
 func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
-	var freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes int64
-	var err error
+	var (
+		freeBytesAvailable, totalNumberOfBytes, totalNumberOfFreeBytes int64
+		err                                                            error
+	)
 
 	ret, _, err := syscall.Syscall6(
 		procGetDiskFreeSpaceEx.Addr(),

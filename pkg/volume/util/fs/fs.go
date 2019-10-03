@@ -34,8 +34,7 @@ import (
 // for the filesystem that path resides upon.
 func FsInfo(path string) (int64, int64, int64, int64, int64, int64, error) {
 	statfs := &unix.Statfs_t{}
-	err := unix.Statfs(path, statfs)
-	if err != nil {
+	if err := unix.Statfs(path, statfs); err != nil {
 		return 0, 0, 0, 0, 0, 0, err
 	}
 
@@ -60,8 +59,7 @@ func DiskUsage(path string) (*resource.Quantity, error) {
 	// First check whether the quota system knows about this directory
 	// A nil quantity with no error means that the path does not support quotas
 	// and we should use other mechanisms.
-	data, err := fsquota.GetConsumption(path)
-	if data != nil {
+	if data, err := fsquota.GetConsumption(path); data != nil {
 		return data, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("unable to retrieve disk consumption via quota for %s: %v", path, err)
@@ -89,14 +87,15 @@ func Find(path string) (int64, error) {
 	// First check whether the quota system knows about this directory
 	// A nil quantity with no error means that the path does not support quotas
 	// and we should use other mechanisms.
-	inodes, err := fsquota.GetInodes(path)
-	if inodes != nil {
+	if inodes, err := fsquota.GetInodes(path); inodes != nil {
 		return inodes.Value(), nil
 	} else if err != nil {
 		return 0, fmt.Errorf("unable to retrieve inode consumption via quota for %s: %v", path, err)
 	}
-	var counter byteCounter
-	var stderr bytes.Buffer
+	var (
+		counter byteCounter
+		stderr  bytes.Buffer
+	)
 	findCmd := exec.Command("find", path, "-xdev", "-printf", ".")
 	findCmd.Stdout, findCmd.Stderr = &counter, &stderr
 	if err := findCmd.Start(); err != nil {
