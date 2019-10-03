@@ -98,7 +98,6 @@ package_group(
     name = "pkg_kubectl_cmd_CONSUMERS_BAD",
     packages = [
         "//cmd/clicheck",
-        "//cmd/hyperkube",
     ],
 )
 
