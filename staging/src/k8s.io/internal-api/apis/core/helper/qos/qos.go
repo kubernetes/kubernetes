@@ -21,7 +21,7 @@ package qos
 import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/core"
 )
 
 var supportedQoSComputeResources = sets.NewString(string(core.ResourceCPU), string(core.ResourceMemory))

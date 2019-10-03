@@ -20,9 +20,9 @@ import (
 	apivalidation "k8s.io/apimachinery/pkg/api/validation"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/core"
-	corevalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/apis/node"
+	"k8s.io/internal-api/apis/core"
+	corevalidation "k8s.io/internal-api/apis/core/validation"
+	"k8s.io/internal-api/apis/node"
 )
 
 // ValidateRuntimeClass validates the RuntimeClass

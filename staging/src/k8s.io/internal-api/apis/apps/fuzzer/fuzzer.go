@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/apis/apps"
+	"k8s.io/internal-api/apis/apps"
 )
 
 // Funcs returns the fuzzer functions for the apps api group.

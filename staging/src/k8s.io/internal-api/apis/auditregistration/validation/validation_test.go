@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/auditregistration"
+	"k8s.io/internal-api/apis/auditregistration"
 	utilpointer "k8s.io/utils/pointer"
 )
 

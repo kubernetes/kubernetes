@@ -19,7 +19,7 @@ package v0
 import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	api "k8s.io/kubernetes/pkg/apis/abac"
+	api "k8s.io/internal-api/apis/abac"
 )
 
 // allAuthenticated matches k8s.io/apiserver/pkg/authentication/user.AllAuthenticated,

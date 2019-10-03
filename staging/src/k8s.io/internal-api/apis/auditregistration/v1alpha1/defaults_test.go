@@ -23,9 +23,9 @@ import (
 	auditregistrationv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	_ "k8s.io/kubernetes/pkg/apis/auditregistration/install"
-	. "k8s.io/kubernetes/pkg/apis/auditregistration/v1alpha1"
+	"k8s.io/internal-api/api/legacyscheme"
+	_ "k8s.io/internal-api/apis/auditregistration/install"
+	. "k8s.io/internal-api/apis/auditregistration/v1alpha1"
 	utilpointer "k8s.io/utils/pointer"
 )
 

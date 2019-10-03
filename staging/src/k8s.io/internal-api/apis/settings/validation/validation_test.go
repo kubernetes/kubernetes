@@ -21,8 +21,8 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/settings"
+	api "k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/settings"
 )
 
 func TestValidateEmptyPodPreset(t *testing.T) {

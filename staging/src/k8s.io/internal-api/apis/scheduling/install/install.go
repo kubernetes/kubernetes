@@ -21,11 +21,11 @@ package install
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
-	"k8s.io/kubernetes/pkg/apis/scheduling/v1"
-	"k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
-	"k8s.io/kubernetes/pkg/apis/scheduling/v1beta1"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/apis/scheduling"
+	"k8s.io/internal-api/apis/scheduling/v1"
+	"k8s.io/internal-api/apis/scheduling/v1alpha1"
+	"k8s.io/internal-api/apis/scheduling/v1beta1"
 )
 
 func init() {

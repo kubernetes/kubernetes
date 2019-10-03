@@ -19,7 +19,7 @@ package v1beta1
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/apis/abac"
+	"k8s.io/internal-api/apis/abac"
 )
 
 // GroupName is the group name use in this package

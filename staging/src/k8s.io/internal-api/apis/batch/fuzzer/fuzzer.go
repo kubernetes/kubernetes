@@ -20,7 +20,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/internal-api/apis/batch"
 )
 
 func newBool(val bool) *bool {

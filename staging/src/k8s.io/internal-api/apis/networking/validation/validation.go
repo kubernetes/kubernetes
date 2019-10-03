@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/apis/networking"
+	api "k8s.io/internal-api/apis/core"
+	apivalidation "k8s.io/internal-api/apis/core/validation"
+	"k8s.io/internal-api/apis/networking"
 )
 
 // ValidateNetworkPolicyName can be used to check whether the given networkpolicy

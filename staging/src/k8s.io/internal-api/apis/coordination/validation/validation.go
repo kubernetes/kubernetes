@@ -19,7 +19,7 @@ package validation
 import (
 	"k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/coordination"
+	"k8s.io/internal-api/apis/coordination"
 )
 
 // ValidateLease validates a Lease.

@@ -27,11 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/internal-api/apis/apps"
+	"k8s.io/internal-api/apis/autoscaling"
+	api "k8s.io/internal-api/apis/core"
+	k8s_api_v1 "k8s.io/internal-api/apis/core/v1"
+	"k8s.io/internal-api/apis/networking"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {

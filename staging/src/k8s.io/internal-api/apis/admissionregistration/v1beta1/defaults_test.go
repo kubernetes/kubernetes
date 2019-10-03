@@ -25,8 +25,8 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	_ "k8s.io/kubernetes/pkg/apis/admissionregistration/install"
+	"k8s.io/internal-api/api/legacyscheme"
+	_ "k8s.io/internal-api/apis/admissionregistration/install"
 	utilpointer "k8s.io/utils/pointer"
 )
 

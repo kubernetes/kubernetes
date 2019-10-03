@@ -20,7 +20,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/internal-api/apis/policy"
 )
 
 // Funcs returns the fuzzer functions for the policy api group.

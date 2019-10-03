@@ -20,7 +20,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
+	"k8s.io/internal-api/apis/admissionregistration"
 )
 
 // Funcs returns the fuzzer functions for the admissionregistration api group.

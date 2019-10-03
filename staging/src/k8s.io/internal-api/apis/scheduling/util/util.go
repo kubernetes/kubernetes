@@ -18,7 +18,7 @@ package util
 
 import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/internal-api/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 )
 

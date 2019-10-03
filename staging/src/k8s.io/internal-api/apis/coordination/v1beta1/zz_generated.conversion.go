@@ -27,7 +27,7 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	coordination "k8s.io/kubernetes/pkg/apis/coordination"
+	coordination "k8s.io/internal-api/apis/coordination"
 )
 
 func init() {

@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/certificates
+// +k8s:conversion-gen=k8s.io/internal-api/apis/certificates
 // +k8s:conversion-gen-external-types=k8s.io/api/certificates/v1beta1
 // +k8s:defaulter-gen=TypeMeta
 // +k8s:defaulter-gen-input=../../../../vendor/k8s.io/api/certificates/v1beta1
 
 // +groupName=certificates.k8s.io
 
-package v1beta1 // import "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+package v1beta1 // import "k8s.io/internal-api/apis/certificates/v1beta1"

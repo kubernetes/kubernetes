@@ -21,8 +21,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	unversionedvalidation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/internal-api/apis/core/validation"
+	"k8s.io/internal-api/apis/rbac"
 )
 
 // ValidateRBACName is exported to allow types outside of the RBAC API group to reuse this validation logic

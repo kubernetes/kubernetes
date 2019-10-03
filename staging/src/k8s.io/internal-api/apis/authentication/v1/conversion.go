@@ -20,7 +20,7 @@ import (
 	v1 "k8s.io/api/authentication/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	authentication "k8s.io/kubernetes/pkg/apis/authentication"
+	authentication "k8s.io/internal-api/apis/authentication"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {

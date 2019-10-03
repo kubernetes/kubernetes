@@ -23,8 +23,8 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/internal-api/apis/apps"
+	k8s_api_v1 "k8s.io/internal-api/apis/core/v1"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {

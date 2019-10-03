@@ -29,13 +29,13 @@ import (
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	intstr "k8s.io/apimachinery/pkg/util/intstr"
-	apps "k8s.io/kubernetes/pkg/apis/apps"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
-	core "k8s.io/kubernetes/pkg/apis/core"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
-	extensions "k8s.io/kubernetes/pkg/apis/extensions"
-	networking "k8s.io/kubernetes/pkg/apis/networking"
-	policy "k8s.io/kubernetes/pkg/apis/policy"
+	apps "k8s.io/internal-api/apis/apps"
+	autoscaling "k8s.io/internal-api/apis/autoscaling"
+	core "k8s.io/internal-api/apis/core"
+	corev1 "k8s.io/internal-api/apis/core/v1"
+	extensions "k8s.io/internal-api/apis/extensions"
+	networking "k8s.io/internal-api/apis/networking"
+	policy "k8s.io/internal-api/apis/policy"
 )
 
 func init() {

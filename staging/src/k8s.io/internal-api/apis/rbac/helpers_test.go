@@ -22,12 +22,12 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/rbac"
-	"k8s.io/kubernetes/pkg/apis/rbac/v1"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/apis/rbac"
+	"k8s.io/internal-api/apis/rbac/v1"
 
 	// install RBAC types
-	_ "k8s.io/kubernetes/pkg/apis/rbac/install"
+	_ "k8s.io/internal-api/apis/rbac/install"
 )
 
 // TestHelpersRoundTrip confirms that the rbac.New* helper functions produce RBAC objects that match objects

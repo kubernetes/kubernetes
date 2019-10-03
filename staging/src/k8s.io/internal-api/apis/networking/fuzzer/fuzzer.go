@@ -19,7 +19,7 @@ package fuzzer
 import (
 	fuzz "github.com/google/gofuzz"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/apis/networking"
+	"k8s.io/internal-api/apis/networking"
 )
 
 // Funcs returns the fuzzer functions for the networking api group.

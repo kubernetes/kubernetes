@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// +k8s:conversion-gen=k8s.io/kubernetes/pkg/apis/autoscaling
+// +k8s:conversion-gen=k8s.io/internal-api/apis/autoscaling
 // +k8s:defaulter-gen=TypeMeta
 
-package v2beta2 // import "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta2"
+package v2beta2 // import "k8s.io/internal-api/apis/autoscaling/v2beta2"

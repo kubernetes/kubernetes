@@ -22,8 +22,8 @@ import (
 
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	_ "k8s.io/kubernetes/pkg/apis/storage/install"
+	"k8s.io/internal-api/api/legacyscheme"
+	_ "k8s.io/internal-api/apis/storage/install"
 )
 
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {

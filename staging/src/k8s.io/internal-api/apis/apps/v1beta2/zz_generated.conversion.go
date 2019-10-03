@@ -28,10 +28,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	apps "k8s.io/kubernetes/pkg/apis/apps"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
-	core "k8s.io/kubernetes/pkg/apis/core"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	apps "k8s.io/internal-api/apis/apps"
+	autoscaling "k8s.io/internal-api/apis/autoscaling"
+	core "k8s.io/internal-api/apis/core"
+	corev1 "k8s.io/internal-api/apis/core/v1"
 )
 
 func init() {

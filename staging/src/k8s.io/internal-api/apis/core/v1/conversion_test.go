@@ -33,15 +33,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	apps "k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/core"
-	corefuzzer "k8s.io/kubernetes/pkg/apis/core/fuzzer"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/internal-api/api/legacyscheme"
+	apps "k8s.io/internal-api/apis/apps"
+	"k8s.io/internal-api/apis/core"
+	corefuzzer "k8s.io/internal-api/apis/core/fuzzer"
+	corev1 "k8s.io/internal-api/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
 
 	// enforce that all types are installed
-	_ "k8s.io/kubernetes/pkg/api/testapi"
+	_ "k8s.io/internal-api/api/testapi"
 )
 
 func TestPodLogOptions(t *testing.T) {

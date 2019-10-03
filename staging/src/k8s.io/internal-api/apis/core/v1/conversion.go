@@ -26,8 +26,8 @@ import (
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/apps"
+	"k8s.io/internal-api/apis/core"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {

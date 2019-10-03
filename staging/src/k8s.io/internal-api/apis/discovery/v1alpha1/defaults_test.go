@@ -23,8 +23,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1alpha1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	_ "k8s.io/kubernetes/pkg/apis/discovery/install"
+	"k8s.io/internal-api/api/legacyscheme"
+	_ "k8s.io/internal-api/apis/discovery/install"
 	utilpointer "k8s.io/utils/pointer"
 )
 

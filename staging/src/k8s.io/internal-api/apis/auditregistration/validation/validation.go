@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/webhook"
-	"k8s.io/kubernetes/pkg/apis/auditregistration"
+	"k8s.io/internal-api/apis/auditregistration"
 )
 
 // ValidateAuditSink validates the AuditSinks

@@ -19,10 +19,10 @@ package extensions
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/networking"
-	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/internal-api/apis/apps"
+	"k8s.io/internal-api/apis/autoscaling"
+	"k8s.io/internal-api/apis/networking"
+	"k8s.io/internal-api/apis/policy"
 )
 
 // GroupName is the group name use in this package

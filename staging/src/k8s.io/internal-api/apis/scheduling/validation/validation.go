@@ -22,8 +22,8 @@ import (
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
+	apivalidation "k8s.io/internal-api/apis/core/validation"
+	"k8s.io/internal-api/apis/scheduling"
 )
 
 // ValidatePriorityClass tests whether required fields in the PriorityClass are

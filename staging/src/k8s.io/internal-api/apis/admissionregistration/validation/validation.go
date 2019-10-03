@@ -27,9 +27,9 @@ import (
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/util/webhook"
-	"k8s.io/kubernetes/pkg/apis/admissionregistration"
-	admissionregistrationv1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1"
-	admissionregistrationv1beta1 "k8s.io/kubernetes/pkg/apis/admissionregistration/v1beta1"
+	"k8s.io/internal-api/apis/admissionregistration"
+	admissionregistrationv1 "k8s.io/internal-api/apis/admissionregistration/v1"
+	admissionregistrationv1beta1 "k8s.io/internal-api/apis/admissionregistration/v1beta1"
 )
 
 func hasWildcard(slice []string) bool {

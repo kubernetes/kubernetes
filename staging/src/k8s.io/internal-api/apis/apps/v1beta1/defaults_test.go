@@ -26,11 +26,11 @@ import (
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	_ "k8s.io/kubernetes/pkg/apis/apps/install"
-	. "k8s.io/kubernetes/pkg/apis/apps/v1beta1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/internal-api/api/legacyscheme"
+	_ "k8s.io/internal-api/apis/apps/install"
+	. "k8s.io/internal-api/apis/apps/v1beta1"
+	api "k8s.io/internal-api/apis/core"
+	_ "k8s.io/internal-api/apis/core/install"
 	utilpointer "k8s.io/utils/pointer"
 )
 

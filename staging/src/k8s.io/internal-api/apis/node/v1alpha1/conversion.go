@@ -20,7 +20,7 @@ import (
 	v1alpha1 "k8s.io/api/node/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	node "k8s.io/kubernetes/pkg/apis/node"
+	node "k8s.io/internal-api/apis/node"
 )
 
 func addConversionFuncs(s *runtime.Scheme) error {

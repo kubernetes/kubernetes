@@ -19,7 +19,7 @@ package policy
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	api "k8s.io/kubernetes/pkg/apis/core"
+	api "k8s.io/internal-api/apis/core"
 )
 
 // PodDisruptionBudgetSpec is a description of a PodDisruptionBudget.

@@ -25,8 +25,8 @@ import (
 	v1alpha1 "k8s.io/api/node/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	core "k8s.io/kubernetes/pkg/apis/core"
-	node "k8s.io/kubernetes/pkg/apis/node"
+	core "k8s.io/internal-api/apis/core"
+	node "k8s.io/internal-api/apis/node"
 )
 
 func TestRuntimeClassConversion(t *testing.T) {

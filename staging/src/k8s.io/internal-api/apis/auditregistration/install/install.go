@@ -21,9 +21,9 @@ package install
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/auditregistration"
-	"k8s.io/kubernetes/pkg/apis/auditregistration/v1alpha1"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/apis/auditregistration"
+	"k8s.io/internal-api/apis/auditregistration/v1alpha1"
 )
 
 func init() {

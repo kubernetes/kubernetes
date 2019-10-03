@@ -20,7 +20,7 @@ import (
 	fuzz "github.com/google/gofuzz"
 
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
-	"k8s.io/kubernetes/pkg/apis/rbac"
+	"k8s.io/internal-api/apis/rbac"
 )
 
 // Funcs returns the fuzzer functions for the rbac api group.

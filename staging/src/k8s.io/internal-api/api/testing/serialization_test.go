@@ -41,12 +41,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
-	"k8s.io/kubernetes/pkg/apis/apps"
-	k8s_apps_v1 "k8s.io/kubernetes/pkg/apis/apps/v1"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/api/testapi"
+	"k8s.io/internal-api/apis/apps"
+	k8s_apps_v1 "k8s.io/internal-api/apis/apps/v1"
+	api "k8s.io/internal-api/apis/core"
+	k8s_api_v1 "k8s.io/internal-api/apis/core/v1"
 	"sigs.k8s.io/yaml"
 )
 

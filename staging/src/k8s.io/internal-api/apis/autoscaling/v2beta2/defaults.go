@@ -20,7 +20,7 @@ import (
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
+	"k8s.io/internal-api/apis/autoscaling"
 )
 
 func addDefaultingFuncs(scheme *runtime.Scheme) error {

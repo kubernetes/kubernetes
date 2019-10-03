@@ -29,12 +29,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	corev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	"k8s.io/internal-api/api/legacyscheme"
+	corev1 "k8s.io/internal-api/apis/core/v1"
 	utilpointer "k8s.io/utils/pointer"
 
 	// enforce that all types are installed
-	_ "k8s.io/kubernetes/pkg/api/testapi"
+	_ "k8s.io/internal-api/api/testapi"
 
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"

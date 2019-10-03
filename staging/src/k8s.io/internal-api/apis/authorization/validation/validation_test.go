@@ -22,7 +22,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	authorizationapi "k8s.io/kubernetes/pkg/apis/authorization"
+	authorizationapi "k8s.io/internal-api/apis/authorization"
 )
 
 func TestValidateSARSpec(t *testing.T) {

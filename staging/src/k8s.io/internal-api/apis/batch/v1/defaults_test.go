@@ -25,10 +25,10 @@ import (
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	_ "k8s.io/kubernetes/pkg/apis/batch/install"
-	. "k8s.io/kubernetes/pkg/apis/batch/v1"
-	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/internal-api/api/legacyscheme"
+	_ "k8s.io/internal-api/apis/batch/install"
+	. "k8s.io/internal-api/apis/batch/v1"
+	_ "k8s.io/internal-api/apis/core/install"
 	utilpointer "k8s.io/utils/pointer"
 )
 

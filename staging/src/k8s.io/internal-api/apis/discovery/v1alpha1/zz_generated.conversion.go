@@ -27,8 +27,8 @@ import (
 	v1alpha1 "k8s.io/api/discovery/v1alpha1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	core "k8s.io/kubernetes/pkg/apis/core"
-	discovery "k8s.io/kubernetes/pkg/apis/discovery"
+	core "k8s.io/internal-api/apis/core"
+	discovery "k8s.io/internal-api/apis/discovery"
 )
 
 func init() {

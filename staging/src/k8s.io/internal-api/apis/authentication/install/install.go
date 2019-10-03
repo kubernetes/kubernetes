@@ -21,10 +21,10 @@ package install
 import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/apis/authentication"
-	"k8s.io/kubernetes/pkg/apis/authentication/v1"
-	"k8s.io/kubernetes/pkg/apis/authentication/v1beta1"
+	"k8s.io/internal-api/api/legacyscheme"
+	"k8s.io/internal-api/apis/authentication"
+	"k8s.io/internal-api/apis/authentication/v1"
+	"k8s.io/internal-api/apis/authentication/v1beta1"
 )
 
 func init() {

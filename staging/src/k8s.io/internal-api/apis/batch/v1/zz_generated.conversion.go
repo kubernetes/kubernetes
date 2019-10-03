@@ -28,9 +28,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	batch "k8s.io/kubernetes/pkg/apis/batch"
-	core "k8s.io/kubernetes/pkg/apis/core"
-	apiscorev1 "k8s.io/kubernetes/pkg/apis/core/v1"
+	batch "k8s.io/internal-api/apis/batch"
+	core "k8s.io/internal-api/apis/core"
+	apiscorev1 "k8s.io/internal-api/apis/core/v1"
 )
 
 func init() {

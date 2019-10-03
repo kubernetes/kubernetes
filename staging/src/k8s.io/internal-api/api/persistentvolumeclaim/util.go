@@ -18,7 +18,7 @@ package persistentvolumeclaim
 
 import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/core"
 	"k8s.io/kubernetes/pkg/features"
 )
 

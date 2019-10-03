@@ -20,8 +20,8 @@ import (
 	"github.com/google/gofuzz"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/apis/core"
-	"k8s.io/kubernetes/pkg/apis/scheduling"
+	"k8s.io/internal-api/apis/core"
+	"k8s.io/internal-api/apis/scheduling"
 	"k8s.io/kubernetes/pkg/features"
 )
 

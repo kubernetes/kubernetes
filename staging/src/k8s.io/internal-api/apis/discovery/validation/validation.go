@@ -22,9 +22,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	api "k8s.io/kubernetes/pkg/apis/core"
-	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
-	"k8s.io/kubernetes/pkg/apis/discovery"
+	api "k8s.io/internal-api/apis/core"
+	apivalidation "k8s.io/internal-api/apis/core/validation"
+	"k8s.io/internal-api/apis/discovery"
 )
 
 var (

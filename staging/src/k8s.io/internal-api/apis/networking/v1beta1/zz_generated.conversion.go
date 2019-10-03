@@ -26,7 +26,7 @@ import (
 	v1beta1 "k8s.io/api/networking/v1beta1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	networking "k8s.io/kubernetes/pkg/apis/networking"
+	networking "k8s.io/internal-api/apis/networking"
 )
 
 func init() {

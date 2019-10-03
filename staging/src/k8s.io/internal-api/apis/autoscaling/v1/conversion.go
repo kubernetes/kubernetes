@@ -24,8 +24,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/conversion"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/kubernetes/pkg/apis/autoscaling"
-	"k8s.io/kubernetes/pkg/apis/core"
+	"k8s.io/internal-api/apis/autoscaling"
+	"k8s.io/internal-api/apis/core"
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
