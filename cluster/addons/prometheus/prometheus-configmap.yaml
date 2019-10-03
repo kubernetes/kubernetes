@@ -152,6 +152,34 @@ data:
         source_labels:
         - __meta_kubernetes_pod_name
         target_label: kubernetes_pod_name
+        
+    - job_name: 'node-exporter'
+      kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names:
+          - kube-system
+      relabel_configs:
+      - action: keep
+        source_labels:
+        - __meta_kubernetes_service_label_k8s_app
+        regex: node-exporter
+      - action: keep
+        source_labels:
+        - __meta_kubernetes_endpoint_port_name
+        regex: metrics
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_namespace
+        target_label: kubernetes_namespace
+      - action: replace
+        source_labels:
+        - __meta_kubernetes_pod_name
+        target_label: kubernetes_pod_name
+      - source_labels:
+        - __meta_kubernetes_service_name
+        target_label: kubernetes_name
+
     alerting:
       alertmanagers:
       - kubernetes_sd_configs:
