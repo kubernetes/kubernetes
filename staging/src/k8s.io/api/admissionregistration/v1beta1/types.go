@@ -531,7 +531,8 @@ type WebhookClientConfig struct {
 	// +optional
 	Service *ServiceReference `json:"service,omitempty" protobuf:"bytes,1,opt,name=service"`
 
-	// `caBundle` is a PEM encoded CA bundle which will be used to validate the webhook's server certificate.
+	// `caBundle` is a base64 representation of a PEM-encoded CA bundle which will
+	// be used to validate the webhook's server certificate.
 	// If unspecified, system trust roots on the apiserver are used.
 	// +optional
 	CABundle []byte `json:"caBundle,omitempty" protobuf:"bytes,2,opt,name=caBundle"`
