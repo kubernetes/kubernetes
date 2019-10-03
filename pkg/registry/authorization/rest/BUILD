@@ -10,8 +10,6 @@ go_library(
     srcs = ["storage_authorization.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/authorization/rest",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/authorization:go_default_library",
         "//pkg/registry/authorization/localsubjectaccessreview:go_default_library",
         "//pkg/registry/authorization/selfsubjectaccessreview:go_default_library",
         "//pkg/registry/authorization/selfsubjectrulesreview:go_default_library",
@@ -23,6 +21,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/authorization:go_default_library",
     ],
 )
 

@@ -10,11 +10,6 @@ go_library(
     srcs = ["storage_scheduling.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/scheduling/rest",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/scheduling:go_default_library",
-        "//pkg/apis/scheduling/v1:go_default_library",
-        "//pkg/apis/scheduling/v1alpha1:go_default_library",
-        "//pkg/apis/scheduling/v1beta1:go_default_library",
         "//pkg/registry/scheduling/priorityclass/storage:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -26,6 +21,11 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/scheduling/v1beta1:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/scheduling:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/scheduling/v1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/scheduling/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/scheduling/v1beta1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

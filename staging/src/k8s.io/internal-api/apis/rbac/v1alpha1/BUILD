@@ -17,14 +17,15 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/rbac/v1alpha1",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/rbac/v1alpha1",
+    importpath = "k8s.io/internal-api/apis/rbac/v1alpha1",
     deps = [
-        "//pkg/apis/rbac:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/rbac:go_default_library",
     ],
 )
 
@@ -33,10 +34,10 @@ go_test(
     srcs = ["conversion_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
-        "//pkg/apis/rbac/install:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/rbac:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/rbac/install:go_default_library",
     ],
 )
 

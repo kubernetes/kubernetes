@@ -9,11 +9,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/podsecuritypolicy",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/api/podsecuritypolicy",
+    importpath = "k8s.io/internal-api/api/podsecuritypolicy",
     deps = [
-        "//pkg/apis/policy:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/policy:go_default_library",
     ],
 )
 
@@ -35,12 +36,12 @@ go_test(
     srcs = ["util_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/policy:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/policy:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

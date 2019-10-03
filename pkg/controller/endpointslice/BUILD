@@ -11,9 +11,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/endpointslice",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/discovery/validation:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/util/endpoint:go_default_library",
         "//pkg/util/hash:go_default_library",
@@ -39,6 +36,9 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/pod:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/discovery/validation:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

@@ -8,9 +8,9 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["fuzzer.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/core/fuzzer",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/core/fuzzer",
+    importpath = "k8s.io/internal-api/apis/core/fuzzer",
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -18,6 +18,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
     ],
 )

@@ -57,7 +57,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/testing:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities:go_default_library",
@@ -81,6 +80,7 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/testing:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],

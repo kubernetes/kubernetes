@@ -37,8 +37,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/apps/install:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v2beta2:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta/testrestmapper:go_default_library",
@@ -50,6 +48,8 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/apps/install:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta2:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/external_metrics/v1beta1:go_default_library",
         "//staging/src/k8s.io/metrics/pkg/apis/metrics/v1alpha1:go_default_library",

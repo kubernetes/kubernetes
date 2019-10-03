@@ -9,14 +9,15 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/autoscaling/v2beta2",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/autoscaling/v2beta2",
+    importpath = "k8s.io/internal-api/apis/autoscaling/v2beta2",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/autoscaling:go_default_library",
         "//staging/src/k8s.io/api/autoscaling/v2beta2:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/autoscaling:go_default_library",
     ],
 )
 

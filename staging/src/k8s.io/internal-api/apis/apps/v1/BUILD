@@ -10,12 +10,10 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/apps/v1",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/apps/v1",
+    importpath = "k8s.io/internal-api/apis/apps/v1",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/v1:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -23,6 +21,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/apps:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/v1:go_default_library",
     ],
 )
 
@@ -34,11 +35,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/apps/install:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/install:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
@@ -46,6 +42,11 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/apps:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/apps/install:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/install:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

@@ -14,8 +14,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/policy:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//pkg/securitycontext:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -40,6 +38,8 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/storage/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/policy:go_default_library",
     ],
 )
 
@@ -51,10 +51,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/core/pod/storage",
     deps = [
-        "//pkg/api/pod:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/validation:go_default_library",
-        "//pkg/apis/policy:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/printers:go_default_library",
@@ -79,6 +75,10 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/pod:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/validation:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/policy:go_default_library",
     ],
 )
 

@@ -9,7 +9,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/nodelifecycle",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/nodelifecycle/scheduler:go_default_library",
         "//pkg/controller/util/node:go_default_library",
@@ -44,6 +43,7 @@ go_library(
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

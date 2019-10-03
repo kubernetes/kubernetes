@@ -13,7 +13,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/master/reconcilers",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/v1/endpoints:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -25,6 +24,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/discovery/v1alpha1:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/endpoints:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

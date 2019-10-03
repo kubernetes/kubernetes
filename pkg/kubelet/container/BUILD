@@ -18,8 +18,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubelet/container",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/v1/pod:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//pkg/util/hash:go_default_library",
@@ -37,6 +35,8 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/pod:go_default_library",
         "//third_party/forked/golang/expansion:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
@@ -55,7 +55,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core/install:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/container/testing:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -63,6 +62,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/install:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],

@@ -16,7 +16,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/cronjob",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1beta1:go_default_library",
@@ -33,6 +32,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/pager:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
         "//vendor/github.com/robfig/cron:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
@@ -46,8 +46,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/batch/install:go_default_library",
-        "//pkg/apis/core/install:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -55,6 +53,8 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/batch/install:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/install:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

@@ -14,13 +14,13 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/policy/poddisruptionbudget",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/policy:go_default_library",
-        "//pkg/apis/policy/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/policy:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/policy/validation:go_default_library",
     ],
 )
 
@@ -29,10 +29,10 @@ go_test(
     srcs = ["strategy_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/policy:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/policy:go_default_library",
     ],
 )
 

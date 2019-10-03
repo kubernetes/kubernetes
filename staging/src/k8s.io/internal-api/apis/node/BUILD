@@ -8,13 +8,14 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/node",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/node",
+    importpath = "k8s.io/internal-api/apis/node",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 
@@ -29,10 +30,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/apis/node/install:all-srcs",
-        "//pkg/apis/node/v1alpha1:all-srcs",
-        "//pkg/apis/node/v1beta1:all-srcs",
-        "//pkg/apis/node/validation:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/node/install:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/node/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/node/v1beta1:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/node/validation:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

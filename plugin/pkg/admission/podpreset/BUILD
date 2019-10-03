@@ -11,7 +11,6 @@ go_test(
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/settings/v1alpha1:go_default_library",
@@ -24,6 +23,7 @@ go_test(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/listers/settings/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/github.com/google/gofuzz:go_default_library",
     ],
 )
@@ -33,9 +33,6 @@ go_library(
     srcs = ["admission.go"],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/podpreset",
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/pods:go_default_library",
-        "//pkg/apis/core/v1:go_default_library",
         "//staging/src/k8s.io/api/settings/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -47,6 +44,9 @@ go_library(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/listers/settings/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/pods:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

@@ -9,10 +9,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/endpoint",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/v1/endpoints:go_default_library",
-        "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/util/endpoint:go_default_library",
         "//pkg/features:go_default_library",
@@ -35,6 +31,10 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/leaderelection/resourcelock:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/endpoints:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/pod:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/v1/helper:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
     ],
@@ -45,9 +45,6 @@ go_test(
     srcs = ["endpoints_controller_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/api/v1/endpoints:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/util/endpoint:go_default_library",
         "//pkg/features:go_default_library",
@@ -64,6 +61,9 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/testapi:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/endpoints:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 

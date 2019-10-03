@@ -11,7 +11,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/bootstrap",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/util/metrics:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -28,6 +27,7 @@ go_library(
         "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/token/jws:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/util/secrets:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -42,8 +42,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/helper:go_default_library",
         "//pkg/controller:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -54,6 +52,8 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/cluster-bootstrap/token/api:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/helper:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
     ],
 )

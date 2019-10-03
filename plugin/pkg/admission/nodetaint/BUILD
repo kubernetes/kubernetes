@@ -6,11 +6,11 @@ go_library(
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/nodetaint",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 
@@ -19,13 +19,13 @@ go_test(
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/admission:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 

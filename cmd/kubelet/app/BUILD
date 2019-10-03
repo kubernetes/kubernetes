@@ -41,8 +41,6 @@ go_library(
     importpath = "k8s.io/kubernetes/cmd/kubelet/app",
     deps = [
         "//cmd/kubelet/app/options:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/credentialprovider:go_default_library",
@@ -139,6 +137,8 @@ go_library(
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//staging/src/k8s.io/kubelet/config/v1beta1:go_default_library",
         "//vendor/github.com/coreos/go-systemd/daemon:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",

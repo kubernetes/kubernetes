@@ -21,11 +21,11 @@ go_test(
     srcs = ["recycler_client_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 

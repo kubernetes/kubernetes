@@ -11,22 +11,23 @@ go_test(
     srcs = ["validation_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/settings:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/settings:go_default_library",
     ],
 )
 
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/settings/validation",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/settings/validation",
+    importpath = "k8s.io/internal-api/apis/settings/validation",
     deps = [
-        "//pkg/apis/core/validation:go_default_library",
-        "//pkg/apis/settings:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/validation:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/settings:go_default_library",
     ],
 )
 

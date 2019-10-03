@@ -16,18 +16,19 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/batch/v2alpha1",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/batch/v2alpha1",
+    importpath = "k8s.io/internal-api/apis/batch/v2alpha1",
     deps = [
-        "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/batch/v1:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v2alpha1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/batch:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/batch/v1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/v1:go_default_library",
     ],
 )
 
@@ -36,11 +37,11 @@ go_test(
     srcs = ["defaults_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/batch/install:go_default_library",
-        "//pkg/apis/core/install:go_default_library",
         "//staging/src/k8s.io/api/batch/v2alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/batch/install:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/install:go_default_library",
     ],
 )
 

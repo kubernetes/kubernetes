@@ -9,11 +9,9 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/apps/validation",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/apps/validation",
+    importpath = "k8s.io/internal-api/apis/apps/validation",
     deps = [
-        "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -22,6 +20,9 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/apps:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/validation:go_default_library",
     ],
 )
 
@@ -30,8 +31,6 @@ go_test(
     srcs = ["validation_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -39,6 +38,8 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/apps:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
     ],
 )

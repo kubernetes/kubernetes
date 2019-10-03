@@ -8,13 +8,14 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/certificates/install",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/certificates/install",
+    importpath = "k8s.io/internal-api/apis/certificates/install",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/certificates:go_default_library",
-        "//pkg/apis/certificates/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/certificates:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/certificates/v1beta1:go_default_library",
     ],
 )
 

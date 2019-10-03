@@ -11,8 +11,8 @@ go_library(
     srcs = ["strategy.go"],
     importpath = "k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp",
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 
@@ -21,8 +21,8 @@ go_test(
     srcs = ["strategy_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 

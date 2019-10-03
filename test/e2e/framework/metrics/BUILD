@@ -25,7 +25,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework/metrics",
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/kubelet/dockershim/metrics:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/master/ports:go_default_library",
@@ -34,6 +33,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
         "//test/e2e/perftype:go_default_library",

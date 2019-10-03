@@ -11,7 +11,6 @@ go_test(
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",
@@ -26,6 +25,7 @@ go_test(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
@@ -39,9 +39,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction",
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/helper/qos:go_default_library",
-        "//pkg/apis/core/v1:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/util/tolerations:go_default_library",
         "//plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction:go_default_library",
@@ -58,6 +55,9 @@ go_library(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/helper/qos:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

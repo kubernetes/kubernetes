@@ -9,13 +9,14 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/pod",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/api/pod",
+    importpath = "k8s.io/internal-api/api/pod",
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 
@@ -37,7 +38,6 @@ go_test(
     srcs = ["util_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/security/apparmor:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
@@ -47,5 +47,6 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )

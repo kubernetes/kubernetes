@@ -18,7 +18,7 @@ go_test(
     name = "go_default_test",
     srcs = ["expand_test.go"],
     embed = [":go_default_library"],
-    deps = ["//pkg/apis/core:go_default_library"],
+    deps = ["//staging/src/k8s.io/internal-api/apis/core:go_default_library"],
 )
 
 filegroup(

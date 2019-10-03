@@ -15,8 +15,6 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:windows": [
-            "//pkg/api/v1/service:go_default_library",
-            "//pkg/apis/core/v1/helper:go_default_library",
             "//pkg/proxy:go_default_library",
             "//pkg/proxy/apis/config:go_default_library",
             "//pkg/proxy/config:go_default_library",
@@ -29,6 +27,8 @@ go_library(
             "//staging/src/k8s.io/apiserver/pkg/features:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
             "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+            "//staging/src/k8s.io/internal-api/api/v1/service:go_default_library",
+            "//staging/src/k8s.io/internal-api/apis/core/v1/helper:go_default_library",
             "//vendor/github.com/Microsoft/hcsshim:go_default_library",
             "//vendor/github.com/Microsoft/hcsshim/hcn:go_default_library",
             "//vendor/github.com/davecgh/go-spew/spew:go_default_library",

@@ -17,7 +17,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/statefulset",
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/history:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
@@ -41,6 +40,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/pod:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -56,9 +56,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/apps/install:go_default_library",
-        "//pkg/apis/core/install:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/history:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
@@ -80,6 +77,9 @@ go_test(
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/pod:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/apps/install:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/install:go_default_library",
     ],
 )
 

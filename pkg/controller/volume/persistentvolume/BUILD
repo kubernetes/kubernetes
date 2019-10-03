@@ -16,7 +16,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/volume/persistentvolume",
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/events:go_default_library",
         "//pkg/controller/volume/persistentvolume/metrics:go_default_library",
@@ -55,6 +54,7 @@ go_library(
         "//staging/src/k8s.io/cloud-provider:go_default_library",
         "//staging/src/k8s.io/cloud-provider/volume/errors:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/v1/helper:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -72,8 +72,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/volume/persistentvolume/testing:go_default_library",
         "//pkg/controller/volume/persistentvolume/util:go_default_library",
@@ -102,6 +100,8 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/testapi:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

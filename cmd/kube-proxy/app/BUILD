@@ -18,7 +18,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-proxy/app",
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/qos:go_default_library",
         "//pkg/master/ports:go_default_library",
@@ -65,6 +64,7 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//staging/src/k8s.io/kube-proxy/config/v1alpha1:go_default_library",
         "//vendor/github.com/fsnotify/fsnotify:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",

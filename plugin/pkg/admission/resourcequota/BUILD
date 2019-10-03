@@ -52,7 +52,6 @@ go_test(
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/quota/v1/generic:go_default_library",
@@ -69,6 +68,7 @@ go_test(
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/github.com/hashicorp/golang-lru:go_default_library",
     ],
 )

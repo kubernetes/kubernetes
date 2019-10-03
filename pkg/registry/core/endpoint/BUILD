@@ -13,13 +13,13 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/core/endpoint",
     deps = [
-        "//pkg/api/endpoints:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/endpoints:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/validation:go_default_library",
     ],
 )
 

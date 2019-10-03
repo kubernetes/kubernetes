@@ -13,12 +13,13 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/settings",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/settings",
+    importpath = "k8s.io/internal-api/apis/settings",
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 
@@ -33,10 +34,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/apis/settings/fuzzer:all-srcs",
-        "//pkg/apis/settings/install:all-srcs",
-        "//pkg/apis/settings/v1alpha1:all-srcs",
-        "//pkg/apis/settings/validation:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/settings/fuzzer:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/settings/install:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/settings/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/settings/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

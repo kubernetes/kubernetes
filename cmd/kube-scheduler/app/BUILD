@@ -12,7 +12,6 @@ go_library(
     deps = [
         "//cmd/kube-scheduler/app/config:go_default_library",
         "//cmd/kube-scheduler/app/options:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
@@ -38,6 +37,7 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

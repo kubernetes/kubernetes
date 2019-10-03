@@ -15,13 +15,14 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/authentication/v1beta1",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/authentication/v1beta1",
+    importpath = "k8s.io/internal-api/apis/authentication/v1beta1",
     deps = [
-        "//pkg/apis/authentication:go_default_library",
         "//staging/src/k8s.io/api/authentication/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/authentication:go_default_library",
     ],
 )
 

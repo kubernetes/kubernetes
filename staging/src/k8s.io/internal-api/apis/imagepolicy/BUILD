@@ -13,7 +13,8 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/imagepolicy",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/imagepolicy",
+    importpath = "k8s.io/internal-api/apis/imagepolicy",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -32,9 +33,9 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/apis/imagepolicy/fuzzer:all-srcs",
-        "//pkg/apis/imagepolicy/install:all-srcs",
-        "//pkg/apis/imagepolicy/v1alpha1:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/imagepolicy/fuzzer:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/imagepolicy/install:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/imagepolicy/v1alpha1:all-srcs",
     ],
     tags = ["automanaged"],
 )

@@ -6,11 +6,11 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/node/runtimeclass/storage",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/node:go_default_library",
         "//pkg/registry/node/runtimeclass:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/node:go_default_library",
     ],
 )
 

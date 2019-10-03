@@ -6,10 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/test/e2e/framework/resource",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/apps:go_default_library",
-        "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/extensions:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -19,6 +15,10 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/apps:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/batch:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/extensions:go_default_library",
     ],
 )
 

@@ -10,8 +10,6 @@ go_library(
     srcs = ["rest.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/authorization/selfsubjectaccessreview",
     deps = [
-        "//pkg/apis/authorization:go_default_library",
-        "//pkg/apis/authorization/validation:go_default_library",
         "//pkg/registry/authorization/util:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -19,6 +17,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/authorization:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/authorization/validation:go_default_library",
     ],
 )
 

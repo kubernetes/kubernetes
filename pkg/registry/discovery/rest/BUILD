@@ -6,14 +6,14 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/discovery/rest",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/discovery:go_default_library",
         "//pkg/registry/discovery/endpointslice/storage:go_default_library",
         "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/discovery:go_default_library",
     ],
 )
 

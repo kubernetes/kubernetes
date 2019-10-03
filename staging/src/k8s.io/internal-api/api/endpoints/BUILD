@@ -9,11 +9,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/endpoints",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/api/endpoints",
+    importpath = "k8s.io/internal-api/api/endpoints",
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/util/hash:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 
@@ -22,8 +23,8 @@ go_test(
     srcs = ["util_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/github.com/davecgh/go-spew/spew:go_default_library",
     ],
 )

@@ -17,13 +17,14 @@ go_library(
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/abac/v1beta1",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/abac/v1beta1",
+    importpath = "k8s.io/internal-api/apis/abac/v1beta1",
     deps = [
-        "//pkg/apis/abac:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/abac:go_default_library",
     ],
 )
 
@@ -32,8 +33,8 @@ go_test(
     srcs = ["conversion_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/abac:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/abac:go_default_library",
     ],
 )
 

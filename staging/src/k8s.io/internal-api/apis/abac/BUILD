@@ -13,7 +13,8 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/abac",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/abac",
+    importpath = "k8s.io/internal-api/apis/abac",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -33,10 +34,10 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/apis/abac/fuzzer:all-srcs",
-        "//pkg/apis/abac/latest:all-srcs",
-        "//pkg/apis/abac/v0:all-srcs",
-        "//pkg/apis/abac/v1beta1:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/abac/fuzzer:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/abac/latest:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/abac/v0:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/abac/v1beta1:all-srcs",
     ],
     tags = ["automanaged"],
 )

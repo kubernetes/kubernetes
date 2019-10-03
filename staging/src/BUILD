@@ -27,6 +27,7 @@ filegroup(
         "//staging/src/k8s.io/component-base:all-srcs",
         "//staging/src/k8s.io/cri-api:all-srcs",
         "//staging/src/k8s.io/csi-translation-lib:all-srcs",
+        "//staging/src/k8s.io/internal-api:all-srcs",
         "//staging/src/k8s.io/kube-aggregator:all-srcs",
         "//staging/src/k8s.io/kube-controller-manager:all-srcs",
         "//staging/src/k8s.io/kube-proxy:all-srcs",

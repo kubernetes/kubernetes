@@ -9,18 +9,19 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/storage/validation",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/storage/validation",
+    importpath = "k8s.io/internal-api/apis/storage/validation",
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/helper:go_default_library",
-        "//pkg/apis/core/validation:go_default_library",
-        "//pkg/apis/storage:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/helper:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/validation:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/storage:go_default_library",
     ],
 )
 
@@ -29,13 +30,13 @@ go_test(
     srcs = ["validation_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/storage:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/storage:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
 )

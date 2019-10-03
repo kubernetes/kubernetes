@@ -14,10 +14,10 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core/helper:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/helper:go_default_library",
     ],
 )
 

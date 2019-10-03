@@ -14,8 +14,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/serviceaccount",
     deps = [
-        "//pkg/api/pod:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/serviceaccount:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -32,6 +30,8 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/pod:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 
@@ -40,7 +40,6 @@ go_test(
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/types:go_default_library",
@@ -55,6 +54,7 @@ go_test(
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

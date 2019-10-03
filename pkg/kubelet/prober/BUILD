@@ -15,7 +15,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/kubelet/prober",
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/events:go_default_library",
@@ -35,6 +34,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/pod:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ],

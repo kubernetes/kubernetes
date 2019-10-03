@@ -10,8 +10,6 @@ go_library(
     srcs = ["test_utils.go"],
     importpath = "k8s.io/kubernetes/pkg/controller/testutil",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/util/node:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -27,6 +25,8 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/github.com/evanphx/json-patch:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

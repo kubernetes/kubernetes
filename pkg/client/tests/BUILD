@@ -16,10 +16,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/install:go_default_library",
         "//pkg/kubelet/server/portforward:go_default_library",
         "//pkg/kubelet/server/remotecommand:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -40,6 +36,10 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/client-go/transport/spdy:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/testapi:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/install:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ],
 )

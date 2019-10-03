@@ -14,7 +14,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac",
     deps = [
-        "//pkg/apis/rbac/v1:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
@@ -22,6 +21,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/client-go/listers/rbac/v1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/rbac/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -34,13 +34,13 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/rbac/v1:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",
         "//plugin/pkg/auth/authorizer/rbac/bootstrappolicy:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/rbac/v1:go_default_library",
     ],
 )
 

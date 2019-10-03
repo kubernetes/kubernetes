@@ -6,11 +6,11 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/auditregistration/auditsink/storage",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/auditregistration:go_default_library",
         "//pkg/registry/auditregistration/auditsink:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/auditregistration:go_default_library",
     ],
 )
 

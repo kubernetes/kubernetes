@@ -37,7 +37,6 @@ go_library(
     deps = [
         "//cmd/kube-apiserver/app:go_default_library",
         "//cmd/kube-apiserver/app/options:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/generated/openapi:go_default_library",
         "//pkg/kubeapiserver:go_default_library",
         "//pkg/kubelet/client:go_default_library",
@@ -67,6 +66,7 @@ go_library(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/coreos/etcd/clientv3:go_default_library",

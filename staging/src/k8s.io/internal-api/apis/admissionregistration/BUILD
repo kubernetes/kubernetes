@@ -13,7 +13,8 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/admissionregistration",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/admissionregistration",
+    importpath = "k8s.io/internal-api/apis/admissionregistration",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -32,11 +33,11 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/apis/admissionregistration/fuzzer:all-srcs",
-        "//pkg/apis/admissionregistration/install:all-srcs",
-        "//pkg/apis/admissionregistration/v1:all-srcs",
-        "//pkg/apis/admissionregistration/v1beta1:all-srcs",
-        "//pkg/apis/admissionregistration/validation:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/admissionregistration/fuzzer:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/admissionregistration/install:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/admissionregistration/v1:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/admissionregistration/v1beta1:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/admissionregistration/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

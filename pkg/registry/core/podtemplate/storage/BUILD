@@ -11,7 +11,6 @@ go_test(
     srcs = ["storage_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/registry/registrytest:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
@@ -20,6 +19,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 
@@ -28,7 +28,6 @@ go_library(
     srcs = ["storage.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/core/podtemplate/storage",
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/printers:go_default_library",
         "//pkg/printers/internalversion:go_default_library",
         "//pkg/printers/storage:go_default_library",
@@ -36,6 +35,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic/registry:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 

@@ -8,11 +8,12 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["qos.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/core/helper/qos",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/core/helper/qos",
+    importpath = "k8s.io/internal-api/apis/core/helper/qos",
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 

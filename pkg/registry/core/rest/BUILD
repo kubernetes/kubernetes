@@ -22,8 +22,6 @@ go_library(
     srcs = ["storage_core.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/core/rest",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/client:go_default_library",
         "//pkg/master/ports:go_default_library",
@@ -60,6 +58,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

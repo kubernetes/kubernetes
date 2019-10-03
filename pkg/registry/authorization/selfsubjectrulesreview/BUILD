@@ -6,13 +6,13 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/authorization/selfsubjectrulesreview",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/authorization:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/authorization:go_default_library",
     ],
 )
 

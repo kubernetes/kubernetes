@@ -43,7 +43,6 @@ go_test(
     srcs = ["nodeinfomanager_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/volume/testing:go_default_library",
         "//pkg/volume/util:go_default_library",
@@ -60,6 +59,7 @@ go_test(
         "//staging/src/k8s.io/client-go/testing:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/helper:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],

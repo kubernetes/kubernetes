@@ -3,14 +3,15 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/discovery/install",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/discovery/install",
+    importpath = "k8s.io/internal-api/apis/discovery/install",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/discovery:go_default_library",
-        "//pkg/apis/discovery/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/discovery:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/discovery/v1alpha1:go_default_library",
     ],
 )
 

@@ -37,9 +37,9 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/k8s.io/utils/exec:go_default_library",

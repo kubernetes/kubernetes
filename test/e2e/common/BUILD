@@ -45,8 +45,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/e2e/common",
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/events:go_default_library",
@@ -77,6 +75,8 @@ go_library(
         "//staging/src/k8s.io/client-go/scale:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/pod:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/kubelet:go_default_library",
         "//test/e2e/framework/node:go_default_library",

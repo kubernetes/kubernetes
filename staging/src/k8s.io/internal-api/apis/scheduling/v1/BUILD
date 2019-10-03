@@ -9,11 +9,10 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/scheduling/v1",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/scheduling/v1",
+    importpath = "k8s.io/internal-api/apis/scheduling/v1",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/scheduling:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
@@ -21,6 +20,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/scheduling:go_default_library",
     ],
 )
 
@@ -43,13 +44,13 @@ go_test(
     srcs = ["defaults_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/testapi:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/scheduling/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/testapi:go_default_library",
     ],
 )

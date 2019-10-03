@@ -6,9 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/plugin/pkg/admission/runtimeclass",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/node:go_default_library",
-        "//pkg/apis/node/v1beta1:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/util/tolerations:go_default_library",
         "//staging/src/k8s.io/api/node/v1beta1:go_default_library",
@@ -19,6 +16,9 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/listers/node/v1beta1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/node:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/node/v1beta1:go_default_library",
     ],
 )
 
@@ -27,7 +27,6 @@ go_test(
     srcs = ["admission_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/node/v1beta1:go_default_library",
@@ -38,6 +37,7 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )

@@ -9,7 +9,8 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["util.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/v1/pod",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/api/v1/pod",
+    importpath = "k8s.io/internal-api/api/v1/pod",
     deps = [
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",

@@ -15,7 +15,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac/bootstrappolicy",
     deps = [
-        "//pkg/apis/rbac/v1:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
@@ -23,6 +22,7 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/rbac/v1:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )
@@ -36,11 +36,6 @@ go_test(
     data = glob(["testdata/**"]),
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/install:go_default_library",
-        "//pkg/apis/rbac/install:go_default_library",
-        "//pkg/apis/rbac/v1:go_default_library",
         "//pkg/registry/rbac/validation:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/rbac/v1:go_default_library",
@@ -48,6 +43,11 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/install:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/rbac/install:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/rbac/v1:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )

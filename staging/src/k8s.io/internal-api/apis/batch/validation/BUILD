@@ -9,16 +9,17 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/batch/validation",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/batch/validation",
+    importpath = "k8s.io/internal-api/apis/batch/validation",
     deps = [
-        "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/core/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/batch:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/validation:go_default_library",
         "//vendor/github.com/robfig/cron:go_default_library",
     ],
 )
@@ -28,13 +29,13 @@ go_test(
     srcs = ["validation_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/batch:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 

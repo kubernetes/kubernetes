@@ -11,13 +11,13 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/nodeinfo",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/resource:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/v1/helper:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

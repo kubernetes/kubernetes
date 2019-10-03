@@ -15,7 +15,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/daemon",
     deps = [
-        "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/daemon/util:go_default_library",
         "//pkg/features:go_default_library",
@@ -50,6 +49,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/pod:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
     ],
@@ -63,10 +63,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/scheduling:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/scheduler/api:go_default_library",
@@ -91,6 +87,10 @@ go_test(
         "//staging/src/k8s.io/client-go/util/flowcontrol:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/pod:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/scheduling:go_default_library",
     ],
 )
 

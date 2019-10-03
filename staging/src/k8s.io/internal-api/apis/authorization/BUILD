@@ -13,7 +13,8 @@ go_library(
         "types.go",
         "zz_generated.deepcopy.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/authorization",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/authorization",
+    importpath = "k8s.io/internal-api/apis/authorization",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
@@ -32,11 +33,11 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/apis/authorization/fuzzer:all-srcs",
-        "//pkg/apis/authorization/install:all-srcs",
-        "//pkg/apis/authorization/v1:all-srcs",
-        "//pkg/apis/authorization/v1beta1:all-srcs",
-        "//pkg/apis/authorization/validation:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/authorization/fuzzer:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/authorization/install:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/authorization/v1:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/authorization/v1beta1:all-srcs",
+        "//staging/src/k8s.io/internal-api/apis/authorization/validation:all-srcs",
     ],
     tags = ["automanaged"],
 )

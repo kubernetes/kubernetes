@@ -14,10 +14,9 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/policy/v1beta1",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/policy/v1beta1",
+    importpath = "k8s.io/internal-api/apis/policy/v1beta1",
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/policy:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -25,6 +24,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/policy:go_default_library",
     ],
 )
 

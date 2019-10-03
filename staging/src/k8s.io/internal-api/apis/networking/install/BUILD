@@ -8,14 +8,15 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/networking/install",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/networking/install",
+    importpath = "k8s.io/internal-api/apis/networking/install",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/networking:go_default_library",
-        "//pkg/apis/networking/v1:go_default_library",
-        "//pkg/apis/networking/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/networking:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/networking/v1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/networking/v1beta1:go_default_library",
     ],
 )
 

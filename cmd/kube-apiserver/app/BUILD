@@ -11,7 +11,6 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/capabilities:go_default_library",
         "//pkg/controller/serviceaccount:go_default_library",
         "//pkg/features:go_default_library",
@@ -67,6 +66,7 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics/prometheus/workqueue:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1/helper:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apis/apiregistration/v1beta1:go_default_library",

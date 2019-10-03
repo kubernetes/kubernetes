@@ -124,8 +124,6 @@ go_test(
     embed = [":go_default_library"],
     tags = ["e2e"],
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/scheduling:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet:go_default_library",
         "//pkg/kubelet/apis/config:go_default_library",
@@ -166,6 +164,8 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis:go_default_library",
         "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/scheduling:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/deviceplugin:go_default_library",

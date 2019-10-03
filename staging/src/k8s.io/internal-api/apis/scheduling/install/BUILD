@@ -8,15 +8,16 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["install.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/scheduling/install",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/scheduling/install",
+    importpath = "k8s.io/internal-api/apis/scheduling/install",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/scheduling:go_default_library",
-        "//pkg/apis/scheduling/v1:go_default_library",
-        "//pkg/apis/scheduling/v1alpha1:go_default_library",
-        "//pkg/apis/scheduling/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/scheduling:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/scheduling/v1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/scheduling/v1alpha1:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/scheduling/v1beta1:go_default_library",
     ],
 )
 

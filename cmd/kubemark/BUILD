@@ -16,7 +16,6 @@ go_library(
     srcs = ["hollow-node.go"],
     importpath = "k8s.io/kubernetes/cmd/kubemark",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubelet/cadvisor/testing:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
@@ -39,6 +38,7 @@ go_library(
         "//staging/src/k8s.io/component-base/metrics/prometheus/version:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//staging/src/k8s.io/component-base/version/verflag:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",

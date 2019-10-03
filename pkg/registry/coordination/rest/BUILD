@@ -6,8 +6,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/registry/coordination/rest",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/coordination:go_default_library",
         "//pkg/registry/coordination/lease/storage:go_default_library",
         "//staging/src/k8s.io/api/coordination/v1:go_default_library",
         "//staging/src/k8s.io/api/coordination/v1beta1:go_default_library",
@@ -15,6 +13,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/coordination:go_default_library",
     ],
 )
 

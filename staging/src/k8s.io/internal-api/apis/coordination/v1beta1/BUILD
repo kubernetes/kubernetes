@@ -8,15 +8,16 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/coordination/v1beta1",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/coordination/v1beta1",
+    importpath = "k8s.io/internal-api/apis/coordination/v1beta1",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/apis/coordination:go_default_library",
         "//staging/src/k8s.io/api/coordination/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/conversion:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/coordination:go_default_library",
     ],
 )
 

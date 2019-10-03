@@ -10,8 +10,6 @@ go_library(
     srcs = ["storage_rbac.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/rbac/rest",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
         "//pkg/registry/rbac/clusterrole:go_default_library",
         "//pkg/registry/rbac/clusterrole/policybased:go_default_library",
         "//pkg/registry/rbac/clusterrole/storage:go_default_library",
@@ -43,6 +41,8 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/rbac/v1:go_default_library",
         "//staging/src/k8s.io/client-go/util/retry:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/rbac:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
 )

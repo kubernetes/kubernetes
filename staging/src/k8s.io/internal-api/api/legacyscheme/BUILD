@@ -3,7 +3,8 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library")
 go_library(
     name = "go_default_library",
     srcs = ["scheme.go"],
-    importpath = "k8s.io/kubernetes/pkg/api/legacyscheme",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/api/legacyscheme",
+    importpath = "k8s.io/internal-api/api/legacyscheme",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",

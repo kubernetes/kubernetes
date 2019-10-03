@@ -14,11 +14,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/batch/job",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/pod:go_default_library",
-        "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/batch/validation:go_default_library",
-        "//pkg/apis/core/validation:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -33,6 +28,11 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/pod:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/batch:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/batch/validation:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/validation:go_default_library",
     ],
 )
 
@@ -41,10 +41,6 @@ go_test(
     srcs = ["strategy_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/testing:go_default_library",
-        "//pkg/apis/batch:go_default_library",
-        "//pkg/apis/batch/install:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
@@ -52,6 +48,10 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/batch:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/batch/install:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 

@@ -13,7 +13,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/test/integration/util",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider/defaults:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
@@ -21,6 +20,7 @@ go_library(
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/tools/events:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
         "//staging/src/k8s.io/legacy-cloud-providers/gce:go_default_library",
         "//test/integration/framework:go_default_library",
         "//vendor/github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud:go_default_library",

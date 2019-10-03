@@ -11,7 +11,6 @@ go_test(
         "integration",
     ],
     deps = [
-        "//pkg/api/testapi:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/fields:go_default_library",
@@ -23,6 +22,7 @@ go_test(
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/testapi:go_default_library",
         "//test/integration/framework:go_default_library",
     ],
 )

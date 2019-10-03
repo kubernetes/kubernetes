@@ -19,8 +19,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/registrytest",
     deps = [
-        "//pkg/api/testapi:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/kubeapiserver:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
@@ -36,6 +34,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/etcd3/testing:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/testapi:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
     ],
 )
 

@@ -19,9 +19,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/volume/util",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/api/v1/pod:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/resizefs:go_default_library",
@@ -43,6 +40,9 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/v1/pod:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/v1/helper:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/strings:go_default_library",
     ],
@@ -60,8 +60,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core/install:go_default_library",
-        "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/util/slice:go_default_library",
         "//pkg/volume:go_default_library",
@@ -72,6 +70,8 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/install:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/v1/helper:go_default_library",
     ] + select({
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/client-go/util/testing:go_default_library",

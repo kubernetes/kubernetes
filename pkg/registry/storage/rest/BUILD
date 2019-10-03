@@ -10,8 +10,6 @@ go_library(
     srcs = ["storage_storage.go"],
     importpath = "k8s.io/kubernetes/pkg/registry/storage/rest",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/storage:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/registry/storage/csidriver/storage:go_default_library",
         "//pkg/registry/storage/csinode/storage:go_default_library",
@@ -25,6 +23,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/storage:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/storage:go_default_library",
     ],
 )
 

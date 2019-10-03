@@ -15,10 +15,9 @@ go_library(
         "zz_generated.conversion.go",
         "zz_generated.defaults.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/apis/networking/v1",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/networking/v1",
+    importpath = "k8s.io/internal-api/apis/networking/v1",
     deps = [
-        "//pkg/apis/core:go_default_library",
-        "//pkg/apis/networking:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/networking/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
@@ -26,6 +25,8 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/schema:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/intstr:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/networking:go_default_library",
     ],
 )
 
@@ -47,12 +48,12 @@ go_test(
     srcs = ["defaults_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/core/install:go_default_library",
-        "//pkg/apis/networking/install:go_default_library",
         "//staging/src/k8s.io/api/networking/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/install:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/networking/install:go_default_library",
     ],
 )

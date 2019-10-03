@@ -16,8 +16,6 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app/options",
     deps = [
-        "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/apis/core:go_default_library",
         "//pkg/cloudprovider/providers:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
@@ -33,6 +31,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/cli/globalflag:go_default_library",
+        "//staging/src/k8s.io/internal-api/api/legacyscheme:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//staging/src/k8s.io/kube-aggregator/pkg/apiserver/scheme:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
@@ -48,7 +48,6 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/core:go_default_library",
         "//pkg/features:go_default_library",
         "//pkg/kubeapiserver/options:go_default_library",
         "//pkg/kubelet/client:go_default_library",
@@ -64,6 +63,7 @@ go_test(
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/cli/globalflag:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core:go_default_library",
         "//vendor/github.com/spf13/pflag:go_default_library",
     ],
 )

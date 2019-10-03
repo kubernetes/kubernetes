@@ -9,14 +9,15 @@ load(
 go_library(
     name = "go_default_library",
     srcs = ["validation.go"],
-    importpath = "k8s.io/kubernetes/pkg/apis/rbac/validation",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/internal-api/apis/rbac/validation",
+    importpath = "k8s.io/internal-api/apis/rbac/validation",
     deps = [
-        "//pkg/apis/core/validation:go_default_library",
-        "//pkg/apis/rbac:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/validation/path:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1/validation:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/core/validation:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/rbac:go_default_library",
     ],
 )
 
@@ -25,9 +26,9 @@ go_test(
     srcs = ["validation_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//pkg/apis/rbac:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation/field:go_default_library",
+        "//staging/src/k8s.io/internal-api/apis/rbac:go_default_library",
     ],
 )
 
