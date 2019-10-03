@@ -146,7 +146,7 @@ Get and Describe can accept **multiple Resource types and names**.
 {% sample lang="yaml" %}
 
 ```bash
-kubectl get kubectl get rc/web service/frontend pods/web-pod-13je7
+kubectl get rc/web service/frontend pods/web-pod-13je7
 ```
 
 {% endmethod %}
