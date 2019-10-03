@@ -28,7 +28,7 @@ spec:
       terminationGracePeriodSeconds: 0
       initContainers:
         - name: install-cni
-          image: gcr.io/projectcalico-org/cni:v3.7.4
+          image: gcr.io/projectcalico-org/cni:v3.8.2
           command: ["/install-cni.sh"]
           env:
             - name: CNI_CONF_NAME
@@ -37,7 +37,7 @@ spec:
               value: |-
                 {
                   "name": "k8s-pod-network",
-                  "cniVersion": "0.3.0",
+                  "cniVersion": "0.3.1",
                   "plugins": [
                     {
                       "type": "calico",
@@ -79,7 +79,7 @@ spec:
         # container programs network policy and routes on each
         # host.
         - name: calico-node
-          image: gcr.io/projectcalico-org/node:v3.7.4
+          image: gcr.io/projectcalico-org/node:v3.8.2
           env:
             - name: CALICO_DISABLE_FILE_LOGGING
               value: "true"
