@@ -2898,11 +2898,6 @@ func isEqualUserGroupPair(l, r *ec2.UserIdGroupPair, compareGroupUserIDs bool) b
 // Returns true if and only if changes were made
 // The security group must already exist
 func (c *Cloud) setSecurityGroupIngress(securityGroupID string, permissions IPPermissionSet) (bool, error) {
-	// We do not want to make changes to the Global defined SG
-	if securityGroupID == c.cfg.Global.ElbSecurityGroup {
-		return false, nil
-	}
-
 	group, err := c.findSecurityGroup(securityGroupID)
 	if err != nil {
 		klog.Warningf("Error retrieving security group %q", err)
@@ -3369,51 +3364,54 @@ func getPortSets(annotation string) (ports *portSets) {
 	return
 }
 
+// This function is useful in extracting the security group list from annotation
+func getSGListFromAnnotation(annotatedSG string) []string {
+	sgList := []string{}
+	for _, extraSG := range strings.Split(annotatedSG, ",") {
+		extraSG = strings.TrimSpace(extraSG)
+		if len(extraSG) > 0 {
+			sgList = append(sgList, extraSG)
+		}
+	}
+	return sgList
+}
+
 // buildELBSecurityGroupList returns list of SecurityGroups which should be
 // attached to ELB created by a service. List always consist of at least
 // 1 member which is an SG created for this service or a SG from the Global config.
 // Extra groups can be specified via annotation, as can extra tags for any
 // new groups. The annotation "ServiceAnnotationLoadBalancerSecurityGroups" allows for
 // setting the security groups specified.
-func (c *Cloud) buildELBSecurityGroupList(serviceName types.NamespacedName, loadBalancerName string, annotations map[string]string) ([]string, error) {
+func (c *Cloud) buildELBSecurityGroupList(serviceName types.NamespacedName, loadBalancerName string, annotations map[string]string) ([]string, bool, error) {
 	var err error
 	var securityGroupID string
+	// We do not want to make changes to a Global defined SG
+	var setupSg = false
 
-	if c.cfg.Global.ElbSecurityGroup != "" {
-		securityGroupID = c.cfg.Global.ElbSecurityGroup
-	} else {
-		// Create a security group for the load balancer
-		sgName := "k8s-elb-" + loadBalancerName
-		sgDescription := fmt.Sprintf("Security group for Kubernetes ELB %s (%v)", loadBalancerName, serviceName)
-		securityGroupID, err = c.ensureSecurityGroup(sgName, sgDescription, getLoadBalancerAdditionalTags(annotations))
-		if err != nil {
-			klog.Errorf("Error creating load balancer security group: %q", err)
-			return nil, err
-		}
-	}
-
-	sgList := []string{}
-
-	for _, extraSG := range strings.Split(annotations[ServiceAnnotationLoadBalancerSecurityGroups], ",") {
-		extraSG = strings.TrimSpace(extraSG)
-		if len(extraSG) > 0 {
-			sgList = append(sgList, extraSG)
-		}
-	}
+	sgList := getSGListFromAnnotation(annotations[ServiceAnnotationLoadBalancerSecurityGroups])
 
 	// If no Security Groups have been specified with the ServiceAnnotationLoadBalancerSecurityGroups annotation, we add the default one.
 	if len(sgList) == 0 {
-		sgList = append(sgList, securityGroupID)
-	}
-
-	for _, extraSG := range strings.Split(annotations[ServiceAnnotationLoadBalancerExtraSecurityGroups], ",") {
-		extraSG = strings.TrimSpace(extraSG)
-		if len(extraSG) > 0 {
-			sgList = append(sgList, extraSG)
+		if c.cfg.Global.ElbSecurityGroup != "" {
+			sgList = append(sgList, c.cfg.Global.ElbSecurityGroup)
+		} else {
+			// Create a security group for the load balancer
+			sgName := "k8s-elb-" + loadBalancerName
+			sgDescription := fmt.Sprintf("Security group for Kubernetes ELB %s (%v)", loadBalancerName, serviceName)
+			securityGroupID, err = c.ensureSecurityGroup(sgName, sgDescription, getLoadBalancerAdditionalTags(annotations))
+			if err != nil {
+				klog.Errorf("Error creating load balancer security group: %q", err)
+				return nil, setupSg, err
+			}
+			sgList = append(sgList, securityGroupID)
+			setupSg = true
 		}
 	}
 
-	return sgList, nil
+	extraSGList := getSGListFromAnnotation(annotations[ServiceAnnotationLoadBalancerExtraSecurityGroups])
+	sgList = append(sgList, extraSGList...)
+
+	return sgList, setupSg, nil
 }
 
 // buildListener creates a new listener from the given port, adding an SSL certificate
@@ -3706,7 +3704,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 
 	loadBalancerName := c.GetLoadBalancerName(ctx, clusterName, apiService)
 	serviceName := types.NamespacedName{Namespace: apiService.Namespace, Name: apiService.Name}
-	securityGroupIDs, err := c.buildELBSecurityGroupList(serviceName, loadBalancerName, annotations)
+	securityGroupIDs, setupSg, err := c.buildELBSecurityGroupList(serviceName, loadBalancerName, annotations)
 	if err != nil {
 		return nil, err
 	}
@@ -3714,7 +3712,7 @@ func (c *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, apiS
 		return nil, fmt.Errorf("[BUG] ELB can't have empty list of Security Groups to be assigned, this is a Kubernetes bug, please report")
 	}
 
-	{
+	if setupSg {
 		ec2SourceRanges := []*ec2.IpRange{}
 		for _, sourceRange := range sourceRanges.StringSlice() {
 			ec2SourceRanges = append(ec2SourceRanges, &ec2.IpRange{CidrIp: aws.String(sourceRange)})
