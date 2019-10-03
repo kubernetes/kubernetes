@@ -113,7 +113,7 @@ kubectl get deployments -l app=nginx
 By default Get and Describe will fetch resource in the default namespace or the namespace specified
 with `--namespace`.
 
-The `---all-namespaces` flag will **fetch Resources from all namespaces**.
+The `--all-namespaces` flag will **fetch Resources from all namespaces**.
 
 {% sample lang="yaml" %}
 
