@@ -86,7 +86,7 @@ func NameSystems() namer.NameSystems {
 			// "k8s.io/apis/events/v1beta1.Event": "eventResource"
 			// these exceptions are used to deconflict the generated code
 			"k8s.io/apis/events/v1beta1.Event":        "eventResources",
-			"k8s.io/kubernetes/pkg/apis/events.Event": "eventResources",
+			"k8s.io/internal-api/apis/events.Event": "eventResources",
 		},
 		KeyFunc: func(t *types.Type) string {
 			return t.Name.Package + "." + t.Name.Name

@@ -25,7 +25,7 @@ import (
 )
 
 /*
-This file is duplicated from "k8s.io/kubernetes/pkg/api/v1/service/util.go"
+This file is duplicated from "k8s.io/internal-api/api/v1/service/util.go"
 in order for in-tree cloud providers to not depend on internal packages.
 */
 

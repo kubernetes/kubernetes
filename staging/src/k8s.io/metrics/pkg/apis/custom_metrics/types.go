@@ -87,7 +87,7 @@ type MetricListOptions struct {
 	MetricLabelSelector string `json:"metricLabelSelector,omitempty" protobuf:"bytes,2,opt,name=metricLabelSelector"`
 }
 
-// NOTE: ObjectReference is copied from k8s.io/kubernetes/pkg/api/types.go. We
+// NOTE: ObjectReference is copied from k8s.io/internal-api/api/types.go. We
 // cannot depend on k8s.io/kubernetes/pkg/api because that creates cyclic
 // dependency between k8s.io/metrics and k8s.io/kubernetes. We cannot depend on
 // k8s.io/client-go/pkg/api because the package is going to be deprecated soon.

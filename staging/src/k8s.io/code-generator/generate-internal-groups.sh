@@ -52,8 +52,8 @@ go install ./"$(dirname "${0}")"/cmd/{defaulter-gen,conversion-gen,client-gen,li
 function codegen::join() { local IFS="$1"; shift; echo "$*"; }
 
 # enumerate group versions
-ALL_FQ_APIS=() # e.g. k8s.io/kubernetes/pkg/apis/apps k8s.io/api/apps/v1
-INT_FQ_APIS=() # e.g. k8s.io/kubernetes/pkg/apis/apps
+ALL_FQ_APIS=() # e.g. k8s.io/internal-api/apis/apps k8s.io/api/apps/v1
+INT_FQ_APIS=() # e.g. k8s.io/internal-api/apis/apps
 EXT_FQ_APIS=() # e.g. k8s.io/api/apps/v1
 for GVs in ${GROUPS_WITH_VERSIONS}; do
   IFS=: read -r G Vs <<<"${GVs}"

@@ -44,8 +44,8 @@ generated_files: gen_deepcopy gen_defaulter gen_conversion gen_openapi gen_binda
 # This is a file that will be emitted by the go2make tool, containing a
 # variable for each Go package in the project (including deps) which lists all
 # of the transitive deps of that package.  Each variable is named the same as
-# the package - for example the variable for `k8s.io/kubernetes/pkg/api` is
-# $(k8s.io/kubernetes/pkg/api).  This is roughly the same DAG that the Go
+# the package - for example the variable for `k8s.io/internal-api/api` is
+# $(k8s.io/internal-api/api).  This is roughly the same DAG that the Go
 # compiler uses.  These variables can be used to figure out if, for example,
 # generated code needs to be regenerated.
 GO_PKGDEPS_FILE = go-pkgdeps.mk
@@ -339,7 +339,7 @@ CONVERSION_DIRS := $(shell                                              \
 )
 
 CONVERSION_FILES := $(addsuffix /$(CONVERSION_FILENAME), $(CONVERSION_DIRS))
-CONVERSION_EXTRA_PEER_DIRS := k8s.io/kubernetes/pkg/apis/core,k8s.io/kubernetes/pkg/apis/core/v1,k8s.io/api/core/v1
+CONVERSION_EXTRA_PEER_DIRS := k8s.io/internal-api/apis/core,k8s.io/internal-api/apis/core/v1,k8s.io/api/core/v1
 
 # Reset the list of packages that need generation.
 $(shell mkdir -p $$(dirname $(META_DIR)/$(CONVERSION_GEN)))

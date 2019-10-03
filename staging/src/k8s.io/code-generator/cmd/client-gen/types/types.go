@@ -44,7 +44,7 @@ func (g Group) NonEmpty() string {
 
 type PackageVersion struct {
 	Version
-	// The fully qualified package, e.g. k8s.io/kubernetes/pkg/apis/apps, where the types.go is found.
+	// The fully qualified package, e.g. k8s.io/internal-api/apis/apps, where the types.go is found.
 	Package string
 }
 

@@ -26,7 +26,7 @@ import (
 	watch "k8s.io/apimachinery/pkg/watch"
 	testing "k8s.io/client-go/testing"
 	examplev1 "k8s.io/code-generator/_examples/MixedCase/apis/example/v1"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscaling "k8s.io/internal-api/apis/autoscaling"
 )
 
 // FakeClusterTestTypes implements ClusterTestTypeInterface

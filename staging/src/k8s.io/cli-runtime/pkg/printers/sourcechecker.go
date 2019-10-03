@@ -26,7 +26,7 @@ var (
 	// disallowedPackagePrefixes contains regular expression templates
 	// for object package paths that are not allowed by printers.
 	disallowedPackagePrefixes = []string{
-		"k8s.io/kubernetes/pkg/apis/",
+		"k8s.io/internal-api/apis/",
 	}
 )
 

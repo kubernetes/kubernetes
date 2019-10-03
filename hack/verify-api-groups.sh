@@ -40,7 +40,7 @@ expected_install_packages=()
 for register_file in "${register_files[@]}"; do
 	package="${register_file#"${prefix}"}"
 	package="${package%"/register.go"}"
-	group_dirname="${package#"k8s.io/kubernetes/pkg/apis/"}"
+	group_dirname="${package#"k8s.io/internal-api/apis/"}"
 	group_dirname="${group_dirname%%"/*"}"
 	group_name=""
 	if grep -q 'GroupName = "' "${register_file}"; then
@@ -92,9 +92,9 @@ done
 # groups_without_codegen is the list of group we EXPECT to not have the client generated for
 # them.  This happens for types that aren't served from the API server
 packages_without_install=(
-	"k8s.io/kubernetes/pkg/apis/abac"
-	"k8s.io/kubernetes/pkg/apis/admission"
-	"k8s.io/kubernetes/pkg/apis/componentconfig" # TODO: Remove this package completely and from this list
+	"k8s.io/internal-api/apis/abac"
+	"k8s.io/internal-api/apis/admission"
+	"k8s.io/internal-api/apis/componentconfig" # TODO: Remove this package completely and from this list
 )
 known_version_files=(
 	"pkg/master/import_known_versions.go"

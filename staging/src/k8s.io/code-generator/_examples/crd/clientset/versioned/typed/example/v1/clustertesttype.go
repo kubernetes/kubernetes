@@ -27,7 +27,7 @@ import (
 	rest "k8s.io/client-go/rest"
 	v1 "k8s.io/code-generator/_examples/crd/apis/example/v1"
 	scheme "k8s.io/code-generator/_examples/crd/clientset/versioned/scheme"
-	autoscaling "k8s.io/kubernetes/pkg/apis/autoscaling"
+	autoscaling "k8s.io/internal-api/apis/autoscaling"
 )
 
 // ClusterTestTypesGetter has a method to return a ClusterTestTypeInterface.

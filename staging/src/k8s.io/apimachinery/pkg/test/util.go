@@ -26,7 +26,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
-// List and ListV1 should be kept in sync with k8s.io/kubernetes/pkg/api#List
+// List and ListV1 should be kept in sync with k8s.io/internal-api/api#List
 // and k8s.io/api/core/v1#List.
 //
 // +k8s:deepcopy-gen=true
