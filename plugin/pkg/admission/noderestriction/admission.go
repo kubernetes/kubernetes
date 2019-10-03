@@ -357,7 +357,7 @@ func (p *Plugin) admitNode(nodeName string, a admission.Attributes) error {
 			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to set the following labels: %s", nodeName, strings.Join(forbiddenLabels.List(), ", ")))
 		}
 		// check and warn if nodes set labels on create that would have been forbidden on update
-		// TODO(liggitt): in 1.17, expand getForbiddenCreateLabels to match getForbiddenUpdateLabels and drop this
+		// TODO(liggitt): in 1.19, expand getForbiddenCreateLabels to match getForbiddenUpdateLabels and drop this
 		if forbiddenUpdateLabels := p.getForbiddenUpdateLabels(modifiedLabels); len(forbiddenUpdateLabels) > 0 {
 			klog.Warningf("node %q added disallowed labels on node creation: %s", nodeName, strings.Join(forbiddenUpdateLabels.List(), ", "))
 		}
@@ -435,7 +435,7 @@ func getLabelNamespace(key string) string {
 }
 
 // getForbiddenCreateLabels returns the set of labels that may not be set by the node.
-// TODO(liggitt): in 1.17, expand to match getForbiddenUpdateLabels()
+// TODO(liggitt): in 1.19, expand to match getForbiddenUpdateLabels()
 func (p *Plugin) getForbiddenCreateLabels(modifiedLabels sets.String) sets.String {
 	if len(modifiedLabels) == 0 {
 		return nil
