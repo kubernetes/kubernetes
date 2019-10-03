@@ -415,10 +415,10 @@ func (m *manager) updateStatusInternal(pod *v1.Pod, status v1.PodStatus, forceUp
 		podName:      pod.Name,
 		podNamespace: pod.Namespace,
 	}
-	m.podStatuses[pod.UID] = newStatus
 
 	select {
 	case m.podStatusChannel <- podStatusSyncRequest{pod.UID, newStatus}:
+		m.podStatuses[pod.UID] = newStatus
 		klog.V(5).Infof("Status Manager: adding pod: %q, with status: (%d, %v) to podStatusChannel",
 			pod.UID, newStatus.version, newStatus.status)
 		return true
