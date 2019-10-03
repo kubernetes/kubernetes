@@ -74,7 +74,7 @@ func (fb fakeBinder) Bind(binding *v1.Binding) error { return fb.b(binding) }
 
 type fakePodConditionUpdater struct{}
 
-func (fc fakePodConditionUpdater) Update(pod *v1.Pod, podCondition *v1.PodCondition) error {
+func (fc fakePodConditionUpdater) update(pod *v1.Pod, podCondition *v1.PodCondition) error {
 	return nil
 }
 
@@ -286,7 +286,7 @@ func TestScheduler(t *testing.T) {
 				},
 			}
 
-			s := NewFromConfig(&factory.Config{
+			s := &Scheduler{
 				SchedulerCache: sCache,
 				Algorithm:      item.algo,
 				GetBinder: func(pod *v1.Pod) factory.Binder {
@@ -295,7 +295,7 @@ func TestScheduler(t *testing.T) {
 						return item.injectBindError
 					}}
 				},
-				PodConditionUpdater: fakePodConditionUpdater{},
+				podConditionUpdater: fakePodConditionUpdater{},
 				Error: func(p *v1.Pod, err error) {
 					gotPod = p
 					gotError = err
@@ -306,7 +306,7 @@ func TestScheduler(t *testing.T) {
 				Framework:    emptyFramework,
 				Recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 				VolumeBinder: volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
-			})
+			}
 			called := make(chan struct{})
 			stopFunc := eventBroadcaster.StartEventWatcher(func(obj runtime.Object) {
 				e, _ := obj.(*v1beta1.Event)
@@ -670,7 +670,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	bindingChan := make(chan *v1.Binding, 1)
 	errChan := make(chan error, 1)
 
-	config := &factory.Config{
+	sched := &Scheduler{
 		SchedulerCache: scache,
 		Algorithm:      algo,
 		GetBinder: func(pod *v1.Pod) factory.Binder {
@@ -686,17 +686,15 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 			errChan <- err
 		},
 		Recorder:            &events.FakeRecorder{},
-		PodConditionUpdater: fakePodConditionUpdater{},
+		podConditionUpdater: fakePodConditionUpdater{},
 		PodPreemptor:        fakePodPreemptor{},
 		Framework:           emptyFramework,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
 	}
 
 	if recorder != nil {
-		config.Recorder = recorder
+		sched.Recorder = recorder
 	}
-
-	sched := NewFromConfig(config)
 
 	return sched, bindingChan, errChan
 }
@@ -722,7 +720,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 	)
 	bindingChan := make(chan *v1.Binding, 2)
 
-	sched := NewFromConfig(&factory.Config{
+	sched := &Scheduler{
 		SchedulerCache: scache,
 		Algorithm:      algo,
 		GetBinder: func(pod *v1.Pod) factory.Binder {
@@ -742,12 +740,12 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 			queuedPodStore.AddIfNotPresent(p)
 		},
 		Recorder:            &events.FakeRecorder{},
-		PodConditionUpdater: fakePodConditionUpdater{},
+		podConditionUpdater: fakePodConditionUpdater{},
 		PodPreemptor:        fakePodPreemptor{},
 		StopEverything:      stop,
 		Framework:           framework,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
-	})
+	}
 
 	return sched, bindingChan
 }
