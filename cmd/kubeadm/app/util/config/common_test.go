@@ -161,13 +161,13 @@ func TestVerifyAPIServerBindAddress(t *testing.T) {
 			address: "2001:db8:85a3::8a2e:370:7334",
 		},
 		{
-			name:          "invalid address: not a global unicast 0.0.0.0",
-			address:       "0.0.0.0",
-			expectedError: true,
+			name:          "valid address 127.0.0.1",
+			address:       "127.0.0.1",
+			expectedError: false,
 		},
 		{
-			name:          "invalid address: not a global unicast 127.0.0.1",
-			address:       "127.0.0.1",
+			name:          "invalid address: not a global unicast 0.0.0.0",
+			address:       "0.0.0.0",
 			expectedError: true,
 		},
 		{

@@ -123,6 +123,14 @@ func VerifyAPIServerBindAddress(address string) error {
 	if ip == nil {
 		return errors.Errorf("cannot parse IP address: %s", address)
 	}
+	// There are users with network setups where default routes are present, but network interfaces
+	// use only link-local addresses (e.g. as described in RFC5549).
+	// In many cases that matching global unicast IP address can be found on loopback interface,
+	// so kubeadm allows users to specify address=Loopback for handling supporting the scenario above.
+	// Nb. SetAPIEndpointDynamicDefaults will try to translate loopback to a valid address afterwards
+	if ip.IsLoopback() {
+		return nil
+	}
 	if !ip.IsGlobalUnicast() {
 		return errors.Errorf("cannot use %q as the bind address for the API Server", address)
 	}

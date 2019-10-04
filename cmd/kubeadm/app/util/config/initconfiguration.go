@@ -26,9 +26,10 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	netutil "k8s.io/apimachinery/pkg/util/net"
 	bootstraputil "k8s.io/cluster-bootstrap/token/util"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
@@ -112,6 +113,22 @@ func SetAPIEndpointDynamicDefaults(cfg *kubeadmapi.APIEndpoint) error {
 	if addressIP == nil && cfg.AdvertiseAddress != "" {
 		return errors.Errorf("couldn't use \"%s\" as \"apiserver-advertise-address\", must be ipv4 or ipv6 address", cfg.AdvertiseAddress)
 	}
+
+	// kubeadm allows users to specify address=Loopback as a selector for global unicast IP address that can be found on loopback interface.
+	// e.g. This is required for network setups where default routes are present, but network interfaces use only link-local addresses (e.g. as described in RFC5549).
+	if addressIP.IsLoopback() {
+		loopbackIP, err := netutil.ChooseBindAddressForInterface(netutil.LoopbackInterfaceName)
+		if err != nil {
+			return err
+		}
+		if loopbackIP != nil {
+			klog.V(4).Infof("Found active IP %v on loopback interface", loopbackIP.String())
+			cfg.AdvertiseAddress = loopbackIP.String()
+			return nil
+		}
+		return errors.New("unable to resolve link-local addresses")
+	}
+
 	// This is the same logic as the API Server uses, except that if no interface is found the address is set to 0.0.0.0, which is invalid and cannot be used
 	// for bootstrapping a cluster.
 	ip, err := ChooseAPIServerBindAddress(addressIP)
