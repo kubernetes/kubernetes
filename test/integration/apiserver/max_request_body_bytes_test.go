@@ -21,11 +21,11 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
 )
 
@@ -33,13 +33,11 @@ import (
 func TestMaxResourceSize(t *testing.T) {
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	clientSet, _ := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
-		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
-			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
-		},
-	})
+	clientSet, _ := framework.StartTestServer(t, stopCh, framework.TestServerSetup{})
 
-	hugeData := []byte(strings.Repeat("x", 1024*1024+1))
+	hugeData := []byte(strings.Repeat("x", 3*1024*1024+1))
+
+	rest := clientSet.Discovery().RESTClient()
 
 	c := clientSet.CoreV1().RESTClient()
 	t.Run("Create should limit the request body size", func(t *testing.T) {
@@ -87,6 +85,30 @@ func TestMaxResourceSize(t *testing.T) {
 
 		}
 	})
+	t.Run("JSONPatchType should handle a patch just under the max limit", func(t *testing.T) {
+		patchBody := []byte(`[{"op":"add","path":"/foo","value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}]`)
+		err = rest.Patch(types.JSONPatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+			Body(patchBody).Do().Error()
+		if err != nil && !errors.IsBadRequest(err) {
+			t.Errorf("expected success or bad request err, got %v", err)
+		}
+	})
+	t.Run("MergePatchType should handle a patch just under the max limit", func(t *testing.T) {
+		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
+		err = rest.Patch(types.MergePatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+			Body(patchBody).Do().Error()
+		if err != nil && !errors.IsBadRequest(err) {
+			t.Errorf("expected success or bad request err, got %v", err)
+		}
+	})
+	t.Run("StrategicMergePatchType should handle a patch just under the max limit", func(t *testing.T) {
+		patchBody := []byte(`{"value":` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + `}`)
+		err = rest.Patch(types.StrategicMergePatchType).AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
+			Body(patchBody).Do().Error()
+		if err != nil && !errors.IsBadRequest(err) {
+			t.Errorf("expected success or bad request err, got %v", err)
+		}
+	})
 	t.Run("Delete should limit the request body size", func(t *testing.T) {
 		err = c.Delete().AbsPath(fmt.Sprintf("/api/v1/namespaces/default/secrets/test")).
 			Body(hugeData).Do().Error()
@@ -96,6 +118,130 @@ func TestMaxResourceSize(t *testing.T) {
 		if !errors.IsRequestEntityTooLargeError(err) {
 			t.Errorf("expected requested entity too large err, got %v", err)
 
+		}
+	})
+
+	// Create YAML over 3MB limit
+	t.Run("create should limit yaml parsing", func(t *testing.T) {
+		yamlBody := []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mytest
+values: ` + strings.Repeat("[", 3*1024*1024))
+
+		_, err := rest.Post().
+			SetHeader("Accept", "application/yaml").
+			SetHeader("Content-Type", "application/yaml").
+			AbsPath("/api/v1/namespaces/default/configmaps").
+			Body(yamlBody).
+			DoRaw()
+		if !apierrors.IsRequestEntityTooLargeError(err) {
+			t.Errorf("expected too large error, got %v", err)
+		}
+	})
+
+	// Create YAML just under 3MB limit, nested
+	t.Run("create should handle a yaml document just under the maximum size with correct nesting", func(t *testing.T) {
+		yamlBody := []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mytest
+values: ` + strings.Repeat("[", 3*1024*1024/2-500) + strings.Repeat("]", 3*1024*1024/2-500))
+
+		_, err := rest.Post().
+			SetHeader("Accept", "application/yaml").
+			SetHeader("Content-Type", "application/yaml").
+			AbsPath("/api/v1/namespaces/default/configmaps").
+			Body(yamlBody).
+			DoRaw()
+		if !apierrors.IsBadRequest(err) {
+			t.Errorf("expected bad request, got %v", err)
+		}
+	})
+
+	// Create YAML just under 3MB limit, not nested
+	t.Run("create should handle a yaml document just under the maximum size with unbalanced nesting", func(t *testing.T) {
+		yamlBody := []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mytest
+values: ` + strings.Repeat("[", 3*1024*1024-1000))
+
+		_, err := rest.Post().
+			SetHeader("Accept", "application/yaml").
+			SetHeader("Content-Type", "application/yaml").
+			AbsPath("/api/v1/namespaces/default/configmaps").
+			Body(yamlBody).
+			DoRaw()
+		if !apierrors.IsBadRequest(err) {
+			t.Errorf("expected bad request, got %v", err)
+		}
+	})
+
+	// Create JSON over 3MB limit
+	t.Run("create should limit json parsing", func(t *testing.T) {
+		jsonBody := []byte(`{
+	"apiVersion": "v1",
+	"kind": "ConfigMap",
+	"metadata": {
+	  "name": "mytest"
+	},
+	"values": ` + strings.Repeat("[", 3*1024*1024/2) + strings.Repeat("]", 3*1024*1024/2) + "}")
+
+		_, err := rest.Post().
+			SetHeader("Accept", "application/json").
+			SetHeader("Content-Type", "application/json").
+			AbsPath("/api/v1/namespaces/default/configmaps").
+			Body(jsonBody).
+			DoRaw()
+		if !apierrors.IsRequestEntityTooLargeError(err) {
+			t.Errorf("expected too large error, got %v", err)
+		}
+	})
+
+	// Create JSON just under 3MB limit, nested
+	t.Run("create should handle a json document just under the maximum size with correct nesting", func(t *testing.T) {
+		jsonBody := []byte(`{
+	"apiVersion": "v1",
+	"kind": "ConfigMap",
+	"metadata": {
+	  "name": "mytest"
+	},
+	"values": ` + strings.Repeat("[", 3*1024*1024/2-100) + strings.Repeat("]", 3*1024*1024/2-100) + "}")
+
+		_, err := rest.Post().
+			SetHeader("Accept", "application/json").
+			SetHeader("Content-Type", "application/json").
+			AbsPath("/api/v1/namespaces/default/configmaps").
+			Body(jsonBody).
+			DoRaw()
+		// TODO(liggitt): expect bad request on deep nesting, rather than success on dropped unknown field data
+		if err != nil && !apierrors.IsBadRequest(err) {
+			t.Errorf("expected bad request, got %v", err)
+		}
+	})
+
+	// Create JSON just under 3MB limit, not nested
+	t.Run("create should handle a json document just under the maximum size with unbalanced nesting", func(t *testing.T) {
+		jsonBody := []byte(`{
+	"apiVersion": "v1",
+	"kind": "ConfigMap",
+	"metadata": {
+	  "name": "mytest"
+	},
+	"values": ` + strings.Repeat("[", 3*1024*1024-1000) + "}")
+
+		_, err := rest.Post().
+			SetHeader("Accept", "application/json").
+			SetHeader("Content-Type", "application/json").
+			AbsPath("/api/v1/namespaces/default/configmaps").
+			Body(jsonBody).
+			DoRaw()
+		if !apierrors.IsBadRequest(err) {
+			t.Errorf("expected bad request, got %v", err)
 		}
 	})
 }
