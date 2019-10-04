@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
-	storage "k8s.io/api/storage/v1beta1"
+	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -985,7 +985,7 @@ func TestInstallCSIDriverExistingAnnotation(t *testing.T) {
 		}
 
 		// Assert
-		nodeInfo, err := client.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
+		nodeInfo, err := client.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			t.Errorf("error getting CSINode: %v", err)
 			continue
@@ -1074,7 +1074,7 @@ func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []t
 
 		if csiNodeInfoEnabled {
 			// CSINode validation
-			nodeInfo, err := client.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
+			nodeInfo, err := client.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
 			if err != nil {
 				if !errors.IsNotFound(err) {
 					t.Errorf("error getting CSINode: %v", err)
