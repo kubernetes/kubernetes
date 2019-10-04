@@ -201,6 +201,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 		c.GenericConfig.RequestTimeout,
 		time.Duration(c.GenericConfig.MinRequestTimeout)*time.Second,
 		apiGroupInfo.StaticOpenAPISpec,
+		c.GenericConfig.MaxRequestBodyBytes,
 	)
 	if err != nil {
 		return nil, err
