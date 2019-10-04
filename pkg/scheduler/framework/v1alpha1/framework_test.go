@@ -81,11 +81,11 @@ func (pl *TestScoreWithNormalizePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestScoreWithNormalizePlugin) NormalizeScore(pc *PluginContext, pod *v1.Pod, scores NodeScoreList) *Status {
+func (pl *TestScoreWithNormalizePlugin) NormalizeScore(state *CycleState, pod *v1.Pod, scores NodeScoreList) *Status {
 	return injectNormalizeRes(pl.inj, scores)
 }
 
-func (pl *TestScoreWithNormalizePlugin) Score(pc *PluginContext, p *v1.Pod, nodeName string) (int, *Status) {
+func (pl *TestScoreWithNormalizePlugin) Score(state *CycleState, p *v1.Pod, nodeName string) (int, *Status) {
 	return setScoreRes(pl.inj)
 }
 
@@ -103,7 +103,7 @@ func (pl *TestScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestScorePlugin) Score(pc *PluginContext, p *v1.Pod, nodeName string) (int, *Status) {
+func (pl *TestScorePlugin) Score(state *CycleState, p *v1.Pod, nodeName string) (int, *Status) {
 	return setScoreRes(pl.inj)
 }
 
@@ -127,7 +127,7 @@ func (pl *TestPreFilterPlugin) Name() string {
 	return preFilterPluginName
 }
 
-func (pl *TestPreFilterPlugin) PreFilter(pc *PluginContext, p *v1.Pod) *Status {
+func (pl *TestPreFilterPlugin) PreFilter(state *CycleState, p *v1.Pod) *Status {
 	pl.PreFilterCalled++
 	return nil
 }
@@ -147,18 +147,18 @@ func (pl *TestPreFilterWithExtensionsPlugin) Name() string {
 	return preFilterWithExtensionsPluginName
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(pc *PluginContext, p *v1.Pod) *Status {
+func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(state *CycleState, p *v1.Pod) *Status {
 	pl.PreFilterCalled++
 	return nil
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) AddPod(pc *PluginContext, podToSchedule *v1.Pod,
+func (pl *TestPreFilterWithExtensionsPlugin) AddPod(state *CycleState, podToSchedule *v1.Pod,
 	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	pl.AddCalled++
 	return nil
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) RemovePod(pc *PluginContext, podToSchedule *v1.Pod,
+func (pl *TestPreFilterWithExtensionsPlugin) RemovePod(state *CycleState, podToSchedule *v1.Pod,
 	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	pl.RemoveCalled++
 	return nil
@@ -175,7 +175,7 @@ func (dp *TestDuplicatePlugin) Name() string {
 	return duplicatePluginName
 }
 
-func (dp *TestDuplicatePlugin) PreFilter(pc *PluginContext, p *v1.Pod) *Status {
+func (dp *TestDuplicatePlugin) PreFilter(state *CycleState, p *v1.Pod) *Status {
 	return nil
 }
 
@@ -206,7 +206,7 @@ var defaultWeights = map[string]int32{
 }
 
 var emptyArgs []config.PluginConfig = make([]config.PluginConfig, 0)
-var pc = &PluginContext{}
+var state = &CycleState{}
 
 // Pod is only used for logging errors.
 var pod = &v1.Pod{}
@@ -453,7 +453,7 @@ func TestRunScorePlugins(t *testing.T) {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
 
-			res, status := f.RunScorePlugins(pc, pod, nodes)
+			res, status := f.RunScorePlugins(state, pod, nodes)
 
 			if tt.err {
 				if status.IsSuccess() {

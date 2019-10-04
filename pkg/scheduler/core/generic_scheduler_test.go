@@ -161,7 +161,7 @@ func (fp *FakeFilterPlugin) reset() {
 
 // Filter is a test function that returns an error or nil, depending on the
 // value of "failedNodeReturnCodeMap".
-func (fp *FakeFilterPlugin) Filter(pc *framework.PluginContext, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+func (fp *FakeFilterPlugin) Filter(state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	atomic.AddInt32(&fp.numFilterCalled, 1)
 
 	if returnCode, ok := fp.failedNodeReturnCodeMap[nodeInfo.Node().Name]; ok {
@@ -674,7 +674,7 @@ func TestGenericScheduler(t *testing.T) {
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)
-			result, err := scheduler.Schedule(framework.NewPluginContext(), test.pod)
+			result, err := scheduler.Schedule(framework.NewCycleState(), test.pod)
 			if !reflect.DeepEqual(err, test.wErr) {
 				t.Errorf("Unexpected error: %v, expected: %v", err.Error(), test.wErr)
 			}
@@ -1426,8 +1426,8 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			newnode := makeNode("newnode", 1000*5, priorityutil.DefaultMemoryRequest*5)
 			newnode.ObjectMeta.Labels = map[string]string{"hostname": "newnode"}
 			nodes = append(nodes, newnode)
-			pluginContext := framework.NewPluginContext()
-			nodeToPods, err := g.selectNodesForPreemption(pluginContext, test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)
+			state := framework.NewCycleState()
+			nodeToPods, err := g.selectNodesForPreemption(state, test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)
 			if err != nil {
 				t.Error(err)
 			}
@@ -1650,8 +1650,8 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 				nodes = append(nodes, makeNode(n, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5))
 			}
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, nodes)
-			pluginContext := framework.NewPluginContext()
-			candidateNodes, _ := g.selectNodesForPreemption(pluginContext, test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)
+			state := framework.NewCycleState()
+			candidateNodes, _ := g.selectNodesForPreemption(state, test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)
 			node := pickOneNodeForPreemption(candidateNodes)
 			found := false
 			for _, nodeName := range test.expected {
@@ -2135,14 +2135,14 @@ func TestPreempt(t *testing.T) {
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				true)
-			pluginContext := framework.NewPluginContext()
+			state := framework.NewCycleState()
 			scheduler.(*genericScheduler).snapshot()
 			// Call Preempt and check the expected results.
 			failedPredMap := defaultFailedPredMap
 			if test.failedPredMap != nil {
 				failedPredMap = test.failedPredMap
 			}
-			node, victims, _, err := scheduler.Preempt(pluginContext, test.pod, error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
+			node, victims, _, err := scheduler.Preempt(state, test.pod, error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}
@@ -2172,7 +2172,7 @@ func TestPreempt(t *testing.T) {
 				test.pod.Status.NominatedNodeName = node.Name
 			}
 			// Call preempt again and make sure it doesn't preempt any more pods.
-			node, victims, _, err = scheduler.Preempt(pluginContext, test.pod, error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
+			node, victims, _, err = scheduler.Preempt(state, test.pod, error(&FitError{Pod: test.pod, FailedPredicates: failedPredMap}))
 			if err != nil {
 				t.Errorf("unexpected error in preemption: %v", err)
 			}

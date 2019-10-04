@@ -134,12 +134,12 @@ func (f *FitError) Error() string {
 // onto machines.
 // TODO: Rename this type.
 type ScheduleAlgorithm interface {
-	Schedule(*framework.PluginContext, *v1.Pod) (scheduleResult ScheduleResult, err error)
+	Schedule(*framework.CycleState, *v1.Pod) (scheduleResult ScheduleResult, err error)
 	// Preempt receives scheduling errors for a pod and tries to create room for
 	// the pod by preempting lower priority pods if possible.
 	// It returns the node where preemption happened, a list of preempted pods, a
 	// list of pods whose nominated node name should be removed, and error if any.
-	Preempt(*framework.PluginContext, *v1.Pod, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
+	Preempt(*framework.CycleState, *v1.Pod, error) (selectedNode *v1.Node, preemptedPods []*v1.Pod, cleanupNominatedPods []*v1.Pod, err error)
 	// Predicates() returns a pointer to a map of predicate functions. This is
 	// exposed for testing.
 	Predicates() map[string]predicates.FitPredicate
@@ -191,7 +191,7 @@ func (g *genericScheduler) snapshot() error {
 // Schedule tries to schedule the given pod to one of the nodes in the node list.
 // If it succeeds, it will return the name of the node.
 // If it fails, it will return a FitError error with reasons.
-func (g *genericScheduler) Schedule(pluginContext *framework.PluginContext, pod *v1.Pod) (result ScheduleResult, err error) {
+func (g *genericScheduler) Schedule(state *framework.CycleState, pod *v1.Pod) (result ScheduleResult, err error) {
 	trace := utiltrace.New("Scheduling", utiltrace.Field{Key: "namespace", Value: pod.Namespace}, utiltrace.Field{Key: "name", Value: pod.Name})
 	defer trace.LogIfLong(100 * time.Millisecond)
 
@@ -200,7 +200,7 @@ func (g *genericScheduler) Schedule(pluginContext *framework.PluginContext, pod 
 	}
 
 	// Run "prefilter" plugins.
-	preFilterStatus := g.framework.RunPreFilterPlugins(pluginContext, pod)
+	preFilterStatus := g.framework.RunPreFilterPlugins(state, pod)
 	if !preFilterStatus.IsSuccess() {
 		return result, preFilterStatus.AsError()
 	}
@@ -216,13 +216,13 @@ func (g *genericScheduler) Schedule(pluginContext *framework.PluginContext, pod 
 
 	trace.Step("Basic checks done")
 	startPredicateEvalTime := time.Now()
-	filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(pluginContext, pod)
+	filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(state, pod)
 	if err != nil {
 		return result, err
 	}
 
 	// Run "postfilter" plugins.
-	postfilterStatus := g.framework.RunPostFilterPlugins(pluginContext, pod, filteredNodes, filteredNodesStatuses)
+	postfilterStatus := g.framework.RunPostFilterPlugins(state, pod, filteredNodes, filteredNodesStatuses)
 	if !postfilterStatus.IsSuccess() {
 		return result, postfilterStatus.AsError()
 	}
@@ -254,7 +254,7 @@ func (g *genericScheduler) Schedule(pluginContext *framework.PluginContext, pod 
 	}
 
 	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
-	priorityList, err := PrioritizeNodes(pod, g.nodeInfoSnapshot.NodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders, g.framework, pluginContext)
+	priorityList, err := PrioritizeNodes(pod, g.nodeInfoSnapshot.NodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders, g.framework, state)
 	if err != nil {
 		return result, err
 	}
@@ -326,7 +326,7 @@ func (g *genericScheduler) selectHost(nodeScoreList framework.NodeScoreList) (st
 // other pods with the same priority. The nominated pod prevents other pods from
 // using the nominated resources and the nominated pod could take a long time
 // before it is retried after many other pending pods.
-func (g *genericScheduler) Preempt(pluginContext *framework.PluginContext, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
+func (g *genericScheduler) Preempt(state *framework.CycleState, pod *v1.Pod, scheduleErr error) (*v1.Node, []*v1.Pod, []*v1.Pod, error) {
 	// Scheduler may return various types of errors. Consider preemption only if
 	// the error is of type FitError.
 	fitError, ok := scheduleErr.(*FitError)
@@ -351,7 +351,7 @@ func (g *genericScheduler) Preempt(pluginContext *framework.PluginContext, pod *
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	nodeToVictims, err := g.selectNodesForPreemption(pluginContext, pod, g.nodeInfoSnapshot.NodeInfoMap, potentialNodes, g.predicates,
+	nodeToVictims, err := g.selectNodesForPreemption(state, pod, g.nodeInfoSnapshot.NodeInfoMap, potentialNodes, g.predicates,
 		g.predicateMetaProducer, g.schedulingQueue, pdbs)
 	if err != nil {
 		return nil, nil, nil, err
@@ -470,7 +470,7 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 
 // Filters the nodes to find the ones that fit based on the given predicate functions
 // Each node is passed through the predicate functions to determine if it is a fit
-func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginContext, pod *v1.Pod) ([]*v1.Node, FailedPredicateMap, framework.NodeToStatusMap, error) {
+func (g *genericScheduler) findNodesThatFit(state *framework.CycleState, pod *v1.Pod) ([]*v1.Node, FailedPredicateMap, framework.NodeToStatusMap, error) {
 	var filtered []*v1.Node
 	failedPredicateMap := FailedPredicateMap{}
 	filteredNodesStatuses := framework.NodeToStatusMap{}
@@ -499,7 +499,7 @@ func (g *genericScheduler) findNodesThatFit(pluginContext *framework.PluginConte
 			nodeName := g.cache.NodeTree().Next()
 
 			fits, failedPredicates, status, err := g.podFitsOnNode(
-				pluginContext,
+				state,
 				pod,
 				meta,
 				g.nodeInfoSnapshot.NodeInfoMap[nodeName],
@@ -619,7 +619,7 @@ func addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata,
 // add the nominated pods. Removal of the victims is done by SelectVictimsOnNode().
 // It removes victims from meta and NodeInfo before calling this function.
 func (g *genericScheduler) podFitsOnNode(
-	pluginContext *framework.PluginContext,
+	state *framework.CycleState,
 	pod *v1.Pod,
 	meta predicates.PredicateMetadata,
 	info *schedulernodeinfo.NodeInfo,
@@ -684,7 +684,7 @@ func (g *genericScheduler) podFitsOnNode(
 			}
 		}
 
-		status = g.framework.RunFilterPlugins(pluginContext, pod, nodeInfoToUse)
+		status = g.framework.RunFilterPlugins(state, pod, nodeInfoToUse)
 		if !status.IsSuccess() && !status.IsUnschedulable() {
 			return false, failedPredicates, status, status.AsError()
 		}
@@ -707,7 +707,7 @@ func PrioritizeNodes(
 	nodes []*v1.Node,
 	extenders []algorithm.SchedulerExtender,
 	fwk framework.Framework,
-	pluginContext *framework.PluginContext) (framework.NodeScoreList, error) {
+	state *framework.CycleState) (framework.NodeScoreList, error) {
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
 	if len(priorityConfigs) == 0 && len(extenders) == 0 {
@@ -793,7 +793,7 @@ func PrioritizeNodes(
 	}
 
 	// Run the Score plugins.
-	scoresMap, scoreStatus := fwk.RunScorePlugins(pluginContext, pod, nodes)
+	scoresMap, scoreStatus := fwk.RunScorePlugins(state, pod, nodes)
 	if !scoreStatus.IsSuccess() {
 		return framework.NodeScoreList{}, scoreStatus.AsError()
 	}
@@ -1005,7 +1005,7 @@ func pickOneNodeForPreemption(nodesToVictims map[*v1.Node]*extenderv1.Victims) *
 // selectNodesForPreemption finds all the nodes with possible victims for
 // preemption in parallel.
 func (g *genericScheduler) selectNodesForPreemption(
-	pluginContext *framework.PluginContext,
+	state *framework.CycleState,
 	pod *v1.Pod,
 	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
 	potentialNodes []*v1.Node,
@@ -1025,9 +1025,9 @@ func (g *genericScheduler) selectNodesForPreemption(
 		if meta != nil {
 			metaCopy = meta.ShallowCopy()
 		}
-		pluginContextClone := pluginContext.Clone()
+		stateClone := state.Clone()
 		pods, numPDBViolations, fits := g.selectVictimsOnNode(
-			pluginContextClone, pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
+			stateClone, pod, metaCopy, nodeNameToInfo[nodeName], fitPredicates, queue, pdbs)
 		if fits {
 			resultLock.Lock()
 			victims := extenderv1.Victims{
@@ -1097,7 +1097,7 @@ func filterPodsWithPDBViolation(pods []interface{}, pdbs []*policy.PodDisruption
 // due to pod affinity, node affinity, or node anti-affinity reasons. None of
 // these predicates can be satisfied by removing more pods from the node.
 func (g *genericScheduler) selectVictimsOnNode(
-	pluginContext *framework.PluginContext,
+	state *framework.CycleState,
 	pod *v1.Pod,
 	meta predicates.PredicateMetadata,
 	nodeInfo *schedulernodeinfo.NodeInfo,
@@ -1120,7 +1120,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 				return err
 			}
 		}
-		status := g.framework.RunPreFilterExtensionRemovePod(pluginContext, pod, rp, nodeInfoCopy)
+		status := g.framework.RunPreFilterExtensionRemovePod(state, pod, rp, nodeInfoCopy)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
@@ -1133,7 +1133,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 				return err
 			}
 		}
-		status := g.framework.RunPreFilterExtensionAddPod(pluginContext, pod, ap, nodeInfoCopy)
+		status := g.framework.RunPreFilterExtensionAddPod(state, pod, ap, nodeInfoCopy)
 		if !status.IsSuccess() {
 			return status.AsError()
 		}
@@ -1156,7 +1156,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 	// inter-pod affinity to one or more victims, but we have decided not to
 	// support this case for performance reasons. Having affinity to lower
 	// priority pods is not a recommended configuration anyway.
-	if fits, _, _, err := g.podFitsOnNode(pluginContext, pod, meta, nodeInfoCopy, fitPredicates, queue, false); !fits {
+	if fits, _, _, err := g.podFitsOnNode(state, pod, meta, nodeInfoCopy, fitPredicates, queue, false); !fits {
 		if err != nil {
 			klog.Warningf("Encountered error while selecting victims on node %v: %v", nodeInfo.Node().Name, err)
 		}
@@ -1174,7 +1174,7 @@ func (g *genericScheduler) selectVictimsOnNode(
 		if err := addPod(p); err != nil {
 			return false, err
 		}
-		fits, _, _, _ := g.podFitsOnNode(pluginContext, pod, meta, nodeInfoCopy, fitPredicates, queue, false)
+		fits, _, _, _ := g.podFitsOnNode(state, pod, meta, nodeInfoCopy, fitPredicates, queue, false)
 		if !fits {
 			if err := removePod(p); err != nil {
 				return false, err

@@ -167,47 +167,47 @@ func (*fakeFramework) NodeInfoSnapshot() *schedulernodeinfo.Snapshot {
 	return nil
 }
 
-func (*fakeFramework) RunPreFilterPlugins(pc *framework.PluginContext, pod *v1.Pod) *framework.Status {
+func (*fakeFramework) RunPreFilterPlugins(state *framework.CycleState, pod *v1.Pod) *framework.Status {
 	return nil
 }
 
-func (*fakeFramework) RunFilterPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+func (*fakeFramework) RunFilterPlugins(state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	return nil
 }
 
-func (*fakeFramework) RunPreFilterExtensionAddPod(pc *framework.PluginContext, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+func (*fakeFramework) RunPreFilterExtensionAddPod(state *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	return nil
 }
 
-func (*fakeFramework) RunPreFilterExtensionRemovePod(pc *framework.PluginContext, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+func (*fakeFramework) RunPreFilterExtensionRemovePod(state *framework.CycleState, podToSchedule *v1.Pod, podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	return nil
 }
 
-func (*fakeFramework) RunScorePlugins(pc *framework.PluginContext, pod *v1.Pod, nodes []*v1.Node) (framework.PluginToNodeScores, *framework.Status) {
+func (*fakeFramework) RunScorePlugins(state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node) (framework.PluginToNodeScores, *framework.Status) {
 	return nil, nil
 }
 
-func (*fakeFramework) RunPreBindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (*fakeFramework) RunPreBindPlugins(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
 
-func (*fakeFramework) RunBindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (*fakeFramework) RunBindPlugins(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
 
-func (*fakeFramework) RunPostBindPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) {}
+func (*fakeFramework) RunPostBindPlugins(state *framework.CycleState, pod *v1.Pod, nodeName string) {}
 
-func (*fakeFramework) RunPostFilterPlugins(pc *framework.PluginContext, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses framework.NodeToStatusMap) *framework.Status {
+func (*fakeFramework) RunPostFilterPlugins(state *framework.CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses framework.NodeToStatusMap) *framework.Status {
 	return nil
 }
 
-func (*fakeFramework) RunReservePlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (*fakeFramework) RunReservePlugins(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
 
-func (*fakeFramework) RunUnreservePlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) {}
+func (*fakeFramework) RunUnreservePlugins(state *framework.CycleState, pod *v1.Pod, nodeName string) {}
 
-func (*fakeFramework) RunPermitPlugins(pc *framework.PluginContext, pod *v1.Pod, nodeName string) *framework.Status {
+func (*fakeFramework) RunPermitPlugins(state *framework.CycleState, pod *v1.Pod, nodeName string) *framework.Status {
 	return nil
 }
 
