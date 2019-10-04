@@ -24,6 +24,7 @@ import (
 	"strconv"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -54,10 +55,10 @@ func (plugin *gcePersistentDiskPlugin) ConstructBlockVolumeSpec(podUID types.UID
 		return nil, fmt.Errorf("failed to get volume plugin information from globalMapPathUUID: %v", globalMapPathUUID)
 	}
 
-	return getVolumeSpecFromGlobalMapPath(globalMapPath)
+	return getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath)
 }
 
-func getVolumeSpecFromGlobalMapPath(globalMapPath string) (*volume.Spec, error) {
+func getVolumeSpecFromGlobalMapPath(volumeName, globalMapPath string) (*volume.Spec, error) {
 	// Get volume spec information from globalMapPath
 	// globalMapPath example:
 	//   plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumeID}
@@ -68,6 +69,9 @@ func getVolumeSpecFromGlobalMapPath(globalMapPath string) (*volume.Spec, error) 
 	}
 	block := v1.PersistentVolumeBlock
 	gceVolume := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: volumeName,
+		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
