@@ -32,7 +32,6 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
-	"runtime/debug"
 	"sort"
 	"strconv"
 	"strings"
@@ -935,48 +934,6 @@ func LoadClientset() (*clientset.Clientset, error) {
 //       use the UUID utility function.
 func RandomSuffix() string {
 	return strconv.Itoa(rand.Intn(10000))
-}
-
-// ExpectEqual expects the specified two are the same, otherwise an exception raises
-func ExpectEqual(actual interface{}, extra interface{}, explain ...interface{}) {
-	gomega.ExpectWithOffset(1, actual).To(gomega.Equal(extra), explain...)
-}
-
-// ExpectNotEqual expects the specified two are not the same, otherwise an exception raises
-func ExpectNotEqual(actual interface{}, extra interface{}, explain ...interface{}) {
-	gomega.ExpectWithOffset(1, actual).NotTo(gomega.Equal(extra), explain...)
-}
-
-// ExpectError expects an error happens, otherwise an exception raises
-func ExpectError(err error, explain ...interface{}) {
-	gomega.ExpectWithOffset(1, err).To(gomega.HaveOccurred(), explain...)
-}
-
-// ExpectNoError checks if "err" is set, and if so, fails assertion while logging the error.
-func ExpectNoError(err error, explain ...interface{}) {
-	ExpectNoErrorWithOffset(1, err, explain...)
-}
-
-// ExpectNoErrorWithOffset checks if "err" is set, and if so, fails assertion while logging the error at "offset" levels above its caller
-// (for example, for call chain f -> g -> ExpectNoErrorWithOffset(1, ...) error would be logged for "f").
-func ExpectNoErrorWithOffset(offset int, err error, explain ...interface{}) {
-	gomega.ExpectWithOffset(1+offset, err).NotTo(gomega.HaveOccurred(), explain...)
-}
-
-// ExpectNoErrorWithRetries checks if an error occurs with the given retry count.
-func ExpectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interface{}) {
-	var err error
-	for i := 0; i < maxRetries; i++ {
-		err = fn()
-		if err == nil {
-			return
-		}
-		Logf("(Attempt %d of %d) Unexpected error occurred: %v", i+1, maxRetries, err)
-	}
-	if err != nil {
-		debug.PrintStack()
-	}
-	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
 // Cleanup stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.

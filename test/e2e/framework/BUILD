@@ -6,6 +6,7 @@ go_library(
         "cleanup.go",
         "create.go",
         "exec_util.go",
+        "expect.go",
         "flake_reporting_util.go",
         "framework.go",
         "get-kubemark-resource-usage.go",
