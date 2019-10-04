@@ -2631,6 +2631,7 @@ EOF
 function setup-nodelocaldns-manifest {
   setup-addon-manifests "addons" "0-dns/nodelocaldns"
   local -r localdns_file="${dst_dir}/0-dns/nodelocaldns/nodelocaldns.yaml"
+  setup-addon-custom-yaml "addons" "0-dns/nodelocaldns" "nodelocaldns.yaml" "${CUSTOM_NODELOCAL_DNS_YAML:-}"
   # Replace the sed configurations with variable values.
   sed -i -e "s/__PILLAR__DNS__DOMAIN__/${DNS_DOMAIN}/g" "${localdns_file}"
   sed -i -e "s/__PILLAR__DNS__SERVER__/${DNS_SERVER_IP}/g" "${localdns_file}"
