@@ -635,7 +635,7 @@ func (t *TestPlugin) Score(state *framework.CycleState, p *v1.Pod, nodeName stri
 	return 1, nil
 }
 
-func (t *TestPlugin) Extensions() framework.ScoreExtensions {
+func (t *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 

@@ -190,13 +190,13 @@ type PreFilterPlugin interface {
 	// PreFilter is called at the beginning of the scheduling cycle. All PreFilter
 	// plugins must return success or the pod will be rejected.
 	PreFilter(state *CycleState, p *v1.Pod) *Status
-	// Extensions returns a PreFilterExtensions interface if the plugin implements one,
+	// PreFilterExtensions returns a PreFilterExtensions interface if the plugin implements one,
 	// or nil if it does not. A Pre-filter plugin can provide extensions to incrementally
 	// modify its pre-processed info. The framework guarantees that the extensions
 	// AddPod/RemovePod will only be called after PreFilter, possibly on a cloned
 	// CycleState, and may call those functions more than once before calling
 	// Filter again on a specific node.
-	Extensions() PreFilterExtensions
+	PreFilterExtensions() PreFilterExtensions
 }
 
 // FilterPlugin is an interface for Filter plugins. These plugins are called at the
@@ -253,8 +253,8 @@ type ScorePlugin interface {
 	// the pod will be rejected.
 	Score(state *CycleState, p *v1.Pod, nodeName string) (int, *Status)
 
-	// Extensions returns a ScoreExtensions interface if it implements one, or nil if does not.
-	Extensions() ScoreExtensions
+	// ScoreExtensions returns a ScoreExtensions interface if it implements one, or nil if does not.
+	ScoreExtensions() ScoreExtensions
 }
 
 // ReservePlugin is an interface for Reserve plugins. These plugins are called

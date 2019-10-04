@@ -163,7 +163,7 @@ func (sp *ScorePlugin) Score(state *framework.CycleState, p *v1.Pod, nodeName st
 	return score, nil
 }
 
-func (sp *ScorePlugin) Extensions() framework.ScoreExtensions {
+func (sp *ScorePlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
@@ -190,7 +190,7 @@ func (sp *ScoreWithNormalizePlugin) NormalizeScore(state *framework.CycleState, 
 	return nil
 }
 
-func (sp *ScoreWithNormalizePlugin) Extensions() framework.ScoreExtensions {
+func (sp *ScoreWithNormalizePlugin) ScoreExtensions() framework.ScoreExtensions {
 	return sp
 }
 
@@ -336,7 +336,7 @@ func (pp *PreFilterPlugin) Name() string {
 }
 
 // Extensions returns the PreFilterExtensions interface.
-func (pp *PreFilterPlugin) Extensions() framework.PreFilterExtensions {
+func (pp *PreFilterPlugin) PreFilterExtensions() framework.PreFilterExtensions {
 	return nil
 }
 

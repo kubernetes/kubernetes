@@ -229,10 +229,10 @@ func (f *framework) RunPreFilterPlugins(
 func (f *framework) RunPreFilterExtensionAddPod(state *CycleState, podToSchedule *v1.Pod,
 	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	for _, pl := range f.preFilterPlugins {
-		if pl.Extensions() == nil {
+		if pl.PreFilterExtensions() == nil {
 			continue
 		}
-		if status := pl.Extensions().AddPod(state, podToSchedule, podToAdd, nodeInfo); !status.IsSuccess() {
+		if status := pl.PreFilterExtensions().AddPod(state, podToSchedule, podToAdd, nodeInfo); !status.IsSuccess() {
 			msg := fmt.Sprintf("error while running AddPod for plugin %q while scheduling pod %q: %v",
 				pl.Name(), podToSchedule.Name, status.Message())
 			klog.Error(msg)
@@ -249,10 +249,10 @@ func (f *framework) RunPreFilterExtensionAddPod(state *CycleState, podToSchedule
 func (f *framework) RunPreFilterExtensionRemovePod(state *CycleState, podToSchedule *v1.Pod,
 	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	for _, pl := range f.preFilterPlugins {
-		if pl.Extensions() == nil {
+		if pl.PreFilterExtensions() == nil {
 			continue
 		}
-		if status := pl.Extensions().RemovePod(state, podToSchedule, podToRemove, nodeInfo); !status.IsSuccess() {
+		if status := pl.PreFilterExtensions().RemovePod(state, podToSchedule, podToRemove, nodeInfo); !status.IsSuccess() {
 			msg := fmt.Sprintf("error while running RemovePod for plugin %q while scheduling pod %q: %v",
 				pl.Name(), podToSchedule.Name, status.Message())
 			klog.Error(msg)
@@ -343,10 +343,10 @@ func (f *framework) RunScorePlugins(state *CycleState, pod *v1.Pod, nodes []*v1.
 	workqueue.ParallelizeUntil(ctx, 16, len(f.scorePlugins), func(index int) {
 		pl := f.scorePlugins[index]
 		nodeScoreList := pluginToNodeScores[pl.Name()]
-		if pl.Extensions() == nil {
+		if pl.ScoreExtensions() == nil {
 			return
 		}
-		if status := pl.Extensions().NormalizeScore(state, pod, nodeScoreList); !status.IsSuccess() {
+		if status := pl.ScoreExtensions().NormalizeScore(state, pod, nodeScoreList); !status.IsSuccess() {
 			err := fmt.Errorf("normalize score plugin %q failed with error %v", pl.Name(), status.Message())
 			errCh.SendErrorWithCancel(err, cancel)
 			return

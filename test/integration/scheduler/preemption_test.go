@@ -114,7 +114,7 @@ func (fp *tokenFilter) RemovePod(state *framework.CycleState, podToSchedule *v1.
 	return nil
 }
 
-func (fp *tokenFilter) Extensions() framework.PreFilterExtensions {
+func (fp *tokenFilter) PreFilterExtensions() framework.PreFilterExtensions {
 	return fp
 }
 

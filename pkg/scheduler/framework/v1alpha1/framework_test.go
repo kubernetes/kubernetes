@@ -89,7 +89,7 @@ func (pl *TestScoreWithNormalizePlugin) Score(state *CycleState, p *v1.Pod, node
 	return setScoreRes(pl.inj)
 }
 
-func (pl *TestScoreWithNormalizePlugin) Extensions() ScoreExtensions {
+func (pl *TestScoreWithNormalizePlugin) ScoreExtensions() ScoreExtensions {
 	return pl
 }
 
@@ -107,7 +107,7 @@ func (pl *TestScorePlugin) Score(state *CycleState, p *v1.Pod, nodeName string) 
 	return setScoreRes(pl.inj)
 }
 
-func (pl *TestScorePlugin) Extensions() ScoreExtensions {
+func (pl *TestScorePlugin) ScoreExtensions() ScoreExtensions {
 	return nil
 }
 
@@ -132,7 +132,7 @@ func (pl *TestPreFilterPlugin) PreFilter(state *CycleState, p *v1.Pod) *Status {
 	return nil
 }
 
-func (pl *TestPreFilterPlugin) Extensions() PreFilterExtensions {
+func (pl *TestPreFilterPlugin) PreFilterExtensions() PreFilterExtensions {
 	return nil
 }
 
@@ -164,7 +164,7 @@ func (pl *TestPreFilterWithExtensionsPlugin) RemovePod(state *CycleState, podToS
 	return nil
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) Extensions() PreFilterExtensions {
+func (pl *TestPreFilterWithExtensionsPlugin) PreFilterExtensions() PreFilterExtensions {
 	return pl
 }
 
@@ -179,7 +179,7 @@ func (dp *TestDuplicatePlugin) PreFilter(state *CycleState, p *v1.Pod) *Status {
 	return nil
 }
 
-func (dp *TestDuplicatePlugin) Extensions() PreFilterExtensions {
+func (dp *TestDuplicatePlugin) PreFilterExtensions() PreFilterExtensions {
 	return nil
 }
 
