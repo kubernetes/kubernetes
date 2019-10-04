@@ -840,7 +840,9 @@ func PrioritizeNodes(
 		// wait for all go routines to finish
 		wg.Wait()
 		for i := range result {
-			result[i].Score += combinedScores[result[i].Name]
+			// MaxExtenderPriority may diverge from the max priority used in the scheduler and defined by MaxNodeScore,
+			// therefore we need to scale the score returned by extenders to the score range used by the scheduler.
+			result[i].Score += combinedScores[result[i].Name] * (framework.MaxNodeScore / extenderv1.MaxExtenderPriority)
 		}
 	}
 
