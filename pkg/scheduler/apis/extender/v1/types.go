@@ -23,10 +23,10 @@ import (
 
 const (
 	// MinExtenderPriority defines the min priority value for extender.
-	MinExtenderPriority int = 0
+	MinExtenderPriority int64 = 0
 
 	// MaxExtenderPriority defines the max priority value for extender.
-	MaxExtenderPriority int = 10
+	MaxExtenderPriority int64 = 10
 )
 
 // ExtenderPreemptionResult represents the result returned by preemption phase of extender.
