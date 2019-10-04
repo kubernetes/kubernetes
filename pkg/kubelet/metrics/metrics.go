@@ -23,7 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -105,7 +104,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           "containers_per_pod_count",
 			Help:           "The number of containers per pod.",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -116,7 +115,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodWorkerDurationKey,
 			Help:           "Duration in seconds to sync a single pod. Broken down by operation type: create, update, or sync",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
@@ -127,7 +126,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodStartDurationKey,
 			Help:           "Duration in seconds for a single pod to go from pending to running.",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -138,7 +137,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           CgroupManagerOperationsKey,
 			Help:           "Duration in seconds for cgroup manager operations. Broken down by method.",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
@@ -149,7 +148,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PodWorkerStartDurationKey,
 			Help:           "Duration in seconds from seeing a pod to starting a worker.",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -160,7 +159,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PLEGRelistDurationKey,
 			Help:           "Duration in seconds for relisting pods in PLEG.",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -182,7 +181,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           PLEGRelistIntervalKey,
 			Help:           "Interval in seconds between relisting in PLEG.",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 	)
@@ -204,7 +203,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           RuntimeOperationsDurationKey,
 			Help:           "Duration in seconds of runtime operations. Broken down by operation type.",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
@@ -238,7 +237,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           EvictionStatsAgeKey,
 			Help:           "Time between when stats are collected, and when pod is evicted based on those stats by eviction signal",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"eviction_signal"},
@@ -261,7 +260,7 @@ var (
 			Subsystem:      KubeletSubsystem,
 			Name:           DevicePluginAllocationDurationKey,
 			Help:           "Duration in seconds to serve a device plugin Allocation request. Broken down by resource name.",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"resource_name"},
@@ -445,7 +444,7 @@ var (
 			Name:      RunPodSandboxDurationKey,
 			Help:      "Duration in seconds of the run_podsandbox operations. Broken down by RuntimeClass.",
 			// Use DefBuckets for now, will customize the buckets if necessary.
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"runtime_handler"},
@@ -486,7 +485,7 @@ var (
 var registerMetrics sync.Once
 
 // Register registers all metrics.
-func Register(containerCache kubecontainer.RuntimeCache, collectors ...prometheus.Collector) {
+func Register(containerCache kubecontainer.RuntimeCache, collectors ...metrics.Collector) {
 	// Register the metrics.
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(NodeName)

@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -57,7 +55,7 @@ var (
 			Subsystem:      kubeletSubsystem,
 			Name:           DockerOperationsLatencyKey,
 			Help:           "Latency in seconds of Docker operations. Broken down by operation type.",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
