@@ -899,7 +899,8 @@ func TestBindPlugin(t *testing.T) {
 	context := initTestSchedulerWithOptions(t, testContext, false, nil, time.Second,
 		scheduler.WithFrameworkPlugins(plugins),
 		scheduler.WithFrameworkPluginConfig(pluginConfig),
-		scheduler.WithFrameworkRegistry(registry))
+		scheduler.WithFrameworkRegistry(registry),
+		scheduler.WithFrameworkConfigProducerRegistry(nil))
 	defer cleanupTest(t, context)
 
 	// Add a few nodes.

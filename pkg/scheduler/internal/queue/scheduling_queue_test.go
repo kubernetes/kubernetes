@@ -163,6 +163,10 @@ func (*fakeFramework) QueueSortFunc() framework.LessFunc {
 	}
 }
 
+func (f *fakeFramework) ListPlugins() map[string][]string {
+	return nil
+}
+
 func (*fakeFramework) NodeInfoSnapshot() *schedulernodeinfo.Snapshot {
 	return nil
 }

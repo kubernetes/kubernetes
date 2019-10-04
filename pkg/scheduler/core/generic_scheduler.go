@@ -65,27 +65,6 @@ const (
 	minFeasibleNodesPercentageToFind = 5
 )
 
-var unresolvablePredicateFailureErrors = map[predicates.PredicateFailureReason]struct{}{
-	predicates.ErrNodeSelectorNotMatch:      {},
-	predicates.ErrPodAffinityRulesNotMatch:  {},
-	predicates.ErrPodNotMatchHostName:       {},
-	predicates.ErrTaintsTolerationsNotMatch: {},
-	predicates.ErrNodeLabelPresenceViolated: {},
-	// Node conditions won't change when scheduler simulates removal of preemption victims.
-	// So, it is pointless to try nodes that have not been able to host the pod due to node
-	// conditions. These include ErrNodeNotReady, ErrNodeUnderPIDPressure, ErrNodeUnderMemoryPressure, ....
-	predicates.ErrNodeNotReady:            {},
-	predicates.ErrNodeNetworkUnavailable:  {},
-	predicates.ErrNodeUnderDiskPressure:   {},
-	predicates.ErrNodeUnderPIDPressure:    {},
-	predicates.ErrNodeUnderMemoryPressure: {},
-	predicates.ErrNodeUnschedulable:       {},
-	predicates.ErrNodeUnknownCondition:    {},
-	predicates.ErrVolumeZoneConflict:      {},
-	predicates.ErrVolumeNodeConflict:      {},
-	predicates.ErrVolumeBindConflict:      {},
-}
-
 // FailedPredicateMap declares a map[string][]algorithm.PredicateFailureReason type.
 type FailedPredicateMap map[string][]predicates.PredicateFailureReason
 
@@ -1204,16 +1183,6 @@ func (g *genericScheduler) selectVictimsOnNode(
 	return victims, numViolatingVictim, true
 }
 
-// unresolvablePredicateExists checks whether failedPredicates has unresolvable predicate.
-func unresolvablePredicateExists(failedPredicates []predicates.PredicateFailureReason) bool {
-	for _, failedPredicate := range failedPredicates {
-		if _, ok := unresolvablePredicateFailureErrors[failedPredicate]; ok {
-			return true
-		}
-	}
-	return false
-}
-
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
 func nodesWherePreemptionMightHelp(nodes []*v1.Node, fitErr *FitError) []*v1.Node {
@@ -1228,7 +1197,7 @@ func nodesWherePreemptionMightHelp(nodes []*v1.Node, fitErr *FitError) []*v1.Nod
 		// to rely less on such assumptions in the code when checking does not impose
 		// significant overhead.
 		// Also, we currently assume all failures returned by extender as resolvable.
-		if !unresolvablePredicateExists(failedPredicates) {
+		if predicates.UnresolvablePredicateExists(failedPredicates) == nil {
 			klog.V(3).Infof("Node %v is a potential node for preemption.", node.Name)
 			potentialNodes = append(potentialNodes, node)
 		}

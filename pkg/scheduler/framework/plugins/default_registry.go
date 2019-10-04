@@ -19,8 +19,9 @@ package plugins
 import (
 	"fmt"
 
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
-	noop "k8s.io/kubernetes/pkg/scheduler/framework/plugins/noop"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
@@ -29,9 +30,7 @@ import (
 // runs custom plugins, can pass a different Registry when initializing the scheduler.
 func NewDefaultRegistry() framework.Registry {
 	return framework.Registry{
-		// This is just a test plugin to showcase the setup, it should be deleted once
-		// we have at least one legitimate plugin here.
-		noop.Name: noop.New,
+		tainttoleration.Name: tainttoleration.New,
 	}
 }
 
@@ -55,10 +54,17 @@ type ConfigProducerRegistry struct {
 
 // NewDefaultConfigProducerRegistry creates a new producer registry.
 func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
-	return &ConfigProducerRegistry{
+	registry := &ConfigProducerRegistry{
 		PredicateToConfigProducer: make(map[string]ConfigProducer),
 		PriorityToConfigProducer:  make(map[string]ConfigProducer),
 	}
+	registry.RegisterPredicate(predicates.PodToleratesNodeTaintsPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, tainttoleration.Name, nil)
+			return
+		})
+
+	return registry
 }
 
 func registerProducer(name string, producer ConfigProducer, producersMap map[string]ConfigProducer) error {
@@ -77,4 +83,16 @@ func (f *ConfigProducerRegistry) RegisterPredicate(name string, producer ConfigP
 // RegisterPriority registers a framework config producer for a priority.
 func (f *ConfigProducerRegistry) RegisterPriority(name string, producer ConfigProducer) error {
 	return registerProducer(name, producer, f.PriorityToConfigProducer)
+}
+
+func appendToPluginSet(set *config.PluginSet, name string, weight *int32) *config.PluginSet {
+	if set == nil {
+		set = &config.PluginSet{}
+	}
+	cfg := config.Plugin{Name: name}
+	if weight != nil {
+		cfg.Weight = *weight
+	}
+	set.Enabled = append(set.Enabled, cfg)
+	return set
 }
