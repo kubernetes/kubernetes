@@ -37,6 +37,8 @@ const (
 	preFilterPluginName               = "prefilter-plugin"
 	preFilterWithExtensionsPluginName = "prefilter-with-extensions-plugin"
 	duplicatePluginName               = "duplicate-plugin"
+	reserveUnreservePluginName        = "reserve-unreserve-plugin"
+	reserveFailedUnreservePluginName  = "reserve-fail-unreserve-plugin"
 )
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
@@ -189,7 +191,43 @@ func newDuplicatePlugin(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
 	return &TestDuplicatePlugin{}, nil
 }
 
-var registry Registry = func() Registry {
+type TestReserveUnreservePlugin struct {
+	unreserveCalled int
+}
+
+func (ru *TestReserveUnreservePlugin) Name() string {
+	return reserveUnreservePluginName
+}
+
+func (ru *TestReserveUnreservePlugin) Reserve(state *CycleState, p *v1.Pod, nodeName string) *Status {
+	return nil
+}
+
+func (ru *TestReserveUnreservePlugin) Unreserve(state *CycleState, p *v1.Pod, nodeName string) {
+	ru.unreserveCalled++
+}
+
+var _ ReservePlugin = &TestReserveUnreservePlugin{}
+
+type TestReserveFailedUnreservePlugin struct {
+	unreserveCalled int
+}
+
+func (ru *TestReserveFailedUnreservePlugin) Name() string {
+	return reserveFailedUnreservePluginName
+}
+
+func (ru *TestReserveFailedUnreservePlugin) Reserve(state *CycleState, p *v1.Pod, nodeName string) *Status {
+	return NewStatus(Error, "Always failed")
+}
+
+func (ru *TestReserveFailedUnreservePlugin) Unreserve(state *CycleState, p *v1.Pod, nodeName string) {
+	ru.unreserveCalled++
+}
+
+var _ UnreservePlugin = &TestReserveUnreservePlugin{}
+
+var registry = func() Registry {
 	r := make(Registry)
 	r.Register(scoreWithNormalizePlugin1, newScoreWithNormalizePlugin1)
 	r.Register(scoreWithNormalizePlugin2, newScoreWithNormalizePlugin2)
@@ -205,7 +243,7 @@ var defaultWeights = map[string]int32{
 	scorePlugin1:              1,
 }
 
-var emptyArgs []config.PluginConfig = make([]config.PluginConfig, 0)
+var emptyArgs = make([]config.PluginConfig, 0)
 var state = &CycleState{}
 
 // Pod is only used for logging errors.
@@ -544,4 +582,44 @@ func injectNormalizeRes(inj injectedResult, scores NodeScoreList) *Status {
 		scores[i].Score = inj.NormalizeRes
 	}
 	return nil
+}
+
+func TestReserveAndUnreservePlugins(t *testing.T) {
+	reserveUnreserve := &TestReserveUnreservePlugin{}
+	reserveFailedUnreserve := &TestReserveFailedUnreservePlugin{}
+	r := make(Registry)
+	r.Register(reserveUnreservePluginName,
+		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+			return reserveUnreserve, nil
+		})
+	r.Register(reserveFailedUnreservePluginName,
+		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+			return reserveFailedUnreserve, nil
+		})
+	plugins := &config.Plugins{
+		Reserve: &config.PluginSet{Enabled: []config.Plugin{
+			{Name: reserveUnreservePluginName},
+			{Name: reserveFailedUnreservePluginName},
+		}},
+		Unreserve: &config.PluginSet{Enabled: []config.Plugin{
+			{Name: reserveUnreservePluginName},
+			{Name: reserveFailedUnreservePluginName}},
+		}}
+	t.Run("TestReserveAndUnreservePlugins", func(t *testing.T) {
+		f, err := NewFramework(r, plugins, emptyArgs)
+		if err != nil {
+			t.Fatalf("Failed to create framework for testing: %v", err)
+		}
+		pod := &v1.Pod{}
+		status := f.RunReservePlugins(nil, pod, "")
+		if status.IsSuccess() {
+			t.Errorf("status must be error")
+		}
+		if reserveUnreserve.unreserveCalled != 1 {
+			t.Errorf("plugin that reserved must unreserve")
+		}
+		if reserveFailedUnreserve.unreserveCalled != 0 {
+			t.Errorf("plugin that failed to reserve must unreserved")
+		}
+	})
 }

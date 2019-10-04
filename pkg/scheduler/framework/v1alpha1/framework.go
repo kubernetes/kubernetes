@@ -56,7 +56,7 @@ type framework struct {
 	preBindPlugins        []PreBindPlugin
 	bindPlugins           []BindPlugin
 	postBindPlugins       []PostBindPlugin
-	unreservePlugins      []UnreservePlugin
+	unreservePlugins      map[string]UnreservePlugin
 	permitPlugins         []PermitPlugin
 
 	clientSet       clientset.Interface
@@ -69,9 +69,9 @@ type framework struct {
 type extensionPoint struct {
 	// the set of plugins to be configured at this extension point.
 	plugins *config.PluginSet
-	// a pointer to the slice storing plugins implementations that will run at this
+	// a pointer to the collection storing plugins implementations that will run at this
 	// extenstion point.
-	slicePtr interface{}
+	collectionPtr interface{}
 }
 
 func (f *framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint {
@@ -167,8 +167,10 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		}
 	}
 
+	f.unreservePlugins = map[string]UnreservePlugin{}
+
 	for _, e := range f.getExtensionPoints(plugins) {
-		if err := updatePluginList(e.slicePtr, e.plugins, pluginsMap); err != nil {
+		if err := updatePluginCollection(e.collectionPtr, e.plugins, pluginsMap); err != nil {
 			return nil, err
 		}
 	}
@@ -188,12 +190,12 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	return f, nil
 }
 
-func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, pluginsMap map[string]Plugin) error {
+func updatePluginCollection(pluginCollection interface{}, pluginSet *config.PluginSet, pluginsMap map[string]Plugin) error {
 	if pluginSet == nil {
 		return nil
 	}
 
-	plugins := reflect.ValueOf(pluginList).Elem()
+	plugins := reflect.ValueOf(pluginCollection).Elem()
 	pluginType := plugins.Type().Elem()
 	set := sets.NewString()
 	for _, ep := range pluginSet.Enabled {
@@ -212,8 +214,13 @@ func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, plugi
 
 		set.Insert(ep.Name)
 
-		newPlugins := reflect.Append(plugins, reflect.ValueOf(pg))
-		plugins.Set(newPlugins)
+		switch plugins.Kind().String() {
+		case "slice":
+			newPlugins := reflect.Append(plugins, reflect.ValueOf(pg))
+			plugins.Set(newPlugins)
+		case "map":
+			plugins.SetMapIndex(reflect.ValueOf(ep.Name), reflect.ValueOf(pg))
+		}
 	}
 	return nil
 }
@@ -462,6 +469,14 @@ func (f *framework) RunPostBindPlugins(
 // returns the error. In such case, pod will not be scheduled.
 func (f *framework) RunReservePlugins(
 	state *CycleState, pod *v1.Pod, nodeName string) *Status {
+	reserved := []string{}
+	defer func() {
+		for _, name := range reserved {
+			if pl, ok := f.unreservePlugins[name]; ok {
+				pl.Unreserve(state, pod, nodeName)
+			}
+		}
+	}()
 	for _, pl := range f.reservePlugins {
 		status := pl.Reserve(state, pod, nodeName)
 		if !status.IsSuccess() {
@@ -469,6 +484,7 @@ func (f *framework) RunReservePlugins(
 			klog.Error(msg)
 			return NewStatus(Error, msg)
 		}
+		reserved = append(reserved, pl.Name())
 	}
 	return nil
 }
@@ -568,17 +584,26 @@ func (f *framework) ListPlugins() map[string][]config.Plugin {
 	m := make(map[string][]config.Plugin)
 
 	for _, e := range f.getExtensionPoints(&config.Plugins{}) {
-		plugins := reflect.ValueOf(e.slicePtr).Elem()
+		plugins := reflect.ValueOf(e.collectionPtr).Elem()
 		extName := plugins.Type().Elem().Name()
 		var cfgs []config.Plugin
-		for i := 0; i < plugins.Len(); i++ {
-			name := plugins.Index(i).Interface().(Plugin).Name()
-			p := config.Plugin{Name: name}
-			if extName == "ScorePlugin" {
-				// Weights apply only to score plugins.
-				p.Weight = int32(f.pluginNameToWeightMap[name])
+		switch plugins.Kind().String() {
+		case "slice":
+			for i := 0; i < plugins.Len(); i++ {
+				name := plugins.Index(i).Interface().(Plugin).Name()
+				p := config.Plugin{Name: name}
+				if extName == "ScorePlugin" {
+					// Weights apply only to score plugins.
+					p.Weight = int32(f.pluginNameToWeightMap[name])
+				}
+				cfgs = append(cfgs, p)
 			}
-			cfgs = append(cfgs, p)
+		case "map":
+			iter := plugins.MapRange()
+			for iter.Next() {
+				name := iter.Value().Interface().(Plugin).Name()
+				cfgs = append(cfgs, config.Plugin{Name: name})
+			}
 		}
 		if len(cfgs) > 0 {
 			m[extName] = cfgs
