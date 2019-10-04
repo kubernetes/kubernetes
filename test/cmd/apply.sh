@@ -144,6 +144,19 @@ __EOF__
   output_message=$(! kubectl get pods a 2>&1 "${kube_flags[@]:?}")
   kube::test::if_has_string "${output_message}" 'pods "a" not found'
 
+  kubectl delete pods a
+  kubectl delete pods b
+
+  # apply a
+  kubectl apply --namespace nsb -l prune-group=true -f hack/testdata/prune/a.yaml "${kube_flags[@]:?}"
+  # apply b with namespace
+  kubectl apply --namespace nsb --prune -l prune-group=true -f hack/testdata/prune/b.yaml "${kube_flags[@]:?}"
+  # check right pod exists
+  kube::test::get_object_assert 'pods b' "{{${id_field:?}}}" 'b'
+  # check wrong pod doesn't exist
+  output_message=$(! kubectl get pods a 2>&1 "${kube_flags[@]:?}")
+  kube::test::if_has_string "${output_message}" 'pods "a" not found'
+
   # cleanup
   kubectl delete pods b
 
