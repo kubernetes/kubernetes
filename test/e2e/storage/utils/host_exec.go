@@ -19,7 +19,7 @@ package utils
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
@@ -51,7 +51,8 @@ func (h *hostExecutor) launchNodeExecPod(node string) *v1.Pod {
 	f := h.Framework
 	cs := f.ClientSet
 	ns := f.Namespace
-	hostExecPod := e2epod.NewExecPodSpec(ns.Name, fmt.Sprintf("hostexec-%s", node), true)
+	hostExecPod := e2epod.NewExecPodSpec(ns.Name, "", true)
+	hostExecPod.GenerateName = fmt.Sprintf("hostexec-%s-", node)
 	hostExecPod.Spec.NodeName = node
 	hostExecPod.Spec.Volumes = []v1.Volume{
 		{
