@@ -857,7 +857,6 @@ func TestGetContainerUsageNanoCores(t *testing.T) {
 			expected: &value1,
 		},
 	}
-
 	for _, test := range tests {
 		provider := &criStatsProvider{cpuUsageCache: test.cpuUsageCache}
 		// Before the update, the cached value should be nil
