@@ -649,7 +649,7 @@ func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(stats *runtimeapi
 		defer p.mutex.Unlock()
 
 		cached, ok := p.cpuUsageCache[id]
-		if !ok || cached.stats.UsageCoreNanoSeconds == nil {
+		if !ok || cached.stats.UsageCoreNanoSeconds == nil || stats.Cpu.UsageCoreNanoSeconds.Value < cached.stats.UsageCoreNanoSeconds.Value {
 			// Cannot compute the usage now, but update the cached stats anyway
 			p.cpuUsageCache[id] = &cpuUsageRecord{stats: stats.Cpu, usageNanoCores: nil}
 			return nil, nil
