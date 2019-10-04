@@ -89,6 +89,12 @@ go_test(
         "authentication_test.go",
         "authorization_test.go",
     ],
+    data = [
+        "testdata/client-expired.pem",
+        "testdata/client-valid.pem",
+        "testdata/intermediate.pem",
+        "testdata/root.pem",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/kubeapiserver/authenticator:go_default_library",
@@ -97,5 +103,6 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
+        "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],
 )

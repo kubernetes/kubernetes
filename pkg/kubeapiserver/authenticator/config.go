@@ -41,7 +41,6 @@ import (
 
 	// Initialize all known client auth plugins.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	certutil "k8s.io/client-go/util/cert"
 	"k8s.io/client-go/util/keyutil"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/serviceaccount"
@@ -49,10 +48,10 @@ import (
 
 // Config contains the data on how to authenticate a request to the Kube API Server
 type Config struct {
-	Anonymous                   bool
-	BasicAuthFile               string
-	BootstrapToken              bool
-	ClientCAFile                string
+	Anonymous      bool
+	BasicAuthFile  string
+	BootstrapToken bool
+
 	TokenAuthFile               string
 	OIDCIssuerURL               string
 	OIDCClientID                string
@@ -78,6 +77,10 @@ type Config struct {
 	// TODO, this is the only non-serializable part of the entire config.  Factor it out into a clientconfig
 	ServiceAccountTokenGetter   serviceaccount.ServiceAccountTokenGetter
 	BootstrapTokenAuthenticator authenticator.Token
+	// ClientVerifyOptionFn are the options for verifying incoming connections using mTLS and directly assigning to users.
+	// Generally this is the CA bundle file used to authenticate client certificates
+	// If this value is nil, then mutual TLS is disabled.
+	ClientVerifyOptionFn x509.VerifyOptionFunc
 }
 
 // New returns an authenticator.Request or an error that supports the standard
@@ -90,8 +93,8 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	// front-proxy, BasicAuth methods, local first, then remote
 	// Add the front proxy authenticator if requested
 	if config.RequestHeaderConfig != nil {
-		requestHeaderAuthenticator, err := headerrequest.NewSecure(
-			config.RequestHeaderConfig.ClientCA,
+		requestHeaderAuthenticator, err := headerrequest.NewDynamicVerifyOptionsSecure(
+			config.RequestHeaderConfig.VerifyOptionFn,
 			config.RequestHeaderConfig.AllowedClientNames,
 			config.RequestHeaderConfig.UsernameHeaders,
 			config.RequestHeaderConfig.GroupHeaders,
@@ -120,11 +123,8 @@ func (config Config) New() (authenticator.Request, *spec.SecurityDefinitions, er
 	}
 
 	// X509 methods
-	if len(config.ClientCAFile) > 0 {
-		certAuth, err := newAuthenticatorFromClientCAFile(config.ClientCAFile)
-		if err != nil {
-			return nil, nil, err
-		}
+	if config.ClientVerifyOptionFn != nil {
+		certAuth := x509.NewDynamic(config.ClientVerifyOptionFn, x509.CommonNameUserConversion)
 		authenticators = append(authenticators, certAuth)
 	}
 
@@ -305,19 +305,6 @@ func newServiceAccountAuthenticator(iss string, keyfiles []string, apiAudiences 
 
 	tokenAuthenticator := serviceaccount.JWTTokenAuthenticator(iss, allPublicKeys, apiAudiences, serviceaccount.NewValidator(serviceAccountGetter))
 	return tokenAuthenticator, nil
-}
-
-// newAuthenticatorFromClientCAFile returns an authenticator.Request or an error
-func newAuthenticatorFromClientCAFile(clientCAFile string) (authenticator.Request, error) {
-	roots, err := certutil.NewPool(clientCAFile)
-	if err != nil {
-		return nil, err
-	}
-
-	opts := x509.DefaultVerifyOptions()
-	opts.Roots = roots
-
-	return x509.New(opts, x509.CommonNameUserConversion), nil
 }
 
 func newWebhookTokenAuthenticator(webhookConfigFile string, ttl time.Duration, implicitAuds authenticator.Audiences) (authenticator.Token, error) {
