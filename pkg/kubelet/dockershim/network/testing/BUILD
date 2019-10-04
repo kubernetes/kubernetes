@@ -35,6 +35,8 @@ go_test(
         "//pkg/kubelet/dockershim/network:go_default_library",
         "//pkg/util/sysctl/testing:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//vendor/github.com/containernetworking/cni/pkg/types:go_default_library",
+        "//vendor/github.com/containernetworking/cni/pkg/types/current:go_default_library",
         "//vendor/github.com/golang/mock/gomock:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
