@@ -37,6 +37,11 @@ const (
 )
 
 const (
+	// LoopbackInterfaceName is the default name of the loopback interface
+	LoopbackInterfaceName = "lo"
+)
+
+const (
 	ipv4RouteFile = "/proc/net/route"
 	ipv6RouteFile = "/proc/net/ipv6_route"
 )
@@ -413,4 +418,22 @@ func ChooseBindAddress(bindAddress net.IP) (net.IP, error) {
 		bindAddress = hostIP
 	}
 	return bindAddress, nil
+}
+
+// ChooseBindAddressForInterface choose a global IP for a specific interface, with priority given to IPv4.
+// This is required in case of network setups where default routes are present, but network
+// interfaces use only link-local addresses (e.g. as described in RFC5549).
+// e.g when using BGP to announce a host IP over link-local ip addresses and this ip address is attached to the lo interface.
+func ChooseBindAddressForInterface(intfName string) (net.IP, error) {
+	var nw networkInterfacer = networkInterface{}
+	for _, family := range []AddressFamily{familyIPv4, familyIPv6} {
+		ip, err := getIPFromInterface(intfName, family, nw)
+		if err != nil {
+			return nil, err
+		}
+		if ip != nil {
+			return ip, nil
+		}
+	}
+	return nil, fmt.Errorf("unable to select an IP from %s network interface", intfName)
 }
