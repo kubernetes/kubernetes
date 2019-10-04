@@ -422,12 +422,12 @@ var (
 
 	// SupportedEtcdVersion lists officially supported etcd versions with corresponding Kubernetes releases
 	SupportedEtcdVersion = map[uint8]string{
-		12: "3.2.24",
 		13: "3.2.24",
 		14: "3.3.10",
 		15: "3.3.10",
 		16: "3.3.15-0",
 		17: "3.3.15-0",
+		18: "3.3.15-0",
 	}
 
 	// KubeadmCertsClusterRoleName sets the name for the ClusterRole that allows
