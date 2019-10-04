@@ -381,3 +381,16 @@ func TestCacheableObject(t *testing.T) {
 
 	runtimetesting.CacheableObjectTest(t, encoder)
 }
+
+func BenchmarkIdentifier(b *testing.B) {
+	encoder := &mockSerializer{}
+	gv := schema.GroupVersion{Group: "group", Version: "version"}
+
+	for i := 0; i < b.N; i++ {
+		id := identifier(gv, encoder)
+		// Avoid optimizing by compiler.
+		if id[0] != '{' {
+			b.Errorf("unexpected identifier: %s", id)
+		}
+	}
+}
