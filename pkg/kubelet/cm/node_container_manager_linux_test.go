@@ -258,6 +258,75 @@ func TestNodeAllocatableForEnforcement(t *testing.T) {
 	}
 }
 
+func TestVerifyReservedResourcesHaveCapacity(t *testing.T) {
+	testCases := []struct {
+		kubeReserved         v1.ResourceList
+		systemReserved       v1.ResourceList
+		capacity             v1.ResourceList
+		invalidConfiguration bool
+		name                 string
+	}{
+		{
+			name:           "supported reserved 2Mi huge pages resources",
+			kubeReserved:   getHugepagesResourceList("2Mi", "2Mi"),
+			systemReserved: getHugepagesResourceList("2Mi", "2Mi"),
+			capacity:       getHugepagesResourceList("2Mi", "1Gi"),
+		},
+		{
+			name:           "supported reserved cpu and memory resources",
+			kubeReserved:   getResourceList("1", "200Mi"),
+			systemReserved: getResourceList("1", "500Mi"),
+			capacity:       getResourceList("24", "76Gi"),
+		},
+		{
+			name:           "no reserved resources",
+			kubeReserved:   v1.ResourceList{},
+			systemReserved: v1.ResourceList{},
+			capacity:       getResourceList("10", "10Gi"),
+		},
+		{
+			name:           "supported 64Ki huge pages resources",
+			kubeReserved:   getHugepagesResourceList("64Ki", "2Mi"),
+			systemReserved: getHugepagesResourceList("64Ki", "2Mi"),
+			capacity:       getHugepagesResourceList("64Ki", "1Gi"),
+		},
+		{
+			name:                 "unsupported reserved 1Gi huge pages resources",
+			kubeReserved:         getHugepagesResourceList("1Gi", "2Gi"),
+			systemReserved:       getHugepagesResourceList("2Mi", "1Mi"),
+			capacity:             getHugepagesResourceList("2Mi", "1Gi"),
+			invalidConfiguration: true,
+		},
+		{
+			name:                 "unsupported reserved 1Gi and 2Mi huge pages resources",
+			kubeReserved:         getHugepagesResourceList("1Gi", "2Gi"),
+			systemReserved:       getHugepagesResourceList("2Mi", "1Mi"),
+			capacity:             getResourceList("6", "32Gi"),
+			invalidConfiguration: true,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			nc := NodeConfig{
+				NodeAllocatableConfig: NodeAllocatableConfig{
+					KubeReserved:   tc.kubeReserved,
+					SystemReserved: tc.systemReserved,
+				},
+			}
+			cm := &containerManagerImpl{
+				NodeConfig: nc,
+				capacity:   tc.capacity,
+			}
+			err := cm.verifyReservedResourcesHaveCapacity()
+			if err == nil && tc.invalidConfiguration {
+				t.Fatalf("Expected invalid reserved resources")
+			} else if err != nil && !tc.invalidConfiguration {
+				t.Fatalf("Expected valid reserved resources configuration: %v", err)
+			}
+		})
+	}
+
+}
 func TestNodeAllocatableInputValidation(t *testing.T) {
 	memoryEvictionThreshold := resource.MustParse("100Mi")
 	highMemoryEvictionThreshold := resource.MustParse("2Gi")
@@ -389,6 +458,65 @@ func TestNodeAllocatableInputValidation(t *testing.T) {
 			t.Fatalf("Expected valid node allocatable configuration: %v", err)
 		}
 	}
+	hugepagesTestCases := []struct {
+		kubeReserved         v1.ResourceList
+		systemReserved       v1.ResourceList
+		capacity             v1.ResourceList
+		invalidConfiguration bool
+	}{
+		{
+			kubeReserved: getHugepagesResourceList("64Ki", "2Gi"),
+			capacity:     getHugepagesResourceList("64Ki", "100Gi"),
+		},
+		{
+			kubeReserved:   getHugepagesResourceList("1Gi", "2Gi"),
+			systemReserved: getHugepagesResourceList("1Gi", "2Gi"),
+			capacity:       getHugepagesResourceList("1Gi", "100Gi"),
+		},
+		{
+			capacity: getHugepagesResourceList("64Ki", "0"),
+		},
+		{
+			kubeReserved:   getHugepagesResourceList("1Gi", "1Gi"),
+			systemReserved: getHugepagesResourceList("1Gi", "1Gi"),
+			capacity:       getHugepagesResourceList("1Gi", "2Gi"),
+		},
+		{
+			kubeReserved:         getHugepagesResourceList("1Gi", "1Gi"),
+			systemReserved:       getHugepagesResourceList("1Gi", "1Gi"),
+			capacity:             getHugepagesResourceList("1Gi", "1Gi"),
+			invalidConfiguration: true,
+		},
+		{
+			kubeReserved:         getHugepagesResourceList("1Gi", "2Gi"),
+			systemReserved:       getHugepagesResourceList("1Gi", "2Gi"),
+			capacity:             getHugepagesResourceList("1Gi", "1Gi"),
+			invalidConfiguration: true,
+		},
+		{
+			kubeReserved:         getHugepagesResourceList("64Ki", "2Gi"),
+			capacity:             getHugepagesResourceList("64Ki", "0"),
+			invalidConfiguration: true,
+		},
+	}
+	for _, tc := range hugepagesTestCases {
+		nc := NodeConfig{
+			NodeAllocatableConfig: NodeAllocatableConfig{
+				KubeReserved:   tc.kubeReserved,
+				SystemReserved: tc.systemReserved,
+			},
+		}
+		cm := &containerManagerImpl{
+			NodeConfig: nc,
+			capacity:   tc.capacity,
+		}
+		err := cm.validateNodeAllocatable()
+		if err == nil && tc.invalidConfiguration {
+			t.Fatalf("Expected invalid node allocatable configuration")
+		} else if err != nil && !tc.invalidConfiguration {
+			t.Fatalf("Expected valid node allocatable configuration: %v", err)
+		}
+	}
 }
 
 // getEphemeralStorageResourceList returns a ResourceList with the
@@ -397,6 +525,14 @@ func getEphemeralStorageResourceList(storage string) v1.ResourceList {
 	res := v1.ResourceList{}
 	if storage != "" {
 		res[v1.ResourceEphemeralStorage] = resource.MustParse(storage)
+	}
+	return res
+}
+
+func getHugepagesResourceList(pageSize, resourceValue string) v1.ResourceList {
+	res := v1.ResourceList{}
+	if pageSize != "" {
+		res[v1.ResourceName(v1.ResourceHugePagesPrefix+pageSize)] = resource.MustParse(resourceValue)
 	}
 	return res
 }

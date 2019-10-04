@@ -229,6 +229,21 @@ func (cm *containerManagerImpl) GetNodeAllocatableReservation() v1.ResourceList 
 	return result
 }
 
+// verifyReservedResourcesHaveCapacity validates reserved resources against the capacity of the resources collected from cAdvisor.
+func (cm *containerManagerImpl) verifyReservedResourcesHaveCapacity() error {
+	for k := range cm.NodeConfig.SystemReserved {
+		if _, ok := cm.capacity[k]; !ok {
+			return fmt.Errorf("cannot reserve %q resource", k)
+		}
+	}
+	for k := range cm.NodeConfig.KubeReserved {
+		if _, ok := cm.capacity[k]; !ok {
+			return fmt.Errorf("cannot reserve %q resource", k)
+		}
+	}
+	return nil
+}
+
 // validateNodeAllocatable ensures that the user specified Node Allocatable Configuration doesn't reserve more than the node capacity.
 // Returns error if the configuration is invalid, nil otherwise.
 func (cm *containerManagerImpl) validateNodeAllocatable() error {

@@ -71,6 +71,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubelet/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/capabilities"
 	"k8s.io/kubernetes/pkg/credentialprovider"
 	"k8s.io/kubernetes/pkg/features"
@@ -1289,17 +1290,21 @@ func parseResourceList(m map[string]string) (v1.ResourceList, error) {
 		switch v1.ResourceName(k) {
 		// CPU, memory, local storage, and PID resources are supported.
 		case v1.ResourceCPU, v1.ResourceMemory, v1.ResourceEphemeralStorage, pidlimit.PIDs:
-			q, err := resource.ParseQuantity(v)
-			if err != nil {
-				return nil, err
-			}
-			if q.Sign() == -1 {
-				return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
-			}
-			rl[v1.ResourceName(k)] = q
 		default:
+			// hugepages are also supported
+			if v1helper.IsHugePageResourceName(v1.ResourceName(k)) {
+				break
+			}
 			return nil, fmt.Errorf("cannot reserve %q resource", k)
 		}
+		q, err := resource.ParseQuantity(v)
+		if err != nil {
+			return nil, err
+		}
+		if q.Sign() == -1 {
+			return nil, fmt.Errorf("resource quantity for %q cannot be negative: %v", k, v)
+		}
+		rl[v1.ResourceName(k)] = q
 	}
 	return rl, nil
 }

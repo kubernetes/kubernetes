@@ -651,6 +651,11 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		}
 	}
 
+	// Ensure that reserved resoures are valid and supported by the node.
+	if err := cm.verifyReservedResourcesHaveCapacity(); err != nil {
+		return err
+	}
+
 	// Ensure that node allocatable configuration is valid.
 	if err := cm.validateNodeAllocatable(); err != nil {
 		return err
