@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "address.go",
+        "conditions.go",
         "taints.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/k8s.io/cloud-provider/node/helpers",
