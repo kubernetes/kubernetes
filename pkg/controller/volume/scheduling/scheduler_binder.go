@@ -348,10 +348,18 @@ func (b *volumeBinder) BindPodVolumes(assumedPod *v1.Pod) (err error) {
 		return err
 	}
 
-	return wait.Poll(time.Second, b.bindTimeout, func() (bool, error) {
+	err = wait.Poll(time.Second, b.bindTimeout, func() (bool, error) {
 		b, err := b.checkBindings(assumedPod, bindings, claimsToProvision)
 		return b, err
 	})
+	if err != nil {
+		pvcName := ""
+		if len(claimsToProvision) > 0 {
+			pvcName = claimsToProvision[0].Name
+		}
+		return fmt.Errorf("Failed to bind volumes: provisioning failed for PVC %q: %v", pvcName, err)
+	}
+	return nil
 }
 
 func getPodName(pod *v1.Pod) string {
