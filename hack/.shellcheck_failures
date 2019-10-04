@@ -1,5 +1,4 @@
 ./build/lib/release.sh
-./cluster/addons/addon-manager/kube-addons.sh
 ./cluster/common.sh
 ./cluster/gce/config-default.sh
 ./cluster/gce/config-test.sh
