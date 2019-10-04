@@ -1181,7 +1181,7 @@ SIG Storage also moves support for Block Volumes to beta (introduced as alpha in
 
 ### SIG UI
 
-The migration to the newest version of Angular is still under active development as it is most important thing on the roadmap at the moment. We are getting closer to to the new release. We continue fixing bugs and adding other improvements.
+The migration to the newest version of Angular is still under active development as it is most important thing on the roadmap at the moment. We are getting closer to the new release. We continue fixing bugs and adding other improvements.
 
 ### SIG VMWare
 
@@ -1639,7 +1639,7 @@ filename | sha512 hash
 * kubeadm: always pass spec.nodeName as --hostname-override for kube-proxy ([#71283](https://github.com/kubernetes/kubernetes/pull/71283), [@Klaven](https://github.com/Klaven))
 * kubeadm join correctly uses --node-name and --cri-socket when --config option is also used ([#71270](https://github.com/kubernetes/kubernetes/pull/71270), [@bart0sh](https://github.com/bart0sh))
 * apiserver can be configured to reject requests that cannot be audit-logged. ([#65763](https://github.com/kubernetes/kubernetes/pull/65763), [@x13n](https://github.com/x13n))
-* Kubelet Device Plugin Registration directory changed from from `{kubelet_root_dir}/plugins/` to `{kubelet_root_dir}/plugins_registry/`. Any drivers (CSI or device plugin) that were using the old path must be updated to work with this version. ([#70494](https://github.com/kubernetes/kubernetes/pull/70494), [@RenaudWasTaken](https://github.com/RenaudWasTaken))
+* Kubelet Device Plugin Registration directory changed from `{kubelet_root_dir}/plugins/` to `{kubelet_root_dir}/plugins_registry/`. Any drivers (CSI or device plugin) that were using the old path must be updated to work with this version. ([#70494](https://github.com/kubernetes/kubernetes/pull/70494), [@RenaudWasTaken](https://github.com/RenaudWasTaken))
 * When the BoundServiceAccountTokenVolumes Alpha feature is enabled, ServiceAccount volumes now use a projected volume source and their names have the prefix "kube-api-access". ([#69848](https://github.com/kubernetes/kubernetes/pull/69848), [@mikedanese](https://github.com/mikedanese))
 
 

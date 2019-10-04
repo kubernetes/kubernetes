@@ -179,7 +179,7 @@ func TestGetNextDiskLun(t *testing.T) {
 			expectedErr:     false,
 		},
 		{
-			desc:            "LUN -1 and and error shall be returned if there's no available LUN",
+			desc:            "LUN -1 and  error shall be returned if there's no available LUN",
 			isDataDisksFull: true,
 			expectedLun:     -1,
 			expectedErr:     true,
