@@ -21,7 +21,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	api "k8s.io/kubernetes/pkg/apis/core"
 
@@ -63,17 +63,17 @@ func TestHugepageHandlerAdd(t *testing.T) {
 	testCases := []struct {
 		description string
 		updateErr   error
-		expErr      error
+		wantErr     bool
 	}{
 		{
 			description: "hugepage handler add - no error",
 			updateErr:   nil,
-			expErr:      nil,
+			wantErr:     false,
 		},
 		{
 			description: "hugepage handler add - container update error",
 			updateErr:   fmt.Errorf("fake update error"),
-			expErr:      fmt.Errorf("fake update error"),
+			wantErr:     true,
 		},
 	}
 
@@ -87,9 +87,14 @@ func TestHugepageHandlerAdd(t *testing.T) {
 		pod := makePod("1Gi", "1Gi")
 		container := &pod.Spec.Containers[0]
 		err := hdr.AddContainer(pod, container, "fakeID")
-		if !reflect.DeepEqual(err, testCase.expErr) {
-			t.Errorf("Hugepage Handler AddContainer() error (%v). expected error: %v but got: %v",
-				testCase.description, testCase.expErr, err)
+		if err != nil {
+			if testCase.wantErr {
+				t.Logf("AddContainer() expected error = %v", err)
+			} else {
+				t.Errorf("Hugepage Handler AddContainer() error (%v). wantErr: %v but got: %v",
+					testCase.description, testCase.wantErr, err)
+			}
+			return
 		}
 	}
 }

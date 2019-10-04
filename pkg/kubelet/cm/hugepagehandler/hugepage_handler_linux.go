@@ -17,13 +17,11 @@ limitations under the License.
 package hugepagehandler
 
 import (
-	"strings"
+	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
-	api "k8s.io/kubernetes/pkg/apis/core"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
 	units "github.com/docker/go-units"
@@ -67,22 +65,18 @@ func (m *handler) Start(containerRuntime runtimeService) {
 }
 
 func (m *handler) AddContainer(p *v1.Pod, c *v1.Container, containerID string) error {
-
 	hugepageLimits := []*runtimeapi.HugepageLimit{}
 	pageSizes := sets.NewString()
 
 	for resourceObj, amountObj := range c.Resources.Limits {
-		//Check if resourceStr is "hugepages-<pageSize>", api.ResourceHugePagesPrefix = "hugepages-"
-		if !v1helper.IsHugePageResourceName(resourceObj) {
-			continue
-		} else {
-			hugepageSizeStr := strings.TrimPrefix(resourceStr, api.ResourceHugePagesPrefix)
-			hugepageSize, err := resource.ParseQuantity(hugepageSizeStr)
+		// Check if resourceObj is "hugepages-<pageSize>". api.ResourceHugePagesPrefix = "hugepages-"
+		if v1helper.IsHugePageResourceName(resourceObj) {
+			pageSize, err := v1helper.HugePageSizeFromResourceName(resourceObj)
 			if err != nil {
 				klog.Infof("[hugepagehandler] Fail to parse hugepage size")
 				continue
 			}
-			sizeString := units.CustomSize("%g%s", float64(hugepageSize.Value()), 1024.0, libcontainercgroups.HugePageSizeUnitList)
+			sizeString := units.CustomSize("%g%s", float64(pageSize.Value()), 1024.0, libcontainercgroups.HugePageSizeUnitList)
 			hugepageLimits = append(hugepageLimits, &runtimeapi.HugepageLimit{
 				PageSize: sizeString,
 				Limit:    uint64(amountObj.Value()),
@@ -91,7 +85,7 @@ func (m *handler) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 		}
 	}
 
-	// for each page size omitted, limit to 0
+	// For each page size omitted, limit to 0
 	for _, pageSize := range cgroupfs.HugePageSizes {
 		if pageSizes.Has(pageSize) {
 			continue
@@ -103,12 +97,10 @@ func (m *handler) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 	}
 
 	if err := m.updateContainerHugepageLimit(containerID, hugepageLimits); err != nil {
-	    return fmt.Errorf("[hugepagehandler] AddContainer error: %v", err)
+		return fmt.Errorf("[hugepagehandler] AddContainer error: %v", err)
 	}
-	if err != nil {
-		klog.Errorf("[hugepagehandler] AddContainer error: %v", err)
-	}
-	return err
+
+	return nil
 }
 
 func (m *handler) updateContainerHugepageLimit(containerID string, hugepageLimit []*runtimeapi.HugepageLimit) error {
