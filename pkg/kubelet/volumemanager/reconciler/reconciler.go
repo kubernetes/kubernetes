@@ -24,6 +24,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -518,7 +519,8 @@ func (rc *reconciler) reconstructVolume(volume podVolume) (*reconstructedVolume,
 				pod.UID,
 				newMapperErr)
 		}
-		checkPath, _ = volumeMapper.GetPodDeviceMapPath()
+		mapDir, linkName := volumeMapper.GetPodDeviceMapPath()
+		checkPath = filepath.Join(mapDir, linkName)
 	} else {
 		var err error
 		volumeMounter, err = plugin.NewMounter(
