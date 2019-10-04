@@ -167,7 +167,7 @@ func ModifyConfig(configAccess ConfigAccess, newConfig clientcmdapi.Config, rela
 		if err := lockFile(filename); err != nil {
 			lockErrors[filename] = err
 		} else {
-		  defer unlockFile(filename)
+			defer unlockFile(filename)
 		}
 	}
 
