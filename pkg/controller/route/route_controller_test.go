@@ -30,8 +30,7 @@ import (
 	core "k8s.io/client-go/testing"
 	cloudprovider "k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
-	"k8s.io/kubernetes/pkg/controller"
-	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
+	cloudnodeutil "k8s.io/cloud-provider/node/helpers"
 )
 
 func alwaysReady() bool { return true }
@@ -66,7 +65,7 @@ func TestIsResponsibleForRoute(t *testing.T) {
 			t.Errorf("%d. Error in test case: unparsable cidr %q", i, testCase.clusterCIDR)
 		}
 		client := fake.NewSimpleClientset()
-		informerFactory := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
+		informerFactory := informers.NewSharedInformerFactory(client, 0)
 		rc := New(nil, nil, informerFactory.Core().V1().Nodes(), myClusterName, []*net.IPNet{cidr})
 		rc.nodeListerSynced = alwaysReady
 		route := &cloudprovider.Route{
@@ -367,7 +366,7 @@ func TestReconcile(t *testing.T) {
 			cidrs = append(cidrs, cidrv6)
 		}
 
-		informerFactory := informers.NewSharedInformerFactory(testCase.clientset, controller.NoResyncPeriodFunc())
+		informerFactory := informers.NewSharedInformerFactory(testCase.clientset, 0)
 		rc := New(routes, testCase.clientset, informerFactory.Core().V1().Nodes(), cluster, cidrs)
 		rc.nodeListerSynced = alwaysReady
 		if err := rc.reconcile(testCase.nodes, testCase.initialRoutes); err != nil {
@@ -376,7 +375,7 @@ func TestReconcile(t *testing.T) {
 		for _, action := range testCase.clientset.Actions() {
 			if action.GetVerb() == "update" && action.GetResource().Resource == "nodes" {
 				node := action.(core.UpdateAction).GetObject().(*v1.Node)
-				_, condition := nodeutil.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
+				_, condition := cloudnodeutil.GetNodeCondition(&node.Status, v1.NodeNetworkUnavailable)
 				if condition == nil {
 					t.Errorf("%d. Missing NodeNetworkUnavailable condition for Node %v", i, node.Name)
 				} else {
