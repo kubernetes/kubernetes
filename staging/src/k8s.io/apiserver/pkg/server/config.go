@@ -159,7 +159,7 @@ type Config struct {
 	// patch may cause.
 	// This affects all places that applies json patch in the binary.
 	JSONPatchMaxCopyBytes int64
-	// The limit on the request body size that would be accepted and decoded in a write request.
+	// The limit on the request size that would be accepted and decoded in a write request
 	// 0 means no limit.
 	MaxRequestBodyBytes int64
 	// MaxRequestsInFlight is the maximum number of parallel non-long-running requests. Every further
@@ -266,22 +266,20 @@ func NewConfig(codecs serializer.CodecFactory) *Config {
 		MaxMutatingRequestsInFlight: 200,
 		RequestTimeout:              time.Duration(60) * time.Second,
 		MinRequestTimeout:           1800,
-		// 10MB is the recommended maximum client request size in bytes
+		// 1.5MB is the recommended client request size in byte
 		// the etcd server should accept. See
-		// https://github.com/etcd-io/etcd/blob/release-3.3/etcdserver/server.go#L90.
+		// https://github.com/etcd-io/etcd/blob/release-3.4/embed/config.go#L56.
 		// A request body might be encoded in json, and is converted to
-		// proto when persisted in etcd. Assuming the upper bound of
-		// the size ratio is 10:1, we set 100MB as the largest size
+		// proto when persisted in etcd, so we allow 2x as the largest size
 		// increase the "copy" operations in a json patch may cause.
-		JSONPatchMaxCopyBytes: int64(100 * 1024 * 1024),
-		// 10MB is the recommended maximum client request size in bytes
+		JSONPatchMaxCopyBytes: int64(3 * 1024 * 1024),
+		// 1.5MB is the recommended client request size in byte
 		// the etcd server should accept. See
-		// https://github.com/etcd-io/etcd/blob/release-3.3/etcdserver/server.go#L90.
+		// https://github.com/etcd-io/etcd/blob/release-3.4/embed/config.go#L56.
 		// A request body might be encoded in json, and is converted to
-		// proto when persisted in etcd. Assuming the upper bound of
-		// the size ratio is 10:1, we set 100MB as the largest request
+		// proto when persisted in etcd, so we allow 2x as the largest request
 		// body size to be accepted and decoded in a write request.
-		MaxRequestBodyBytes:          int64(100 * 1024 * 1024),
+		MaxRequestBodyBytes:          int64(3 * 1024 * 1024),
 		EnableAPIResponseCompression: utilfeature.DefaultFeatureGate.Enabled(features.APIResponseCompression),
 
 		// Default to treating watch as a long-running operation

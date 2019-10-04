@@ -101,6 +101,10 @@ type crdHandler struct {
 
 	// so that we can do create on update.
 	authorizer authorizer.Authorizer
+
+	// The limit on the request size that would be accepted and decoded in a write request
+	// 0 means no limit.
+	maxRequestBodyBytes int64
 }
 
 // crdInfo stores enough information to serve the storage for the custom resource
@@ -140,7 +144,8 @@ func NewCustomResourceDefinitionHandler(
 	serviceResolver webhook.ServiceResolver,
 	authResolverWrapper webhook.AuthenticationInfoResolverWrapper,
 	masterCount int,
-	authorizer authorizer.Authorizer) (*crdHandler, error) {
+	authorizer authorizer.Authorizer,
+	maxRequestBodyBytes int64) (*crdHandler, error) {
 	ret := &crdHandler{
 		versionDiscoveryHandler: versionDiscoveryHandler,
 		groupDiscoveryHandler:   groupDiscoveryHandler,
@@ -152,6 +157,7 @@ func NewCustomResourceDefinitionHandler(
 		establishingController:  establishingController,
 		masterCount:             masterCount,
 		authorizer:              authorizer,
+		maxRequestBodyBytes:     maxRequestBodyBytes,
 	}
 	crdInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: ret.updateCustomResourceDefinition,
@@ -593,6 +599,8 @@ func (r *crdHandler) getOrCreateServingInfoFor(crd *apiextensions.CustomResource
 			TableConvertor: storages[v.Name].CustomResource,
 
 			Authorizer: r.authorizer,
+
+			MaxRequestBodyBytes: r.maxRequestBodyBytes,
 		}
 		if utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
 			reqScope := requestScopes[v.Name]
