@@ -31,6 +31,7 @@ import (
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
+	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 )
 
 const (
@@ -71,13 +72,23 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		tlsConfig.Certificates = append(tlsConfig.Certificates, *c)
 	}
 
-	// TODO this will become dynamic.
 	if s.ClientCA != nil {
 		// Populate PeerCertificates in requests, but don't reject connections without certificates
 		// This allows certificates to be validated by authenticators, while still allowing other auth types
 		tlsConfig.ClientAuth = tls.RequestClientCert
-		// Specify allowed CAs for client certificates
-		tlsConfig.ClientCAs = s.ClientCA
+
+		dynamicCertificateController := dynamiccertificates.NewDynamicServingCertificateController(
+			*tlsConfig,
+			s.ClientCA,
+			nil, // TODO see how to plumb an event recorder down in here. For now this results in simply klog messages.
+		)
+		// runonce to be sure that we have a value.
+		if err := dynamicCertificateController.RunOnce(); err != nil {
+			return nil, err
+		}
+		go dynamicCertificateController.Run(1, stopCh)
+
+		tlsConfig.GetConfigForClient = dynamicCertificateController.GetConfigForClient
 	}
 
 	return tlsConfig, nil

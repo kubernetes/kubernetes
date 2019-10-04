@@ -98,6 +98,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/endpoints/request:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/generic:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/registry/rest:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/server/dynamiccertificates:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/egressselector:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/filters:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:go_default_library",
@@ -107,7 +108,6 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/util/openapi:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
-        "//staging/src/k8s.io/client-go/util/cert:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
         "//vendor/github.com/coreos/go-systemd/daemon:go_default_library",
         "//vendor/github.com/emicklei/go-restful:go_default_library",
@@ -135,6 +135,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/server/dynamiccertificates:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/egressselector:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/filters:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/server/healthz:all-srcs",
