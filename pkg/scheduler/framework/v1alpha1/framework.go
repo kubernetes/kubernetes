@@ -103,47 +103,47 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		}
 	}
 
-	if err := updatePluginList(reflect.ValueOf(&f.preFilterPlugins), plugins.PreFilter, reflect.TypeOf((*PreFilterPlugin)(nil)), pluginsMap); err != nil {
+	if err := updatePluginList(&f.preFilterPlugins, plugins.PreFilter, pluginsMap); err != nil {
 		return nil, err
 	}
 
-	if err := updatePluginList(reflect.ValueOf(&f.filterPlugins), plugins.Filter, reflect.TypeOf((*FilterPlugin)(nil)), pluginsMap); err != nil {
+	if err := updatePluginList(&f.filterPlugins, plugins.Filter, pluginsMap); err != nil {
 		return nil, err
 	}
 
-	if err := updatePluginList(reflect.ValueOf(&f.reservePlugins), plugins.Reserve, reflect.TypeOf((*ReservePlugin)(nil)), pluginsMap); err != nil {
+	if err := updatePluginList(&f.reservePlugins, plugins.Reserve, pluginsMap); err != nil {
 		return nil, err
 	}
 
-	if err := updatePluginList(reflect.ValueOf(&f.postFilterPlugins), plugins.PostFilter, reflect.TypeOf((*PostFilterPlugin)(nil)), pluginsMap); err != nil {
+	if err := updatePluginList(&f.postFilterPlugins, plugins.PostFilter, pluginsMap); err != nil {
 		return nil, err
 	}
 
-	if err := updatePluginList(reflect.ValueOf(&f.scorePlugins), plugins.Score, reflect.TypeOf((*ScorePlugin)(nil)), pluginsMap); err != nil {
+	if err := updatePluginList(&f.scorePlugins, plugins.Score, pluginsMap); err != nil {
 		return nil, err
 	}
 
-	if err := updatePluginList(reflect.ValueOf(&f.preBindPlugins), plugins.PreBind, reflect.TypeOf((*PreBindPlugin)(nil)), pluginsMap); err != nil {
+	if err := updatePluginList(&f.preBindPlugins, plugins.PreBind, pluginsMap); err != nil {
 		return nil, err
 	}
 
-	if err := updatePluginList(reflect.ValueOf(&f.bindPlugins), plugins.Bind, reflect.TypeOf((*BindPlugin)(nil)), pluginsMap); err != nil {
+	if err := updatePluginList(&f.bindPlugins, plugins.Bind, pluginsMap); err != nil {
 		return nil, err
 	}
 
-	if err := updatePluginList(reflect.ValueOf(&f.postBindPlugins), plugins.PostBind, reflect.TypeOf((*PostBindPlugin)(nil)), pluginsMap); err != nil {
+	if err := updatePluginList(&f.postBindPlugins, plugins.PostBind, pluginsMap); err != nil {
 		return nil, err
 	}
 
-	if err := updatePluginList(reflect.ValueOf(&f.unreservePlugins), plugins.Unreserve, reflect.TypeOf((*UnreservePlugin)(nil)), pluginsMap); err != nil {
+	if err := updatePluginList(&f.unreservePlugins, plugins.Unreserve, pluginsMap); err != nil {
 		return nil, err
 	}
 
-	if err := updatePluginList(reflect.ValueOf(&f.permitPlugins), plugins.Permit, reflect.TypeOf((*PermitPlugin)(nil)), pluginsMap); err != nil {
+	if err := updatePluginList(&f.permitPlugins, plugins.Permit, pluginsMap); err != nil {
 		return nil, err
 	}
 
-	if err := updatePluginList(reflect.ValueOf(&f.queueSortPlugins), plugins.QueueSort, reflect.TypeOf((*QueueSortPlugin)(nil)), pluginsMap); err != nil {
+	if err := updatePluginList(&f.queueSortPlugins, plugins.QueueSort, pluginsMap); err != nil {
 		return nil, err
 	}
 
@@ -160,13 +160,13 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	return f, nil
 }
 
-func updatePluginList(pluginList reflect.Value, pluginSet *config.PluginSet, pluginType reflect.Type, pluginsMap map[string]Plugin) error {
+func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, pluginsMap map[string]Plugin) error {
 	if pluginSet == nil {
 		return nil
 	}
 
-	plugins := pluginList.Elem()
-	pluginType = pluginType.Elem()
+	plugins := reflect.ValueOf(pluginList).Elem()
+	pluginType := plugins.Type().Elem()
 	set := sets.NewString()
 	for _, ep := range pluginSet.Enabled {
 		pg, ok := pluginsMap[ep.Name]
