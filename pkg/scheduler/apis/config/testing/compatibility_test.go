@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package compatibility
+package testing
 
 import (
 	"testing"
@@ -34,9 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 )
 
@@ -46,8 +44,8 @@ type testCase struct {
 	featureGates     map[featuregate.Feature]bool
 	wantPredicates   sets.String
 	wantPrioritizers sets.String
-	wantPlugins      map[string][]kubeschedulerconfig.Plugin
-	wantExtenders    []schedulerapi.ExtenderConfig
+	wantPlugins      map[string][]config.Plugin
+	wantExtenders    []config.Extender
 }
 
 func TestCompatibility_v1_Scheduler(t *testing.T) {
@@ -66,7 +64,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  "priorities": [
                   ]
 		}`,
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeResourcesFit"},
@@ -107,7 +105,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAntiAffinity",
 				"TestLabelPreference",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeAffinity"},
@@ -155,7 +153,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAntiAffinity",
 				"TestLabelPreference",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -211,7 +209,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAntiAffinity",
 				"TestLabelPreference",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -275,7 +273,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -343,7 +341,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -422,7 +420,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -448,14 +446,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
-			wantExtenders: []schedulerapi.ExtenderConfig{{
+			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
 				PrioritizeVerb:   "prioritize",
 				Weight:           1,
 				BindVerb:         "bind", // 1.7 was missing json tags on the BindVerb field and required "BindVerb"
 				EnableHTTPS:      true,
-				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
 				HTTPTimeout:      1,
 				NodeCacheCapable: true,
 			}},
@@ -512,7 +510,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -538,14 +536,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
-			wantExtenders: []schedulerapi.ExtenderConfig{{
+			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
 				PrioritizeVerb:   "prioritize",
 				Weight:           1,
 				BindVerb:         "bind", // 1.8 became case-insensitive and tolerated "bindVerb"
 				EnableHTTPS:      true,
-				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
 				HTTPTimeout:      1,
 				NodeCacheCapable: true,
 			}},
@@ -603,7 +601,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -630,14 +628,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
-			wantExtenders: []schedulerapi.ExtenderConfig{{
+			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
 				PrioritizeVerb:   "prioritize",
 				Weight:           1,
 				BindVerb:         "bind", // 1.9 was case-insensitive and tolerated "bindVerb"
 				EnableHTTPS:      true,
-				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
 				HTTPTimeout:      1,
 				NodeCacheCapable: true,
 			}},
@@ -698,7 +696,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -725,17 +723,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
-			wantExtenders: []schedulerapi.ExtenderConfig{{
+			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
 				PrioritizeVerb:   "prioritize",
 				Weight:           1,
 				BindVerb:         "bind", // 1.10 was case-insensitive and tolerated "bindVerb"
 				EnableHTTPS:      true,
-				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
 				HTTPTimeout:      1,
 				NodeCacheCapable: true,
-				ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+				ManagedResources: []config.ExtenderManagedResource{{Name: "example.com/foo", IgnoredByScheduler: true}},
 				Ignorable:        true,
 			}},
 		},
@@ -805,7 +803,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -833,17 +831,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
-			wantExtenders: []schedulerapi.ExtenderConfig{{
+			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
 				PrioritizeVerb:   "prioritize",
 				Weight:           1,
 				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
 				EnableHTTPS:      true,
-				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
 				HTTPTimeout:      1,
 				NodeCacheCapable: true,
-				ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+				ManagedResources: []config.ExtenderManagedResource{{Name: "example.com/foo", IgnoredByScheduler: true}},
 				Ignorable:        true,
 			}},
 		},
@@ -914,7 +912,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -943,17 +941,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
-			wantExtenders: []schedulerapi.ExtenderConfig{{
+			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
 				PrioritizeVerb:   "prioritize",
 				Weight:           1,
 				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
 				EnableHTTPS:      true,
-				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
 				HTTPTimeout:      1,
 				NodeCacheCapable: true,
-				ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+				ManagedResources: []config.ExtenderManagedResource{{Name: "example.com/foo", IgnoredByScheduler: true}},
 				Ignorable:        true,
 			}},
 		},
@@ -1023,7 +1021,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -1053,17 +1051,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
-			wantExtenders: []schedulerapi.ExtenderConfig{{
+			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
 				PrioritizeVerb:   "prioritize",
 				Weight:           1,
 				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
 				EnableHTTPS:      true,
-				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
 				HTTPTimeout:      1,
 				NodeCacheCapable: true,
-				ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+				ManagedResources: []config.ExtenderManagedResource{{Name: "example.com/foo", IgnoredByScheduler: true}},
 				Ignorable:        true,
 			}},
 		},
@@ -1137,7 +1135,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
@@ -1167,17 +1165,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
-			wantExtenders: []schedulerapi.ExtenderConfig{{
+			wantExtenders: []config.Extender{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
 				PrioritizeVerb:   "prioritize",
 				Weight:           1,
 				BindVerb:         "bind", // 1.11 restored case-sensitivity, but allowed either "BindVerb" or "bindVerb"
 				EnableHTTPS:      true,
-				TLSConfig:        &schedulerapi.ExtenderTLSConfig{Insecure: true},
+				TLSConfig:        &config.ExtenderTLSConfig{Insecure: true},
 				HTTPTimeout:      1,
 				NodeCacheCapable: true,
-				ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
+				ManagedResources: []config.ExtenderManagedResource{{Name: "example.com/foo", IgnoredByScheduler: true}},
 				Ignorable:        true,
 			}},
 		},
@@ -1196,7 +1194,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			featureGates: map[featuregate.Feature]bool{
 				features.EvenPodsSpread: true,
 			},
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
@@ -1222,7 +1220,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			featureGates: map[featuregate.Feature]bool{
 				features.AttachVolumeLimit: false,
 			},
-			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
@@ -1279,12 +1277,12 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			}
 			policyConfigMap := v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "scheduler-custom-policy-config"},
-				Data:       map[string]string{schedulerconfig.SchedulerPolicyConfigMapKey: tc.JSON},
+				Data:       map[string]string{config.SchedulerPolicyConfigMapKey: tc.JSON},
 			}
 			client := fake.NewSimpleClientset(&policyConfigMap)
-			algorithmSrc := schedulerconfig.SchedulerAlgorithmSource{
-				Policy: &schedulerconfig.SchedulerPolicySource{
-					ConfigMap: &kubeschedulerconfig.SchedulerPolicyConfigMapSource{
+			algorithmSrc := config.SchedulerAlgorithmSource{
+				Policy: &config.SchedulerPolicySource{
+					ConfigMap: &config.SchedulerPolicyConfigMapSource{
 						Namespace: policyConfigMap.Namespace,
 						Name:      policyConfigMap.Name,
 					},
@@ -1365,7 +1363,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	}
 }
 
-func pluginsToStringSet(plugins []kubeschedulerconfig.Plugin) sets.String {
+func pluginsToStringSet(plugins []config.Plugin) sets.String {
 	s := sets.NewString()
 	for _, p := range plugins {
 		s.Insert(p.Name)

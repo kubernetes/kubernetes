@@ -48,9 +48,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/api/validation"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -107,8 +106,8 @@ type Config struct {
 	SchedulingQueue internalqueue.SchedulingQueue
 
 	// The final configuration of the framework.
-	Plugins      config.Plugins
-	PluginConfig []config.PluginConfig
+	Plugins      schedulerapi.Plugins
+	PluginConfig []schedulerapi.PluginConfig
 }
 
 // Configurator defines I/O, caching, and other functionality needed to
@@ -173,8 +172,8 @@ type Configurator struct {
 
 	// framework configuration arguments.
 	registry                     framework.Registry
-	plugins                      *config.Plugins
-	pluginConfig                 []config.PluginConfig
+	plugins                      *schedulerapi.Plugins
+	pluginConfig                 []schedulerapi.PluginConfig
 	pluginConfigProducerRegistry *plugins.ConfigProducerRegistry
 	nodeInfoSnapshot             *nodeinfosnapshot.Snapshot
 
@@ -207,8 +206,8 @@ type ConfigFactoryArgs struct {
 	PodMaxBackoffSeconds           int64
 	StopCh                         <-chan struct{}
 	Registry                       framework.Registry
-	Plugins                        *config.Plugins
-	PluginConfig                   []config.PluginConfig
+	Plugins                        *schedulerapi.Plugins
+	PluginConfig                   []schedulerapi.PluginConfig
 	PluginConfigProducerRegistry   *plugins.ConfigProducerRegistry
 }
 
@@ -346,12 +345,12 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, er
 	}
 
 	var extenders []algorithm.SchedulerExtender
-	if len(policy.ExtenderConfigs) != 0 {
+	if len(policy.Extenders) != 0 {
 		ignoredExtendedResources := sets.NewString()
 		var ignorableExtenders []algorithm.SchedulerExtender
-		for ii := range policy.ExtenderConfigs {
-			klog.V(2).Infof("Creating extender with config %+v", policy.ExtenderConfigs[ii])
-			extender, err := core.NewHTTPExtender(&policy.ExtenderConfigs[ii])
+		for ii := range policy.Extenders {
+			klog.V(2).Infof("Creating extender with config %+v", policy.Extenders[ii])
+			extender, err := core.NewHTTPExtender(&policy.Extenders[ii])
 			if err != nil {
 				return nil, err
 			}
@@ -360,7 +359,7 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, er
 			} else {
 				ignorableExtenders = append(ignorableExtenders, extender)
 			}
-			for _, r := range policy.ExtenderConfigs[ii].ManagedResources {
+			for _, r := range policy.Extenders[ii].ManagedResources {
 				if r.IgnoredByScheduler {
 					ignoredExtendedResources.Insert(string(r.Name))
 				}
@@ -414,11 +413,11 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 
 	// Combine all framework configurations. If this results in any duplication, framework
 	// instantiation should fail.
-	var plugins config.Plugins
+	var plugins schedulerapi.Plugins
 	plugins.Append(pluginsForPredicates)
 	plugins.Append(pluginsForPriorities)
 	plugins.Append(c.plugins)
-	var pluginConfig []config.PluginConfig
+	var pluginConfig []schedulerapi.PluginConfig
 	pluginConfig = append(pluginConfig, pluginConfigForPredicates...)
 	pluginConfig = append(pluginConfig, pluginConfigForPriorities...)
 	pluginConfig = append(pluginConfig, c.pluginConfig...)
@@ -505,7 +504,7 @@ func getBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerEx
 // getPriorityConfigs returns priorities configuration: ones that will run as priorities and ones that will run
 // as framework plugins. Specifically, a priority will run as a framework plugin if a plugin config producer was
 // registered for that priority.
-func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, *config.Plugins, []config.PluginConfig, error) {
+func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, *schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
 	allPriorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, *c.factoryArgs)
 	if err != nil {
 		return nil, nil, nil, err
@@ -516,8 +515,8 @@ func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]prioritie
 	}
 
 	var priorityConfigs []priorities.PriorityConfig
-	var plugins config.Plugins
-	var pluginConfig []config.PluginConfig
+	var plugins schedulerapi.Plugins
+	var pluginConfig []schedulerapi.PluginConfig
 	frameworkConfigProducers := c.pluginConfigProducerRegistry.PriorityToConfigProducer
 	for _, p := range allPriorityConfigs {
 		if producer, exist := frameworkConfigProducers[p.Name]; exist {
@@ -544,7 +543,7 @@ func (c *Configurator) GetPredicateMetadataProducer() (predicates.PredicateMetad
 // registered for that predicate.
 // Note that the framework executes plugins according to their order in the Plugins list, and so predicates run as plugins
 // are added to the Plugins list according to the order specified in predicates.Ordering().
-func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[string]predicates.FitPredicate, *config.Plugins, []config.PluginConfig, error) {
+func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[string]predicates.FitPredicate, *schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
 	allFitPredicates, err := getFitPredicateFunctions(predicateKeys, *c.factoryArgs)
 	if err != nil {
 		return nil, nil, nil, err
@@ -570,8 +569,8 @@ func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[strin
 
 	// Second, create the framework plugin configurations, and place them in the order
 	// that the corresponding predicates were supposed to run.
-	var plugins config.Plugins
-	var pluginConfig []config.PluginConfig
+	var plugins schedulerapi.Plugins
+	var pluginConfig []schedulerapi.PluginConfig
 
 	for _, predicateKey := range predicates.Ordering() {
 		if asPlugins.Has(predicateKey) {

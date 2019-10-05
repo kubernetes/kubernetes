@@ -23,6 +23,7 @@ import (
 	"strings"
 	"sync"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
@@ -31,7 +32,7 @@ import (
 	v1beta1storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/requestedtocapacityratio"
@@ -436,15 +437,15 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, args *pl
 }
 
 func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *schedulerapi.RequestedToCapacityRatioArguments) (priorities.FunctionShape, priorities.ResourceToWeightMap) {
-	n := len(arguments.UtilizationShape)
+	n := len(arguments.Shape)
 	points := make([]priorities.FunctionShapePoint, 0, n)
-	for _, point := range arguments.UtilizationShape {
+	for _, point := range arguments.Shape {
 		points = append(points, priorities.FunctionShapePoint{
 			Utilization: int64(point.Utilization),
-			// CustomPriorityMaxScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
+			// MaxCustomPriorityScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
 			// therefore we need to scale the score returned by requested to capacity ratio to the score range
 			// used by the scheduler.
-			Score: int64(point.Score) * (framework.MaxNodeScore / schedulerapi.CustomPriorityMaxScore),
+			Score: int64(point.Score) * (framework.MaxNodeScore / schedulerapi.MaxCustomPriorityScore),
 		})
 	}
 	shape, err := priorities.NewFunctionShape(points)
@@ -457,9 +458,9 @@ func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *s
 		return shape, resourceToWeightMap
 	}
 	for _, resource := range arguments.Resources {
-		resourceToWeightMap[resource.Name] = int64(resource.Weight)
+		resourceToWeightMap[v1.ResourceName(resource.Name)] = resource.Weight
 		if resource.Weight == 0 {
-			resourceToWeightMap[resource.Name] = 1
+			resourceToWeightMap[v1.ResourceName(resource.Name)] = 1
 		}
 	}
 	return shape, resourceToWeightMap

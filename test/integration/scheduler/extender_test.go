@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
@@ -315,7 +315,7 @@ func TestSchedulerExtender(t *testing.T) {
 	defer es3.Close()
 
 	policy := schedulerapi.Policy{
-		ExtenderConfigs: []schedulerapi.ExtenderConfig{
+		Extenders: []schedulerapi.Extender{
 			{
 				URLPrefix:      es1.URL,
 				FilterVerb:     filter,

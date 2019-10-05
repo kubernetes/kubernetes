@@ -29,7 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -53,7 +53,7 @@ type HTTPExtender struct {
 	ignorable        bool
 }
 
-func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, error) {
+func makeTransport(config *schedulerapi.Extender) (http.RoundTripper, error) {
 	var cfg restclient.Config
 	if config.TLSConfig != nil {
 		cfg.TLSClientConfig.Insecure = config.TLSConfig.Insecure
@@ -84,7 +84,7 @@ func makeTransport(config *schedulerapi.ExtenderConfig) (http.RoundTripper, erro
 }
 
 // NewHTTPExtender creates an HTTPExtender object.
-func NewHTTPExtender(config *schedulerapi.ExtenderConfig) (algorithm.SchedulerExtender, error) {
+func NewHTTPExtender(config *schedulerapi.Extender) (algorithm.SchedulerExtender, error) {
 	if config.HTTPTimeout.Nanoseconds() == 0 {
 		config.HTTPTimeout = time.Duration(DefaultExtenderTimeout)
 	}

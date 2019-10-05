@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 // +k8s:deepcopy-gen=package
+// +k8s:openapi-gen=true
+// +groupName=kubescheduler.config.k8s.io
 
-// Package api contains scheduler API objects.
-package api // import "k8s.io/kubernetes/pkg/scheduler/api"
+package v1 // import "k8s.io/kube-scheduler/config/v1"
