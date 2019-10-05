@@ -91,6 +91,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 
 	var cfg *kubeadmapi.InitConfiguration
 	if flags.cfgPath != "" {
+		klog.Warning("WARNING: Usage of the --config flag for reconfiguring the cluster during upgrade is not recommended!")
 		cfg, err = configutil.LoadInitConfigurationFromFile(flags.cfgPath)
 	} else {
 		cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade/config", false)
