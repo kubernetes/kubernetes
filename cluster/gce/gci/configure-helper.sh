@@ -1930,7 +1930,7 @@ function start-kube-apiserver {
   fi
 
   if [[ -n "${ADMISSION_CONTROL:-}" ]]; then
-    params+=" --admission-control=${ADMISSION_CONTROL}"
+    params+=" --enable-admission-plugins=${ADMISSION_CONTROL}"
     params+=" --admission-control-config-file=/etc/srv/kubernetes/admission_controller_config.yaml"
   fi
 
