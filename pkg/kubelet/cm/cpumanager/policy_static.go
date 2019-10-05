@@ -301,3 +301,99 @@ func (p *staticPolicy) guaranteedCPUs(pod *v1.Pod, container *v1.Container) int 
 	// https://golang.org/ref/spec#Numeric_types
 	return int(cpuQuantity.Value())
 }
+
+func (p *staticPolicy) GetTopologyHints(s state.State, pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+	// If there are no CPU resources requested for this container, we do not
+	// generate any topology hints.
+	if _, ok := container.Resources.Requests[v1.ResourceCPU]; !ok {
+		return nil
+	}
+
+	// Get a count of how many guaranteed CPUs have been requested.
+	requested := p.guaranteedCPUs(&pod, &container)
+
+	// If there are no guaranteed CPUs being requested, we do not generate
+	// any topology hints. This can happen, for example, because init
+	// containers don't have to have guaranteed CPUs in order for the pod
+	// to still be in the Guaranteed QOS tier.
+	if requested == 0 {
+		return nil
+	}
+
+	// Get a list of available CPUs.
+	available := p.assignableCPUs(s)
+
+	// Generate hints.
+	cpuHints := p.generateCPUTopologyHints(available, requested)
+	klog.Infof("[cpumanager] TopologyHints generated for pod '%v', container '%v': %v", pod.Name, container.Name, cpuHints)
+
+	return map[string][]topologymanager.TopologyHint{
+		string(v1.ResourceCPU): cpuHints,
+	}
+}
+
+// generateCPUtopologyHints generates a set of TopologyHints given the set of
+// available CPUs and the number of CPUs being requested.
+//
+// It follows the convention of marking all hints that have the same number of
+// bits set as the narrowest matching NUMANodeAffinity with 'Preferred: true', and
+// marking all others with 'Preferred: false'.
+func (p *staticPolicy) generateCPUTopologyHints(availableCPUs cpuset.CPUSet, request int) []topologymanager.TopologyHint {
+	// Initialize minAffinitySize to include all NUMA Nodes.
+	minAffinitySize := p.topology.CPUDetails.NUMANodes().Size()
+	// Initialize minSocketsOnMinAffinity to include all Sockets.
+	minSocketsOnMinAffinity := p.topology.CPUDetails.Sockets().Size()
+
+	// Iterate through all combinations of socket bitmask and build hints from them.
+	hints := []topologymanager.TopologyHint{}
+	bitmask.IterateBitMasks(p.topology.CPUDetails.NUMANodes().ToSlice(), func(mask bitmask.BitMask) {
+		// First, update minAffinitySize and minSocketsOnMinAffinity for the
+		// current request size.
+		cpusInMask := p.topology.CPUDetails.CPUsInNUMANodes(mask.GetBits()...).Size()
+		socketsInMask := p.topology.CPUDetails.SocketsInNUMANodes(mask.GetBits()...).Size()
+		if cpusInMask >= request && mask.Count() < minAffinitySize {
+			minAffinitySize = mask.Count()
+			if socketsInMask < minSocketsOnMinAffinity {
+				minSocketsOnMinAffinity = socketsInMask
+			}
+		}
+
+		// Then check to see if we have enough CPUs available on the current
+		// socket bitmask to satisfy the CPU request.
+		numMatching := 0
+		for _, c := range availableCPUs.ToSlice() {
+			if mask.IsSet(p.topology.CPUDetails[c].NUMANodeID) {
+				numMatching++
+			}
+		}
+
+		// If we don't, then move onto the next combination.
+		if numMatching < request {
+			return
+		}
+
+		// Otherwise, create a new hint from the socket bitmask and add it to the
+		// list of hints.  We set all hint preferences to 'false' on the first
+		// pass through.
+		hints = append(hints, topologymanager.TopologyHint{
+			NUMANodeAffinity: mask,
+			Preferred:        false,
+		})
+	})
+
+	// Loop back through all hints and update the 'Preferred' field based on
+	// counting the number of bits sets in the affinity mask and comparing it
+	// to the minAffinitySize. Only those with an equal number of bits set (and
+	// with a minimal set of sockets) will be considered preferred.
+	for i := range hints {
+		if hints[i].NUMANodeAffinity.Count() == minAffinitySize {
+			nodes := hints[i].NUMANodeAffinity.GetBits()
+			numSockets := p.topology.CPUDetails.SocketsInNUMANodes(nodes...).Size()
+			if numSockets == minSocketsOnMinAffinity {
+				hints[i].Preferred = true
+			}
+		}
+	}
+
+	return hints
+}

@@ -66,9 +66,10 @@ type Manager interface {
 	// State returns a read-only interface to the internal CPU manager state.
 	State() state.Reader
 
-	// GetTopologyHints implements the Topology Manager Interface and is
-	// consulted to make Topology aware resource alignments
-	GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint
+	// GetTopologyHints implements the topologymanager.HintProvider Interface
+	// and is consulted to achieve NUMA aware resource alignment among this
+	// and other resource controllers.
+	GetTopologyHints(v1.Pod, v1.Container) map[string][]topologymanager.TopologyHint
 }
 
 type manager struct {
@@ -214,6 +215,11 @@ func (m *manager) RemoveContainer(containerID string) error {
 
 func (m *manager) State() state.Reader {
 	return m.state
+}
+
+func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+	// Delegate to active policy
+	return m.policy.GetTopologyHints(m.state, pod, container)
 }
 
 type reconciledContainer struct {
