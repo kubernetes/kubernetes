@@ -118,6 +118,7 @@ const (
 	DefaultEndpointReconcilerTTL = 15 * time.Second
 )
 
+// ExtraConfig defines extra configuration for the master
 type ExtraConfig struct {
 	ClientCARegistrationHook ClientCARegistrationHook
 
@@ -189,6 +190,7 @@ type ExtraConfig struct {
 	VersionedInformers informers.SharedInformerFactory
 }
 
+// Config defines configuration for the master
 type Config struct {
 	GenericConfig *genericapiserver.Config
 	ExtraConfig   ExtraConfig
@@ -199,8 +201,8 @@ type completedConfig struct {
 	ExtraConfig   *ExtraConfig
 }
 
+// CompletedConfig embeds a private pointer that cannot be instantiated outside of this package
 type CompletedConfig struct {
-	// Embed a private pointer that cannot be instantiated outside of this package.
 	*completedConfig
 }
 
@@ -272,50 +274,50 @@ func (c *Config) createEndpointReconciler() reconcilers.EndpointReconciler {
 }
 
 // Complete fills in any fields not set that are required to have valid data. It's mutating the receiver.
-func (cfg *Config) Complete() CompletedConfig {
-	c := completedConfig{
-		cfg.GenericConfig.Complete(cfg.ExtraConfig.VersionedInformers),
-		&cfg.ExtraConfig,
+func (c *Config) Complete() CompletedConfig {
+	cfg := completedConfig{
+		c.GenericConfig.Complete(c.ExtraConfig.VersionedInformers),
+		&c.ExtraConfig,
 	}
 
-	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(c.ExtraConfig.ServiceIPRange)
+	serviceIPRange, apiServerServiceIP, err := ServiceIPRange(cfg.ExtraConfig.ServiceIPRange)
 	if err != nil {
 		klog.Fatalf("Error determining service IP ranges: %v", err)
 	}
-	if c.ExtraConfig.ServiceIPRange.IP == nil {
-		c.ExtraConfig.ServiceIPRange = serviceIPRange
+	if cfg.ExtraConfig.ServiceIPRange.IP == nil {
+		cfg.ExtraConfig.ServiceIPRange = serviceIPRange
 	}
-	if c.ExtraConfig.APIServerServiceIP == nil {
-		c.ExtraConfig.APIServerServiceIP = apiServerServiceIP
+	if cfg.ExtraConfig.APIServerServiceIP == nil {
+		cfg.ExtraConfig.APIServerServiceIP = apiServerServiceIP
 	}
 
-	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: c.GenericConfig.ExternalAddress}
+	discoveryAddresses := discovery.DefaultAddresses{DefaultAddress: cfg.GenericConfig.ExternalAddress}
 	discoveryAddresses.CIDRRules = append(discoveryAddresses.CIDRRules,
-		discovery.CIDRRule{IPRange: c.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(c.ExtraConfig.APIServerServiceIP.String(), strconv.Itoa(c.ExtraConfig.APIServerServicePort))})
-	c.GenericConfig.DiscoveryAddresses = discoveryAddresses
+		discovery.CIDRRule{IPRange: cfg.ExtraConfig.ServiceIPRange, Address: net.JoinHostPort(cfg.ExtraConfig.APIServerServiceIP.String(), strconv.Itoa(cfg.ExtraConfig.APIServerServicePort))})
+	cfg.GenericConfig.DiscoveryAddresses = discoveryAddresses
 
-	if c.ExtraConfig.ServiceNodePortRange.Size == 0 {
+	if cfg.ExtraConfig.ServiceNodePortRange.Size == 0 {
 		// TODO: Currently no way to specify an empty range (do we need to allow this?)
 		// We should probably allow this for clouds that don't require NodePort to do load-balancing (GCE)
 		// but then that breaks the strict nestedness of ServiceType.
 		// Review post-v1
-		c.ExtraConfig.ServiceNodePortRange = kubeoptions.DefaultServiceNodePortRange
-		klog.Infof("Node port range unspecified. Defaulting to %v.", c.ExtraConfig.ServiceNodePortRange)
+		cfg.ExtraConfig.ServiceNodePortRange = kubeoptions.DefaultServiceNodePortRange
+		klog.Infof("Node port range unspecified. Defaulting to %v.", cfg.ExtraConfig.ServiceNodePortRange)
 	}
 
-	if c.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
-		c.ExtraConfig.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
+	if cfg.ExtraConfig.EndpointReconcilerConfig.Interval == 0 {
+		cfg.ExtraConfig.EndpointReconcilerConfig.Interval = DefaultEndpointReconcilerInterval
 	}
 
-	if c.ExtraConfig.MasterEndpointReconcileTTL == 0 {
-		c.ExtraConfig.MasterEndpointReconcileTTL = DefaultEndpointReconcilerTTL
+	if cfg.ExtraConfig.MasterEndpointReconcileTTL == 0 {
+		cfg.ExtraConfig.MasterEndpointReconcileTTL = DefaultEndpointReconcilerTTL
 	}
 
-	if c.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
-		c.ExtraConfig.EndpointReconcilerConfig.Reconciler = cfg.createEndpointReconciler()
+	if cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler == nil {
+		cfg.ExtraConfig.EndpointReconcilerConfig.Reconciler = c.createEndpointReconciler()
 	}
 
-	return CompletedConfig{&c}
+	return CompletedConfig{&cfg}
 }
 
 // New returns a new instance of Master from the given config.
@@ -403,6 +405,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 	return m, nil
 }
 
+// InstallLegacyAPI will install the legacy APIs for the restStorageProviders if they are enabled.
 func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) error {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
@@ -452,7 +455,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 		}
 		apiGroupInfo, enabled, err := restStorageBuilder.NewRESTStorage(apiResourceConfigSource, restOptionsGetter)
 		if err != nil {
-			return fmt.Errorf("problem initializing API group %q : %v.", groupName, err)
+			return fmt.Errorf("problem initializing API group %q : %v", groupName, err)
 		}
 		if !enabled {
 			klog.Warningf("API group %q is not enabled, skipping.", groupName)
@@ -512,6 +515,7 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 	return addrs, nil
 }
 
+// DefaultAPIResourceConfigSource returns default configuration for an APIResource.
 func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 	ret := serverstorage.NewResourceConfig()
 	// NOTE: GroupVersions listed here will be enabled by default. Don't put alpha versions in the list.
