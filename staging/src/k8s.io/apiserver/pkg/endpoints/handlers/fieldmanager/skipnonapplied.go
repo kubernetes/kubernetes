@@ -19,61 +19,48 @@ package fieldmanager
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 type skipNonAppliedManager struct {
-	fieldManager  FieldManager
-	objectCreater runtime.ObjectCreater
-	gvk           schema.GroupVersionKind
+	fieldManager           Manager
+	objectCreater          runtime.ObjectCreater
+	gvk                    schema.GroupVersionKind
+	beforeApplyManagerName string
 }
 
-var _ FieldManager = &skipNonAppliedManager{}
+var _ Manager = &skipNonAppliedManager{}
 
-// NewSkipNonAppliedManager creates a new wrapped FieldManager that only starts tracking managers after the first apply
-func NewSkipNonAppliedManager(fieldManager FieldManager, objectCreater runtime.ObjectCreater, gvk schema.GroupVersionKind) FieldManager {
+// NewSkipNonAppliedManager creates a new wrapped FieldManager that only starts tracking managers after the first apply.
+func NewSkipNonAppliedManager(fieldManager Manager, objectCreater runtime.ObjectCreater, gvk schema.GroupVersionKind) Manager {
 	return &skipNonAppliedManager{
-		fieldManager:  fieldManager,
-		objectCreater: objectCreater,
-		gvk:           gvk,
+		fieldManager:           fieldManager,
+		objectCreater:          objectCreater,
+		gvk:                    gvk,
+		beforeApplyManagerName: "before-first-apply",
 	}
 }
 
-// Update implements FieldManager.
-func (f *skipNonAppliedManager) Update(liveObj, newObj runtime.Object, manager string) (runtime.Object, error) {
-	liveObjAccessor, err := meta.Accessor(liveObj)
-	if err != nil {
-		return newObj, nil
+// Update implements Manager.
+func (f *skipNonAppliedManager) Update(liveObj, newObj runtime.Object, managed Managed, manager string) (runtime.Object, Managed, error) {
+	if len(managed.Fields()) == 0 {
+		return newObj, managed, nil
 	}
-	newObjAccessor, err := meta.Accessor(newObj)
-	if err != nil {
-		return newObj, nil
-	}
-	if len(liveObjAccessor.GetManagedFields()) == 0 && len(newObjAccessor.GetManagedFields()) == 0 {
-		return newObj, nil
-	}
-
-	return f.fieldManager.Update(liveObj, newObj, manager)
+	return f.fieldManager.Update(liveObj, newObj, managed, manager)
 }
 
-// Apply implements FieldManager.
-func (f *skipNonAppliedManager) Apply(liveObj runtime.Object, patch []byte, fieldManager string, force bool) (runtime.Object, error) {
-	liveObjAccessor, err := meta.Accessor(liveObj)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't get accessor: %v", err)
-	}
-	if len(liveObjAccessor.GetManagedFields()) == 0 {
+// Apply implements Manager.
+func (f *skipNonAppliedManager) Apply(liveObj runtime.Object, patch []byte, managed Managed, fieldManager string, force bool) (runtime.Object, Managed, error) {
+	if len(managed.Fields()) == 0 {
 		emptyObj, err := f.objectCreater.New(f.gvk)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create empty object of type %v: %v", f.gvk, err)
+			return nil, nil, fmt.Errorf("failed to create empty object of type %v: %v", f.gvk, err)
 		}
-		liveObj, err = f.fieldManager.Update(emptyObj, liveObj, "before-first-apply")
+		liveObj, managed, err = f.fieldManager.Update(emptyObj, liveObj, managed, f.beforeApplyManagerName)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create manager for existing fields: %v", err)
+			return nil, nil, fmt.Errorf("failed to create manager for existing fields: %v", err)
 		}
 	}
-
-	return f.fieldManager.Apply(liveObj, patch, fieldManager, force)
+	return f.fieldManager.Apply(liveObj, patch, managed, fieldManager, force)
 }
