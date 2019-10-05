@@ -18,7 +18,7 @@ limitations under the License.
 // as cache.heap, however, this heap does not perform synchronization. It leaves
 // synchronization to the SchedulingQueue.
 
-package util
+package heap
 
 import (
 	"container/heap"
@@ -41,9 +41,9 @@ type itemKeyValue struct {
 	obj interface{}
 }
 
-// heapData is an internal struct that implements the standard heap interface
+// data is an internal struct that implements the standard heap interface
 // and keeps the data stored in the heap.
-type heapData struct {
+type data struct {
 	// items is a map from key of the objects to the objects and their index.
 	// We depend on the property that items in the map are in the queue and vice versa.
 	items map[string]*heapItem
@@ -56,16 +56,16 @@ type heapData struct {
 	// should be deterministic.
 	keyFunc KeyFunc
 	// lessFunc is used to compare two objects in the heap.
-	lessFunc LessFunc
+	lessFunc lessFunc
 }
 
 var (
-	_ = heap.Interface(&heapData{}) // heapData is a standard heap
+	_ = heap.Interface(&data{}) // heapData is a standard heap
 )
 
 // Less compares two objects and returns true if the first one should go
 // in front of the second one in the heap.
-func (h *heapData) Less(i, j int) bool {
+func (h *data) Less(i, j int) bool {
 	if i > len(h.queue) || j > len(h.queue) {
 		return false
 	}
@@ -81,11 +81,11 @@ func (h *heapData) Less(i, j int) bool {
 }
 
 // Len returns the number of items in the Heap.
-func (h *heapData) Len() int { return len(h.queue) }
+func (h *data) Len() int { return len(h.queue) }
 
 // Swap implements swapping of two elements in the heap. This is a part of standard
 // heap interface and should never be called directly.
-func (h *heapData) Swap(i, j int) {
+func (h *data) Swap(i, j int) {
 	h.queue[i], h.queue[j] = h.queue[j], h.queue[i]
 	item := h.items[h.queue[i]]
 	item.index = i
@@ -94,7 +94,7 @@ func (h *heapData) Swap(i, j int) {
 }
 
 // Push is supposed to be called by heap.Push only.
-func (h *heapData) Push(kv interface{}) {
+func (h *data) Push(kv interface{}) {
 	keyValue := kv.(*itemKeyValue)
 	n := len(h.queue)
 	h.items[keyValue.key] = &heapItem{keyValue.obj, n}
@@ -102,7 +102,7 @@ func (h *heapData) Push(kv interface{}) {
 }
 
 // Pop is supposed to be called by heap.Pop only.
-func (h *heapData) Pop() interface{} {
+func (h *data) Pop() interface{} {
 	key := h.queue[len(h.queue)-1]
 	h.queue = h.queue[0 : len(h.queue)-1]
 	item, ok := h.items[key]
@@ -115,7 +115,7 @@ func (h *heapData) Pop() interface{} {
 }
 
 // Peek is supposed to be called by heap.Peek only.
-func (h *heapData) Peek() interface{} {
+func (h *data) Peek() interface{} {
 	if len(h.queue) > 0 {
 		return h.items[h.queue[0]].obj
 	}
@@ -127,7 +127,7 @@ func (h *heapData) Peek() interface{} {
 type Heap struct {
 	// data stores objects and has a queue that keeps their ordering according
 	// to the heap invariant.
-	data *heapData
+	data *data
 	// metricRecorder updates the counter when elements of a heap get added or
 	// removed, and it does nothing if it's nil
 	metricRecorder metrics.MetricRecorder
@@ -239,15 +239,15 @@ func (h *Heap) Len() int {
 	return len(h.data.queue)
 }
 
-// NewHeap returns a Heap which can be used to queue up items to process.
-func NewHeap(keyFn KeyFunc, lessFn LessFunc) *Heap {
-	return NewHeapWithRecorder(keyFn, lessFn, nil)
+// New returns a Heap which can be used to queue up items to process.
+func New(keyFn KeyFunc, lessFn lessFunc) *Heap {
+	return NewWithRecorder(keyFn, lessFn, nil)
 }
 
-// NewHeapWithRecorder wraps an optional metricRecorder to compose a Heap object.
-func NewHeapWithRecorder(keyFn KeyFunc, lessFn LessFunc, metricRecorder metrics.MetricRecorder) *Heap {
+// NewWithRecorder wraps an optional metricRecorder to compose a Heap object.
+func NewWithRecorder(keyFn KeyFunc, lessFn lessFunc, metricRecorder metrics.MetricRecorder) *Heap {
 	return &Heap{
-		data: &heapData{
+		data: &data{
 			items:    map[string]*heapItem{},
 			queue:    []string{},
 			keyFunc:  keyFn,
@@ -256,3 +256,7 @@ func NewHeapWithRecorder(keyFn KeyFunc, lessFn LessFunc, metricRecorder metrics.
 		metricRecorder: metricRecorder,
 	}
 }
+
+// lessFunc is a function that receives two items and returns true if the first
+// item should be placed before the second one when the list is sorted.
+type lessFunc = func(item1, item2 interface{}) bool
