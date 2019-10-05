@@ -24,13 +24,15 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"golang.org/x/net/http2"
-	"k8s.io/klog"
-
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/validation"
+	certutil "k8s.io/client-go/util/cert"
+	"k8s.io/klog"
 )
 
 const (
@@ -38,9 +40,8 @@ const (
 )
 
 // tlsConfig produces the tls.Config to serve with.
-func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, error) {
+func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, []string, error) {
 	tlsConfig := &tls.Config{
-		NameToCertificate: s.SNICerts,
 		// Can't use SSLv3 because of POODLE and BEAST
 		// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 		// Can't use TLSv1.1 because of RC4 cipher usage
@@ -60,27 +61,80 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 	if len(s.CipherSuites) > 0 {
 		tlsConfig.CipherSuites = s.CipherSuites
 	}
+
+	var filesToWatch []string
+
 	if s.Cert != nil {
-		tlsConfig.Certificates = []tls.Certificate{*s.Cert}
-	}
-	// append all named certs. Otherwise, the go tls stack will think no SNI processing
-	// is necessary because there is only one cert anyway.
-	// Moreover, if ServerCert.CertFile/ServerCert.KeyFile are not set, the first SNI
-	// cert will become the default cert. That's what we expect anyway.
-	for _, c := range s.SNICerts {
-		tlsConfig.Certificates = append(tlsConfig.Certificates, *c)
+		if s.Cert.Static != nil {
+			tlsConfig.Certificates = []tls.Certificate{*s.Cert.Static}
+		} else {
+			tlsCert, err := tls.LoadX509KeyPair(s.Cert.CertFile, s.Cert.KeyFile)
+			if err != nil {
+				return nil, nil, fmt.Errorf("unable to load server certificate: %v", err)
+			}
+			tlsConfig.Certificates = []tls.Certificate{tlsCert}
+
+			filesToWatch = append(filesToWatch, s.Cert.CertFile, s.Cert.KeyFile)
+		}
 	}
 
-	// TODO this will become dynamic.
-	if s.ClientCA != nil {
+	if len(s.SNICerts) > 0 {
+		// load SNI certs
+		namedTLSCerts := make([]NamedTLSCert, 0, len(s.SNICerts))
+		for _, nck := range s.SNICerts {
+			var tlsCert tls.Certificate
+			var err error
+			if nck.Static != nil {
+				tlsCert = *nck.Static
+			} else {
+				tlsCert, err = tls.LoadX509KeyPair(nck.CertFile, nck.KeyFile)
+				if err != nil {
+					return nil, nil, fmt.Errorf("failed to load SNI cert and key: %v", err)
+				}
+
+				filesToWatch = append(filesToWatch, nck.CertFile, nck.KeyFile)
+			}
+			namedTLSCerts = append(namedTLSCerts, NamedTLSCert{
+				TLSCert: tlsCert,
+				Names:   nck.Names,
+			})
+
+			// append all named certs. Otherwise, the go tls stack will think no SNI processing
+			// is necessary because there is only one cert anyway.
+			// Moreover, if ServerCert.CertFile/ServerCert.KeyFile are not set, the first SNI
+			// cert will become the default cert. That's what we expect anyway.
+			tlsConfig.Certificates = append(tlsConfig.Certificates, tlsCert)
+		}
+
+		var err error
+		tlsConfig.NameToCertificate, err = GetNamedCertificateMap(namedTLSCerts)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to created named certificate map: %v", err)
+		}
+	}
+
+	if len(s.ClientCA) > 0 {
 		// Populate PeerCertificates in requests, but don't reject connections without certificates
 		// This allows certificates to be validated by authenticators, while still allowing other auth types
 		tlsConfig.ClientAuth = tls.RequestClientCert
+		tlsConfig.ClientCAs = x509.NewCertPool()
+
 		// Specify allowed CAs for client certificates
-		tlsConfig.ClientCAs = s.ClientCA
+		for _, file := range s.ClientCA {
+			clientCAs, err := certutil.CertsFromFile(file)
+			if err != nil {
+				return nil, nil, fmt.Errorf("unable to load client CA file: %v", err)
+			}
+
+			for _, ca := range clientCAs {
+				tlsConfig.ClientCAs.AddCert(ca)
+			}
+
+			filesToWatch = append(filesToWatch, file)
+		}
 	}
 
-	return tlsConfig, nil
+	return tlsConfig, filesToWatch, nil
 }
 
 // Serve runs the secure http server. It fails only if certificates cannot be loaded or the initial listen call fails.
@@ -91,16 +145,41 @@ func (s *SecureServingInfo) Serve(handler http.Handler, shutdownTimeout time.Dur
 		return nil, fmt.Errorf("listener must not be nil")
 	}
 
-	tlsConfig, err := s.tlsConfig(stopCh)
+	currentConfig := new(atomic.Value)
+	tlsConfig, filesToWatch, err := s.tlsConfig(stopCh)
 	if err != nil {
 		return nil, err
+	}
+	currentConfig.Store(tlsConfig)
+
+	changed, err := watchFiles(stopCh, filesToWatch)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing file watcher: %v", err)
+	}
+
+	if changed != nil {
+		go func() {
+			for range changed {
+				tlsConfig, _, err = s.tlsConfig(stopCh)
+				if err != nil {
+					klog.Errorf("unable to reload tls config: %v", err)
+					continue
+				}
+
+				currentConfig.Store(tlsConfig)
+			}
+		}()
 	}
 
 	secureServer := &http.Server{
 		Addr:           s.Listener.Addr().String(),
 		Handler:        handler,
 		MaxHeaderBytes: 1 << 20,
-		TLSConfig:      tlsConfig,
+		TLSConfig: &tls.Config{
+			GetConfigForClient: func(*tls.ClientHelloInfo) (*tls.Config, error) {
+				return currentConfig.Load().(*tls.Config), nil
+			},
+		},
 	}
 
 	// At least 99% of serialized resources in surveyed clusters were smaller than 256kb.
@@ -253,4 +332,42 @@ func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
 	tc.SetKeepAlive(true)
 	tc.SetKeepAlivePeriod(defaultKeepAlivePeriod)
 	return tc, nil
+}
+
+func watchFiles(stopCh <-chan struct{}, files []string) (<-chan struct{}, error) {
+	if len(files) == 0 {
+		return nil, nil
+	}
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, fmt.Errorf("unable to create file watcher: %v", err)
+	}
+
+	for _, file := range files {
+		if err := watcher.Add(file); err != nil {
+			return nil, fmt.Errorf("error adding file to watcher: %v", err)
+		}
+	}
+
+	changed := make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-watcher.Errors:
+				klog.Errorf("Received an error from watcher: %v", err)
+			case <-watcher.Events:
+				changed <- struct{}{}
+			case <-stopCh:
+				close(changed)
+				if err := watcher.Close(); err != nil {
+					klog.Errorf("Received an error closing watcher: %v", err)
+				}
+				return
+			}
+		}
+	}()
+
+	return changed, nil
 }

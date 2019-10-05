@@ -71,7 +71,12 @@ func (s *SecureServingOptionsWithLoopback) ApplyTo(secureServingInfo **server.Se
 
 	default:
 		*loopbackClientConfig = secureLoopbackClientConfig
-		(*secureServingInfo).SNICerts[server.LoopbackClientServerNameOverride] = &tlsCert
+
+		// We write to the start of the SNICerts slice, so that we are guaranteed the `apiserver-loopback-client` map key
+		(*secureServingInfo).SNICerts = append([]server.CertKey{{
+			Names:  []string{server.LoopbackClientServerNameOverride},
+			Static: &tlsCert,
+		}}, (*secureServingInfo).SNICerts...)
 	}
 
 	return nil
