@@ -21,6 +21,7 @@ reviewers:
 - CaoShuFeng
 - jennybuckley
 - apelisse
+- jpbetz
 labels:
 - sig/api-machinery
 - area/apiserver
