@@ -7,11 +7,7 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//staging/src/k8s.io/kube-scheduler/config/v1:all-srcs",
-        "//staging/src/k8s.io/kube-scheduler/config/v1alpha1:all-srcs",
-    ],
+    srcs = [":package-srcs"],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

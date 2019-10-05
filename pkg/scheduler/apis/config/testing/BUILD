@@ -2,7 +2,10 @@ load("@io_bazel_rules_go//go:def.bzl", "go_test")
 
 go_test(
     name = "go_default_test",
-    srcs = ["compatibility_test.go"],
+    srcs = [
+        "compatibility_test.go",
+        "policy_test.go",
+    ],
     deps = [
         "//pkg/apis/core/install:go_default_library",
         "//pkg/features:go_default_library",
@@ -10,6 +13,7 @@ go_test(
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/algorithmprovider/defaults:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/apis/config/scheme:go_default_library",
         "//pkg/scheduler/core:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
