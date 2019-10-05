@@ -4500,7 +4500,7 @@ func TestValidateEnv(t *testing.T) {
 					},
 				},
 			}},
-			expectedError: "[0].valueFrom: Invalid value: \"\": may not be specified when `value` is not empty",
+			expectedError: "[0].valueFrom: Invalid value: \"\": may not be specified because resource has been modified since last applied configuration",
 		},
 		{
 			name: "valueFrom without a source",

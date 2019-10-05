@@ -2130,7 +2130,7 @@ func validateEnvVarValueFrom(ev core.EnvVar, fldPath *field.Path) field.ErrorLis
 		allErrs = append(allErrs, field.Invalid(fldPath, "", "must specify one of: `fieldRef`, `resourceFieldRef`, `configMapKeyRef` or `secretKeyRef`"))
 	} else if len(ev.Value) != 0 {
 		if numSources != 0 {
-			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified when `value` is not empty"))
+			allErrs = append(allErrs, field.Invalid(fldPath, "", "may not be specified because resource has been modified since last applied configuration"))
 		}
 	} else if numSources > 1 {
 		allErrs = append(allErrs, field.Invalid(fldPath, "", "may not have more than one field specified at a time"))
