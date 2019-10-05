@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package log should be removed after switching to use core framework log.
+// Package log will be removed after switching to use core framework log.
+// Do not make further changes here!
 package log
 
 import (
