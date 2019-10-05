@@ -769,7 +769,7 @@ github.com/stretchr/objx
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
 github.com/stretchr/testify/require
-# github.com/syndtr/gocapability v0.0.0-20160928074757-e7cb7fa329f4 => github.com/syndtr/gocapability v0.0.0-20160928074757-e7cb7fa329f4
+# github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 github.com/syndtr/gocapability/capability
 # github.com/thecodeteam/goscaleio v0.1.0 => github.com/thecodeteam/goscaleio v0.1.0
 github.com/thecodeteam/goscaleio
