@@ -135,7 +135,6 @@ release_filegroup(
     name = "server-targets",
     conditioned_srcs = for_platforms(for_server = [
         "//cluster/gce/gci/mounter",
-        "//cmd/hyperkube",
         "//cmd/kube-apiserver",
         "//cmd/kube-controller-manager",
         "//cmd/kube-scheduler",

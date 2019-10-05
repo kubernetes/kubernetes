@@ -426,7 +426,6 @@ define RELEASE_IMAGES_HELP_INFO
 # Build release images
 #
 # Args:
-#   KUBE_BUILD_HYPERKUBE: Whether to build hyperkube image as well. Set to 'n' to skip.
 #   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'n' to skip.
 #
 # Example:
@@ -470,7 +469,6 @@ define QUICK_RELEASE_IMAGES_HELP_INFO
 #
 # Args:
 #   KUBE_FASTBUILD: Whether to cross-compile for other architectures. Set to 'false' to do so.
-#   KUBE_BUILD_HYPERKUBE: Whether to build hyperkube image as well. Set to 'n' to skip.
 #   KUBE_BUILD_CONFORMANCE: Whether to build conformance testing image as well. Set to 'n' to skip.
 #
 # Example:

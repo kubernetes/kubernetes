@@ -73,7 +73,6 @@ kube::golang::server_targets() {
     cmd/kube-controller-manager
     cmd/kubelet
     cmd/kubeadm
-    cmd/hyperkube
     cmd/kube-scheduler
     vendor/k8s.io/apiextensions-apiserver
     cluster/gce/gci/mounter
