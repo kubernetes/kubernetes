@@ -6,8 +6,9 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
-        "//pkg/scheduler/framework/plugins/noop:go_default_library",
+        "//pkg/scheduler/framework/plugins/tainttoleration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
     ],
 )
@@ -24,7 +25,9 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/scheduler/framework/plugins/examples:all-srcs",
+        "//pkg/scheduler/framework/plugins/migration:all-srcs",
         "//pkg/scheduler/framework/plugins/noop:all-srcs",
+        "//pkg/scheduler/framework/plugins/tainttoleration:all-srcs",
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],

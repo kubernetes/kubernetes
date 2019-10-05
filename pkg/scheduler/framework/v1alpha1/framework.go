@@ -33,6 +33,11 @@ import (
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
+const (
+	// Specifies the maximum timeout a permit plugin can return.
+	maxTimeout time.Duration = 15 * time.Minute
+)
+
 // framework is the component responsible for initializing and running scheduler
 // plugins.
 type framework struct {
@@ -53,10 +58,32 @@ type framework struct {
 	permitPlugins         []PermitPlugin
 }
 
-const (
-	// Specifies the maximum timeout a permit plugin can return.
-	maxTimeout time.Duration = 15 * time.Minute
-)
+// extensionPoint encapsulates desired and applied set of plugins at a specific extension
+// point. This is used to simplify iterating over all extension points supported by the
+// framework.
+type extensionPoint struct {
+	// the set of plugins to be configured at this extension point.
+	plugins *config.PluginSet
+	// a pointer to the slice storing plugins implementations that will run at this
+	// extenstion point.
+	slicePtr interface{}
+}
+
+func (f *framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint {
+	return []extensionPoint{
+		{plugins.PreFilter, &f.preFilterPlugins},
+		{plugins.Filter, &f.filterPlugins},
+		{plugins.Reserve, &f.reservePlugins},
+		{plugins.PostFilter, &f.postFilterPlugins},
+		{plugins.Score, &f.scorePlugins},
+		{plugins.PreBind, &f.preBindPlugins},
+		{plugins.Bind, &f.bindPlugins},
+		{plugins.PostBind, &f.postBindPlugins},
+		{plugins.Unreserve, &f.unreservePlugins},
+		{plugins.Permit, &f.permitPlugins},
+		{plugins.QueueSort, &f.queueSortPlugins},
+	}
+}
 
 var _ = Framework(&framework{})
 
@@ -73,29 +100,30 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	}
 
 	// get needed plugins from config
-	pg := pluginsNeeded(plugins)
+	pg := f.pluginsNeeded(plugins)
 	if len(pg) == 0 {
 		return f, nil
 	}
 
-	pluginConfig := pluginNameToConfig(args)
+	pluginConfig := make(map[string]*runtime.Unknown, 0)
+	for i := range args {
+		pluginConfig[args[i].Name] = &args[i].Args
+	}
+
 	pluginsMap := make(map[string]Plugin)
 	for name, factory := range r {
-		// initialize only needed plugins
+		// initialize only needed plugins.
 		if _, ok := pg[name]; !ok {
 			continue
 		}
 
-		// find the config args of a plugin
-		state := pluginConfig[name]
-
-		p, err := factory(state, f)
+		p, err := factory(pluginConfig[name], f)
 		if err != nil {
 			return nil, fmt.Errorf("error initializing plugin %q: %v", name, err)
 		}
 		pluginsMap[name] = p
 
-		// A weight of zero is not permitted, plugins can be disabled explicitly
+		// a weight of zero is not permitted, plugins can be disabled explicitly
 		// when configured.
 		f.pluginNameToWeightMap[name] = int(pg[name].Weight)
 		if f.pluginNameToWeightMap[name] == 0 {
@@ -103,50 +131,14 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 		}
 	}
 
-	if err := updatePluginList(&f.preFilterPlugins, plugins.PreFilter, pluginsMap); err != nil {
-		return nil, err
+	for _, e := range f.getExtensionPoints(plugins) {
+		if err := updatePluginList(e.slicePtr, e.plugins, pluginsMap); err != nil {
+			return nil, err
+		}
 	}
 
-	if err := updatePluginList(&f.filterPlugins, plugins.Filter, pluginsMap); err != nil {
-		return nil, err
-	}
-
-	if err := updatePluginList(&f.reservePlugins, plugins.Reserve, pluginsMap); err != nil {
-		return nil, err
-	}
-
-	if err := updatePluginList(&f.postFilterPlugins, plugins.PostFilter, pluginsMap); err != nil {
-		return nil, err
-	}
-
-	if err := updatePluginList(&f.scorePlugins, plugins.Score, pluginsMap); err != nil {
-		return nil, err
-	}
-
-	if err := updatePluginList(&f.preBindPlugins, plugins.PreBind, pluginsMap); err != nil {
-		return nil, err
-	}
-
-	if err := updatePluginList(&f.bindPlugins, plugins.Bind, pluginsMap); err != nil {
-		return nil, err
-	}
-
-	if err := updatePluginList(&f.postBindPlugins, plugins.PostBind, pluginsMap); err != nil {
-		return nil, err
-	}
-
-	if err := updatePluginList(&f.unreservePlugins, plugins.Unreserve, pluginsMap); err != nil {
-		return nil, err
-	}
-
-	if err := updatePluginList(&f.permitPlugins, plugins.Permit, pluginsMap); err != nil {
-		return nil, err
-	}
-
-	if err := updatePluginList(&f.queueSortPlugins, plugins.QueueSort, pluginsMap); err != nil {
-		return nil, err
-	}
-
+	// Verifying the score weights again since Plugin.Name() could return a different
+	// value from the one used in the configuration.
 	for _, scorePlugin := range f.scorePlugins {
 		if f.pluginNameToWeightMap[scorePlugin.Name()] == 0 {
 			return nil, fmt.Errorf("score plugin %q is not configured with weight", scorePlugin.Name())
@@ -171,15 +163,15 @@ func updatePluginList(pluginList interface{}, pluginSet *config.PluginSet, plugi
 	for _, ep := range pluginSet.Enabled {
 		pg, ok := pluginsMap[ep.Name]
 		if !ok {
-			return fmt.Errorf("%s %q does not exist", pluginType.String(), ep.Name)
+			return fmt.Errorf("%s %q does not exist", pluginType.Name(), ep.Name)
 		}
 
 		if !reflect.TypeOf(pg).Implements(pluginType) {
-			return fmt.Errorf("plugin %q does not extend %s plugin", ep.Name, pluginType.String())
+			return fmt.Errorf("plugin %q does not extend %s plugin", ep.Name, pluginType.Name())
 		}
 
 		if set.Has(ep.Name) {
-			return fmt.Errorf("plugin %q already registered as %q", ep.Name, pluginType.String())
+			return fmt.Errorf("plugin %q already registered as %q", ep.Name, pluginType.Name())
 		}
 
 		set.Insert(ep.Name)
@@ -534,17 +526,33 @@ func (f *framework) GetWaitingPod(uid types.UID) WaitingPod {
 	return f.waitingPods.get(uid)
 }
 
-func pluginNameToConfig(args []config.PluginConfig) map[string]*runtime.Unknown {
-	state := make(map[string]*runtime.Unknown, 0)
-	for i := range args {
-		// This is needed because the type of PluginConfig.Args is not pointer type.
-		p := args[i]
-		state[p.Name] = &p.Args
+// ListPlugins returns a map of extension point name to plugin names configured at each extension
+// point. Returns nil if no plugins where configred.
+func (f *framework) ListPlugins() map[string][]string {
+	m := make(map[string][]string)
+
+	insert := func(ptr interface{}) {
+		plugins := reflect.ValueOf(ptr).Elem()
+		var names []string
+		for i := 0; i < plugins.Len(); i++ {
+			name := plugins.Index(i).Interface().(Plugin).Name()
+			names = append(names, name)
+		}
+		if len(names) > 0 {
+			extName := plugins.Type().Elem().Name()
+			m[extName] = names
+		}
 	}
-	return state
+	for _, e := range f.getExtensionPoints(&config.Plugins{}) {
+		insert(e.slicePtr)
+	}
+	if len(m) > 0 {
+		return m
+	}
+	return nil
 }
 
-func pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
+func (f *framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
 	pgMap := make(map[string]config.Plugin, 0)
 
 	if plugins == nil {
@@ -559,17 +567,8 @@ func pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
 			pgMap[pg.Name] = pg
 		}
 	}
-	find(plugins.QueueSort)
-	find(plugins.PreFilter)
-	find(plugins.Filter)
-	find(plugins.PostFilter)
-	find(plugins.Score)
-	find(plugins.Reserve)
-	find(plugins.Permit)
-	find(plugins.PreBind)
-	find(plugins.Bind)
-	find(plugins.PostBind)
-	find(plugins.Unreserve)
-
+	for _, e := range f.getExtensionPoints(plugins) {
+		find(e.plugins)
+	}
 	return pgMap
 }

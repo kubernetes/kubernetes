@@ -37,10 +37,11 @@ import (
 func TestCompatibility_v1_Scheduler(t *testing.T) {
 	// Add serialized versions of scheduler config that exercise available options to ensure compatibility between releases
 	schedulerFiles := map[string]struct {
-		JSON             string
-		wantPredicates   sets.String
-		wantPrioritizers sets.String
-		wantExtenders    []schedulerapi.ExtenderConfig
+		JSON              string
+		wantPredicates    sets.String
+		wantPrioritizers  sets.String
+		wantFilterPlugins sets.String
+		wantExtenders     []schedulerapi.ExtenderConfig
 	}{
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
@@ -214,7 +215,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 				"CheckNodeMemoryPressure",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
@@ -233,6 +233,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"NodeAffinityPriority",
 				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
+			),
+			wantFilterPlugins: sets.NewString(
+				"TaintToleration",
 			),
 		},
 
@@ -279,7 +282,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"MaxEBSVolumeCount",
@@ -301,6 +303,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
+			),
+			wantFilterPlugins: sets.NewString(
+				"TaintToleration",
 			),
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -356,7 +361,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"MaxEBSVolumeCount",
@@ -378,6 +382,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
+			),
+			wantFilterPlugins: sets.NewString(
+				"TaintToleration",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -445,7 +452,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodeCondition",
@@ -468,6 +474,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
+			),
+			wantFilterPlugins: sets.NewString(
+				"TaintToleration",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -536,7 +545,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodeCondition",
@@ -560,6 +568,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
+			),
+			wantFilterPlugins: sets.NewString(
+				"TaintToleration",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -632,7 +643,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodePIDPressure",
@@ -657,6 +667,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
+			),
+			wantFilterPlugins: sets.NewString(
+				"TaintToleration",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -741,7 +754,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodePIDPressure",
@@ -767,6 +779,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
+			),
+			wantFilterPlugins: sets.NewString(
+				"TaintToleration",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -852,7 +867,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodePIDPressure",
@@ -879,6 +893,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
+			),
+			wantFilterPlugins: sets.NewString(
+				"TaintToleration",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -963,7 +980,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodePIDPressure",
@@ -991,6 +1007,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
+			),
+			wantFilterPlugins: sets.NewString(
+				"TaintToleration",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -1079,7 +1098,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodePIDPressure",
@@ -1108,6 +1126,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
 			),
+			wantFilterPlugins: sets.NewString(
+				"TaintToleration",
+			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
@@ -1128,6 +1149,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	seenPredicates := sets.NewString()
 	seenPriorities := sets.NewString()
 	mandatoryPredicates := sets.NewString("CheckNodeCondition")
+	filterToPredicateMap := map[string]string{
+		"TaintToleration": "PodToleratesNodeTaints",
+	}
 
 	for v, tc := range schedulerFiles {
 		t.Run(v, func(t *testing.T) {
@@ -1163,26 +1187,39 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				algorithmSrc,
 				make(chan struct{}),
 			)
+
 			if err != nil {
 				t.Fatalf("%s: Error constructing: %v", v, err)
 			}
-			schedPredicates := sets.NewString()
+			gotPredicates := sets.NewString()
 			for p := range sched.Algorithm.Predicates() {
-				schedPredicates.Insert(p)
+				gotPredicates.Insert(p)
 			}
 			wantPredicates := tc.wantPredicates.Union(mandatoryPredicates)
-			if !schedPredicates.Equal(wantPredicates) {
-				t.Errorf("Got predicates %v, want %v", schedPredicates, wantPredicates)
-			}
-			schedPrioritizers := sets.NewString()
-			for _, p := range sched.Algorithm.Prioritizers() {
-				schedPrioritizers.Insert(p.Name)
+			if !gotPredicates.Equal(wantPredicates) {
+				t.Errorf("Got predicates %v, want %v", gotPredicates, wantPredicates)
 			}
 
-			if !schedPrioritizers.Equal(tc.wantPrioritizers) {
-				t.Errorf("Got prioritizers %v, want %v", schedPrioritizers, tc.wantPrioritizers)
+			gotPrioritizers := sets.NewString()
+			for _, p := range sched.Algorithm.Prioritizers() {
+				gotPrioritizers.Insert(p.Name)
 			}
-			schedExtenders := sched.Algorithm.Extenders()
+			if !gotPrioritizers.Equal(tc.wantPrioritizers) {
+				t.Errorf("Got prioritizers %v, want %v", gotPrioritizers, tc.wantPrioritizers)
+			}
+
+			gotFilterPlugins := sets.NewString()
+			plugins := sched.Framework.ListPlugins()
+			for _, p := range plugins["FilterPlugin"] {
+				gotFilterPlugins.Insert(p)
+				seenPredicates.Insert(filterToPredicateMap[p])
+
+			}
+			if !gotFilterPlugins.Equal(tc.wantFilterPlugins) {
+				t.Errorf("Got filter plugins %v, want %v", gotFilterPlugins, tc.wantFilterPlugins)
+			}
+
+			gotExtenders := sched.Algorithm.Extenders()
 			var wantExtenders []*core.HTTPExtender
 			for _, e := range tc.wantExtenders {
 				extender, err := core.NewHTTPExtender(&e)
@@ -1191,13 +1228,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				}
 				wantExtenders = append(wantExtenders, extender.(*core.HTTPExtender))
 			}
-			for i := range schedExtenders {
-				if !core.Equal(wantExtenders[i], schedExtenders[i].(*core.HTTPExtender)) {
-					t.Errorf("Got extender #%d %+v, want %+v", i, schedExtenders[i], wantExtenders[i])
+			for i := range gotExtenders {
+				if !core.Equal(wantExtenders[i], gotExtenders[i].(*core.HTTPExtender)) {
+					t.Errorf("Got extender #%d %+v, want %+v", i, gotExtenders[i], wantExtenders[i])
 				}
 			}
-			seenPredicates = seenPredicates.Union(schedPredicates)
-			seenPriorities = seenPriorities.Union(schedPrioritizers)
+
+			seenPredicates = seenPredicates.Union(gotPredicates)
+			seenPriorities = seenPriorities.Union(gotPrioritizers)
 		})
 	}
 

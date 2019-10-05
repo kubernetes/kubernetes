@@ -23,6 +23,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,6 +95,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		policy               string
 		expectedPredicates   sets.String
 		expectedPrioritizers sets.String
+		expectedPlugins      map[string][]string
 	}{
 		{
 			policy: `{
@@ -136,7 +139,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 			),
 			expectedPrioritizers: sets.NewString(
 				"BalancedResourceAllocation",
@@ -148,6 +150,9 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"TaintTolerationPriority",
 				"ImageLocalityPriority",
 			),
+			expectedPlugins: map[string][]string{
+				"FilterPlugin": {"TaintToleration"},
+			},
 		},
 		{
 			policy: `{
@@ -201,7 +206,6 @@ kind: Policy
 				"MaxGCEPDVolumeCount",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
-				"PodToleratesNodeTaints",
 			),
 			expectedPrioritizers: sets.NewString(
 				"BalancedResourceAllocation",
@@ -213,6 +217,9 @@ kind: Policy
 				"TaintTolerationPriority",
 				"ImageLocalityPriority",
 			),
+			expectedPlugins: map[string][]string{
+				"FilterPlugin": {"TaintToleration"},
+			},
 		},
 		{
 			policy: `apiVersion: v1
@@ -286,6 +293,10 @@ priorities: []
 		}
 		if !schedPrioritizers.Equal(test.expectedPrioritizers) {
 			t.Errorf("Expected priority functions %v, got %v", test.expectedPrioritizers, schedPrioritizers)
+		}
+		schedPlugins := sched.Framework.ListPlugins()
+		if diff := cmp.Diff(test.expectedPlugins, schedPlugins); diff != "" {
+			t.Errorf("unexpected predicates diff (-want, +got): %s", diff)
 		}
 	}
 }

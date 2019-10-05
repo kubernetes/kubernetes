@@ -405,6 +405,10 @@ type Framework interface {
 	// or "Success". If none of the plugins handled binding, RunBindPlugins returns
 	// code=4("skip") status.
 	RunBindPlugins(state *CycleState, pod *v1.Pod, nodeName string) *Status
+
+	// ListPlugins returns a map of extension point name to plugin names
+	// configured at each extension point.
+	ListPlugins() map[string][]string
 }
 
 // FrameworkHandle provides data and some tools that plugins can use. It is
