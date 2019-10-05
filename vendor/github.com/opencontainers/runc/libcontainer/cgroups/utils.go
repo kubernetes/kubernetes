@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	units "github.com/docker/go-units"
@@ -22,12 +24,29 @@ const (
 	CgroupProcesses  = "cgroup.procs"
 )
 
+var (
+	isUnifiedOnce sync.Once
+	isUnified     bool
+)
+
 // HugePageSizeUnitList is a list of the units used by the linux kernel when
 // naming the HugePage control files.
 // https://www.kernel.org/doc/Documentation/cgroup-v1/hugetlb.txt
 // TODO Since the kernel only use KB, MB and GB; TB and PB should be removed,
 // depends on https://github.com/docker/go-units/commit/a09cd47f892041a4fac473133d181f5aea6fa393
 var HugePageSizeUnitList = []string{"B", "KB", "MB", "GB", "TB", "PB"}
+
+// IsCgroup2UnifiedMode returns whether we are running in cgroup v2 unified mode.
+func IsCgroup2UnifiedMode() bool {
+	isUnifiedOnce.Do(func() {
+		var st syscall.Statfs_t
+		if err := syscall.Statfs("/sys/fs/cgroup", &st); err != nil {
+			panic("cannot statfs cgroup root")
+		}
+		isUnified = st.Type == unix.CGROUP2_SUPER_MAGIC
+	})
+	return isUnified
+}
 
 // https://www.kernel.org/doc/Documentation/cgroup-v1/cgroups.txt
 func FindCgroupMountpoint(cgroupPath, subsystem string) (string, error) {
@@ -49,6 +68,10 @@ func FindCgroupMountpointAndRoot(cgroupPath, subsystem string) (string, string, 
 	}
 	defer f.Close()
 
+	if IsCgroup2UnifiedMode() {
+		subsystem = ""
+	}
+
 	return findCgroupMountpointAndRootFromReader(f, cgroupPath, subsystem)
 }
 
@@ -57,12 +80,12 @@ func findCgroupMountpointAndRootFromReader(reader io.Reader, cgroupPath, subsyst
 	for scanner.Scan() {
 		txt := scanner.Text()
 		fields := strings.Fields(txt)
-		if len(fields) < 5 {
+		if len(fields) < 9 {
 			continue
 		}
 		if strings.HasPrefix(fields[4], cgroupPath) {
 			for _, opt := range strings.Split(fields[len(fields)-1], ",") {
-				if opt == subsystem {
+				if (subsystem == "" && fields[9] == "cgroup2") || opt == subsystem {
 					return fields[4], fields[3], nil
 				}
 			}
@@ -76,6 +99,19 @@ func findCgroupMountpointAndRootFromReader(reader io.Reader, cgroupPath, subsyst
 }
 
 func isSubsystemAvailable(subsystem string) bool {
+	if IsCgroup2UnifiedMode() {
+		controllers, err := GetAllSubsystems()
+		if err != nil {
+			return false
+		}
+		for _, c := range controllers {
+			if c == subsystem {
+				return true
+			}
+		}
+		return false
+	}
+
 	cgroups, err := ParseCgroupFile("/proc/self/cgroup")
 	if err != nil {
 		return false
@@ -120,7 +156,7 @@ func FindCgroupMountpointDir() (string, error) {
 			return "", fmt.Errorf("Found no fields post '-' in %q", text)
 		}
 
-		if postSeparatorFields[0] == "cgroup" {
+		if postSeparatorFields[0] == "cgroup" || postSeparatorFields[0] == "cgroup2" {
 			// Check that the mount is properly formatted.
 			if numPostFields < 3 {
 				return "", fmt.Errorf("Error found less than 3 fields post '-' in %q", text)
@@ -193,6 +229,19 @@ func getCgroupMountsHelper(ss map[string]bool, mi io.Reader, all bool) ([]Mount,
 // GetCgroupMounts returns the mounts for the cgroup subsystems.
 // all indicates whether to return just the first instance or all the mounts.
 func GetCgroupMounts(all bool) ([]Mount, error) {
+	if IsCgroup2UnifiedMode() {
+		availableControllers, err := GetAllSubsystems()
+		if err != nil {
+			return nil, err
+		}
+		m := Mount{
+			Mountpoint: "/sys/fs/cgroup",
+			Root:       "/sys/fs/cgroup",
+			Subsystems: availableControllers,
+		}
+		return []Mount{m}, nil
+	}
+
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
 		return nil, err
@@ -356,6 +405,9 @@ func parseCgroupFromReader(r io.Reader) (map[string]string, error) {
 }
 
 func getControllerPath(subsystem string, cgroups map[string]string) (string, error) {
+	if IsCgroup2UnifiedMode() {
+		return "/", nil
+	}
 
 	if p, ok := cgroups[subsystem]; ok {
 		return p, nil

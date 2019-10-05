@@ -22,6 +22,7 @@ var actions = map[string]configs.Action{
 	"SCMP_ACT_TRAP":  configs.Trap,
 	"SCMP_ACT_ALLOW": configs.Allow,
 	"SCMP_ACT_TRACE": configs.Trace,
+	"SCMP_ACT_LOG":   configs.Log,
 }
 
 var archs = map[string]string{

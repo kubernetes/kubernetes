@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "apply_nosystemd.go",
         "apply_systemd.go",
+        "unified_hierarchy.go",
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/opencontainers/runc/libcontainer/cgroups/systemd",
     importpath = "github.com/opencontainers/runc/libcontainer/cgroups/systemd",
@@ -28,7 +29,6 @@ go_library(
         ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/github.com/coreos/go-systemd/dbus:go_default_library",
-            "//vendor/github.com/coreos/go-systemd/util:go_default_library",
             "//vendor/github.com/godbus/dbus:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups:go_default_library",
             "//vendor/github.com/opencontainers/runc/libcontainer/cgroups/fs:go_default_library",
