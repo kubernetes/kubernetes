@@ -295,6 +295,20 @@ var _ = SIGDescribe("Networking", func() {
 				framework.Failf("Unexpected endpoints return: %v, expect 1 endpoints", eps)
 			}
 		})
+
+		ginkgo.It("should be able to handle large requests: http", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f)
+			ginkgo.By(fmt.Sprintf("dialing(http) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterHTTPPort))
+			message := strings.Repeat("42", 1000)
+			config.DialEchoFromTestContainer("http", config.ClusterIP, e2enetwork.ClusterHTTPPort, config.MaxTries, 0, message)
+		})
+
+		ginkgo.It("should be able to handle large requests: udp", func() {
+			config := e2enetwork.NewNetworkingTestConfig(f)
+			ginkgo.By(fmt.Sprintf("dialing(udp) %v --> %v:%v (config.clusterIP)", config.TestContainerPod.Name, config.ClusterIP, e2enetwork.ClusterUDPPort))
+			message := "n" + strings.Repeat("o", 1999)
+			config.DialEchoFromTestContainer("udp", config.ClusterIP, e2enetwork.ClusterUDPPort, config.MaxTries, 0, message)
+		})
 	})
 
 	ginkgo.It("should recreate its iptables rules if they are deleted [Disruptive]", func() {
