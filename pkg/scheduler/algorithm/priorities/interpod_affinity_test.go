@@ -336,7 +336,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine4", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: labelRgIndia}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 5}, {Name: "machine3", Score: framework.MaxNodeScore}, {Name: "machine4", Score: framework.MaxNodeScore}, {Name: "machine5", Score: 5}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 50}, {Name: "machine3", Score: framework.MaxNodeScore}, {Name: "machine4", Score: framework.MaxNodeScore}, {Name: "machine5", Score: 50}},
 			name:         "Affinity: nodes in one region has more matching pods comparing to other reqion, so the region which has more macthes will get high score",
 		},
 		// Test with the different operators and values for pod affinity scheduling preference, including some match failures.
@@ -352,7 +352,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgIndia}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 2}, {Name: "machine2", Score: framework.MaxNodeScore}, {Name: "machine3", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 20}, {Name: "machine2", Score: framework.MaxNodeScore}, {Name: "machine3", Score: 0}},
 			name:         "Affinity: different Label operators and values for pod affinity scheduling preference, including some match failures ",
 		},
 		// Test the symmetry cases for affinity, the difference between affinity and symmetry is not the pod wants to run together with some existing pods,
@@ -482,7 +482,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine4", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: labelRgIndia}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 4}, {Name: "machine3", Score: framework.MaxNodeScore}, {Name: "machine4", Score: framework.MaxNodeScore}, {Name: "machine5", Score: 4}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 40}, {Name: "machine3", Score: framework.MaxNodeScore}, {Name: "machine4", Score: framework.MaxNodeScore}, {Name: "machine5", Score: 40}},
 			name:         "Affinity and Anti Affinity: considering both affinity and anti-affinity, the pod to schedule and existing pods have the same labels",
 		},
 		// Consider Affinity, Anti Affinity and symmetry together.

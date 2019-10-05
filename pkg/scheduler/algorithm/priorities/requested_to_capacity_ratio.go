@@ -38,7 +38,16 @@ type FunctionShapePoint struct {
 
 var (
 	// give priority to least utilized nodes by default
-	defaultFunctionShape, _ = NewFunctionShape([]FunctionShapePoint{{0, 10}, {100, 0}})
+	defaultFunctionShape, _ = NewFunctionShape([]FunctionShapePoint{
+		{
+			Utilization: 0,
+			Score:       framework.MaxNodeScore,
+		},
+		{
+			Utilization: 100,
+			Score:       framework.MinNodeScore,
+		},
+	})
 )
 
 const (

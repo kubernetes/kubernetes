@@ -65,9 +65,9 @@ func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArguments(t *testi
 	}
 	builtShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(&arguments)
 	expectedShape, _ := priorities.NewFunctionShape([]priorities.FunctionShapePoint{
-		{Utilization: 10, Score: 1},
-		{Utilization: 30, Score: 5},
-		{Utilization: 70, Score: 2},
+		{Utilization: 10, Score: 10},
+		{Utilization: 30, Score: 50},
+		{Utilization: 70, Score: 20},
 	})
 	expectedResources := priorities.ResourceToWeightMap{
 		v1.ResourceCPU:    1,
@@ -87,9 +87,9 @@ func TestBuildScoringFunctionShapeFromRequestedToCapacityRatioArgumentsNilResour
 	}
 	builtShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(&arguments)
 	expectedShape, _ := priorities.NewFunctionShape([]priorities.FunctionShapePoint{
-		{Utilization: 10, Score: 1},
-		{Utilization: 30, Score: 5},
-		{Utilization: 70, Score: 2},
+		{Utilization: 10, Score: 10},
+		{Utilization: 30, Score: 50},
+		{Utilization: 70, Score: 20},
 	})
 	expectedResources := priorities.ResourceToWeightMap{
 		v1.ResourceCPU:    1,
