@@ -388,7 +388,7 @@ github.com/go-openapi/validate
 # github.com/go-ozzo/ozzo-validation v3.5.0+incompatible => github.com/go-ozzo/ozzo-validation v3.5.0+incompatible
 github.com/go-ozzo/ozzo-validation
 github.com/go-ozzo/ozzo-validation/is
-# github.com/godbus/dbus v4.1.0+incompatible => github.com/godbus/dbus v4.1.0+incompatible
+# github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f => github.com/godbus/dbus v0.0.0-20181101234600-2ff6f7ffd60f
 github.com/godbus/dbus
 # github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d => github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 github.com/gogo/protobuf/gogoproto

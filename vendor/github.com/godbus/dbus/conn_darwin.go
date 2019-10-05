@@ -31,3 +31,7 @@ func getSystemBusPlatformAddress() string {
 	}
 	return defaultSystemBusAddress
 }
+
+func tryDiscoverDbusSessionBusAddress() string {
+	return ""
+}
