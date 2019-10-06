@@ -550,9 +550,10 @@ func TestPreFilterPlugins(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create framework for testing: %v", err)
 		}
-		f.RunPreFilterPlugins(context.Background(), nil, nil)
-		f.RunPreFilterExtensionAddPod(context.Background(), nil, nil, nil, nil)
-		f.RunPreFilterExtensionRemovePod(context.Background(), nil, nil, nil, nil)
+
+		f.RunPreFilterPlugins(context.Background(), nil, pod)
+		f.RunPreFilterExtensionAddPod(context.Background(), nil, pod, nil, nil)
+		f.RunPreFilterExtensionRemovePod(context.Background(), nil, pod, nil, nil)
 
 		if preFilter1.PreFilterCalled != 1 {
 			t.Errorf("preFilter1 called %v, expected: 1", preFilter1.PreFilterCalled)
@@ -571,6 +572,13 @@ func TestPreFilterPlugins(t *testing.T) {
 }
 
 func TestRecordingMetrics(t *testing.T) {
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
+	nodeInfo.SetNode(&v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "foo",
+		},
+	})
+
 	tests := []struct {
 		name               string
 		action             func(f Framework)
@@ -586,7 +594,7 @@ func TestRecordingMetrics(t *testing.T) {
 		},
 		{
 			name:               "Filter - Success",
-			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), nil, pod, nil) },
+			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), nil, pod, nodeInfo) },
 			wantExtensionPoint: "Filter",
 			wantStatus:         Success,
 		},
@@ -648,7 +656,7 @@ func TestRecordingMetrics(t *testing.T) {
 		},
 		{
 			name:               "Filter - Error",
-			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), nil, pod, nil) },
+			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), nil, pod, nodeInfo) },
 			inject:             injectedResult{FilterStatus: int(Error)},
 			wantExtensionPoint: "Filter",
 			wantStatus:         Error,
