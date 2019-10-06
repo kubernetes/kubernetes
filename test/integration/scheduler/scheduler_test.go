@@ -95,7 +95,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 		policy               string
 		expectedPredicates   sets.String
 		expectedPrioritizers sets.String
-		expectedPlugins      map[string][]string
+		expectedPlugins      map[string][]kubeschedulerconfig.Plugin
 	}{
 		{
 			policy: `{
@@ -147,11 +147,11 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"NodeAffinityPriority",
 				"NodePreferAvoidPodsPriority",
 				"SelectorSpreadPriority",
-				"TaintTolerationPriority",
 				"ImageLocalityPriority",
 			),
-			expectedPlugins: map[string][]string{
-				"FilterPlugin": {"TaintToleration"},
+			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 1}},
 			},
 		},
 		{
@@ -214,11 +214,11 @@ kind: Policy
 				"NodeAffinityPriority",
 				"NodePreferAvoidPodsPriority",
 				"SelectorSpreadPriority",
-				"TaintTolerationPriority",
 				"ImageLocalityPriority",
 			),
-			expectedPlugins: map[string][]string{
-				"FilterPlugin": {"TaintToleration"},
+			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 1}},
 			},
 		},
 		{

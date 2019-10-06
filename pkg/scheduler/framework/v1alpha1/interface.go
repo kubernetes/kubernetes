@@ -26,6 +26,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -252,7 +253,7 @@ type ScorePlugin interface {
 	// Score is called on each filtered node. It must return success and an integer
 	// indicating the rank of the node. All scoring plugins must return success or
 	// the pod will be rejected.
-	Score(state *CycleState, p *v1.Pod, nodeName string) (int, *Status)
+	Score(state *CycleState, p *v1.Pod, nodeName string) (int64, *Status)
 
 	// ScoreExtensions returns a ScoreExtensions interface if it implements one, or nil if does not.
 	ScoreExtensions() ScoreExtensions
@@ -407,9 +408,8 @@ type Framework interface {
 	// code=4("skip") status.
 	RunBindPlugins(state *CycleState, pod *v1.Pod, nodeName string) *Status
 
-	// ListPlugins returns a map of extension point name to plugin names
-	// configured at each extension point.
-	ListPlugins() map[string][]string
+	// ListPlugins returns a map of extension point name to list of configured Plugins.
+	ListPlugins() map[string][]config.Plugin
 }
 
 // FrameworkHandle provides data and some tools that plugins can use. It is

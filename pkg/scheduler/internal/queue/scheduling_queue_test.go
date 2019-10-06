@@ -31,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/metrics/testutil"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -165,7 +166,7 @@ func (*fakeFramework) QueueSortFunc() framework.LessFunc {
 	}
 }
 
-func (f *fakeFramework) ListPlugins() map[string][]string {
+func (f *fakeFramework) ListPlugins() map[string][]config.Plugin {
 	return nil
 }
 

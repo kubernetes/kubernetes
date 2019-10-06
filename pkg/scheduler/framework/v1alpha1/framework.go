@@ -553,18 +553,24 @@ func (f *framework) GetWaitingPod(uid types.UID) WaitingPod {
 
 // ListPlugins returns a map of extension point name to plugin names configured at each extension
 // point. Returns nil if no plugins where configred.
-func (f *framework) ListPlugins() map[string][]string {
-	m := make(map[string][]string)
+func (f *framework) ListPlugins() map[string][]config.Plugin {
+	m := make(map[string][]config.Plugin)
+
 	for _, e := range f.getExtensionPoints(&config.Plugins{}) {
 		plugins := reflect.ValueOf(e.slicePtr).Elem()
-		var names []string
+		extName := plugins.Type().Elem().Name()
+		var cfgs []config.Plugin
 		for i := 0; i < plugins.Len(); i++ {
 			name := plugins.Index(i).Interface().(Plugin).Name()
-			names = append(names, name)
+			p := config.Plugin{Name: name}
+			if extName == "ScorePlugin" {
+				// Weights apply only to score plugins.
+				p.Weight = int32(f.pluginNameToWeightMap[name])
+			}
+			cfgs = append(cfgs, p)
 		}
-		if len(names) > 0 {
-			extName := plugins.Type().Elem().Name()
-			m[extName] = names
+		if len(cfgs) > 0 {
+			m[extName] = cfgs
 		}
 	}
 	if len(m) > 0 {
@@ -579,7 +585,7 @@ func (f *framework) ClientSet() clientset.Interface {
 }
 
 func (f *framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {
-	pgMap := make(map[string]config.Plugin, 0)
+	pgMap := make(map[string]config.Plugin)
 
 	if plugins == nil {
 		return pgMap
