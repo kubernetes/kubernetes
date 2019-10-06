@@ -1,0 +1,17 @@
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//staging/src/k8s.io/deviceplugin-api/pkg/apis/deviceplugin/v1alpha:all-srcs",
+        "//staging/src/k8s.io/deviceplugin-api/pkg/apis/deviceplugin/v1beta1:all-srcs",
+    ],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
+)
