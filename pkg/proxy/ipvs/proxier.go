@@ -578,36 +578,37 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 	}
 	ipvsModules := utilipvs.GetRequiredIPVSModules(kernelVersion)
 
-	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersionStr)
-	b, err := ioutil.ReadFile(builtinModsFilePath)
-	if err != nil {
-		klog.Warningf("Failed to read file %s with error %v. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", builtinModsFilePath, err)
-	}
 	var bmods []string
-	for _, module := range ipvsModules {
-		if match, _ := regexp.Match(module+".ko", b); match {
-			bmods = append(bmods, module)
-		}
-	}
 
-	// Try to load IPVS required kernel modules using modprobe first
-	for _, kmod := range ipvsModules {
-		err := handle.executor.Command("modprobe", "--", kmod).Run()
-		if err != nil {
-			klog.Warningf("Failed to load kernel module %v with modprobe. "+
-				"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", kmod)
-		}
-	}
-
-	// Find out loaded kernel modules
+	// Find out loaded kernel modules. If this is a full static kernel it will thrown an error
 	modulesFile, err := os.Open("/proc/modules")
 	if err != nil {
+		klog.Warningf("Failed to read file /proc/modules with error %v. Kube-proxy requires loadable modules support enabled in the kernel", err)
 		return nil, err
 	}
 
 	mods, err := getFirstColumn(modulesFile)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find loaded kernel modules: %v", err)
+	}
+
+	builtinModsFilePath := fmt.Sprintf("/lib/modules/%s/modules.builtin", kernelVersionStr)
+	b, err := ioutil.ReadFile(builtinModsFilePath)
+	if err != nil {
+		klog.Warningf("Failed to read file %s with error %v. You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", builtinModsFilePath, err)
+	}
+
+	for _, module := range ipvsModules {
+		if match, _ := regexp.Match(module+".ko", b); match {
+			bmods = append(bmods, module)
+		} else {
+			// Try to load the required IPVS kernel modules if not built in
+			err := handle.executor.Command("modprobe", "--", module).Run()
+			if err != nil {
+				klog.Warningf("Failed to load kernel module %v with modprobe. "+
+					"You can ignore this message when kube-proxy is running inside container without mounting /lib/modules", module)
+			}
+		}
 	}
 
 	return append(mods, bmods...), nil
