@@ -211,7 +211,6 @@ var (
 			Help:           "Total preemption attempts in the cluster till now",
 			StabilityLevel: metrics.ALPHA,
 		})
-
 	pendingPods = metrics.NewGaugeVec(
 		&metrics.GaugeOpts{
 			Subsystem:      SchedulerSubsystem,
@@ -219,6 +218,13 @@ var (
 			Help:           "Number of pending pods, by the queue type. 'active' means number of pods in activeQ; 'backoff' means number of pods in backoffQ; 'unschedulable' means number of pods in unschedulableQ.",
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"queue"})
+	SchedulerGoroutines = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "scheduler_goroutines",
+			Help:           "Number of running goroutines split by the work they do such as binding.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"work"})
 
 	PodSchedulingDuration = metrics.NewHistogram(
 		&metrics.HistogramOpts{
@@ -279,6 +285,7 @@ var (
 		PodSchedulingAttempts,
 		FrameworkExtensionPointDuration,
 		SchedulerQueueIncomingPods,
+		SchedulerGoroutines,
 	}
 )
 
