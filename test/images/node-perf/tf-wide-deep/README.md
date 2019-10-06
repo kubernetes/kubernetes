@@ -3,7 +3,7 @@
 The container image described here predicts the income using the census income dataset in Tensorflow. For more
 information, see
 [https://github.com/tensorflow/models/tree/master/official/wide_deep](https://github.com/tensorflow/models/tree/master/official/wide_deep).
-This image is used as a workload in in node performance testing.
+This image is used as a workload in node performance testing.
 
 ## How to release:
 ```

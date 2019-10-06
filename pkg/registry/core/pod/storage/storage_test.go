@@ -105,7 +105,7 @@ func TestCreate(t *testing.T) {
 	test := genericregistrytest.New(t, storage.Store)
 	pod := validNewPod()
 	pod.ObjectMeta = metav1.ObjectMeta{}
-	// Make an invalid pod with an an incorrect label.
+	// Make an invalid pod with an incorrect label.
 	invalidPod := validNewPod()
 	invalidPod.Namespace = test.TestNamespace()
 	invalidPod.Labels = map[string]string{

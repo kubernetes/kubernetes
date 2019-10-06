@@ -269,7 +269,7 @@ var _ = SIGDescribe("AdmissionWebhook [Privileged:ClusterAdmin]", func() {
 		Testname: Admission webhook, admission control not allowed on webhook configuration objects
 		Description: Register webhooks that mutate and deny deletion of webhook configuration objects. Attempt to create
 		and delete a webhook configuration object; both operations MUST be allowed and the webhook configuration object
-		MUST NOT be mutated the the webhooks.
+		MUST NOT be mutated the webhooks.
 	*/
 	framework.ConformanceIt("should not be able to mutate or prevent deletion of webhook configuration objects", func() {
 		validatingWebhookCleanup := registerValidatingWebhookForWebhookConfigurations(f, f.UniqueName+"blocking", context, servicePort)

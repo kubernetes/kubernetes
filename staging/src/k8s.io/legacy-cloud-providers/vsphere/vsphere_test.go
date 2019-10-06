@@ -1109,7 +1109,7 @@ func TestSecretVSphereConfig(t *testing.T) {
 				)
 			}
 		}
-		// Check, if all all connections are configured with the global CA certificate
+		// Check, if all connections are configured with the global CA certificate
 		if expectedCaPath := cfg.Global.CAFile; expectedCaPath != "" {
 			for name, instance := range vs.vsphereInstanceMap {
 				if actualCaPath := instance.conn.CACert; actualCaPath != expectedCaPath {

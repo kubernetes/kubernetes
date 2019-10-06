@@ -91,7 +91,7 @@ var _ = KubeadmDescribe("kubeadm-config ConfigMap", func() {
 		)
 	})
 
-	ginkgo.It("should be accessible for for nodes", func() {
+	ginkgo.It("should be accessible for nodes", func() {
 		ExpectSubjectHasAccessToResource(f.ClientSet,
 			rbacv1.GroupKind, nodesGroup,
 			kubeadmConfigConfigMapResource,

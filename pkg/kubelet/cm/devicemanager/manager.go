@@ -675,7 +675,7 @@ func (m *ManagerImpl) devicesToAllocate(podUID, contName, resource string, requi
 }
 
 func (m *ManagerImpl) takeByTopology(resource string, available sets.String, affinity bitmask.BitMask, request int) []string {
-	// Build a map of of NUMA Nodes to the devices associated with them. A
+	// Build a map of NUMA Nodes to the devices associated with them. A
 	// device may be associated to multiple NUMA nodes at the same time. If an
 	// available device does not have any NUMA Nodes associated with it, add it
 	// to a list of NUMA Nodes for the fake NUMANode -1.
