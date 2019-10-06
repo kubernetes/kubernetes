@@ -719,7 +719,7 @@ func TestFindFitAllError(t *testing.T) {
 	nodes := makeNodeList([]string{"3", "2", "1"})
 	scheduler := makeScheduler(predicates, nodes)
 
-	_, predicateMap, _, err := scheduler.findNodesThatFit(nil, &v1.Pod{})
+	_, predicateMap, _, err := scheduler.findNodesThatFit(framework.NewCycleState(), &v1.Pod{})
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -749,7 +749,7 @@ func TestFindFitSomeError(t *testing.T) {
 	scheduler := makeScheduler(predicates, nodes)
 
 	pod := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "1", UID: types.UID("1")}}
-	_, predicateMap, _, err := scheduler.findNodesThatFit(nil, pod)
+	_, predicateMap, _, err := scheduler.findNodesThatFit(framework.NewCycleState(), pod)
 
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -830,7 +830,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 		cache.UpdateNodeInfoSnapshot(scheduler.nodeInfoSnapshot)
 		queue.UpdateNominatedPodForNode(&v1.Pod{ObjectMeta: metav1.ObjectMeta{UID: types.UID("nominated")}, Spec: v1.PodSpec{Priority: &midPriority}}, "1")
 
-		_, _, _, err := scheduler.findNodesThatFit(nil, test.pod)
+		_, _, _, err := scheduler.findNodesThatFit(framework.NewCycleState(), test.pod)
 
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -999,7 +999,7 @@ func TestZeroRequest(t *testing.T) {
 
 			list, err := PrioritizeNodes(
 				test.pod, nodeNameToInfo, metaData, priorityConfigs,
-				schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{}, emptyFramework, nil)
+				schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{}, emptyFramework, framework.NewCycleState())
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
