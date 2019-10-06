@@ -534,12 +534,13 @@ func (adc *attachDetachController) podDelete(obj interface{}) {
 
 func (adc *attachDetachController) nodeAdd(obj interface{}) {
 	node, ok := obj.(*v1.Node)
-	// TODO: investigate if nodeName is empty then if we can return
-	// kubernetes/kubernetes/issues/37777
 	if node == nil || !ok {
 		return
 	}
 	nodeName := types.NodeName(node.Name)
+	if len(nodeName) == 0 {
+		return
+	}
 	adc.nodeUpdate(nil, obj)
 	// kubernetes/kubernetes/issues/37586
 	// This is to workaround the case when a node add causes to wipe out
@@ -550,12 +551,14 @@ func (adc *attachDetachController) nodeAdd(obj interface{}) {
 
 func (adc *attachDetachController) nodeUpdate(oldObj, newObj interface{}) {
 	node, ok := newObj.(*v1.Node)
-	// TODO: investigate if nodeName is empty then if we can return
 	if node == nil || !ok {
 		return
 	}
 
 	nodeName := types.NodeName(node.Name)
+	if len(nodeName) == 0 {
+		return
+	}
 	adc.addNodeToDswp(node, nodeName)
 	adc.processVolumesInUse(nodeName, node.Status.VolumesInUse)
 }
