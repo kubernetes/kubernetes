@@ -277,7 +277,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 	// the actual error is that the object contains duplicate fields.
 	altered, err := yaml.YAMLToJSONStrict(originalData)
 	if err != nil {
-		return nil, actual, runtime.NewStrictDecodingError(err.Error(), string(originalData))
+		return nil, actual, runtime.NewStrictDecodingError(err, string(originalData))
 	}
 	// As performance is not an issue for now for the strict deserializer (one has regardless to do
 	// the unmarshal twice), we take the sanitized, altered data that is guaranteed to have no duplicated
@@ -286,7 +286,7 @@ func (s *Serializer) Decode(originalData []byte, gvk *schema.GroupVersionKind, i
 	// the actual error is that the object contains unknown field.
 	strictObj := obj.DeepCopyObject()
 	if err := strictCaseSensitiveJsonIterator.Unmarshal(altered, strictObj); err != nil {
-		return nil, actual, runtime.NewStrictDecodingError(err.Error(), string(originalData))
+		return nil, actual, runtime.NewStrictDecodingError(err, string(originalData))
 	}
 	// Always return the same object as the non-strict serializer to avoid any deviations.
 	return obj, actual, nil

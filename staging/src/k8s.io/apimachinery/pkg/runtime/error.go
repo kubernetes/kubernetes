@@ -17,6 +17,7 @@ limitations under the License.
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -124,20 +125,25 @@ func IsMissingVersion(err error) bool {
 // strictDecodingError is a base error type that is returned by a strict Decoder such
 // as UniversalStrictDecoder.
 type strictDecodingError struct {
-	message string
-	data    string
+	error error
+	data  string
 }
 
 // NewStrictDecodingError creates a new strictDecodingError object.
-func NewStrictDecodingError(message string, data string) error {
+func NewStrictDecodingError(err error, data string) error {
 	return &strictDecodingError{
-		message: message,
-		data:    data,
+		error: err,
+		data:  data,
 	}
 }
 
+// Unwrap returns the underlying error.
+func (e *strictDecodingError) Unwrap() error {
+	return e.error
+}
+
 func (e *strictDecodingError) Error() string {
-	return fmt.Sprintf("strict decoder error for %s: %s", e.data, e.message)
+	return fmt.Sprintf("strict decoder error for %s: %s", e.data, e.error)
 }
 
 // IsStrictDecodingError returns true if the error indicates that the provided object
@@ -146,6 +152,7 @@ func IsStrictDecodingError(err error) bool {
 	if err == nil {
 		return false
 	}
-	_, ok := err.(*strictDecodingError)
-	return ok
+
+	var e *strictDecodingError
+	return errors.As(err, &e)
 }

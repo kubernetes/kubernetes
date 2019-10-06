@@ -13,6 +13,7 @@ go_test(
         "conversion_test.go",
         "converter_test.go",
         "embedded_test.go",
+        "error_test.go",
         "extension_test.go",
         "local_scheme_test.go",
         "mapper_test.go",
