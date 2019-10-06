@@ -251,6 +251,7 @@ func (f *framework) RunPreFilterPlugins(
 	defer func() { recordExtensionPointDuration(startTime, preFilter, status) }()
 	for _, pl := range f.preFilterPlugins {
 		status := pl.PreFilter(ctx, state, pod)
+		klog.V(10).Infof("Running %q prefilter plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
 				msg := fmt.Sprintf("rejected by %q at prefilter: %v", pl.Name(), status.Message())
@@ -282,7 +283,9 @@ func (f *framework) RunPreFilterExtensionAddPod(
 		if pl.PreFilterExtensions() == nil {
 			continue
 		}
-		if status := pl.PreFilterExtensions().AddPod(ctx, state, podToSchedule, podToAdd, nodeInfo); !status.IsSuccess() {
+		status := pl.PreFilterExtensions().AddPod(ctx, state, podToSchedule, podToAdd, nodeInfo)
+		klog.V(10).Infof("Running AddPod for plugin %q for pod %q: %v", pl.Name(), podToSchedule.Name, status.Message())
+		if !status.IsSuccess() {
 			msg := fmt.Sprintf("error while running AddPod for plugin %q while scheduling pod %q: %v",
 				pl.Name(), podToSchedule.Name, status.Message())
 			klog.Error(msg)
@@ -309,7 +312,9 @@ func (f *framework) RunPreFilterExtensionRemovePod(
 		if pl.PreFilterExtensions() == nil {
 			continue
 		}
-		if status := pl.PreFilterExtensions().RemovePod(ctx, state, podToSchedule, podToRemove, nodeInfo); !status.IsSuccess() {
+		status := pl.PreFilterExtensions().RemovePod(ctx, state, podToSchedule, podToRemove, nodeInfo)
+		klog.V(10).Infof("Running RemovePod for plugin %q for pod %q: %v", pl.Name(), podToSchedule.Name, status.Message())
+		if !status.IsSuccess() {
 			msg := fmt.Sprintf("error while running RemovePod for plugin %q while scheduling pod %q: %v",
 				pl.Name(), podToSchedule.Name, status.Message())
 			klog.Error(msg)
@@ -334,10 +339,11 @@ func (f *framework) RunFilterPlugins(
 	defer func() { recordExtensionPointDuration(startTime, filter, status) }()
 	for _, pl := range f.filterPlugins {
 		status := pl.Filter(ctx, state, pod, nodeInfo)
+		klog.V(10).Infof("Running %q filter plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 		if !status.IsSuccess() {
 			if !status.IsUnschedulable() {
-				errMsg := fmt.Sprintf("error while running %q filter plugin for pod %q: %v",
-					pl.Name(), pod.Name, status.Message())
+				errMsg := fmt.Sprintf("error while running %q filter plugin for pod %q on node %v: %v",
+					pl.Name(), pod.Name, nodeInfo.Node().Name, status.Message())
 				klog.Error(errMsg)
 				return NewStatus(Error, errMsg)
 			}
@@ -362,6 +368,7 @@ func (f *framework) RunPostFilterPlugins(
 	defer func() { recordExtensionPointDuration(startTime, postFilter, status) }()
 	for _, pl := range f.postFilterPlugins {
 		status := pl.PostFilter(ctx, state, pod, nodes, filteredNodesStatuses)
+		klog.V(10).Infof("Running %q postfilter plugin for pod %q: %v(%+v) on nodes %+v", pl.Name(), pod.Name, status.Message(), filteredNodesStatuses, nodes)
 		if !status.IsSuccess() {
 			msg := fmt.Sprintf("error while running %q postfilter plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
@@ -462,6 +469,7 @@ func (f *framework) RunPreBindPlugins(
 	defer func() { recordExtensionPointDuration(startTime, preBind, status) }()
 	for _, pl := range f.preBindPlugins {
 		status := pl.PreBind(ctx, state, pod, nodeName)
+		klog.V(10).Infof("running %q prebind plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 		if !status.IsSuccess() {
 			msg := fmt.Sprintf("error while running %q prebind plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
@@ -480,6 +488,7 @@ func (f *framework) RunBindPlugins(ctx context.Context, state *CycleState, pod *
 	}
 	for _, bp := range f.bindPlugins {
 		status = bp.Bind(ctx, state, pod, nodeName)
+		klog.V(10).Infof("Running %q bind plugin for pod %q : %v", bp.Name(), pod.Name, status.Message())
 		if status != nil && status.Code() == Skip {
 			continue
 		}
@@ -512,6 +521,7 @@ func (f *framework) RunReservePlugins(
 	defer func() { recordExtensionPointDuration(startTime, reserve, status) }()
 	for _, pl := range f.reservePlugins {
 		status := pl.Reserve(ctx, state, pod, nodeName)
+		klog.V(10).Infof("Running %q reserve plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 		if !status.IsSuccess() {
 			msg := fmt.Sprintf("error while running %q reserve plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 			klog.Error(msg)
@@ -546,6 +556,7 @@ func (f *framework) RunPermitPlugins(
 	statusCode := Success
 	for _, pl := range f.permitPlugins {
 		status, timeout := pl.Permit(ctx, state, pod, nodeName)
+		klog.V(10).Infof("Running %q permit plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
 				msg := fmt.Sprintf("rejected by %q at permit: %v", pl.Name(), status.Message())
@@ -575,6 +586,7 @@ func (f *framework) RunPermitPlugins(
 		defer f.waitingPods.remove(pod.UID)
 		klog.V(4).Infof("waiting for pod %q at permit", pod.Name)
 		s := <-w.s
+		klog.V(10).Infof("wait complete for permit plugins for pod %q", pod.Name)
 		if !s.IsSuccess() {
 			if s.IsUnschedulable() {
 				msg := fmt.Sprintf("pod %q rejected while waiting at permit: %v", pod.Name, s.Message())
