@@ -384,6 +384,14 @@ func (detacher *gcePersistentDiskDetacher) Detach(volumeName string, nodeName ty
 }
 
 func (detacher *gcePersistentDiskDetacher) UnmountDevice(deviceMountPath string) error {
+	if runtime.GOOS == "windows" {
+		// Flush data cache for windows because it does not do so automatically during unmount device
+		exec := detacher.host.GetExec(gcePersistentDiskPluginName)
+		err := volumeutil.WriteVolumeCache(deviceMountPath, exec)
+		if err != nil {
+			return err
+		}
+	}
 	return mount.CleanupMountPoint(deviceMountPath, detacher.host.GetMounter(gcePersistentDiskPluginName), false)
 }
 
