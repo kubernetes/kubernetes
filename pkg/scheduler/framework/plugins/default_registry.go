@@ -21,6 +21,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/general"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podfitshostports"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podfitsresources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
@@ -30,7 +33,10 @@ import (
 // runs custom plugins, can pass a different Registry when initializing the scheduler.
 func NewDefaultRegistry() framework.Registry {
 	return framework.Registry{
-		tainttoleration.Name: tainttoleration.New,
+		tainttoleration.Name:  tainttoleration.New,
+		podfitshostports.Name: podfitshostports.New,
+		podfitsresources.Name: podfitsresources.New,
+		general.Name:          general.New,
 	}
 }
 
@@ -61,6 +67,21 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPredicate(predicates.PodToleratesNodeTaintsPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, tainttoleration.Name, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.PodFitsHostPortsPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, podfitshostports.Name, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.PodFitsResourcesPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, podfitsresources.Name, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.GeneralPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, general.Name, nil)
 			return
 		})
 

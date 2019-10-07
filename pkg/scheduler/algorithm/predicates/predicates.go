@@ -62,8 +62,12 @@ const (
 	GeneralPred = "GeneralPredicates"
 	// HostNamePred defines the name of predicate HostName.
 	HostNamePred = "HostName"
+	// PodFitsHostPred defines the name of predicate PodFitsHost.
+	PodFitsHostPred = "PodFitsHost"
 	// PodFitsHostPortsPred defines the name of predicate PodFitsHostPorts.
 	PodFitsHostPortsPred = "PodFitsHostPorts"
+	// PodMatchNodeSelectorPred defines the name of predicate PodMatchNodeSelector.
+	PodMatchNodeSelectorPred = "PodMatchNodeSelector"
 	// MatchNodeSelectorPred defines the name of predicate MatchNodeSelector.
 	MatchNodeSelectorPred = "MatchNodeSelector"
 	// PodFitsResourcesPred defines the name of predicate PodFitsResources.

@@ -8,6 +8,9 @@ go_library(
     deps = [
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/framework/plugins/general:go_default_library",
+        "//pkg/scheduler/framework/plugins/podfitshostports:go_default_library",
+        "//pkg/scheduler/framework/plugins/podfitsresources:go_default_library",
         "//pkg/scheduler/framework/plugins/tainttoleration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
     ],
@@ -25,8 +28,13 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/scheduler/framework/plugins/examples:all-srcs",
+        "//pkg/scheduler/framework/plugins/general:all-srcs",
         "//pkg/scheduler/framework/plugins/migration:all-srcs",
         "//pkg/scheduler/framework/plugins/noop:all-srcs",
+        "//pkg/scheduler/framework/plugins/podfitshost:all-srcs",
+        "//pkg/scheduler/framework/plugins/podfitshostports:all-srcs",
+        "//pkg/scheduler/framework/plugins/podfitsresources:all-srcs",
+        "//pkg/scheduler/framework/plugins/podmatchnnodeselector:all-srcs",
         "//pkg/scheduler/framework/plugins/tainttoleration:all-srcs",
     ],
     tags = ["automanaged"],

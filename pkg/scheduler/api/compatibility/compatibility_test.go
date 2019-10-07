@@ -104,8 +104,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsHostPorts",
-				"PodFitsResources",
 				"NoDiskConflict",
 				"HostName",
 				"TestServiceAffinity",
@@ -118,6 +116,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"TestServiceAntiAffinity",
 				"TestLabelPreference",
+			),
+			wantFilterPlugins: sets.NewString(
+				"PodFitsHostPorts",
+				"PodFitsResources",
 			),
 		},
 
@@ -152,8 +154,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsResources",
-				"PodFitsHostPorts",
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
@@ -172,6 +172,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"TestServiceAntiAffinity",
 				"TestLabelPreference",
+			),
+			wantFilterPlugins: sets.NewString(
+				"PodFitsHostPorts",
+				"PodFitsResources",
 			),
 		},
 
@@ -210,8 +214,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsResources",
-				"PodFitsHostPorts",
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
@@ -220,7 +222,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -236,6 +237,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantFilterPlugins: sets.NewString(
 				"TaintToleration",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"General",
 			),
 		},
 
@@ -277,8 +281,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsResources",
-				"PodFitsHostPorts",
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
@@ -288,7 +290,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -306,6 +307,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantFilterPlugins: sets.NewString(
 				"TaintToleration",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"General",
 			),
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -356,8 +360,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsResources",
-				"PodFitsHostPorts",
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
@@ -367,7 +369,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -385,6 +386,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantFilterPlugins: sets.NewString(
 				"TaintToleration",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"General",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -447,8 +451,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsResources",
-				"PodFitsHostPorts",
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
@@ -459,7 +461,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -477,6 +478,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantFilterPlugins: sets.NewString(
 				"TaintToleration",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"General",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -540,8 +544,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsResources",
-				"PodFitsHostPorts",
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
@@ -552,7 +554,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
@@ -571,6 +572,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantFilterPlugins: sets.NewString(
 				"TaintToleration",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"General",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -638,8 +642,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsResources",
-				"PodFitsHostPorts",
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
@@ -651,7 +653,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
@@ -670,6 +671,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantFilterPlugins: sets.NewString(
 				"TaintToleration",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"General",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -749,8 +753,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsResources",
-				"PodFitsHostPorts",
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
@@ -762,7 +764,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
@@ -782,6 +783,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantFilterPlugins: sets.NewString(
 				"TaintToleration",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"General",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -862,8 +866,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsResources",
-				"PodFitsHostPorts",
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
@@ -876,7 +878,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxAzureDiskVolumeCount",
 				"MaxCSIVolumeCountPred",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
@@ -896,6 +897,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantFilterPlugins: sets.NewString(
 				"TaintToleration",
+				"PodFitsHostPorts",
+				"General",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -975,8 +978,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsResources",
-				"PodFitsHostPorts",
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
@@ -990,7 +991,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxCSIVolumeCountPred",
 				"MaxCinderVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
@@ -1010,6 +1010,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantFilterPlugins: sets.NewString(
 				"TaintToleration",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"General",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -1093,8 +1096,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPredicates: sets.NewString(
 				"MatchNodeSelector",
-				"PodFitsResources",
-				"PodFitsHostPorts",
 				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
@@ -1108,7 +1109,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxCSIVolumeCountPred",
 				"MaxCinderVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
@@ -1128,6 +1128,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantFilterPlugins: sets.NewString(
 				"TaintToleration",
+				"PodFitsResources",
+				"PodFitsHostPorts",
+				"General",
 			),
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -1150,7 +1153,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	seenPriorities := sets.NewString()
 	mandatoryPredicates := sets.NewString("CheckNodeCondition")
 	filterToPredicateMap := map[string]string{
-		"TaintToleration": "PodToleratesNodeTaints",
+		"TaintToleration":  "PodToleratesNodeTaints",
+		"PodFitsResources": "PodFitsResources",
+		"PodFitsHostPorts": "PodFitsHostPorts",
+		"General":          "GeneralPredicates",
 	}
 
 	for v, tc := range schedulerFiles {
