@@ -1305,7 +1305,7 @@ You can now bind tokens to service requests. ([ref](https://github.com/kubernete
 * Azure VM names can now contain the underscore (`_`) character ([#63526](https://github.com/kubernetes/kubernetes/pull/63526), [@djsly](https://github.com/djsly))
 * Azure disks now support external resource groups.
 ([#64427](https://github.com/kubernetes/kubernetes/pull/64427), [@andyzhangx](https://github.com/andyzhangx))
-* Added reason message logs for non-existant Azure resources.
+* Added reason message logs for non-existent Azure resources.
 ([#64248](https://github.com/kubernetes/kubernetes/pull/64248), [@feiskyer](https://github.com/feiskyer))
 
 ### SIG CLI
