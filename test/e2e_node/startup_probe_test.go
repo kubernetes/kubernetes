@@ -19,13 +19,15 @@ package e2e_node
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/uuid"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -37,9 +39,16 @@ const (
 	defaultObservationTimeout = time.Minute * 4
 )
 
-var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive] [NodeFeature:StartupProbe]", func() {
-	f := framework.NewDefaultFramework("critical-pod-test")
+var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive] [NodeFeature:StartupProbe][NodeAlphaFeature:StartupProbe]", func() {
+	f := framework.NewDefaultFramework("startup-probe-test")
 	var podClient *framework.PodClient
+	ginkgo.BeforeEach(func() {
+		// It's not enough to set this flag in the kubelet because the apiserver needs it too
+		if !utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe) {
+			e2elog.Failf("run test with --feature-gates=StartupProbe=true to test the startupProbe in kubelet worker, ccurrent set %t", utilfeature.DefaultFeatureGate.Enabled(features.StartupProbe))
+		}
+		podClient = f.PodClient()
+	})
 
 	/*
 		These tests are located here as they require tempSetCurrentKubeletConfig to enable the feature gate for startupProbe.
