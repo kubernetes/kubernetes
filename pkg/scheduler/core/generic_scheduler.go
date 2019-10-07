@@ -732,7 +732,11 @@ func PrioritizeNodes(
 		if priorityConfigs[i].Function != nil {
 			wg.Add(1)
 			go func(index int) {
-				defer wg.Done()
+				metrics.SchedulerGoroutines.WithLabelValues("prioritizing_legacy").Inc()
+				defer func() {
+					metrics.SchedulerGoroutines.WithLabelValues("prioritizing_legacy").Dec()
+					wg.Done()
+				}()
 				var err error
 				results[index], err = priorityConfigs[index].Function(pod, nodeNameToInfo, nodes)
 				if err != nil {
@@ -766,7 +770,11 @@ func PrioritizeNodes(
 		}
 		wg.Add(1)
 		go func(index int) {
-			defer wg.Done()
+			metrics.SchedulerGoroutines.WithLabelValues("prioritizing_mapreduce").Inc()
+			defer func() {
+				metrics.SchedulerGoroutines.WithLabelValues("prioritizing_mapreduce").Dec()
+				wg.Done()
+			}()
 			if err := priorityConfigs[index].Reduce(pod, meta, nodeNameToInfo, results[index]); err != nil {
 				appendError(err)
 			}
@@ -812,7 +820,11 @@ func PrioritizeNodes(
 			}
 			wg.Add(1)
 			go func(extIndex int) {
-				defer wg.Done()
+				metrics.SchedulerGoroutines.WithLabelValues("prioritizing_extender").Inc()
+				defer func() {
+					metrics.SchedulerGoroutines.WithLabelValues("prioritizing_extender").Dec()
+					wg.Done()
+				}()
 				prioritizedList, weight, err := extenders[extIndex].Prioritize(pod, nodes)
 				if err != nil {
 					// Prioritization errors from extender can be ignored, let k8s/other extenders determine the priorities
