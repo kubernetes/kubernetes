@@ -22,13 +22,14 @@ import (
 	"testing"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 
 	core "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	_ "k8s.io/kubernetes/pkg/apis/apps/install"
@@ -96,6 +97,41 @@ func TestStatefulPodControlCreatePodExists(t *testing.T) {
 		t.Errorf("Pod and PVC exist: got %d events, but want 0", eventCount)
 		for i := range events {
 			t.Log(events[i])
+		}
+	}
+}
+
+func TestStatefulPodControlCreatePodPvcTerminatingFailure(t *testing.T) {
+	recorder := record.NewFakeRecorder(10)
+	set := newStatefulSet(3)
+	pod := newStatefulSetPod(set, 0)
+	fakeClient := &fake.Clientset{}
+	pvcs := getPersistentVolumeClaims(set, pod)
+	pvcIndexer := cache.NewIndexer(cache.MetaNamespaceKeyFunc, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc})
+	for k := range pvcs {
+		pvc := pvcs[k]
+		pvc.SetDeletionTimestamp(&metav1.Time{})
+		pvcIndexer.Add(&pvc)
+	}
+	pvcLister := corelisters.NewPersistentVolumeClaimLister(pvcIndexer)
+	control := NewRealStatefulPodControl(fakeClient, nil, nil, pvcLister, recorder)
+	fakeClient.AddReactor("create", "persistentvolumeclaims", func(action core.Action) (bool, runtime.Object, error) {
+		create := action.(core.CreateAction)
+		return true, create.GetObject(), nil
+	})
+	fakeClient.AddReactor("create", "pods", func(action core.Action) (bool, runtime.Object, error) {
+		return true, pod, apierrors.NewAlreadyExists(action.GetResource().GroupResource(), pod.Name)
+	})
+	if err := control.CreateStatefulPod(set, pod); err == nil {
+		t.Error("Failed to produce error on PVC creation failure")
+	}
+	events := collectEvents(recorder.Events)
+	if eventCount := len(events); eventCount != 2 {
+		t.Errorf("PVC create failure: got %d events, but want 2", eventCount)
+	}
+	for i := range events {
+		if !strings.Contains(events[i], v1.EventTypeWarning) {
+			t.Errorf("Found unexpected non-warning event %s", events[i])
 		}
 	}
 }
