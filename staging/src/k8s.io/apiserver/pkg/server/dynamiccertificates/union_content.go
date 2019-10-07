@@ -18,10 +18,17 @@ package dynamiccertificates
 
 import (
 	"bytes"
+	"crypto/x509"
 	"strings"
+
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 )
 
 type unionCAContent []CAContentProvider
+
+var _ Notifier = &unionCAContent{}
+var _ CAContentProvider = &unionCAContent{}
+var _ ControllerRunner = &unionCAContent{}
 
 // NewUnionCAContentProvider returns a CAContentProvider that is a union of other CAContentProviders
 func NewUnionCAContentProvider(caContentProviders ...CAContentProvider) CAContentProvider {
@@ -45,4 +52,49 @@ func (c unionCAContent) CurrentCABundleContent() []byte {
 	}
 
 	return bytes.Join(caBundles, []byte("\n"))
+}
+
+// CurrentCABundleContent provides ca bundle byte content
+func (c unionCAContent) VerifyOptions() x509.VerifyOptions {
+	// TODO make more efficient.  This isn't actually used in any of our mainline paths.  It's called to build the TLSConfig
+	// TODO on file changes, but the actual authentication runs against the individual items, not the union.
+	ret, err := newCABundleAndVerifier(c.Name(), c.CurrentCABundleContent())
+	if err != nil {
+		// because we're made up of already vetted values, this indicates some kind of coding error
+		panic(err)
+	}
+
+	return ret.verifyOptions
+}
+
+// AddListener adds a listener to be notified when the CA content changes.
+func (c unionCAContent) AddListener(listener Listener) {
+	for _, curr := range c {
+		if notifier, ok := curr.(Notifier); ok {
+			notifier.AddListener(listener)
+		}
+	}
+}
+
+// AddListener adds a listener to be notified when the CA content changes.
+func (c unionCAContent) RunOnce() error {
+	errors := []error{}
+	for _, curr := range c {
+		if controller, ok := curr.(ControllerRunner); ok {
+			if err := controller.RunOnce(); err != nil {
+				errors = append(errors, err)
+			}
+		}
+	}
+
+	return utilerrors.NewAggregate(errors)
+}
+
+// Run runs the controller
+func (c unionCAContent) Run(workers int, stopCh <-chan struct{}) {
+	for _, curr := range c {
+		if controller, ok := curr.(ControllerRunner); ok {
+			go controller.Run(workers, stopCh)
+		}
+	}
 }

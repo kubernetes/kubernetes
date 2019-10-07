@@ -17,10 +17,10 @@ limitations under the License.
 package dynamiccertificates
 
 import (
+	"bytes"
 	"crypto/x509"
 	"fmt"
 	"io/ioutil"
-	"reflect"
 	"sync/atomic"
 	"time"
 
@@ -32,8 +32,28 @@ import (
 	"k8s.io/klog"
 )
 
-type CAListener interface {
+// FileRefreshDuration is exposed so that integration tests can crank up the reload speed.
+var FileRefreshDuration = 1 * time.Minute
+
+// Listener is an interface to use to notify interested parties of a change.
+type Listener interface {
+	// Enqueue should be called when an input may have changed
 	Enqueue()
+}
+
+// Notifier is a way to add listeners
+type Notifier interface {
+	// AddListener is adds a listener to be notified of potential input changes
+	AddListener(listener Listener)
+}
+
+// ControllerRunner is a generic interface for starting a controller
+type ControllerRunner interface {
+	// RunOnce runs the sync loop a single time.  This useful for synchronous priming
+	RunOnce() error
+
+	// Run should be called a go .Run
+	Run(workers int, stopCh <-chan struct{})
 }
 
 // DynamicFileCAContent provies a CAContentProvider that can dynamically react to new file content
@@ -47,18 +67,22 @@ type DynamicFileCAContent struct {
 	// caBundle is a caBundleAndVerifier that contains the last read, non-zero length content of the file
 	caBundle atomic.Value
 
-	listeners []CAListener
+	listeners []Listener
 
 	// queue only ever has one item, but it has nice error handling backoff/retry semantics
 	queue workqueue.RateLimitingInterface
 }
+
+var _ Notifier = &DynamicFileCAContent{}
+var _ CAContentProvider = &DynamicFileCAContent{}
+var _ ControllerRunner = &DynamicFileCAContent{}
 
 type caBundleAndVerifier struct {
 	caBundle      []byte
 	verifyOptions x509.VerifyOptions
 }
 
-// NewStaticCAContentFromFile returns a CAContentProvider based on a filename
+// NewDynamicCAContentFromFile returns a CAContentProvider based on a filename that automatically reloads content
 func NewDynamicCAContentFromFile(purpose, filename string) (*DynamicFileCAContent, error) {
 	if len(filename) == 0 {
 		return nil, fmt.Errorf("missing filename for ca bundle")
@@ -78,7 +102,7 @@ func NewDynamicCAContentFromFile(purpose, filename string) (*DynamicFileCAConten
 }
 
 // AddListener adds a listener to be notified when the CA content changes.
-func (c *DynamicFileCAContent) AddListener(listener CAListener) {
+func (c *DynamicFileCAContent) AddListener(listener Listener) {
 	c.listeners = append(c.listeners, listener)
 }
 
@@ -93,8 +117,7 @@ func (c *DynamicFileCAContent) loadCABundle() error {
 	}
 
 	// check to see if we have a change. If the values are the same, do nothing.
-	existing, ok := c.caBundle.Load().(*caBundleAndVerifier)
-	if ok && existing != nil && reflect.DeepEqual(existing.caBundle, caBundle) {
+	if !c.hasCAChanged(caBundle) {
 		return nil
 	}
 
@@ -111,6 +134,30 @@ func (c *DynamicFileCAContent) loadCABundle() error {
 	return nil
 }
 
+// hasCAChanged returns true if the caBundle is different than the current.
+func (c *DynamicFileCAContent) hasCAChanged(caBundle []byte) bool {
+	uncastExisting := c.caBundle.Load()
+	if uncastExisting == nil {
+		return true
+	}
+
+	// check to see if we have a change. If the values are the same, do nothing.
+	existing, ok := uncastExisting.(*caBundleAndVerifier)
+	if !ok {
+		return true
+	}
+	if !bytes.Equal(existing.caBundle, caBundle) {
+		return true
+	}
+
+	return false
+}
+
+// RunOnce runs a single sync loop
+func (c *DynamicFileCAContent) RunOnce() error {
+	return c.loadCABundle()
+}
+
 // Run starts the kube-apiserver and blocks until stopCh is closed.
 func (c *DynamicFileCAContent) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
@@ -123,7 +170,7 @@ func (c *DynamicFileCAContent) Run(workers int, stopCh <-chan struct{}) {
 	go wait.Until(c.runWorker, time.Second, stopCh)
 
 	// start timer that rechecks every minute, just in case.  this also serves to prime the controller quickly.
-	_ = wait.PollImmediateUntil(1*time.Minute, func() (bool, error) {
+	_ = wait.PollImmediateUntil(FileRefreshDuration, func() (bool, error) {
 		c.queue.Add(workItemKey)
 		return false, nil
 	}, stopCh)
@@ -164,11 +211,12 @@ func (c *DynamicFileCAContent) Name() string {
 
 // CurrentCABundleContent provides ca bundle byte content
 func (c *DynamicFileCAContent) CurrentCABundleContent() (cabundle []byte) {
-	return c.caBundle.Load().(caBundleAndVerifier).caBundle
+	return c.caBundle.Load().(*caBundleAndVerifier).caBundle
 }
 
+// VerifyOptions provides verifyoptions compatible with authenticators
 func (c *DynamicFileCAContent) VerifyOptions() x509.VerifyOptions {
-	return c.caBundle.Load().(caBundleAndVerifier).verifyOptions
+	return c.caBundle.Load().(*caBundleAndVerifier).verifyOptions
 }
 
 // newVerifyOptions creates a new verification func from a file.  It reads the content and then fails.

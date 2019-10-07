@@ -89,7 +89,7 @@ func TestNewStaticCertKeyContent(t *testing.T) {
 	}{
 		{
 			name:        "filled",
-			clientCA:    NewStaticCAContent("test-ca", []byte("content-1")),
+			clientCA:    &staticCAContent{name: "test-ca", caBundle: &caBundleAndVerifier{caBundle: []byte("content-1")}},
 			servingCert: testCertProvider,
 			sniCerts:    []SNICertKeyContentProvider{testCertProvider},
 			expected: &dynamicCertificateContent{
@@ -101,7 +101,7 @@ func TestNewStaticCertKeyContent(t *testing.T) {
 		},
 		{
 			name:        "missingCA",
-			clientCA:    NewStaticCAContent("test-ca", []byte("")),
+			clientCA:    &staticCAContent{name: "test-ca", caBundle: &caBundleAndVerifier{caBundle: []byte("")}},
 			expected:    nil,
 			expectedErr: `not loading an empty client ca bundle from "test-ca"`,
 		},
