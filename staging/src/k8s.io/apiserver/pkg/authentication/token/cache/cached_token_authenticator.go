@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	lrucache "k8s.io/apimachinery/pkg/util/cache"
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 )
@@ -45,6 +46,8 @@ type cachedTokenAuthenticator struct {
 type cache interface {
 	// given a key, return the record, and whether or not it existed
 	get(key string) (value *cacheRecord, exists bool)
+	// multiple requests for the same key arriving within computationTime of each other share work.
+	getOrWait(key string, compute lrucache.ComputeFunc, computationTime time.Duration) (value *cacheRecord, exists bool)
 	// caches the record for the key
 	set(key string, value *cacheRecord, ttl time.Duration)
 	// removes the record for the key
@@ -66,28 +69,61 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 	}
 }
 
+const (
+	// We have to cache for a non-zero amount of time in order to be able to share work.
+	minimumCacheTTL = 1 * time.Microsecond
+
+	// if it takes longer than this to perform the underlying auth call, it
+	// will still succeed, but other calls arriving after this time and
+	// before its completion will not share its result.
+	maxComputationTimeForJoining = 500 * time.Millisecond
+)
+
+func (a *cachedTokenAuthenticator) lookupFunc(ctx context.Context, token string) lrucache.ComputeFunc {
+	return func(abort <-chan time.Time) (value interface{}, ttl time.Duration) {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		go func() {
+			select {
+			case <-abort:
+				cancel()
+			case ctx.Done():
+			}
+		}()
+		resp, ok, err := a.authenticator.AuthenticateToken(ctx, token)
+		if !a.cacheErrs && err != nil {
+			// caching the error for the briefest amount of time is
+			// how we let all waiting on the result see it.
+			return &cacheRecord{resp: resp, ok: ok, err: err}, minimumCacheTTL
+		}
+
+		ttl := minimumCacheTTL
+
+		switch {
+		case ok:
+			if a.successTTL > ttl {
+				ttl = a.successTTL
+			}
+		case !ok:
+			if a.failureTTL > ttl {
+				ttl = a.failureTTL
+			}
+		}
+		return &cacheRecord{resp: resp, ok: ok, err: err}, ttl
+	}
+}
+
 // AuthenticateToken implements authenticator.Token
 func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	auds, _ := authenticator.AudiencesFrom(ctx)
 
 	key := keyFunc(auds, token)
-	if record, ok := a.cache.get(key); ok {
+	if record, ok := a.cache.getOrWait(key, a.lookupFunc(token), maxComputationTimeForJoining); ok {
 		return record.resp, record.ok, record.err
 	}
 
-	resp, ok, err := a.authenticator.AuthenticateToken(ctx, token)
-	if !a.cacheErrs && err != nil {
-		return resp, ok, err
-	}
-
-	switch {
-	case ok && a.successTTL > 0:
-		a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.successTTL)
-	case !ok && a.failureTTL > 0:
-		a.cache.set(key, &cacheRecord{resp: resp, ok: ok, err: err}, a.failureTTL)
-	}
-
-	return resp, ok, err
+	// We should not be able to get a cache miss.
+	return nil, false, errors.New("unexpected cache miss")
 }
 
 func keyFunc(auds []string, token string) string {
