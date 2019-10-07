@@ -248,6 +248,14 @@ var (
 		},
 		[]string{"extension_point", "status"})
 
+	SchedulerQueueIncomingPods = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "queue_incoming_pods_total",
+			Help:           "Number of pods added to scheduling queues by event and queue type.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"queue", "event"})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		SchedulingLatency,
@@ -270,6 +278,7 @@ var (
 		PodSchedulingDuration,
 		PodSchedulingAttempts,
 		FrameworkExtensionPointDuration,
+		SchedulerQueueIncomingPods,
 	}
 )
 
