@@ -218,6 +218,24 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"queue"})
 
+	PodSchedulingDuration = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "pod_scheduling_duration_seconds",
+			Help:           "E2e latency for a pod being scheduled which may include multiple scheduling attempts.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		})
+
+	PodSchedulingAttempts = metrics.NewHistogram(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "pod_scheduling_attempts",
+			Help:           "Number of attempts to successfully schedule a pod.",
+			Buckets:        metrics.ExponentialBuckets(1, 2, 5),
+			StabilityLevel: metrics.ALPHA,
+		})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		SchedulingLatency,
@@ -237,6 +255,8 @@ var (
 		PreemptionVictims,
 		PreemptionAttempts,
 		pendingPods,
+		PodSchedulingDuration,
+		PodSchedulingAttempts,
 	}
 )
 

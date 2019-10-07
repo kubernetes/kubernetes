@@ -88,7 +88,7 @@ type Config struct {
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
 	// stale while they sit in a channel.
-	NextPod func() *v1.Pod
+	NextPod func() *framework.PodInfo
 
 	// WaitForCacheSync waits for scheduler cache to populate.
 	// It returns true if it was successful, false if the controller should shutdown.
@@ -96,7 +96,7 @@ type Config struct {
 
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
-	Error func(*v1.Pod, error)
+	Error func(*framework.PodInfo, error)
 
 	// Recorder is the EventRecorder to use
 	Recorder events.EventRecorder
@@ -470,7 +470,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
 		},
 		NextPod:         internalqueue.MakeNextPodFunc(podQueue),
-		Error:           MakeDefaultErrorFunc(c.client, podQueue, c.schedulerCache, c.StopEverything),
+		Error:           MakeDefaultErrorFunc(c.client, podQueue, c.schedulerCache),
 		StopEverything:  c.StopEverything,
 		VolumeBinder:    c.volumeBinder,
 		SchedulingQueue: podQueue,
@@ -636,8 +636,9 @@ func NewPodInformer(client clientset.Interface, resyncPeriod time.Duration) core
 }
 
 // MakeDefaultErrorFunc construct a function to handle pod scheduler error
-func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache, stopEverything <-chan struct{}) func(pod *v1.Pod, err error) {
-	return func(pod *v1.Pod, err error) {
+func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.SchedulingQueue, schedulerCache internalcache.Cache) func(*framework.PodInfo, error) {
+	return func(podInfo *framework.PodInfo, err error) {
+		pod := podInfo.Pod
 		if err == core.ErrNoNodesAvailable {
 			klog.V(2).Infof("Unable to schedule %v/%v: no nodes are registered to the cluster; waiting", pod.Namespace, pod.Name)
 		} else {
@@ -681,7 +682,8 @@ func MakeDefaultErrorFunc(client clientset.Interface, podQueue internalqueue.Sch
 				pod, err := client.CoreV1().Pods(podID.Namespace).Get(podID.Name, metav1.GetOptions{})
 				if err == nil {
 					if len(pod.Spec.NodeName) == 0 {
-						if err := podQueue.AddUnschedulableIfNotPresent(pod, podSchedulingCycle); err != nil {
+						podInfo.Pod = pod
+						if err := podQueue.AddUnschedulableIfNotPresent(podInfo, podSchedulingCycle); err != nil {
 							klog.Error(err)
 						}
 					}

@@ -153,11 +153,30 @@ type Plugin interface {
 	Name() string
 }
 
-// PodInfo is minimum cell in the scheduling queue.
+// PodInfo is a wrapper to a Pod with additional information for purposes such as tracking
+// the timestamp when it's added to the queue or recording per-pod metrics.
 type PodInfo struct {
 	Pod *v1.Pod
 	// The time pod added to the scheduling queue.
 	Timestamp time.Time
+	// Number of schedule attempts before successfully scheduled.
+	// It's used to record the # attempts metric.
+	Attempts int
+	// The time when the pod is added to the queue for the first time. The pod may be added
+	// back to the queue multiple times before it's successfully scheduled.
+	// It shouldn't be updated once initialized. It's used to record the e2e scheduling
+	// latency for a pod.
+	InitialAttemptTimestamp time.Time
+}
+
+// DeepCopy returns a deep copy of the PodInfo object.
+func (podInfo *PodInfo) DeepCopy() *PodInfo {
+	return &PodInfo{
+		Pod:                     podInfo.Pod.DeepCopy(),
+		Timestamp:               podInfo.Timestamp,
+		Attempts:                podInfo.Attempts,
+		InitialAttemptTimestamp: podInfo.InitialAttemptTimestamp,
+	}
 }
 
 // LessFunc is the function to sort pod info

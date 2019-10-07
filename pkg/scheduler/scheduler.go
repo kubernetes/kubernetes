@@ -85,7 +85,7 @@ type Scheduler struct {
 	// is available. We don't use a channel for this, because scheduling
 	// a pod may take some amount of time and we don't want pods to get
 	// stale while they sit in a channel.
-	NextPod func() *v1.Pod
+	NextPod func() *framework.PodInfo
 
 	// WaitForCacheSync waits for scheduler cache to populate.
 	// It returns true if it was successful, false if the controller should shutdown.
@@ -93,7 +93,7 @@ type Scheduler struct {
 
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
-	Error func(*v1.Pod, error)
+	Error func(*framework.PodInfo, error)
 
 	// Recorder is the EventRecorder to use
 	Recorder events.EventRecorder
@@ -389,8 +389,9 @@ func (sched *Scheduler) Run() {
 // recordFailedSchedulingEvent records an event for the pod that indicates the
 // pod has failed to schedule.
 // NOTE: This function modifies "pod". "pod" should be copied before being passed.
-func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason string, message string) {
-	sched.Error(pod, err)
+func (sched *Scheduler) recordSchedulingFailure(podInfo *framework.PodInfo, err error, reason string, message string) {
+	sched.Error(podInfo, err)
+	pod := podInfo.Pod
 	sched.Recorder.Eventf(pod, nil, v1.EventTypeWarning, "FailedScheduling", "Scheduling", message)
 	if err := sched.podConditionUpdater.update(pod, &v1.PodCondition{
 		Type:    v1.PodScheduled,
@@ -400,18 +401,6 @@ func (sched *Scheduler) recordSchedulingFailure(pod *v1.Pod, err error, reason s
 	}); err != nil {
 		klog.Errorf("Error updating the condition of the pod %s/%s: %v", pod.Namespace, pod.Name, err)
 	}
-}
-
-// schedule implements the scheduling algorithm and returns the suggested result(host,
-// evaluated nodes number,feasible nodes number).
-func (sched *Scheduler) schedule(pod *v1.Pod, state *framework.CycleState) (core.ScheduleResult, error) {
-	result, err := sched.Algorithm.Schedule(state, pod)
-	if err != nil {
-		pod = pod.DeepCopy()
-		sched.recordSchedulingFailure(pod, err, v1.PodReasonUnschedulable, err.Error())
-		return core.ScheduleResult{}, err
-	}
-	return result, nil
 }
 
 // preempt tries to create room for a pod that has failed to schedule, by preempting lower priority pods if possible.
@@ -474,18 +463,6 @@ func (sched *Scheduler) preempt(state *framework.CycleState, fwk framework.Frame
 	return nodeName, err
 }
 
-// assumeVolumes will update the volume cache with the chosen bindings
-//
-// This function modifies assumed if volume binding is required.
-func (sched *Scheduler) assumeVolumes(assumed *v1.Pod, host string) (allBound bool, err error) {
-	allBound, err = sched.VolumeBinder.Binder.AssumePodVolumes(assumed, host)
-	if err != nil {
-		sched.recordSchedulingFailure(assumed, err, SchedulerError,
-			fmt.Sprintf("AssumePodVolumes failed: %v", err))
-	}
-	return
-}
-
 // bindVolumes will make the API update with the assumed bindings and wait until
 // the PV controller has completely finished the binding operation.
 //
@@ -502,7 +479,6 @@ func (sched *Scheduler) bindVolumes(assumed *v1.Pod) error {
 			klog.Errorf("scheduler cache ForgetPod failed: %v", forgetErr)
 		}
 
-		sched.recordSchedulingFailure(assumed, err, "VolumeBindingFailed", err.Error())
 		return err
 	}
 
@@ -521,14 +497,6 @@ func (sched *Scheduler) assume(assumed *v1.Pod, host string) error {
 
 	if err := sched.SchedulerCache.AssumePod(assumed); err != nil {
 		klog.Errorf("scheduler cache AssumePod failed: %v", err)
-
-		// This is most probably result of a BUG in retrying logic.
-		// We report an error here so that pod scheduling can be retried.
-		// This relies on the fact that Error will check if the pod has been bound
-		// to a node and if so will not add it back to the unscheduled pods queue
-		// (otherwise this would cause an infinite loop).
-		sched.recordSchedulingFailure(assumed, err, SchedulerError,
-			fmt.Sprintf("AssumePod failed: %v", err))
 		return err
 	}
 	// if "assumed" is a nominated pod, we should remove it from internal cache
@@ -584,7 +552,8 @@ func (sched *Scheduler) bind(assumed *v1.Pod, targetNode string, state *framewor
 func (sched *Scheduler) scheduleOne() {
 	fwk := sched.Framework
 
-	pod := sched.NextPod()
+	podInfo := sched.NextPod()
+	pod := podInfo.Pod
 	// pod could be nil when schedulerQueue is closed
 	if pod == nil {
 		return
@@ -600,9 +569,10 @@ func (sched *Scheduler) scheduleOne() {
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
 	state := framework.NewCycleState()
-	scheduleResult, err := sched.schedule(pod, state)
+	scheduleResult, err := sched.Algorithm.Schedule(state, pod)
 	if err != nil {
-		// schedule() may have failed because the pod would not fit on any host, so we try to
+		sched.recordSchedulingFailure(podInfo.DeepCopy(), err, v1.PodReasonUnschedulable, err.Error())
+		// Schedule() may have failed because the pod would not fit on any host, so we try to
 		// preempt, with the expectation that the next time the pod is tried for scheduling it
 		// will fit due to the preemption. It is also possible that a different pod will schedule
 		// into the resources that were preempted, but this is harmless.
@@ -633,7 +603,8 @@ func (sched *Scheduler) scheduleOne() {
 	metrics.DeprecatedSchedulingAlgorithmLatency.Observe(metrics.SinceInMicroseconds(start))
 	// Tell the cache to assume that a pod now is running on a given node, even though it hasn't been bound yet.
 	// This allows us to keep scheduling without waiting on binding to occur.
-	assumedPod := pod.DeepCopy()
+	assumedPodInfo := podInfo.DeepCopy()
+	assumedPod := assumedPodInfo.Pod
 
 	// Assume volumes first before assuming the pod.
 	//
@@ -642,16 +613,17 @@ func (sched *Scheduler) scheduleOne() {
 	// Otherwise, binding of volumes is started after the pod is assumed, but before pod binding.
 	//
 	// This function modifies 'assumedPod' if volume binding is required.
-	allBound, err := sched.assumeVolumes(assumedPod, scheduleResult.SuggestedHost)
+	allBound, err := sched.VolumeBinder.Binder.AssumePodVolumes(assumedPod, scheduleResult.SuggestedHost)
 	if err != nil {
-		klog.Errorf("error assuming volumes: %v", err)
+		sched.recordSchedulingFailure(assumedPodInfo, err, SchedulerError,
+			fmt.Sprintf("AssumePodVolumes failed: %v", err))
 		metrics.PodScheduleErrors.Inc()
 		return
 	}
 
 	// Run "reserve" plugins.
 	if sts := fwk.RunReservePlugins(state, assumedPod, scheduleResult.SuggestedHost); !sts.IsSuccess() {
-		sched.recordSchedulingFailure(assumedPod, sts.AsError(), SchedulerError, sts.Message())
+		sched.recordSchedulingFailure(assumedPodInfo, sts.AsError(), SchedulerError, sts.Message())
 		metrics.PodScheduleErrors.Inc()
 		return
 	}
@@ -659,7 +631,12 @@ func (sched *Scheduler) scheduleOne() {
 	// assume modifies `assumedPod` by setting NodeName=scheduleResult.SuggestedHost
 	err = sched.assume(assumedPod, scheduleResult.SuggestedHost)
 	if err != nil {
-		klog.Errorf("error assuming pod: %v", err)
+		// This is most probably result of a BUG in retrying logic.
+		// We report an error here so that pod scheduling can be retried.
+		// This relies on the fact that Error will check if the pod has been bound
+		// to a node and if so will not add it back to the unscheduled pods queue
+		// (otherwise this would cause an infinite loop).
+		sched.recordSchedulingFailure(assumedPodInfo, err, SchedulerError, fmt.Sprintf("AssumePod failed: %v", err))
 		metrics.PodScheduleErrors.Inc()
 		// trigger un-reserve plugins to clean up state associated with the reserved Pod
 		fwk.RunUnreservePlugins(state, assumedPod, scheduleResult.SuggestedHost)
@@ -671,7 +648,7 @@ func (sched *Scheduler) scheduleOne() {
 		if !allBound {
 			err := sched.bindVolumes(assumedPod)
 			if err != nil {
-				klog.Errorf("error binding volumes: %v", err)
+				sched.recordSchedulingFailure(assumedPodInfo, err, "VolumeBindingFailed", err.Error())
 				metrics.PodScheduleErrors.Inc()
 				// trigger un-reserve plugins to clean up state associated with the reserved Pod
 				fwk.RunUnreservePlugins(state, assumedPod, scheduleResult.SuggestedHost)
@@ -695,7 +672,7 @@ func (sched *Scheduler) scheduleOne() {
 			}
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod
 			fwk.RunUnreservePlugins(state, assumedPod, scheduleResult.SuggestedHost)
-			sched.recordSchedulingFailure(assumedPod, permitStatus.AsError(), reason, permitStatus.Message())
+			sched.recordSchedulingFailure(assumedPodInfo, permitStatus.AsError(), reason, permitStatus.Message())
 			return
 		}
 
@@ -710,7 +687,7 @@ func (sched *Scheduler) scheduleOne() {
 			}
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod
 			fwk.RunUnreservePlugins(state, assumedPod, scheduleResult.SuggestedHost)
-			sched.recordSchedulingFailure(assumedPod, preBindStatus.AsError(), reason, preBindStatus.Message())
+			sched.recordSchedulingFailure(assumedPodInfo, preBindStatus.AsError(), reason, preBindStatus.Message())
 			return
 		}
 
@@ -718,11 +695,10 @@ func (sched *Scheduler) scheduleOne() {
 		metrics.E2eSchedulingLatency.Observe(metrics.SinceInSeconds(start))
 		metrics.DeprecatedE2eSchedulingLatency.Observe(metrics.SinceInMicroseconds(start))
 		if err != nil {
-			klog.Errorf("error binding pod: %v", err)
 			metrics.PodScheduleErrors.Inc()
 			// trigger un-reserve plugins to clean up state associated with the reserved Pod
 			fwk.RunUnreservePlugins(state, assumedPod, scheduleResult.SuggestedHost)
-			sched.recordSchedulingFailure(assumedPod, err, SchedulerError, fmt.Sprintf("Binding rejected: %v", err))
+			sched.recordSchedulingFailure(assumedPodInfo, err, SchedulerError, fmt.Sprintf("Binding rejected: %v", err))
 		} else {
 			// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
 			if klog.V(2) {
@@ -731,6 +707,8 @@ func (sched *Scheduler) scheduleOne() {
 			}
 
 			metrics.PodScheduleSuccesses.Inc()
+			metrics.PodSchedulingAttempts.Observe(float64(podInfo.Attempts))
+			metrics.PodSchedulingDuration.Observe(metrics.SinceInSeconds(podInfo.InitialAttemptTimestamp))
 
 			// Run "postbind" plugins.
 			fwk.RunPostBindPlugins(state, assumedPod, scheduleResult.SuggestedHost)
