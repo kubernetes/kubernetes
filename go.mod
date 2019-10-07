@@ -116,7 +116,7 @@ require (
 	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	github.com/thecodeteam/goscaleio v0.1.0
 	github.com/urfave/negroni v1.0.0 // indirect
-	github.com/vishvananda/netlink v0.0.0-20171020171820-b2de5d10e38e
+	github.com/vishvananda/netlink v1.0.0
 	github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936 // indirect
 	github.com/vmware/govmomi v0.20.1
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
@@ -464,7 +464,7 @@ replace (
 	github.com/valyala/fasthttp => github.com/valyala/fasthttp v1.2.0
 	github.com/valyala/quicktemplate => github.com/valyala/quicktemplate v1.1.1
 	github.com/valyala/tcplisten => github.com/valyala/tcplisten v0.0.0-20161114210144-ceec8f93295a
-	github.com/vishvananda/netlink => github.com/vishvananda/netlink v0.0.0-20171020171820-b2de5d10e38e
+	github.com/vishvananda/netlink => github.com/vishvananda/netlink v1.0.0
 	github.com/vishvananda/netns => github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.20.1
 	github.com/xiang90/probing => github.com/xiang90/probing v0.0.0-20190116061207-43a291ad63a2
