@@ -44,6 +44,8 @@ type DynamicServingCertificateController struct {
 
 	// clientCA provides the very latest content of the ca bundle
 	clientCA CAContentProvider
+	// servingCert provides the very latest content of the default serving certificate
+	servingCert CertKeyContentProvider
 
 	// currentlyServedContent holds the original bytes that we are serving. This is used to decide if we need to set a
 	// new atomic value. The types used for efficient TLSConfig preclude using the processed value.
@@ -60,11 +62,13 @@ type DynamicServingCertificateController struct {
 func NewDynamicServingCertificateController(
 	baseTLSConfig tls.Config,
 	clientCA CAContentProvider,
+	servingCert CertKeyContentProvider,
 	eventRecorder events.EventRecorder,
 ) *DynamicServingCertificateController {
 	c := &DynamicServingCertificateController{
 		baseTLSConfig: baseTLSConfig,
 		clientCA:      clientCA,
+		servingCert:   servingCert,
 
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DynamicServingCertificateController"),
 		eventRecorder: eventRecorder,
@@ -91,13 +95,23 @@ func (c *DynamicServingCertificateController) GetConfigForClient(clientHello *tl
 func (c *DynamicServingCertificateController) newTLSContent() (*dynamicCertificateContent, error) {
 	newContent := &dynamicCertificateContent{}
 
-	currClientCABundle := c.clientCA.CurrentCABundleContent()
-	// don't remove all content.  The value was configured at one time, so continue using that.
-	// Errors reading content can be reported by lower level controllers.
-	if len(currClientCABundle) == 0 {
-		return nil, fmt.Errorf("not loading an empty client ca bundle from %q", c.clientCA.Name())
+	if c.clientCA != nil {
+		currClientCABundle := c.clientCA.CurrentCABundleContent()
+		// don't remove all content.  The value was configured at one time, so continue using that.
+		if len(currClientCABundle) == 0 {
+			return nil, fmt.Errorf("not loading an empty client ca bundle from %q", c.clientCA.Name())
+		}
+		newContent.clientCA = caBundleContent{caBundle: currClientCABundle}
 	}
-	newContent.clientCA = caBundleContent{caBundle: currClientCABundle}
+
+	if c.servingCert != nil {
+		currServingCert, currServingKey := c.servingCert.CurrentCertKeyContent()
+		if len(currServingCert) == 0 || len(currServingKey) == 0 {
+			return nil, fmt.Errorf("not loading an empty serving certificate from %q", c.servingCert.Name())
+		}
+
+		newContent.servingCert = certKeyContent{cert: currServingCert, key: currServingKey}
+	}
 
 	return newContent, nil
 }
@@ -115,9 +129,12 @@ func (c *DynamicServingCertificateController) syncCerts() error {
 		return nil
 	}
 
+	// make a shallow copy and override the dynamic pieces which have changed.
+	newTLSConfigCopy := c.baseTLSConfig.Clone()
+
 	// parse new content to add to TLSConfig
-	newClientCAPool := x509.NewCertPool()
 	if len(newContent.clientCA.caBundle) > 0 {
+		newClientCAPool := x509.NewCertPool()
 		newClientCAs, err := cert.ParseCertsPEM(newContent.clientCA.caBundle)
 		if err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
@@ -130,11 +147,36 @@ func (c *DynamicServingCertificateController) syncCerts() error {
 
 			newClientCAPool.AddCert(cert)
 		}
+
+		newTLSConfigCopy.ClientCAs = newClientCAPool
 	}
 
-	// make a copy and override the dynamic pieces which have changed.
-	newTLSConfigCopy := c.baseTLSConfig.Clone()
-	newTLSConfigCopy.ClientCAs = newClientCAPool
+	if len(newContent.servingCert.cert) > 0 && len(newContent.servingCert.key) > 0 {
+		cert, err := tls.X509KeyPair(newContent.servingCert.cert, newContent.servingCert.key)
+		if err != nil {
+			return fmt.Errorf("invalid serving cert keypair: %v", err)
+		}
+
+		x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
+		if err != nil {
+			return fmt.Errorf("invalid serving cert: %v", err)
+		}
+
+		klog.V(2).Infof("loaded serving cert [%q]: %s", c.servingCert.Name(), GetHumanCertDetail(x509Cert))
+		if c.eventRecorder != nil {
+			c.eventRecorder.Eventf(nil, nil, v1.EventTypeWarning, "TLSConfigChanged", "ServingCertificateReload", "loaded serving cert [%q]: %s", c.clientCA.Name(), GetHumanCertDetail(x509Cert))
+		}
+
+		newTLSConfigCopy.Certificates = []tls.Certificate{cert}
+
+		// append all named certs. Otherwise, the go tls stack will think no SNI processing
+		// is necessary because there is only one cert anyway.
+		// Moreover, if ServerCert.CertFile/ServerCert.KeyFile are not set, the first SNI
+		// cert will become the default cert. That's what we expect anyway.
+		for _, c := range newTLSConfigCopy.NameToCertificate {
+			newTLSConfigCopy.Certificates = append(newTLSConfigCopy.Certificates, *c)
+		}
+	}
 
 	// store new values of content for serving.
 	c.currentServingTLSConfig.Store(newTLSConfigCopy)

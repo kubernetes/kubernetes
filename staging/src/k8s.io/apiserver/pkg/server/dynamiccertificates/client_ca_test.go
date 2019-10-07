@@ -59,6 +59,42 @@ func TestDynamicCertificateContentEquals(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "same with serving",
+			lhs: &dynamicCertificateContent{
+				clientCA:    caBundleContent{caBundle: []byte("foo")},
+				servingCert: certKeyContent{cert: []byte("foo"), key: []byte("foo")},
+			},
+			rhs: &dynamicCertificateContent{
+				clientCA:    caBundleContent{caBundle: []byte("foo")},
+				servingCert: certKeyContent{cert: []byte("foo"), key: []byte("foo")},
+			},
+			expected: true,
+		},
+		{
+			name: "different serving cert",
+			lhs: &dynamicCertificateContent{
+				clientCA:    caBundleContent{caBundle: []byte("foo")},
+				servingCert: certKeyContent{cert: []byte("foo"), key: []byte("foo")},
+			},
+			rhs: &dynamicCertificateContent{
+				clientCA:    caBundleContent{caBundle: []byte("foo")},
+				servingCert: certKeyContent{cert: []byte("bar"), key: []byte("foo")},
+			},
+			expected: false,
+		},
+		{
+			name: "different serving key",
+			lhs: &dynamicCertificateContent{
+				clientCA:    caBundleContent{caBundle: []byte("foo")},
+				servingCert: certKeyContent{cert: []byte("foo"), key: []byte("foo")},
+			},
+			rhs: &dynamicCertificateContent{
+				clientCA:    caBundleContent{caBundle: []byte("foo")},
+				servingCert: certKeyContent{cert: []byte("foo"), key: []byte("bar")},
+			},
+			expected: false,
+		},
 	}
 
 	for _, test := range tests {
