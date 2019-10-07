@@ -14,9 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package factory can set up a scheduler. This code is here instead of
-// cmd/scheduler for both testability and reuse.
-package factory
+package scheduler
 
 import (
 	"fmt"

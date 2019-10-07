@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package factory
+package scheduler
 
 import (
 	"fmt"
@@ -111,8 +111,8 @@ type Snapshot struct {
 	algorithmProviderMap   map[string]AlgorithmProviderConfig
 }
 
-// Copy returns a snapshot of current registered predicates and priorities.
-func Copy() *Snapshot {
+// RegisteredPredicatesAndPrioritiesSnapshot returns a snapshot of current registered predicates and priorities.
+func RegisteredPredicatesAndPrioritiesSnapshot() *Snapshot {
 	schedulerFactoryMutex.RLock()
 	defer schedulerFactoryMutex.RUnlock()
 
@@ -147,8 +147,8 @@ func Copy() *Snapshot {
 	return &copy
 }
 
-// Apply sets state of predicates and priorities to `s`.
-func Apply(s *Snapshot) {
+// ApplyPredicatesAndPriorities sets state of predicates and priorities to `s`.
+func ApplyPredicatesAndPriorities(s *Snapshot) {
 	schedulerFactoryMutex.Lock()
 	fitPredicateMap = s.fitPredicateMap
 	mandatoryFitPredicates = s.mandatoryFitPredicates

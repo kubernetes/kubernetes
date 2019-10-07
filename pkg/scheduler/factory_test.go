@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package factory
+package scheduler
 
 import (
 	"errors"
@@ -583,7 +583,7 @@ func TestGetBinderFunc(t *testing.T) {
 			extenders: []algorithm.SchedulerExtender{
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
 			},
-			expectedBinderType: "*factory.binder",
+			expectedBinderType: "*scheduler.binder",
 		},
 		{
 			name:    "one of the extenders is a binder and interested in pod",
@@ -592,7 +592,7 @@ func TestGetBinderFunc(t *testing.T) {
 				&fakeExtender{isBinder: false, interestedPodName: "pod0"},
 				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
 			},
-			expectedBinderType: "*factory.fakeExtender",
+			expectedBinderType: "*scheduler.fakeExtender",
 		},
 		{
 			name:    "one of the extenders is a binder, but not interested in pod",
@@ -601,7 +601,7 @@ func TestGetBinderFunc(t *testing.T) {
 				&fakeExtender{isBinder: false, interestedPodName: "pod1"},
 				&fakeExtender{isBinder: true, interestedPodName: "pod0"},
 			},
-			expectedBinderType: "*factory.binder",
+			expectedBinderType: "*scheduler.binder",
 		},
 	}
 

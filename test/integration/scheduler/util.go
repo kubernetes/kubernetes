@@ -55,7 +55,6 @@ import (
 	// Register defaults in pkg/scheduler/algorithmprovider.
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -160,7 +159,7 @@ func initTestSchedulerWithOptions(
 
 	// create independent pod informer if required
 	if setPodInformer {
-		podInformer = factory.NewPodInformer(context.clientSet, 12*time.Hour)
+		podInformer = scheduler.NewPodInformer(context.clientSet, 12*time.Hour)
 	} else {
 		podInformer = context.informerFactory.Core().V1().Pods()
 	}

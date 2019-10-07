@@ -23,7 +23,6 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
 
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
 )
@@ -106,7 +105,7 @@ func TestSkipPodUpdate(t *testing.T) {
 	}
 	for _, test := range table {
 		t.Run(test.name, func(t *testing.T) {
-			c := NewFromConfig(&factory.Config{
+			c := NewFromConfig(&Config{
 				SchedulerCache: &fakecache.Cache{
 					IsAssumedPodFunc: test.isAssumedPodFunc,
 					GetPodFunc:       test.getPodFunc,

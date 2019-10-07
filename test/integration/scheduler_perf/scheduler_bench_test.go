@@ -33,7 +33,7 @@ import (
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
+	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -364,7 +364,7 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	finalFunc, clientset := mustSetupScheduler()
 	defer finalFunc()
 
-	podInformer := factory.NewPodInformer(clientset, 0)
+	podInformer := scheduler.NewPodInformer(clientset, 0)
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
 		clientset,
 		[]testutils.CountToStrategy{{Count: numNodes, Strategy: nodeStrategy}},

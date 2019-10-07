@@ -37,7 +37,6 @@ import (
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
@@ -78,7 +77,7 @@ type Scheduler struct {
 	SchedulerCache internalcache.Cache
 
 	Algorithm core.ScheduleAlgorithm
-	GetBinder func(pod *v1.Pod) factory.Binder
+	GetBinder func(pod *v1.Pod) Binder
 	// PodConditionUpdater is used only in case of scheduling errors. If we succeed
 	// with scheduling, PodScheduled condition will be updated in apiserver in /bind
 	// handler so that binding and setting PodCondition it is atomic.
@@ -289,7 +288,7 @@ func New(client clientset.Interface,
 	registry.Merge(options.frameworkOutOfTreeRegistry)
 
 	// Set up the configurator which can create schedulers from configs.
-	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
+	configurator := NewConfigFactory(&ConfigFactoryArgs{
 		Client:                         client,
 		InformerFactory:                informerFactory,
 		PodInformer:                    podInformer,
@@ -316,7 +315,7 @@ func New(client clientset.Interface,
 		Plugins:                        options.frameworkPlugins,
 		PluginConfig:                   options.frameworkPluginConfig,
 	})
-	var config *factory.Config
+	var config *Config
 	source := schedulerAlgorithmSource
 	switch {
 	case source.Provider != nil:
@@ -398,7 +397,7 @@ func initPolicyFromConfigMap(client clientset.Interface, policyRef *kubeschedule
 }
 
 // NewFromConfig returns a new scheduler using the provided Config.
-func NewFromConfig(config *factory.Config) *Scheduler {
+func NewFromConfig(config *Config) *Scheduler {
 	metrics.Register()
 	return &Scheduler{
 		SchedulerCache:    config.SchedulerCache,
