@@ -75,6 +75,7 @@ import (
 	kubeletcertificate "k8s.io/kubernetes/pkg/kubelet/certificate"
 	"k8s.io/kubernetes/pkg/kubelet/certificate/bootstrap"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim"
@@ -644,6 +645,22 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 			klog.Info("--cgroups-per-qos enabled, but --cgroup-root was not specified.  defaulting to /")
 			s.CgroupRoot = "/"
 		}
+
+		reservedSystemCPUs, err := cpuset.Parse(s.ReservedSystemCPUs)
+		if err != nil {
+			reservedSystemCPUs = cpuset.NewCPUSet()
+		}
+		if reservedSystemCPUs.Size() > 0 {
+			klog.Infof("KubeReserved=\"%v\", SystemReserved=\"%v\". The cpu will be overwritten by --reserved-cpus option", s.KubeReserved, s.SystemReserved)
+			if s.KubeReserved != nil {
+				delete(s.KubeReserved, "cpu")
+			}
+			if s.SystemReserved == nil {
+				s.SystemReserved = make(map[string]string)
+			}
+			s.SystemReserved["cpu"] = strconv.Itoa(reservedSystemCPUs.Size())
+			klog.Infof("after cpu is overwritten, KubeReserved=\"%v\", SystemReserved=\"%v\"", s.KubeReserved, s.SystemReserved)
+		}
 		kubeReserved, err := parseResourceList(s.KubeReserved)
 		if err != nil {
 			return err
@@ -686,6 +703,7 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 					EnforceNodeAllocatable:   sets.NewString(s.EnforceNodeAllocatable...),
 					KubeReserved:             kubeReserved,
 					SystemReserved:           systemReserved,
+					ReservedSystemCPUs:       reservedSystemCPUs,
 					HardEvictionThresholds:   hardEvictionThresholds,
 				},
 				QOSReserved:                           *experimentalQOSReserved,

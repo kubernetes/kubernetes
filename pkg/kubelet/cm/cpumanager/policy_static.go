@@ -19,7 +19,7 @@ package cpumanager
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
@@ -89,14 +89,19 @@ var _ Policy = &staticPolicy{}
 // NewStaticPolicy returns a CPU manager policy that does not change CPU
 // assignments for exclusively pinned guaranteed containers after the main
 // container process starts.
-func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, affinity topologymanager.Store) Policy {
+func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, reservedCPUs cpuset.CPUSet, affinity topologymanager.Store) Policy {
 	allCPUs := topology.CPUDetails.CPUs()
-	// takeByTopology allocates CPUs associated with low-numbered cores from
-	// allCPUs.
-	//
-	// For example: Given a system with 8 CPUs available and HT enabled,
-	// if numReservedCPUs=2, then reserved={0,4}
-	reserved, _ := takeByTopology(topology, allCPUs, numReservedCPUs)
+	var reserved cpuset.CPUSet
+	if reservedCPUs.Size() > 0 {
+		reserved = reservedCPUs
+	} else {
+		// takeByTopology allocates CPUs associated with low-numbered cores from
+		// allCPUs.
+		//
+		// For example: Given a system with 8 CPUs available and HT enabled,
+		// if numReservedCPUs=2, then reserved={0,4}
+		reserved, _ = takeByTopology(topology, allCPUs, numReservedCPUs)
+	}
 
 	if reserved.Size() != numReservedCPUs {
 		panic(fmt.Sprintf("[cpumanager] unable to reserve the required amount of CPUs (size of %s did not equal %d)", reserved, numReservedCPUs))

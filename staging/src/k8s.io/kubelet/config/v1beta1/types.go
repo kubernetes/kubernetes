@@ -710,6 +710,10 @@ type KubeletConfiguration struct {
 	// Default: nil
 	// +optional
 	KubeReserved map[string]string `json:"kubeReserved,omitempty"`
+	// This ReservedSystemCPUs option specifies the cpu list reserved for the host level system threads and kubernetes related threads.
+	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
+	// This option overwrites CPUs provided by system-reserved and kube-reserved.
+	ReservedSystemCPUs string `json:"reservedSystemCPUs,omitempty"`
 	// This flag helps kubelet identify absolute name of top level cgroup used to enforce `SystemReserved` compute resource reservation for OS system daemons.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	// Dynamic Kubelet Config (beta): This field should not be updated without a full node
