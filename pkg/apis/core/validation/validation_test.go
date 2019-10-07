@@ -3134,6 +3134,13 @@ func TestValidateVolumes(t *testing.T) {
 								},
 							},
 							{
+								Path: "name",
+								ResourceFieldRef: &core.ResourceFieldSelector{
+									ContainerName: "test-container",
+									Resource:      "name",
+								},
+							},
+							{
 								Path: "cpu_limit",
 								ResourceFieldRef: &core.ResourceFieldSelector{
 									ContainerName: "test-container",

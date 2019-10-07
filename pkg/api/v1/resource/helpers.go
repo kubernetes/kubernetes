@@ -180,6 +180,8 @@ func ExtractContainerResourceValue(fs *v1.ResourceFieldSelector, container *v1.C
 	}
 
 	switch fs.Resource {
+	case "name":
+		return container.Name, nil
 	case "limits.cpu":
 		return convertResourceCPUToString(container.Resources.Limits.Cpu(), divisor)
 	case "limits.memory":
