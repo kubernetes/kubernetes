@@ -11,6 +11,7 @@ go_test(
     srcs = [
         "http_test.go",
         "interface_test.go",
+        "port_allocator_test.go",
         "port_range_test.go",
         "port_split_test.go",
         "util_test.go",
@@ -29,6 +30,7 @@ go_library(
     srcs = [
         "http.go",
         "interface.go",
+        "port_allocator.go",
         "port_range.go",
         "port_split.go",
         "util.go",
@@ -37,6 +39,7 @@ go_library(
     importpath = "k8s.io/apimachinery/pkg/util/net",
     deps = [
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//vendor/golang.org/x/net/http2:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

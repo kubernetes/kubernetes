@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package userspace
+package net
 
 import (
 	"errors"
@@ -23,7 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -31,6 +30,7 @@ var (
 	errPortRangeNoPortsRemaining = errors.New("port allocation failed; there are no remaining ports left to allocate in the accepted range")
 )
 
+// PortAllocator is an interface for port allocation.
 type PortAllocator interface {
 	AllocateNext() (int, error)
 	Release(int)
@@ -50,10 +50,10 @@ func (r *randomAllocator) Release(_ int) {
 	// noop
 }
 
-// newPortAllocator builds PortAllocator for a given PortRange. If the PortRange is empty
+// NewPortAllocator builds PortAllocator for a given PortRange. If the PortRange is empty
 // then a random port allocator is returned; otherwise, a new range-based allocator
 // is returned.
-func newPortAllocator(r net.PortRange) PortAllocator {
+func NewPortAllocator(r PortRange) PortAllocator {
 	if r.Base == 0 {
 		return &randomAllocator{}
 	}
@@ -67,14 +67,14 @@ const (
 )
 
 type rangeAllocator struct {
-	net.PortRange
+	PortRange
 	ports chan int
 	used  big.Int
 	lock  sync.Mutex
 	rand  *rand.Rand
 }
 
-func newPortRangeAllocator(r net.PortRange, autoFill bool) PortAllocator {
+func newPortRangeAllocator(r PortRange, autoFill bool) PortAllocator {
 	if r.Base == 0 || r.Size == 0 {
 		panic("illegal argument: may not specify an empty port range")
 	}

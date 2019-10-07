@@ -14,17 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package userspace
+package net
 
 import (
 	"reflect"
 	"testing"
-
-	"k8s.io/apimachinery/pkg/util/net"
 )
 
 func TestRangeAllocatorEmpty(t *testing.T) {
-	r := &net.PortRange{}
+	r := &PortRange{}
 	r.Set("0-0")
 	defer func() {
 		if rv := recover(); rv == nil {
@@ -35,7 +33,7 @@ func TestRangeAllocatorEmpty(t *testing.T) {
 }
 
 func TestRangeAllocatorFullyAllocated(t *testing.T) {
-	r := &net.PortRange{}
+	r := &PortRange{}
 	r.Set("1-1")
 	// Don't auto-fill ports, we'll manually turn the crank
 	pra := newPortRangeAllocator(*r, false)
@@ -105,7 +103,7 @@ func TestRangeAllocatorFullyAllocated(t *testing.T) {
 }
 
 func TestRangeAllocator_RandomishAllocation(t *testing.T) {
-	r := &net.PortRange{}
+	r := &PortRange{}
 	r.Set("1-100")
 	pra := newPortRangeAllocator(*r, false)
 	a := pra.(*rangeAllocator)

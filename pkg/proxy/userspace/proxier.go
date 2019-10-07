@@ -125,7 +125,7 @@ type Proxier struct {
 	listenIP        net.IP
 	iptables        iptables.Interface
 	hostIP          net.IP
-	proxyPorts      PortAllocator
+	proxyPorts      utilnet.PortAllocator
 	makeProxySocket ProxySocketFunc
 	exec            utilexec.Interface
 	// endpointsSynced and servicesSynced are set to 1 when the corresponding
@@ -208,16 +208,16 @@ func NewCustomProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptab
 		return nil, fmt.Errorf("failed to set open file handler limit: %v", err)
 	}
 
-	proxyPorts := newPortAllocator(pr)
+	proxyPorts := utilnet.NewPortAllocator(pr)
 
 	klog.V(2).Infof("Setting proxy IP to %v and initializing iptables", hostIP)
 	return createProxier(loadBalancer, listenIP, iptables, exec, hostIP, proxyPorts, syncPeriod, minSyncPeriod, udpIdleTimeout, makeProxySocket)
 }
 
-func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, hostIP net.IP, proxyPorts PortAllocator, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
+func createProxier(loadBalancer LoadBalancer, listenIP net.IP, iptables iptables.Interface, exec utilexec.Interface, hostIP net.IP, proxyPorts utilnet.PortAllocator, syncPeriod, minSyncPeriod, udpIdleTimeout time.Duration, makeProxySocket ProxySocketFunc) (*Proxier, error) {
 	// convenient to pass nil for tests..
 	if proxyPorts == nil {
-		proxyPorts = newPortAllocator(utilnet.PortRange{})
+		proxyPorts = utilnet.NewPortAllocator(utilnet.PortRange{})
 	}
 	// Set up the iptables foundations we need.
 	if err := iptablesInit(iptables); err != nil {
