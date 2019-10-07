@@ -38,9 +38,12 @@ const (
 	defaultObservationTimeout = time.Minute * 4
 )
 
-var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive] [NodeFeature:StartupProbe]", func() {
-	f := framework.NewDefaultFramework("critical-pod-test")
+var _ = framework.KubeDescribe("StartupProbe [Serial] [Disruptive] [NodeAlphaFeature:StartupProbe]", func() {
+	f := framework.NewDefaultFramework("startup-probe-test")
 	var podClient *framework.PodClient
+	ginkgo.BeforeEach(func() {
+		podClient = f.PodClient()
+	})
 
 	/*
 		These tests are located here as they require tempSetCurrentKubeletConfig to enable the feature gate for startupProbe.
