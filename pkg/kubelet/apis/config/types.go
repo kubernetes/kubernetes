@@ -331,6 +331,10 @@ type KubeletConfiguration struct {
 	// This flag accepts a list of options. Acceptable options are `pods`, `system-reserved` & `kube-reserved`.
 	// Refer to [Node Allocatable](https://git.k8s.io/community/contributors/design-proposals/node/node-allocatable.md) doc for more information.
 	EnforceNodeAllocatable []string
+	// This option specifies the cpu list reserved for the host level system threads and kubernetes related threads.
+	// This provide a "static" CPU list rather than the "dynamic" list by system-reserved and kube-reserved.
+	// This option overwrites CPUs provided by system-reserved and kube-reserved.
+	ReservedSystemCPUs string
 }
 
 type KubeletAuthorizationMode string

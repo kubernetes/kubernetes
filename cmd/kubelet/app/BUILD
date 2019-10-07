@@ -57,6 +57,7 @@ go_library(
         "//pkg/kubelet/certificate:go_default_library",
         "//pkg/kubelet/certificate/bootstrap:go_default_library",
         "//pkg/kubelet/cm:go_default_library",
+        "//pkg/kubelet/cm/cpuset:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
         "//pkg/kubelet/dockershim:go_default_library",
