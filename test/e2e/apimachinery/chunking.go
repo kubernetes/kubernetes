@@ -130,7 +130,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		loopCount := int64(0)
 		var continueChunkHistory []string
 		ginkgo.By("retrieving invidual chunk list of ConfigMap")
-		e2elog.Logf("configMapLabelSelector: %v", configMapLabelSelector)
+		framework.Logf("configMapLabelSelector: %v", configMapLabelSelector)
 		for {
 			opts := metav1.ListOptions{
 				LabelSelector: string(configMapLabelSelector),
@@ -143,10 +143,10 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			framework.ExpectNoError(err, "failed fetching ConfigMap list")
 
 			if len(list.Continue) == 0 {
-				e2elog.Logf("reached end of chunk list")
+				framework.Logf("reached end of chunk list")
 				break
 			} else {
-				e2elog.Logf("list.Continue: %v", list.Continue)
+				framework.Logf("list.Continue: %v", list.Continue)
 			}
 
 			if loopCount > 0 && len(continueChunkHistory) > 0 {
@@ -157,7 +157,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 			loopCount++
 
 			continueDecode, _ := base64.StdEncoding.DecodeString(list.Continue)
-			e2elog.Logf("Fetched %d chunks; Continue: %s; Items: %s; Continue unwrapped value: %v", loopCount, list.Continue, fmt.Sprintf("%T", list.Items), string(continueDecode))
+			framework.Logf("Fetched %d chunks; Continue: %s; Items: %s; Continue unwrapped value: %v", loopCount, list.Continue, fmt.Sprintf("%T", list.Items), string(continueDecode))
 
 		}
 
