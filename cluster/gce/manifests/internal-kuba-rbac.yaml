@@ -88,6 +88,7 @@ rules:
   - batch
   resources:
   - jobs
+  - cronjobs
   verbs:
   - get
   - list
@@ -105,7 +106,7 @@ roleRef:
   name: system:gke-uas-metrics-reader
 subjects:
 - kind: User
-  name: vpa-recommender
+  name: system:vpa-recommender
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -120,7 +121,7 @@ roleRef:
   name: system:gke-uas-adapter
 subjects:
 - kind: User
-  name: vpa-recommender
+  name: system:vpa-recommender
   namespace: kube-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -135,7 +136,7 @@ roleRef:
   name: system:gke-uas-collection-reader
 subjects:
 - kind: User
-  name: vpa-recommender
+  name: system:vpa-recommender
   namespace: kube-system
 ---
 # VPA Recommender is the Kubernetes Unified Autoscaling Adapter
@@ -163,6 +164,20 @@ subjects:
 # Kuba which uses the vpa-recommender user credentials, so we need to
 # bind it to vpa-recommender as well.
 # https://github.com/GoogleCloudPlatform/k8s-stackdriver/blob/6e4d20308f4a195d99f11c55ce04e69339339bb2/custom-metrics-stackdriver-adapter/deploy/production/adapter.yaml#L154
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-metrics-reader
+rules:
+- apiGroups:
+  - "external.metrics.k8s.io"
+  resources:
+  - "*"
+  verbs:
+  - list
+  - get
+  - watch
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

@@ -339,3 +339,57 @@ subjects:
 - kind: User
   name: system:vpa-admission-controller
   namespace: kube-system
+---
+# VPA Recommender is the Kubernetes Unified Autoscaling Adapter
+# (Kuba). Kuba also runs an HPA controller which talks to UAS and
+# controls HPA objects in lieu of Controller Manager. So it needs
+# the same permissions as the CM HPA controller.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:gke-uas-hpa-controller
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:controller:horizontal-pod-autoscaler
+subjects:
+- kind: User
+  name: system:vpa-recommender
+  namespace: kube-system
+---
+# The Stackdriver Custom Metrics Adapter creates the
+# external-metrics-reader cluster role and binds it to the
+# horizontal-pod-autoscaler service account.  But HPA is now running in
+# Kuba which uses the vpa-recommender user credentials, so we need to
+# bind it to vpa-recommender as well.
+# https://github.com/GoogleCloudPlatform/k8s-stackdriver/blob/6e4d20308f4a195d99f11c55ce04e69339339bb2/custom-metrics-stackdriver-adapter/deploy/production/adapter.yaml#L154
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: external-metrics-reader
+rules:
+- apiGroups:
+  - "external.metrics.k8s.io"
+  resources:
+  - "*"
+  verbs:
+  - list
+  - get
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: uas-hpa-external-metrics-reader
+  labels:
+    addonmanager.kubernetes.io/mode: Reconcile
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: external-metrics-reader
+subjects:
+  - kind: User
+    name: system:vpa-recommender
+    namespace: kube-system
