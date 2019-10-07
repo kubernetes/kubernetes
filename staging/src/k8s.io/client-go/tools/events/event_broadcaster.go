@@ -102,6 +102,10 @@ func newBroadcaster(sink EventSink, sleepDuration time.Duration, eventCache map[
 	}
 }
 
+func (e *eventBroadcasterImpl) Shutdown() {
+	e.Broadcaster.Shutdown()
+}
+
 // refreshExistingEventSeries refresh events TTL
 func (e *eventBroadcasterImpl) refreshExistingEventSeries() {
 	// TODO: Investigate whether lock contention won't be a problem

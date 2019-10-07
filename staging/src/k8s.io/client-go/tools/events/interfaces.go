@@ -54,6 +54,9 @@ type EventBroadcaster interface {
 	// NOTE: events received on your eventHandler should be copied before being used.
 	// TODO: figure out if this can be removed.
 	StartEventWatcher(eventHandler func(event runtime.Object)) func()
+
+	// Shutdown shuts down the broadcaster
+	Shutdown()
 }
 
 // EventSink knows how to store events (client-go implements it.)
