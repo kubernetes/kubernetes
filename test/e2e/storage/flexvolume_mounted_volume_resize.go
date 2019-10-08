@@ -37,10 +37,8 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
-const (
-	// total time to wait for cloudprovider or file system resize to finish
-	totalResizeWaitPeriod = 5 * time.Minute
-)
+// total time to wait for cloudprovider or file system resize to finish
+const totalResizeWaitPeriod = 5 * time.Minute
 
 var _ = utils.SIGDescribe("Mounted flexvolume expand[Slow]", func() {
 	var (
