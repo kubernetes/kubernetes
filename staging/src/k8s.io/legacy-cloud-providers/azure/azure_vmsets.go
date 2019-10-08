@@ -68,7 +68,7 @@ type VMSet interface {
 	// DetachDisk detaches a vhd from host. The vhd can be identified by diskName or diskURI.
 	DetachDisk(diskName, diskURI string, nodeName types.NodeName) (*http.Response, error)
 	// GetDataDisks gets a list of data disks attached to the node.
-	GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error)
+	GetDataDisks(nodeName types.NodeName, crt cacheReadType) ([]compute.DataDisk, error)
 
 	// GetPowerStatusByNodeName returns the power state of the specified node.
 	GetPowerStatusByNodeName(name string) (string, error)

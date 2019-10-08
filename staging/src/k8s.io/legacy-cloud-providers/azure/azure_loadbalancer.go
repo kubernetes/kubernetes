@@ -882,7 +882,7 @@ func (az *Cloud) reconcileLoadBalancer(clusterName string, service *v1.Service, 
 
 			if isInternal {
 				// Refresh updated lb which will be used later in other places.
-				newLB, exist, err := az.getAzureLoadBalancer(lbName)
+				newLB, exist, err := az.getAzureLoadBalancer(lbName, cachedData)
 				if err != nil {
 					klog.V(2).Infof("reconcileLoadBalancer for service(%s): getAzureLoadBalancer(%s) failed: %v", serviceName, lbName, err)
 					return nil, err
@@ -1028,7 +1028,7 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		ports = []v1.ServicePort{}
 	}
 
-	sg, err := az.getSecurityGroup()
+	sg, err := az.getSecurityGroup(cachedData)
 	if err != nil {
 		return nil, err
 	}
@@ -1368,7 +1368,7 @@ func (az *Cloud) reconcilePublicIP(clusterName string, service *v1.Service, lbNa
 	}
 
 	if lbName != "" {
-		loadBalancer, _, err := az.getAzureLoadBalancer(lbName)
+		loadBalancer, _, err := az.getAzureLoadBalancer(lbName, cachedData)
 		if err != nil {
 			return nil, err
 		}
