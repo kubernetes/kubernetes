@@ -21,6 +21,14 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
+const (
+	// PredicatesStateKey is the key in CycleState to PredicateStateData
+	PredicatesStateKey = "predicates"
+
+	// PrioritiesStateKey is the key in CycleState to PrioritiesStateData
+	PrioritiesStateKey = "priorities"
+)
+
 // PredicateResultToFrameworkStatus converts a predicate result (PredicateFailureReason + error)
 // to a framework status.
 func PredicateResultToFrameworkStatus(reasons []predicates.PredicateFailureReason, err error) *framework.Status {
@@ -47,14 +55,6 @@ func ErrorToFrameworkStatus(err error) *framework.Status {
 	}
 	return nil
 }
-
-const (
-	// PredicatesStateKey is the key in CycleState to PredicateStateData
-	PredicatesStateKey = "predicates"
-
-	// PrioritiesStateKey is the key in CycleState to PrioritiesStateData
-	PrioritiesStateKey = "priorities"
-)
 
 // PredicatesStateData is a pointer to PredicateMetadata. In the normal case, StateData is supposed to
 // be generated and stored in CycleState by a framework plugin (like a PreFilter pre-computing data for

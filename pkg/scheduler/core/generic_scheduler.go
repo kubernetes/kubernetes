@@ -556,7 +556,7 @@ func (g *genericScheduler) findNodesThatFit(state *framework.CycleState, pod *v1
 
 // addNominatedPods adds pods with equal or greater priority which are nominated
 // to run on the node given in nodeInfo to meta and nodeInfo. It returns 1) whether
-// any pod was added, 2) augmented meta data, 3) augmented nodeInfo.
+// any pod was added, 2) augmented metadata, 3) augmented CycleState 4) augmented nodeInfo.
 func (g *genericScheduler) addNominatedPods(pod *v1.Pod, meta predicates.PredicateMetadata, state *framework.CycleState,
 	nodeInfo *schedulernodeinfo.NodeInfo, queue internalqueue.SchedulingQueue) (bool, predicates.PredicateMetadata,
 	*framework.CycleState, *schedulernodeinfo.NodeInfo, error) {
@@ -640,7 +640,7 @@ func (g *genericScheduler) podFitsOnNode(
 		stateToUse := state
 		nodeInfoToUse := info
 		if i == 0 {
-			err := error(nil)
+			var err error
 			podsAdded, metaToUse, stateToUse, nodeInfoToUse, err = g.addNominatedPods(pod, meta, state, info, queue)
 			if err != nil {
 				return false, []predicates.PredicateFailureReason{}, nil, err
