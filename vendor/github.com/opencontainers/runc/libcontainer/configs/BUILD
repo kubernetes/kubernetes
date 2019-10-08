@@ -5,7 +5,7 @@ go_library(
     srcs = [
         "blkio_device.go",
         "cgroup_linux.go",
-        "cgroup_windows.go",
+        "cgroup_unsupported.go",
         "config.go",
         "config_linux.go",
         "device.go",
