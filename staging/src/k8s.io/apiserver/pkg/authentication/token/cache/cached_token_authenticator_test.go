@@ -153,8 +153,6 @@ type singleBenchmark struct {
 	tokens          []string
 	chokepoint      chan struct{}
 
-	onFirstResponse sync.Once
-
 	b  *testing.B
 	wg sync.WaitGroup
 }
@@ -195,13 +193,6 @@ func (s *singleBenchmark) lookup(ctx context.Context, token string) (*authentica
 	if !ok {
 		panic("test setup problem")
 	}
-	s.onFirstResponse.Do(func() {
-		// since 500ms is the fastest we can return, reset the
-		// timer on the first response. Otherwise the benchmark
-		// code may think that we're too slow to be worth
-		// calling with larger N's.
-		//s.b.ResetTimer()
-	})
 	return r.resp, r.ok, r.err
 }
 

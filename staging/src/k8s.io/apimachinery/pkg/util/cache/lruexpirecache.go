@@ -97,30 +97,26 @@ type ComputeFunc func(abort <-chan time.Time) (value interface{}, ttl time.Durat
 // the value; requests for the same key that arrive within computationTime will
 // be blocked while the computation is in progress; for all such requests,
 // compute() will only be called once.
-//
-// In the unlikely event the cache has so much churn that a freshly computed
-// value can't be regotten, this will attempt to compute it again, but not more
-// than 3 times, and not if more than `computationTime` passes overall.
 func (c *LRUExpireCache) GetOrWait(key interface{}, compute ComputeFunc, computationTime time.Duration) (interface{}, bool) {
-	thisTTL := computationTime
-	if thisTTL < 0 {
-		thisTTL = 0
+	computationTTL := computationTime
+	if computationTTL < 0 {
+		computationTTL = 0
 	}
-	ce, ch := c.getOrBegin(key, thisTTL)
+	ce, ch := c.getOrBegin(key, computationTTL)
 	if ch != nil {
 		// We are the first caller for this key, so begin the
 		// computation.
-		abort := c.clock.After(thisTTL)
+		abort := c.clock.After(computationTTL)
 		go func() {
 			defer close(ch)
-			value, ttl := compute(abort)
-			if ttl > 0 {
+			value, entryTTL := compute(abort)
+			if entryTTL > 0 {
 				// write a new entry before closing the channel
 				// so that new getters of this key can check
 				// ce.value and not wait; existing waiters
 				// won't look at finalValue until after we
 				// close the channel, so there is no race.
-				c.Add(key, value, ttl)
+				c.Add(key, value, entryTTL)
 				ce.finalValue = value
 			} else {
 				c.Remove(key)
@@ -147,21 +143,22 @@ func (c *LRUExpireCache) GetOrWait(key interface{}, compute ComputeFunc, computa
 	return ce.finalValue, true
 }
 
-// If ttl <= 0, it will not begin anything and instead return (nil, nil).
+// If the entry exists, return (entry, nil). Otherwise...
+// * If ttl > 0, return (entry, channel to close on computation completion).
+//   Caller must ensure this channel is closed.
+// * If ttl <= 0, it will not begin anything and instead return (nil, nil) to
+//   indicate a cache miss.
 func (c *LRUExpireCache) getOrBegin(key interface{}, ttl time.Duration) (*cacheEntry, chan<- struct{}) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	e, ok := c.cache.Get(key)
-	if ok {
+	if e, ok := c.cache.Get(key); ok {
 		n := c.clock.Now()
-		et := e.(*cacheEntry).expireTime
-		if n.After(et) {
+		et := e.(*cacheEntry)
+		if n.After(et.expireTime) {
 			c.cache.Remove(key)
-			ok = false
+		} else {
+			return et, nil
 		}
-	}
-	if ok {
-		return e.(*cacheEntry), nil
 	}
 	if ttl <= 0 {
 		return nil, nil
