@@ -182,6 +182,10 @@ filename | sha512 hash
 [kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.14.7/kubernetes-node-linux-s390x.tar.gz) | `bca2c439588fccb4f10f6bb5f2f06bdb9606ed9baf3101cd792b8b826c668905fddc82bd81b99204592f8b42a3e3ded9da9b96418a3ba20e41a1f67d20520cce`
 [kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.14.7/kubernetes-node-windows-amd64.tar.gz) | `e67828b5998342f8095f102e9c91e6ad5c59dbae3566c5acc4a83bb042b3ddb8118f224a11a44bbcb4af8c34a852c973b52f4d871584f718f982629206b29153`
 
+## Known Issues
+
+* There is a known issue [#82923](https://github.com/kubernetes/kubernetes/issues/82923) in the AWS cloudprovider, where ELBs fail to register instances.  The fix has been merged [#82954](https://github.com/kubernetes/kubernetes/pull/82954) and will be included in v1.14.8.
+
 ## Changelog since v1.14.6
 
 ### Other notable changes
@@ -197,8 +201,6 @@ filename | sha512 hash
 * remove iSCSI volume storage cleartext secrets in logs ([#81215](https://github.com/kubernetes/kubernetes/pull/81215), [@zouyee](https://github.com/zouyee))
 * Fix a bug in server printer that could cause kube-apiserver to panic. ([#79349](https://github.com/kubernetes/kubernetes/pull/79349), [@roycaihw](https://github.com/roycaihw))
 * Fix a bug in the IPVS proxier where virtual servers are not cleaned up even though the corresponding Service object was deleted. ([#80942](https://github.com/kubernetes/kubernetes/pull/80942), [@gongguan](https://github.com/gongguan))
-
-
 
 # v1.14.6
 
