@@ -86,7 +86,6 @@ pkg/controller/replication/config/v1alpha1
 pkg/controller/resourcequota
 pkg/controller/resourcequota/config/v1alpha1
 pkg/controller/route
-pkg/controller/service
 pkg/controller/service/config/v1alpha1
 pkg/controller/serviceaccount/config/v1alpha1
 pkg/controller/statefulset
