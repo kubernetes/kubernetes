@@ -263,41 +263,13 @@ func (plugin *awsElasticBlockStorePlugin) ConstructVolumeSpec(volName, mountPath
 	if err != nil {
 		return nil, err
 	}
-	// This is a workaround to fix the issue in converting aws volume id from globalPDPath
-	// There are three aws volume id formats and their volumeID from GetDeviceNameFromMount() are:
-	// aws:///vol-1234 (aws/vol-1234)
-	// aws://us-east-1/vol-1234 (aws/us-east-1/vol-1234)
-	// vol-1234 (vol-1234)
-	// This code is for converting volume id to aws style volume id for the first two cases.
-	sourceName := volumeID
-	if strings.HasPrefix(volumeID, "aws/") {
-		names := strings.Split(volumeID, "/")
-		length := len(names)
-		if length < 2 || length > 3 {
-			return nil, fmt.Errorf("Failed to get AWS volume id from mount path %q: invalid volume name format %q", mountPath, volumeID)
-		}
-		volName := names[length-1]
-		if !strings.HasPrefix(volName, "vol-") {
-			return nil, fmt.Errorf("Invalid volume name format for AWS volume (%q) retrieved from mount path %q", volName, mountPath)
-		}
-		if length == 2 {
-			sourceName = awsURLNamePrefix + "" + "/" + volName // empty zone label
-		}
-		if length == 3 {
-			sourceName = awsURLNamePrefix + names[1] + "/" + volName // names[1] is the zone label
-		}
-		klog.V(4).Infof("Convert aws volume name from %q to %q ", volumeID, sourceName)
+	volumeID, err = formatVolumeID(volumeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get AWS volume id from mount path %q: %v", mountPath, err)
 	}
 
-	awsVolume := &v1.Volume{
-		Name: volName,
-		VolumeSource: v1.VolumeSource{
-			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-				VolumeID: sourceName,
-			},
-		},
-	}
-	return volume.NewSpecFromVolume(awsVolume), nil
+	file := v1.PersistentVolumeFilesystem
+	return newAWSVolumeSpec(volName, volumeID, file), nil
 }
 
 func (plugin *awsElasticBlockStorePlugin) RequiresFSResize() bool {
