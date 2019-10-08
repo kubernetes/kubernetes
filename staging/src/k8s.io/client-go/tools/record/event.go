@@ -127,6 +127,9 @@ type EventBroadcaster interface {
 	// NewRecorder returns an EventRecorder that can be used to send events to this EventBroadcaster
 	// with the event source set to the given event source.
 	NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorder
+
+	// Shutdown shuts down the broadcaster
+	Shutdown()
 }
 
 // Creates a new event broadcaster.
@@ -167,6 +170,10 @@ func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSin
 		func(event *v1.Event) {
 			recordToSink(sink, event, eventCorrelator, eventBroadcaster.sleepDuration)
 		})
+}
+
+func (e *eventBroadcasterImpl) Shutdown() {
+	e.Broadcaster.Shutdown()
 }
 
 func recordToSink(sink EventSink, event *v1.Event, eventCorrelator *EventCorrelator, sleepDuration time.Duration) {
