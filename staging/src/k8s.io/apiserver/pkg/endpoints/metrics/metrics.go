@@ -189,10 +189,10 @@ var (
 		[]string{"requestKind"},
 	)
 
-	requestErrorTotal = compbasemetrics.NewCounterVec(
+	requestErrorsTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name: "apiserver_request_error_total",
-			Help: "Number of requests which have resulted in an apiserver response error",
+			Name:           "apiserver_request_errors_total",
+			Help:           "Number of requests which have resulted in an apiserver response error.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "code"},
@@ -213,7 +213,7 @@ var (
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
-		requestErrorTotal,
+		requestErrorsTotal,
 	}
 )
 
@@ -261,9 +261,9 @@ func RecordRequestError(req *http.Request, requestInfo *request.RequestInfo, com
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
 	if requestInfo.IsResourceRequest {
-		requestErrorTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
+		requestErrorsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
-		requestErrorTotal.WithLabelValues(cleanVerb(verb, req), "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
+		requestErrorsTotal.WithLabelValues(cleanVerb(verb, req), "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
 	}
 }
 
