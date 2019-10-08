@@ -41,11 +41,11 @@ func (c *simpleCache) get(key string) (*cacheRecord, bool) {
 }
 
 func (c *simpleCache) getOrWait(key string, compute lrucache.ComputeFunc, computationTime time.Duration) (value *cacheRecord, exists bool) {
-	val, ok := c.lru.GetOrWait(key, compute, computationTime)
+	record, ok := c.lru.GetOrWait(key, compute, computationTime)
 	if !ok {
 		return nil, false
 	}
-	value, ok := record.(*cacheRecord)
+	value, ok = record.(*cacheRecord)
 	return value, ok
 }
 

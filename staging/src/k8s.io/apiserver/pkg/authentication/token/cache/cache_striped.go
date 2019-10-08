@@ -19,6 +19,8 @@ package cache
 import (
 	"hash/fnv"
 	"time"
+
+	lrucache "k8s.io/apimachinery/pkg/util/cache"
 )
 
 // split cache lookups across N striped caches
@@ -46,7 +48,7 @@ func newStripedCache(stripeCount int, hash hashFunc, newCacheFunc newCacheFunc) 
 func (c *stripedCache) get(key string) (*cacheRecord, bool) {
 	return c.caches[c.hashFunc(key)%c.stripeCount].get(key)
 }
-func (c *simpleCache) getOrWait(key string, compute lrucache.ComputeFunc, computationTime time.Duration) (value *cacheRecord, exists bool) {
+func (c *stripedCache) getOrWait(key string, compute lrucache.ComputeFunc, computationTime time.Duration) (value *cacheRecord, exists bool) {
 	return c.caches[c.hashFunc(key)%c.stripeCount].getOrWait(key, compute, computationTime)
 }
 func (c *stripedCache) set(key string, value *cacheRecord, ttl time.Duration) {

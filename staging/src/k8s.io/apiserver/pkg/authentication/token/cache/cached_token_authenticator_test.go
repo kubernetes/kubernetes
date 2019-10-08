@@ -47,11 +47,13 @@ func TestCachedTokenAuthenticator(t *testing.T) {
 	a.AuthenticateToken(context.Background(), "bad1")
 	a.AuthenticateToken(context.Background(), "bad2")
 	a.AuthenticateToken(context.Background(), "bad3")
+	fakeClock.Step(2 * time.Microsecond)
 	a.AuthenticateToken(context.Background(), "bad1")
 	a.AuthenticateToken(context.Background(), "bad2")
 	a.AuthenticateToken(context.Background(), "bad3")
+	fakeClock.Step(2 * time.Microsecond)
 	if !reflect.DeepEqual(calledWithToken, []string{"bad1", "bad2", "bad3", "bad1", "bad2", "bad3"}) {
-		t.Errorf("Expected failing calls to bypass cache, got %v", calledWithToken)
+		t.Errorf("Expected failing calls to not stay in the cache, got %v", calledWithToken)
 	}
 
 	// reset calls, make the backend return success for three user tokens

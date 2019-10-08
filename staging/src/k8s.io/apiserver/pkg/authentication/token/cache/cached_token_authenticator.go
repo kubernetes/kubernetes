@@ -18,6 +18,7 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -87,7 +88,7 @@ func (a *cachedTokenAuthenticator) lookupFunc(ctx context.Context, token string)
 			select {
 			case <-abort:
 				cancel()
-			case ctx.Done():
+			case <-ctx.Done():
 			}
 		}()
 		resp, ok, err := a.authenticator.AuthenticateToken(ctx, token)
@@ -97,7 +98,7 @@ func (a *cachedTokenAuthenticator) lookupFunc(ctx context.Context, token string)
 			return &cacheRecord{resp: resp, ok: ok, err: err}, minimumCacheTTL
 		}
 
-		ttl := minimumCacheTTL
+		ttl = minimumCacheTTL
 
 		switch {
 		case ok:
@@ -118,7 +119,7 @@ func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token 
 	auds, _ := authenticator.AudiencesFrom(ctx)
 
 	key := keyFunc(auds, token)
-	if record, ok := a.cache.getOrWait(key, a.lookupFunc(token), maxComputationTimeForJoining); ok {
+	if record, ok := a.cache.getOrWait(key, a.lookupFunc(ctx, token), maxComputationTimeForJoining); ok {
 		return record.resp, record.ok, record.err
 	}
 
