@@ -1835,7 +1835,7 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 	duration := base
 	for {
 		if err := kl.runtimeState.runtimeErrors(); err != nil {
-			klog.Infof("skipping pod synchronization - %v", err)
+			klog.Errorf("skipping pod synchronization - %v", err)
 			// exponential backoff
 			time.Sleep(duration)
 			duration = time.Duration(math.Min(float64(max), factor*float64(duration)))
