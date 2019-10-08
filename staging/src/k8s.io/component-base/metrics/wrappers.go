@@ -79,3 +79,9 @@ type PromRegistry interface {
 	Unregister(prometheus.Collector) bool
 	Gather() ([]*dto.MetricFamily, error)
 }
+
+// Gatherer is the interface for the part of a registry in charge of gathering
+// the collected metrics into a number of MetricFamilies.
+type Gatherer interface {
+	prometheus.Gatherer
+}
