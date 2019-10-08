@@ -110,12 +110,6 @@ func IsStaticPod(pod *v1.Pod) bool {
 	return err == nil && source != kubetypes.ApiserverSource
 }
 
-// IsMirrorPod returns true if the passed Pod is a Mirror Pod.
-func IsMirrorPod(pod *v1.Pod) bool {
-	_, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
-	return ok
-}
-
 func getHashFromMirrorPod(pod *v1.Pod) (string, bool) {
 	hash, ok := pod.Annotations[kubetypes.ConfigMirrorAnnotationKey]
 	return hash, ok

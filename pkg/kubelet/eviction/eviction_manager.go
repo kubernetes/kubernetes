@@ -547,19 +547,9 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
 	// do not evict such pods. Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
-	if kubelettypes.IsStaticPod(pod) {
-		// need mirrorPod to check its "priority" value; static pod doesn't carry it
-		if mirrorPod, ok := m.mirrorPodFunc(pod); ok && mirrorPod != nil {
-			// skip only when it's a static and critical pod
-			if kubelettypes.IsCriticalPod(mirrorPod) {
-				klog.Errorf("eviction manager: cannot evict a critical static pod %s", format.Pod(pod))
-				return false
-			}
-		} else {
-			// we should never hit this
-			klog.Errorf("eviction manager: cannot get mirror pod from static pod %s, so cannot evict it", format.Pod(pod))
-			return false
-		}
+	if kubelettypes.IsCriticalPod(pod) {
+		klog.Errorf("eviction manager: cannot evict a critical pod %s", format.Pod(pod))
+		return false
 	}
 	status := v1.PodStatus{
 		Phase:   v1.PodFailed,

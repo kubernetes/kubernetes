@@ -35,7 +35,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/client/conditions"
-	kubepod "k8s.io/kubernetes/pkg/kubelet/pod"
+	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -434,7 +434,7 @@ func FilterNonRestartablePods(pods []*v1.Pod) []*v1.Pod {
 }
 
 func isNotRestartAlwaysMirrorPod(p *v1.Pod) bool {
-	if !kubepod.IsMirrorPod(p) {
+	if !kubetypes.IsMirrorPod(p) {
 		return false
 	}
 	return p.Spec.RestartPolicy != v1.RestartPolicyAlways

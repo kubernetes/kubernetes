@@ -16,7 +16,7 @@ go_library(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/client/conditions:go_default_library",
         "//pkg/controller:go_default_library",
-        "//pkg/kubelet/pod:go_default_library",
+        "//pkg/kubelet/types:go_default_library",
         "//pkg/kubelet/util/format:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
