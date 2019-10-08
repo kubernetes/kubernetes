@@ -932,7 +932,7 @@ func (f *fakeVMSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName
 	return nil, fmt.Errorf("unimplemented")
 }
 
-func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error) {
+func (f *fakeVMSet) GetDataDisks(nodeName types.NodeName, crt cacheReadType) ([]compute.DataDisk, error) {
 	return nil, fmt.Errorf("unimplemented")
 }
 
