@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 
-	_ "go.etcd.io/etcd/etcdserver/api/v3rpc" // Force package logger init.
 	"github.com/coreos/pkg/capnslog"
+	_ "go.etcd.io/etcd/etcdserver/api/v3rpc" // Force package logger init.
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

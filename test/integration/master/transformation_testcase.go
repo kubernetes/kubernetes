@@ -29,8 +29,8 @@ import (
 
 	"k8s.io/klog"
 
-	"go.etcd.io/etcd/clientv3"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.etcd.io/etcd/clientv3"
 	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"

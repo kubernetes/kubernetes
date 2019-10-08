@@ -137,8 +137,8 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//test/integration:go_default_library",
         "//test/integration/framework:go_default_library",
-        "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
+        "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/sigs.k8s.io/yaml:go_default_library",
     ] + select({
