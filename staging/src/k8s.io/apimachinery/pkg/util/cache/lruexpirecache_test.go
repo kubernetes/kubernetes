@@ -19,6 +19,7 @@ package cache
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -88,13 +89,13 @@ type blockedComputeFunc struct {
 	key   string
 	value string
 
-	// if a race is expected, the winning compute function sets this to true.
-	winner bool
+	// if a race is expected, the winning compute function increments this.
+	winCount int64
 
 	computeTTL    time.Duration
 	cacheEntryTTL time.Duration
 
-	callCount  int
+	callCount  int64
 	blockUntil chan struct{}
 }
 
@@ -117,7 +118,7 @@ func (b *blockedComputeFunc) compute(notifyOnBegin chan<- struct{}) func(abort <
 	return func(abort <-chan time.Time) (interface{}, time.Duration) {
 		notifyOnBegin <- struct{}{}
 		// fmt.Printf("compute[%v=%v] begin: %v\n", b.key, b.value, b.framework.clock.Now())
-		b.callCount++
+		atomic.AddInt64(&b.callCount, 1)
 
 		// Make sure that if both channels are waiting when we get
 		// here, the abort channel is selected.
@@ -216,9 +217,13 @@ func (b *blockedComputeFunc) expectMiss(t *testing.T) func(interface{}, bool) {
 func (b *blockedComputeFunc) expectRace(t *testing.T) func(interface{}, bool) {
 	return func(v interface{}, ok bool) {
 		if ok && v == b.value {
-			b.winner = true
+			atomic.AddInt64(&b.winCount, 1)
 		}
 	}
+}
+
+func (b *blockedComputeFunc) Calls() int {
+	return int(atomic.LoadInt64(&b.callCount))
 }
 
 func TestJoinedGet(t *testing.T) {
@@ -250,8 +255,8 @@ func TestJoinedGet(t *testing.T) {
 
 	wg.Wait()
 
-	if cf.callCount != 1 {
-		t.Errorf("saw %v calls", cf.callCount)
+	if calls := cf.Calls(); calls != 1 {
+		t.Errorf("saw %v calls", calls)
 	}
 
 	expectEntry(t, j.cache, "joined", "12345")
@@ -298,7 +303,7 @@ func TestJoinedGetTimeout(t *testing.T) {
 				t.Errorf("expected to unblock %v waiting compute() calls, but unblocked %v", e, a)
 			}
 
-			if e, a := tt.expectCalls, cf.callCount; e != a {
+			if e, a := tt.expectCalls, cf.Calls(); e != a {
 				t.Errorf("expected %v calls but saw %v calls", e, a)
 			}
 		})
@@ -330,7 +335,7 @@ func TestRegularGetDuringJoinedGet(t *testing.T) {
 		t.Errorf("expected to unblock %v waiting compute() calls, but unblocked %v", e, a)
 	}
 
-	if e, a := 1, cf.callCount; e != a {
+	if e, a := 1, cf.Calls(); e != a {
 		t.Errorf("expected %v calls but saw %v calls", e, a)
 	}
 }
@@ -366,7 +371,7 @@ func TestEvictDuringJoinedGet(t *testing.T) {
 		t.Errorf("expected to unblock %v waiting compute() calls, but unblocked %v", e, a)
 	}
 
-	if e, a := 2, cf.callCount; e != a {
+	if e, a := 2, cf.Calls(); e != a {
 		t.Errorf("expected %v calls but saw %v calls", e, a)
 	}
 }
@@ -399,7 +404,7 @@ func TestJoinedThrashing(t *testing.T) {
 		}
 	}()
 
-	unblocker := func(cf *blockedComputeFunc) {
+	thrash := func(cf *blockedComputeFunc) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -415,50 +420,29 @@ func TestJoinedThrashing(t *testing.T) {
 			}
 			t.Logf("unblocked %v total threads", unblocked)
 		}()
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				var wg2 sync.WaitGroup
+				for i := 0; i < 5; i++ {
+					cf.checkOne(&wg2, startCounter, cf.expectRace(t))
+				}
+				wg2.Wait()
+				select {
+				case <-stop:
+					return
+				default:
+				}
+			}
+		}()
 	}
 
-	for i := 0; i < 10; i++ {
-		wg.Add(3)
+	for i := 0; i < 100; i++ {
 		str := fmt.Sprintf("%v", i)
-		go func() {
-			defer wg.Done()
-			cf := newBCF(j, "race_"+str, "12345", 2*time.Second, 10*time.Second)
-			go unblocker(cf)
-			for {
-				cf.checkOne(&wg, startCounter, cf.expectRace(t))
-				select {
-				case <-stop:
-					return
-				default:
-				}
-			}
-		}()
-		go func() {
-			defer wg.Done()
-			cf := newBCF(j, "race_"+str, "54321", 2*time.Second, 2*time.Second)
-			go unblocker(cf)
-			for {
-				cf.checkOne(&wg, startCounter, cf.expectRace(t))
-				select {
-				case <-stop:
-					return
-				default:
-				}
-			}
-		}()
-		go func() {
-			defer wg.Done()
-			cf := newBCF(j, "norace_"+str, "12345", 2*time.Second, 2*time.Second)
-			go unblocker(cf)
-			for {
-				cf.checkOne(&wg, startCounter, cf.expectRace(t))
-				select {
-				case <-stop:
-					return
-				default:
-				}
-			}
-		}()
+		thrash(newBCF(j, "race_"+str, "12345", 2*time.Second, 10*time.Second))
+		thrash(newBCF(j, "norace_"+str, "12345", 2*time.Second, 2*time.Second))
+		thrash(newBCF(j, "race_"+str, "54321", 2*time.Second, 2*time.Second))
 	}
 
 	time.Sleep(5 * time.Second)
