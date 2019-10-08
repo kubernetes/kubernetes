@@ -391,7 +391,7 @@ func (sched *Scheduler) schedule(pod *v1.Pod, state *framework.CycleState) (core
 		sched.recordSchedulingFailure(pod, err, v1.PodReasonUnschedulable, err.Error())
 		return core.ScheduleResult{}, err
 	}
-	return result, err
+	return result, nil
 }
 
 // preempt tries to create room for a pod that has failed to schedule, by preempting lower priority pods if possible.
