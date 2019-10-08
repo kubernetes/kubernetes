@@ -30,8 +30,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-
-	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 )
 
 var _ Validator = &KernelValidator{}
@@ -63,20 +61,24 @@ const (
 )
 
 // Validate is part of the system.Validator interface.
-func (k *KernelValidator) Validate(spec SysSpec) (error, error) {
+func (k *KernelValidator) Validate(spec SysSpec) ([]error, []error) {
 	helper := KernelValidatorHelperImpl{}
 	release, err := helper.GetKernelReleaseVersion()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get kernel release")
+		return nil, []error{errors.Wrap(err, "failed to get kernel release")}
 	}
 	k.kernelRelease = release
 	var errs []error
-	errs = append(errs, k.validateKernelVersion(spec.KernelSpec))
+	if err = k.validateKernelVersion(spec.KernelSpec); err != nil {
+		errs = append(errs, err)
+	}
 	// only validate kernel config when necessary (currently no kernel config for windows)
 	if len(spec.KernelSpec.Required) > 0 || len(spec.KernelSpec.Forbidden) > 0 || len(spec.KernelSpec.Optional) > 0 {
-		errs = append(errs, k.validateKernelConfig(spec.KernelSpec))
+		if err = k.validateKernelConfig(spec.KernelSpec); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return nil, errorsutil.NewAggregate(errs)
+	return nil, errs
 }
 
 // validateKernelVersion validates the kernel version.
