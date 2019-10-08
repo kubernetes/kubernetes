@@ -46,6 +46,8 @@ type DynamicServingCertificateController struct {
 	clientCA CAContentProvider
 	// servingCert provides the very latest content of the default serving certificate
 	servingCert CertKeyContentProvider
+	// sniCerts are a list of CertKeyContentProvider with associated names used for SNI
+	sniCerts []SNICertKeyContentProvider
 
 	// currentlyServedContent holds the original bytes that we are serving. This is used to decide if we need to set a
 	// new atomic value. The types used for efficient TLSConfig preclude using the processed value.
@@ -63,12 +65,14 @@ func NewDynamicServingCertificateController(
 	baseTLSConfig tls.Config,
 	clientCA CAContentProvider,
 	servingCert CertKeyContentProvider,
+	sniCerts []SNICertKeyContentProvider,
 	eventRecorder events.EventRecorder,
 ) *DynamicServingCertificateController {
 	c := &DynamicServingCertificateController{
 		baseTLSConfig: baseTLSConfig,
 		clientCA:      clientCA,
 		servingCert:   servingCert,
+		sniCerts:      sniCerts,
 
 		queue:         workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "DynamicServingCertificateController"),
 		eventRecorder: eventRecorder,
@@ -111,6 +115,15 @@ func (c *DynamicServingCertificateController) newTLSContent() (*dynamicCertifica
 		}
 
 		newContent.servingCert = certKeyContent{cert: currServingCert, key: currServingKey}
+	}
+
+	for i, sniCert := range c.sniCerts {
+		currCert, currKey := sniCert.CurrentCertKeyContent()
+		if len(currCert) == 0 || len(currKey) == 0 {
+			return nil, fmt.Errorf("not loading an empty SNI certificate from %d/%q", i, sniCert.Name())
+		}
+
+		newContent.sniCerts = append(newContent.sniCerts, sniCertKeyContent{certKeyContent: certKeyContent{cert: currCert, key: currKey}, sniNames: sniCert.SNINames()})
 	}
 
 	return newContent, nil
@@ -168,13 +181,20 @@ func (c *DynamicServingCertificateController) syncCerts() error {
 		}
 
 		newTLSConfigCopy.Certificates = []tls.Certificate{cert}
+	}
+
+	if len(newContent.sniCerts) > 0 {
+		newTLSConfigCopy.NameToCertificate, err = c.BuildNamedCertificates(newContent.sniCerts)
+		if err != nil {
+			return fmt.Errorf("unable to build named certificate map: %v", err)
+		}
 
 		// append all named certs. Otherwise, the go tls stack will think no SNI processing
 		// is necessary because there is only one cert anyway.
-		// Moreover, if ServerCert.CertFile/ServerCert.KeyFile are not set, the first SNI
+		// Moreover, if servingCert is not set, the first SNI
 		// cert will become the default cert. That's what we expect anyway.
-		for _, c := range newTLSConfigCopy.NameToCertificate {
-			newTLSConfigCopy.Certificates = append(newTLSConfigCopy.Certificates, *c)
+		for _, sniCert := range newTLSConfigCopy.NameToCertificate {
+			newTLSConfigCopy.Certificates = append(newTLSConfigCopy.Certificates, *sniCert)
 		}
 	}
 

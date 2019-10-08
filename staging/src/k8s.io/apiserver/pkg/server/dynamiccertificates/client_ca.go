@@ -34,6 +34,7 @@ type dynamicCertificateContent struct {
 	// clientCA holds the content for the clientCA bundle
 	clientCA    caBundleContent
 	servingCert certKeyContent
+	sniCerts    []sniCertKeyContent
 }
 
 // caBundleContent holds the content for the clientCA bundle.  Wrapping the bytes makes the Equals work nicely with the
@@ -53,6 +54,16 @@ func (c *dynamicCertificateContent) Equal(rhs *dynamicCertificateContent) bool {
 
 	if !c.servingCert.Equal(&rhs.servingCert) {
 		return false
+	}
+
+	if len(c.sniCerts) != len(rhs.sniCerts) {
+		return false
+	}
+
+	for i := range c.sniCerts {
+		if !c.sniCerts[i].Equal(&rhs.sniCerts[i]) {
+			return false
+		}
 	}
 
 	return true
