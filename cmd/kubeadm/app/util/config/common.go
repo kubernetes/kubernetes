@@ -140,7 +140,7 @@ func VerifyAPIServerBindAddress(address string) error {
 }
 
 // ChooseAPIServerBindAddress is a wrapper for netutil.ChooseBindAddress that also handles
-// the case where no default routes were found and an IP for the API server could not be obatained.
+// the case where no default routes were found and an IP for the API server could not be obtained.
 func ChooseAPIServerBindAddress(bindAddress net.IP) (net.IP, error) {
 	ip, err := netutil.ChooseBindAddress(bindAddress)
 	if err != nil {
