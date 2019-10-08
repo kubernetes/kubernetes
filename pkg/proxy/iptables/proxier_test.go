@@ -1079,6 +1079,38 @@ func onlyLocalNodePorts(t *testing.T, fp *Proxier, ipt *iptablestest.FakeIPTable
 	}
 }
 
+func TestComputeProbability(t *testing.T) {
+	expectedProbabilities := map[int]string{
+		1:      "1.0000000000",
+		2:      "0.5000000000",
+		10:     "0.1000000000",
+		100:    "0.0100000000",
+		1000:   "0.0010000000",
+		10000:  "0.0001000000",
+		100000: "0.0000100000",
+		100001: "0.0000099999",
+	}
+
+	for num, expected := range expectedProbabilities {
+		actual := computeProbability(num)
+		if actual != expected {
+			t.Errorf("Expected computeProbability(%d) to be %s, got: %s", num, expected, actual)
+		}
+	}
+
+	prevProbability := float64(0)
+	for i := 100000; i > 1; i-- {
+		currProbability, err := strconv.ParseFloat(computeProbability(i), 64)
+		if err != nil {
+			t.Fatalf("Error parsing float probability for %d: %v", i, err)
+		}
+		if currProbability <= prevProbability {
+			t.Fatalf("Probability unexpectedly <= to previous probability for %d: (%0.10f <= %0.10f)", i, currProbability, prevProbability)
+		}
+		prevProbability = currProbability
+	}
+}
+
 func makeTestService(namespace, name string, svcFunc func(*v1.Service)) *v1.Service {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -2350,10 +2382,10 @@ COMMIT
 -A KUBE-MARK-MASQ -j MARK --set-xmark 
 -A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 ! -s 10.0.0.0/24 -j KUBE-MARK-MASQ
 -A KUBE-SERVICES -m comment --comment "ns1/svc1: cluster IP" -m tcp -p tcp -d 172.20.1.1/32 --dport 0 -j KUBE-SVC-AHZNAGK3SCETOS2T
--A KUBE-SVC-AHZNAGK3SCETOS2T -m statistic --mode random --probability 0.33333 -j KUBE-SEP-PXD6POUVGD2I37UY
+-A KUBE-SVC-AHZNAGK3SCETOS2T -m statistic --mode random --probability 0.3333333333 -j KUBE-SEP-PXD6POUVGD2I37UY
 -A KUBE-SEP-PXD6POUVGD2I37UY -s 10.0.1.1/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-PXD6POUVGD2I37UY -m tcp -p tcp -j DNAT --to-destination 10.0.1.1:80
--A KUBE-SVC-AHZNAGK3SCETOS2T -m statistic --mode random --probability 0.50000 -j KUBE-SEP-SOKZUIT7SCEVIP33
+-A KUBE-SVC-AHZNAGK3SCETOS2T -m statistic --mode random --probability 0.5000000000 -j KUBE-SEP-SOKZUIT7SCEVIP33
 -A KUBE-SEP-SOKZUIT7SCEVIP33 -s 10.0.1.2/32 -j KUBE-MARK-MASQ
 -A KUBE-SEP-SOKZUIT7SCEVIP33 -m tcp -p tcp -j DNAT --to-destination 10.0.1.2:80
 -A KUBE-SVC-AHZNAGK3SCETOS2T -j KUBE-SEP-WVE3FAB34S7NZGDJ
