@@ -867,10 +867,10 @@ func PodFitsResources(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulerno
 	ignoredExtendedResources := sets.NewString()
 
 	var podRequest *schedulernodeinfo.Resource
-	if predicateMeta, ok := meta.(*predicateMetadata); ok {
-		podRequest = predicateMeta.podRequest
-		if predicateMeta.ignoredExtendedResources != nil {
-			ignoredExtendedResources = predicateMeta.ignoredExtendedResources
+	if predicateMeta, ok := meta.(*predicateMetadata); ok && predicateMeta.podFitsResourcesMetadata != nil {
+		podRequest = predicateMeta.podFitsResourcesMetadata.podRequest
+		if predicateMeta.podFitsResourcesMetadata.ignoredExtendedResources != nil {
+			ignoredExtendedResources = predicateMeta.podFitsResourcesMetadata.ignoredExtendedResources
 		}
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
@@ -1062,10 +1062,8 @@ func (s *ServiceAffinity) serviceAffinityMetadataProducer(pm *predicateMetadata)
 		klog.Errorf("Cannot precompute service affinity, a pod is required to calculate service affinity.")
 		return
 	}
-	pm.serviceAffinityInUse = true
-	var err error
 	// Store services which match the pod.
-	pm.serviceAffinityMatchingPodServices, err = s.serviceLister.GetPodServices(pm.pod)
+	matchingPodServices, err := s.serviceLister.GetPodServices(pm.pod)
 	if err != nil {
 		klog.Errorf("Error precomputing service affinity: could not list services: %v", err)
 	}
@@ -1076,7 +1074,11 @@ func (s *ServiceAffinity) serviceAffinityMetadataProducer(pm *predicateMetadata)
 	}
 
 	// consider only the pods that belong to the same namespace
-	pm.serviceAffinityMatchingPodList = FilterPodsByNamespace(allMatches, pm.pod.Namespace)
+	matchingPodList := FilterPodsByNamespace(allMatches, pm.pod.Namespace)
+	pm.serviceAffinityMetadata = &serviceAffinityMetadata{
+		matchingPodList:     matchingPodList,
+		matchingPodServices: matchingPodServices,
+	}
 }
 
 // NewServiceAffinityPredicate creates a ServiceAffinity.
@@ -1120,14 +1122,14 @@ func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister al
 func (s *ServiceAffinity) checkServiceAffinity(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	var services []*v1.Service
 	var pods []*v1.Pod
-	if pm, ok := meta.(*predicateMetadata); ok && (pm.serviceAffinityMatchingPodList != nil || pm.serviceAffinityMatchingPodServices != nil) {
-		services = pm.serviceAffinityMatchingPodServices
-		pods = pm.serviceAffinityMatchingPodList
+	if pm, ok := meta.(*predicateMetadata); ok && pm.serviceAffinityMetadata != nil && (pm.serviceAffinityMetadata.matchingPodList != nil || pm.serviceAffinityMetadata.matchingPodServices != nil) {
+		services = pm.serviceAffinityMetadata.matchingPodServices
+		pods = pm.serviceAffinityMetadata.matchingPodList
 	} else {
 		// Make the predicate resilient in case metadata is missing.
 		pm = &predicateMetadata{pod: pod}
 		s.serviceAffinityMetadataProducer(pm)
-		pods, services = pm.serviceAffinityMatchingPodList, pm.serviceAffinityMatchingPodServices
+		pods, services = pm.serviceAffinityMetadata.matchingPodList, pm.serviceAffinityMetadata.matchingPodServices
 	}
 	filteredPods := nodeInfo.FilterOutPods(pods)
 	node := nodeInfo.Node()
@@ -1158,8 +1160,8 @@ func (s *ServiceAffinity) checkServiceAffinity(pod *v1.Pod, meta PredicateMetada
 // PodFitsHostPorts checks if a node has free ports for the requested pod ports.
 func PodFitsHostPorts(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	var wantPorts []*v1.ContainerPort
-	if predicateMeta, ok := meta.(*predicateMetadata); ok {
-		wantPorts = predicateMeta.podPorts
+	if predicateMeta, ok := meta.(*predicateMetadata); ok && predicateMeta.podFitsHostPortsMetadata != nil {
+		wantPorts = predicateMeta.podFitsHostPortsMetadata.podPorts
 	} else {
 		// We couldn't parse metadata - fallback to computing it.
 		wantPorts = schedutil.GetContainerPorts(pod)
@@ -1410,7 +1412,7 @@ func (c *PodAffinityChecker) satisfiesExistingPodsAntiAffinity(pod *v1.Pod, meta
 	}
 	var topologyMaps *topologyPairsMaps
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
-		topologyMaps = predicateMeta.topologyPairsAntiAffinityPodsMap
+		topologyMaps = predicateMeta.podAffinityMetadata.topologyPairsAntiAffinityPodsMap
 	} else {
 		// Filter out pods whose nodeName is equal to nodeInfo.node.Name, but are not
 		// present in nodeInfo. Pods on other nodes pass the filter.
@@ -1486,7 +1488,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 	}
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
 		// Check all affinity terms.
-		topologyPairsPotentialAffinityPods := predicateMeta.topologyPairsPotentialAffinityPods
+		topologyPairsPotentialAffinityPods := predicateMeta.podAffinityMetadata.topologyPairsPotentialAffinityPods
 		if affinityTerms := GetPodAffinityTerms(affinity.PodAffinity); len(affinityTerms) > 0 {
 			matchExists := c.nodeMatchesAllTopologyTerms(pod, topologyPairsPotentialAffinityPods, nodeInfo, affinityTerms)
 			if !matchExists {
@@ -1503,7 +1505,7 @@ func (c *PodAffinityChecker) satisfiesPodsAffinityAntiAffinity(pod *v1.Pod,
 		}
 
 		// Check all anti-affinity terms.
-		topologyPairsPotentialAntiAffinityPods := predicateMeta.topologyPairsPotentialAntiAffinityPods
+		topologyPairsPotentialAntiAffinityPods := predicateMeta.podAffinityMetadata.topologyPairsPotentialAntiAffinityPods
 		if antiAffinityTerms := GetPodAntiAffinityTerms(affinity.PodAntiAffinity); len(antiAffinityTerms) > 0 {
 			matchExists := c.nodeMatchesAnyTopologyTerm(pod, topologyPairsPotentialAntiAffinityPods, nodeInfo, antiAffinityTerms)
 			if matchExists {
@@ -1783,15 +1785,15 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 		return true, nil, nil
 	}
 
-	var podSpreadCache *podSpreadCache
+	var evenPodsSpreadMetadata *evenPodsSpreadMetadata
 	if predicateMeta, ok := meta.(*predicateMetadata); ok {
-		podSpreadCache = predicateMeta.podSpreadCache
+		evenPodsSpreadMetadata = predicateMeta.evenPodsSpreadMetadata
 	} else { // We don't have precomputed metadata. We have to follow a slow path to check spread constraints.
 		// TODO(autoscaler): get it implemented
 		return false, nil, errors.New("metadata not pre-computed for EvenPodsSpreadPredicate")
 	}
 
-	if podSpreadCache == nil || len(podSpreadCache.tpPairToMatchNum) == 0 {
+	if evenPodsSpreadMetadata == nil || len(evenPodsSpreadMetadata.tpPairToMatchNum) == 0 {
 		return true, nil, nil
 	}
 
@@ -1814,16 +1816,16 @@ func EvenPodsSpreadPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *sche
 		}
 
 		pair := topologyPair{key: tpKey, value: tpVal}
-		paths, ok := podSpreadCache.tpKeyToCriticalPaths[tpKey]
+		paths, ok := evenPodsSpreadMetadata.tpKeyToCriticalPaths[tpKey]
 		if !ok {
 			// error which should not happen
-			klog.Errorf("internal error: get paths from key %q of %#v", tpKey, podSpreadCache.tpKeyToCriticalPaths)
+			klog.Errorf("internal error: get paths from key %q of %#v", tpKey, evenPodsSpreadMetadata.tpKeyToCriticalPaths)
 			continue
 		}
 		// judging criteria:
 		// 'existing matching num' + 'if self-match (1 or 0)' - 'global min matching num' <= 'maxSkew'
 		minMatchNum := paths[0].matchNum
-		matchNum := podSpreadCache.tpPairToMatchNum[pair]
+		matchNum := evenPodsSpreadMetadata.tpPairToMatchNum[pair]
 		skew := matchNum + selfMatchNum - minMatchNum
 		if skew > constraint.MaxSkew {
 			klog.V(5).Infof("node '%s' failed spreadConstraint[%s]: matchNum(%d) + selfMatchNum(%d) - minMatchNum(%d) > maxSkew(%d)", node.Name, tpKey, matchNum, selfMatchNum, minMatchNum, constraint.MaxSkew)
