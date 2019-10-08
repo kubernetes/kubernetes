@@ -47,6 +47,7 @@ type vmssVirtualMachinesEntry struct {
 	vmssName       string
 	instanceID     string
 	virtualMachine *compute.VirtualMachineScaleSetVM
+	lastUpdate     time.Time
 }
 
 func (ss *scaleSet) makeVmssVMName(scaleSetName, instanceID string) string {
@@ -101,6 +102,7 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*timedCache, error) {
 						vmssName:       ssName,
 						instanceID:     to.String(vm.InstanceID),
 						virtualMachine: &vm,
+						lastUpdate:     time.Now().UTC(),
 					})
 				}
 			}
@@ -113,7 +115,7 @@ func (ss *scaleSet) newVMSSVirtualMachinesCache() (*timedCache, error) {
 }
 
 func (ss *scaleSet) deleteCacheForNode(nodeName string) error {
-	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey)
+	cached, err := ss.vmssVMCache.Get(vmssVirtualMachinesKey, allowUnsafeRead)
 	if err != nil {
 		return err
 	}
@@ -150,8 +152,8 @@ func (ss *scaleSet) newAvailabilitySetNodesCache() (*timedCache, error) {
 	return newTimedcache(availabilitySetNodesCacheTTL, getter)
 }
 
-func (ss *scaleSet) isNodeManagedByAvailabilitySet(nodeName string) (bool, error) {
-	cached, err := ss.availabilitySetNodesCache.Get(availabilitySetNodesKey)
+func (ss *scaleSet) isNodeManagedByAvailabilitySet(nodeName string, crt cacheReadType) (bool, error) {
+	cached, err := ss.availabilitySetNodesCache.Get(availabilitySetNodesKey, crt)
 	if err != nil {
 		return false, err
 	}
