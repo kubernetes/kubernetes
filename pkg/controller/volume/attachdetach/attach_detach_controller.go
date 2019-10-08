@@ -203,9 +203,12 @@ func NewAttachDetachController(
 
 	// This custom indexer will index pods by its PVC keys. Then we don't need
 	// to iterate all pods every time to find pods which reference given PVC.
-	adc.podIndexer.AddIndexers(kcache.Indexers{
+	err := adc.podIndexer.AddIndexers(kcache.Indexers{
 		pvcKeyIndex: indexByPVCKey,
 	})
+	if err != nil {
+		klog.Warningf("adding indexer got %v", err)
+	}
 
 	nodeInformer.Informer().AddEventHandler(kcache.ResourceEventHandlerFuncs{
 		AddFunc:    adc.nodeAdd,
