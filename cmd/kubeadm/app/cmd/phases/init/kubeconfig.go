@@ -38,7 +38,7 @@ var (
 			short: "Generate a kubeconfig file for the admin to use and for kubeadm itself",
 			long:  "Generate the kubeconfig file for the admin and for kubeadm itself, and save it to %s file.",
 		},
-		kubeadmconstants.KubeletKubeConfigFileName: {
+		kubeadmconstants.KubeletBootstrapKubeConfigFileName: {
 			name:  "kubelet",
 			short: "Generate a kubeconfig file for the kubelet to use *only* for cluster bootstrapping purposes",
 			long: cmdutil.LongDesc(`
@@ -74,7 +74,7 @@ func NewKubeConfigPhase() workflow.Phase {
 				RunAllSiblings: true,
 			},
 			NewKubeConfigFilePhase(kubeadmconstants.AdminKubeConfigFileName),
-			NewKubeConfigFilePhase(kubeadmconstants.KubeletKubeConfigFileName),
+			NewKubeConfigFilePhase(kubeadmconstants.KubeletBootstrapKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.ControllerManagerKubeConfigFileName),
 			NewKubeConfigFilePhase(kubeadmconstants.SchedulerKubeConfigFileName),
 		},
@@ -103,7 +103,7 @@ func getKubeConfigPhaseFlags(name string) []string {
 		options.KubeconfigDir,
 		options.KubernetesVersion,
 	}
-	if name == "all" || name == kubeadmconstants.KubeletKubeConfigFileName {
+	if name == "all" || name == kubeadmconstants.KubeletBootstrapKubeConfigFileName {
 		flags = append(flags,
 			options.NodeName,
 		)

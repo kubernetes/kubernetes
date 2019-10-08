@@ -121,7 +121,7 @@ func TestGetKubeConfigSpecs(t *testing.T) {
 				organizations:  []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
 			{
-				kubeConfigFile: kubeadmconstants.KubeletKubeConfigFileName,
+				kubeConfigFile: kubeadmconstants.KubeletBootstrapKubeConfigFileName,
 				clientName:     fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name),
 				organizations:  []string{kubeadmconstants.NodesGroup},
 			},
@@ -557,8 +557,8 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		},
 		"some files don't exist": {
 			filesToWrite: map[string]*clientcmdapi.Config{
-				kubeadmconstants.AdminKubeConfigFileName:   config,
-				kubeadmconstants.KubeletKubeConfigFileName: config,
+				kubeadmconstants.AdminKubeConfigFileName:            config,
+				kubeadmconstants.KubeletBootstrapKubeConfigFileName: config,
 			},
 			initConfig:    initConfig,
 			expectedError: true,
@@ -566,7 +566,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		"some files have invalid CA": {
 			filesToWrite: map[string]*clientcmdapi.Config{
 				kubeadmconstants.AdminKubeConfigFileName:             config,
-				kubeadmconstants.KubeletKubeConfigFileName:           config,
+				kubeadmconstants.KubeletBootstrapKubeConfigFileName:  config,
 				kubeadmconstants.ControllerManagerKubeConfigFileName: configWithAnotherClusterCa,
 				kubeadmconstants.SchedulerKubeConfigFileName:         config,
 			},
@@ -576,7 +576,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		"some files have invalid Server Url": {
 			filesToWrite: map[string]*clientcmdapi.Config{
 				kubeadmconstants.AdminKubeConfigFileName:             config,
-				kubeadmconstants.KubeletKubeConfigFileName:           config,
+				kubeadmconstants.KubeletBootstrapKubeConfigFileName:  config,
 				kubeadmconstants.ControllerManagerKubeConfigFileName: config,
 				kubeadmconstants.SchedulerKubeConfigFileName:         configWithAnotherServerURL,
 			},
@@ -586,7 +586,7 @@ func TestValidateKubeconfigsForExternalCA(t *testing.T) {
 		"all files are valid": {
 			filesToWrite: map[string]*clientcmdapi.Config{
 				kubeadmconstants.AdminKubeConfigFileName:             config,
-				kubeadmconstants.KubeletKubeConfigFileName:           config,
+				kubeadmconstants.KubeletBootstrapKubeConfigFileName:  config,
 				kubeadmconstants.ControllerManagerKubeConfigFileName: config,
 				kubeadmconstants.SchedulerKubeConfigFileName:         config,
 			},
