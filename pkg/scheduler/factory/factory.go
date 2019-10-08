@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -403,7 +403,12 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 	pluginConfig = append(pluginConfig, pluginConfigForPriorities...)
 	pluginConfig = append(pluginConfig, c.pluginConfig...)
 
-	framework, err := framework.NewFramework(c.registry, &plugins, pluginConfig)
+	framework, err := framework.NewFramework(
+		c.registry,
+		&plugins,
+		pluginConfig,
+		framework.WithClientSet(c.client),
+	)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
 	}
