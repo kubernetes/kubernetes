@@ -24,7 +24,6 @@ import (
 	"encoding/base64"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/util/uuid"
 
 	v1 "k8s.io/api/core/v1"
@@ -89,23 +88,23 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				list, err := client.List(opts)
 				framework.ExpectNoError(err, "failed to list ConfigMaps in namespace: %s, given limit: %d", ns, opts.Limit)
 				framework.Logf("Retrieved %d/%d results with rv %s and continue %s", len(list.Items), opts.Limit, list.ResourceVersion, list.Continue)
-				gomega.Expect(len(list.Items)).To(gomega.BeNumerically("<=", opts.Limit))
+				framework.ExpectEqual(int64(len(list.Items)) <= opts.Limit, true, "Amount of items retrieved doesn't equal the amount of items requested")
 
 				prevFound = found
 				for _, item := range list.Items {
-					framework.ExpectEqual(item.Name, fmt.Sprintf("configmap-%04d", found))
+					framework.ExpectEqual(item.Name, fmt.Sprintf("configmap-%04d", found), "Name of item fetched doesn't match expected")
 					found++
 				}
 				if len(lastRV) == 0 {
 					lastRV = list.ResourceVersion
 				}
-				framework.ExpectEqual(list.ResourceVersion, lastRV)
+				framework.ExpectEqual(list.ResourceVersion, lastRV, "ResourceVersion fond doesn't match expected")
 				if shouldCheckRemainingItem() {
 					if list.GetContinue() == "" {
-						gomega.Expect(numberOfTotalResources - found).To(gomega.Equal(int(0)))
+						framework.ExpectEqual(numberOfTotalResources-found, int(0), "Items found not equal to total number of resources created")
 					} else {
-						gomega.Expect(numberOfTotalResources - found).ToNot(gomega.Equal(int(0)))
-						gomega.Expect((numberOfTotalResources - found) + len(list.Items) + prevFound).To(gomega.BeNumerically("==", numberOfTotalResources))
+						framework.ExpectNotEqual(numberOfTotalResources-found, int(0), "Discovered more items than created")
+						framework.ExpectEqual((numberOfTotalResources-found)+len(list.Items)+prevFound, numberOfTotalResources)
 					}
 				}
 				if len(list.Continue) == 0 {
@@ -113,14 +112,14 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 				}
 				opts.Continue = list.Continue
 			}
-			gomega.Expect(found).To(gomega.BeNumerically("==", numberOfTotalResources))
+			framework.ExpectEqual(found, numberOfTotalResources, "Items found not equal to total number of resources created")
 		}
 
 		ginkgo.By("retrieving those results all at once")
 		opts := metav1.ListOptions{Limit: numberOfTotalResources + 1}
 		list, err := client.List(opts)
 		framework.ExpectNoError(err, "failed to list ConfigMaps in namespace: %s, given limit: %d", ns, opts.Limit)
-		gomega.Expect(list.Items).To(gomega.HaveLen(numberOfTotalResources))
+		framework.ExpectEqual(len(list.Items), numberOfTotalResources, "Items found doesn't equal resources created")
 	})
 
 	ginkgo.It("should chunk lists of ConfigMaps", func() {
@@ -151,7 +150,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 
 			if loopCount > 0 && len(continueChunkHistory) > 0 {
 				searchChunkHistory, _ := contains(continueChunkHistory, list.Continue)
-				gomega.Expect(searchChunkHistory).NotTo(gomega.Equal(true), "chunks already exists")
+				framework.ExpectNotEqual(searchChunkHistory, true, "chunks already exists")
 			}
 			continueChunkHistory = append(continueChunkHistory, list.Continue)
 			loopCount++
@@ -162,7 +161,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		}
 
 		ginkgo.By("making sure that total number of resources created matches total number of resources discovered by fetching indiviual chunks")
-		gomega.Expect(len(continueChunkHistory)+1).To(gomega.Equal(numberOfTotalResources), "number of resources created should match the number iterated through")
+		framework.ExpectEqual(len(continueChunkHistory)+1, numberOfTotalResources, "number of resources created should match the number iterated through")
 
 		ginkgo.By("retrieving those results all at once")
 		opts := metav1.ListOptions{
@@ -171,7 +170,7 @@ var _ = SIGDescribe("Servers with support for API chunking", func() {
 		}
 		list, err := client.List(opts)
 		framework.ExpectNoError(err, "failed to list all ConfigMaps in namespace: %s, given limit: %d", ns, opts.Limit)
-		gomega.Expect(list.Items).To(gomega.HaveLen(numberOfTotalResources))
+		framework.ExpectEqual(len(list.Items), numberOfTotalResources, "Items found doesn't equal resources created")
 	})
 })
 
