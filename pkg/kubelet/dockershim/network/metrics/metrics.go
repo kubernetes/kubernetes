@@ -20,8 +20,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 )
@@ -46,7 +44,7 @@ var (
 			Subsystem:      kubeletSubsystem,
 			Name:           NetworkPluginOperationsLatencyKey,
 			Help:           "Latency in seconds of network plugin operations. Broken down by operation type.",
-			Buckets:        prometheus.DefBuckets,
+			Buckets:        metrics.DefBuckets,
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"operation_type"},
