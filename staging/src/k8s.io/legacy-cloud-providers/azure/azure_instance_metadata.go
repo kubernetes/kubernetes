@@ -141,7 +141,7 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 
 // GetMetadata gets instance metadata from cache.
 func (ims *InstanceMetadataService) GetMetadata() (*InstanceMetadata, error) {
-	cache, err := ims.imsCache.Get(metadataCacheKey)
+	cache, err := ims.imsCache.Get(metadataCacheKey, cachedData)
 	if err != nil {
 		return nil, err
 	}
