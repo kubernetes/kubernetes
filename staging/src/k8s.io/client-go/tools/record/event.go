@@ -164,11 +164,11 @@ type eventBroadcasterImpl struct {
 // StartRecordingToSink starts sending events received from the specified eventBroadcaster to the given sink.
 // The return value can be ignored or used to stop recording, if desired.
 // TODO: make me an object with parameterizable queue length and retry interval
-func (eventBroadcaster *eventBroadcasterImpl) StartRecordingToSink(sink EventSink) watch.Interface {
-	eventCorrelator := NewEventCorrelatorWithOptions(eventBroadcaster.options)
-	return eventBroadcaster.StartEventWatcher(
+func (e *eventBroadcasterImpl) StartRecordingToSink(sink EventSink) watch.Interface {
+	eventCorrelator := NewEventCorrelatorWithOptions(e.options)
+	return e.StartEventWatcher(
 		func(event *v1.Event) {
-			recordToSink(sink, event, eventCorrelator, eventBroadcaster.sleepDuration)
+			recordToSink(sink, event, eventCorrelator, e.sleepDuration)
 		})
 }
 
@@ -256,8 +256,8 @@ func recordEvent(sink EventSink, event *v1.Event, patch []byte, updateExistingEv
 
 // StartLogging starts sending events received from this EventBroadcaster to the given logging function.
 // The return value can be ignored or used to stop recording, if desired.
-func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format string, args ...interface{})) watch.Interface {
-	return eventBroadcaster.StartEventWatcher(
+func (e *eventBroadcasterImpl) StartLogging(logf func(format string, args ...interface{})) watch.Interface {
+	return e.StartEventWatcher(
 		func(e *v1.Event) {
 			logf("Event(%#v): type: '%v' reason: '%v' %v", e.InvolvedObject, e.Type, e.Reason, e.Message)
 		})
@@ -265,8 +265,8 @@ func (eventBroadcaster *eventBroadcasterImpl) StartLogging(logf func(format stri
 
 // StartEventWatcher starts sending events received from this EventBroadcaster to the given event handler function.
 // The return value can be ignored or used to stop recording, if desired.
-func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) watch.Interface {
-	watcher := eventBroadcaster.Watch()
+func (e *eventBroadcasterImpl) StartEventWatcher(eventHandler func(*v1.Event)) watch.Interface {
+	watcher := e.Watch()
 	go func() {
 		defer utilruntime.HandleCrash()
 		for watchEvent := range watcher.ResultChan() {
@@ -283,8 +283,8 @@ func (eventBroadcaster *eventBroadcasterImpl) StartEventWatcher(eventHandler fun
 }
 
 // NewRecorder returns an EventRecorder that records events with the given event source.
-func (eventBroadcaster *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorder {
-	return &recorderImpl{scheme, source, eventBroadcaster.Broadcaster, clock.RealClock{}}
+func (e *eventBroadcasterImpl) NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorder {
+	return &recorderImpl{scheme, source, e.Broadcaster, clock.RealClock{}}
 }
 
 type recorderImpl struct {
