@@ -18,7 +18,10 @@ package cache
 
 import (
 	"context"
+	"fmt"
+	"math/rand"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -126,4 +129,147 @@ func TestCachedTokenAuthenticatorWithAudiences(t *testing.T) {
 	if u, ok, _ := a.AuthenticateToken(authenticator.WithAudiences(context.Background(), []string{"audB"}), "usertoken1"); !ok || u.User.GetName() != "user1-different" {
 		t.Errorf("Expected user1-different")
 	}
+}
+
+func BenchmarkCachedTokenAuthenticator(b *testing.B) {
+	tokenCount := []int{100, 500, 1000, 2000, 5000, 10000}
+	for _, tc := range tokenCount {
+		b.Run(fmt.Sprintf("toks-%v", tc), newSingleBenchmark(tc).bench)
+	}
+}
+
+func newSingleBenchmark(tokenCount int) *singleBenchmark {
+	s := &singleBenchmark{
+		tokenCount: tokenCount,
+	}
+	s.makeTokens()
+	return s
+}
+
+type singleBenchmark struct {
+	tokenCount int
+
+	tokenToResponse map[string]*cacheRecord
+	tokens          []string
+	chokepoint      chan struct{}
+
+	onFirstResponse sync.Once
+
+	b  *testing.B
+	wg sync.WaitGroup
+}
+
+func (s *singleBenchmark) makeTokens() {
+	s.tokenToResponse = map[string]*cacheRecord{}
+	s.tokens = []string{}
+
+	for i := 0; i < s.tokenCount; i++ {
+		tok := fmt.Sprintf("token_%v", i)
+		r := cacheRecord{
+			resp: &authenticator.Response{
+				User: &user.DefaultInfo{Name: "holder of token " + tok},
+			},
+		}
+		choice := rand.Intn(1000)
+		switch {
+		case choice < 900:
+			r.ok = true
+			r.err = nil
+		case choice < 990:
+			r.ok = false
+			r.err = nil
+		default:
+			r.ok = false
+			r.err = fmt.Errorf("I can't think of a clever error name right now")
+		}
+		s.tokens = append(s.tokens, tok)
+		s.tokenToResponse[tok] = &r
+	}
+}
+
+func (s *singleBenchmark) lookup(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	<-s.chokepoint
+	defer func() { s.chokepoint <- struct{}{} }()
+	time.Sleep(1 * time.Millisecond)
+	r, ok := s.tokenToResponse[token]
+	if !ok {
+		panic("test setup problem")
+	}
+	s.onFirstResponse.Do(func() {
+		// since 500ms is the fastest we can return, reset the
+		// timer on the first response. Otherwise the benchmark
+		// code may think that we're too slow to be worth
+		// calling with larger N's.
+		//s.b.ResetTimer()
+	})
+	return r.resp, r.ok, r.err
+}
+
+func (s *singleBenchmark) queueBatches() (<-chan int, int) {
+	batchSize := 1
+	threads := 1
+
+	switch {
+	case s.b.N < 5000:
+		threads = s.b.N
+		batchSize = 1
+	default:
+		threads = 5000
+		batchSize = s.b.N / (threads * 10)
+		if batchSize < 1 {
+			batchSize = 1
+		}
+	}
+
+	batches := make(chan int, 1000000)
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		defer close(batches)
+		remaining := s.b.N
+		for remaining > batchSize {
+			batches <- batchSize
+			remaining -= batchSize
+		}
+		batches <- remaining
+	}()
+
+	return batches, threads
+}
+
+func (s *singleBenchmark) bench(b *testing.B) {
+	s.b = b
+	a := newWithClock(
+		authenticator.TokenFunc(s.lookup),
+		true,
+		4*time.Second,
+		500*time.Millisecond,
+		utilclock.RealClock{},
+	)
+	const maxInFlight = 4
+	s.chokepoint = make(chan struct{}, maxInFlight)
+	for i := 0; i < maxInFlight; i++ {
+		s.chokepoint <- struct{}{}
+	}
+
+	batches, threadCount := s.queueBatches()
+	s.b.ResetTimer()
+
+	for i := 0; i < threadCount; i++ {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			// don't contend over the lock for the global rand.Rand
+			r := rand.New(rand.NewSource(rand.Int63()))
+			for count := range batches {
+				for i := 0; i < count; i++ {
+					tok := s.tokens[r.Intn(len(s.tokens))]
+					a.AuthenticateToken(context.Background(), tok)
+					a.AuthenticateToken(context.Background(), s.tokens[0])
+				}
+			}
+		}()
+	}
+
+	s.wg.Wait()
 }
