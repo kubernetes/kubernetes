@@ -182,7 +182,7 @@ func NewLifecycle(immortalNamespaces sets.String) (*Lifecycle, error) {
 	return newLifecycleWithClock(immortalNamespaces, clock.RealClock{})
 }
 
-func newLifecycleWithClock(immortalNamespaces sets.String, clock utilcache.Clock) (*Lifecycle, error) {
+func newLifecycleWithClock(immortalNamespaces sets.String, clock clock.Clock) (*Lifecycle, error) {
 	forceLiveLookupCache := utilcache.NewLRUExpireCacheWithClock(100, clock)
 	return &Lifecycle{
 		Handler:              admission.NewHandler(admission.Create, admission.Update, admission.Delete),
