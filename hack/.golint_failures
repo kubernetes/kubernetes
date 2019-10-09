@@ -81,7 +81,6 @@ pkg/controller/podgc
 pkg/controller/podgc/config/v1alpha1
 pkg/controller/replicaset
 pkg/controller/replicaset/config/v1alpha1
-pkg/controller/replication
 pkg/controller/replication/config/v1alpha1
 pkg/controller/resourcequota
 pkg/controller/resourcequota/config/v1alpha1

@@ -16,7 +16,7 @@ limitations under the License.
 
 // This file contains adapters that convert between RC and RS,
 // as if ReplicationController were an older API version of ReplicaSet.
-// It allows ReplicaSetController to directly replace the old ReplicationManager,
+// It allows ReplicaSetController to directly replace the old Manager,
 // which was previously a manually-maintained copy-paste of RSC.
 
 package replication

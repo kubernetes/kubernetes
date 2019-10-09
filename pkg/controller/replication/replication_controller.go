@@ -16,7 +16,7 @@ limitations under the License.
 
 // ### ATTENTION ###
 //
-// ReplicationManager is now just a wrapper around ReplicaSetController,
+// Manager is now just a wrapper around ReplicaSetController,
 // with a conversion layer that effectively treats ReplicationController
 // as if it were an older API version of ReplicaSet.
 //
@@ -38,22 +38,23 @@ import (
 )
 
 const (
+	// BurstReplicas is a realistic value of the burstReplica field of the replica set manager (see replicaset controller)
 	BurstReplicas = replicaset.BurstReplicas
 )
 
-// ReplicationManager is responsible for synchronizing ReplicationController objects stored
+// Manager is responsible for synchronizing ReplicationController objects stored
 // in the system with actual running pods.
 // It is actually just a wrapper around ReplicaSetController.
-type ReplicationManager struct {
+type Manager struct {
 	replicaset.ReplicaSetController
 }
 
 // NewReplicationManager configures a replication manager with the specified event recorder
-func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicationManager {
+func NewReplicationManager(podInformer coreinformers.PodInformer, rcInformer coreinformers.ReplicationControllerInformer, kubeClient clientset.Interface, burstReplicas int) *Manager {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
-	return &ReplicationManager{
+	return &Manager{
 		*replicaset.NewBaseController(informerAdapter{rcInformer}, podInformer, clientsetAdapter{kubeClient}, burstReplicas,
 			v1.SchemeGroupVersion.WithKind("ReplicationController"),
 			"replication_controller",

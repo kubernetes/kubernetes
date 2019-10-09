@@ -105,7 +105,7 @@ func newMatchingPod(podName, namespace string) *v1.Pod {
 	}
 }
 
-func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replication.ReplicationManager, informers.SharedInformerFactory, clientset.Interface) {
+func rmSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, *replication.Manager, informers.SharedInformerFactory, clientset.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 
@@ -143,7 +143,7 @@ func rmSimpleSetup(t *testing.T) (*httptest.Server, framework.CloseFunc, clients
 }
 
 // Run RC controller and informers
-func runControllerAndInformers(t *testing.T, rm *replication.ReplicationManager, informers informers.SharedInformerFactory, podNum int) chan struct{} {
+func runControllerAndInformers(t *testing.T, rm *replication.Manager, informers informers.SharedInformerFactory, podNum int) chan struct{} {
 	stopCh := make(chan struct{})
 	informers.Start(stopCh)
 	waitToObservePods(t, informers.Core().V1().Pods().Informer(), podNum)
