@@ -109,7 +109,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"PodFitsHostPorts",
 				"PodFitsResources",
 				"NoDiskConflict",
-				"HostName",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -121,6 +120,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAntiAffinity",
 				"TestLabelPreference",
 			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+				},
+			},
 		},
 
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -156,7 +160,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"MaxEBSVolumeCount",
@@ -175,6 +178,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAntiAffinity",
 				"TestLabelPreference",
 			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeName"},
+				},
+			},
 		},
 
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -214,7 +222,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
@@ -236,8 +243,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
-				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 		},
 
@@ -281,7 +291,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
@@ -306,8 +315,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MostRequestedPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
-				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -360,7 +372,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
@@ -385,8 +396,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MostRequestedPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
-				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -451,7 +465,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
@@ -477,8 +490,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MostRequestedPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
-				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -544,7 +560,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
@@ -571,8 +586,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MostRequestedPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
-				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -642,7 +660,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
@@ -670,8 +687,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MostRequestedPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
-				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -753,7 +773,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
@@ -782,8 +801,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
-				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -866,7 +888,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
@@ -896,8 +917,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
-				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -979,7 +1003,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
@@ -1010,8 +1033,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
-				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -1097,7 +1123,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"HostName",
 				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
@@ -1128,8 +1153,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
-				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+				"FilterPlugin": {
+					{Name: "NodeName"},
+					{Name: "TaintToleration"},
+				},
+				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -1153,6 +1181,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	mandatoryPredicates := sets.NewString("CheckNodeCondition")
 	filterToPredicateMap := map[string]string{
 		"TaintToleration": "PodToleratesNodeTaints",
+		"NodeName":        "HostName",
 	}
 	scoreToPriorityMap := map[string]string{
 		"TaintToleration": "TaintTolerationPriority",
