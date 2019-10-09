@@ -253,6 +253,7 @@ The main themes of this release are:
 - Systems running `iptables` 1.8.0 or newer should start it in legacy mode. Please note that this affects all versions of Kubernetes and not only v1.16.0. For more detailed information about the issue and how to apply a workaround, please refer to the official documentation
 - Generating informers for packages in directories containing dots in their name is broken. This will be fixed in v1.16.1. ([#82860](https://github.com/kubernetes/kubernetes/issues/82860))
 - kube-scheduler won't be able to report scheduling Events if `events.k8s.io/v1beta1` API is disabled. We are targeting the fix for v1.16.2 ([#83203](https://github.com/kubernetes/kubernetes/issues/83203))
+- The etcd client library vendored in v1.16 (github.com/coreos/etcd/clientv3) has a bug where IPv6 IP addresses get incorrectly trimmed to the first occurance of the `:` character. This affects all users of the client library including the kube-apiserver and kubeadm. We are targeting the fix for this bug in v1.16.3. ([#83550](https://github.com/kubernetes/kubernetes/issues/83550))
 
 ## Urgent Upgrade Notes
 
