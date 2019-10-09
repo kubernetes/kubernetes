@@ -28,6 +28,7 @@ import (
 	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/metrics"
 	apirequest "k8s.io/apiserver/pkg/endpoints/request"
 )
@@ -119,6 +120,23 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	case <-after:
+		defer func() {
+			// resultCh needs to have a reader, since the function doing
+			// the work needs to send to it. This is defer'd to ensure it runs
+			// ever if the post timeout work itself panics.
+			go func() {
+				res := <-resultCh
+				if res != nil {
+					switch t := res.(type) {
+					case error:
+						utilruntime.HandleError(t)
+					default:
+						utilruntime.HandleError(fmt.Errorf("%v", res))
+					}
+				}
+			}()
+		}()
+
 		postTimeoutFn()
 		tw.timeout(err)
 	}
