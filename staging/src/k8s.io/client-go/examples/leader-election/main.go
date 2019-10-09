@@ -60,9 +60,16 @@ func main() {
 
 	flag.StringVar(&kubeconfig, "kubeconfig", "", "absolute path to the kubeconfig file")
 	flag.StringVar(&id, "id", uuid.New().String(), "the holder identity name")
-	flag.StringVar(&leaseLockName, "lease-lock-name", "example", "the lease lock resource name")
-	flag.StringVar(&leaseLockNamespace, "lease-lock-namespace", "default", "the lease lock resource namespace")
+	flag.StringVar(&leaseLockName, "lease-lock-name", "", "the lease lock resource name")
+	flag.StringVar(&leaseLockNamespace, "lease-lock-namespace", "", "the lease lock resource namespace")
 	flag.Parse()
+
+	if leaseLockName == "" {
+		klog.Fatal("unable to get lease lock resource name (missing lease-lock-name flag).")
+	}
+	if leaseLockNamespace == "" {
+		klog.Fatal("unable to get lease lock resource namespace (missing lease-lock-namespace flag).")
+	}
 
 	// leader election uses the Kubernetes API by writing to a
 	// lock object, which can be a LeaseLock object (preferred),
@@ -121,9 +128,9 @@ func main() {
 		// get elected before your background loop finished, violating
 		// the stated goal of the lease.
 		ReleaseOnCancel: true,
-		LeaseDuration:   15 * time.Second,
-		RenewDeadline:   10 * time.Second,
-		RetryPeriod:     2 * time.Second,
+		LeaseDuration:   60 * time.Second,
+		RenewDeadline:   15 * time.Second,
+		RetryPeriod:     5 * time.Second,
 		Callbacks: leaderelection.LeaderCallbacks{
 			OnStartedLeading: func(ctx context.Context) {
 				// we're notified when we start - this is where you would
@@ -131,8 +138,9 @@ func main() {
 				run(ctx)
 			},
 			OnStoppedLeading: func() {
-				// we can do cleanup here
-				klog.Fatalf("leader lost: %s", id)
+				// we can do cleanup here, or after the RunOrDie method
+				// returns
+				klog.Infof("leader lost: %s", id)
 			},
 			OnNewLeader: func(identity string) {
 				// we're notified when new leader elected
@@ -144,6 +152,4 @@ func main() {
 			},
 		},
 	})
-
-	panic("unreachable")
 }
