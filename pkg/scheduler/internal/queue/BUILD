@@ -43,7 +43,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/clock:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
-        "//vendor/github.com/prometheus/client_model/go:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
     ],
 )
 
