@@ -24,6 +24,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/errors"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
@@ -109,15 +110,14 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 	}
 
 	cleanup := func() {
+		var errs []error
 		for _, resource := range l.resources {
-			resource.cleanupResource()
+			errs = append(errs, resource.cleanupResource())
 		}
 
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
-
+		errs = append(errs, tryFunc(l.driverCleanup))
+		l.driverCleanup = nil
+		framework.ExpectNoError(errors.NewAggregate(errs), "while cleanup resource")
 		validateMigrationVolumeOpCounts(f.ClientSet, dInfo.InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 

@@ -143,8 +143,10 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, dDriver)
 
 		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
-		defer l.resource.cleanupResource()
-
+		defer func() {
+			err := l.resource.cleanupResource()
+			framework.ExpectNoError(err, "while cleaning up resource")
+		}()
 		defer func() {
 			cleanupTest(l.cs, l.ns.Name, l.runningPod.Name, l.unschedulablePod.Name, l.pvcs, l.pvNames)
 		}()

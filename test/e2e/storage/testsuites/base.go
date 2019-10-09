@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+	"github.com/pkg/errors"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -33,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	apierrors "k8s.io/apimachinery/pkg/util/errors"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
@@ -81,7 +83,7 @@ type TestSuiteInfo struct {
 // TestResource represents an interface for resources that is used by TestSuite
 type TestResource interface {
 	// cleanupResource cleans up the test resources created when setting up the resource
-	cleanupResource()
+	cleanupResource() error
 }
 
 func getTestNameStr(suite TestSuite, pattern testpatterns.TestPattern) string {
@@ -268,9 +270,9 @@ func createVolumeSource(pvcName string, readOnly bool) *v1.VolumeSource {
 }
 
 // cleanupResource cleans up genericVolumeTestResource
-func (r *genericVolumeTestResource) cleanupResource() {
+func (r *genericVolumeTestResource) cleanupResource() error {
 	f := r.config.Framework
-
+	var cleanUpErrs []error
 	if r.pvc != nil || r.pv != nil {
 		switch r.pattern.VolType {
 		case testpatterns.PreprovisionedPV:
@@ -287,10 +289,15 @@ func (r *genericVolumeTestResource) cleanupResource() {
 			}
 			if r.pvc != nil {
 				err := e2epv.DeletePersistentVolumeClaim(f.ClientSet, r.pvc.Name, f.Namespace.Name)
-				framework.ExpectNoError(err, "Failed to delete PVC %v", r.pvc.Name)
+				if err != nil {
+					cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to delete PVC %v", r.pvc.Name))
+				}
 				if r.pv != nil {
 					err = framework.WaitForPersistentVolumeDeleted(f.ClientSet, r.pv.Name, 5*time.Second, 5*time.Minute)
-					framework.ExpectNoError(err, "Persistent Volume %v not deleted by dynamic provisioner", r.pv.Name)
+					if err != nil {
+						cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err,
+							"Persistent Volume %v not deleted by dynamic provisioner", r.pv.Name))
+					}
 				}
 			}
 		default:
@@ -300,13 +307,18 @@ func (r *genericVolumeTestResource) cleanupResource() {
 
 	if r.sc != nil {
 		ginkgo.By("Deleting sc")
-		deleteStorageClass(f.ClientSet, r.sc.Name)
+		if err := deleteStorageClass(f.ClientSet, r.sc.Name); err != nil {
+			cleanUpErrs = append(cleanUpErrs, errors.Wrapf(err, "Failed to delete StorageClass %v", r.sc.Name))
+		}
 	}
 
 	// Cleanup volume for pre-provisioned volume tests
 	if r.volume != nil {
-		r.volume.DeleteVolume()
+		if err := tryFunc(r.volume.DeleteVolume); err != nil {
+			cleanUpErrs = append(cleanUpErrs, errors.Wrap(err, "Failed to delete Volume"))
+		}
 	}
+	return apierrors.NewAggregate(cleanUpErrs)
 }
 
 func createPVCPV(
@@ -396,11 +408,12 @@ func isDelayedBinding(sc *storagev1.StorageClass) bool {
 }
 
 // deleteStorageClass deletes the passed in StorageClass and catches errors other than "Not Found"
-func deleteStorageClass(cs clientset.Interface, className string) {
+func deleteStorageClass(cs clientset.Interface, className string) error {
 	err := cs.StorageV1().StorageClasses().Delete(className, nil)
 	if err != nil && !apierrs.IsNotFound(err) {
-		framework.ExpectNoError(err)
+		return err
 	}
+	return nil
 }
 
 // convertTestConfig returns a framework test config with the
@@ -684,4 +697,18 @@ func skipVolTypePatterns(pattern testpatterns.TestPattern, driver TestDriver, sk
 	if supportsProvisioning && skipVolTypes[pattern.VolType] {
 		framework.Skipf("Driver supports dynamic provisioning, skipping %s pattern", pattern.VolType)
 	}
+}
+
+func tryFunc(f func()) error {
+	var err error
+	if f == nil {
+		return nil
+	}
+	defer func() {
+		if recoverError := recover(); recoverError != nil {
+			err = fmt.Errorf("%v", recoverError)
+		}
+	}()
+	f()
+	return err
 }
