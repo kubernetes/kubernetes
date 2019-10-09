@@ -88,7 +88,6 @@ test/e2e/lifecycle
 test/e2e/lifecycle/bootstrap
 test/e2e/manifest
 test/e2e/network
-test/e2e/node
 test/e2e/storage
 test/e2e/storage/drivers
 test/e2e/storage/testsuites
