@@ -223,6 +223,8 @@ var _ = SIGDescribe("PreStop", func() {
 			}
 			return false, err
 		})
+
+		framework.ExpectNoError(err, "validate-pod-is-running")
 	})
 })
 

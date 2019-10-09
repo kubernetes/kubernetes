@@ -281,7 +281,9 @@ func getCPUStat(f *framework.Framework, host string) (usage, uptime float64) {
 	lines := strings.Split(result.Stdout, "\n")
 
 	usage, err = strconv.ParseFloat(lines[0], 64)
+	framework.ExpectNoError(err, "Cannot parse float for usage")
 	uptime, err = strconv.ParseFloat(lines[1], 64)
+	framework.ExpectNoError(err, "Cannot parse float for uptime")
 
 	// Convert from nanoseconds to seconds
 	usage *= 1e-9
