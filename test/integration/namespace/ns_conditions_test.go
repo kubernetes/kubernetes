@@ -129,7 +129,7 @@ func jsonToUnstructured(stub, version, kind string) (*unstructured.Unstructured,
 	return &unstructured.Unstructured{Object: typeMetaAdder}, nil
 }
 
-func namespaceLifecycleSetup(t *testing.T) (framework.CloseFunc, *namespace.NamespaceController, informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
+func namespaceLifecycleSetup(t *testing.T) (framework.CloseFunc, *namespace.Controller, informers.SharedInformerFactory, clientset.Interface, dynamic.Interface) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 

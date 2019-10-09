@@ -50,8 +50,8 @@ const (
 	namespaceDeletionGracePeriod = 5 * time.Second
 )
 
-// NamespaceController is responsible for performing actions dependent upon a namespace phase
-type NamespaceController struct {
+// Controller is responsible for performing actions dependent upon a namespace phase
+type Controller struct {
 	// lister that can list namespaces from a shared cache
 	lister corelisters.NamespaceLister
 	// returns true when the namespace cache is ready
@@ -69,10 +69,10 @@ func NewNamespaceController(
 	discoverResourcesFn func() ([]*metav1.APIResourceList, error),
 	namespaceInformer coreinformers.NamespaceInformer,
 	resyncPeriod time.Duration,
-	finalizerToken v1.FinalizerName) *NamespaceController {
+	finalizerToken v1.FinalizerName) *Controller {
 
 	// create the controller so we can inject the enqueue function
-	namespaceController := &NamespaceController{
+	namespaceController := &Controller{
 		queue:                      workqueue.NewNamedRateLimitingQueue(nsControllerRateLimiter(), "namespace"),
 		namespacedResourcesDeleter: deletion.NewNamespacedResourcesDeleter(kubeClient.CoreV1().Namespaces(), metadataClient, kubeClient.CoreV1(), discoverResourcesFn, finalizerToken),
 	}
@@ -115,7 +115,7 @@ func nsControllerRateLimiter() workqueue.RateLimiter {
 
 // enqueueNamespace adds an object to the controller work queue
 // obj could be an *v1.Namespace, or a DeletionFinalStateUnknown item.
-func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
+func (nm *Controller) enqueueNamespace(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
@@ -137,7 +137,7 @@ func (nm *NamespaceController) enqueueNamespace(obj interface{}) {
 // Each namespace can be in the queue at most once.
 // The system ensures that no two workers can process
 // the same namespace at the same time.
-func (nm *NamespaceController) worker() {
+func (nm *Controller) worker() {
 	workFunc := func() bool {
 		key, quit := nm.queue.Get()
 		if quit {
@@ -174,7 +174,7 @@ func (nm *NamespaceController) worker() {
 }
 
 // syncNamespaceFromKey looks for a namespace with the specified key in its store and synchronizes it
-func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
+func (nm *Controller) syncNamespaceFromKey(key string) (err error) {
 	startTime := time.Now()
 	defer func() {
 		klog.V(4).Infof("Finished syncing namespace %q (%v)", key, time.Since(startTime))
@@ -193,7 +193,7 @@ func (nm *NamespaceController) syncNamespaceFromKey(key string) (err error) {
 }
 
 // Run starts observing the system with the specified number of workers.
-func (nm *NamespaceController) Run(workers int, stopCh <-chan struct{}) {
+func (nm *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer nm.queue.ShutDown()
 

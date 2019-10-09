@@ -70,7 +70,6 @@ pkg/controller/garbagecollector
 pkg/controller/garbagecollector/config/v1alpha1
 pkg/controller/job
 pkg/controller/job/config/v1alpha1
-pkg/controller/namespace
 pkg/controller/namespace/config/v1alpha1
 pkg/controller/nodeipam/config/v1alpha1
 pkg/controller/nodelifecycle/config/v1alpha1
