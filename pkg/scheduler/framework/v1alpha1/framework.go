@@ -555,9 +555,8 @@ func (f *framework) GetWaitingPod(uid types.UID) WaitingPod {
 // point. Returns nil if no plugins where configred.
 func (f *framework) ListPlugins() map[string][]string {
 	m := make(map[string][]string)
-
-	insert := func(ptr interface{}) {
-		plugins := reflect.ValueOf(ptr).Elem()
+	for _, e := range f.getExtensionPoints(&config.Plugins{}) {
+		plugins := reflect.ValueOf(e.slicePtr).Elem()
 		var names []string
 		for i := 0; i < plugins.Len(); i++ {
 			name := plugins.Index(i).Interface().(Plugin).Name()
@@ -567,9 +566,6 @@ func (f *framework) ListPlugins() map[string][]string {
 			extName := plugins.Type().Elem().Name()
 			m[extName] = names
 		}
-	}
-	for _, e := range f.getExtensionPoints(&config.Plugins{}) {
-		insert(e.slicePtr)
 	}
 	if len(m) > 0 {
 		return m
