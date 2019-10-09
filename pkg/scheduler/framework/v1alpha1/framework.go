@@ -30,6 +30,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -58,7 +59,8 @@ type framework struct {
 	unreservePlugins      []UnreservePlugin
 	permitPlugins         []PermitPlugin
 
-	clientSet clientset.Interface
+	clientSet              clientset.Interface
+	sharedSchedulerListers SharedSchedulerListers
 }
 
 // extensionPoint encapsulates desired and applied set of plugins at a specific extension
@@ -89,7 +91,8 @@ func (f *framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint
 }
 
 type frameworkOptions struct {
-	clientSet clientset.Interface
+	clientSet     clientset.Interface
+	internalCache internalcache.Cache
 }
 
 // Option for the framework.
@@ -99,6 +102,13 @@ type Option func(*frameworkOptions)
 func WithClientSet(clientSet clientset.Interface) Option {
 	return func(o *frameworkOptions) {
 		o.clientSet = clientSet
+	}
+}
+
+// WithInternalCache sets internalCache for the scheduling framework.
+func WithInternalCache(internalCache internalcache.Cache) Option {
+	return func(o *frameworkOptions) {
+		o.internalCache = internalCache
 	}
 }
 
@@ -114,11 +124,12 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 	}
 
 	f := &framework{
-		registry:              r,
-		nodeInfoSnapshot:      schedulernodeinfo.NewSnapshot(),
-		pluginNameToWeightMap: make(map[string]int),
-		waitingPods:           newWaitingPodsMap(),
-		clientSet:             options.clientSet,
+		registry:               r,
+		nodeInfoSnapshot:       schedulernodeinfo.NewSnapshot(),
+		pluginNameToWeightMap:  make(map[string]int),
+		waitingPods:            newWaitingPodsMap(),
+		clientSet:              options.clientSet,
+		sharedSchedulerListers: &sharedSchedulerListers{options.internalCache},
 	}
 	if plugins == nil {
 		return f, nil
@@ -576,6 +587,10 @@ func (f *framework) ListPlugins() map[string][]string {
 // ClientSet returns a kubernetes clientset.
 func (f *framework) ClientSet() clientset.Interface {
 	return f.clientSet
+}
+
+func (f *framework) SharedSchedulerListers() SharedSchedulerListers {
+	return f.sharedSchedulerListers
 }
 
 func (f *framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {

@@ -408,6 +408,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		&plugins,
 		pluginConfig,
 		framework.WithClientSet(c.client),
+		framework.WithInternalCache(c.schedulerCache),
 	)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)

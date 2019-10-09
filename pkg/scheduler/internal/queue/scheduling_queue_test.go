@@ -227,6 +227,10 @@ func (*fakeFramework) ClientSet() clientset.Interface {
 	return nil
 }
 
+func (*fakeFramework) SharedSchedulerListers() framework.SharedSchedulerListers {
+	return nil
+}
+
 func TestPriorityQueue_AddWithReversePriorityLessFunc(t *testing.T) {
 	q := NewPriorityQueue(nil, &fakeFramework{})
 	if err := q.Add(&medPriorityPod); err != nil {

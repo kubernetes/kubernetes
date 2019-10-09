@@ -26,6 +26,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -433,4 +435,22 @@ type FrameworkHandle interface {
 
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface
+
+	// SharedSchedulerListers returns a shared scheduler listers.
+	SharedSchedulerListers() SharedSchedulerListers
+}
+
+// SharedSchedulerListers encapsulates listers for objects cached in the scheduler.
+type SharedSchedulerListers interface {
+	// PodLister returns a pod lister which represents anything that can list pods for
+	// a scheduler.
+	PodLister() algorithm.PodLister
+
+	// NodeInfo returns a node info which represents anything that can get node object
+	// from node name.
+	NodeInfo() predicates.NodeInfo
+
+	// CSINodeInfo returns a csi node info which represents anything that can get CSINode
+	// object from node name.
+	CSINodeInfo() predicates.CSINodeInfo
 }
