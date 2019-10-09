@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/metrics/testutil"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -224,6 +225,10 @@ func (*fakeFramework) GetWaitingPod(uid types.UID) framework.WaitingPod {
 }
 
 func (*fakeFramework) ClientSet() clientset.Interface {
+	return nil
+}
+
+func (*fakeFramework) SharedInformerFactory() informers.SharedInformerFactory {
 	return nil
 }
 

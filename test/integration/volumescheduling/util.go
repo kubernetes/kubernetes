@@ -142,17 +142,8 @@ func createSchedulerWithPodInformer(
 
 	return scheduler.New(
 		clientSet,
-		informerFactory.Core().V1().Nodes(),
+		informerFactory,
 		podInformer,
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Apps().V1().ReplicaSets(),
-		informerFactory.Apps().V1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		informerFactory.Storage().V1beta1().CSINodes(),
 		recorder,
 		schedulerconfig.SchedulerAlgorithmSource{
 			Provider: &defaultProviderName,

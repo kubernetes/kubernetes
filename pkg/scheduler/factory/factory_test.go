@@ -482,6 +482,7 @@ func newConfigFactoryWithFrameworkRegistry(
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	return NewConfigFactory(&ConfigFactoryArgs{
 		Client:                         client,
+		InformerFactory:                informerFactory,
 		NodeInformer:                   informerFactory.Core().V1().Nodes(),
 		PodInformer:                    informerFactory.Core().V1().Pods(),
 		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),

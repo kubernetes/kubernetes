@@ -250,17 +250,8 @@ priorities: []
 		defaultBindTimeout := int64(30)
 
 		sched, err := scheduler.New(clientSet,
-			informerFactory.Core().V1().Nodes(),
+			informerFactory,
 			factory.NewPodInformer(clientSet, 0),
-			informerFactory.Core().V1().PersistentVolumes(),
-			informerFactory.Core().V1().PersistentVolumeClaims(),
-			informerFactory.Core().V1().ReplicationControllers(),
-			informerFactory.Apps().V1().ReplicaSets(),
-			informerFactory.Apps().V1().StatefulSets(),
-			informerFactory.Core().V1().Services(),
-			informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-			informerFactory.Storage().V1().StorageClasses(),
-			informerFactory.Storage().V1beta1().CSINodes(),
 			eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
 			kubeschedulerconfig.SchedulerAlgorithmSource{
 				Policy: &kubeschedulerconfig.SchedulerPolicySource{
@@ -322,17 +313,8 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 	defaultBindTimeout := int64(30)
 
 	_, err := scheduler.New(clientSet,
-		informerFactory.Core().V1().Nodes(),
+		informerFactory,
 		factory.NewPodInformer(clientSet, 0),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Apps().V1().ReplicaSets(),
-		informerFactory.Apps().V1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		informerFactory.Storage().V1beta1().CSINodes(),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
 		kubeschedulerconfig.SchedulerAlgorithmSource{
 			Policy: &kubeschedulerconfig.SchedulerPolicySource{

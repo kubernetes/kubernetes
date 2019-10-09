@@ -27,9 +27,8 @@ import (
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
-	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/features"
 )
@@ -381,13 +380,8 @@ func (sched *Scheduler) skipPodUpdate(pod *v1.Pod) bool {
 func AddAllEventHandlers(
 	sched *Scheduler,
 	schedulerName string,
-	nodeInformer coreinformers.NodeInformer,
+	informerFactory informers.SharedInformerFactory,
 	podInformer coreinformers.PodInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	serviceInformer coreinformers.ServiceInformer,
-	storageClassInformer storageinformersv1.StorageClassInformer,
-	csiNodeInformer storageinformersv1beta1.CSINodeInformer,
 ) {
 	// scheduled pod cache
 	podInformer.Informer().AddEventHandler(
@@ -440,7 +434,7 @@ func AddAllEventHandlers(
 		},
 	)
 
-	nodeInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().Nodes().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.addNodeToCache,
 			UpdateFunc: sched.updateNodeInCache,
@@ -449,7 +443,7 @@ func AddAllEventHandlers(
 	)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		csiNodeInformer.Informer().AddEventHandler(
+		informerFactory.Storage().V1beta1().CSINodes().Informer().AddEventHandler(
 			cache.ResourceEventHandlerFuncs{
 				AddFunc:    sched.onCSINodeAdd,
 				UpdateFunc: sched.onCSINodeUpdate,
@@ -460,7 +454,7 @@ func AddAllEventHandlers(
 
 	// On add and delete of PVs, it will affect equivalence cache items
 	// related to persistent volume
-	pvInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().PersistentVolumes().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			// MaxPDVolumeCountPredicate: since it relies on the counts of PV.
 			AddFunc:    sched.onPvAdd,
@@ -469,7 +463,7 @@ func AddAllEventHandlers(
 	)
 
 	// This is for MaxPDVolumeCountPredicate: add/delete PVC will affect counts of PV when it is bound.
-	pvcInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().PersistentVolumeClaims().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.onPvcAdd,
 			UpdateFunc: sched.onPvcUpdate,
@@ -479,7 +473,7 @@ func AddAllEventHandlers(
 	// This is for ServiceAffinity: affected by the selector of the service is updated.
 	// Also, if new service is added, equivalence cache will also become invalid since
 	// existing pods may be "captured" by this service and change this predicate result.
-	serviceInformer.Informer().AddEventHandler(
+	informerFactory.Core().V1().Services().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc:    sched.onServiceAdd,
 			UpdateFunc: sched.onServiceUpdate,
@@ -487,7 +481,7 @@ func AddAllEventHandlers(
 		},
 	)
 
-	storageClassInformer.Informer().AddEventHandler(
+	informerFactory.Storage().V1().StorageClasses().Informer().AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: sched.onStorageClassAdd,
 		},

@@ -31,6 +31,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
@@ -131,6 +132,9 @@ type PodPreemptor interface {
 // construct a new scheduler.
 type Configurator struct {
 	client clientset.Interface
+
+	informerFactory informers.SharedInformerFactory
+
 	// a means to list all PersistentVolumes
 	pVLister corelisters.PersistentVolumeLister
 	// a means to list all PersistentVolumeClaims
@@ -196,6 +200,7 @@ type Configurator struct {
 // ConfigFactoryArgs is a set arguments passed to NewConfigFactory.
 type ConfigFactoryArgs struct {
 	Client                         clientset.Interface
+	InformerFactory                informers.SharedInformerFactory
 	NodeInformer                   coreinformers.NodeInformer
 	PodInformer                    coreinformers.PodInformer
 	PvInformer                     coreinformers.PersistentVolumeInformer
@@ -243,6 +248,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 
 	c := &Configurator{
 		client:                         args.Client,
+		informerFactory:                args.InformerFactory,
 		pVLister:                       args.PvInformer.Lister(),
 		pVCLister:                      args.PvcInformer.Lister(),
 		serviceLister:                  args.ServiceInformer.Lister(),
@@ -416,6 +422,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		&plugins,
 		pluginConfig,
 		framework.WithClientSet(c.client),
+		framework.WithInformerFactory(c.informerFactory),
 	)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
