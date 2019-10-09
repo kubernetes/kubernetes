@@ -28,8 +28,6 @@ GROUP_ID=$(id -g)
 DOCKER_OPTS=${DOCKER_OPTS:-""}
 IFS=" " read -r -a DOCKER <<< "docker ${DOCKER_OPTS}"
 DOCKER_HOST=${DOCKER_HOST:-""}
-DOCKER_MACHINE_NAME=${DOCKER_MACHINE_NAME:-"kube-dev"}
-readonly DOCKER_MACHINE_DRIVER=${DOCKER_MACHINE_DRIVER:-"virtualbox --virtualbox-cpu-count -1"}
 
 # This will canonicalize the path
 KUBE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd -P)
@@ -173,59 +171,9 @@ function kube::build::docker_available_on_osx() {
       return 0
     fi
 
-    kube::log::status "No docker host is set. Checking options for setting one..."
-    if [[ -z "$(which docker-machine)" ]]; then
-      kube::log::status "It looks like you're running Mac OS X, yet neither Docker for Mac nor docker-machine can be found."
-      kube::log::status "See: https://docs.docker.com/engine/installation/mac/ for installation instructions."
-      return 1
-    elif [[ -n "$(which docker-machine)" ]]; then
-      kube::build::prepare_docker_machine
-    fi
+    kube::log::status "Please start Docker and try again."
+    return 1
   fi
-}
-
-function kube::build::prepare_docker_machine() {
-  kube::log::status "docker-machine was found."
-
-  local available_memory_bytes
-  available_memory_bytes=$(sysctl -n hw.memsize 2>/dev/null)
-
-  local bytes_in_mb=1048576
-
-  # Give virtualbox 1/2 the system memory. Its necessary to divide by 2, instead
-  # of multiple by .5, because bash can only multiply by ints.
-  local memory_divisor=2
-
-  local virtualbox_memory_mb=$(( available_memory_bytes / (bytes_in_mb * memory_divisor) ))
-
-  docker-machine inspect "${DOCKER_MACHINE_NAME}" &> /dev/null || {
-    kube::log::status "Creating a machine to build Kubernetes"
-    docker-machine create --driver "${DOCKER_MACHINE_DRIVER}" \
-      --virtualbox-memory "${virtualbox_memory_mb}" \
-      --engine-env HTTP_PROXY="${KUBERNETES_HTTP_PROXY:-}" \
-      --engine-env HTTPS_PROXY="${KUBERNETES_HTTPS_PROXY:-}" \
-      --engine-env NO_PROXY="${KUBERNETES_NO_PROXY:-127.0.0.1}" \
-      "${DOCKER_MACHINE_NAME}" > /dev/null || {
-      kube::log::error "Something went wrong creating a machine."
-      kube::log::error "Try the following: "
-      kube::log::error "docker-machine create -d ${DOCKER_MACHINE_DRIVER} --virtualbox-memory ${virtualbox_memory_mb} ${DOCKER_MACHINE_NAME}"
-      return 1
-    }
-  }
-  docker-machine start "${DOCKER_MACHINE_NAME}" &> /dev/null
-  # it takes `docker-machine env` a few seconds to work if the machine was just started
-  local docker_machine_out
-  while ! docker_machine_out=$(docker-machine env "${DOCKER_MACHINE_NAME}" 2>&1); do
-    if [[ ${docker_machine_out} =~ "Error checking TLS connection" ]]; then
-      echo "${docker_machine_out}"
-      docker-machine regenerate-certs "${DOCKER_MACHINE_NAME}"
-    else
-      sleep 1
-    fi
-  done
-  eval "$(docker-machine env "${DOCKER_MACHINE_NAME}")"
-  kube::log::status "A Docker host using docker-machine named '${DOCKER_MACHINE_NAME}' is ready to go!"
-  return 0
 }
 
 function kube::build::is_osx() {
