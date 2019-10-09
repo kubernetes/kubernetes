@@ -37,7 +37,6 @@ package drivers
 
 import (
 	"fmt"
-	"math/rand"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -55,6 +54,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -750,8 +750,8 @@ func (h *hostPathDriver) CreateVolume(config *testsuites.PerTestConfig, volType 
 	cs := f.ClientSet
 
 	// pods should be scheduled on the node
-	nodes := framework.GetReadySchedulableNodesOrDie(cs)
-	node := nodes.Items[rand.Intn(len(nodes.Items))]
+	node, err := e2enode.GetRandomReadySchedulableNode(cs)
+	framework.ExpectNoError(err)
 	config.ClientNodeName = node.Name
 	return nil
 }
@@ -832,8 +832,8 @@ func (h *hostPathSymlinkDriver) CreateVolume(config *testsuites.PerTestConfig, v
 	volumeName := "test-volume"
 
 	// pods should be scheduled on the node
-	nodes := framework.GetReadySchedulableNodesOrDie(cs)
-	node := nodes.Items[rand.Intn(len(nodes.Items))]
+	node, err := e2enode.GetRandomReadySchedulableNode(cs)
+	framework.ExpectNoError(err)
 	config.ClientNodeName = node.Name
 
 	cmd := fmt.Sprintf("mkdir %v -m 777 && ln -s %v %v", sourcePath, sourcePath, targetPath)
@@ -1766,9 +1766,9 @@ func (l *localDriver) SkipUnsupportedTest(pattern testpatterns.TestPattern) {
 }
 
 func (l *localDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTestConfig, func()) {
-	// choose a randome node to test against
-	nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-	l.node = &nodes.Items[rand.Intn(len(nodes.Items))]
+	var err error
+	l.node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+	framework.ExpectNoError(err)
 
 	l.hostExec = utils.NewHostExec(f)
 	l.ltrMgr = utils.NewLocalResourceManager("local-driver", l.hostExec, "/tmp")

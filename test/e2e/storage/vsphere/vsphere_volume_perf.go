@@ -26,6 +26,7 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -76,7 +77,8 @@ var _ = utils.SIGDescribe("vcp-performance [Feature:vsphere]", func() {
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 
-		nodes := framework.GetReadySchedulableNodesOrDie(client)
+		nodes, err := e2enode.GetReadySchedulableNodes(client)
+		framework.ExpectNoError(err)
 		gomega.Expect(len(nodes.Items)).To(gomega.BeNumerically(">=", 1), "Requires at least %d nodes (not %d)", 2, len(nodes.Items))
 
 		msg := fmt.Sprintf("Cannot attach %d volumes to %d nodes. Maximum volumes that can be attached on %d nodes is %d", volumeCount, len(nodes.Items), len(nodes.Items), SCSIUnitsAvailablePerNode*len(nodes.Items))

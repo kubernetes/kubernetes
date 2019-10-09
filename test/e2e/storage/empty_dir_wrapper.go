@@ -25,12 +25,12 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -346,9 +346,8 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 	const nodeHostnameLabelKey = "kubernetes.io/hostname"
 
 	rcName := wrappedVolumeRaceRCNamePrefix + string(uuid.NewUUID())
-	nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-	gomega.Expect(len(nodeList.Items)).To(gomega.BeNumerically(">", 0))
-	targetNode := nodeList.Items[0]
+	targetNode, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+	framework.ExpectNoError(err)
 
 	ginkgo.By("Creating RC which spawns configmap-volume pods")
 	affinity := &v1.Affinity{
@@ -397,7 +396,7 @@ func testNoWrappedVolumeRace(f *framework.Framework, volumes []v1.Volume, volume
 			},
 		},
 	}
-	_, err := f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rc)
+	_, err = f.ClientSet.CoreV1().ReplicationControllers(f.Namespace.Name).Create(rc)
 	framework.ExpectNoError(err, "error creating replication controller")
 
 	defer func() {

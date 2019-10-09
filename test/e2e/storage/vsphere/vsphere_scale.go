@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -87,7 +88,9 @@ var _ = utils.SIGDescribe("vcp at scale [Feature:vsphere] ", func() {
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)
 		datastoreName = GetAndExpectStringEnvVar(StorageClassDatastoreName)
 
-		nodes = framework.GetReadySchedulableNodesOrDie(client)
+		var err error
+		nodes, err = e2enode.GetReadySchedulableNodes(client)
+		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Skipf("Requires at least %d nodes (not %d)", 2, len(nodes.Items))
 		}

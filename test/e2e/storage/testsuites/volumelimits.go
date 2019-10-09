@@ -34,6 +34,7 @@ import (
 	migrationplugins "k8s.io/csi-translation-lib/plugins" // volume plugin names are exported nicely there
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -125,12 +126,9 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 		ginkgo.By("Picking a random node")
 		var nodeName string
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if len(nodeList.Items) != 0 {
-			nodeName = nodeList.Items[0].Name
-		} else {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+		nodeName = node.Name
 		framework.Logf("Selected node %s", nodeName)
 
 		ginkgo.By("Checking node limits")

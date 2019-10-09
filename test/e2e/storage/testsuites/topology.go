@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -236,7 +237,10 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 
 // getCurrentTopologies() goes through all Nodes and returns up to maxCount unique driver topologies
 func (t *topologyTestSuite) getCurrentTopologies(cs clientset.Interface, keys []string, maxCount int) ([]topology, error) {
-	nodes := framework.GetReadySchedulableNodesOrDie(cs)
+	nodes, err := e2enode.GetReadySchedulableNodes(cs)
+	if err != nil {
+		return nil, err
+	}
 
 	topos := []topology{}
 

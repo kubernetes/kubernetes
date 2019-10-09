@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -58,10 +59,8 @@ var _ = utils.SIGDescribe("Volume Provisioning on Datastore [Feature:vsphere]", 
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 		scParameters = make(map[string]string)
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if !(len(nodeList.Items) > 0) {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
+		_, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.It("verify dynamically provisioned pv using storageclass fails on an invalid datastore", func() {

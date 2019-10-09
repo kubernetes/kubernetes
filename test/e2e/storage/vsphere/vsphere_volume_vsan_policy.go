@@ -108,16 +108,10 @@ var _ = utils.SIGDescribe("Storage Policy Based Volume Provisioning [Feature:vsp
 		tagPolicy = GetAndExpectStringEnvVar(SPBMTagPolicy)
 		framework.Logf("framework: %+v", f)
 		scParameters = make(map[string]string)
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if !(len(nodeList.Items) > 0) {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
+		_, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
 		masternodes, _, err := e2enode.GetMasterAndWorkerNodes(client)
-		if err != nil {
-			framework.Logf("Unexpected error occurred: %v", err)
-		}
-		// TODO: write a wrapper for ExpectNoErrorWithOffset()
-		framework.ExpectNoErrorWithOffset(0, err)
+		framework.ExpectNoError(err)
 		gomega.Expect(masternodes).NotTo(gomega.BeEmpty())
 		masterNode = masternodes.List()[0]
 	})
