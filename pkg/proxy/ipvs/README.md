@@ -302,7 +302,7 @@ modprobe -- ip_vs_sh
 modprobe -- nf_conntrack_ipv4
 
 # to check loaded modules, use
-lsmod | grep -e ipvs -e nf_conntrack_ipv4
+lsmod | grep -e ip_vs -e nf_conntrack_ipv4
 # or
 cut -f1 -d " "  /proc/modules | grep -e ip_vs -e nf_conntrack_ipv4
  ```
