@@ -16,12 +16,12 @@ limitations under the License.
 
 // ### ATTENTION ###
 //
-// Manager is now just a wrapper around ReplicaSetController,
+// Manager is now just a wrapper around Controller,
 // with a conversion layer that effectively treats ReplicationController
 // as if it were an older API version of ReplicaSet.
 //
 // However, RC and RS still have separate storage and separate instantiations
-// of the ReplicaSetController object.
+// of the Controller object.
 
 package replication
 
