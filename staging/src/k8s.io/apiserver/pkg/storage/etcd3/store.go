@@ -550,17 +550,6 @@ func (s *store) List(ctx context.Context, key, resourceVersion string, pred stor
 			returnedRV = continueRV
 		}
 	case s.pagingEnabled && pred.Limit > 0:
-		if len(resourceVersion) > 0 {
-			fromRV, err := s.versioner.ParseResourceVersion(resourceVersion)
-			if err != nil {
-				return apierrors.NewBadRequest(fmt.Sprintf("invalid resource version: %v", err))
-			}
-			if fromRV > 0 {
-				options = append(options, clientv3.WithRev(int64(fromRV)))
-			}
-			returnedRV = int64(fromRV)
-		}
-
 		rangeEnd := clientv3.GetPrefixRangeEnd(keyPrefix)
 		options = append(options, clientv3.WithRange(rangeEnd))
 
