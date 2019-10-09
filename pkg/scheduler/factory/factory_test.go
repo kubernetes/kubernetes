@@ -52,8 +52,10 @@ import (
 )
 
 const (
-	disablePodPreemption = false
-	bindTimeoutSeconds   = 600
+	disablePodPreemption             = false
+	bindTimeoutSeconds               = 600
+	podInitialBackoffDurationSeconds = 1
+	podMaxBackoffDurationSeconds     = 10
 )
 
 func TestCreate(t *testing.T) {
@@ -254,7 +256,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	defer close(stopCh)
 
 	timestamp := time.Now()
-	queue := internalqueue.NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+	queue := internalqueue.NewPriorityQueue(nil, nil, internalqueue.WithClock(clock.NewFakeClock(timestamp)))
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
 	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache, stopCh)
 
@@ -494,6 +496,8 @@ func newConfigFactoryWithFrameworkRegistry(
 		disablePodPreemption,
 		schedulerapi.DefaultPercentageOfNodesToScore,
 		bindTimeoutSeconds,
+		podMaxBackoffDurationSeconds,
+		podInitialBackoffDurationSeconds,
 		stopCh,
 		registry,
 		nil,

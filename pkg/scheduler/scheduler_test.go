@@ -197,6 +197,8 @@ func TestSchedulerCreation(t *testing.T) {
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
+		WithPodInitialBackoffSeconds(1),
+		WithPodMaxBackoffSeconds(10),
 	)
 
 	if err != nil {

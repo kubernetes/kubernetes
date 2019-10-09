@@ -45,13 +45,24 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
-var (
+const (
+	// If the pod stays in unschedulableQ longer than the unschedulableQTimeInterval,
+	// the pod will be moved from unschedulableQ to activeQ.
+	unschedulableQTimeInterval = 60 * time.Second
+
 	queueClosed = "scheduling queue is closed"
 )
 
-// If the pod stays in unschedulableQ longer than the unschedulableQTimeInterval,
-// the pod will be moved from unschedulableQ to activeQ.
-const unschedulableQTimeInterval = 60 * time.Second
+const (
+	// DefaultPodInitialBackoffDuration is the default value for the initial backoff duration
+	// for unschedulable pods. To change the default podInitialBackoffDurationSeconds used by the
+	// scheduler, update the ComponentConfig value in defaults.go
+	DefaultPodInitialBackoffDuration time.Duration = 1 * time.Second
+	// DefaultPodMaxBackoffDuration is the default value for the max backoff duration
+	// for unschedulable pods. To change the default podMaxBackoffDurationSeconds used by the
+	// scheduler, update the ComponentConfig value in defaults.go
+	DefaultPodMaxBackoffDuration time.Duration = 10 * time.Second
+)
 
 // SchedulingQueue is an interface for a queue to store pods waiting to be scheduled.
 // The interface follows a pattern similar to cache.FIFO and cache.Heap and
@@ -90,8 +101,8 @@ type SchedulingQueue interface {
 }
 
 // NewSchedulingQueue initializes a priority queue as a new scheduling queue.
-func NewSchedulingQueue(stop <-chan struct{}, fwk framework.Framework) SchedulingQueue {
-	return NewPriorityQueue(stop, fwk)
+func NewSchedulingQueue(stop <-chan struct{}, fwk framework.Framework, opts ...Option) SchedulingQueue {
+	return NewPriorityQueue(stop, fwk, opts...)
 }
 
 // NominatedNodeName returns nominated node name of a Pod.
@@ -140,6 +151,42 @@ type PriorityQueue struct {
 	closed bool
 }
 
+type priorityQueueOptions struct {
+	clock                     util.Clock
+	podInitialBackoffDuration time.Duration
+	podMaxBackoffDuration     time.Duration
+}
+
+// Option configures a PriorityQueue
+type Option func(*priorityQueueOptions)
+
+// WithClock sets clock for PriorityQueue, the default clock is util.RealClock.
+func WithClock(clock util.Clock) Option {
+	return func(o *priorityQueueOptions) {
+		o.clock = clock
+	}
+}
+
+// WithPodInitialBackoffDuration sets pod initial backoff duration for PriorityQueue,
+func WithPodInitialBackoffDuration(duration time.Duration) Option {
+	return func(o *priorityQueueOptions) {
+		o.podInitialBackoffDuration = duration
+	}
+}
+
+// WithPodMaxBackoffDuration sets pod max backoff duration for PriorityQueue,
+func WithPodMaxBackoffDuration(duration time.Duration) Option {
+	return func(o *priorityQueueOptions) {
+		o.podMaxBackoffDuration = duration
+	}
+}
+
+var defaultPriorityQueueOptions = priorityQueueOptions{
+	clock:                     util.RealClock{},
+	podInitialBackoffDuration: DefaultPodInitialBackoffDuration,
+	podMaxBackoffDuration:     DefaultPodMaxBackoffDuration,
+}
+
 // Making sure that PriorityQueue implements SchedulingQueue.
 var _ = SchedulingQueue(&PriorityQueue{})
 
@@ -162,12 +209,16 @@ func activeQComp(podInfo1, podInfo2 interface{}) bool {
 }
 
 // NewPriorityQueue creates a PriorityQueue object.
-func NewPriorityQueue(stop <-chan struct{}, fwk framework.Framework) *PriorityQueue {
-	return NewPriorityQueueWithClock(stop, util.RealClock{}, fwk)
-}
+func NewPriorityQueue(
+	stop <-chan struct{},
+	fwk framework.Framework,
+	opts ...Option,
+) *PriorityQueue {
+	options := defaultPriorityQueueOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
 
-// NewPriorityQueueWithClock creates a PriorityQueue which uses the passed clock for time.
-func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, fwk framework.Framework) *PriorityQueue {
 	comp := activeQComp
 	if fwk != nil {
 		if queueSortFunc := fwk.QueueSortFunc(); queueSortFunc != nil {
@@ -181,9 +232,9 @@ func NewPriorityQueueWithClock(stop <-chan struct{}, clock util.Clock, fwk frame
 	}
 
 	pq := &PriorityQueue{
-		clock:            clock,
+		clock:            options.clock,
 		stop:             stop,
-		podBackoff:       NewPodBackoffMap(1*time.Second, 10*time.Second),
+		podBackoff:       NewPodBackoffMap(options.podInitialBackoffDuration, options.podMaxBackoffDuration),
 		activeQ:          heap.NewWithRecorder(podInfoKeyFunc, comp, metrics.NewActivePodsRecorder()),
 		unschedulableQ:   newUnschedulablePodsMap(metrics.NewUnschedulablePodsRecorder()),
 		nominatedPods:    newNominatedPodMap(),

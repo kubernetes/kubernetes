@@ -47,6 +47,18 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) f
 		allErrs = append(allErrs, field.Invalid(field.NewPath("percentageOfNodesToScore"),
 			cc.PercentageOfNodesToScore, "not in valid range 0-100"))
 	}
+	if cc.PodInitialBackoffSeconds == nil {
+		allErrs = append(allErrs, field.Required(field.NewPath("podInitialBackoffSeconds"), ""))
+	} else if *cc.PodInitialBackoffSeconds <= 0 {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("podInitialBackoffSeconds"),
+			cc.PodInitialBackoffSeconds, "must be greater than 0"))
+	}
+	if cc.PodMaxBackoffSeconds == nil {
+		allErrs = append(allErrs, field.Required(field.NewPath("podMaxBackoffSeconds"), ""))
+	} else if cc.PodInitialBackoffSeconds != nil && *cc.PodMaxBackoffSeconds < *cc.PodInitialBackoffSeconds {
+		allErrs = append(allErrs, field.Invalid(field.NewPath("podMaxBackoffSeconds"),
+			cc.PodMaxBackoffSeconds, "must be greater than or equal to PodInitialBackoffSeconds"))
+	}
 	return allErrs
 }
 

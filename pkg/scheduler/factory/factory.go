@@ -180,6 +180,10 @@ type Configurator struct {
 
 	bindTimeoutSeconds int64
 
+	podInitialBackoffSeconds int64
+
+	podMaxBackoffSeconds int64
+
 	enableNonPreempting bool
 
 	// framework configuration arguments.
@@ -207,6 +211,8 @@ type ConfigFactoryArgs struct {
 	DisablePreemption              bool
 	PercentageOfNodesToScore       int32
 	BindTimeoutSeconds             int64
+	PodInitialBackoffSeconds       int64
+	PodMaxBackoffSeconds           int64
 	StopCh                         <-chan struct{}
 	Registry                       framework.Registry
 	Plugins                        *config.Plugins
@@ -253,6 +259,8 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 		disablePreemption:              args.DisablePreemption,
 		percentageOfNodesToScore:       args.PercentageOfNodesToScore,
 		bindTimeoutSeconds:             args.BindTimeoutSeconds,
+		podInitialBackoffSeconds:       args.PodInitialBackoffSeconds,
+		podMaxBackoffSeconds:           args.PodMaxBackoffSeconds,
 		enableNonPreempting:            utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority),
 		registry:                       args.Registry,
 		plugins:                        args.Plugins,
@@ -413,7 +421,12 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
 	}
 
-	podQueue := internalqueue.NewSchedulingQueue(c.StopEverything, framework)
+	podQueue := internalqueue.NewSchedulingQueue(
+		c.StopEverything,
+		framework,
+		internalqueue.WithPodInitialBackoffDuration(time.Duration(c.podInitialBackoffSeconds)*time.Second),
+		internalqueue.WithPodMaxBackoffDuration(time.Duration(c.podMaxBackoffSeconds)*time.Second),
+	)
 
 	// Setup cache debugger.
 	debugger := cachedebugger.New(
