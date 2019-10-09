@@ -211,6 +211,12 @@ func (s *EtcdOptions) addEtcdHealthEndpoint(c *server.Config) error {
 		if err != nil {
 			return err
 		}
+		// We explicitly don't use AddHealthChecks here, because we don't want
+		// to add to /livez. An unhealthy KMS provider is not likely to be
+		// fixed by an apiserver restart, so it should not mark the apiserver
+		// unhealthy, only unready. (We still add to /healthz, because when
+		// using /healthz it is up to the caller to distinguish between
+		// liveness and readiness checks by using ?exclude.)
 		c.HealthzChecks = append(c.ReadyzChecks, kmsPluginHealthzChecks...)
 		c.ReadyzChecks = append(c.ReadyzChecks, kmsPluginHealthzChecks...)
 	}
