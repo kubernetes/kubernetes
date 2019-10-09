@@ -21,7 +21,7 @@ limitations under the License.
 // For RC, the objects are converted on the way in and out (see ../replication/),
 // as if ReplicationController were just an older API version of ReplicaSet.
 // However, RC and RS still have separate storage and separate instantiations
-// of the ReplicaSetController object.
+// of the Controller object.
 //
 // Use rsc.Kind in log messages rather than hard-coding "ReplicaSet".
 
@@ -61,7 +61,7 @@ import (
 )
 
 const (
-	// Realistic value of the burstReplica field for the replica set manager based off
+	// BurstReplicas is a realistic value of the burstReplica field for the replica set manager based off
 	// performance requirements for kubernetes 1.0.
 	BurstReplicas = 500
 
@@ -69,9 +69,9 @@ const (
 	statusUpdateRetries = 1
 )
 
-// ReplicaSetController is responsible for synchronizing ReplicaSet objects stored
+// Controller is responsible for synchronizing ReplicaSet objects stored
 // in the system with actual running pods.
-type ReplicaSetController struct {
+type Controller struct {
 	// GroupVersionKind indicates the controller type.
 	// Different instances of this struct may handle different GVKs.
 	// For example, this struct can be used (with adapters) to handle ReplicationController.
@@ -106,7 +106,7 @@ type ReplicaSetController struct {
 }
 
 // NewReplicaSetController configures a replica set controller with the specified event recorder
-func NewReplicaSetController(rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *ReplicaSetController {
+func NewReplicaSetController(rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int) *Controller {
 	eventBroadcaster := record.NewBroadcaster()
 	eventBroadcaster.StartLogging(klog.Infof)
 	eventBroadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: kubeClient.CoreV1().Events("")})
@@ -124,12 +124,12 @@ func NewReplicaSetController(rsInformer appsinformers.ReplicaSetInformer, podInf
 // NewBaseController is the implementation of NewReplicaSetController with additional injected
 // parameters so that it can also serve as the implementation of NewReplicationController.
 func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer coreinformers.PodInformer, kubeClient clientset.Interface, burstReplicas int,
-	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface) *ReplicaSetController {
+	gvk schema.GroupVersionKind, metricOwnerName, queueName string, podControl controller.PodControlInterface) *Controller {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		metrics.RegisterMetricAndTrackRateLimiterUsage(metricOwnerName, kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
 
-	rsc := &ReplicaSetController{
+	rsc := &Controller{
 		GroupVersionKind: gvk,
 		kubeClient:       kubeClient,
 		podControl:       podControl,
@@ -165,16 +165,16 @@ func NewBaseController(rsInformer appsinformers.ReplicaSetInformer, podInformer 
 	return rsc
 }
 
-// SetEventRecorder replaces the event recorder used by the ReplicaSetController
+// SetEventRecorder replaces the event recorder used by the Controller
 // with the given recorder. Only used for testing.
-func (rsc *ReplicaSetController) SetEventRecorder(recorder record.EventRecorder) {
+func (rsc *Controller) SetEventRecorder(recorder record.EventRecorder) {
 	// TODO: Hack. We can't cleanly shutdown the event recorder, so benchmarks
 	// need to pass in a fake.
 	rsc.podControl = controller.RealPodControl{KubeClient: rsc.kubeClient, Recorder: recorder}
 }
 
 // Run begins watching and syncing.
-func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
+func (rsc *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer rsc.queue.ShutDown()
 
@@ -194,7 +194,7 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 }
 
 // getPodReplicaSets returns a list of ReplicaSets matching the given pod.
-func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*apps.ReplicaSet {
+func (rsc *Controller) getPodReplicaSets(pod *v1.Pod) []*apps.ReplicaSet {
 	rss, err := rsc.rsLister.GetPodReplicaSets(pod)
 	if err != nil {
 		return nil
@@ -210,7 +210,7 @@ func (rsc *ReplicaSetController) getPodReplicaSets(pod *v1.Pod) []*apps.ReplicaS
 // resolveControllerRef returns the controller referenced by a ControllerRef,
 // or nil if the ControllerRef could not be resolved to a matching controller
 // of the correct Kind.
-func (rsc *ReplicaSetController) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.ReplicaSet {
+func (rsc *Controller) resolveControllerRef(namespace string, controllerRef *metav1.OwnerReference) *apps.ReplicaSet {
 	// We can't look up by UID, so look up by Name and then verify UID.
 	// Don't even try to look up by Name if it's the wrong Kind.
 	if controllerRef.Kind != rsc.Kind {
@@ -229,7 +229,7 @@ func (rsc *ReplicaSetController) resolveControllerRef(namespace string, controll
 }
 
 // callback when RS is updated
-func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
+func (rsc *Controller) updateRS(old, cur interface{}) {
 	oldRS := old.(*apps.ReplicaSet)
 	curRS := cur.(*apps.ReplicaSet)
 
@@ -252,7 +252,7 @@ func (rsc *ReplicaSetController) updateRS(old, cur interface{}) {
 }
 
 // When a pod is created, enqueue the replica set that manages it and update its expectations.
-func (rsc *ReplicaSetController) addPod(obj interface{}) {
+func (rsc *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
 
 	if pod.DeletionTimestamp != nil {
@@ -295,7 +295,7 @@ func (rsc *ReplicaSetController) addPod(obj interface{}) {
 // When a pod is updated, figure out what replica set/s manage it and wake them
 // up. If the labels of the pod have changed we need to awaken both the old
 // and new replica set. old and cur must be *v1.Pod types.
-func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
+func (rsc *Controller) updatePod(old, cur interface{}) {
 	curPod := cur.(*v1.Pod)
 	oldPod := old.(*v1.Pod)
 	if curPod.ResourceVersion == oldPod.ResourceVersion {
@@ -369,7 +369,7 @@ func (rsc *ReplicaSetController) updatePod(old, cur interface{}) {
 
 // When a pod is deleted, enqueue the replica set that manages the pod and update its expectations.
 // obj could be an *v1.Pod, or a DeletionFinalStateUnknown marker item.
-func (rsc *ReplicaSetController) deletePod(obj interface{}) {
+func (rsc *Controller) deletePod(obj interface{}) {
 	pod, ok := obj.(*v1.Pod)
 
 	// When a delete is dropped, the relist will notice a pod in the store not
@@ -408,7 +408,7 @@ func (rsc *ReplicaSetController) deletePod(obj interface{}) {
 }
 
 // obj could be an *apps.ReplicaSet, or a DeletionFinalStateUnknown marker item.
-func (rsc *ReplicaSetController) enqueueReplicaSet(obj interface{}) {
+func (rsc *Controller) enqueueReplicaSet(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
@@ -418,7 +418,7 @@ func (rsc *ReplicaSetController) enqueueReplicaSet(obj interface{}) {
 }
 
 // obj could be an *apps.ReplicaSet, or a DeletionFinalStateUnknown marker item.
-func (rsc *ReplicaSetController) enqueueReplicaSetAfter(obj interface{}, after time.Duration) {
+func (rsc *Controller) enqueueReplicaSetAfter(obj interface{}, after time.Duration) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("couldn't get key for object %+v: %v", obj, err))
@@ -429,12 +429,12 @@ func (rsc *ReplicaSetController) enqueueReplicaSetAfter(obj interface{}, after t
 
 // worker runs a worker thread that just dequeues items, processes them, and marks them done.
 // It enforces that the syncHandler is never invoked concurrently with the same key.
-func (rsc *ReplicaSetController) worker() {
+func (rsc *Controller) worker() {
 	for rsc.processNextWorkItem() {
 	}
 }
 
-func (rsc *ReplicaSetController) processNextWorkItem() bool {
+func (rsc *Controller) processNextWorkItem() bool {
 	key, quit := rsc.queue.Get()
 	if quit {
 		return false
@@ -456,7 +456,7 @@ func (rsc *ReplicaSetController) processNextWorkItem() bool {
 // manageReplicas checks and updates replicas for the given ReplicaSet.
 // Does NOT modify <filteredPods>.
 // It will requeue the replica set in case of an error while creating/deleting pods.
-func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps.ReplicaSet) error {
+func (rsc *Controller) manageReplicas(filteredPods []*v1.Pod, rs *apps.ReplicaSet) error {
 	diff := len(filteredPods) - int(*(rs.Spec.Replicas))
 	rsKey, err := controller.KeyFunc(rs)
 	if err != nil {
@@ -559,7 +559,7 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 // syncReplicaSet will sync the ReplicaSet with the given key if it has had its expectations fulfilled,
 // meaning it did not expect to see any more of its pods created or deleted. This function is not meant to be
 // invoked concurrently with the same key.
-func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
+func (rsc *Controller) syncReplicaSet(key string) error {
 
 	startTime := time.Now()
 	defer func() {
@@ -627,7 +627,7 @@ func (rsc *ReplicaSetController) syncReplicaSet(key string) error {
 	return manageReplicasErr
 }
 
-func (rsc *ReplicaSetController) claimPods(rs *apps.ReplicaSet, selector labels.Selector, filteredPods []*v1.Pod) ([]*v1.Pod, error) {
+func (rsc *Controller) claimPods(rs *apps.ReplicaSet, selector labels.Selector, filteredPods []*v1.Pod) ([]*v1.Pod, error) {
 	// If any adoptions are attempted, we should first recheck for deletion with
 	// an uncached quorum read sometime after listing Pods (see #42639).
 	canAdoptFunc := controller.RecheckDeletionTimestamp(func() (metav1.Object, error) {

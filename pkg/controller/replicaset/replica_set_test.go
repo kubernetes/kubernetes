@@ -51,7 +51,7 @@ import (
 	"k8s.io/kubernetes/pkg/securitycontext"
 )
 
-func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh chan struct{}, burstReplicas int) (*ReplicaSetController, informers.SharedInformerFactory) {
+func testNewReplicaSetControllerFromClient(client clientset.Interface, stopCh chan struct{}, burstReplicas int) (*Controller, informers.SharedInformerFactory) {
 	informers := informers.NewSharedInformerFactory(client, controller.NoResyncPeriodFunc())
 
 	ret := NewReplicaSetController(
@@ -166,7 +166,7 @@ func newPodList(store cache.Store, count int, status v1.PodPhase, labelMap map[s
 
 // processSync initiates a sync via processNextWorkItem() to test behavior that
 // depends on both functions (such as re-queueing on sync error).
-func processSync(rsc *ReplicaSetController, key string) error {
+func processSync(rsc *Controller, key string) error {
 	// Save old syncHandler and replace with one that captures the error.
 	oldSyncHandler := rsc.syncHandler
 	defer func() {
@@ -1093,7 +1093,7 @@ func TestDeletionTimestamp(t *testing.T) {
 }
 
 // setupManagerWithGCEnabled creates a RS manager with a fakePodControl
-func setupManagerWithGCEnabled(stopCh chan struct{}, objs ...runtime.Object) (manager *ReplicaSetController, fakePodControl *controller.FakePodControl, informers informers.SharedInformerFactory) {
+func setupManagerWithGCEnabled(stopCh chan struct{}, objs ...runtime.Object) (manager *Controller, fakePodControl *controller.FakePodControl, informers informers.SharedInformerFactory) {
 	c := fake.NewSimpleClientset(objs...)
 	fakePodControl = &controller.FakePodControl{}
 	manager, informers = testNewReplicaSetControllerFromClient(c, stopCh, BurstReplicas)

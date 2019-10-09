@@ -46,7 +46,7 @@ const (
 // in the system with actual running pods.
 // It is actually just a wrapper around ReplicaSetController.
 type Manager struct {
-	replicaset.ReplicaSetController
+	replicaset.Controller
 }
 
 // NewReplicationManager configures a replication manager with the specified event recorder
