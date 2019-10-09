@@ -196,7 +196,7 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 			expected: TopologyHint{
 				NUMANodeAffinity: NewTestSocketMask(numaNodes...),
-				Preferred:        true,
+				Preferred:        false,
 			},
 		},
 		{
@@ -688,6 +688,37 @@ func TestCalculateAffinity(t *testing.T) {
 			expected: TopologyHint{
 				NUMANodeAffinity: NewTestSocketMask(0),
 				Preferred:        false,
+			},
+		},
+		{
+			name:   "Special cased PolicySingleNumaNode with one no-preference provider",
+			policy: NewSingleNumaNodePolicy(),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestSocketMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestSocketMask(1),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestSocketMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					nil,
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestSocketMask(0),
+				Preferred:        true,
 			},
 		},
 	}
