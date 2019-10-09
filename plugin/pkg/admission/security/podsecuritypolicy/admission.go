@@ -118,7 +118,6 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	}
 
 	// only mutate if this is a CREATE request. On updates we only validate.
-	// TODO(liggitt): allow spec mutation during initializing updates?
 	if a.GetOperation() != admission.Create {
 		return nil
 	}
@@ -228,7 +227,6 @@ func (p *Plugin) computeSecurityContext(ctx context.Context, a admission.Attribu
 
 	// sort policies by name to make order deterministic
 	// If mutation is not allowed and validatedPSPHint is provided, check the validated policy first.
-	// TODO(liggitt): add priority field to allow admins to bucket differently
 	sort.SliceStable(policies, func(i, j int) bool {
 		if !specMutationAllowed {
 			if policies[i].Name == validatedPSPHint {
