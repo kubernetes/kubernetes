@@ -16,7 +16,6 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis:go_default_library",
         "//pkg/scheduler/api:go_default_library",
-        "//pkg/util/metrics:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//staging/src/k8s.io/api/coordination/v1beta1:go_default_library",
@@ -44,26 +43,9 @@ go_library(
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
         "//staging/src/k8s.io/component-base/metrics:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/ratelimiter:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],
-)
-
-filegroup(
-    name = "package-srcs",
-    srcs = glob(["**"]),
-    tags = ["automanaged"],
-    visibility = ["//visibility:private"],
-)
-
-filegroup(
-    name = "all-srcs",
-    srcs = [
-        ":package-srcs",
-        "//pkg/controller/nodelifecycle/config:all-srcs",
-        "//pkg/controller/nodelifecycle/scheduler:all-srcs",
-    ],
-    tags = ["automanaged"],
-    visibility = ["//visibility:public"],
 )
 
 go_test(
@@ -100,4 +82,22 @@ go_test(
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
     ],
+)
+
+filegroup(
+    name = "package-srcs",
+    srcs = glob(["**"]),
+    tags = ["automanaged"],
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "all-srcs",
+    srcs = [
+        ":package-srcs",
+        "//pkg/controller/nodelifecycle/config:all-srcs",
+        "//pkg/controller/nodelifecycle/scheduler:all-srcs",
+    ],
+    tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
