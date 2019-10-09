@@ -104,3 +104,18 @@ func PriorityMetadata(state *framework.CycleState) interface{} {
 	}
 	return meta
 }
+
+// PredicateMetadata returns predicate metadata stored in CycleState.
+func PredicateMetadata(state *framework.CycleState) interface{} {
+	if state == nil {
+		return nil
+	}
+
+	var meta interface{}
+	if s, err := state.Read(PredicatesStateKey); err == nil {
+		meta = s.(*PredicatesStateData).Reference
+	} else {
+		klog.Errorf("reading key %q from CycleState, continuing without metadata: %v", PredicatesStateKey, err)
+	}
+	return meta
+}
