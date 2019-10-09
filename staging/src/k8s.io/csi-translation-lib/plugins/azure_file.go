@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -174,6 +174,10 @@ func (t *azureFileCSITranslator) GetInTreePluginName() string {
 // GetCSIPluginName returns the name of the CSI plugin
 func (t *azureFileCSITranslator) GetCSIPluginName() string {
 	return AzureFileDriverName
+}
+
+func (t *azureFileCSITranslator) RepairVolumeHandle(volumeHandle, nodeID string) (string, error) {
+	return volumeHandle, nil
 }
 
 // get file share info according to volume id, e.g.

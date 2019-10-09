@@ -186,3 +186,11 @@ func (CSITranslator) IsInlineMigratable(vol *v1.Volume) bool {
 	}
 	return false
 }
+
+// RepairVolumeHandle generates a correct volume handle based on node ID information.
+func (CSITranslator) RepairVolumeHandle(driverName, volumeHandle, nodeID string) (string, error) {
+	if plugin, ok := inTreePlugins[driverName]; ok {
+		return plugin.RepairVolumeHandle(volumeHandle, nodeID)
+	}
+	return "", fmt.Errorf("could not find In-Tree driver name for CSI plugin %v", driverName)
+}

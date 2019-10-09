@@ -17,7 +17,7 @@ limitations under the License.
 package plugins
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 )
 
@@ -55,4 +55,7 @@ type InTreePlugin interface {
 
 	// GetCSIPluginName returns the name of the CSI plugin that supersedes the in-tree plugin
 	GetCSIPluginName() string
+
+	// RepairVolumeHandle generates a correct volume handle based on node ID information.
+	RepairVolumeHandle(volumeHandle, nodeID string) (string, error)
 }

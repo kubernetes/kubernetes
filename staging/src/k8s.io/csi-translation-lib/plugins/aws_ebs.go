@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -159,6 +159,10 @@ func (t *awsElasticBlockStoreCSITranslator) GetInTreePluginName() string {
 // GetCSIPluginName returns the name of the CSI plugin
 func (t *awsElasticBlockStoreCSITranslator) GetCSIPluginName() string {
 	return AWSEBSDriverName
+}
+
+func (t *awsElasticBlockStoreCSITranslator) RepairVolumeHandle(volumeHandle, nodeID string) (string, error) {
+	return volumeHandle, nil
 }
 
 // awsVolumeRegMatch represents Regex Match for AWS volume.
