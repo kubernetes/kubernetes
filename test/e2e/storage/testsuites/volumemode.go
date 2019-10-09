@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -60,6 +61,9 @@ func InitVolumeModeTestSuite() TestSuite {
 				testpatterns.FsVolModeDynamicPV,
 				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModeDynamicPV,
+			},
+			supportedSizeRange: volume.SizeRange{
+				Min: "1Mi",
 			},
 		},
 	}
@@ -155,9 +159,13 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 					framework.Skipf("Driver %q does not define Dynamic Provision StorageClass - skipping", dInfo.Name)
 				}
 				l.sc.VolumeBindingMode = &volBindMode
+				testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+				driverVolumeSizeRange := dInfo.SupportedSizeRange
+				claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+				framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 
 				l.pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
-					ClaimSize:        dDriver.GetClaimSize(),
+					ClaimSize:        claimSize,
 					StorageClassName: &(l.sc.Name),
 					VolumeMode:       &pattern.VolMode,
 				}, l.ns.Name)
@@ -278,7 +286,8 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 	ginkgo.It("should fail to use a volume in a pod with mismatched mode [Slow]", func() {
 		skipTestIfBlockNotSupported(driver)
 		init()
-		l.genericVolumeTestResource = *createGenericVolumeTestResource(driver, l.config, pattern)
+		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+		l.genericVolumeTestResource = *createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
 		defer cleanup()
 
 		ginkgo.By("Creating pod")
@@ -326,7 +335,8 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 			skipTestIfBlockNotSupported(driver)
 		}
 		init()
-		l.genericVolumeTestResource = *createGenericVolumeTestResource(driver, l.config, pattern)
+		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+		l.genericVolumeTestResource = *createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
 		defer cleanup()
 
 		ginkgo.By("Creating pod")

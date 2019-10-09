@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
 
@@ -111,7 +112,9 @@ func loadDriverDefinition(filename string) (*driverDefinition, error) {
 				"", // Default fsType
 			),
 		},
-		ClaimSize: "5Gi",
+		SupportedSizeRange: volume.SizeRange{
+			Min: "5Gi",
+		},
 	}
 	// TODO: strict checking of the file content once https://github.com/kubernetes/kubernetes/pull/71589
 	// or something similar is merged.
@@ -200,9 +203,9 @@ type driverDefinition struct {
 		ReadOnly bool
 	}
 
-	// ClaimSize defines the desired size of dynamically
-	// provisioned volumes. Default is "5GiB".
-	ClaimSize string
+	// SupportedSizeRange defines the desired size of dynamically
+	// provisioned volumes.
+	SupportedSizeRange volume.SizeRange
 
 	// ClientNodeName selects a specific node for scheduling test pods.
 	// Can be left empty. Most drivers should not need this and instead
@@ -300,10 +303,6 @@ func (d *driverDefinition) GetSnapshotClass(config *testsuites.PerTestConfig) *u
 	suffix := snapshotter + "-vsc"
 
 	return testsuites.GetSnapshotClass(snapshotter, parameters, ns, suffix)
-}
-
-func (d *driverDefinition) GetClaimSize() string {
-	return d.ClaimSize
 }
 
 func (d *driverDefinition) GetVolume(config *testsuites.PerTestConfig, volumeNumber int) (map[string]string, bool, bool) {
