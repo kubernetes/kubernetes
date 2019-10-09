@@ -1,14 +1,10 @@
-package(default_visibility = ["//visibility:public"])
-
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_library",
-)
+load("@io_bazel_rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "go_default_library",
     srcs = ["server.go"],
     importpath = "k8s.io/kubernetes/cmd/kube-scheduler/app",
+    visibility = ["//visibility:public"],
     deps = [
         "//cmd/kube-scheduler/app/config:go_default_library",
         "//cmd/kube-scheduler/app/options:go_default_library",
@@ -22,6 +18,8 @@ go_library(
         "//pkg/util/flag:go_default_library",
         "//pkg/version:go_default_library",
         "//pkg/version/verflag:go_default_library",
+        "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/events/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authorization/authorizer:go_default_library",
@@ -32,8 +30,11 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/server/mux:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/routes:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/util/term:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/scheme:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/events:go_default_library",
         "//staging/src/k8s.io/client-go/tools/leaderelection:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/cli/globalflag:go_default_library",
         "//staging/src/k8s.io/component-base/metrics/legacyregistry:go_default_library",
@@ -58,4 +59,5 @@ filegroup(
         "//cmd/kube-scheduler/app/testing:all-srcs",
     ],
     tags = ["automanaged"],
+    visibility = ["//visibility:public"],
 )
