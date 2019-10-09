@@ -507,3 +507,206 @@ resources:
 		})
 	}
 }
+
+func TestCBCKeyRotationWithOverlappingProviders(t *testing.T) {
+	testCBCKeyRotationWithProviders(
+		t,
+		`{
+  "kind": "EncryptionConfiguration",
+  "apiVersion": "apiserver.config.k8s.io/v1",
+  "resources": [
+    {
+      "resources": [
+        "ignored"
+      ],
+      "providers": [
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "1",
+                "secret": "Owq7A4JrJpSjrvH8kXkvl4JmOLzvZ6j9BcGRkR8OPQ4="
+              }
+            ]
+          }
+        },
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "2",
+                "secret": "+qcnfOFX3aRXM9PuY7lQXDWYIQ3GWUdBc3nYBo91SCA="
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}`,
+		"k8s:enc:aescbc:v1:1:",
+		`{
+  "kind": "EncryptionConfiguration",
+  "apiVersion": "apiserver.config.k8s.io/v1",
+  "resources": [
+    {
+      "resources": [
+        "ignored"
+      ],
+      "providers": [
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "2",
+                "secret": "+qcnfOFX3aRXM9PuY7lQXDWYIQ3GWUdBc3nYBo91SCA="
+              }
+            ]
+          }
+        },
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "1",
+                "secret": "Owq7A4JrJpSjrvH8kXkvl4JmOLzvZ6j9BcGRkR8OPQ4="
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}`,
+		"k8s:enc:aescbc:v1:2:",
+	)
+}
+
+func TestCBCKeyRotationWithoutOverlappingProviders(t *testing.T) {
+	testCBCKeyRotationWithProviders(
+		t,
+		`{
+  "kind": "EncryptionConfiguration",
+  "apiVersion": "apiserver.config.k8s.io/v1",
+  "resources": [
+    {
+      "resources": [
+        "ignored"
+      ],
+      "providers": [
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "A",
+                "secret": "Owq7A4JrJpSjrvH8kXkvl4JmOLzvZ6j9BcGRkR8OPQ4="
+              },
+              {
+                "name": "B",
+                "secret": "+qcnfOFX3aRXM9PuY7lQXDWYIQ3GWUdBc3nYBo91SCA="
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}`,
+		"k8s:enc:aescbc:v1:A:",
+		`{
+  "kind": "EncryptionConfiguration",
+  "apiVersion": "apiserver.config.k8s.io/v1",
+  "resources": [
+    {
+      "resources": [
+        "ignored"
+      ],
+      "providers": [
+        {
+          "aescbc": {
+            "keys": [
+              {
+                "name": "B",
+                "secret": "+qcnfOFX3aRXM9PuY7lQXDWYIQ3GWUdBc3nYBo91SCA="
+              },
+              {
+                "name": "A",
+                "secret": "Owq7A4JrJpSjrvH8kXkvl4JmOLzvZ6j9BcGRkR8OPQ4="
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}`,
+		"k8s:enc:aescbc:v1:B:",
+	)
+}
+
+func testCBCKeyRotationWithProviders(t *testing.T, firstEncryptionConfig, firstPrefix, secondEncryptionConfig, secondPrefix string) {
+	p := getTransformerFromEncryptionConfig(t, firstEncryptionConfig)
+
+	context := value.DefaultContext([]byte("authenticated_data"))
+
+	out, err := p.TransformToStorage([]byte("firstvalue"), context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(out, []byte(firstPrefix)) {
+		t.Fatalf("unexpected prefix: %q", out)
+	}
+	from, stale, err := p.TransformFromStorage(out, context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stale || !bytes.Equal([]byte("firstvalue"), from) {
+		t.Fatalf("unexpected data: %t %q", stale, from)
+	}
+
+	// verify changing the context fails storage
+	_, _, err = p.TransformFromStorage(out, value.DefaultContext([]byte("incorrect_context")))
+	if err != nil {
+		t.Fatalf("CBC mode does not support authentication: %v", err)
+	}
+
+	// reverse the order, use the second key
+	p = getTransformerFromEncryptionConfig(t, secondEncryptionConfig)
+	from, stale, err = p.TransformFromStorage(out, context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !stale || !bytes.Equal([]byte("firstvalue"), from) {
+		t.Fatalf("unexpected data: %t %q", stale, from)
+	}
+
+	out, err = p.TransformToStorage([]byte("firstvalue"), context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.HasPrefix(out, []byte(secondPrefix)) {
+		t.Fatalf("unexpected prefix: %q", out)
+	}
+	from, stale, err = p.TransformFromStorage(out, context)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stale || !bytes.Equal([]byte("firstvalue"), from) {
+		t.Fatalf("unexpected data: %t %q", stale, from)
+	}
+}
+
+func getTransformerFromEncryptionConfig(t *testing.T, encryptionConfig string) value.Transformer {
+	t.Helper()
+	transformers, err := ParseEncryptionConfiguration(strings.NewReader(encryptionConfig))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(transformers) != 1 {
+		t.Fatalf("input config does not have exactly one resource: %s", encryptionConfig)
+	}
+	for _, transformer := range transformers {
+		return transformer
+	}
+	panic("unreachable")
+}
