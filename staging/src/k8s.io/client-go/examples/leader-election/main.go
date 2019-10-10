@@ -138,9 +138,9 @@ func main() {
 				run(ctx)
 			},
 			OnStoppedLeading: func() {
-				// we can do cleanup here, or after the RunOrDie method
-				// returns
+				// we can do cleanup here
 				klog.Infof("leader lost: %s", id)
+				os.Exit(0)
 			},
 			OnNewLeader: func(identity string) {
 				// we're notified when new leader elected
