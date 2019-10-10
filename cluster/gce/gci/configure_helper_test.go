@@ -26,14 +26,13 @@ import (
 	"testing"
 	"text/template"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 )
 
 const (
-	envScriptFileName         = "kube-env"
-	configureHelperScriptName = "configure-helper.sh"
+	envScriptFileName = "kube-env"
 )
 
 type ManifestTestCase struct {
@@ -123,15 +122,15 @@ func (c *ManifestTestCase) mustCreateEnv(envTemplate string, env interface{}) st
 	return f.Name()
 }
 
-func (c *ManifestTestCase) mustInvokeFunc(envTemplate string, env interface{}) {
+func (c *ManifestTestCase) mustInvokeFunc(envTemplate, scriptName string, env interface{}) {
 	envScriptPath := c.mustCreateEnv(envTemplate, env)
-	args := fmt.Sprintf("source %s ; source %s; %s", envScriptPath, configureHelperScriptName, c.manifestFuncName)
+	args := fmt.Sprintf("source %s ; source %s; %s", envScriptPath, scriptName, c.manifestFuncName)
 	cmd := exec.Command("bash", "-c", args)
 
 	bs, err := cmd.CombinedOutput()
 	if err != nil {
 		c.t.Logf("%s", bs)
-		c.t.Fatalf("Failed to run configure-helper.sh: %v", err)
+		c.t.Fatalf("Failed to run %s: %v", scriptName, err)
 	}
 	c.t.Logf("%s", string(bs))
 }
