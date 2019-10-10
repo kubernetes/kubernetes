@@ -17,6 +17,7 @@ limitations under the License.
 package pluginwatcher
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"runtime"
@@ -24,11 +25,18 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog"
 
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
 	"k8s.io/kubernetes/pkg/kubelet/util"
 	utilfs "k8s.io/kubernetes/pkg/util/filesystem"
+)
+
+const (
+	DefaultPluginRegistrationLimiterQPS float32 = 10.0
+	DefaultPluginRegistrationBurst              = 10
+	DefaultPluginRegistrationTimeout            = 1 * time.Second
 )
 
 // Watcher is the plugin watcher
@@ -38,14 +46,16 @@ type Watcher struct {
 	fsWatcher           *fsnotify.Watcher
 	stopped             chan struct{}
 	desiredStateOfWorld cache.DesiredStateOfWorld
+	registrationLimiter flowcontrol.RateLimiter
 }
 
-// NewWatcher provides a new watcher for socket registration
-func NewWatcher(sockDir string, desiredStateOfWorld cache.DesiredStateOfWorld) *Watcher {
+// NewWatcher provides a new watcher for socket registration.
+func NewWatcher(sockDir string, desiredStateOfWorld cache.DesiredStateOfWorld, registrationLimiter flowcontrol.RateLimiter) *Watcher {
 	return &Watcher{
 		path:                sockDir,
 		fs:                  &utilfs.DefaultFs{},
 		desiredStateOfWorld: desiredStateOfWorld,
+		registrationLimiter: registrationLimiter,
 	}
 }
 
@@ -191,7 +201,14 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 	if runtime.GOOS == "windows" {
 		socketPath = util.NormalizePath(socketPath)
 	}
-	//TODO: Implement rate limiting to mitigate any DOS kind of attacks.
+
+	if err := w.waitToRespectRateLimiting(); err != nil {
+		// Given the defaults, we should only see this error message in
+		// _very_ rare circumstances (i.e. a ton of registration
+		// requests).
+		return fmt.Errorf("could not claim token to register plugin before timeout")
+	}
+
 	// Update desired state of world list of plugins
 	// If the socket path does exist in the desired world cache, there's still
 	// a possibility that it has been deleted and recreated again before it is
@@ -203,6 +220,13 @@ func (w *Watcher) handlePluginRegistration(socketPath string) error {
 		return fmt.Errorf("error adding socket path %s or updating timestamp to desired state cache: %v", socketPath, err)
 	}
 	return nil
+}
+
+func (w *Watcher) waitToRespectRateLimiting() error {
+	ctx, cancel := context.WithTimeout(context.Background(), DefaultPluginRegistrationTimeout)
+	defer cancel()
+
+	return w.registrationLimiter.Wait(ctx)
 }
 
 func (w *Watcher) handleDeleteEvent(event fsnotify.Event) {

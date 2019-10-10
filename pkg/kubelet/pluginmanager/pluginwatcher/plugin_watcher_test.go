@@ -27,6 +27,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog"
 	registerapi "k8s.io/kubelet/pkg/apis/pluginregistration/v1"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
@@ -253,8 +254,55 @@ func TestPluginRegistrationAtKubeletStart(t *testing.T) {
 	}
 }
 
+func TestPluginRegistrationFailsWhenAboveRateLimit(t *testing.T) {
+	defer cleanup(t)
+
+	dsw := cache.NewDesiredStateOfWorld()
+
+	neverAcceptRateLimiter := flowcontrol.NewFakeNeverRateLimiter()
+	newWatcherWithRateLimiter(t, dsw, wait.NeverStop, neverAcceptRateLimiter)
+
+	// Because the rate limiter always fails, we can choose a small value
+	// for the number we attempt to create.
+	numPluginsToAttemptCreate := 1
+	for i := 0; i < numPluginsToAttemptCreate; i++ {
+		socketPath := fmt.Sprintf("%s/plugin-%d.sock", socketDir, i)
+		pluginName := fmt.Sprintf("example-plugin-%d", i)
+
+		p := NewTestExamplePlugin(pluginName, registerapi.DevicePlugin, socketPath, supportedVersions...)
+		require.NoError(t, p.Serve("v1beta1", "v1beta2"))
+
+		// Ideally, we'd be able to wait and see the
+		// `handlePluginRegistration` function fail before we continue with
+		// the test suite. However, actually observing this failure
+		// outside of `PluginWatcher` requires some refactoring.
+		//
+		// We may attempt this refactoring for now, but for now, I think
+		// we can safetly assume that, given we are only attempting to
+		// create one plugin, if the plugin is registered within 5x the
+		// timeout, we're not going to be able to register it. We can
+		// now progress to checking the desired state.
+		time.Sleep(5 * DefaultPluginRegistrationTimeout)
+
+		// Check the desired state for plugins
+		dswPlugins := dsw.GetPluginsToRegister()
+		if len(dswPlugins) != 0 {
+			t.Fatalf("TestPluginRegistration: desired state of world length should be 0 but it's %d", len(dswPlugins))
+		}
+
+		// Stop the plugin; the plugin never was in the desired state of
+		// the world cache, so we don't need to worry about removing it.
+		require.NoError(t, p.Stop())
+	}
+}
+
 func newWatcher(t *testing.T, desiredStateOfWorldCache cache.DesiredStateOfWorld, stopCh <-chan struct{}) *Watcher {
-	w := NewWatcher(socketDir, desiredStateOfWorldCache)
+	defaultAlwaysAcceptRateLimiter := flowcontrol.NewFakeAlwaysRateLimiter()
+	return newWatcherWithRateLimiter(t, desiredStateOfWorldCache, stopCh, defaultAlwaysAcceptRateLimiter)
+}
+
+func newWatcherWithRateLimiter(t *testing.T, desiredStateOfWorldCache cache.DesiredStateOfWorld, stopCh <-chan struct{}, rateLimiter flowcontrol.RateLimiter) *Watcher {
+	w := NewWatcher(socketDir, desiredStateOfWorldCache, rateLimiter)
 	require.NoError(t, w.Start(stopCh))
 
 	return w

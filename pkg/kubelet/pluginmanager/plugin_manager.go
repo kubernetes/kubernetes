@@ -21,6 +21,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager/cache"
@@ -67,10 +68,14 @@ func NewPluginManager(
 		asw,
 	)
 
+	registrationLimiter := flowcontrol.NewTokenBucketRateLimiter(
+		pluginwatcher.DefaultPluginRegistrationLimiterQPS, pluginwatcher.DefaultPluginRegistrationBurst)
+
 	pm := &pluginManager{
 		desiredStateOfWorldPopulator: pluginwatcher.NewWatcher(
 			sockDir,
 			dsw,
+			registrationLimiter,
 		),
 		reconciler:          reconciler,
 		desiredStateOfWorld: dsw,
