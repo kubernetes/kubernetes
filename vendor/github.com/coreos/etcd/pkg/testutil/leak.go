@@ -70,13 +70,13 @@ func CheckAfterTest(d time.Duration) error {
 	}
 	var bad string
 	badSubstring := map[string]string{
-		").writeLoop(":                                 "a Transport",
+		").writeLoop(": "a Transport",
 		"created by net/http/httptest.(*Server).Start": "an httptest.Server",
-		"timeoutHandler":                               "a TimeoutHandler",
-		"net.(*netFD).connect(":                        "a timing out dial",
-		").noteClientGone(":                            "a closenotifier sender",
-		").readLoop(":                                  "a Transport",
-		".grpc":                                        "a gRPC resource",
+		"timeoutHandler":        "a TimeoutHandler",
+		"net.(*netFD).connect(": "a timing out dial",
+		").noteClientGone(":     "a closenotifier sender",
+		").readLoop(":           "a Transport",
+		".grpc":                 "a gRPC resource",
 	}
 
 	var stacks string

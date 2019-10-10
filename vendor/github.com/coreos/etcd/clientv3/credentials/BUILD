@@ -7,6 +7,7 @@ go_library(
     importpath = "github.com/coreos/etcd/clientv3/credentials",
     visibility = ["//visibility:public"],
     deps = [
+        "//vendor/github.com/coreos/etcd/clientv3/balancer/resolver/endpoint:go_default_library",
         "//vendor/github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes:go_default_library",
         "//vendor/google.golang.org/grpc/credentials:go_default_library",
     ],
