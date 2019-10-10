@@ -205,6 +205,13 @@ aliases:
     - krzyzacy
     - ixdy
     - spiffxp
+  sig-node-approvers:
+    - Random-Liu
+    - dchen1107
+    - derekwaynecarr
+    - tallclair
+    - vishh
+    - yujuhong
   sig-node-reviewers:
     - Random-Liu
     - dashpole
