@@ -273,6 +273,20 @@ aliases:
     - bskiba
     - MaciekPytel
     - mwielgus
+  sig-instrumentation-approvers:
+    - piosz
+    - brancz
+  sig-instrumentation-reviewers:
+    - kawych
+    - s-urbaniak
+    - DirectXMan12
+    - x13n
+    - loburm
+    - huangyuqi
+    - andyxning
+    - coffeepac
+    - monotek
+    - logicalhan
 
   api-approvers:
     - erictune
