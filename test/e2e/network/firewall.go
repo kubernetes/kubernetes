@@ -145,7 +145,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 			pod.Spec.HostNetwork = true
 			_, err := cs.CoreV1().Pods(ns).Create(pod)
 			framework.ExpectNoError(err)
-			framework.ExpectNoError(f.WaitForPodRunning(podName))
+			framework.ExpectNoError(f.WaitForPodReady(podName))
 			framework.Logf("Netexec pod %q in namespace %q running", podName, ns)
 
 			defer func() {

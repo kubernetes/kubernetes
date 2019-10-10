@@ -421,7 +421,7 @@ var _ = SIGDescribe("DNS", func() {
 				framework.Failf("ginkgo.Failed to delete pod %s: %v", testAgnhostPod.Name, err)
 			}
 		}()
-		err = f.WaitForPodRunning(testAgnhostPod.Name)
+		err = f.WaitForPodReady(testAgnhostPod.Name)
 		framework.ExpectNoError(err, "failed to wait for pod %s to be running", testAgnhostPod.Name)
 
 		runCommand := func(arg string) string {
