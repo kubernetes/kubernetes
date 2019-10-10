@@ -95,4 +95,5 @@ func addToGroupVersion(scheme *runtime.Scheme) error {
 // the logic for conversion private.
 func init() {
 	localSchemeBuilder.Register(addToGroupVersion)
+	localSchemeBuilder.Register(metav1.RegisterConversions)
 }
