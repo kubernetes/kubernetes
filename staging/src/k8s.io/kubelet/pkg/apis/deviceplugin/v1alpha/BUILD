@@ -11,7 +11,8 @@ go_library(
         "api.pb.go",
         "constants.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1alpha",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubelet/pkg/apis/deviceplugin/v1alpha",
+    importpath = "k8s.io/kubelet/pkg/apis/deviceplugin/v1alpha",
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",

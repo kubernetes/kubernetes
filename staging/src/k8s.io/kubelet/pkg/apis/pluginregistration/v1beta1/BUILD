@@ -11,11 +11,11 @@ go_library(
         "api.pb.go",
         "constants.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubelet/apis/deviceplugin/v1beta1",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubelet/pkg/apis/pluginregistration/v1beta1",
+    importpath = "k8s.io/kubelet/pkg/apis/pluginregistration/v1beta1",
     deps = [
         "//vendor/github.com/gogo/protobuf/gogoproto:go_default_library",
         "//vendor/github.com/gogo/protobuf/proto:go_default_library",
-        "//vendor/github.com/gogo/protobuf/sortkeys:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
         "//vendor/google.golang.org/grpc/codes:go_default_library",
         "//vendor/google.golang.org/grpc/status:go_default_library",
