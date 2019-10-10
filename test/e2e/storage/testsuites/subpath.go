@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -67,6 +68,7 @@ func InitSubPathTestSuite() TestSuite {
 			},
 			supportedSizeRange: volume.SizeRange{
 				Min: "1Mi",
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
 			},
 		},
 	}

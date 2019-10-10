@@ -142,7 +142,8 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		defer cleanup()
 
 		cs := f.ClientSet
-		fileSizes := createFileSizes(dInfo.MaxFileSize)
+		sz, _ := strconv.Atoi(dInfo.SupportedSizeRange.Max)
+		fileSizes := createFileSizes(int64(sz))
 		testFile := fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name)
 		var fsGroup *int64
 		if !framework.NodeOSDistroIs("windows") && dInfo.Capabilities[CapFsGroup] {

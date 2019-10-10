@@ -91,9 +91,9 @@ func InitNFSDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "nfs",
 			InTreePluginName: "kubernetes.io/nfs",
-			MaxFileSize:      testpatterns.FileSizeLarge,
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
+				Max: strconv.FormatInt(testpatterns.FileSizeLarge, 10),
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -233,9 +233,9 @@ func InitGlusterFSDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "gluster",
 			InTreePluginName: "kubernetes.io/glusterfs",
-			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -356,7 +356,9 @@ func InitISCSIDriver() testsuites.TestDriver {
 			Name:             "iscsi",
 			InTreePluginName: "kubernetes.io/iscsi",
 			FeatureTag:       "[Feature:Volumes]",
-			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 				"ext2",
@@ -470,9 +472,9 @@ func InitRbdDriver() testsuites.TestDriver {
 			Name:             "rbd",
 			InTreePluginName: "kubernetes.io/rbd",
 			FeatureTag:       "[Feature:Volumes][Serial]",
-			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -602,9 +604,9 @@ func InitCephFSDriver() testsuites.TestDriver {
 			Name:             "ceph",
 			InTreePluginName: "kubernetes.io/cephfs",
 			FeatureTag:       "[Feature:Volumes][Serial]",
-			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -705,7 +707,9 @@ func InitHostPathDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "hostPath",
 			InTreePluginName: "kubernetes.io/host-path",
-			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -780,7 +784,9 @@ func InitHostPathSymlinkDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "hostPathSymlink",
 			InTreePluginName: "kubernetes.io/host-path",
-			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -923,7 +929,9 @@ func InitEmptydirDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "emptydir",
 			InTreePluginName: "kubernetes.io/empty-dir",
-			MaxFileSize:      testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -990,9 +998,9 @@ func InitCinderDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "cinder",
 			InTreePluginName: "kubernetes.io/cinder",
-			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1162,9 +1170,9 @@ func InitGcePdDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "gcepd",
 			InTreePluginName: "kubernetes.io/gce-pd",
-			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
 			},
 			SupportedFsType:      supportedTypes,
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
@@ -1297,9 +1305,9 @@ func InitVSphereDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "vsphere",
 			InTreePluginName: "kubernetes.io/vsphere-volume",
-			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1419,9 +1427,9 @@ func InitAzureDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "azure",
 			InTreePluginName: "kubernetes.io/azure-file",
-			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1553,9 +1561,9 @@ func InitAwsDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:             "aws",
 			InTreePluginName: "kubernetes.io/aws-ebs",
-			MaxFileSize:      testpatterns.FileSizeMedium,
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
@@ -1749,7 +1757,9 @@ func InitLocalDriverWithVolumeType(volumeType utils.LocalVolumeType) func() test
 				Name:             "local",
 				InTreePluginName: "kubernetes.io/local-volume",
 				FeatureTag:       featureTag,
-				MaxFileSize:      maxFileSize,
+				SupportedSizeRange: volume.SizeRange{
+					Max: strconv.FormatInt(maxFileSize, 10),
+				},
 				SupportedFsType:  supportedFsTypes,
 				Capabilities:     capabilities,
 			},

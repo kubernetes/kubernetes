@@ -167,6 +167,7 @@ type DriverInfo struct {
 	FeatureTag       string // FeatureTag for the driver
 
 	// Max file size to be tested for this driver
+	// Deprecated - see SupportedSizeRange
 	MaxFileSize int64
 	// The range of size supported by this driver
 	SupportedSizeRange volume.SizeRange

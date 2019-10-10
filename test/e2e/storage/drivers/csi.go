@@ -77,12 +77,12 @@ func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]b
 		driverInfo: testsuites.DriverInfo{
 			Name:        name,
 			FeatureTag:  "",
-			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
 			SupportedSizeRange: volume.SizeRange{
 				Min: "1Mi",
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
 			},
 			Capabilities: capabilities,
 		},
@@ -252,7 +252,9 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:        "csi-mock",
 			FeatureTag:  "",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			SupportedSizeRange: volume.SizeRange{
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
+			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -375,9 +377,9 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 		driverInfo: testsuites.DriverInfo{
 			Name:        GCEPDCSIDriverName,
 			FeatureTag:  "[Serial]",
-			MaxFileSize: testpatterns.FileSizeMedium,
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
+				Max: strconv.FormatInt(testpatterns.FileSizeMedium, 10),
 			},
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
