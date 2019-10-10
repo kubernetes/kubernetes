@@ -150,13 +150,13 @@ Firewall rule should have correct firewall rules for e2e cluster,MrHohn,0,networ
 GCP Volumes GlusterFS should be mountable,nikhiljindal,0,storage
 GCP Volumes NFSv4 should be mountable for NFSv4,nikhiljindal,0,storage
 GKE local SSD should write and read from node local SSD,fabioy,0,storage
-GKE node pools should create a cluster with multiple node pools,fabioy,1,cluster-lifecycle
-Garbage Collection Test: * Should eventually garbage collect containers when we exceed the number of dead containers per container,Random-Liu,0,cluster-lifecycle
-Garbage collector should delete RS created by deployment when not orphaning,rkouj,0,cluster-lifecycle
-Garbage collector should delete pods created by rc when not orphaning,justinsb,1,cluster-lifecycle
-Garbage collector should orphan RS created by deployment when deleteOptions.OrphanDependents is true,rkouj,0,cluster-lifecycle
-Garbage collector should orphan pods created by rc if delete options say so,fabioy,1,cluster-lifecycle
-Garbage collector should orphan pods created by rc if deleteOptions.OrphanDependents is nil,zmerlynn,1,cluster-lifecycle
+GKE node pools should create a cluster with multiple node pools,fabioy,1,cloud-provider-gcp
+Garbage Collection Test: * Should eventually garbage collect containers when we exceed the number of dead containers per container,Random-Liu,0,node
+Garbage collector should delete RS created by deployment when not orphaning,rkouj,0,cloud-provider-gcp
+Garbage collector should delete pods created by rc when not orphaning,justinsb,1,cloud-provider-gcp
+Garbage collector should orphan RS created by deployment when deleteOptions.OrphanDependents is true,rkouj,0,cloud-provider-gcp
+Garbage collector should orphan pods created by rc if delete options say so,fabioy,1,cloud-provider-gcp
+Garbage collector should orphan pods created by rc if deleteOptions.OrphanDependents is nil,zmerlynn,1,cloud-provider-gcp
 "Generated release_1_5 clientset should create pods, delete pods, watch pods",rrati,0,api-machinery
 "Generated release_1_5 clientset should create v2alpha1 cronJobs, delete cronJobs, watch cronJobs",soltysh,1,api-machinery
 HA-master survive addition/removal replicas different zones,derekwaynecarr,0,api-machinery
@@ -292,8 +292,8 @@ NoExecuteTaintManager eventually evict pod with finite tolerations from tainted 
 NoExecuteTaintManager evicts pods from tainted nodes,freehan,0,scheduling
 NoExecuteTaintManager removing taint cancels eviction,freehan,0,scheduling
 NodeProblemDetector KernelMonitor should generate node condition and events for corresponding errors,Random-Liu,0,node
-Nodes Resize should be able to add nodes,piosz,1,cluster-lifecycle
-Nodes Resize should be able to delete nodes,zmerlynn,1,cluster-lifecycle
+Nodes Resize should be able to add nodes,piosz,1,cloud-provider-gcp
+Nodes Resize should be able to delete nodes,zmerlynn,1,cloud-provider-gcp
 Opaque resources should account opaque integer resources in pods with multiple containers.,ConnorDoyle,0,node
 Opaque resources should not break pods that do not consume opaque integer resources.,ConnorDoyle,0,node
 Opaque resources should not schedule pods that exceed the available amount of opaque integer resource.,ConnorDoyle,0,node
@@ -495,9 +495,9 @@ Summary API when querying /stats/summary should report resource usage through th
 Sysctls should reject invalid sysctls,davidopp,1,node
 Sysctls should support sysctls,Random-Liu,1,node
 Sysctls should support unsafe sysctls which are actually whitelisted,deads2k,1,node
-Upgrade cluster upgrade should maintain a functioning cluster,luxas,1,cluster-lifecycle
-Upgrade master upgrade should maintain a functioning cluster,xiang90,1,cluster-lifecycle
-Upgrade node upgrade should maintain a functioning cluster,zmerlynn,1,cluster-lifecycle
+Upgrade cluster upgrade should maintain a functioning cluster,justinsb,1,cloud-provider-gcp
+Upgrade master upgrade should maintain a functioning cluster,justinsb,1,cloud-provider-gcp
+Upgrade node upgrade should maintain a functioning cluster,justinsb,1,cloud-provider-gcp
 Variable Expansion should allow composing env vars into new env vars,derekwaynecarr,0,node
 Variable Expansion should allow substituting values in a container's args,dchen1107,1,node
 Variable Expansion should allow substituting values in a container's command,mml,1,node

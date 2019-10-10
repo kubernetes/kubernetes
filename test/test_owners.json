@@ -39,7 +39,7 @@
  "cli": [
   "Kubectl"
  ],
- "cluster-lifecycle": [
+ "cloud-provider-gcp": [
   "GKE node",
   "Garbage",
   "Nodes",
