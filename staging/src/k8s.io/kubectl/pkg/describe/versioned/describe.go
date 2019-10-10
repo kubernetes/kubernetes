@@ -474,7 +474,7 @@ func describeLimitRangeSpec(spec corev1.LimitRangeSpec, prefix string, w PrefixW
 // DescribeLimitRanges merges a set of limit range items into a single tabular description
 func DescribeLimitRanges(limitRanges *corev1.LimitRangeList, w PrefixWriter) {
 	if len(limitRanges.Items) == 0 {
-		w.Write(LEVEL_0, "No resource limits.\n")
+		w.Write(LEVEL_0, "No LimitRange resource.\n")
 		return
 	}
 	w.Write(LEVEL_0, "Resource Limits\n Type\tResource\tMin\tMax\tDefault Request\tDefault Limit\tMax Limit/Request Ratio\n")
