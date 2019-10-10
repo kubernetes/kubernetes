@@ -46,7 +46,6 @@ go_library(
         "//staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
-        "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
