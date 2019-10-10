@@ -1187,6 +1187,14 @@ func (plugin *glusterfsPlugin) ExpandVolumeDevice(spec *volume.Spec, newSize res
 	if err != nil {
 		return oldSize, fmt.Errorf("failed to get volumeID for volume %s: %v", volumeName, err)
 	}
+
+	if volumeID == volumeName {
+		// If the volume was provisioned/created statically
+		// we would have landed here. Trying expand on those volume is not possible
+		// as we are not sure about the heketi/server credentials to use
+		return oldSize, fmt.Errorf("this volume looks to be statically/manually provisioned, can not expand this volume")
+	}
+
 	//Get details of StorageClass.
 	class, err := volutil.GetClassForVolume(plugin.host.GetKubeClient(), spec.PersistentVolume)
 	if err != nil {
