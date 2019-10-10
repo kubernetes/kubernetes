@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/admissionregistration/v1beta1"
+	"k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -95,13 +95,13 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 			defer wg.Done()
 			hook, ok := invocation.Webhook.GetValidatingWebhook()
 			if !ok {
-				utilruntime.HandleError(fmt.Errorf("validating webhook dispatch requires v1beta1.ValidatingWebhook, but got %T", hook))
+				utilruntime.HandleError(fmt.Errorf("validating webhook dispatch requires v1.ValidatingWebhook, but got %T", hook))
 				return
 			}
 			versionedAttr := versionedAttrs[invocation.Kind]
 			t := time.Now()
 			err := d.callHook(ctx, hook, invocation, versionedAttr)
-			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
+			ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1.Ignore
 			rejected := false
 			if err != nil {
 				switch err := err.(type) {
@@ -161,12 +161,12 @@ func (d *validatingDispatcher) Dispatch(ctx context.Context, attr admission.Attr
 	return errs[0]
 }
 
-func (d *validatingDispatcher) callHook(ctx context.Context, h *v1beta1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes) error {
+func (d *validatingDispatcher) callHook(ctx context.Context, h *v1.ValidatingWebhook, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes) error {
 	if attr.Attributes.IsDryRun() {
 		if h.SideEffects == nil {
 			return &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
 		}
-		if !(*h.SideEffects == v1beta1.SideEffectClassNone || *h.SideEffects == v1beta1.SideEffectClassNoneOnDryRun) {
+		if !(*h.SideEffects == v1.SideEffectClassNone || *h.SideEffects == v1.SideEffectClassNoneOnDryRun) {
 			return webhookerrors.NewDryRunUnsupportedErr(h.Name)
 		}
 	}

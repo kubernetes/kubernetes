@@ -28,7 +28,7 @@ import (
 	"k8s.io/klog"
 
 	admissionv1 "k8s.io/api/admission/v1"
-	"k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -103,7 +103,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 		}
 		hook, ok := invocation.Webhook.GetMutatingWebhook()
 		if !ok {
-			return fmt.Errorf("mutating webhook dispatch requires v1beta1.MutatingWebhook, but got %T", hook)
+			return fmt.Errorf("mutating webhook dispatch requires v1.MutatingWebhook, but got %T", hook)
 		}
 		// This means that during reinvocation, a webhook will not be
 		// called for the first time. For example, if the webhook is
@@ -133,7 +133,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			round = 1
 		}
 		changed, err := a.callAttrMutatingHook(ctx, hook, invocation, versionedAttr, o, round, i)
-		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == v1beta1.Ignore
+		ignoreClientCallFailures := hook.FailurePolicy != nil && *hook.FailurePolicy == admissionregistrationv1.Ignore
 		rejected := false
 		if err != nil {
 			switch err := err.(type) {
@@ -156,7 +156,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 			webhookReinvokeCtx.RequireReinvokingPreviouslyInvokedPlugins()
 			reinvokeCtx.SetShouldReinvoke()
 		}
-		if hook.ReinvocationPolicy != nil && *hook.ReinvocationPolicy == v1beta1.IfNeededReinvocationPolicy {
+		if hook.ReinvocationPolicy != nil && *hook.ReinvocationPolicy == admissionregistrationv1.IfNeededReinvocationPolicy {
 			webhookReinvokeCtx.AddReinvocableWebhookToPreviouslyInvoked(invocation.Webhook.GetUID())
 		}
 		if err == nil {
@@ -196,7 +196,7 @@ func (a *mutatingDispatcher) Dispatch(ctx context.Context, attr admission.Attrib
 
 // note that callAttrMutatingHook updates attr
 
-func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta1.MutatingWebhook, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes, o admission.ObjectInterfaces, round, idx int) (bool, error) {
+func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *admissionregistrationv1.MutatingWebhook, invocation *generic.WebhookInvocation, attr *generic.VersionedAttributes, o admission.ObjectInterfaces, round, idx int) (bool, error) {
 	configurationName := invocation.Webhook.GetConfigurationName()
 	annotator := newWebhookAnnotator(attr, round, idx, h.Name, configurationName)
 	changed := false
@@ -205,7 +205,7 @@ func (a *mutatingDispatcher) callAttrMutatingHook(ctx context.Context, h *v1beta
 		if h.SideEffects == nil {
 			return false, &webhookutil.ErrCallingWebhook{WebhookName: h.Name, Reason: fmt.Errorf("Webhook SideEffects is nil")}
 		}
-		if !(*h.SideEffects == v1beta1.SideEffectClassNone || *h.SideEffects == v1beta1.SideEffectClassNoneOnDryRun) {
+		if !(*h.SideEffects == admissionregistrationv1.SideEffectClassNone || *h.SideEffects == admissionregistrationv1.SideEffectClassNoneOnDryRun) {
 			return false, webhookerrors.NewDryRunUnsupportedErr(h.Name)
 		}
 	}
