@@ -26,7 +26,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway v1.3.0 // indirect
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/jonboulle/clockwork v0.1.0 // indirect
-	github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/pborman/uuid v1.2.0
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
 	github.com/prometheus/client_golang v0.9.4

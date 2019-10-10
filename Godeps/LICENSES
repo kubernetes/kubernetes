@@ -15126,16 +15126,6 @@ SOFTWARE.
 ================================================================================
 = vendor/github.com/munnerz/goautoneg licensed under: =
 
-PACKAGE
-
-package goautoneg
-import "bitbucket.org/ww/goautoneg"
-
-HTTP Content-Type Autonegotiation.
-
-The functions in this package implement the behaviour specified in
-http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
-
 Copyright (c) 2011, Open Knowledge Foundation Ltd.
 All rights reserved.
 
@@ -15168,33 +15158,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
-FUNCTIONS
-
-func Negotiate(header string, alternatives []string) (content_type string)
-Negotiate the most appropriate content_type given the accept header
-and a list of alternatives.
-
-func ParseAccept(header string) (accept []Accept)
-Parse an Accept Header string returning a sorted list
-of clauses
-
-
-TYPES
-
-type Accept struct {
-    Type, SubType string
-    Q             float32
-    Params        map[string]string
-}
-Structure to represent a clause in an HTTP Accept Header
-
-
-SUBDIRECTORIES
-
-	.hg
-
-= vendor/github.com/munnerz/goautoneg/README.txt a33eda65f1bc658f358e1d690c6a93d4
+= vendor/github.com/munnerz/goautoneg/LICENSE 0c241922fc69330e2e5590de114f3bf5
 ================================================================================
 
 

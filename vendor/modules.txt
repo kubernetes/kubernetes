@@ -627,7 +627,7 @@ github.com/mohae/deepcopy
 github.com/morikuni/aec
 # github.com/mrunalp/fileutils v0.0.0-20171103030105-7d4729fb3618 => github.com/mrunalp/fileutils v0.0.0-20171103030105-7d4729fb3618
 github.com/mrunalp/fileutils
-# github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d => github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
+# github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 => github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 github.com/munnerz/goautoneg
 # github.com/mvdan/xurls v1.1.0 => github.com/mvdan/xurls v1.1.0
 github.com/mvdan/xurls

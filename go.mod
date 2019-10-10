@@ -91,7 +91,7 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb // indirect
 	github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c // indirect
 	github.com/mrunalp/fileutils v0.0.0-20171103030105-7d4729fb3618 // indirect
-	github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
+	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/mvdan/xurls v1.1.0
 	github.com/onsi/ginkgo v1.10.1
 	github.com/onsi/gomega v1.7.0
@@ -357,7 +357,7 @@ replace (
 	github.com/mohae/deepcopy => github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
 	github.com/morikuni/aec => github.com/morikuni/aec v0.0.0-20170113033406-39771216ff4c
 	github.com/mrunalp/fileutils => github.com/mrunalp/fileutils v0.0.0-20171103030105-7d4729fb3618
-	github.com/munnerz/goautoneg => github.com/munnerz/goautoneg v0.0.0-20120707110453-a547fc61f48d
+	github.com/munnerz/goautoneg => github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
 	github.com/mvdan/xurls => github.com/mvdan/xurls v1.1.0
 	github.com/mwitkow/go-conntrack => github.com/mwitkow/go-conntrack v0.0.0-20161129095857-cc309e4a2223
 	github.com/mxk/go-flowrate => github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f
