@@ -27,6 +27,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
+	utilexec "k8s.io/utils/exec"
+
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
 	ioutil "k8s.io/kubernetes/pkg/volume/util"
@@ -110,7 +112,7 @@ func (plugin *iscsiPlugin) NewMounter(spec *volume.Spec, pod *v1.Pod, _ volume.V
 	return plugin.newMounterInternal(spec, pod.UID, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()), secret)
 }
 
-func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec, secret map[string]string) (volume.Mounter, error) {
+func (plugin *iscsiPlugin) newMounterInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec utilexec.Interface, secret map[string]string) (volume.Mounter, error) {
 	readOnly, fsType, err := getISCSIVolumeInfo(spec)
 	if err != nil {
 		return nil, err
@@ -153,7 +155,7 @@ func (plugin *iscsiPlugin) NewBlockVolumeMapper(spec *volume.Spec, pod *v1.Pod, 
 	return plugin.newBlockVolumeMapperInternal(spec, uid, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()), secret)
 }
 
-func (plugin *iscsiPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec, secret map[string]string) (volume.BlockVolumeMapper, error) {
+func (plugin *iscsiPlugin) newBlockVolumeMapperInternal(spec *volume.Spec, podUID types.UID, manager diskManager, mounter mount.Interface, exec utilexec.Interface, secret map[string]string) (volume.BlockVolumeMapper, error) {
 	readOnly, _, err := getISCSIVolumeInfo(spec)
 	if err != nil {
 		return nil, err
@@ -174,7 +176,7 @@ func (plugin *iscsiPlugin) NewUnmounter(volName string, podUID types.UID) (volum
 	return plugin.newUnmounterInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetMounter(plugin.GetPluginName()), plugin.host.GetExec(plugin.GetPluginName()))
 }
 
-func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface, exec mount.Exec) (volume.Unmounter, error) {
+func (plugin *iscsiPlugin) newUnmounterInternal(volName string, podUID types.UID, manager diskManager, mounter mount.Interface, exec utilexec.Interface) (volume.Unmounter, error) {
 	return &iscsiDiskUnmounter{
 		iscsiDisk: &iscsiDisk{
 			podUID:          podUID,
@@ -194,7 +196,7 @@ func (plugin *iscsiPlugin) NewBlockVolumeUnmapper(volName string, podUID types.U
 	return plugin.newUnmapperInternal(volName, podUID, &ISCSIUtil{}, plugin.host.GetExec(plugin.GetPluginName()))
 }
 
-func (plugin *iscsiPlugin) newUnmapperInternal(volName string, podUID types.UID, manager diskManager, exec mount.Exec) (volume.BlockVolumeUnmapper, error) {
+func (plugin *iscsiPlugin) newUnmapperInternal(volName string, podUID types.UID, manager diskManager, exec utilexec.Interface) (volume.BlockVolumeUnmapper, error) {
 	return &iscsiDiskUnmapper{
 		iscsiDisk: &iscsiDisk{
 			podUID:  podUID,
@@ -318,7 +320,7 @@ type iscsiDiskMounter struct {
 	fsType       string
 	volumeMode   v1.PersistentVolumeMode
 	mounter      *mount.SafeFormatAndMount
-	exec         mount.Exec
+	exec         utilexec.Interface
 	deviceUtil   ioutil.DeviceUtil
 	mountOptions []string
 }
@@ -356,7 +358,7 @@ func (b *iscsiDiskMounter) SetUpAt(dir string, mounterArgs volume.MounterArgs) e
 type iscsiDiskUnmounter struct {
 	*iscsiDisk
 	mounter    mount.Interface
-	exec       mount.Exec
+	exec       utilexec.Interface
 	deviceUtil ioutil.DeviceUtil
 }
 
@@ -376,7 +378,7 @@ func (c *iscsiDiskUnmounter) TearDownAt(dir string) error {
 type iscsiDiskMapper struct {
 	*iscsiDisk
 	readOnly   bool
-	exec       mount.Exec
+	exec       utilexec.Interface
 	deviceUtil ioutil.DeviceUtil
 }
 
@@ -392,7 +394,7 @@ func (b *iscsiDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, vo
 
 type iscsiDiskUnmapper struct {
 	*iscsiDisk
-	exec       mount.Exec
+	exec       utilexec.Interface
 	deviceUtil ioutil.DeviceUtil
 }
 

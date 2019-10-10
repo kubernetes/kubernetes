@@ -23,6 +23,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	utilexec "k8s.io/utils/exec"
 )
 
 const (
@@ -53,13 +55,6 @@ type Interface interface {
 	GetMountRefs(pathname string) ([]string, error)
 }
 
-// Exec is an interface for executing commands on systems.
-type Exec interface {
-	// Run executes a command and returns its stdout + stderr combined in one
-	// stream.
-	Run(cmd string, args ...string) ([]byte, error)
-}
-
 // Compile-time check to ensure all Mounter implementations satisfy
 // the mount interface.
 var _ Interface = &Mounter{}
@@ -79,7 +74,7 @@ type MountPoint struct {
 // mounts it otherwise the device is formatted first then mounted.
 type SafeFormatAndMount struct {
 	Interface
-	Exec
+	Exec utilexec.Interface
 }
 
 // FormatAndMount formats the given disk, if needed, and mounts it.

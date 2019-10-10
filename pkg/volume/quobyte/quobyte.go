@@ -102,7 +102,7 @@ func (plugin *quobytePlugin) CanSupport(spec *volume.Spec) bool {
 	}
 
 	exec := plugin.host.GetExec(plugin.GetPluginName())
-	if out, err := exec.Run("ls", "/sbin/mount.quobyte"); err == nil {
+	if out, err := exec.Command("ls", "/sbin/mount.quobyte").CombinedOutput(); err == nil {
 		klog.V(4).Infof("quobyte: can support: %s", string(out))
 		return true
 	}

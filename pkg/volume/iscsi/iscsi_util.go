@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -96,7 +97,7 @@ func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
 		v := b.secret[k]
 		if len(v) > 0 {
 			// explicitly not using execWithLog so secrets are not logged
-			out, err := b.exec.Run("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "update", "-n", k, "-v", v)
+			out, err := b.exec.Command("iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "update", "-n", k, "-v", v).CombinedOutput()
 			if err != nil {
 				return fmt.Errorf("iscsi: failed to update discoverydb key %q error: %v", k, string(out))
 			}
@@ -119,7 +120,7 @@ func updateISCSINode(b iscsiDiskMounter, tp string) error {
 		v := b.secret[k]
 		if len(v) > 0 {
 			// explicitly not using execWithLog so secrets are not logged
-			out, err := b.exec.Run("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", k, "-v", v)
+			out, err := b.exec.Command("iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", k, "-v", v).CombinedOutput()
 			if err != nil {
 				return fmt.Errorf("iscsi: failed to update node session key %q error: %v", k, string(out))
 			}
@@ -561,7 +562,7 @@ func deleteDevices(c iscsiDiskUnmounter) error {
 	}
 	// Flush any multipath device maps
 	for mpathDevice := range mpathDevices {
-		_, err = c.exec.Run("multipath", "-f", mpathDevice)
+		_, err = c.exec.Command("multipath", "-f", mpathDevice).CombinedOutput()
 		if err != nil {
 			klog.Warningf("Warning: Failed to flush multipath device map: %s\nError: %v", mpathDevice, err)
 			// Fall through -- keep deleting the block devices
@@ -722,7 +723,7 @@ func (util *ISCSIUtil) DetachBlockISCSIDisk(c iscsiDiskUnmapper, mapPath string)
 	return nil
 }
 
-func (util *ISCSIUtil) detachISCSIDisk(exec mount.Exec, portals []string, iqn, iface, volName, initiatorName string, found bool) error {
+func (util *ISCSIUtil) detachISCSIDisk(exec utilexec.Interface, portals []string, iqn, iface, volName, initiatorName string, found bool) error {
 	for _, portal := range portals {
 		logoutArgs := []string{"-m", "node", "-p", portal, "-T", iqn, "--logout"}
 		deleteArgs := []string{"-m", "node", "-p", portal, "-T", iqn, "-o", "delete"}
@@ -731,7 +732,7 @@ func (util *ISCSIUtil) detachISCSIDisk(exec mount.Exec, portals []string, iqn, i
 			deleteArgs = append(deleteArgs, []string{"-I", iface}...)
 		}
 		klog.Infof("iscsi: log out target %s iqn %s iface %s", portal, iqn, iface)
-		out, err := exec.Run("iscsiadm", logoutArgs...)
+		out, err := exec.Command("iscsiadm", logoutArgs...).CombinedOutput()
 		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
 			klog.Errorf("iscsi: failed to detach disk Error: %s", string(out))
@@ -739,7 +740,7 @@ func (util *ISCSIUtil) detachISCSIDisk(exec mount.Exec, portals []string, iqn, i
 		}
 		// Delete the node record
 		klog.Infof("iscsi: delete node record target %s iqn %s", portal, iqn)
-		out, err = exec.Run("iscsiadm", deleteArgs...)
+		out, err = exec.Command("iscsiadm", deleteArgs...).CombinedOutput()
 		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
 			klog.Errorf("iscsi: failed to delete node record Error: %s", string(out))
@@ -750,7 +751,7 @@ func (util *ISCSIUtil) detachISCSIDisk(exec mount.Exec, portals []string, iqn, i
 	// If the iface is not created via iscsi plugin, skip to delete
 	if initiatorName != "" && found && iface == (portals[0]+":"+volName) {
 		deleteArgs := []string{"-m", "iface", "-I", iface, "-o", "delete"}
-		out, err := exec.Run("iscsiadm", deleteArgs...)
+		out, err := exec.Command("iscsiadm", deleteArgs...).CombinedOutput()
 		err = ignoreExitCodes(err, exit_ISCSI_ERR_NO_OBJS_FOUND, exit_ISCSI_ERR_SESS_NOT_FOUND)
 		if err != nil {
 			klog.Errorf("iscsi: failed to delete iface Error: %s", string(out))
@@ -884,9 +885,15 @@ func cloneIface(b iscsiDiskMounter) error {
 			return lastErr
 		}
 	}
+	// Get and sort keys to maintain a stable iteration order
+	var keys []string
+	for k := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
 	// update new iface records
-	for key, val := range params {
-		_, err = execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "update", "-n", key, "-v", val)
+	for _, key := range keys {
+		_, err = execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "update", "-n", key, "-v", params[key])
 		if err != nil {
 			execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "delete")
 			lastErr = fmt.Errorf("iscsi: failed to update iface records: %s (%v). iface(%s) will be used", out, err, b.InitIface)
@@ -965,7 +972,7 @@ func ignoreExitCodes(err error, ignoredExitCodes ...int) error {
 
 func execWithLog(b iscsiDiskMounter, cmd string, args ...string) (string, error) {
 	start := time.Now()
-	out, err := b.exec.Run(cmd, args...)
+	out, err := b.exec.Command(cmd, args...).CombinedOutput()
 	if klog.V(5) {
 		d := time.Since(start)
 		klog.V(5).Infof("Executed %s %v in %v, err: %v", cmd, args, d, err)

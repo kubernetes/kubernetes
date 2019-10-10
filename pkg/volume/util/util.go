@@ -36,6 +36,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
+
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
+	utilexec "k8s.io/utils/exec"
 	utilstrings "k8s.io/utils/strings"
 )
 
@@ -585,11 +587,11 @@ func HasMountRefs(mountPath string, mountRefs []string) bool {
 }
 
 //WriteVolumeCache flush disk data given the spcified mount path
-func WriteVolumeCache(deviceMountPath string, exec mount.Exec) error {
+func WriteVolumeCache(deviceMountPath string, exec utilexec.Interface) error {
 	// If runtime os is windows, execute Write-VolumeCache powershell command on the disk
 	if runtime.GOOS == "windows" {
 		cmd := fmt.Sprintf("Get-Volume -FilePath %s | Write-Volumecache", deviceMountPath)
-		output, err := exec.Run("powershell", "/c", cmd)
+		output, err := exec.Command("powershell", "/c", cmd).CombinedOutput()
 		klog.Infof("command (%q) execeuted: %v, output: %q", cmd, err, string(output))
 		if err != nil {
 			return fmt.Errorf("command (%q) failed: %v, output: %q", cmd, err, string(output))
