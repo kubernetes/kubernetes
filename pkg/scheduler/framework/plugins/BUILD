@@ -26,7 +26,6 @@ filegroup(
         ":package-srcs",
         "//pkg/scheduler/framework/plugins/examples:all-srcs",
         "//pkg/scheduler/framework/plugins/migration:all-srcs",
-        "//pkg/scheduler/framework/plugins/noop:all-srcs",
         "//pkg/scheduler/framework/plugins/tainttoleration:all-srcs",
     ],
     tags = ["automanaged"],
