@@ -133,7 +133,7 @@ spec:
         operator: "Exists"
       containers:
       - name: node-cache
-        image: k8s.gcr.io/k8s-dns-node-cache:1.15.6
+        image: k8s.gcr.io/k8s-dns-node-cache:1.15.7
         resources:
           requests:
             cpu: 25m
