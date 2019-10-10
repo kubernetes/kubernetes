@@ -2328,6 +2328,7 @@ message NodeSpec {
   // Unschedulable controls node schedulability of new pods. By default, node is schedulable.
   // More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration
   // +optional
+  // Deprecated in favor of TaintNodeByCondition
   optional bool unschedulable = 4;
 
   // If specified, the node's taints.

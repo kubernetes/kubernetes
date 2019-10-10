@@ -3686,6 +3686,7 @@ type NodeSpec struct {
 
 	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
 	// +optional
+	// Deprecated in favor of TaintNodeByCondition
 	Unschedulable bool
 
 	// If specified, the node's taints.
