@@ -49,10 +49,6 @@ type PrintFlags struct {
 	TypeSetterPrinter *printers.TypeSetterPrinter
 	// OutputFormat contains currently set output format
 	OutputFormat *string
-
-	// OutputFlagSpecified indicates whether the user specifically requested a certain kind of output.
-	// Using this function allows a sophisticated caller to change the flag binding logic if they so desire.
-	OutputFlagSpecified func() bool
 }
 
 // AllowedFormats returns list of allowed output formats
