@@ -124,7 +124,8 @@ type schedulerOptions struct {
 	bindTimeoutSeconds              int64
 	podInitialBackoffSeconds        int64
 	podMaxBackoffSeconds            int64
-	frameworkRegistry               framework.Registry
+	frameworkDefaultRegistry        framework.Registry
+	frameworkOutOfTreeRegistry      framework.Registry
 	frameworkConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry
 	frameworkPlugins                *kubeschedulerconfig.Plugins
 	frameworkPluginConfig           []kubeschedulerconfig.PluginConfig
@@ -168,10 +169,18 @@ func WithBindTimeoutSeconds(bindTimeoutSeconds int64) Option {
 	}
 }
 
-// WithFrameworkRegistry sets the framework registry.
-func WithFrameworkRegistry(registry framework.Registry) Option {
+// WithFrameworkDefaultRegistry sets the framework's default registry.
+func WithFrameworkDefaultRegistry(registry framework.Registry) Option {
 	return func(o *schedulerOptions) {
-		o.frameworkRegistry = registry
+		o.frameworkDefaultRegistry = registry
+	}
+}
+
+// WithFrameworkOutOfTreeRegistry sets the registry for out-of-tree plugins. Those plugins
+// will be appended to the default registry.
+func WithFrameworkOutOfTreeRegistry(registry framework.Registry) Option {
+	return func(o *schedulerOptions) {
+		o.frameworkOutOfTreeRegistry = registry
 	}
 }
 
@@ -218,7 +227,6 @@ var defaultSchedulerOptions = schedulerOptions{
 	bindTimeoutSeconds:              BindTimeoutSeconds,
 	podInitialBackoffSeconds:        int64(internalqueue.DefaultPodInitialBackoffDuration.Seconds()),
 	podMaxBackoffSeconds:            int64(internalqueue.DefaultPodMaxBackoffDuration.Seconds()),
-	frameworkRegistry:               frameworkplugins.NewDefaultRegistry(),
 	frameworkConfigProducerRegistry: frameworkplugins.NewDefaultConfigProducerRegistry(),
 	// The plugins and pluginConfig options are currently nil because we currently don't have
 	// "default" plugins. All plugins that we run through the framework currently come from two
@@ -253,6 +261,28 @@ func New(client clientset.Interface,
 	for _, opt := range opts {
 		opt(&options)
 	}
+
+	schedulerCache := internalcache.New(30*time.Second, stopCh)
+	volumeBinder := volumebinder.NewVolumeBinder(client, nodeInformer, pvcInformer, pvInformer, storageClassInformer,
+		time.Duration(options.bindTimeoutSeconds)*time.Second)
+
+	registry := options.frameworkDefaultRegistry
+	if registry == nil {
+		registry = frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{
+			SchedulerCache:     schedulerCache,
+			ServiceLister:      serviceInformer.Lister(),
+			ControllerLister:   replicationControllerInformer.Lister(),
+			ReplicaSetLister:   replicaSetInformer.Lister(),
+			StatefulSetLister:  statefulSetInformer.Lister(),
+			PDBLister:          pdbInformer.Lister(),
+			PVLister:           pvInformer.Lister(),
+			PVCLister:          pvcInformer.Lister(),
+			StorageClassLister: storageClassInformer.Lister(),
+			VolumeBinder:       volumeBinder,
+		})
+	}
+	registry.Merge(options.frameworkOutOfTreeRegistry)
+
 	// Set up the configurator which can create schedulers from configs.
 	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		Client:                         client,
@@ -267,13 +297,15 @@ func New(client clientset.Interface,
 		PdbInformer:                    pdbInformer,
 		StorageClassInformer:           storageClassInformer,
 		CSINodeInformer:                csiNodeInformer,
+		VolumeBinder:                   volumeBinder,
+		SchedulerCache:                 schedulerCache,
 		HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
 		DisablePreemption:              options.disablePreemption,
 		PercentageOfNodesToScore:       options.percentageOfNodesToScore,
 		BindTimeoutSeconds:             options.bindTimeoutSeconds,
 		PodInitialBackoffSeconds:       options.podInitialBackoffSeconds,
 		PodMaxBackoffSeconds:           options.podMaxBackoffSeconds,
-		Registry:                       options.frameworkRegistry,
+		Registry:                       registry,
 		PluginConfigProducerRegistry:   options.frameworkConfigProducerRegistry,
 		Plugins:                        options.frameworkPlugins,
 		PluginConfig:                   options.frameworkPluginConfig,

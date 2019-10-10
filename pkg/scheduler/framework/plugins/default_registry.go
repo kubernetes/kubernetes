@@ -19,16 +19,35 @@ package plugins
 import (
 	"fmt"
 
+	corelisters "k8s.io/client-go/listers/core/v1"
+	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
+
+// RegistryArgs arguments needed to create default plugin factories.
+type RegistryArgs struct {
+	SchedulerCache     internalcache.Cache
+	ServiceLister      algorithm.ServiceLister
+	ControllerLister   algorithm.ControllerLister
+	ReplicaSetLister   algorithm.ReplicaSetLister
+	StatefulSetLister  algorithm.StatefulSetLister
+	PDBLister          algorithm.PDBLister
+	PVLister           corelisters.PersistentVolumeLister
+	PVCLister          corelisters.PersistentVolumeClaimLister
+	StorageClassLister storagelistersv1.StorageClassLister
+	VolumeBinder       *volumebinder.VolumeBinder
+}
 
 // NewDefaultRegistry builds a default registry with all the default plugins.
 // This is the registry that Kubernetes default scheduler uses. A scheduler that
 // runs custom plugins, can pass a different Registry when initializing the scheduler.
-func NewDefaultRegistry() framework.Registry {
+func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 	return framework.Registry{
 		tainttoleration.Name: tainttoleration.New,
 	}

@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/scheduler"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/plugin/pkg/admission/priority"
@@ -124,8 +123,7 @@ var _ = framework.FilterPlugin(&tokenFilter{})
 func TestPreemption(t *testing.T) {
 	// Initialize scheduler with a filter plugin.
 	var filter tokenFilter
-	registry := frameworkplugins.NewDefaultRegistry()
-
+	registry := make(framework.Registry)
 	registry.Register(filterPluginName, func(_ *runtime.Unknown, fh framework.FrameworkHandle) (framework.Plugin, error) {
 		return &filter, nil
 	})
@@ -149,7 +147,7 @@ func TestPreemption(t *testing.T) {
 		initTestMaster(t, "preemptiom", nil),
 		false, nil, time.Second,
 		scheduler.WithFrameworkPlugins(plugins),
-		scheduler.WithFrameworkRegistry(registry))
+		scheduler.WithFrameworkOutOfTreeRegistry(registry))
 
 	defer cleanupTest(t, context)
 	cs := context.clientSet
