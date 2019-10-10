@@ -97,7 +97,12 @@ func (r *ReplicaSetUpgradeTest) Test(f *framework.Framework, done <-chan struct{
 	framework.ExpectNoError(err)
 
 	ginkgo.By(fmt.Sprintf("Waiting for replicaset %s to have all of its replicas ready after scaling", rsName))
-	framework.ExpectNoError(replicaset.WaitForReadyReplicaSet(c, ns, rsName))
+
+	err = replicaset.WaitForReadyReplicaSet(c, ns, rsName)
+	if err != nil {
+		framework.DumpAllNamespaceInfo(f.ClientSet, ns)
+	}
+	framework.ExpectNoError(err)
 }
 
 // Teardown cleans up any remaining resources.
