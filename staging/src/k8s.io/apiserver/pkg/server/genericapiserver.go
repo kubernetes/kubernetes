@@ -353,7 +353,7 @@ func (s preparedGenericAPIServer) NonBlockingRun(stopCh <-chan struct{}) error {
 	// after http server shutdown.
 	auditStopCh := make(chan struct{})
 
-	// Start the audit backend before any request comes in. This means we must call Backend.Run
+	// Start the audit backend before any request comes in. This means we must call AuditBackend.Run
 	// before http server start serving. Otherwise the Backend.ProcessEvents call might block.
 	if s.AuditBackend != nil {
 		if err := s.AuditBackend.Run(auditStopCh); err != nil {
