@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
@@ -91,18 +91,38 @@ const (
 	clusterNameKey = "kubernetes-cluster-name"
 )
 
-// GetLoadBalancer returns whether the specified load balancer exists, and
+// GetLoadBalancer returns whether the specified load balancer and its components exist, and
 // if so, what its status is.
 func (az *Cloud) GetLoadBalancer(ctx context.Context, clusterName string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
-	_, status, exists, err = az.getServiceLoadBalancer(service, clusterName, nil, false)
+	// Since public IP is not a part of the load balancer on Azure,
+	// there is a chance that we could orphan public IP resources while we delete the load blanacer (kubernetes/kubernetes#80571).
+	// We need to make sure the existence of the load balancer depends on the load balancer resource and public IP resource on Azure.
+	existsPip := func() bool {
+		pipName, err := az.determinePublicIPName(clusterName, service)
+		if err != nil {
+			return false
+		}
+		pipResourceGroup := az.getPublicIPAddressResourceGroup(service)
+		_, existsPip, err := az.getPublicIPAddress(pipResourceGroup, pipName)
+		if err != nil {
+			return false
+		}
+		return existsPip
+	}()
+
+	_, status, existsLb, err := az.getServiceLoadBalancer(service, clusterName, nil, false)
 	if err != nil {
-		return nil, false, err
+		return nil, existsPip, err
 	}
-	if !exists {
+
+	// Return exists = false only if the load balancer and the public IP are not found on Azure
+	if !existsLb && !existsPip {
 		serviceName := getServiceName(service)
 		klog.V(5).Infof("getloadbalancer (cluster:%s) (service:%s) - doesn't exist", clusterName, serviceName)
 		return nil, false, nil
 	}
+
+	// Return exists = true if either the load balancer or the public IP (or both) exists
 	return status, true, nil
 }
 
@@ -156,6 +176,10 @@ func (az *Cloud) EnsureLoadBalancer(ctx context.Context, clusterName string, ser
 
 // UpdateLoadBalancer updates hosts under the specified load balancer.
 func (az *Cloud) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
+	if !az.shouldUpdateLoadBalancer(clusterName, service) {
+		klog.V(2).Infof("UpdateLoadBalancer: skipping service %s because it is either being deleted or does not exist anymore", service.Name)
+		return nil
+	}
 	_, err := az.EnsureLoadBalancer(ctx, clusterName, service, nodes)
 	return err
 }
@@ -449,7 +473,7 @@ func (az *Cloud) findServiceIPAddress(ctx context.Context, clusterName string, s
 		return service.Spec.LoadBalancerIP, nil
 	}
 
-	lbStatus, existsLb, err := az.GetLoadBalancer(ctx, clusterName, service)
+	_, lbStatus, existsLb, err := az.getServiceLoadBalancer(service, clusterName, nil, false)
 	if err != nil {
 		return "", err
 	}
@@ -1184,6 +1208,11 @@ func (az *Cloud) reconcileSecurityGroup(clusterName string, service *v1.Service,
 		klog.V(10).Infof("CreateOrUpdateSecurityGroup(%q): end", *sg.Name)
 	}
 	return &sg, nil
+}
+
+func (az *Cloud) shouldUpdateLoadBalancer(clusterName string, service *v1.Service) bool {
+	_, _, existsLb, _ := az.getServiceLoadBalancer(service, clusterName, nil, false)
+	return existsLb && service.ObjectMeta.DeletionTimestamp == nil
 }
 
 func logSafe(s *string) string {
