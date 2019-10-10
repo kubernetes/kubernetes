@@ -17,6 +17,7 @@ limitations under the License.
 package leaderelection
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"sync"
@@ -238,23 +239,23 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 
 			switch objectType {
 			case "endpoints":
-				lock = &rl.EndpointsLock{
+				lock = rl.MakeCancelable(&rl.EndpointsLock{
 					EndpointsMeta: objectMeta,
 					LockConfig:    resourceLockConfig,
 					Client:        c.CoreV1(),
-				}
+				})
 			case "configmaps":
-				lock = &rl.ConfigMapLock{
+				lock = rl.MakeCancelable(&rl.ConfigMapLock{
 					ConfigMapMeta: objectMeta,
 					LockConfig:    resourceLockConfig,
 					Client:        c.CoreV1(),
-				}
+				})
 			case "leases":
-				lock = &rl.LeaseLock{
+				lock = rl.MakeCancelable(&rl.LeaseLock{
 					LeaseMeta:  objectMeta,
 					LockConfig: resourceLockConfig,
 					Client:     c.CoordinationV1(),
-				}
+				})
 			}
 
 			lec := LeaderElectionConfig{
@@ -275,7 +276,7 @@ func testTryAcquireOrRenew(t *testing.T, objectType string) {
 				observedTime:      test.observedTime,
 				clock:             clock.RealClock{},
 			}
-			if test.expectSuccess != le.tryAcquireOrRenew() {
+			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
 				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
 			}
 
@@ -815,29 +816,29 @@ func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
 			switch objectType {
 			case rl.EndpointsLeasesResourceLock:
 				lock = &rl.MultiLock{
-					Primary: &rl.EndpointsLock{
+					Primary: rl.MakeCancelable(&rl.EndpointsLock{
 						EndpointsMeta: objectMeta,
 						LockConfig:    resourceLockConfig,
 						Client:        c.CoreV1(),
-					},
-					Secondary: &rl.LeaseLock{
+					}),
+					Secondary: rl.MakeCancelable(&rl.LeaseLock{
 						LeaseMeta:  objectMeta,
 						LockConfig: resourceLockConfig,
 						Client:     c.CoordinationV1(),
-					},
+					}),
 				}
 			case rl.ConfigMapsLeasesResourceLock:
 				lock = &rl.MultiLock{
-					Primary: &rl.ConfigMapLock{
+					Primary: rl.MakeCancelable(&rl.ConfigMapLock{
 						ConfigMapMeta: objectMeta,
 						LockConfig:    resourceLockConfig,
 						Client:        c.CoreV1(),
-					},
-					Secondary: &rl.LeaseLock{
+					}),
+					Secondary: rl.MakeCancelable(&rl.LeaseLock{
 						LeaseMeta:  objectMeta,
 						LockConfig: resourceLockConfig,
 						Client:     c.CoordinationV1(),
-					},
+					}),
 				}
 			}
 
@@ -858,7 +859,7 @@ func testTryAcquireOrRenewMultiLock(t *testing.T, objectType string) {
 				observedTime:      test.observedTime,
 				clock:             clock.RealClock{},
 			}
-			if test.expectSuccess != le.tryAcquireOrRenew() {
+			if test.expectSuccess != le.tryAcquireOrRenew(context.Background()) {
 				t.Errorf("unexpected result of tryAcquireOrRenew: [succeeded=%v]", !test.expectSuccess)
 			}
 
@@ -894,4 +895,98 @@ func TestTryAcquireOrRenewEndpointsLeases(t *testing.T) {
 // Will test leader election using configmapsleases as the resource
 func TestTryAcquireOrRenewConfigMapsLeases(t *testing.T) {
 	testTryAcquireOrRenewMultiLock(t, "configmapsleases")
+}
+
+// This tests the entire renew cycle to ensure we don't race in the timeout
+// logic, and to fully cover renew.
+//
+// Individual lock types are covered above.
+func TestFullRenew(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// OnNewLeader is called async so we have to wait for it.
+	var wg sync.WaitGroup
+	wg.Add(1)
+	var reportedLeader string
+
+	objectType := "leases"
+	observedTime := time.Now().Add(1000 * time.Hour) /* some time in the future */
+	observedRecord := rl.LeaderElectionRecord{HolderIdentity: "baz"}
+
+
+	objectMeta := metav1.ObjectMeta{Namespace: "foo", Name: "bar"}
+	resourceLockConfig := rl.ResourceLockConfig{
+		Identity:      "baz",
+	}
+	c := &fake.Clientset{}
+	reactors := []Reactor{
+		{
+			verb: "get",
+			reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+				return true, createLockObject(t, objectType, action.GetNamespace(), action.(fakeclient.GetAction).GetName(), rl.LeaderElectionRecord{HolderIdentity: "baz"}), nil
+			},
+		},
+		{
+			verb: "update",
+			reaction: func(action fakeclient.Action) (handled bool, ret runtime.Object, err error) {
+				return true, action.(fakeclient.CreateAction).GetObject(), nil
+			},
+		},
+	}
+	for _, reactor := range reactors {
+		c.AddReactor(reactor.verb, objectType, reactor.reaction)
+	}
+	c.AddReactor("*", "*", func(action fakeclient.Action) (bool, runtime.Object, error) {
+		t.Errorf("unreachable action. testclient called too many times: %+v", action)
+		return true, nil, fmt.Errorf("unreachable action")
+	})
+
+	lock := rl.MakeCancelable(&rl.LeaseLock{
+		LeaseMeta:  objectMeta,
+		LockConfig: resourceLockConfig,
+		Client:     c.CoordinationV1(),
+	})
+
+	lec := LeaderElectionConfig{
+		Lock:          lock,
+		// high so that the race detector's pauses don't cause issues
+		LeaseDuration: 400 * time.Second,
+		RenewDeadline: 100 * time.Second,
+		Callbacks: LeaderCallbacks{
+			OnNewLeader: func(l string) {
+				defer wg.Done()
+				defer cancel() // stop the leader election after one cycle
+				reportedLeader = l
+			},
+		},
+	}
+	observedRawRecord := GetRawRecordOrDie(t, objectType, observedRecord)
+	le := &LeaderElector{
+		config:            lec,
+		observedRecord:    observedRecord,
+		observedRawRecord: observedRawRecord,
+		observedTime:      observedTime,
+		clock:             clock.RealClock{},
+		metrics: globalMetricsFactory.newLeaderMetrics(),
+	}
+
+	le.renew(ctx)
+
+	le.observedRecord.AcquireTime = metav1.Time{}
+	le.observedRecord.RenewTime = metav1.Time{}
+	if le.observedRecord.HolderIdentity != "baz" {
+		t.Errorf("expected holder:\n\t%+v\ngot:\n\t%+v", "baz", le.observedRecord.HolderIdentity)
+	}
+	if len(reactors) != len(c.Actions()) {
+		t.Errorf("wrong number of api interactions")
+	}
+	if le.observedRecord.LeaderTransitions != 0 {
+		t.Errorf("leader should not have transitioned but did")
+	}
+
+	wg.Wait()
+	if reportedLeader != "baz" {
+		t.Errorf("reported leader was not the new leader. expected %q, got %q", "baz", reportedLeader)
+	}
 }

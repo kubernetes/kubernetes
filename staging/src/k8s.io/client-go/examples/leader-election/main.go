@@ -84,7 +84,7 @@ func main() {
 
 	// we use the Lease lock type since edits to Leases are less common
 	// and fewer objects in the cluster watch "all Leases".
-	lock := &resourcelock.LeaseLock{
+	lock := resourcelock.MakeCancelable(&resourcelock.LeaseLock{
 		LeaseMeta: metav1.ObjectMeta{
 			Name:      leaseLockName,
 			Namespace: leaseLockNamespace,
@@ -93,7 +93,7 @@ func main() {
 		LockConfig: resourcelock.ResourceLockConfig{
 			Identity: id,
 		},
-	}
+	})
 
 	// use a Go context so we can tell the leaderelection code when we
 	// want to step down
