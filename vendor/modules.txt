@@ -194,7 +194,7 @@ github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
 # github.com/coreos/bbolt v1.3.1-coreos.6 => github.com/coreos/bbolt v1.3.1-coreos.6
 github.com/coreos/bbolt
-# github.com/coreos/etcd v3.3.15+incompatible => github.com/coreos/etcd v3.3.15+incompatible
+# github.com/coreos/etcd v3.3.16+incompatible => github.com/coreos/etcd v3.3.16+incompatible
 github.com/coreos/etcd/alarm
 github.com/coreos/etcd/auth
 github.com/coreos/etcd/auth/authpb
