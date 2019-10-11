@@ -130,7 +130,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"CheckNodeDiskPressure",
 				"CheckNodeMemoryPressure",
 				"CheckNodePIDPressure",
-				"CheckVolumeBinding",
 				"GeneralPredicates",
 				"MatchInterPodAffinity",
 				"MaxAzureDiskVolumeCount",
@@ -150,7 +149,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"ImageLocalityPriority",
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
+				"FilterPlugin": {{Name: "TaintToleration"}, {Name: "VolumeBinding"}},
 				"ScorePlugin":  {{Name: "TaintToleration", Weight: 1}},
 			},
 		},
@@ -197,7 +196,6 @@ kind: Policy
 				"CheckNodeDiskPressure",
 				"CheckNodeMemoryPressure",
 				"CheckNodePIDPressure",
-				"CheckVolumeBinding",
 				"GeneralPredicates",
 				"MatchInterPodAffinity",
 				"MaxAzureDiskVolumeCount",
@@ -217,7 +215,7 @@ kind: Policy
 				"ImageLocalityPriority",
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
-				"FilterPlugin": {{Name: "TaintToleration"}},
+				"FilterPlugin": {{Name: "TaintToleration"}, {Name: "VolumeBinding"}},
 				"ScorePlugin":  {{Name: "TaintToleration", Weight: 1}},
 			},
 		},

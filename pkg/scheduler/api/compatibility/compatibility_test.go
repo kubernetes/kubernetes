@@ -570,7 +570,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
 				"GeneralPredicates",
-				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -589,6 +588,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"FilterPlugin": {
 					{Name: "NodeName"},
 					{Name: "TaintToleration"},
+					{Name: "VolumeBinding"},
 				},
 				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
@@ -671,7 +671,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
 				"GeneralPredicates",
-				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -690,6 +689,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"FilterPlugin": {
 					{Name: "NodeName"},
 					{Name: "TaintToleration"},
+					{Name: "VolumeBinding"},
 				},
 				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
@@ -784,7 +784,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
 				"GeneralPredicates",
-				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -804,6 +803,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"FilterPlugin": {
 					{Name: "NodeName"},
 					{Name: "TaintToleration"},
+					{Name: "VolumeBinding"},
 				},
 				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
@@ -900,7 +900,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxCSIVolumeCountPred",
 				"MatchInterPodAffinity",
 				"GeneralPredicates",
-				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -920,6 +919,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"FilterPlugin": {
 					{Name: "NodeName"},
 					{Name: "TaintToleration"},
+					{Name: "VolumeBinding"},
 				},
 				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
@@ -1016,7 +1016,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxCinderVolumeCount",
 				"MatchInterPodAffinity",
 				"GeneralPredicates",
-				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -1036,6 +1035,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"FilterPlugin": {
 					{Name: "NodeName"},
 					{Name: "TaintToleration"},
+					{Name: "VolumeBinding"},
 				},
 				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
@@ -1136,7 +1136,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxCinderVolumeCount",
 				"MatchInterPodAffinity",
 				"GeneralPredicates",
-				"CheckVolumeBinding",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -1156,6 +1155,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"FilterPlugin": {
 					{Name: "NodeName"},
 					{Name: "TaintToleration"},
+					{Name: "VolumeBinding"},
 				},
 				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
 			},
@@ -1182,6 +1182,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	filterToPredicateMap := map[string]string{
 		"TaintToleration": "PodToleratesNodeTaints",
 		"NodeName":        "HostName",
+		"VolumeBinding":   "CheckVolumeBinding",
 	}
 	scoreToPriorityMap := map[string]string{
 		"TaintToleration": "TaintTolerationPriority",
