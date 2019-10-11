@@ -47,6 +47,7 @@ go_test(
     srcs = [
         "convert_test.go",
         "goopenapi_test.go",
+        "unfold_test.go",
         "validation_test.go",
     ],
     embed = [":go_default_library"],
