@@ -1,6 +1,6 @@
 dependencies:
   - name: "etcd"
-    version: 3.3.15
+    version: 3.3.17
     refPaths:
     - path: cluster/gce/manifests/etcd.manifest
       match: etcd_docker_tag|etcd_version

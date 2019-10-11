@@ -25,4 +25,4 @@ spec:
         imagePullPolicy: Never
         args: [ "--etcd-servers=http://localhost:2379" ]
       - name: etcd
-        image: quay.io/coreos/etcd:v3.3.15
+        image: quay.io/coreos/etcd:v3.3.17
