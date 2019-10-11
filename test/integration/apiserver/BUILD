@@ -89,6 +89,7 @@ filegroup(
         ":package-srcs",
         "//test/integration/apiserver/admissionwebhook:all-srcs",
         "//test/integration/apiserver/apply:all-srcs",
+        "//test/integration/apiserver/podlogs:all-srcs",
     ],
     tags = ["automanaged"],
 )
