@@ -25,44 +25,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/diff"
-	"k8s.io/kubernetes/pkg/api/v1/pod"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 )
 
 // TestSortableList tests SortableList by storing pods in the list and sorting
 // them by their priority.
-func TestSortableList(t *testing.T) {
-	higherPriority := func(pod1, pod2 interface{}) bool {
-		return pod.GetPodPriority(pod1.(*v1.Pod)) > pod.GetPodPriority(pod2.(*v1.Pod))
-	}
-	podList := SortableList{CompFunc: higherPriority}
-	// Add a few Pods with different priorities from lowest to highest priority.
-	for i := 0; i < 10; i++ {
-		var p = int32(i)
-		pod := &v1.Pod{
-			Spec: v1.PodSpec{
-				Containers: []v1.Container{
-					{
-						Name:  "container",
-						Image: "image",
-					},
-				},
-				Priority: &p,
-			},
-		}
-		podList.Items = append(podList.Items, pod)
-	}
-	podList.Sort()
-	if len(podList.Items) != 10 {
-		t.Errorf("expected length of list was 10, got: %v", len(podList.Items))
-	}
-	var prevPriority = int32(10)
-	for _, p := range podList.Items {
-		if *p.(*v1.Pod).Spec.Priority >= prevPriority {
-			t.Errorf("Pods are not soreted. Current pod pririty is %v, while previous one was %v.", *p.(*v1.Pod).Spec.Priority, prevPriority)
-		}
-	}
-}
 
 func TestGetContainerPorts(t *testing.T) {
 	tests := []struct {
