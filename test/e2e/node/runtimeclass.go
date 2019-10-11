@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("[sig-node] RuntimeClass", func() {
 		gomega.Expect(apierrs.IsForbidden(err)).To(gomega.BeTrue(), "should be forbidden error")
 	})
 
-	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling [NodeFeature:RuntimeHandler] ", func() {
+	ginkgo.It("should run a Pod requesting a RuntimeClass with scheduling [NodeFeature:RuntimeHandler] [Disruptive] ", func() {
 		nodeName := scheduling.GetNodeThatCanRunPod(f)
 		nodeSelector := map[string]string{
 			"foo":  "bar",
