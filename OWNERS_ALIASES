@@ -287,6 +287,7 @@ aliases:
     - coffeepac
     - monotek
     - logicalhan
+    - RainbowMango
 
   api-approvers:
     - erictune
