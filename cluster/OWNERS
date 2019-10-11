@@ -3,19 +3,18 @@
 reviewers:
   - bentheelder
   - eparis
-  - jbeda
   - Katharine
   - mikedanese
   - zmerlynn
   - dims
 approvers:
   - eparis
-  - jbeda
   - mikedanese
   - spiffxp
   - zmerlynn
   - dims
 emeritus_approvers:
   - roberthbailey   # 2019-03-08
+  - jbeda
 labels:
 - sig/cluster-lifecycle

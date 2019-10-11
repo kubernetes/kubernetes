@@ -395,7 +395,6 @@ aliases:
     - soltysh
     - piosz
     - jsafrane
-    - jbeda
 
   # api-reviewers targeted by sig area
   # see https://git.k8s.io/community/sig-architecture/api-review-process.md#training-reviews
