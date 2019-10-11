@@ -178,15 +178,19 @@ func (pb *prober) runProbe(probeType probeType, p *v1.Probe, pod *v1.Pod, status
 		url := formatURL(scheme, host, port, path)
 		headers := buildHeader(p.HTTPGet.HTTPHeaders)
 		klog.V(4).Infof("HTTP-Probe Headers: %v", headers)
-		successCodes := p.HTTPGet.SuccessCodes
-		klog.V(4).Infof("HTTP-Probe SuccesCode: %v", successCodes)
+
+		expectHTTPCodes := p.HTTPGet.expectHTTPCodes
+		klog.V(4).Infof("HTTP-Probe ExpectHTTPCode: %v", expectHTTPCodes)
+		expectHTTPContent := p.HTTPGet.expectHTTPContent
+		klog.V(4).Infof("HTTP-Probe ExpectHTTPContent: %s", expectHTTPContent)
+
 		switch probeType {
 		case liveness:
-			return pb.livenessHTTP.Probe(url, headers, successCodes, timeout)
+			return pb.livenessHttp.Probe(url, headers, expectHTTPCodes, expectHTTPContent, timeout)
 		case startup:
-			return pb.startupHTTP.Probe(url, headers, successCodes, timeout)
+			return pb.startupHTTP.Probe(url, headers, expectHTTPCodes, expectHTTPContent, timeout)
 		default:
-			return pb.readinessHTTP.Probe(url, headers, successCodes, timeout)
+			return pb.readinessHTTP.Probe(url, headers, expectHTTPCodes, expectHTTPContent, timeout)
 		}
 	}
 	if p.TCPSocket != nil {

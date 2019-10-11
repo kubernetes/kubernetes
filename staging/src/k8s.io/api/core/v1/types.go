@@ -1784,6 +1784,7 @@ type VolumeMount struct {
 	// Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
 	// Defaults to "" (volume's root).
 	// SubPathExpr and SubPath are mutually exclusive.
+	// This field is beta in 1.15.
 	// +optional
 	SubPathExpr string `json:"subPathExpr,omitempty" protobuf:"bytes,6,opt,name=subPathExpr"`
 }
@@ -1971,9 +1972,14 @@ type HTTPGetAction struct {
 	// Custom headers to set in the request. HTTP allows repeated headers.
 	// +optional
 	HTTPHeaders []HTTPHeader `json:"httpHeaders,omitempty" protobuf:"bytes,5,rep,name=httpHeaders"`
-	// Success status code. If return code in the StatusCode, it trade as success.
+	// Expect status code. If return code in the ExpectStatusCode and response match EexpectHTTPContent(will ignore if ExpectHTTPContent is empty). it treat as success.
+	// This field is alpha-level and is only honored by servers that enable the HTTPProbePlus feature.
 	// +optional
-	SuccessCodes []int `json:"successCodes,omitempty" protobuf:"bytes,6,rep,name=successCodes"`
+	ExpectHTTPCodes []int32 `json:"expectHTTPCodes,omitempty" protobuf:"bytes,6,rep,name=expectHTTPCodes"`
+	// Expect HTTP conetnt. If http response content match expectHTTPContent and result HTTPcode in ExpectHTTPCodes (will ignore if ExpectHTTPCodes is empty). It treat as success
+	// This field is alpha-level and is only honored by servers that enable the HTTPProbePlus feature.
+	// +optional
+	ExpectHTTPContent string `json:"expectHTTPContent,omitempty" protobuf:"bytes,7,rep,name=expectHTTPContent"`
 }
 
 // URIScheme identifies the scheme used for connection to a host for Get actions

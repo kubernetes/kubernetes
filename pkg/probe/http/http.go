@@ -24,8 +24,13 @@ import (
 	"net/url"
 	"time"
 
+	"path/filepath"
+
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/component-base/version"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/probe"
 
 	"k8s.io/klog"
@@ -60,7 +65,7 @@ func NewWithTLSConfig(config *tls.Config, followNonLocalRedirects bool) Prober {
 
 // Prober is an interface that defines the Probe function for doing HTTP readiness/liveness checks.
 type Prober interface {
-	Probe(url *url.URL, headers http.Header, successCodes []int, timeout time.Duration) (probe.Result, string, error)
+	Probe(url *url.URL, headers http.Header, expectHTTPCodes []int, expectHTTPContent string, timeout time.Duration) (probe.Result, string, error)
 }
 
 type httpProber struct {
@@ -69,13 +74,13 @@ type httpProber struct {
 }
 
 // Probe returns a ProbeRunner capable of running an HTTP check.
-func (pr httpProber) Probe(url *url.URL, headers http.Header, successCodes []int, timeout time.Duration) (probe.Result, string, error) {
+func (pr httpProber) Probe(url *url.URL, headers http.Header, expectHTTPCodes []int, expectHTTPContent string, timeout time.Duration) (probe.Result, string, error) {
 	client := &http.Client{
 		Timeout:       timeout,
 		Transport:     pr.transport,
 		CheckRedirect: redirectChecker(pr.followNonLocalRedirects),
 	}
-	return DoHTTPProbe(url, headers, successCodes, client)
+	return DoHTTPProbe(url, headers, expectHTTPCodes, expectHTTPContent, client)
 }
 
 // GetHTTPInterface is an interface for making HTTP requests, that returns a response and error.
@@ -84,10 +89,11 @@ type GetHTTPInterface interface {
 }
 
 // DoHTTPProbe checks if a GET request to the url succeeds.
-// If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
-// If the HTTP response code is unsuccessful or HTTP communication fails, it returns Failure.
+// When HTTPProbePlus not enable, If the HTTP response code is successful (i.e. 400 > code >= 200), it returns Success.
+// If the HTTP response code is unsuccessful or HTTP communication fails(200 > code >= 400), it returns Failure.
+// When HTTPProbePlus is enable, if both response code in expectHTTPCodes and response content match expectHTTPContent, it return Success.
 // This is exported because some other packages may want to do direct HTTP probes.
-func DoHTTPProbe(url *url.URL, headers http.Header, successCodes []int, client GetHTTPInterface) (probe.Result, string, error) {
+func DoHTTPProbe(url *url.URL, headers http.Header, expectHTTPCodes []int, expectHTTPContent string, client GetHTTPInterface) (probe.Result, string, error) {
 	req, err := http.NewRequest("GET", url.String(), nil)
 	if err != nil {
 		// Convert errors into failures to catch timeouts.
@@ -120,32 +126,76 @@ func DoHTTPProbe(url *url.URL, headers http.Header, successCodes []int, client G
 		}
 	}
 	body := string(b)
-	result, err := statusCodeChecker(res, url, successCodes)
+	result, err, reason := hTTPCheckerPlus(res, url, expectHTTPCodes, expectHTTPContent, body)
 	if result == probe.Failure {
 		klog.V(4).Infof("Probe failed for %s with request headers %v, response body: %v", url.String(), headers, body)
-		body = fmt.Sprintf("HTTP probe failed with statuscode: %d, successCodes: %v", res.StatusCode, successCodes)
+		body = reason
 	}
 	return result, body, err
 }
 
-func statusCodeChecker(res *http.Response, url *url.URL, successCodes []int) (probe.Result, error) {
-	if len(successCodes) != 0 {
-		for _, code := range successCodes {
-			if code == res.StatusCode {
-				klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
-				return probe.Success, nil
-			}
+// If  HTTPProbePlus not enable run default statusCodechecker, else run contentChecker
+// and statusCodeCheckerPlus
+func hTTPCheckerPlus(res *http.Response, url *url.URL, expectHTTPCodes []int, expectHTTPContent, body string) (probe.Result, error, string) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.HTTPProbePlus) || (len(expectHTTPCodes) == 0 && expectHTTPContent == "") {
+		return statusCodeChecker(res, url)
+	}
+	result, err, reason := contentChecker(res, url, expectHTTPContent, body)
+	if result == probe.Failure || err != nil {
+		return result, err, reason
+	}
+	return statusCodeCheckerPlus(res, url, expectHTTPCodes)
+}
+
+// If expectHTTPContent is not set.It return Success
+// If repsonse body match expectHTTPContent pattern, it return Success, else Failure
+func contentChecker(res *http.Response, url *url.URL, expectHTTPContent, body string) (probe.Result, error, string) {
+	// if expectHTTPContent is empty, return Success directly
+	if expectHTTPContent == "" {
+		klog.V(4).Infof("expectHTTPContent is empty. skip it.")
+		return probe.Success, nil, ""
+	}
+	// check expectHTTPContent match body or not
+	isMatch, err := filepath.Match(expectHTTPContent, body)
+	if err != nil {
+		return probe.Failure, err, ""
+	}
+	// match
+	if isMatch {
+		return probe.Success, nil, ""
+	}
+	// not match
+	return probe.Failure, nil, fmt.Sprintf("HTTP probe failed with content: %s not match expectHTTPContent: %s", body, expectHTTPContent)
+}
+
+// If expectHTTPCodes is not set, it return  Success.
+// if repsonse code in  expectHTTPCodes, it return Success, else Failure
+func statusCodeCheckerPlus(res *http.Response, url *url.URL, expectHTTPCodes []int) (probe.Result, error, string) {
+	if len(expectHTTPCodes) == 0 {
+		//if expectHTTPCodes is empty return success directly
+		klog.V(4).Infof("HTTPProbePlus is enabled, but expectHTTPCodes for url %s was empty, check status code treat as success", url.String())
+		return probe.Success, nil, ""
+	}
+	for _, code := range expectHTTPCodes {
+		if code == res.StatusCode {
+			klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
+			return probe.Success, nil, ""
 		}
-	} else if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
+	}
+	return probe.Failure, nil, fmt.Sprintf("HTTP probe failed with statuscode: %d, expectHTTPCodes: %v", res.StatusCode, expectHTTPCodes)
+}
+
+func statusCodeChecker(res *http.Response, url *url.URL) (probe.Result, error, string) {
+	if res.StatusCode >= http.StatusOK && res.StatusCode < http.StatusBadRequest {
 		if res.StatusCode >= http.StatusMultipleChoices { // Redirect
 			klog.V(4).Infof("Probe terminated redirects for %s, Response: %v", url.String(), *res)
-			return probe.Warning, nil
+			return probe.Warning, nil, ""
 		}
 		klog.V(4).Infof("Probe succeeded for %s, Response: %v", url.String(), *res)
-		return probe.Success, nil
+		return probe.Success, nil, ""
 	}
 
-	return probe.Failure, nil
+	return probe.Failure, nil, fmt.Sprintf("HTTP probe failed with statuscode: %d, HTTPCodes: must >= %d and < %d", res.StatusCode, http.StatusOK, http.StatusBadRequest)
 }
 
 func redirectChecker(followNonLocalRedirects bool) func(*http.Request, []*http.Request) error {
