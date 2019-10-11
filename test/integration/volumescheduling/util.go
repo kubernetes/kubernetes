@@ -53,46 +53,6 @@ type testContext struct {
 	stopCh          chan struct{}
 }
 
-// initTestMaster initializes a test environment and creates a master with default
-// configuration.
-func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *testContext {
-	context := testContext{
-		stopCh: make(chan struct{}),
-	}
-
-	// 1. Create master
-	h := &framework.MasterHolder{Initialized: make(chan struct{})}
-	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		<-h.Initialized
-		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
-	}))
-
-	masterConfig := framework.NewIntegrationTestMasterConfig()
-
-	if admission != nil {
-		masterConfig.GenericConfig.AdmissionControl = admission
-	}
-
-	_, context.httpServer, context.closeFn = framework.RunAMasterUsingServer(masterConfig, s, h)
-
-	if nsPrefix != "default" {
-		context.ns = framework.CreateTestingNamespace(nsPrefix+string(uuid.NewUUID()), s, t)
-	} else {
-		context.ns = framework.CreateTestingNamespace("default", s, t)
-	}
-
-	// 2. Create kubeclient
-	context.clientSet = clientset.NewForConfigOrDie(
-		&restclient.Config{
-			QPS: -1, Host: s.URL,
-			ContentConfig: restclient.ContentConfig{
-				GroupVersion: &schema.GroupVersion{Group: "", Version: "v1"},
-			},
-		},
-	)
-	return &context
-}
-
 // initTestSchedulerWithOptions initializes a test environment and creates a scheduler with default
 // configuration and other options.
 func initTestSchedulerWithOptions(
