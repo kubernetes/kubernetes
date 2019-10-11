@@ -21,6 +21,8 @@ func newIntrospectIntf(h *defaultHandler) *exportedIntf {
 //NewDefaultHandler returns an instance of the default
 //call handler. This is useful if you want to implement only
 //one of the two handlers but not both.
+//
+// Deprecated: this is the default value, don't use it, it will be unexported.
 func NewDefaultHandler() *defaultHandler {
 	h := &defaultHandler{
 		objects:     make(map[ObjectPath]*exportedObj),
@@ -161,6 +163,7 @@ func newExportedObject() *exportedObj {
 }
 
 type exportedObj struct {
+	mu         sync.RWMutex
 	interfaces map[string]*exportedIntf
 }
 
@@ -168,19 +171,27 @@ func (obj *exportedObj) LookupInterface(name string) (Interface, bool) {
 	if name == "" {
 		return obj, true
 	}
+	obj.mu.RLock()
+	defer obj.mu.RUnlock()
 	intf, exists := obj.interfaces[name]
 	return intf, exists
 }
 
 func (obj *exportedObj) AddInterface(name string, iface *exportedIntf) {
+	obj.mu.Lock()
+	defer obj.mu.Unlock()
 	obj.interfaces[name] = iface
 }
 
 func (obj *exportedObj) DeleteInterface(name string) {
+	obj.mu.Lock()
+	defer obj.mu.Unlock()
 	delete(obj.interfaces, name)
 }
 
 func (obj *exportedObj) LookupMethod(name string) (Method, bool) {
+	obj.mu.RLock()
+	defer obj.mu.RUnlock()
 	for _, intf := range obj.interfaces {
 		method, exists := intf.LookupMethod(name)
 		if exists {
@@ -220,8 +231,12 @@ func (obj *exportedIntf) isFallbackInterface() bool {
 //NewDefaultSignalHandler returns an instance of the default
 //signal handler. This is useful if you want to implement only
 //one of the two handlers but not both.
+//
+// Deprecated: this is the default value, don't use it, it will be unexported.
 func NewDefaultSignalHandler() *defaultSignalHandler {
-	return &defaultSignalHandler{}
+	return &defaultSignalHandler{
+		closeChan: make(chan struct{}),
+	}
 }
 
 func isDefaultSignalHandler(handler SignalHandler) bool {
@@ -231,32 +246,47 @@ func isDefaultSignalHandler(handler SignalHandler) bool {
 
 type defaultSignalHandler struct {
 	sync.RWMutex
-	closed  bool
-	signals []chan<- *Signal
+	closed    bool
+	signals   []chan<- *Signal
+	closeChan chan struct{}
 }
 
 func (sh *defaultSignalHandler) DeliverSignal(intf, name string, signal *Signal) {
-	go func() {
-		sh.RLock()
-		defer sh.RUnlock()
-		if sh.closed {
+	sh.RLock()
+	defer sh.RUnlock()
+	if sh.closed {
+		return
+	}
+	for _, ch := range sh.signals {
+		select {
+		case ch <- signal:
+		case <-sh.closeChan:
 			return
+		default:
+			go func() {
+				select {
+				case ch <- signal:
+				case <-sh.closeChan:
+					return
+				}
+			}()
 		}
-		for _, ch := range sh.signals {
-			ch <- signal
-		}
-	}()
+	}
 }
 
 func (sh *defaultSignalHandler) Init() error {
 	sh.Lock()
 	sh.signals = make([]chan<- *Signal, 0)
+	sh.closeChan = make(chan struct{})
 	sh.Unlock()
 	return nil
 }
 
 func (sh *defaultSignalHandler) Terminate() {
 	sh.Lock()
+	if !sh.closed {
+		close(sh.closeChan)
+	}
 	sh.closed = true
 	for _, ch := range sh.signals {
 		close(ch)
