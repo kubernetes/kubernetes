@@ -473,7 +473,7 @@ func (sched *Scheduler) preempt(state *framework.CycleState, fwk framework.Frame
 			sched.Recorder.Eventf(victim, preemptor, v1.EventTypeNormal, "Preempted", "Preempting", "Preempted by %v/%v on node %v", preemptor.Namespace, preemptor.Name, nodeName)
 
 		}
-		metrics.PreemptionVictims.Set(float64(len(victims)))
+		metrics.PreemptionVictims.Observe(float64(len(victims)))
 	}
 	// Clearing nominated pods should happen outside of "if node != nil". Node could
 	// be nil when a pod with nominated node name is eligible to preempt again,
