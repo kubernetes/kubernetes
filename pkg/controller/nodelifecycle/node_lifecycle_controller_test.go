@@ -63,8 +63,8 @@ const (
 
 func alwaysReady() bool { return true }
 
-func fakeGetPodsAssignedToNode(c *fake.Clientset) func(string) ([]v1.Pod, error) {
-	return func(nodeName string) ([]v1.Pod, error) {
+func fakeGetPodsAssignedToNode(c *fake.Clientset) func(string) ([]*v1.Pod, error) {
+	return func(nodeName string) ([]*v1.Pod, error) {
 		selector := fields.SelectorFromSet(fields.Set{"spec.nodeName": nodeName})
 		pods, err := c.CoreV1().Pods(v1.NamespaceAll).List(metav1.ListOptions{
 			FieldSelector: selector.String(),
@@ -73,7 +73,11 @@ func fakeGetPodsAssignedToNode(c *fake.Clientset) func(string) ([]v1.Pod, error)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get Pods assigned to node %v", nodeName)
 		}
-		return pods.Items, nil
+		rPods := make([]*v1.Pod, len(pods.Items))
+		for i := range pods.Items {
+			rPods[i] = &pods.Items[i]
+		}
+		return rPods, nil
 	}
 }
 

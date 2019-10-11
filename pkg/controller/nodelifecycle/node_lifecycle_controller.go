@@ -246,7 +246,7 @@ type Controller struct {
 	nodeLister          corelisters.NodeLister
 	nodeInformerSynced  cache.InformerSynced
 
-	getPodsAssignedToNode func(nodeName string) ([]v1.Pod, error)
+	getPodsAssignedToNode func(nodeName string) ([]*v1.Pod, error)
 
 	recorder record.EventRecorder
 
@@ -419,18 +419,18 @@ func NewNodeLifecycleController(
 	})
 
 	podIndexer := podInformer.Informer().GetIndexer()
-	nc.getPodsAssignedToNode = func(nodeName string) ([]v1.Pod, error) {
+	nc.getPodsAssignedToNode = func(nodeName string) ([]*v1.Pod, error) {
 		objs, err := podIndexer.ByIndex(nodeNameKeyIndex, nodeName)
 		if err != nil {
 			return nil, err
 		}
-		pods := make([]v1.Pod, 0, len(objs))
+		pods := make([]*v1.Pod, 0, len(objs))
 		for _, obj := range objs {
 			pod, ok := obj.(*v1.Pod)
 			if !ok {
 				continue
 			}
-			pods = append(pods, *pod)
+			pods = append(pods, pod)
 		}
 		return pods, nil
 	}
@@ -700,14 +700,18 @@ func (nc *Controller) doEvictionPass() {
 	}
 }
 
-func listPodsFromNode(kubeClient clientset.Interface, nodeName string) ([]v1.Pod, error) {
+func listPodsFromNode(kubeClient clientset.Interface, nodeName string) ([]*v1.Pod, error) {
 	selector := fields.OneTermEqualSelector(apicore.PodHostField, nodeName).String()
 	options := metav1.ListOptions{FieldSelector: selector}
 	pods, err := kubeClient.CoreV1().Pods(metav1.NamespaceAll).List(options)
 	if err != nil {
 		return nil, err
 	}
-	return pods.Items, nil
+	rPods := make([]*v1.Pod, len(pods.Items))
+	for i := range pods.Items {
+		rPods[i] = &pods.Items[i]
+	}
+	return rPods, nil
 }
 
 // monitorNodeHealth verifies node health are constantly updated by kubelet, and
