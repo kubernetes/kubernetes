@@ -22,7 +22,7 @@ limitations under the License.
 // Package v1beta3 defines the v1beta3 version of the kubeadm configuration file format.
 //
 // A list of changes since v1beta2:
-//	- TBD
+//	- Optional fields are marked as such via comment tags.
 //	See the Kubernetes 1.17 changelog for further details.
 //
 // Migration from old kubeadm config versions
