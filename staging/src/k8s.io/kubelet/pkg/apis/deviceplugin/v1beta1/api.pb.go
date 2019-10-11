@@ -344,7 +344,7 @@ func (m *NUMANode) GetID() int64 {
 // E.g:
 // struct Device {
 //    ID: "GPU-fef8089b-4820-abfc-e83e-94318197576e",
-//    State: "Healthy",
+//    Health: "Healthy",
 //    Topology:
 //      Node:
 //ID: 1
