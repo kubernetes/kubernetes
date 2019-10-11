@@ -22,7 +22,6 @@ import (
 	"net"
 	"sync"
 
-	"github.com/coreos/etcd/clientv3/balancer/resolver/endpoint"
 	"github.com/coreos/etcd/etcdserver/api/v3rpc/rpctypes"
 	grpccredentials "google.golang.org/grpc/credentials"
 )
@@ -66,37 +65,38 @@ func (b *bundle) NewWithMode(mode string) (grpccredentials.Bundle, error) {
 }
 
 // transportCredential implements "grpccredentials.TransportCredentials" interface.
-// transportCredential wraps TransportCredentials to track which
-// addresses are dialed for which endpoints, and then sets the authority when checking the endpoint's cert to the
-// hostname or IP of the dialed endpoint.
-// This is a workaround of a gRPC load balancer issue. gRPC uses the dialed target's service name as the authority when
-// checking all endpoint certs, which does not work for etcd servers using their hostname or IP as the Subject Alternative Name
-// in their TLS certs.
-// To enable, include both WithTransportCredentials(creds) and WithContextDialer(creds.Dialer)
-// when dialing.
 type transportCredential struct {
 	gtc grpccredentials.TransportCredentials
-	mu  sync.Mutex
-	// addrToEndpoint maps from the connection addresses that are dialed to the hostname or IP of the
-	// endpoint provided to the dialer when dialing
-	addrToEndpoint map[string]string
 }
 
 func newTransportCredential(cfg *tls.Config) *transportCredential {
 	return &transportCredential{
-		gtc:            grpccredentials.NewTLS(cfg),
-		addrToEndpoint: map[string]string{},
+		gtc: grpccredentials.NewTLS(cfg),
 	}
 }
 
 func (tc *transportCredential) ClientHandshake(ctx context.Context, authority string, rawConn net.Conn) (net.Conn, grpccredentials.AuthInfo, error) {
-	// Set the authority when checking the endpoint's cert to the hostname or IP of the dialed endpoint
-	tc.mu.Lock()
-	dialEp, ok := tc.addrToEndpoint[rawConn.RemoteAddr().String()]
-	tc.mu.Unlock()
-	if ok {
-		_, host, _ := endpoint.ParseEndpoint(dialEp)
-		authority = host
+	// Only overwrite when authority is an IP address!
+	// Let's say, a server runs SRV records on "etcd.local" that resolves
+	// to "m1.etcd.local", and its SAN field also includes "m1.etcd.local".
+	// But what if SAN does not include its resolved IP address (e.g. 127.0.0.1)?
+	// Then, the server should only authenticate using its DNS hostname "m1.etcd.local",
+	// instead of overwriting it with its IP address.
+	// And we do not overwrite "localhost" either. Only overwrite IP addresses!
+	if isIP(authority) {
+		target := rawConn.RemoteAddr().String()
+		if authority != target {
+			// When user dials with "grpc.WithDialer", "grpc.DialContext" "cc.parsedTarget"
+			// update only happens once. This is problematic, because when TLS is enabled,
+			// retries happen through "grpc.WithDialer" with static "cc.parsedTarget" from
+			// the initial dial call.
+			// If the server authenticates by IP addresses, we want to set a new endpoint as
+			// a new authority. Otherwise
+			// "transport: authentication handshake failed: x509: certificate is valid for 127.0.0.1, 192.168.121.180, not 192.168.223.156"
+			// when the new dial target is "192.168.121.180" whose certificate host name is also "192.168.121.180"
+			// but client tries to authenticate with previously set "cc.parsedTarget" field "192.168.223.156"
+			authority = target
+		}
 	}
 	return tc.gtc.ClientHandshake(ctx, authority, rawConn)
 }
@@ -115,31 +115,13 @@ func (tc *transportCredential) Info() grpccredentials.ProtocolInfo {
 }
 
 func (tc *transportCredential) Clone() grpccredentials.TransportCredentials {
-	copy := map[string]string{}
-	tc.mu.Lock()
-	for k, v := range tc.addrToEndpoint {
-		copy[k] = v
-	}
-	tc.mu.Unlock()
 	return &transportCredential{
-		gtc:            tc.gtc.Clone(),
-		addrToEndpoint: copy,
+		gtc: tc.gtc.Clone(),
 	}
 }
 
 func (tc *transportCredential) OverrideServerName(serverNameOverride string) error {
 	return tc.gtc.OverrideServerName(serverNameOverride)
-}
-
-func (tc *transportCredential) Dialer(ctx context.Context, dialEp string) (net.Conn, error) {
-	// Keep track of which addresses are dialed for which endpoints
-	conn, err := endpoint.Dialer(ctx, dialEp)
-	if conn != nil {
-		tc.mu.Lock()
-		tc.addrToEndpoint[conn.RemoteAddr().String()] = dialEp
-		tc.mu.Unlock()
-	}
-	return conn, err
 }
 
 // perRPCCredential implements "grpccredentials.PerRPCCredentials" interface.
