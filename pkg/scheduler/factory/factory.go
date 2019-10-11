@@ -207,6 +207,8 @@ type ConfigFactoryArgs struct {
 	PdbInformer                    policyinformers.PodDisruptionBudgetInformer
 	StorageClassInformer           storageinformersv1.StorageClassInformer
 	CSINodeInformer                storageinformersv1beta1.CSINodeInformer
+	VolumeBinder                   *volumebinder.VolumeBinder
+	SchedulerCache                 internalcache.Cache
 	HardPodAffinitySymmetricWeight int32
 	DisablePreemption              bool
 	PercentageOfNodesToScore       int32
@@ -227,7 +229,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 	if stopEverything == nil {
 		stopEverything = wait.NeverStop
 	}
-	schedulerCache := internalcache.New(30*time.Second, stopEverything)
 
 	// storageClassInformer is only enabled through VolumeScheduling feature gate
 	var storageClassLister storagelistersv1.StorageClassLister
@@ -253,7 +254,8 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 		podLister:                      args.PodInformer.Lister(),
 		storageClassLister:             storageClassLister,
 		csiNodeLister:                  csiNodeLister,
-		schedulerCache:                 schedulerCache,
+		volumeBinder:                   args.VolumeBinder,
+		schedulerCache:                 args.SchedulerCache,
 		StopEverything:                 stopEverything,
 		hardPodAffinitySymmetricWeight: args.HardPodAffinitySymmetricWeight,
 		disablePreemption:              args.DisablePreemption,
@@ -267,8 +269,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 		pluginConfig:                   args.PluginConfig,
 		pluginConfigProducerRegistry:   args.PluginConfigProducerRegistry,
 	}
-	// Setup volume binder
-	c.volumeBinder = volumebinder.NewVolumeBinder(args.Client, args.NodeInformer, args.PvcInformer, args.PvInformer, args.StorageClassInformer, time.Duration(args.BindTimeoutSeconds)*time.Second)
 	c.scheduledPodsHasSynced = args.PodInformer.Informer().HasSynced
 
 	return c
