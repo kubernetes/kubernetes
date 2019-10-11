@@ -16,9 +16,7 @@
 package endpoint
 
 import (
-	"context"
 	"fmt"
-	"net"
 	"net/url"
 	"strings"
 	"sync"
@@ -230,18 +228,13 @@ func ParseTarget(target string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
-// Dialer dials a endpoint using net.Dialer.
-// Context cancelation and timeout are supported.
-func Dialer(ctx context.Context, dialEp string) (net.Conn, error) {
-	proto, host, _ := ParseEndpoint(dialEp)
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
+// ParseHostPort splits a "<host>:<port>" string into the host and port parts.
+// The port part is optional.
+func ParseHostPort(hostPort string) (host string, port string) {
+	parts := strings.SplitN(hostPort, ":", 2)
+	host = parts[0]
+	if len(parts) > 1 {
+		port = parts[1]
 	}
-	dialer := &net.Dialer{}
-	if deadline, ok := ctx.Deadline(); ok {
-		dialer.Deadline = deadline
-	}
-	return dialer.DialContext(ctx, proto, host)
+	return host, port
 }
