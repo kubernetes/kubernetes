@@ -80,6 +80,15 @@ func addCondition(in *unstructured.Unstructured, name, status string) *unstructu
 	return in
 }
 
+func addConditionForPhase(in *unstructured.Unstructured, name, status string) *unstructured.Unstructured {
+	statusMap, _, _ := unstructured.NestedMap(in.Object , "status")
+	statusMap =  map[string]interface{}{
+		"phase": status,
+	}
+	unstructured.SetNestedMap(in.Object, statusMap, "status" )
+	return in
+}
+
 func TestWaitForDeletion(t *testing.T) {
 	scheme := runtime.NewScheme()
 
@@ -768,6 +777,120 @@ func TestWaitForCondition(t *testing.T) {
 
 				Printer:     printers.NewDiscardingPrinter(),
 				ConditionFn: ConditionalWait{conditionName: "the-condition", conditionStatus: "status-value", errOut: ioutil.Discard}.IsConditionMet,
+				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
+			}
+			err := o.RunWait()
+			switch {
+			case err == nil && len(test.expectedErr) == 0:
+			case err != nil && len(test.expectedErr) == 0:
+				t.Fatal(err)
+			case err == nil && len(test.expectedErr) != 0:
+				t.Fatalf("missing: %q", test.expectedErr)
+			case err != nil && len(test.expectedErr) != 0:
+				if !strings.Contains(err.Error(), test.expectedErr) {
+					t.Fatalf("expected %q, got %q", test.expectedErr, err.Error())
+				}
+			}
+
+			test.validateActions(t, fakeClient.Actions())
+		})
+	}
+}
+
+
+
+func TestWaitForPhaseCondition(t *testing.T) {
+	scheme := runtime.NewScheme()
+
+	tests := []struct {
+		name       string
+		infos      []*resource.Info
+		fakeClient func() *dynamicfakeclient.FakeDynamicClient
+		timeout    time.Duration
+
+		expectedErr     string
+		validateActions func(t *testing.T, actions []clienttesting.Action)
+	}{
+		{
+			name: "present on get",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "name-foo",
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, newUnstructuredList(addConditionForPhase(
+						newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+						"status", "status-value",
+					)), nil
+				})
+				return fakeClient
+			},
+			timeout: 10 * time.Second,
+
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 1 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+		{
+			name: "times out",
+			infos: []*resource.Info{
+				{
+					Mapping: &meta.RESTMapping{
+						Resource: schema.GroupVersionResource{Group: "group", Version: "version", Resource: "theresource"},
+					},
+					Name:      "name-foo",
+					Namespace: "ns-foo",
+				},
+			},
+			fakeClient: func() *dynamicfakeclient.FakeDynamicClient {
+				fakeClient := dynamicfakeclient.NewSimpleDynamicClient(scheme)
+				fakeClient.PrependReactor("list", "theresource", func(action clienttesting.Action) (handled bool, ret runtime.Object, err error) {
+					return true, addConditionForPhase(
+						newUnstructured("group/version", "TheKind", "ns-foo", "name-foo"),
+						"status", "status-value",
+					), nil
+				})
+				return fakeClient
+			},
+			timeout: 1 * time.Second,
+
+			expectedErr: "timed out waiting for the condition on theresource/name-foo",
+			validateActions: func(t *testing.T, actions []clienttesting.Action) {
+				if len(actions) != 2 {
+					t.Fatal(spew.Sdump(actions))
+				}
+				if !actions[0].Matches("list", "theresource") || actions[0].(clienttesting.ListAction).GetListRestrictions().Fields.String() != "metadata.name=name-foo" {
+					t.Error(spew.Sdump(actions))
+				}
+				if !actions[1].Matches("watch", "theresource") {
+					t.Error(spew.Sdump(actions))
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := test.fakeClient()
+			o := &WaitOptions{
+				ResourceFinder: genericclioptions.NewSimpleFakeResourceFinder(test.infos...),
+				DynamicClient:  fakeClient,
+				Timeout:        test.timeout,
+
+				Printer:     printers.NewDiscardingPrinter(),
+				ConditionFn: ConditionalWait{conditionName: ".status.phase", conditionStatus: "status-value", errOut: ioutil.Discard}.IsPhaseConditionMet,
 				IOStreams:   genericclioptions.NewTestIOStreamsDiscard(),
 			}
 			err := o.RunWait()

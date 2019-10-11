@@ -23,6 +23,8 @@ import (
 	"io"
 	"strings"
 	"time"
+	"regexp"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
@@ -60,6 +62,9 @@ var (
 	waitExample = templates.Examples(`
 		# Wait for the pod "busybox1" to contain the status condition of type "Ready".
 		kubectl wait --for=condition=Ready pod/busybox1
+
+		# Wait for the pod "busybox1" to contain the status phase to be "Running".
+		kubectl wait --for='jsonpath={.status.phase=Running}' pod/busybox1
 
 		# Wait for the pod "busybox1" to be deleted, with a timeout of 60s, after having issued the "delete" command.
 		kubectl delete pod/busybox1
@@ -107,7 +112,7 @@ func NewCmdWait(restClientGetter genericclioptions.RESTClientGetter, streams gen
 	flags := NewWaitFlags(restClientGetter, streams)
 
 	cmd := &cobra.Command{
-		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available]",
+		Use:     "wait ([-f FILENAME] | resource.group/resource.name | resource.group [(-l label | --all)]) [--for=delete|--for condition=available|--for=jsonpath=...]",
 		Short:   "Experimental: Wait for a specific condition on one or many resources.",
 		Long:    waitLong,
 		Example: waitExample,
@@ -133,7 +138,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
 	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
-	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name].")
+	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name|jsonpath=...].")
 }
 
 // ToOptions converts from CLI inputs to runtime inputs
@@ -177,6 +182,28 @@ func (flags *WaitFlags) ToOptions(args []string) (*WaitOptions, error) {
 func conditionFuncFor(condition string, errOut io.Writer) (ConditionFunc, error) {
 	if strings.ToLower(condition) == "delete" {
 		return IsDeleted, nil
+	}
+	if strings.HasPrefix(condition, "jsonpath="){
+		conditionName := condition[len("jsonpath="):]
+		conditionValue := "true"
+		conditionName , _ = RelaxedJSONPathExpression(conditionName)
+		if equalsIndex := strings.Index(conditionName, "="); equalsIndex != -1 {
+			conditionValue  = conditionName[equalsIndex+1:len(conditionName)-1]
+			conditionName = conditionName[1:equalsIndex]
+		}
+
+		if strings.HasPrefix(conditionValue,"\""){
+			quotedVal, err := strconv.Unquote(conditionValue)
+			if err != nil{
+				return nil, fmt.Errorf("unrecognized condition: %q", condition)
+			}
+			conditionValue = quotedVal
+		}
+		return ConditionalWait{
+			conditionName:   conditionName,
+			conditionStatus: conditionValue,
+			errOut:          errOut,
+		}.IsPhaseConditionMet, nil
 	}
 	if strings.HasPrefix(condition, "condition=") {
 		conditionName := condition[len("condition="):]
@@ -262,6 +289,7 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 
 		nameSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
 
+
 		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
 		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(metav1.ListOptions{FieldSelector: nameSelector})
 		if apierrors.IsNotFound(err) {
@@ -275,6 +303,7 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 			return info.Object, true, nil
 		}
 		gottenObj := &gottenObjList.Items[0]
+
 		resourceLocation := ResourceLocation{
 			GroupResource: info.Mapping.Resource.GroupResource(),
 			Namespace:     gottenObj.GetNamespace(),
@@ -303,6 +332,73 @@ func IsDeleted(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error
 
 		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
 		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, Wait{errOut: o.ErrOut}.IsDeleted)
+		cancel()
+		switch {
+		case err == nil:
+			return watchEvent.Object, true, nil
+		case err == watchtools.ErrWatchClosed:
+			continue
+		case err == wait.ErrWaitTimeout:
+			if watchEvent != nil {
+				return watchEvent.Object, false, errWaitTimeoutWithName
+			}
+			return gottenObj, false, errWaitTimeoutWithName
+		default:
+			return gottenObj, false, err
+		}
+	}
+}
+
+
+// IsPhaseConditionMet is a conditionfunc for waiting on an API for phase condition to be met
+func (w ConditionalWait) IsPhaseConditionMet(info *resource.Info, o *WaitOptions) (runtime.Object, bool, error) {
+	endTime := time.Now().Add(o.Timeout)
+	for {
+		if len(info.Name) == 0 {
+			return info.Object, false, fmt.Errorf("resource name must be provided")
+		}
+
+		nameSelector := fields.OneTermEqualSelector("metadata.name", info.Name).String()
+
+		var gottenObj *unstructured.Unstructured
+		// List with a name field selector to get the current resourceVersion to watch from (not the object's resourceVersion)
+		gottenObjList, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).List(metav1.ListOptions{FieldSelector: nameSelector})
+
+		resourceVersion := ""
+		switch {
+		case err != nil:
+			return info.Object, false, err
+		case len(gottenObjList.Items) != 1:
+			resourceVersion = gottenObjList.GetResourceVersion()
+		default:
+			gottenObj = &gottenObjList.Items[0]
+			conditionMet, err := w.checkPhase(gottenObj)
+			if conditionMet {
+				return gottenObj, true, nil
+			}
+			if err != nil {
+				return gottenObj, false, err
+			}
+			resourceVersion = gottenObjList.GetResourceVersion()
+		}
+
+		watchOptions := metav1.ListOptions{}
+		watchOptions.FieldSelector = nameSelector
+		watchOptions.ResourceVersion = resourceVersion
+		objWatch, err := o.DynamicClient.Resource(info.Mapping.Resource).Namespace(info.Namespace).Watch(watchOptions)
+		if err != nil {
+			return gottenObj, false, err
+		}
+
+		timeout := endTime.Sub(time.Now())
+		errWaitTimeoutWithName := extendErrWaitTimeout(wait.ErrWaitTimeout, info)
+		if timeout < 0 {
+			// we're out of time
+			return gottenObj, false, errWaitTimeoutWithName
+		}
+
+		ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), o.Timeout)
+		watchEvent, err := watchtools.UntilWithoutRetry(ctx, objWatch, w.isPhaseConditionMet)
 		cancel()
 		switch {
 		case err == nil:
@@ -457,4 +553,82 @@ func (w ConditionalWait) isConditionMet(event watch.Event) (bool, error) {
 
 func extendErrWaitTimeout(err error, info *resource.Info) error {
 	return fmt.Errorf("%s on %s/%s", err.Error(), info.Mapping.Resource.Resource, info.Name)
+}
+
+
+func (w ConditionalWait) isPhaseConditionMet(event watch.Event) (bool, error) {
+	if event.Type == watch.Error {
+		// keep waiting in the event we see an error - we expect the watch to be closed by
+		// the server
+		err := apierrors.FromObject(event.Object)
+		fmt.Fprintf(w.errOut, "error: An error occurred while waiting for the condition to be satisfied: %v", err)
+		return false, nil
+	}
+	if event.Type == watch.Deleted {
+		// this will chain back out, result in another get and an return false back up the chain
+		return false, nil
+	}
+	obj := event.Object.(*unstructured.Unstructured)
+	return w.checkPhase(obj)
+}
+
+
+func (w ConditionalWait) checkPhase(obj *unstructured.Unstructured) (bool, error) {
+
+	phase := strings.Split(w.conditionName, ".")[2]
+	conditions, found, err := unstructured.NestedMap(obj.Object, "status" )
+
+	if err != nil {
+		return false, err
+	}
+	if !found {
+		return false, nil
+	}
+	var names string
+	for name, _ := range conditions {
+		
+		names += name
+		if strings.ToLower(name) != strings.ToLower(phase) {
+			continue
+		} 
+		phaseStatus, found, err := unstructured.NestedString(conditions, phase)
+		if !found || err != nil {
+			continue
+		}
+		return strings.ToLower(phaseStatus) ==  strings.ToLower(w.conditionStatus), nil
+	}
+	
+	return false, nil
+}
+
+
+
+
+var jsonRegexp = regexp.MustCompile(`^\{\.?([^{}]+)\}$|^\.?([^{}]+)$`)
+
+// RelaxedJSONPathExpression attempts to be flexible with JSONPath expressions, it accepts:
+//   * metadata.name (no leading '.' or curly braces '{...}'
+//   * {metadata.name} (no leading '.')
+//   * .metadata.name (no curly braces '{...}')
+//   * {.metadata.name} (complete expression)
+// And transforms them all into a valid jsonpath expression:
+//   {.metadata.name}
+func RelaxedJSONPathExpression(pathExpression string) (string, error) {
+	if len(pathExpression) == 0 {
+		return pathExpression, nil
+	}
+	submatches := jsonRegexp.FindStringSubmatch(pathExpression)
+	if submatches == nil {
+		return "", fmt.Errorf("unexpected path string, expected a 'name1.name2' or '.name1.name2' or '{name1.name2}' or '{.name1.name2}'")
+	}
+	if len(submatches) != 3 {
+		return "", fmt.Errorf("unexpected submatch list: %v", submatches)
+	}
+	var fieldSpec string
+	if len(submatches[1]) != 0 {
+		fieldSpec = submatches[1]
+	} else {
+		fieldSpec = submatches[2]
+	}
+	return fmt.Sprintf("{.%s}", fieldSpec), nil
 }
