@@ -28,11 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
-	appsinformers "k8s.io/client-go/informers/apps/v1"
+	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
-	policyinformers "k8s.io/client-go/informers/policy/v1beta1"
-	storageinformersv1 "k8s.io/client-go/informers/storage/v1"
-	storageinformersv1beta1 "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -241,17 +238,8 @@ var defaultSchedulerOptions = schedulerOptions{
 
 // New returns a Scheduler
 func New(client clientset.Interface,
-	nodeInformer coreinformers.NodeInformer,
+	informerFactory informers.SharedInformerFactory,
 	podInformer coreinformers.PodInformer,
-	pvInformer coreinformers.PersistentVolumeInformer,
-	pvcInformer coreinformers.PersistentVolumeClaimInformer,
-	replicationControllerInformer coreinformers.ReplicationControllerInformer,
-	replicaSetInformer appsinformers.ReplicaSetInformer,
-	statefulSetInformer appsinformers.StatefulSetInformer,
-	serviceInformer coreinformers.ServiceInformer,
-	pdbInformer policyinformers.PodDisruptionBudgetInformer,
-	storageClassInformer storageinformersv1.StorageClassInformer,
-	csiNodeInformer storageinformersv1beta1.CSINodeInformer,
 	recorder events.EventRecorder,
 	schedulerAlgorithmSource kubeschedulerconfig.SchedulerAlgorithmSource,
 	stopCh <-chan struct{},
@@ -263,21 +251,27 @@ func New(client clientset.Interface,
 	}
 
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
-	volumeBinder := volumebinder.NewVolumeBinder(client, nodeInformer, pvcInformer, pvInformer, storageClassInformer,
-		time.Duration(options.bindTimeoutSeconds)*time.Second)
+	volumeBinder := volumebinder.NewVolumeBinder(
+		client,
+		informerFactory.Core().V1().Nodes(),
+		informerFactory.Core().V1().PersistentVolumeClaims(),
+		informerFactory.Core().V1().PersistentVolumes(),
+		informerFactory.Storage().V1().StorageClasses(),
+		time.Duration(options.bindTimeoutSeconds)*time.Second,
+	)
 
 	registry := options.frameworkDefaultRegistry
 	if registry == nil {
 		registry = frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{
 			SchedulerCache:     schedulerCache,
-			ServiceLister:      serviceInformer.Lister(),
-			ControllerLister:   replicationControllerInformer.Lister(),
-			ReplicaSetLister:   replicaSetInformer.Lister(),
-			StatefulSetLister:  statefulSetInformer.Lister(),
-			PDBLister:          pdbInformer.Lister(),
-			PVLister:           pvInformer.Lister(),
-			PVCLister:          pvcInformer.Lister(),
-			StorageClassLister: storageClassInformer.Lister(),
+			ServiceLister:      informerFactory.Core().V1().Services().Lister(),
+			ControllerLister:   informerFactory.Core().V1().ReplicationControllers().Lister(),
+			ReplicaSetLister:   informerFactory.Apps().V1().ReplicaSets().Lister(),
+			StatefulSetLister:  informerFactory.Apps().V1().StatefulSets().Lister(),
+			PDBLister:          informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
+			PVLister:           informerFactory.Core().V1().PersistentVolumes().Lister(),
+			PVCLister:          informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+			StorageClassLister: informerFactory.Storage().V1().StorageClasses().Lister(),
 			VolumeBinder:       volumeBinder,
 		})
 	}
@@ -286,17 +280,18 @@ func New(client clientset.Interface,
 	// Set up the configurator which can create schedulers from configs.
 	configurator := factory.NewConfigFactory(&factory.ConfigFactoryArgs{
 		Client:                         client,
-		NodeInformer:                   nodeInformer,
+		InformerFactory:                informerFactory,
 		PodInformer:                    podInformer,
-		PvInformer:                     pvInformer,
-		PvcInformer:                    pvcInformer,
-		ReplicationControllerInformer:  replicationControllerInformer,
-		ReplicaSetInformer:             replicaSetInformer,
-		StatefulSetInformer:            statefulSetInformer,
-		ServiceInformer:                serviceInformer,
-		PdbInformer:                    pdbInformer,
-		StorageClassInformer:           storageClassInformer,
-		CSINodeInformer:                csiNodeInformer,
+		NodeInformer:                   informerFactory.Core().V1().Nodes(),
+		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
+		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
+		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
+		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
+		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
+		ServiceInformer:                informerFactory.Core().V1().Services(),
+		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
 		VolumeBinder:                   volumeBinder,
 		SchedulerCache:                 schedulerCache,
 		HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
@@ -349,7 +344,7 @@ func New(client clientset.Interface,
 	// Create the scheduler.
 	sched := NewFromConfig(config)
 	sched.podConditionUpdater = &podConditionUpdaterImpl{client}
-	AddAllEventHandlers(sched, options.schedulerName, nodeInformer, podInformer, pvInformer, pvcInformer, serviceInformer, storageClassInformer, csiNodeInformer)
+	AddAllEventHandlers(sched, options.schedulerName, informerFactory, podInformer)
 	return sched, nil
 }
 

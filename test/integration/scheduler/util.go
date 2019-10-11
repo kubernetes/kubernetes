@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -184,17 +184,8 @@ func initTestSchedulerWithOptions(
 	opts = append([]scheduler.Option{scheduler.WithBindTimeoutSeconds(600)}, opts...)
 	context.scheduler, err = scheduler.New(
 		context.clientSet,
-		context.informerFactory.Core().V1().Nodes(),
+		context.informerFactory,
 		podInformer,
-		context.informerFactory.Core().V1().PersistentVolumes(),
-		context.informerFactory.Core().V1().PersistentVolumeClaims(),
-		context.informerFactory.Core().V1().ReplicationControllers(),
-		context.informerFactory.Apps().V1().ReplicaSets(),
-		context.informerFactory.Apps().V1().StatefulSets(),
-		context.informerFactory.Core().V1().Services(),
-		context.informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		context.informerFactory.Storage().V1().StorageClasses(),
-		context.informerFactory.Storage().V1beta1().CSINodes(),
 		recorder,
 		algorithmSrc,
 		context.stopCh,

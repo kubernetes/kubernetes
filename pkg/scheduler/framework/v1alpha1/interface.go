@@ -25,6 +25,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -452,4 +453,6 @@ type FrameworkHandle interface {
 
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface
+
+	SharedInformerFactory() informers.SharedInformerFactory
 }

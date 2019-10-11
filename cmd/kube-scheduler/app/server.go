@@ -167,17 +167,8 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 
 	// Create the scheduler.
 	sched, err := scheduler.New(cc.Client,
-		cc.InformerFactory.Core().V1().Nodes(),
+		cc.InformerFactory,
 		cc.PodInformer,
-		cc.InformerFactory.Core().V1().PersistentVolumes(),
-		cc.InformerFactory.Core().V1().PersistentVolumeClaims(),
-		cc.InformerFactory.Core().V1().ReplicationControllers(),
-		cc.InformerFactory.Apps().V1().ReplicaSets(),
-		cc.InformerFactory.Apps().V1().StatefulSets(),
-		cc.InformerFactory.Core().V1().Services(),
-		cc.InformerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		cc.InformerFactory.Storage().V1().StorageClasses(),
-		cc.InformerFactory.Storage().V1beta1().CSINodes(),
 		cc.Recorder,
 		cc.ComponentConfig.AlgorithmSource,
 		stopCh,
