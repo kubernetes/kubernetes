@@ -17,9 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
-	"bytes"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 
@@ -4754,44 +4752,6 @@ func TestPrintEndpointSlice(t *testing.T) {
 		}
 		if !reflect.DeepEqual(test.expected, rows) {
 			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
-		}
-	}
-}
-
-func verifyTable(t *testing.T, table *metav1beta1.Table) {
-	var panicErr interface{}
-	func() {
-		defer func() {
-			panicErr = recover()
-		}()
-		table.DeepCopyObject() // cells are untyped, better check that types are JSON types and can be deep copied
-	}()
-
-	if panicErr != nil {
-		t.Errorf("unexpected panic during deepcopy of table %#v: %v", table, panicErr)
-	}
-}
-
-// VerifyDatesInOrder checks the start of each line for a RFC1123Z date
-// and posts error if all subsequent dates are not equal or increasing
-func VerifyDatesInOrder(
-	resultToTest, rowDelimiter, columnDelimiter string, t *testing.T) {
-	lines := strings.Split(resultToTest, rowDelimiter)
-	var previousTime time.Time
-	for _, str := range lines {
-		columns := strings.Split(str, columnDelimiter)
-		if len(columns) > 0 {
-			currentTime, err := time.Parse(time.RFC1123Z, columns[0])
-			if err == nil {
-				if previousTime.After(currentTime) {
-					t.Errorf(
-						"Output is not sorted by time. %s should be listed after %s. Complete output: %s",
-						previousTime.Format(time.RFC1123Z),
-						currentTime.Format(time.RFC1123Z),
-						resultToTest)
-				}
-				previousTime = currentTime
-			}
 		}
 	}
 }

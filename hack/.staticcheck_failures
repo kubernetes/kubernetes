@@ -28,7 +28,6 @@ pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/remote
 pkg/master
 pkg/printers
-pkg/printers/internalversion
 pkg/probe/http
 pkg/proxy/healthcheck
 pkg/proxy/iptables
