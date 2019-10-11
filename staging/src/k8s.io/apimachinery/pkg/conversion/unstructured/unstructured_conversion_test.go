@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -465,4 +466,77 @@ func TestUnstructuredToUnstructuredConversion(t *testing.T) {
 	err := scheme.Convert(inUnstructured, outUnstructured, nil)
 	assert.NoError(t, err)
 	assert.Equal(t, inUnstructured, outUnstructured)
+}
+
+func benchmarkCarp() *testapigroupv1.Carp {
+	t := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	return &testapigroupv1.Carp{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "name",
+			Namespace: "namespace",
+		},
+		Spec: testapigroupv1.CarpSpec{
+			RestartPolicy: "restart",
+			NodeSelector: map[string]string{
+				"label1": "value1",
+				"label2": "value2",
+			},
+			ServiceAccountName: "service-account",
+			HostNetwork:        false,
+			HostPID:            true,
+			Subdomain:          "hostname.subdomain.namespace.svc.domain",
+		},
+		Status: testapigroupv1.CarpStatus{
+			Phase: "phase",
+			Conditions: []testapigroupv1.CarpCondition{
+				{
+					Type:               "condition1",
+					Status:             "true",
+					LastProbeTime:      t,
+					LastTransitionTime: t,
+					Reason:             "reason",
+					Message:            "message",
+				},
+			},
+			Message: "message",
+			Reason:  "reason",
+			HostIP:  "1.2.3.4",
+		},
+	}
+}
+
+func BenchmarkToUnstructured(b *testing.B) {
+	carp := benchmarkCarp()
+	converter := runtime.DefaultUnstructuredConverter
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		result, err := converter.ToUnstructured(carp)
+		if err != nil {
+			b.Fatalf("Unexpected conversion error: %v", err)
+		}
+		if len(result) != 3 {
+			b.Errorf("Unexpected conversion result: %#v", result)
+		}
+	}
+}
+
+func BenchmarkFromUnstructured(b *testing.B) {
+	carp := benchmarkCarp()
+	converter := runtime.DefaultUnstructuredConverter
+	unstr, err := converter.ToUnstructured(carp)
+	if err != nil {
+		b.Fatalf("Unexpected conversion error: %v", err)
+	}
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		result := testapigroupv1.Carp{}
+		if err := converter.FromUnstructured(unstr, &result); err != nil {
+			b.Fatalf("Unexpected conversion error: %v", err)
+		}
+		if result.Status.Phase != "phase" {
+			b.Errorf("Unexpected conversion result: %#v", result)
+		}
+	}
 }
