@@ -409,7 +409,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.RESTOptionsGetter, legacyRESTStorageProvider corerest.LegacyRESTStorageProvider) error {
 	legacyRESTStorage, apiGroupInfo, err := legacyRESTStorageProvider.NewLegacyRESTStorage(restOptionsGetter)
 	if err != nil {
-		return fmt.Errorf("Error building core storage: %v", err)
+		return fmt.Errorf("error building core storage: %v", err)
 	}
 
 	controllerName := "bootstrap-controller"
@@ -419,14 +419,17 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 	m.GenericAPIServer.AddPreShutdownHookOrDie(controllerName, bootstrapController.PreShutdownHook)
 
 	if err := m.GenericAPIServer.InstallLegacyAPIGroup(genericapiserver.DefaultLegacyAPIPrefix, &apiGroupInfo); err != nil {
-		return fmt.Errorf("Error in registering group versions: %v", err)
+		return fmt.Errorf("error in registering group versions: %v", err)
 	}
 	return nil
 }
 
 func (m *Master) installTunneler(nodeTunneler tunneler.Tunneler, nodeClient corev1client.NodeInterface) {
 	nodeTunneler.Run(nodeAddressProvider{nodeClient}.externalAddresses)
-	m.GenericAPIServer.AddHealthChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler)))
+	if err := m.GenericAPIServer.AddHealthChecks(healthz.NamedCheck("SSH Tunnel Check", tunneler.TunnelSyncHealthChecker(nodeTunneler))); err != nil {
+		klog.Warning("error adding health check for SSH tunnel")
+		return
+	}
 	prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 		Name: "apiserver_proxy_tunnel_sync_duration_seconds",
 		Help: "The time since the last successful synchronization of the SSH tunnels for proxy requests.",
@@ -445,7 +448,7 @@ type RESTStorageProvider interface {
 
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
 func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
-	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
+	var apiGroupsInfo []*genericapiserver.APIGroupInfo
 
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
@@ -475,7 +478,7 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 	}
 
 	if err := m.GenericAPIServer.InstallAPIGroups(apiGroupsInfo...); err != nil {
-		return fmt.Errorf("Error in registering group versions: %v", err)
+		return fmt.Errorf("error in registering group versions: %v", err)
 	}
 	return nil
 }
@@ -493,7 +496,7 @@ func (n nodeAddressProvider) externalAddresses() ([]string, error) {
 		return nil, err
 	}
 	var matchErr error
-	addrs := []string{}
+	var addrs []string
 	for ix := range nodes.Items {
 		node := &nodes.Items[ix]
 		addr, err := nodeutil.GetPreferredNodeAddress(node, preferredAddressTypes)
