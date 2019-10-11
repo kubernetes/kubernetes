@@ -196,7 +196,7 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 			expected: TopologyHint{
 				NUMANodeAffinity: NewTestBitMask(numaNodes...),
-				Preferred:        true,
+				Preferred:        false,
 			},
 		},
 		{
@@ -688,6 +688,37 @@ func TestCalculateAffinity(t *testing.T) {
 			expected: TopologyHint{
 				NUMANodeAffinity: NewTestBitMask(0),
 				Preferred:        false,
+			},
+		},
+		{
+			name:   "Special cased PolicySingleNumaNode with one no-preference provider",
+			policy: NewSingleNumaNodePolicy(),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					nil,
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(0),
+				Preferred:        true,
 			},
 		},
 	}
