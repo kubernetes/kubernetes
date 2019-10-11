@@ -19,6 +19,8 @@ package compatibility
 import (
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -37,11 +39,11 @@ import (
 func TestCompatibility_v1_Scheduler(t *testing.T) {
 	// Add serialized versions of scheduler config that exercise available options to ensure compatibility between releases
 	schedulerFiles := map[string]struct {
-		JSON              string
-		wantPredicates    sets.String
-		wantPrioritizers  sets.String
-		wantFilterPlugins sets.String
-		wantExtenders     []schedulerapi.ExtenderConfig
+		JSON             string
+		wantPredicates   sets.String
+		wantPrioritizers sets.String
+		wantPlugins      map[string][]kubeschedulerconfig.Plugin
+		wantExtenders    []schedulerapi.ExtenderConfig
 	}{
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
@@ -231,12 +233,12 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
 				"NodeAffinityPriority",
-				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 			),
-			wantFilterPlugins: sets.NewString(
-				"TaintToleration",
-			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+			},
 		},
 
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -300,13 +302,13 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"NodePreferAvoidPodsPriority",
 				"NodeAffinityPriority",
-				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 			),
-			wantFilterPlugins: sets.NewString(
-				"TaintToleration",
-			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+			},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
@@ -379,13 +381,13 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"NodePreferAvoidPodsPriority",
 				"NodeAffinityPriority",
-				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 			),
-			wantFilterPlugins: sets.NewString(
-				"TaintToleration",
-			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
@@ -471,13 +473,13 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"NodePreferAvoidPodsPriority",
 				"NodeAffinityPriority",
-				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 			),
-			wantFilterPlugins: sets.NewString(
-				"TaintToleration",
-			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
@@ -565,13 +567,13 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"NodePreferAvoidPodsPriority",
 				"NodeAffinityPriority",
-				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 			),
-			wantFilterPlugins: sets.NewString(
-				"TaintToleration",
-			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
@@ -664,13 +666,13 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"NodePreferAvoidPodsPriority",
 				"NodeAffinityPriority",
-				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 			),
-			wantFilterPlugins: sets.NewString(
-				"TaintToleration",
-			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
@@ -775,14 +777,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"NodePreferAvoidPodsPriority",
 				"NodeAffinityPriority",
-				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
 			),
-			wantFilterPlugins: sets.NewString(
-				"TaintToleration",
-			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
@@ -889,14 +891,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"NodePreferAvoidPodsPriority",
 				"NodeAffinityPriority",
-				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
 			),
-			wantFilterPlugins: sets.NewString(
-				"TaintToleration",
-			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
@@ -1003,14 +1005,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"NodePreferAvoidPodsPriority",
 				"NodeAffinityPriority",
-				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
 			),
-			wantFilterPlugins: sets.NewString(
-				"TaintToleration",
-			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
@@ -1121,14 +1123,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"SelectorSpreadPriority",
 				"NodePreferAvoidPodsPriority",
 				"NodeAffinityPriority",
-				"TaintTolerationPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
 			),
-			wantFilterPlugins: sets.NewString(
-				"TaintToleration",
-			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {{Name: "TaintToleration"}},
+				"ScorePlugin":  {{Name: "TaintToleration", Weight: 2}},
+			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
 				FilterVerb:       "filter",
@@ -1151,6 +1153,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	mandatoryPredicates := sets.NewString("CheckNodeCondition")
 	filterToPredicateMap := map[string]string{
 		"TaintToleration": "PodToleratesNodeTaints",
+	}
+	scoreToPriorityMap := map[string]string{
+		"TaintToleration": "TaintTolerationPriority",
 	}
 
 	for v, tc := range schedulerFiles {
@@ -1208,15 +1213,17 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				t.Errorf("Got prioritizers %v, want %v", gotPrioritizers, tc.wantPrioritizers)
 			}
 
-			gotFilterPlugins := sets.NewString()
-			plugins := sched.Framework.ListPlugins()
-			for _, p := range plugins["FilterPlugin"] {
-				gotFilterPlugins.Insert(p)
-				seenPredicates.Insert(filterToPredicateMap[p])
+			gotPlugins := sched.Framework.ListPlugins()
+			for _, p := range gotPlugins["FilterPlugin"] {
+				seenPredicates.Insert(filterToPredicateMap[p.Name])
 
 			}
-			if !gotFilterPlugins.Equal(tc.wantFilterPlugins) {
-				t.Errorf("Got filter plugins %v, want %v", gotFilterPlugins, tc.wantFilterPlugins)
+			for _, p := range gotPlugins["FilterPlugin"] {
+				seenPriorities.Insert(scoreToPriorityMap[p.Name])
+
+			}
+			if diff := cmp.Diff(tc.wantPlugins, gotPlugins); diff != "" {
+				t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 			}
 
 			gotExtenders := sched.Algorithm.Extenders()

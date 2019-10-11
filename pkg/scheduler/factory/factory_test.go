@@ -636,7 +636,7 @@ func (t *TestPlugin) Name() string {
 	return t.name
 }
 
-func (t *TestPlugin) Score(state *framework.CycleState, p *v1.Pod, nodeName string) (int, *framework.Status) {
+func (t *TestPlugin) Score(state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
 	return 1, nil
 }
 

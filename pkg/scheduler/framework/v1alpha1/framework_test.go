@@ -85,7 +85,7 @@ func (pl *TestScoreWithNormalizePlugin) NormalizeScore(state *CycleState, pod *v
 	return injectNormalizeRes(pl.inj, scores)
 }
 
-func (pl *TestScoreWithNormalizePlugin) Score(state *CycleState, p *v1.Pod, nodeName string) (int, *Status) {
+func (pl *TestScoreWithNormalizePlugin) Score(state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
 	return setScoreRes(pl.inj)
 }
 
@@ -103,7 +103,7 @@ func (pl *TestScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestScorePlugin) Score(state *CycleState, p *v1.Pod, nodeName string) (int, *Status) {
+func (pl *TestScorePlugin) Score(state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
 	return setScoreRes(pl.inj)
 }
 
@@ -523,13 +523,13 @@ func buildConfigWithWeights(weights map[string]int32, ps ...string) *config.Plug
 }
 
 type injectedResult struct {
-	ScoreRes     int   `json:"scoreRes,omitempty"`
+	ScoreRes     int64 `json:"scoreRes,omitempty"`
 	NormalizeRes int64 `json:"normalizeRes,omitempty"`
 	ScoreErr     bool  `json:"scoreErr,omitempty"`
 	NormalizeErr bool  `json:"normalizeErr,omitempty"`
 }
 
-func setScoreRes(inj injectedResult) (int, *Status) {
+func setScoreRes(inj injectedResult) (int64, *Status) {
 	if inj.ScoreErr {
 		return 0, NewStatus(Error, "injecting failure.")
 	}

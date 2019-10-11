@@ -8,6 +8,7 @@ go_library(
     deps = [
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
+        "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/plugins/tainttoleration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
