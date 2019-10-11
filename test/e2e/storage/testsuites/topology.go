@@ -29,7 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -139,7 +139,10 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		framework.ExpectNotEqual(l.resource.sc, nil, "driver failed to provide a StorageClass")
 		l.resource.sc.VolumeBindingMode = &pattern.BindingMode
 
-		claimSize := dDriver.GetClaimSize()
+		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
+		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
 		l.resource.pvc = e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
 			ClaimSize:        claimSize,
 			StorageClassName: &(l.resource.sc.Name),
@@ -233,7 +236,10 @@ func (t *topologyTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 
 // getCurrentTopologies() goes through all Nodes and returns up to maxCount unique driver topologies
 func (t *topologyTestSuite) getCurrentTopologies(cs clientset.Interface, keys []string, maxCount int) ([]topology, error) {
-	nodes := framework.GetReadySchedulableNodesOrDie(cs)
+	nodes, err := e2enode.GetReadySchedulableNodes(cs)
+	if err != nil {
+		return nil, err
+	}
 
 	topos := []topology{}
 
@@ -256,7 +262,7 @@ func (t *topologyTestSuite) getCurrentTopologies(cs clientset.Interface, keys []
 			}
 		}
 		if !found {
-			e2elog.Logf("found topology %v", topo)
+			framework.Logf("found topology %v", topo)
 			topos = append(topos, topo)
 		}
 		if len(topos) >= maxCount {
@@ -311,12 +317,12 @@ func (t *topologyTestSuite) verifyNodeTopology(node *v1.Node, allowedTopos []top
 			}
 		}
 	}
-	e2elog.Failf("node %v topology labels %+v doesn't match allowed topologies +%v", node.Name, node.Labels, allowedTopos)
+	framework.Failf("node %v topology labels %+v doesn't match allowed topologies +%v", node.Name, node.Labels, allowedTopos)
 }
 
 func (t *topologyTestSuite) createResources(cs clientset.Interface, l *topologyTest, affinity *v1.Affinity) {
 	var err error
-	e2elog.Logf("Creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.resource.sc, l.resource.pvc)
+	framework.Logf("Creating storage class object and pvc object for driver - sc: %v, pvc: %v", l.resource.sc, l.resource.pvc)
 
 	ginkgo.By("Creating sc")
 	l.resource.sc, err = cs.StorageV1().StorageClasses().Create(l.resource.sc)

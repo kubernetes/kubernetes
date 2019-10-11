@@ -84,6 +84,16 @@ type KubeSchedulerConfiguration struct {
 	// If this value is nil, the default value will be used.
 	BindTimeoutSeconds *int64 `json:"bindTimeoutSeconds"`
 
+	// PodInitialBackoffSeconds is the initial backoff for unschedulable pods.
+	// If specified, it must be greater than 0. If this value is null, the default value (1s)
+	// will be used.
+	PodInitialBackoffSeconds *int64 `json:"podInitialBackoffSeconds"`
+
+	// PodMaxBackoffSeconds is the max backoff for unschedulable pods.
+	// If specified, it must be greater than podInitialBackoffSeconds. If this value is null,
+	// the default value (10s) will be used.
+	PodMaxBackoffSeconds *int64 `json:"podMaxBackoffSeconds"`
+
 	// Plugins specify the set of plugins that should be enabled or disabled. Enabled plugins are the
 	// ones that should be enabled in addition to the default plugins. Disabled plugins are any of the
 	// default plugins that should be disabled.

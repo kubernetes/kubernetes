@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
@@ -45,6 +47,8 @@ import (
 
 var (
 	migratedPlugins *string
+	minValidSize    = "1Ki"
+	maxValidSize    = "10Ei"
 )
 
 func init() {
@@ -67,9 +71,10 @@ type TestSuite interface {
 
 // TestSuiteInfo represents a set of parameters for TestSuite
 type TestSuiteInfo struct {
-	name         string                     // name of the TestSuite
-	featureTag   string                     // featureTag for the TestSuite
-	testPatterns []testpatterns.TestPattern // Slice of TestPattern for the TestSuite
+	name               string                     // name of the TestSuite
+	featureTag         string                     // featureTag for the TestSuite
+	testPatterns       []testpatterns.TestPattern // Slice of TestPattern for the TestSuite
+	supportedSizeRange volume.SizeRange           // Size range supported by the test suite
 }
 
 // TestResource represents an interface for resources that is used by TestSuite
@@ -181,7 +186,7 @@ type genericVolumeTestResource struct {
 
 var _ TestResource = &genericVolumeTestResource{}
 
-func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, pattern testpatterns.TestPattern) *genericVolumeTestResource {
+func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, pattern testpatterns.TestPattern, testVolumeSizeRange volume.SizeRange) *genericVolumeTestResource {
 	r := genericVolumeTestResource{
 		driver:  driver,
 		config:  config,
@@ -214,7 +219,11 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 	case testpatterns.DynamicPV:
 		framework.Logf("Creating resource for dynamic PV")
 		if dDriver, ok := driver.(DynamicPVTestDriver); ok {
-			claimSize := dDriver.GetClaimSize()
+			var err error
+			driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
+			claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+			framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, driverVolumeSizeRange)
+			framework.Logf("Using claimSize:%s, test suite supported size:%v, driver(%s) supported size:%v ", claimSize, testVolumeSizeRange, dDriver.GetDriverInfo().Name, testVolumeSizeRange)
 			r.sc = dDriver.GetDynamicProvisionStorageClass(r.config, pattern.FsType)
 
 			if pattern.BindingMode != "" {
@@ -225,7 +234,7 @@ func createGenericVolumeTestResource(driver TestDriver, config *PerTestConfig, p
 			}
 
 			ginkgo.By("creating a StorageClass " + r.sc.Name)
-			var err error
+
 			r.sc, err = cs.StorageV1().StorageClasses().Create(r.sc)
 			framework.ExpectNoError(err)
 
@@ -412,6 +421,55 @@ func convertTestConfig(in *PerTestConfig) volume.TestConfig {
 		ClientNodeName: in.ClientNodeName,
 		NodeSelector:   in.ClientNodeSelector,
 	}
+}
+
+// getSizeRangesIntersection takes two instances of storage size ranges and determines the
+// intersection of the intervals (if it exists) and return the minimum of the intersection
+// to be used as the claim size for the test.
+// if value not set, that means there's no minimum or maximum size limitation and we set default size for it.
+func getSizeRangesIntersection(first volume.SizeRange, second volume.SizeRange) (string, error) {
+	var firstMin, firstMax, secondMin, secondMax resource.Quantity
+	var err error
+
+	//if SizeRange is not set, assign a minimum or maximum size
+	if len(first.Min) == 0 {
+		first.Min = minValidSize
+	}
+	if len(first.Max) == 0 {
+		first.Max = maxValidSize
+	}
+	if len(second.Min) == 0 {
+		second.Min = minValidSize
+	}
+	if len(second.Max) == 0 {
+		second.Max = maxValidSize
+	}
+
+	if firstMin, err = resource.ParseQuantity(first.Min); err != nil {
+		return "", err
+	}
+	if firstMax, err = resource.ParseQuantity(first.Max); err != nil {
+		return "", err
+	}
+	if secondMin, err = resource.ParseQuantity(second.Min); err != nil {
+		return "", err
+	}
+	if secondMax, err = resource.ParseQuantity(second.Max); err != nil {
+		return "", err
+	}
+
+	interSectionStart := math.Max(float64(firstMin.Value()), float64(secondMin.Value()))
+	intersectionEnd := math.Min(float64(firstMax.Value()), float64(secondMax.Value()))
+
+	// the minimum of the intersection shall be returned as the claim size
+	var intersectionMin resource.Quantity
+
+	if intersectionEnd-interSectionStart >= 0 { //have intersection
+		intersectionMin = *resource.NewQuantity(int64(interSectionStart), "BinarySI") //convert value to BinarySI format. E.g. 5Gi
+		// return the minimum of the intersection as the claim size
+		return intersectionMin.String(), nil
+	}
+	return "", fmt.Errorf("intersection of size ranges %+v, %+v is null", first, second)
 }
 
 func getSnapshot(claimName string, ns, snapshotClassName string) *unstructured.Unstructured {

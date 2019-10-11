@@ -30,6 +30,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	volumeevents "k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -112,10 +113,8 @@ var _ = utils.SIGDescribe("Zone Support", func() {
 		zoneD = GetAndExpectStringEnvVar(VCPZoneD)
 		scParameters = make(map[string]string)
 		zones = make([]string, 0)
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if !(len(nodeList.Items) > 0) {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
+		_, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.It("Verify dynamically created pv with allowed zones specified in storage class, shows the right zone information on its labels", func() {

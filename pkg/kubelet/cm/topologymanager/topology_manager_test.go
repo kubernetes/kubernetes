@@ -196,7 +196,7 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 			expected: TopologyHint{
 				NUMANodeAffinity: NewTestBitMask(numaNodes...),
-				Preferred:        true,
+				Preferred:        false,
 			},
 		},
 		{
@@ -690,6 +690,37 @@ func TestCalculateAffinity(t *testing.T) {
 				Preferred:        false,
 			},
 		},
+		{
+			name:   "Special cased PolicySingleNumaNode with one no-preference provider",
+			policy: NewSingleNumaNodePolicy(),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource1": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+				&mockHintProvider{
+					nil,
+				},
+			},
+			expected: TopologyHint{
+				NUMANodeAffinity: NewTestBitMask(0),
+				Preferred:        true,
+			},
+		},
 	}
 
 	for _, tc := range tcases {
@@ -875,6 +906,32 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "QOSClass set as Burstable. BestEffort Policy. More than one Preferred Affinity.",
+			qosClass: v1.PodQOSBurstable,
+			policy:   NewBestEffortPolicy(),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
 			name:     "QOSClass set as Guaranteed. BestEffort Policy. No Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   NewBestEffortPolicy(),
@@ -895,6 +952,28 @@ func TestAdmit(t *testing.T) {
 		{
 			name:     "QOSClass set as Guaranteed. Restricted Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
+			policy:   NewRestrictedPolicy(),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as Burstable. Restricted Policy. Preferred Affinity.",
+			qosClass: v1.PodQOSBurstable,
 			policy:   NewRestrictedPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{
@@ -941,8 +1020,52 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "QOSClass set as Burstable. Restricted Policy. More than one Preferred affinity.",
+			qosClass: v1.PodQOSBurstable,
+			policy:   NewRestrictedPolicy(),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(1),
+								Preferred:        true,
+							},
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
 			name:     "QOSClass set as Guaranteed. Restricted Policy. No Preferred affinity.",
 			qosClass: v1.PodQOSGuaranteed,
+			policy:   NewRestrictedPolicy(),
+			hp: []HintProvider{
+				&mockHintProvider{
+					map[string][]TopologyHint{
+						"resource": {
+							{
+								NUMANodeAffinity: NewTestBitMask(0, 1),
+								Preferred:        false,
+							},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name:     "QOSClass set as Burstable. Restricted Policy. No Preferred affinity.",
+			qosClass: v1.PodQOSBurstable,
 			policy:   NewRestrictedPolicy(),
 			hp: []HintProvider{
 				&mockHintProvider{

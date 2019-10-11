@@ -29,9 +29,9 @@ import (
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller/volume/protectionutil"
-	"k8s.io/kubernetes/pkg/util/metrics"
 	"k8s.io/kubernetes/pkg/util/slice"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -58,7 +58,7 @@ func NewPVProtectionController(pvInformer coreinformers.PersistentVolumeInformer
 		storageObjectInUseProtectionEnabled: storageObjectInUseProtectionFeatureEnabled,
 	}
 	if cl != nil && cl.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("persistentvolume_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
+		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("persistentvolume_protection_controller", cl.CoreV1().RESTClient().GetRateLimiter())
 	}
 
 	e.pvLister = pvInformer.Lister()

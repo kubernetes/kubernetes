@@ -207,6 +207,8 @@ pluginConfig:
 
 	defaultSource := "DefaultProvider"
 	defaultBindTimeoutSeconds := int64(600)
+	defaultPodInitialBackoffSeconds := int64(1)
+	defaultPodMaxBackoffSeconds := int64(10)
 
 	testcases := []struct {
 		name             string
@@ -275,8 +277,10 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				BindTimeoutSeconds: &defaultBindTimeoutSeconds,
-				Plugins:            nil,
+				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: &defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     &defaultPodMaxBackoffSeconds,
+				Plugins:                  nil,
 			},
 		},
 		{
@@ -355,7 +359,9 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				BindTimeoutSeconds: &defaultBindTimeoutSeconds,
+				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: &defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     &defaultPodMaxBackoffSeconds,
 			},
 		},
 		{
@@ -416,7 +422,9 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				BindTimeoutSeconds: &defaultBindTimeoutSeconds,
+				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: &defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     &defaultPodMaxBackoffSeconds,
 				Plugins: &kubeschedulerconfig.Plugins{
 					Reserve: &kubeschedulerconfig.PluginSet{
 						Enabled: []kubeschedulerconfig.Plugin{

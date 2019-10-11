@@ -24,6 +24,13 @@ import (
 	"k8s.io/component-base/metrics"
 )
 
+// CollectAndCompare registers the provided Collector with a newly created
+// pedantic Registry. It then does the same as GatherAndCompare, gathering the
+// metrics from the pedantic Registry.
+func CollectAndCompare(c metrics.Collector, expected io.Reader, metricNames ...string) error {
+	return testutil.CollectAndCompare(c, expected, metricNames...)
+}
+
 // GatherAndCompare gathers all metrics from the provided Gatherer and compares
 // it to an expected output read from the provided Reader in the Prometheus text
 // exposition format. If any metricNames are provided, only metrics with those

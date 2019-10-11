@@ -52,8 +52,10 @@ import (
 )
 
 const (
-	disablePodPreemption = false
-	bindTimeoutSeconds   = 600
+	disablePodPreemption             = false
+	bindTimeoutSeconds               = 600
+	podInitialBackoffDurationSeconds = 1
+	podMaxBackoffDurationSeconds     = 10
 )
 
 func TestCreate(t *testing.T) {
@@ -249,17 +251,18 @@ func TestDefaultErrorFunc(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
+	testPodInfo := &framework.PodInfo{Pod: testPod}
 	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 
 	timestamp := time.Now()
-	queue := internalqueue.NewPriorityQueueWithClock(nil, clock.NewFakeClock(timestamp), nil)
+	queue := internalqueue.NewPriorityQueue(nil, nil, internalqueue.WithClock(clock.NewFakeClock(timestamp)))
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
-	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache, stopCh)
+	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache)
 
 	// Trigger error handling again to put the pod in unschedulable queue
-	errFunc(testPod, nil)
+	errFunc(testPodInfo, nil)
 
 	// Try up to a minute to retrieve the error pod from priority queue
 	foundPodFlag := false
@@ -293,7 +296,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	queue.MoveAllToActiveQueue()
 
 	// Trigger error handling again to put the pod in backoff queue
-	errFunc(testPod, nil)
+	errFunc(testPodInfo, nil)
 
 	foundPodFlag = false
 	for i := 0; i < maxIterations; i++ {
@@ -478,34 +481,36 @@ func newConfigFactoryWithFrameworkRegistry(
 	registry framework.Registry, pluginConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry) *Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	return NewConfigFactory(&ConfigFactoryArgs{
-		client,
-		informerFactory.Core().V1().Nodes(),
-		informerFactory.Core().V1().Pods(),
-		informerFactory.Core().V1().PersistentVolumes(),
-		informerFactory.Core().V1().PersistentVolumeClaims(),
-		informerFactory.Core().V1().ReplicationControllers(),
-		informerFactory.Apps().V1().ReplicaSets(),
-		informerFactory.Apps().V1().StatefulSets(),
-		informerFactory.Core().V1().Services(),
-		informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		informerFactory.Storage().V1().StorageClasses(),
-		informerFactory.Storage().V1beta1().CSINodes(),
-		hardPodAffinitySymmetricWeight,
-		disablePodPreemption,
-		schedulerapi.DefaultPercentageOfNodesToScore,
-		bindTimeoutSeconds,
-		stopCh,
-		registry,
-		nil,
-		[]config.PluginConfig{},
-		pluginConfigProducerRegistry,
+		Client:                         client,
+		NodeInformer:                   informerFactory.Core().V1().Nodes(),
+		PodInformer:                    informerFactory.Core().V1().Pods(),
+		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
+		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
+		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
+		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
+		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
+		ServiceInformer:                informerFactory.Core().V1().Services(),
+		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
+		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
+		HardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
+		DisablePreemption:              disablePodPreemption,
+		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
+		BindTimeoutSeconds:             bindTimeoutSeconds,
+		PodInitialBackoffSeconds:       podInitialBackoffDurationSeconds,
+		PodMaxBackoffSeconds:           podMaxBackoffDurationSeconds,
+		StopCh:                         stopCh,
+		Registry:                       registry,
+		Plugins:                        nil,
+		PluginConfig:                   []config.PluginConfig{},
+		PluginConfigProducerRegistry:   pluginConfigProducerRegistry,
 	})
 }
 
 func newConfigFactory(
 	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}) *Configurator {
 	return newConfigFactoryWithFrameworkRegistry(client, hardPodAffinitySymmetricWeight, stopCh,
-		frameworkplugins.NewDefaultRegistry(), frameworkplugins.NewDefaultConfigProducerRegistry())
+		frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{}), frameworkplugins.NewDefaultConfigProducerRegistry())
 }
 
 type fakeExtender struct {
@@ -631,7 +636,7 @@ func (t *TestPlugin) Name() string {
 	return t.name
 }
 
-func (t *TestPlugin) Score(state *framework.CycleState, p *v1.Pod, nodeName string) (int, *framework.Status) {
+func (t *TestPlugin) Score(state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
 	return 1, nil
 }
 

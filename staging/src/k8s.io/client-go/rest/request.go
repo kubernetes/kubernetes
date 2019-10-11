@@ -691,6 +691,33 @@ func (r *Request) Stream() (io.ReadCloser, error) {
 	}
 }
 
+// requestPreflightCheck looks for common programmer errors on Request.
+//
+// We tackle here two programmer mistakes. The first one is to try to create
+// something(POST) using an empty string as namespace with namespaceSet as
+// true. If namespaceSet is true then namespace should also be defined. The
+// second mistake is, when under the same circumstances, the programmer tries
+// to GET, PUT or DELETE a named resource(resourceName != ""), again, if
+// namespaceSet is true then namespace must not be empty.
+func (r *Request) requestPreflightCheck() error {
+	if !r.namespaceSet {
+		return nil
+	}
+	if len(r.namespace) > 0 {
+		return nil
+	}
+
+	switch r.verb {
+	case "POST":
+		return fmt.Errorf("an empty namespace may not be set during creation")
+	case "GET", "PUT", "DELETE":
+		if len(r.resourceName) > 0 {
+			return fmt.Errorf("an empty namespace may not be set when a resource name is provided")
+		}
+	}
+	return nil
+}
+
 // request connects to the server and invokes the provided function when a server response is
 // received. It handles retry behavior and up front validation of requests. It will invoke
 // fn at most once. It will return an error if a problem occurred prior to connecting to the
@@ -707,12 +734,8 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 		return r.err
 	}
 
-	// TODO: added to catch programmer errors (invoking operations with an object with an empty namespace)
-	if (r.verb == "GET" || r.verb == "PUT" || r.verb == "DELETE") && r.namespaceSet && len(r.resourceName) > 0 && len(r.namespace) == 0 {
-		return fmt.Errorf("an empty namespace may not be set when a resource name is provided")
-	}
-	if (r.verb == "POST") && r.namespaceSet && len(r.namespace) == 0 {
-		return fmt.Errorf("an empty namespace may not be set during creation")
+	if err := r.requestPreflightCheck(); err != nil {
+		return err
 	}
 
 	client := r.client
@@ -815,8 +838,6 @@ func (r *Request) request(fn func(*http.Request, *http.Response)) error {
 // processing.
 //
 // Error type:
-//  * If the request can't be constructed, or an error happened earlier while building its
-//    arguments: *RequestConstructionError
 //  * If the server responds with a status: *errors.StatusError or *errors.UnexpectedObjectError
 //  * http.Client.Do errors are returned directly.
 func (r *Request) Do() Result {

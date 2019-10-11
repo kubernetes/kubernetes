@@ -1,10 +1,11 @@
 # See the OWNERS docs at https://go.k8s.io/owners
 
 reviewers:
-  - gmarek
-  - shyamjvs
   - wojtek-t
 approvers:
+  - wojtek-t
+emeritus_approvers:
   - gmarek
   - shyamjvs
-  - wojtek-t
+labels:
+  - sig/scalability

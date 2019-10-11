@@ -5160,45 +5160,6 @@ func TestValidateDisabledSubpathExpr(t *testing.T) {
 		}
 	}
 
-	// Repeat with feature gate off
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpathEnvExpansion, false)()
-	cases = map[string]struct {
-		mounts      []core.VolumeMount
-		expectError bool
-	}{
-		"subpath expr not specified": {
-			[]core.VolumeMount{
-				{
-					Name:      "abc-123",
-					MountPath: "/bab",
-				},
-			},
-			false,
-		},
-		"subpath expr specified": {
-			[]core.VolumeMount{
-				{
-					Name:        "abc-123",
-					MountPath:   "/bab",
-					SubPathExpr: "$(POD_NAME)",
-				},
-			},
-			false, // validation should not fail, dropping the field is handled in PrepareForCreate/PrepareForUpdate
-		},
-	}
-
-	for name, test := range cases {
-		errs := ValidateVolumeMounts(test.mounts, GetVolumeDeviceMap(goodVolumeDevices), vols, &container, field.NewPath("field"))
-
-		if len(errs) != 0 && !test.expectError {
-			t.Errorf("test %v failed: %+v", name, errs)
-		}
-
-		if len(errs) == 0 && test.expectError {
-			t.Errorf("test %v failed, expected error", name)
-		}
-	}
-
 	// Repeat with subpath feature gate off
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.VolumeSubpath, false)()
 	cases = map[string]struct {

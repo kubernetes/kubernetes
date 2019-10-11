@@ -34,6 +34,7 @@ import (
 	migrationplugins "k8s.io/csi-translation-lib/plugins" // volume plugin names are exported nicely there
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
@@ -125,12 +126,9 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 		ginkgo.By("Picking a random node")
 		var nodeName string
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		if len(nodeList.Items) != 0 {
-			nodeName = nodeList.Items[0].Name
-		} else {
-			framework.Failf("Unable to find ready and schedulable Node")
-		}
+		node, err := e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
+		nodeName = node.Name
 		framework.Logf("Selected node %s", nodeName)
 
 		ginkgo.By("Checking node limits")
@@ -139,7 +137,12 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 		framework.Logf("Node %s can handle %d volumes of driver %s", nodeName, limit, driverInfo.Name)
 		// Create a storage class and generate a PVC. Do not instantiate the PVC yet, keep it for the last pod.
-		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
+		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+		driverVolumeSizeRange := dDriver.GetDriverInfo().SupportedSizeRange
+		claimSize, err := getSizeRangesIntersection(testVolumeSizeRange, driverVolumeSizeRange)
+		framework.ExpectNoError(err, "determine intersection of test size range %+v and driver size range %+v", testVolumeSizeRange, dDriver)
+
+		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
 		defer l.resource.cleanupResource()
 
 		defer func() {
@@ -148,9 +151,10 @@ func (t *volumeLimitsTestSuite) defineTests(driver TestDriver, pattern testpatte
 
 		// Create <limit> PVCs for one gigantic pod.
 		ginkgo.By(fmt.Sprintf("Creating %d PVC(s)", limit))
+
 		for i := 0; i < limit; i++ {
 			pvc := e2epv.MakePersistentVolumeClaim(e2epv.PersistentVolumeClaimConfig{
-				ClaimSize:        dDriver.GetClaimSize(),
+				ClaimSize:        claimSize,
 				StorageClassName: &l.resource.sc.Name,
 			}, l.ns.Name)
 			pvc, err = l.cs.CoreV1().PersistentVolumeClaims(l.ns.Name).Create(pvc)

@@ -16,7 +16,6 @@ go_library(
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
-        "//pkg/scheduler/framework/plugins:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/util/configz:go_default_library",

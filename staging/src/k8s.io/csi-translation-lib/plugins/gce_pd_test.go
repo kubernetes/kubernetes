@@ -17,10 +17,11 @@ limitations under the License.
 package plugins
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 )
 
@@ -201,6 +202,84 @@ func TestTranslateAllowedTopologies(t *testing.T) {
 		if !reflect.DeepEqual(gotTop, tc.expectedToplogy) {
 			t.Errorf("Expected topology: %v, but got: %v", tc.expectedToplogy, gotTop)
 		}
+	}
+}
+
+func TestRepairVolumeHandle(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		volumeHandle         string
+		nodeID               string
+		expectedVolumeHandle string
+		expectedErr          bool
+	}{
+		{
+			name:                 "fully specified",
+			volumeHandle:         fmt.Sprintf(volIDZonalFmt, "foo", "bar", "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "bada", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDZonalFmt, "foo", "bar", "baz"),
+		},
+		{
+			name:                 "fully specified (regional)",
+			volumeHandle:         fmt.Sprintf(volIDRegionalFmt, "foo", "us-central1-c", "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "bada", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDRegionalFmt, "foo", "us-central1-c", "baz"),
+		},
+		{
+			name:                 "no project",
+			volumeHandle:         fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, "bar", "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "bada", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDZonalFmt, "bing", "bar", "baz"),
+		},
+		{
+			name:                 "no project or zone",
+			volumeHandle:         fmt.Sprintf(volIDZonalFmt, UnspecifiedValue, UnspecifiedValue, "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "bada", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDZonalFmt, "bing", "bada", "baz"),
+		},
+		{
+			name:                 "no project or region",
+			volumeHandle:         fmt.Sprintf(volIDRegionalFmt, UnspecifiedValue, UnspecifiedValue, "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "us-central1-c", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDRegionalFmt, "bing", "us-central1", "baz"),
+		},
+		{
+			name:                 "no project (regional)",
+			volumeHandle:         fmt.Sprintf(volIDRegionalFmt, UnspecifiedValue, "us-west1", "baz"),
+			nodeID:               fmt.Sprintf(nodeIDFmt, "bing", "us-central1-c", "boom"),
+			expectedVolumeHandle: fmt.Sprintf(volIDRegionalFmt, "bing", "us-west1", "baz"),
+		},
+		{
+			name:         "invalid handle",
+			volumeHandle: "foo",
+			nodeID:       fmt.Sprintf(nodeIDFmt, "bing", "us-central1-c", "boom"),
+			expectedErr:  true,
+		},
+		{
+			name:         "invalid node ID",
+			volumeHandle: fmt.Sprintf(volIDRegionalFmt, UnspecifiedValue, "us-west1", "baz"),
+			nodeID:       "foo",
+			expectedErr:  true,
+		},
+	}
+	g := NewGCEPersistentDiskCSITranslator()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotVolumeHandle, err := g.RepairVolumeHandle(tc.volumeHandle, tc.nodeID)
+			if err != nil && !tc.expectedErr {
+				if !tc.expectedErr {
+					t.Fatalf("Got error: %v, but expected none", err)
+				}
+				return
+			}
+			if err == nil && tc.expectedErr {
+				t.Fatal("Got no error, but expected one")
+			}
+
+			if gotVolumeHandle != tc.expectedVolumeHandle {
+				t.Fatalf("Got volume handle %s, but expected %s", gotVolumeHandle, tc.expectedVolumeHandle)
+			}
+		})
 	}
 }
 

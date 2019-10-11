@@ -205,6 +205,13 @@ aliases:
     - krzyzacy
     - ixdy
     - spiffxp
+  sig-node-approvers:
+    - Random-Liu
+    - dchen1107
+    - derekwaynecarr
+    - tallclair
+    - vishh
+    - yujuhong
   sig-node-reviewers:
     - Random-Liu
     - dashpole
@@ -273,6 +280,20 @@ aliases:
     - bskiba
     - MaciekPytel
     - mwielgus
+  sig-instrumentation-approvers:
+    - piosz
+    - brancz
+  sig-instrumentation-reviewers:
+    - kawych
+    - s-urbaniak
+    - DirectXMan12
+    - x13n
+    - loburm
+    - huangyuqi
+    - andyxning
+    - coffeepac
+    - monotek
+    - logicalhan
 
   api-approvers:
     - erictune

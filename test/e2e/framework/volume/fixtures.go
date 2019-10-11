@@ -90,6 +90,22 @@ const (
 	iSCSIIQNTemplate = "iqn.2003-01.io.k8s:e2e.%s"
 )
 
+// SizeRange encapsulates a range of sizes specified as minimum and maximum quantity strings
+// Both values are optional.
+// If size is not set, it will assume there's not limitation and it may set a very small size (E.g. 1ki)
+// as Min and set a considerable big size(E.g. 10Ei) as Max, which make it possible to calculate
+// the intersection of given intervals (if it exists)
+type SizeRange struct {
+	// Max quantity specified as a string including units. E.g "3Gi".
+	// If the Max size is unset, It will be assign a default valid maximum size 10Ei,
+	// which is defined in test/e2e/storage/testsuites/base.go
+	Max string
+	// Min quantity specified as a string including units. E.g "1Gi"
+	// If the Min size is unset, It will be assign a default valid minimum size 1Ki,
+	// which is defined in test/e2e/storage/testsuites/base.go
+	Min string
+}
+
 // TestConfig is a struct for configuration of one tests. The test consist of:
 // - server pod - runs serverImage, exports ports[]
 // - client pod - does not need any special configuration

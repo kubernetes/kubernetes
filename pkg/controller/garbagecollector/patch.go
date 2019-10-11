@@ -19,7 +19,6 @@ package garbagecollector
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -29,13 +28,31 @@ import (
 	"k8s.io/kubernetes/pkg/controller/garbagecollector/metaonly"
 )
 
+type objectForDeleteOwnerRefStrategicMergePatch struct {
+	Metadata objectMetaForMergePatch `json:"metadata"`
+}
+
+type objectMetaForMergePatch struct {
+	UID             types.UID           `json:"uid"`
+	OwnerReferences []map[string]string `json:"ownerReferences"`
+}
+
 func deleteOwnerRefStrategicMergePatch(dependentUID types.UID, ownerUIDs ...types.UID) []byte {
-	var pieces []string
+	var pieces []map[string]string
 	for _, ownerUID := range ownerUIDs {
-		pieces = append(pieces, fmt.Sprintf(`{"$patch":"delete","uid":"%s"}`, ownerUID))
+		pieces = append(pieces, map[string]string{"$patch": "delete", "uid": string(ownerUID)})
 	}
-	patch := fmt.Sprintf(`{"metadata":{"ownerReferences":[%s],"uid":"%s"}}`, strings.Join(pieces, ","), dependentUID)
-	return []byte(patch)
+	patch := objectForDeleteOwnerRefStrategicMergePatch{
+		Metadata: objectMetaForMergePatch{
+			UID:             dependentUID,
+			OwnerReferences: pieces,
+		},
+	}
+	patchBytes, err := json.Marshal(&patch)
+	if err != nil {
+		return []byte{}
+	}
+	return patchBytes
 }
 
 // getMetadata tries getting object metadata from local cache, and sends GET request to apiserver when

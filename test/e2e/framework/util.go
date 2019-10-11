@@ -1410,51 +1410,6 @@ func getNodeEvents(c clientset.Interface, nodeName string) []v1.Event {
 	return events.Items
 }
 
-// waitListSchedulableNodes is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
-	var nodes *v1.NodeList
-	var err error
-	if wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
-		nodes, err = c.CoreV1().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
-			"spec.unschedulable": "false",
-		}.AsSelector().String()})
-		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		return true, nil
-	}) != nil {
-		return nodes, err
-	}
-	return nodes, nil
-}
-
-// waitListSchedulableNodesOrDie is a wrapper around listing nodes supporting retries.
-func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
-	nodes, err := waitListSchedulableNodes(c)
-	if err != nil {
-		ExpectNoError(err, "Non-retryable failure or timed out while listing nodes for e2e cluster.")
-	}
-	return nodes
-}
-
-// GetReadySchedulableNodesOrDie addresses the common use case of getting nodes you can do work on.
-// 1) Needs to be schedulable.
-// 2) Needs to be ready.
-// If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
-// TODO: remove this function here when references point to e2enode.
-func GetReadySchedulableNodesOrDie(c clientset.Interface) (nodes *v1.NodeList) {
-	nodes = waitListSchedulableNodesOrDie(c)
-	// previous tests may have cause failures of some nodes. Let's skip
-	// 'Not Ready' nodes, just in case (there is no need to fail the test).
-	e2enode.Filter(nodes, func(node v1.Node) bool {
-		return e2enode.IsNodeSchedulable(&node) && e2enode.IsNodeUntainted(&node)
-	})
-	return nodes
-}
-
 // WaitForAllNodesSchedulable waits up to timeout for all
 // (but TestContext.AllowedNotReadyNodes) to become scheduable.
 func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) error {

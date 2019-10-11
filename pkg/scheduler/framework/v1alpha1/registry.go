@@ -68,3 +68,13 @@ func (r Registry) Unregister(name string) error {
 	delete(r, name)
 	return nil
 }
+
+// Merge merges the provided registry to the current one.
+func (r Registry) Merge(in Registry) error {
+	for name, factory := range in {
+		if err := r.Register(name, factory); err != nil {
+			return err
+		}
+	}
+	return nil
+}

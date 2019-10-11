@@ -40,6 +40,31 @@ func Kind(kind string) schema.GroupKind {
 	return SchemeGroupVersion.WithKind(kind).GroupKind()
 }
 
+// scheme is the registry for the common types that adhere to the meta v1 API spec.
+var scheme = runtime.NewScheme()
+
+// ParameterCodec knows about query parameters used with the meta v1 API spec.
+var ParameterCodec = runtime.NewParameterCodec(scheme)
+
+func addEventConversionFuncs(scheme *runtime.Scheme) error {
+	return scheme.AddConversionFuncs(
+		Convert_v1_WatchEvent_To_watch_Event,
+		Convert_v1_InternalEvent_To_v1_WatchEvent,
+		Convert_watch_Event_To_v1_WatchEvent,
+		Convert_v1_WatchEvent_To_v1_InternalEvent,
+	)
+}
+
+var optionsTypes = []runtime.Object{
+	&ListOptions{},
+	&ExportOptions{},
+	&GetOptions{},
+	&DeleteOptions{},
+	&CreateOptions{},
+	&UpdateOptions{},
+	&PatchOptions{},
+}
+
 // AddToGroupVersion registers common meta types into schemas.
 func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion) {
 	scheme.AddKnownTypeWithName(groupVersion.WithKind(WatchEventKind), &WatchEvent{})
@@ -48,21 +73,7 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&InternalEvent{},
 	)
 	// Supports legacy code paths, most callers should use metav1.ParameterCodec for now
-	scheme.AddKnownTypes(groupVersion,
-		&ListOptions{},
-		&ExportOptions{},
-		&GetOptions{},
-		&DeleteOptions{},
-		&CreateOptions{},
-		&UpdateOptions{},
-		&PatchOptions{},
-	)
-	utilruntime.Must(scheme.AddConversionFuncs(
-		Convert_v1_WatchEvent_To_watch_Event,
-		Convert_v1_InternalEvent_To_v1_WatchEvent,
-		Convert_watch_Event_To_v1_WatchEvent,
-		Convert_v1_WatchEvent_To_v1_InternalEvent,
-	))
+	scheme.AddKnownTypes(groupVersion, optionsTypes...)
 	// Register Unversioned types under their own special group
 	scheme.AddUnversionedTypes(Unversioned,
 		&Status{},
@@ -72,36 +83,14 @@ func AddToGroupVersion(scheme *runtime.Scheme, groupVersion schema.GroupVersion)
 		&APIResourceList{},
 	)
 
+	utilruntime.Must(addEventConversionFuncs(scheme))
+
 	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
 	utilruntime.Must(AddConversionFuncs(scheme))
 	utilruntime.Must(RegisterDefaults(scheme))
 }
 
-// scheme is the registry for the common types that adhere to the meta v1 API spec.
-var scheme = runtime.NewScheme()
-
-// ParameterCodec knows about query parameters used with the meta v1 API spec.
-var ParameterCodec = runtime.NewParameterCodec(scheme)
-
-func init() {
-	scheme.AddUnversionedTypes(SchemeGroupVersion,
-		&ListOptions{},
-		&ExportOptions{},
-		&GetOptions{},
-		&DeleteOptions{},
-		&CreateOptions{},
-		&UpdateOptions{},
-		&PatchOptions{},
-	)
-
-	if err := AddMetaToScheme(scheme); err != nil {
-		panic(err)
-	}
-
-	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
-	utilruntime.Must(RegisterDefaults(scheme))
-}
-
+// AddMetaToScheme registers base meta types into schemas.
 func AddMetaToScheme(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&Table{},
@@ -113,4 +102,13 @@ func AddMetaToScheme(scheme *runtime.Scheme) error {
 	return scheme.AddConversionFuncs(
 		Convert_Slice_string_To_v1_IncludeObjectPolicy,
 	)
+}
+
+func init() {
+	scheme.AddUnversionedTypes(SchemeGroupVersion, optionsTypes...)
+
+	utilruntime.Must(AddMetaToScheme(scheme))
+
+	// register manually. This usually goes through the SchemeBuilder, which we cannot use here.
+	utilruntime.Must(RegisterDefaults(scheme))
 }

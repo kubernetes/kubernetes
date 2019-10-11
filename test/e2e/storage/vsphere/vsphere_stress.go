@@ -27,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -51,7 +52,6 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		iterations    int
 		policyName    string
 		datastoreName string
-		err           error
 		scNames       = []string{storageclass1, storageclass2, storageclass3, storageclass4}
 	)
 
@@ -61,8 +61,8 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		client = f.ClientSet
 		namespace = f.Namespace.Name
 
-		nodeList := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		gomega.Expect(nodeList.Items).NotTo(gomega.BeEmpty(), "Unable to find ready and schedulable Node")
+		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		framework.ExpectNoError(err)
 
 		// if VCP_STRESS_INSTANCES = 12 and VCP_STRESS_ITERATIONS is 10. 12 threads will run in parallel for 10 times.
 		// Resulting 120 Volumes and POD Creation. Volumes will be provisioned with each different types of Storage Class,
@@ -72,7 +72,6 @@ var _ = utils.SIGDescribe("vsphere cloud provider stress [Feature:vsphere]", fun
 		gomega.Expect(instances > len(scNames)).To(gomega.BeTrue(), "VCP_STRESS_INSTANCES should be greater than 3 to utilize all 4 types of storage classes")
 
 		iterations = GetAndExpectIntEnvVar(VCPStressIterations)
-		framework.ExpectNoError(err, "Error Parsing VCP_STRESS_ITERATIONS")
 		gomega.Expect(iterations > 0).To(gomega.BeTrue(), "VCP_STRESS_ITERATIONS should be greater than 0")
 
 		policyName = GetAndExpectStringEnvVar(SPBMPolicyName)

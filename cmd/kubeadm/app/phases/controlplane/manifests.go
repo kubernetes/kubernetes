@@ -192,20 +192,52 @@ func getAPIServerCommand(cfg *kubeadmapi.ClusterConfiguration, localAPIEndpoint 
 }
 
 // getAuthzModes gets the authorization-related parameters to the api server
-// Node,RBAC should be fixed in this order at the beginning
-// AlwaysAllow and AlwaysDeny is ignored as they are only for testing
+// Node,RBAC is the default mode if nothing is passed to kubeadm. User provided modes override
+// the default.
 func getAuthzModes(authzModeExtraArgs string) string {
-	modes := []string{
+	defaultMode := []string{
 		kubeadmconstants.ModeNode,
 		kubeadmconstants.ModeRBAC,
 	}
-	if strings.Contains(authzModeExtraArgs, kubeadmconstants.ModeABAC) {
-		modes = append(modes, kubeadmconstants.ModeABAC)
+
+	if len(authzModeExtraArgs) > 0 {
+		mode := []string{}
+		for _, requested := range strings.Split(authzModeExtraArgs, ",") {
+			if isValidAuthzMode(requested) {
+				mode = append(mode, requested)
+			} else {
+				klog.Warningf("ignoring unknown kube-apiserver authorization-mode %q", requested)
+			}
+		}
+
+		// only return the user provided mode if at least one was valid
+		if len(mode) > 0 {
+			klog.Warningf("the default kube-apiserver authorization-mode is %q; using %q",
+				strings.Join(defaultMode, ","),
+				strings.Join(mode, ","),
+			)
+			return strings.Join(mode, ",")
+		}
 	}
-	if strings.Contains(authzModeExtraArgs, kubeadmconstants.ModeWebhook) {
-		modes = append(modes, kubeadmconstants.ModeWebhook)
+	return strings.Join(defaultMode, ",")
+}
+
+func isValidAuthzMode(authzMode string) bool {
+	allModes := []string{
+		kubeadmconstants.ModeNode,
+		kubeadmconstants.ModeRBAC,
+		kubeadmconstants.ModeWebhook,
+		kubeadmconstants.ModeABAC,
+		kubeadmconstants.ModeAlwaysAllow,
+		kubeadmconstants.ModeAlwaysDeny,
 	}
-	return strings.Join(modes, ",")
+
+	for _, mode := range allModes {
+		if authzMode == mode {
+			return true
+		}
+	}
+	return false
 }
 
 // calcNodeCidrSize determines the size of the subnets used on each node, based

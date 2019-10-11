@@ -93,7 +93,8 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 			framework.Skipf("Driver %s doesn't support %v -- skipping", driver.GetDriverInfo().Name, pattern.VolMode)
 		}
 
-		l.resource = createGenericVolumeTestResource(driver, l.config, pattern)
+		testVolumeSizeRange := s.getTestSuiteInfo().supportedSizeRange
+		l.resource = createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
 	}
 
 	cleanup := func() {

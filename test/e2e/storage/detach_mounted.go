@@ -18,7 +18,6 @@ package storage
 
 import (
 	"fmt"
-	"math/rand"
 	"path"
 
 	"time"
@@ -28,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -48,7 +48,7 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 
 	var cs clientset.Interface
 	var ns *v1.Namespace
-	var node v1.Node
+	var node *v1.Node
 	var suffix string
 
 	ginkgo.BeforeEach(func() {
@@ -59,8 +59,9 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 
 		cs = f.ClientSet
 		ns = f.Namespace
-		nodes := framework.GetReadySchedulableNodesOrDie(f.ClientSet)
-		node = nodes.Items[rand.Intn(len(nodes.Items))]
+		var err error
+		node, err = e2enode.GetRandomReadySchedulableNode(f.ClientSet)
+		framework.ExpectNoError(err)
 		suffix = ns.Name
 	})
 
@@ -71,7 +72,7 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 		driverInstallAs := driver + "-" + suffix
 
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on node %s as %s", path.Join(driverDir, driver), node.Name, driverInstallAs))
-		installFlex(cs, &node, "k8s", driverInstallAs, path.Join(driverDir, driver))
+		installFlex(cs, node, "k8s", driverInstallAs, path.Join(driverDir, driver))
 		ginkgo.By(fmt.Sprintf("installing flexvolume %s on master as %s", path.Join(driverDir, driver), driverInstallAs))
 		installFlex(cs, nil, "k8s", driverInstallAs, path.Join(driverDir, driver))
 		volumeSource := v1.VolumeSource{
@@ -118,7 +119,7 @@ var _ = utils.SIGDescribe("Detaching volumes", func() {
 		framework.ExpectNoError(err, "while waiting for volume to be removed from in-use")
 
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from node %s", driverInstallAs, node.Name))
-		uninstallFlex(cs, &node, "k8s", driverInstallAs)
+		uninstallFlex(cs, node, "k8s", driverInstallAs)
 		ginkgo.By(fmt.Sprintf("uninstalling flexvolume %s from master", driverInstallAs))
 		uninstallFlex(cs, nil, "k8s", driverInstallAs)
 	})

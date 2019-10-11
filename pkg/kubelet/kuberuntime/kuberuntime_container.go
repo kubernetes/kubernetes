@@ -407,7 +407,9 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 		if status.State == runtimeapi.ContainerState_CONTAINER_EXITED {
 			// Populate the termination message if needed.
 			annotatedInfo := getContainerInfoFromAnnotations(status.Annotations)
-			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError && cStatus.ExitCode != 0
+			// If a container cannot even be started, it certainly does not have logs, so no need to fallbackToLogs.
+			fallbackToLogs := annotatedInfo.TerminationMessagePolicy == v1.TerminationMessageFallbackToLogsOnError &&
+				cStatus.ExitCode != 0 && cStatus.Reason != "ContainerCannotRun"
 			tMessage, checkLogs := getTerminationMessage(status, annotatedInfo.TerminationMessagePath, fallbackToLogs)
 			if checkLogs {
 				// if dockerLegacyService is populated, we're supposed to use it to fetch logs
@@ -420,9 +422,12 @@ func (m *kubeGenericRuntimeManager) getPodContainerStatuses(uid kubetypes.UID, n
 					tMessage = m.readLastStringFromContainerLogs(status.GetLogPath())
 				}
 			}
-			// Use the termination message written by the application is not empty
+			// Enrich the termination message written by the application is not empty
 			if len(tMessage) != 0 {
-				cStatus.Message = tMessage
+				if len(cStatus.Message) != 0 {
+					cStatus.Message += ": "
+				}
+				cStatus.Message += tMessage
 			}
 		}
 		statuses[i] = cStatus

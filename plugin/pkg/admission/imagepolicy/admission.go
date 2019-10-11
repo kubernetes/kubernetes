@@ -84,7 +84,6 @@ type Plugin struct {
 	responseCache *cache.LRUExpireCache
 	allowTTL      time.Duration
 	denyTTL       time.Duration
-	retryBackoff  time.Duration
 	defaultAllow  bool
 }
 

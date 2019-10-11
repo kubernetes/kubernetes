@@ -26,8 +26,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
+	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -48,6 +50,9 @@ func InitMultiVolumeTestSuite() TestSuite {
 				testpatterns.FsVolModeDynamicPV,
 				testpatterns.BlockVolModePreprovisionedPV,
 				testpatterns.BlockVolModeDynamicPV,
+			},
+			supportedSizeRange: volume.SizeRange{
+				Min: "1Mi",
 			},
 		},
 	}
@@ -136,7 +141,8 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		numVols := 2
 
 		for i := 0; i < numVols; i++ {
-			resource := createGenericVolumeTestResource(driver, l.config, pattern)
+			testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+			resource := createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.pvc)
 		}
@@ -165,7 +171,8 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		if l.driver.GetDriverInfo().Capabilities[CapSingleNodeVolume] {
 			framework.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, CapSingleNodeVolume)
 		}
-		nodes := framework.GetReadySchedulableNodesOrDie(l.cs)
+		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
+		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Skipf("Number of available nodes is less than 2 - skipping")
 		}
@@ -177,7 +184,8 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		numVols := 2
 
 		for i := 0; i < numVols; i++ {
-			resource := createGenericVolumeTestResource(driver, l.config, pattern)
+			testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+			resource := createGenericVolumeTestResource(driver, l.config, pattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.pvc)
 		}
@@ -215,7 +223,8 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 				// 1st volume should be block and set filesystem for 2nd and later volumes
 				curPattern.VolMode = v1.PersistentVolumeFilesystem
 			}
-			resource := createGenericVolumeTestResource(driver, l.config, curPattern)
+			testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+			resource := createGenericVolumeTestResource(driver, l.config, curPattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.pvc)
 		}
@@ -248,7 +257,8 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		if l.driver.GetDriverInfo().Capabilities[CapSingleNodeVolume] {
 			framework.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, CapSingleNodeVolume)
 		}
-		nodes := framework.GetReadySchedulableNodesOrDie(l.cs)
+		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
+		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Skipf("Number of available nodes is less than 2 - skipping")
 		}
@@ -265,7 +275,8 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 				// 1st volume should be block and set filesystem for 2nd and later volumes
 				curPattern.VolMode = v1.PersistentVolumeFilesystem
 			}
-			resource := createGenericVolumeTestResource(driver, l.config, curPattern)
+			testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+			resource := createGenericVolumeTestResource(driver, l.config, curPattern, testVolumeSizeRange)
 			l.resources = append(l.resources, resource)
 			pvcs = append(pvcs, resource.pvc)
 		}
@@ -290,7 +301,8 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		}
 
 		// Create volume
-		resource := createGenericVolumeTestResource(l.driver, l.config, pattern)
+		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+		resource := createGenericVolumeTestResource(l.driver, l.config, pattern, testVolumeSizeRange)
 		l.resources = append(l.resources, resource)
 
 		// Test access to the volume from pods on different node
@@ -314,7 +326,8 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		}
 
 		// Check different-node test requirement
-		nodes := framework.GetReadySchedulableNodesOrDie(l.cs)
+		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
+		framework.ExpectNoError(err)
 		if len(nodes.Items) < numPods {
 			framework.Skipf(fmt.Sprintf("Number of available nodes is less than %d - skipping", numPods))
 		}
@@ -323,7 +336,8 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		}
 
 		// Create volume
-		resource := createGenericVolumeTestResource(l.driver, l.config, pattern)
+		testVolumeSizeRange := t.getTestSuiteInfo().supportedSizeRange
+		resource := createGenericVolumeTestResource(l.driver, l.config, pattern, testVolumeSizeRange)
 		l.resources = append(l.resources, resource)
 
 		// Test access to the volume from pods on different node

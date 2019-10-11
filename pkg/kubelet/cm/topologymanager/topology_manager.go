@@ -201,7 +201,7 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
 			klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with any resource")
-			allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, true}})
+			allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
 			continue
 		}
 
@@ -209,13 +209,13 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		for resource := range hints {
 			if hints[resource] == nil {
 				klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with resource '%s'", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, true}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{nil, true}})
 				continue
 			}
 
 			if len(hints[resource]) == 0 {
 				klog.Infof("[topologymanager] Hint Provider has no possible NUMA affinities for resource '%s'", resource)
-				allProviderHints = append(allProviderHints, []TopologyHint{{defaultAffinity, false}})
+				allProviderHints = append(allProviderHints, []TopologyHint{{nil, false}})
 				continue
 			}
 
@@ -235,17 +235,20 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		preferred := true
 		var numaAffinities []bitmask.BitMask
 		for _, hint := range permutation {
-			// Only consider hints that have an actual NUMANodeAffinity set.
-			if hint.NUMANodeAffinity != nil {
-				if !hint.Preferred {
-					preferred = false
-				}
-				// Special case PolicySingleNumaNode to only prefer hints where
-				// all providers have a single NUMA affinity set.
-				if m.policy != nil && m.policy.Name() == PolicySingleNumaNode && hint.NUMANodeAffinity.Count() > 1 {
-					preferred = false
-				}
+			if hint.NUMANodeAffinity == nil {
+				numaAffinities = append(numaAffinities, defaultAffinity)
+			} else {
 				numaAffinities = append(numaAffinities, hint.NUMANodeAffinity)
+			}
+
+			if !hint.Preferred {
+				preferred = false
+			}
+
+			// Special case PolicySingleNumaNode to only prefer hints where
+			// all providers have a single NUMA affinity set.
+			if m.policy != nil && m.policy.Name() == PolicySingleNumaNode && hint.NUMANodeAffinity != nil && hint.NUMANodeAffinity.Count() > 1 {
+				preferred = false
 			}
 		}
 
@@ -320,23 +323,17 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	}
 	pod := attrs.Pod
 	c := make(map[string]TopologyHint)
-	klog.Infof("[topologymanager] Pod QoS Level: %v", pod.Status.QOSClass)
 
-	if pod.Status.QOSClass == v1.PodQOSGuaranteed {
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			result := m.calculateAffinity(*pod, container)
-			admitPod := m.policy.CanAdmitPodResult(&result)
-			if !admitPod.Admit {
-				return admitPod
-			}
-			c[container.Name] = result
+	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		result := m.calculateAffinity(*pod, container)
+		admitPod := m.policy.CanAdmitPodResult(&result)
+		if !admitPod.Admit {
+			return admitPod
 		}
-		m.podTopologyHints[string(pod.UID)] = c
-		klog.Infof("[topologymanager] Topology Affinity for Pod: %v are %v", pod.UID, m.podTopologyHints[string(pod.UID)])
-
-	} else {
-		klog.Infof("[topologymanager] Topology Manager only affinitises Guaranteed pods.")
+		c[container.Name] = result
 	}
+	m.podTopologyHints[string(pod.UID)] = c
+	klog.Infof("[topologymanager] Topology Affinity for Pod: %v are %v", pod.UID, m.podTopologyHints[string(pod.UID)])
 
 	return lifecycle.PodAdmitResult{
 		Admit: true,

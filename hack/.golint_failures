@@ -111,7 +111,6 @@ pkg/kubectl/cmd/convert
 pkg/kubectl/cmd/get
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
-pkg/kubelet/apis/deviceplugin/v1beta1
 pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
 pkg/kubelet/cm
 pkg/kubelet/config
@@ -527,6 +526,7 @@ staging/src/k8s.io/kubectl/pkg/polymorphichelpers
 staging/src/k8s.io/kubectl/pkg/scale
 staging/src/k8s.io/kubectl/pkg/util/templates
 staging/src/k8s.io/kubelet/config/v1beta1
+staging/src/k8s.io/kubelet/pkg/apis/deviceplugin/v1beta1
 staging/src/k8s.io/legacy-cloud-providers/vsphere
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics
 staging/src/k8s.io/metrics/pkg/apis/custom_metrics/v1beta1

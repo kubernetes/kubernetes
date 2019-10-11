@@ -197,6 +197,8 @@ func TestSchedulerCreation(t *testing.T) {
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
+		WithPodInitialBackoffSeconds(1),
+		WithPodMaxBackoffSeconds(10),
 	)
 
 	if err != nil {
@@ -290,12 +292,12 @@ func TestScheduler(t *testing.T) {
 					}}
 				},
 				podConditionUpdater: fakePodConditionUpdater{},
-				Error: func(p *v1.Pod, err error) {
-					gotPod = p
+				Error: func(p *framework.PodInfo, err error) {
+					gotPod = p.Pod
 					gotError = err
 				},
-				NextPod: func() *v1.Pod {
-					return item.sendPod
+				NextPod: func() *framework.PodInfo {
+					return &framework.PodInfo{Pod: item.sendPod}
 				},
 				Framework:    emptyFramework,
 				Recorder:     eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
@@ -673,10 +675,10 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 				return nil
 			}}
 		},
-		NextPod: func() *v1.Pod {
-			return clientcache.Pop(queuedPodStore).(*v1.Pod)
+		NextPod: func() *framework.PodInfo {
+			return &framework.PodInfo{Pod: clientcache.Pop(queuedPodStore).(*v1.Pod)}
 		},
-		Error: func(p *v1.Pod, err error) {
+		Error: func(p *framework.PodInfo, err error) {
 			errChan <- err
 		},
 		Recorder:            &events.FakeRecorder{},
@@ -694,7 +696,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 }
 
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
-	framework, _ := framework.NewFramework(emptyPluginRegistry, nil, []kubeschedulerconfig.PluginConfig{})
+	fwk, _ := framework.NewFramework(emptyPluginRegistry, nil, []kubeschedulerconfig.PluginConfig{})
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil, nil),
@@ -702,7 +704,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		predicates.EmptyPredicateMetadataProducer,
 		[]priorities.PriorityConfig{},
 		priorities.EmptyPriorityMetadataProducer,
-		framework,
+		fwk,
 		[]algorithm.SchedulerExtender{},
 		nil,
 		informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
@@ -727,17 +729,17 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		WaitForCacheSync: func() bool {
 			return true
 		},
-		NextPod: func() *v1.Pod {
-			return clientcache.Pop(queuedPodStore).(*v1.Pod)
+		NextPod: func() *framework.PodInfo {
+			return &framework.PodInfo{Pod: clientcache.Pop(queuedPodStore).(*v1.Pod)}
 		},
-		Error: func(p *v1.Pod, err error) {
+		Error: func(p *framework.PodInfo, err error) {
 			queuedPodStore.AddIfNotPresent(p)
 		},
 		Recorder:            &events.FakeRecorder{},
 		podConditionUpdater: fakePodConditionUpdater{},
 		PodPreemptor:        fakePodPreemptor{},
 		StopEverything:      stop,
-		Framework:           framework,
+		Framework:           fwk,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
 	}
 

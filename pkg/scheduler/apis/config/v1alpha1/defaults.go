@@ -98,4 +98,14 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 		defaultBindTimeoutSeconds := int64(600)
 		obj.BindTimeoutSeconds = &defaultBindTimeoutSeconds
 	}
+
+	if obj.PodInitialBackoffSeconds == nil {
+		defaultPodInitialBackoffSeconds := int64(1)
+		obj.PodInitialBackoffSeconds = &defaultPodInitialBackoffSeconds
+	}
+
+	if obj.PodMaxBackoffSeconds == nil {
+		defaultPodMaxBackoffSeconds := int64(10)
+		obj.PodMaxBackoffSeconds = &defaultPodMaxBackoffSeconds
+	}
 }

@@ -17,7 +17,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/controller/cronjob",
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
-        "//pkg/util/metrics:go_default_library",
         "//staging/src/k8s.io/api/batch/v1:go_default_library",
         "//staging/src/k8s.io/api/batch/v1beta1:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -33,6 +32,7 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/pager:go_default_library",
         "//staging/src/k8s.io/client-go/tools/record:go_default_library",
         "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/prometheus/ratelimiter:go_default_library",
         "//vendor/github.com/robfig/cron:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

@@ -17,8 +17,17 @@ limitations under the License.
 package migration
 
 import (
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+)
+
+const (
+	// PredicatesStateKey is the key in CycleState to PredicateStateData
+	PredicatesStateKey = "predicates"
+
+	// PrioritiesStateKey is the key in CycleState to PrioritiesStateData
+	PrioritiesStateKey = "priorities"
 )
 
 // PredicateResultToFrameworkStatus converts a predicate result (PredicateFailureReason + error)
@@ -46,4 +55,52 @@ func ErrorToFrameworkStatus(err error) *framework.Status {
 		return framework.NewStatus(framework.Error, err.Error())
 	}
 	return nil
+}
+
+// PredicatesStateData is a pointer to PredicateMetadata. In the normal case, StateData is supposed to
+// be generated and stored in CycleState by a framework plugin (like a PreFilter pre-computing data for
+// its corresponding Filter). However, during migration, the scheduler will inject a pointer to
+// PredicateMetadata into CycleState. This "hack" is necessary because during migration Filters that implement
+// predicates functionality will be calling into the existing predicate functions, and need
+// to pass PredicateMetadata.
+type PredicatesStateData struct {
+	Reference interface{}
+}
+
+// Clone is supposed to make a copy of the data, but since this is just a pointer, we are practically
+// just copying the pointer. This is ok because the actual reference to the PredicateMetadata
+// copy that is made by generic_scheduler during preemption cycle will be injected again outside
+// the framework.
+func (p *PredicatesStateData) Clone() framework.StateData {
+	return &PredicatesStateData{
+		Reference: p.Reference,
+	}
+}
+
+// PrioritiesStateData is a pointer to PrioritiesMetadata.
+type PrioritiesStateData struct {
+	Reference interface{}
+}
+
+// Clone is supposed to make a copy of the data, but since this is just a pointer, we are practically
+// just copying the pointer.
+func (p *PrioritiesStateData) Clone() framework.StateData {
+	return &PrioritiesStateData{
+		Reference: p.Reference,
+	}
+}
+
+// PriorityMetadata returns priority metadata stored in CycleState.
+func PriorityMetadata(state *framework.CycleState) interface{} {
+	if state == nil {
+		return nil
+	}
+
+	var meta interface{}
+	if s, err := state.Read(PrioritiesStateKey); err == nil {
+		meta = s.(*PrioritiesStateData).Reference
+	} else {
+		klog.Errorf("reading key %q from CycleState, continuing without metadata: %v", PrioritiesStateKey, err)
+	}
+	return meta
 }

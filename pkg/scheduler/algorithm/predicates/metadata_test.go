@@ -22,7 +22,7 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -62,41 +62,38 @@ func predicateMetadataEquivalent(meta1, meta2 *predicateMetadata) error {
 	if meta1.podBestEffort != meta2.podBestEffort {
 		return fmt.Errorf("podBestEfforts are not equal")
 	}
-	if meta1.serviceAffinityInUse != meta2.serviceAffinityInUse {
-		return fmt.Errorf("serviceAffinityInUses are not equal")
-	}
-	if len(meta1.podPorts) != len(meta2.podPorts) {
+	if len(meta1.podFitsHostPortsMetadata.podPorts) != len(meta2.podFitsHostPortsMetadata.podPorts) {
 		return fmt.Errorf("podPorts are not equal")
 	}
-	for !reflect.DeepEqual(meta1.podPorts, meta2.podPorts) {
+	for !reflect.DeepEqual(meta1.podFitsHostPortsMetadata.podPorts, meta2.podFitsHostPortsMetadata.podPorts) {
 		return fmt.Errorf("podPorts are not equal")
 	}
-	if !reflect.DeepEqual(meta1.topologyPairsPotentialAffinityPods, meta2.topologyPairsPotentialAffinityPods) {
+	if !reflect.DeepEqual(meta1.podAffinityMetadata.topologyPairsPotentialAffinityPods, meta2.podAffinityMetadata.topologyPairsPotentialAffinityPods) {
 		return fmt.Errorf("topologyPairsPotentialAffinityPods are not equal")
 	}
-	if !reflect.DeepEqual(meta1.topologyPairsPotentialAntiAffinityPods, meta2.topologyPairsPotentialAntiAffinityPods) {
+	if !reflect.DeepEqual(meta1.podAffinityMetadata.topologyPairsPotentialAntiAffinityPods, meta2.podAffinityMetadata.topologyPairsPotentialAntiAffinityPods) {
 		return fmt.Errorf("topologyPairsPotentialAntiAffinityPods are not equal")
 	}
-	if !reflect.DeepEqual(meta1.topologyPairsAntiAffinityPodsMap.podToTopologyPairs,
-		meta2.topologyPairsAntiAffinityPodsMap.podToTopologyPairs) {
+	if !reflect.DeepEqual(meta1.podAffinityMetadata.topologyPairsAntiAffinityPodsMap.podToTopologyPairs,
+		meta2.podAffinityMetadata.topologyPairsAntiAffinityPodsMap.podToTopologyPairs) {
 		return fmt.Errorf("topologyPairsAntiAffinityPodsMap.podToTopologyPairs are not equal")
 	}
-	if !reflect.DeepEqual(meta1.topologyPairsAntiAffinityPodsMap.topologyPairToPods,
-		meta2.topologyPairsAntiAffinityPodsMap.topologyPairToPods) {
+	if !reflect.DeepEqual(meta1.podAffinityMetadata.topologyPairsAntiAffinityPodsMap.topologyPairToPods,
+		meta2.podAffinityMetadata.topologyPairsAntiAffinityPodsMap.topologyPairToPods) {
 		return fmt.Errorf("topologyPairsAntiAffinityPodsMap.topologyPairToPods are not equal")
 	}
-	if meta1.serviceAffinityInUse {
-		sortablePods1 := sortablePods(meta1.serviceAffinityMatchingPodList)
+	if meta1.serviceAffinityMetadata != nil {
+		sortablePods1 := sortablePods(meta1.serviceAffinityMetadata.matchingPodList)
 		sort.Sort(sortablePods1)
-		sortablePods2 := sortablePods(meta2.serviceAffinityMatchingPodList)
+		sortablePods2 := sortablePods(meta2.serviceAffinityMetadata.matchingPodList)
 		sort.Sort(sortablePods2)
 		if !reflect.DeepEqual(sortablePods1, sortablePods2) {
 			return fmt.Errorf("serviceAffinityMatchingPodLists are not euqal")
 		}
 
-		sortableServices1 := sortableServices(meta1.serviceAffinityMatchingPodServices)
+		sortableServices1 := sortableServices(meta1.serviceAffinityMetadata.matchingPodServices)
 		sort.Sort(sortableServices1)
-		sortableServices2 := sortableServices(meta2.serviceAffinityMatchingPodServices)
+		sortableServices2 := sortableServices(meta2.serviceAffinityMetadata.matchingPodServices)
 		sort.Sort(sortableServices2)
 		if !reflect.DeepEqual(sortableServices1, sortableServices2) {
 			return fmt.Errorf("serviceAffinityMatchingPodServices are not euqal")
@@ -407,111 +404,117 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 			},
 		},
 		podBestEffort: true,
-		podRequest: &schedulernodeinfo.Resource{
-			MilliCPU:         1000,
-			Memory:           300,
-			AllowedPodNumber: 4,
-		},
-		podPorts: []*v1.ContainerPort{
-			{
-				Name:          "name",
-				HostPort:      10,
-				ContainerPort: 20,
-				Protocol:      "TCP",
-				HostIP:        "1.2.3.4",
+		podFitsResourcesMetadata: &podFitsResourcesMetadata{
+			podRequest: &schedulernodeinfo.Resource{
+				MilliCPU:         1000,
+				Memory:           300,
+				AllowedPodNumber: 4,
 			},
 		},
-		topologyPairsAntiAffinityPodsMap: &topologyPairsMaps{
-			topologyPairToPods: map[topologyPair]podSet{
-				{key: "name", value: "machine1"}: {
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2", Labels: selector1},
-						Spec: v1.PodSpec{NodeName: "nodeC"},
-					}: struct{}{},
-				},
-				{key: "name", value: "machine2"}: {
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-						Spec: v1.PodSpec{NodeName: "nodeA"},
-					}: struct{}{},
-				},
-			},
-			podToTopologyPairs: map[string]topologyPairSet{
-				"p2_": {
-					topologyPair{key: "name", value: "machine1"}: struct{}{},
-				},
-				"p1_": {
-					topologyPair{key: "name", value: "machine2"}: struct{}{},
+		podFitsHostPortsMetadata: &podFitsHostPortsMetadata{
+			podPorts: []*v1.ContainerPort{
+				{
+					Name:          "name",
+					HostPort:      10,
+					ContainerPort: 20,
+					Protocol:      "TCP",
+					HostIP:        "1.2.3.4",
 				},
 			},
 		},
-		topologyPairsPotentialAffinityPods: &topologyPairsMaps{
-			topologyPairToPods: map[topologyPair]podSet{
-				{key: "name", value: "nodeA"}: {
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-						Spec: v1.PodSpec{NodeName: "nodeA"},
-					}: struct{}{},
+		podAffinityMetadata: &podAffinityMetadata{
+			topologyPairsAntiAffinityPodsMap: &topologyPairsMaps{
+				topologyPairToPods: map[topologyPair]podSet{
+					{key: "name", value: "machine1"}: {
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2", Labels: selector1},
+							Spec: v1.PodSpec{NodeName: "nodeC"},
+						}: struct{}{},
+					},
+					{key: "name", value: "machine2"}: {
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+							Spec: v1.PodSpec{NodeName: "nodeA"},
+						}: struct{}{},
+					},
 				},
-				{key: "name", value: "nodeC"}: {
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
-						Spec: v1.PodSpec{
-							NodeName: "nodeC",
-						},
-					}: struct{}{},
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p6", Labels: selector1},
-						Spec: v1.PodSpec{NodeName: "nodeC"},
-					}: struct{}{},
+				podToTopologyPairs: map[string]topologyPairSet{
+					"p2_": {
+						topologyPair{key: "name", value: "machine1"}: struct{}{},
+					},
+					"p1_": {
+						topologyPair{key: "name", value: "machine2"}: struct{}{},
+					},
 				},
 			},
-			podToTopologyPairs: map[string]topologyPairSet{
-				"p1_": {
-					topologyPair{key: "name", value: "nodeA"}: struct{}{},
+			topologyPairsPotentialAffinityPods: &topologyPairsMaps{
+				topologyPairToPods: map[topologyPair]podSet{
+					{key: "name", value: "nodeA"}: {
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+							Spec: v1.PodSpec{NodeName: "nodeA"},
+						}: struct{}{},
+					},
+					{key: "name", value: "nodeC"}: {
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+							Spec: v1.PodSpec{
+								NodeName: "nodeC",
+							},
+						}: struct{}{},
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p6", Labels: selector1},
+							Spec: v1.PodSpec{NodeName: "nodeC"},
+						}: struct{}{},
+					},
 				},
-				"p2_": {
-					topologyPair{key: "name", value: "nodeC"}: struct{}{},
+				podToTopologyPairs: map[string]topologyPairSet{
+					"p1_": {
+						topologyPair{key: "name", value: "nodeA"}: struct{}{},
+					},
+					"p2_": {
+						topologyPair{key: "name", value: "nodeC"}: struct{}{},
+					},
+					"p6_": {
+						topologyPair{key: "name", value: "nodeC"}: struct{}{},
+					},
 				},
-				"p6_": {
-					topologyPair{key: "name", value: "nodeC"}: struct{}{},
+			},
+			topologyPairsPotentialAntiAffinityPods: &topologyPairsMaps{
+				topologyPairToPods: map[topologyPair]podSet{
+					{key: "name", value: "nodeN"}: {
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
+							Spec: v1.PodSpec{NodeName: "nodeN"},
+						}: struct{}{},
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
+							Spec: v1.PodSpec{
+								NodeName: "nodeM",
+							},
+						}: struct{}{},
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p3"},
+							Spec: v1.PodSpec{
+								NodeName: "nodeM",
+							},
+						}: struct{}{},
+					},
+					{key: "name", value: "nodeM"}: {
+						&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p6", Labels: selector1},
+							Spec: v1.PodSpec{NodeName: "nodeM"},
+						}: struct{}{},
+					},
+				},
+				podToTopologyPairs: map[string]topologyPairSet{
+					"p1_": {
+						topologyPair{key: "name", value: "nodeN"}: struct{}{},
+					},
+					"p2_": {
+						topologyPair{key: "name", value: "nodeN"}: struct{}{},
+					},
+					"p3_": {
+						topologyPair{key: "name", value: "nodeN"}: struct{}{},
+					},
+					"p6_": {
+						topologyPair{key: "name", value: "nodeM"}: struct{}{},
+					},
 				},
 			},
 		},
-		topologyPairsPotentialAntiAffinityPods: &topologyPairsMaps{
-			topologyPairToPods: map[topologyPair]podSet{
-				{key: "name", value: "nodeN"}: {
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: selector1},
-						Spec: v1.PodSpec{NodeName: "nodeN"},
-					}: struct{}{},
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p2"},
-						Spec: v1.PodSpec{
-							NodeName: "nodeM",
-						},
-					}: struct{}{},
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p3"},
-						Spec: v1.PodSpec{
-							NodeName: "nodeM",
-						},
-					}: struct{}{},
-				},
-				{key: "name", value: "nodeM"}: {
-					&v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "p6", Labels: selector1},
-						Spec: v1.PodSpec{NodeName: "nodeM"},
-					}: struct{}{},
-				},
-			},
-			podToTopologyPairs: map[string]topologyPairSet{
-				"p1_": {
-					topologyPair{key: "name", value: "nodeN"}: struct{}{},
-				},
-				"p2_": {
-					topologyPair{key: "name", value: "nodeN"}: struct{}{},
-				},
-				"p3_": {
-					topologyPair{key: "name", value: "nodeN"}: struct{}{},
-				},
-				"p6_": {
-					topologyPair{key: "name", value: "nodeM"}: struct{}{},
-				},
-			},
-		},
-		podSpreadCache: &podSpreadCache{
+		evenPodsSpreadMetadata: &evenPodsSpreadMetadata{
 			tpKeyToCriticalPaths: map[string]*criticalPaths{
 				"name": {{"nodeA", 1}, {"nodeC", 2}},
 			},
@@ -520,13 +523,14 @@ func TestPredicateMetadata_ShallowCopy(t *testing.T) {
 				{key: "name", value: "nodeC"}: 2,
 			},
 		},
-		serviceAffinityInUse: true,
-		serviceAffinityMatchingPodList: []*v1.Pod{
-			{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
-			{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}},
-		},
-		serviceAffinityMatchingPodServices: []*v1.Service{
-			{ObjectMeta: metav1.ObjectMeta{Name: "service1"}},
+		serviceAffinityMetadata: &serviceAffinityMetadata{
+			matchingPodList: []*v1.Pod{
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod1"}},
+				{ObjectMeta: metav1.ObjectMeta{Name: "pod2"}},
+			},
+			matchingPodServices: []*v1.Service{
+				{ObjectMeta: metav1.ObjectMeta{Name: "service1"}},
+			},
 		},
 	}
 
@@ -896,7 +900,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 		pod          *v1.Pod
 		nodes        []*v1.Node
 		existingPods []*v1.Pod
-		want         *podSpreadCache
+		want         *evenPodsSpreadMetadata
 	}{
 		{
 			name: "clean cluster with one spreadConstraint",
@@ -909,7 +913,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 				st.MakeNode().Name("node-y").Label("zone", "zone2").Label("node", "node-y").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 0}, {"zone2", 0}},
 				},
@@ -937,7 +941,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 2}, {"zone1", 3}},
 				},
@@ -967,7 +971,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y1").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone3", 0}, {"zone2", 2}},
 				},
@@ -996,7 +1000,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y1").Namespace("ns2").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y2").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 1}, {"zone1", 2}},
 				},
@@ -1027,7 +1031,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-x", 0}, {"node-b", 1}},
@@ -1064,7 +1068,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-b", 1}, {"node-a", 2}},
@@ -1093,7 +1097,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-a").Node("node-a").Label("foo", "").Obj(),
 				st.MakePod().Name("p-b").Node("node-b").Label("bar", "").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 0}, {"zone1", 1}},
 					"node": {{"node-a", 0}, {"node-y", 0}},
@@ -1127,7 +1131,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Label("bar", "").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-b", 0}, {"node-a", 1}},
@@ -1163,7 +1167,7 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 				st.MakePod().Name("p-y3").Node("node-y").Label("foo", "").Obj(),
 				st.MakePod().Name("p-y4").Node("node-y").Label("foo", "").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 3}, {"zone2", 4}},
 					"node": {{"node-b", 1}, {"node-a", 2}},
@@ -1181,10 +1185,10 @@ func TestGetTPMapMatchingSpreadConstraints(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
-			got, _ := getExistingPodSpreadCache(tt.pod, nodeInfoMap)
+			got, _ := getEvenPodsSpreadMetadata(tt.pod, nodeInfoMap)
 			got.sortCriticalPaths()
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getExistingPodSpreadCache() = %v, want %v", *got, *tt.want)
+				t.Errorf("getEvenPodsSpreadMetadata() = %v, want %v", *got, *tt.want)
 			}
 		})
 	}
@@ -1198,7 +1202,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 		existingPods []*v1.Pod
 		nodeIdx      int // denotes which node 'addedPod' belongs to
 		nodes        []*v1.Node
-		want         *podSpreadCache
+		want         *evenPodsSpreadMetadata
 	}{
 		{
 			name: "node a and b both impact current min match",
@@ -1212,7 +1216,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-b", 0}, {"node-a", 1}},
 				},
@@ -1236,7 +1240,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 1}, {"node-b", 1}},
 				},
@@ -1260,7 +1264,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 0}, {"node-b", 1}},
 				},
@@ -1284,7 +1288,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"node": {{"node-a", 0}, {"node-b", 2}},
 				},
@@ -1307,7 +1311,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 0}, {"zone1", 1}},
 					"node": {{"node-x", 0}, {"node-a", 1}},
@@ -1335,7 +1339,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-a").Label("zone", "zone1").Label("node", "node-a").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 1}, {"zone2", 1}},
 					"node": {{"node-a", 1}, {"node-x", 1}},
@@ -1366,7 +1370,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 1}, {"zone1", 3}},
 					"node": {{"node-a", 1}, {"node-x", 1}},
@@ -1398,7 +1402,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 1}, {"zone1", 2}},
 					"node": {{"node-a", 0}, {"node-b", 1}},
@@ -1430,7 +1434,7 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 1}, {"zone2", 1}},
 					"node": {{"node-a", 1}, {"node-b", 1}},
@@ -1448,12 +1452,12 @@ func TestPodSpreadCache_addPod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
-			podSpreadCache, _ := getExistingPodSpreadCache(tt.preemptor, nodeInfoMap)
+			evenPodsSpreadMetadata, _ := getEvenPodsSpreadMetadata(tt.preemptor, nodeInfoMap)
 
-			podSpreadCache.addPod(tt.addedPod, tt.preemptor, tt.nodes[tt.nodeIdx])
-			podSpreadCache.sortCriticalPaths()
-			if !reflect.DeepEqual(podSpreadCache, tt.want) {
-				t.Errorf("podSpreadCache#addPod() = %v, want %v", podSpreadCache, tt.want)
+			evenPodsSpreadMetadata.addPod(tt.addedPod, tt.preemptor, tt.nodes[tt.nodeIdx])
+			evenPodsSpreadMetadata.sortCriticalPaths()
+			if !reflect.DeepEqual(evenPodsSpreadMetadata, tt.want) {
+				t.Errorf("evenPodsSpreadMetadata#addPod() = %v, want %v", evenPodsSpreadMetadata, tt.want)
 			}
 		})
 	}
@@ -1468,7 +1472,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 		deletedPodIdx int     // need to reuse *Pod of existingPods[i]
 		deletedPod    *v1.Pod // this field is used only when deletedPodIdx is -1
 		nodeIdx       int     // denotes which node "deletedPod" belongs to
-		want          *podSpreadCache
+		want          *evenPodsSpreadMetadata
 	}{
 		{
 			// A high priority pod may not be scheduled due to node taints or resource shortage.
@@ -1489,7 +1493,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			},
 			deletedPodIdx: 0, // remove pod "p-a1"
 			nodeIdx:       0, // node-a
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 1}, {"zone2", 1}},
 				},
@@ -1518,7 +1522,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			},
 			deletedPodIdx: 0, // remove pod "p-a1"
 			nodeIdx:       0, // node-a
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 1}, {"zone2", 2}},
 				},
@@ -1548,7 +1552,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			},
 			deletedPodIdx: 0, // remove pod "p-a0"
 			nodeIdx:       0, // node-a
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 2}, {"zone2", 2}},
 				},
@@ -1578,7 +1582,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			deletedPodIdx: -1,
 			deletedPod:    st.MakePod().Name("p-a0").Node("node-a").Label("bar", "").Obj(),
 			nodeIdx:       0, // node-a
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone1", 2}, {"zone2", 2}},
 				},
@@ -1608,7 +1612,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			},
 			deletedPodIdx: 3, // remove pod "p-x1"
 			nodeIdx:       2, // node-x
-			want: &podSpreadCache{
+			want: &evenPodsSpreadMetadata{
 				tpKeyToCriticalPaths: map[string]*criticalPaths{
 					"zone": {{"zone2", 1}, {"zone1", 3}},
 					"node": {{"node-b", 1}, {"node-x", 1}},
@@ -1626,7 +1630,7 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
-			podSpreadCache, _ := getExistingPodSpreadCache(tt.preemptor, nodeInfoMap)
+			evenPodsSpreadMetadata, _ := getEvenPodsSpreadMetadata(tt.preemptor, nodeInfoMap)
 
 			var deletedPod *v1.Pod
 			if tt.deletedPodIdx < len(tt.existingPods) && tt.deletedPodIdx >= 0 {
@@ -1634,10 +1638,10 @@ func TestPodSpreadCache_removePod(t *testing.T) {
 			} else {
 				deletedPod = tt.deletedPod
 			}
-			podSpreadCache.removePod(deletedPod, tt.preemptor, tt.nodes[tt.nodeIdx])
-			podSpreadCache.sortCriticalPaths()
-			if !reflect.DeepEqual(podSpreadCache, tt.want) {
-				t.Errorf("podSpreadCache#removePod() = %v, want %v", podSpreadCache, tt.want)
+			evenPodsSpreadMetadata.removePod(deletedPod, tt.preemptor, tt.nodes[tt.nodeIdx])
+			evenPodsSpreadMetadata.sortCriticalPaths()
+			if !reflect.DeepEqual(evenPodsSpreadMetadata, tt.want) {
+				t.Errorf("evenPodsSpreadMetadata#removePod() = %v, want %v", evenPodsSpreadMetadata, tt.want)
 			}
 		})
 	}
@@ -1686,7 +1690,7 @@ func BenchmarkTestGetTPMapMatchingSpreadConstraints(b *testing.B) {
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(existingPods, allNodes)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				getExistingPodSpreadCache(tt.pod, nodeNameToInfo)
+				getEvenPodsSpreadMetadata(tt.pod, nodeNameToInfo)
 			}
 		})
 	}
@@ -1698,7 +1702,7 @@ var (
 )
 
 // sortCriticalPaths is only served for testing purpose.
-func (c *podSpreadCache) sortCriticalPaths() {
+func (c *evenPodsSpreadMetadata) sortCriticalPaths() {
 	for _, paths := range c.tpKeyToCriticalPaths {
 		// If two paths both hold minimum matching number, and topologyValue is unordered.
 		if paths[0].matchNum == paths[1].matchNum && paths[0].topologyValue > paths[1].topologyValue {

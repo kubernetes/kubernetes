@@ -27,6 +27,8 @@ import (
 
 func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	testTimeout := int64(0)
+	podInitialBackoffSeconds := int64(1)
+	podMaxBackoffSeconds := int64(1)
 	validConfig := &config.KubeSchedulerConfiguration{
 		SchedulerName:                  "me",
 		HealthzBindAddress:             "0.0.0.0:10254",
@@ -57,6 +59,8 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 				ResourceName:      "name",
 			},
 		},
+		PodInitialBackoffSeconds: &podInitialBackoffSeconds,
+		PodMaxBackoffSeconds:     &podMaxBackoffSeconds,
 		BindTimeoutSeconds:       &testTimeout,
 		PercentageOfNodesToScore: 35,
 	}

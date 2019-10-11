@@ -569,13 +569,10 @@ func (asw *actualStateOfWorld) GetAttachedVolumesForNode(
 	attachedVolumes := make(
 		[]AttachedVolume, 0 /* len */, len(asw.attachedVolumes) /* cap */)
 	for _, volumeObj := range asw.attachedVolumes {
-		for actualNodeName, nodeObj := range volumeObj.nodesAttachedTo {
-			if actualNodeName == nodeName {
-				attachedVolumes = append(
-					attachedVolumes,
-					getAttachedVolume(&volumeObj, &nodeObj))
-				break
-			}
+		if nodeObj, nodeExists := volumeObj.nodesAttachedTo[nodeName]; nodeExists {
+			attachedVolumes = append(
+				attachedVolumes,
+				getAttachedVolume(&volumeObj, &nodeObj))
 		}
 	}
 
@@ -610,9 +607,9 @@ func (asw *actualStateOfWorld) GetNodesForAttachedVolume(volumeName v1.UniqueVol
 	}
 
 	nodes := []types.NodeName{}
-	for k, nodesAttached := range volumeObj.nodesAttachedTo {
+	for nodeName, nodesAttached := range volumeObj.nodesAttachedTo {
 		if nodesAttached.attachedConfirmed {
-			nodes = append(nodes, k)
+			nodes = append(nodes, nodeName)
 		}
 	}
 	return nodes
@@ -627,14 +624,14 @@ func (asw *actualStateOfWorld) GetVolumesToReportAttached() map[types.NodeName][
 		if nodeToUpdateObj.statusUpdateNeeded {
 			attachedVolumes := make(
 				[]v1.AttachedVolume,
+				0,
 				len(nodeToUpdateObj.volumesToReportAsAttached) /* len */)
-			i := 0
 			for _, volume := range nodeToUpdateObj.volumesToReportAsAttached {
-				attachedVolumes[i] = v1.AttachedVolume{
-					Name:       volume,
-					DevicePath: asw.attachedVolumes[volume].devicePath,
-				}
-				i++
+				attachedVolumes = append(attachedVolumes,
+					v1.AttachedVolume{
+						Name:       volume,
+						DevicePath: asw.attachedVolumes[volume].devicePath,
+					})
 			}
 			volumesToReportAttached[nodeToUpdateObj.nodeName] = attachedVolumes
 		}

@@ -36,10 +36,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
-	"k8s.io/kubernetes/pkg/util/metrics"
 )
 
 const (
@@ -69,7 +69,7 @@ func NewController(podInformer coreinformers.PodInformer,
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "endpoint-slice-controller"})
 
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
-		metrics.RegisterMetricAndTrackRateLimiterUsage("endpoint_slice_controller", client.DiscoveryV1alpha1().RESTClient().GetRateLimiter())
+		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_slice_controller", client.DiscoveryV1alpha1().RESTClient().GetRateLimiter())
 	}
 
 	c := &Controller{
@@ -137,14 +137,14 @@ type Controller struct {
 	// Added as a member to the struct to allow injection for testing.
 	podsSynced cache.InformerSynced
 
-	// endpointSliceLister is able to list/get pods and is populated by the
+	// endpointSliceLister is able to list/get endpoint slices and is populated by the
 	// shared informer passed to NewController
 	endpointSliceLister discoverylisters.EndpointSliceLister
 	// endpointSlicesSynced returns true if the endpoint slice shared informer has been synced at least once.
 	// Added as a member to the struct to allow injection for testing.
 	endpointSlicesSynced cache.InformerSynced
 
-	// nodeLister is able to list/get pods and is populated by the
+	// nodeLister is able to list/get nodes and is populated by the
 	// shared informer passed to NewController
 	nodeLister corelisters.NodeLister
 	// nodesSynced returns true if the node shared informer has been synced at least once.
@@ -159,7 +159,7 @@ type Controller struct {
 	triggerTimeTracker *endpointutil.TriggerTimeTracker
 
 	// Services that need to be updated. A channel is inappropriate here,
-	// because it allowes services with lots of pods to be serviced much
+	// because it allows services with lots of pods to be serviced much
 	// more often than services with few pods; it also would cause a
 	// service that's inserted multiple times to be processed more than
 	// necessary.
@@ -179,8 +179,8 @@ func (c *Controller) Run(workers int, stopCh <-chan struct{}) {
 	defer utilruntime.HandleCrash()
 	defer c.queue.ShutDown()
 
-	klog.Infof("Starting endpoint controller")
-	defer klog.Infof("Shutting down endpoint controller")
+	klog.Infof("Starting endpoint slice controller")
+	defer klog.Infof("Shutting down endpoint slice controller")
 
 	if !cache.WaitForNamedCacheSync("endpoint_slice", stopCh, c.podsSynced, c.servicesSynced) {
 		return
@@ -251,6 +251,8 @@ func (c *Controller) syncService(key string) error {
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			c.triggerTimeTracker.DeleteService(namespace, name)
+			// The service has been deleted, return nil so that it won't be retried.
+			return nil
 		}
 		return err
 	}

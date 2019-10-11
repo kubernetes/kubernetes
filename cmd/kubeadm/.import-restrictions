@@ -77,7 +77,6 @@
 				"k8s.io/kubernetes/pkg/util/conntrack",
 				"k8s.io/kubernetes/pkg/util/hash",
 				"k8s.io/kubernetes/pkg/util/iptables",
-				"k8s.io/kubernetes/pkg/util/metrics",
 				"k8s.io/kubernetes/pkg/util/parsers",
 				"k8s.io/kubernetes/pkg/util/sysctl",
 				"k8s.io/kubernetes/pkg/util/taints"

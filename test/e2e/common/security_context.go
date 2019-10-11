@@ -271,6 +271,19 @@ var _ = framework.KubeDescribe("Security Context", func() {
 				framework.Failf("unprivileged container shouldn't be able to create dummy device")
 			}
 		})
+
+		ginkgo.It("should run the container as privileged when true [LinuxOnly] [NodeFeature:HostAccess]", func() {
+			podName := createAndWaitUserPod(true)
+			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, podName, podName)
+			if err != nil {
+				framework.Failf("GetPodLogs for pod %q failed: %v", podName, err)
+			}
+
+			framework.Logf("Got logs for pod %q: %q", podName, logs)
+			if strings.Contains(logs, "Operation not permitted") {
+				framework.Failf("privileged container should be able to create dummy device")
+			}
+		})
 	})
 
 	ginkgo.Context("when creating containers with AllowPrivilegeEscalation", func() {
