@@ -19,6 +19,7 @@ package plugins
 import (
 	"fmt"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
@@ -27,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -53,6 +55,9 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 	return framework.Registry{
 		tainttoleration.Name: tainttoleration.New,
 		nodename.Name:        nodename.New,
+		volumebinding.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+			return volumebinding.NewFromVolumeBinder(args.VolumeBinder), nil
+		},
 	}
 }
 
@@ -88,6 +93,11 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPredicate(predicates.HostNamePred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodename.Name, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.CheckVolumeBindingPred,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, volumebinding.Name, nil)
 			return
 		})
 
