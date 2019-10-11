@@ -542,10 +542,10 @@ func (f *framework) RunPermitPlugins(
 	ctx context.Context, state *CycleState, pod *v1.Pod, nodeName string) (status *Status) {
 	startTime := time.Now()
 	defer func() { recordExtensionPointDuration(startTime, permit, status) }()
-	timeout := maxTimeout
+	pluginsWaitTime := make(map[string]time.Duration)
 	statusCode := Success
 	for _, pl := range f.permitPlugins {
-		status, d := pl.Permit(ctx, state, pod, nodeName)
+		status, timeout := pl.Permit(ctx, state, pod, nodeName)
 		if !status.IsSuccess() {
 			if status.IsUnschedulable() {
 				msg := fmt.Sprintf("rejected by %q at permit: %v", pl.Name(), status.Message())
@@ -553,10 +553,11 @@ func (f *framework) RunPermitPlugins(
 				return NewStatus(status.Code(), msg)
 			}
 			if status.Code() == Wait {
-				// Use the minimum timeout duration.
-				if timeout > d {
-					timeout = d
+				// Not allowed to be greater than maxTimeout.
+				if timeout > maxTimeout {
+					timeout = maxTimeout
 				}
+				pluginsWaitTime[pl.Name()] = timeout
 				statusCode = Wait
 			} else {
 				msg := fmt.Sprintf("error while running %q permit plugin for pod %q: %v", pl.Name(), pod.Name, status.Message())
@@ -569,27 +570,20 @@ func (f *framework) RunPermitPlugins(
 	// We now wait for the minimum duration if at least one plugin asked to
 	// wait (and no plugin rejected the pod)
 	if statusCode == Wait {
-		w := newWaitingPod(pod)
+		w := newWaitingPod(pod, pluginsWaitTime)
 		f.waitingPods.add(w)
 		defer f.waitingPods.remove(pod.UID)
-		timer := time.NewTimer(timeout)
-		klog.V(4).Infof("waiting for %v for pod %q at permit", timeout, pod.Name)
-		select {
-		case <-timer.C:
-			msg := fmt.Sprintf("pod %q rejected due to timeout after waiting %v at permit", pod.Name, timeout)
-			klog.V(4).Infof(msg)
-			return NewStatus(Unschedulable, msg)
-		case s := <-w.s:
-			if !s.IsSuccess() {
-				if s.IsUnschedulable() {
-					msg := fmt.Sprintf("rejected while waiting at permit: %v", s.Message())
-					klog.V(4).Infof(msg)
-					return NewStatus(s.Code(), msg)
-				}
-				msg := fmt.Sprintf("error received while waiting at permit for pod %q: %v", pod.Name, s.Message())
-				klog.Error(msg)
-				return NewStatus(Error, msg)
+		klog.V(4).Infof("waiting for pod %q at permit", pod.Name)
+		s := <-w.s
+		if !s.IsSuccess() {
+			if s.IsUnschedulable() {
+				msg := fmt.Sprintf("pod %q rejected while waiting at permit: %v", pod.Name, s.Message())
+				klog.V(4).Infof(msg)
+				return NewStatus(s.Code(), msg)
 			}
+			msg := fmt.Sprintf("error received while waiting at permit for pod %q: %v", pod.Name, s.Message())
+			klog.Error(msg)
+			return NewStatus(Error, msg)
 		}
 	}
 
