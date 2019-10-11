@@ -82,7 +82,6 @@ test/e2e/common
 test/e2e/instrumentation/logging/stackdriver
 test/e2e/instrumentation/monitoring
 test/e2e/lifecycle
-test/e2e/lifecycle/bootstrap
 test/e2e/manifest
 test/e2e/network
 test/e2e/storage
