@@ -842,7 +842,7 @@ func (cont *NginxIngressController) Init() {
 	// clusters, i.e. clusters where nodes don't have public IPs.
 	framework.Logf("Creating load balancer service for nginx ingress controller")
 	serviceJig := e2eservice.NewTestJig(cont.Client, "nginx-ingress-lb")
-	serviceJig.CreateTCPServiceOrFail(cont.Ns, func(svc *v1.Service) {
+	_, err := serviceJig.CreateTCPService(cont.Ns, func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeLoadBalancer
 		svc.Spec.Selector = map[string]string{"k8s-app": "nginx-ingress-lb"}
 		svc.Spec.Ports = []v1.ServicePort{
@@ -850,7 +850,9 @@ func (cont *NginxIngressController) Init() {
 			{Name: "https", Port: 443},
 			{Name: "stats", Port: 18080}}
 	})
-	cont.lbSvc = serviceJig.WaitForLoadBalancerOrFail(cont.Ns, "nginx-ingress-lb", e2eservice.GetServiceLoadBalancerCreationTimeout(cont.Client))
+	framework.ExpectNoError(err)
+	cont.lbSvc, err = serviceJig.WaitForLoadBalancer(cont.Ns, "nginx-ingress-lb", e2eservice.GetServiceLoadBalancerCreationTimeout(cont.Client))
+	framework.ExpectNoError(err)
 
 	read := func(file string) string {
 		return string(testfiles.ReadOrDie(filepath.Join(IngressManifestPath, "nginx", file)))

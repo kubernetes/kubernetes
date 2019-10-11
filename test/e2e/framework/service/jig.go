@@ -96,54 +96,51 @@ func (j *TestJig) newServiceTemplate(namespace string, proto v1.Protocol, port i
 // CreateTCPServiceWithPort creates a new TCP Service with given port based on the
 // j's defaults. Callers can provide a function to tweak the Service object before
 // it is created.
-func (j *TestJig) CreateTCPServiceWithPort(namespace string, tweak func(svc *v1.Service), port int32) *v1.Service {
+func (j *TestJig) CreateTCPServiceWithPort(namespace string, tweak func(svc *v1.Service), port int32) (*v1.Service, error) {
 	svc := j.newServiceTemplate(namespace, v1.ProtocolTCP, port)
 	if tweak != nil {
 		tweak(svc)
 	}
 	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
-		framework.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
+		return nil, fmt.Errorf("failed to create TCP Service %q: %v", svc.Name, err)
 	}
-	j.sanityCheckService(result, svc.Spec.Type)
-	return result
+	return j.sanityCheckService(result, svc.Spec.Type)
 }
 
-// CreateTCPServiceOrFail creates a new TCP Service based on the j's
+// CreateTCPService creates a new TCP Service based on the j's
 // defaults.  Callers can provide a function to tweak the Service object before
 // it is created.
-func (j *TestJig) CreateTCPServiceOrFail(namespace string, tweak func(svc *v1.Service)) *v1.Service {
+func (j *TestJig) CreateTCPService(namespace string, tweak func(svc *v1.Service)) (*v1.Service, error) {
 	svc := j.newServiceTemplate(namespace, v1.ProtocolTCP, 80)
 	if tweak != nil {
 		tweak(svc)
 	}
 	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
-		framework.Failf("Failed to create TCP Service %q: %v", svc.Name, err)
+		return nil, fmt.Errorf("failed to create TCP Service %q: %v", svc.Name, err)
 	}
-	j.sanityCheckService(result, svc.Spec.Type)
-	return result
+	return j.sanityCheckService(result, svc.Spec.Type)
 }
 
-// CreateUDPServiceOrFail creates a new UDP Service based on the j's
+// CreateUDPService creates a new UDP Service based on the j's
 // defaults.  Callers can provide a function to tweak the Service object before
 // it is created.
-func (j *TestJig) CreateUDPServiceOrFail(namespace string, tweak func(svc *v1.Service)) *v1.Service {
+func (j *TestJig) CreateUDPService(namespace string, tweak func(svc *v1.Service)) (*v1.Service, error) {
 	svc := j.newServiceTemplate(namespace, v1.ProtocolUDP, 80)
 	if tweak != nil {
 		tweak(svc)
 	}
 	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
-		framework.Failf("Failed to create UDP Service %q: %v", svc.Name, err)
+		return nil, fmt.Errorf("failed to create UDP Service %q: %v", svc.Name, err)
 	}
-	j.sanityCheckService(result, svc.Spec.Type)
-	return result
+	return j.sanityCheckService(result, svc.Spec.Type)
 }
 
-// CreateExternalNameServiceOrFail creates a new ExternalName type Service based on the j's defaults.
+// CreateExternalNameService creates a new ExternalName type Service based on the j's defaults.
 // Callers can provide a function to tweak the Service object before it is created.
-func (j *TestJig) CreateExternalNameServiceOrFail(namespace string, tweak func(svc *v1.Service)) *v1.Service {
+func (j *TestJig) CreateExternalNameService(namespace string, tweak func(svc *v1.Service)) (*v1.Service, error) {
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: namespace,
@@ -161,16 +158,15 @@ func (j *TestJig) CreateExternalNameServiceOrFail(namespace string, tweak func(s
 	}
 	result, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
-		framework.Failf("Failed to create ExternalName Service %q: %v", svc.Name, err)
+		return nil, fmt.Errorf("failed to create ExternalName Service %q: %v", svc.Name, err)
 	}
-	j.sanityCheckService(result, svc.Spec.Type)
-	return result
+	return j.sanityCheckService(result, svc.Spec.Type)
 }
 
 // ChangeServiceType updates the given service's ServiceType to the given newType.
-func (j *TestJig) ChangeServiceType(namespace, name string, newType v1.ServiceType, timeout time.Duration) {
+func (j *TestJig) ChangeServiceType(namespace, name string, newType v1.ServiceType, timeout time.Duration) error {
 	ingressIP := ""
-	svc := j.UpdateServiceOrFail(namespace, name, func(s *v1.Service) {
+	svc, err := j.UpdateService(namespace, name, func(s *v1.Service) {
 		for _, ing := range s.Status.LoadBalancer.Ingress {
 			if ing.IP != "" {
 				ingressIP = ing.IP
@@ -179,28 +175,38 @@ func (j *TestJig) ChangeServiceType(namespace, name string, newType v1.ServiceTy
 		s.Spec.Type = newType
 		s.Spec.Ports[0].NodePort = 0
 	})
-	if ingressIP != "" {
-		j.WaitForLoadBalancerDestroyOrFail(namespace, svc.Name, ingressIP, int(svc.Spec.Ports[0].Port), timeout)
+	if err != nil {
+		return err
 	}
+	if ingressIP != "" {
+		_, err = j.WaitForLoadBalancerDestroy(namespace, svc.Name, ingressIP, int(svc.Spec.Ports[0].Port), timeout)
+	}
+	return err
 }
 
 // CreateOnlyLocalNodePortService creates a NodePort service with
 // ExternalTrafficPolicy set to Local and sanity checks its nodePort.
 // If createPod is true, it also creates an RC with 1 replica of
 // the standard netexec container used everywhere in this test.
-func (j *TestJig) CreateOnlyLocalNodePortService(namespace, serviceName string, createPod bool) *v1.Service {
+func (j *TestJig) CreateOnlyLocalNodePortService(namespace, serviceName string, createPod bool) (*v1.Service, error) {
 	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=NodePort and ExternalTrafficPolicy=Local")
-	svc := j.CreateTCPServiceOrFail(namespace, func(svc *v1.Service) {
+	svc, err := j.CreateTCPService(namespace, func(svc *v1.Service) {
 		svc.Spec.Type = v1.ServiceTypeNodePort
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 		svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: 80}}
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	if createPod {
 		ginkgo.By("creating a pod to be part of the service " + serviceName)
-		j.RunOrFail(namespace, nil)
+		_, err = j.Run(namespace, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return svc
+	return svc, nil
 }
 
 // CreateOnlyLocalLoadBalancerService creates a loadbalancer service with
@@ -208,26 +214,32 @@ func (j *TestJig) CreateOnlyLocalNodePortService(namespace, serviceName string, 
 // If createPod is true, it also creates an RC with 1 replica of
 // the standard netexec container used everywhere in this test.
 func (j *TestJig) CreateOnlyLocalLoadBalancerService(namespace, serviceName string, timeout time.Duration, createPod bool,
-	tweak func(svc *v1.Service)) *v1.Service {
-	j.CreateLoadBalancerService(namespace, serviceName, timeout, func(svc *v1.Service) {
+	tweak func(svc *v1.Service)) (*v1.Service, error) {
+	_, err := j.CreateLoadBalancerService(namespace, serviceName, timeout, func(svc *v1.Service) {
 		ginkgo.By("setting ExternalTrafficPolicy=Local")
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 		if tweak != nil {
 			tweak(svc)
 		}
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	if createPod {
 		ginkgo.By("creating a pod to be part of the service " + serviceName)
-		j.RunOrFail(namespace, nil)
+		_, err = j.Run(namespace, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 	ginkgo.By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
-	return j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
+	return j.WaitForLoadBalancer(namespace, serviceName, timeout)
 }
 
 // CreateLoadBalancerService creates a loadbalancer service and waits
 // for it to acquire an ingress IP.
-func (j *TestJig) CreateLoadBalancerService(namespace, serviceName string, timeout time.Duration, tweak func(svc *v1.Service)) *v1.Service {
+func (j *TestJig) CreateLoadBalancerService(namespace, serviceName string, timeout time.Duration, tweak func(svc *v1.Service)) (*v1.Service, error) {
 	ginkgo.By("creating a service " + namespace + "/" + serviceName + " with type=LoadBalancer")
 	svc := j.newServiceTemplate(namespace, v1.ProtocolTCP, 80)
 	svc.Spec.Type = v1.ServiceTypeLoadBalancer
@@ -238,37 +250,42 @@ func (j *TestJig) CreateLoadBalancerService(namespace, serviceName string, timeo
 	}
 	_, err := j.Client.CoreV1().Services(namespace).Create(svc)
 	if err != nil {
-		framework.Failf("Failed to create LoadBalancer Service %q: %v", svc.Name, err)
+		return nil, fmt.Errorf("failed to create LoadBalancer Service %q: %v", svc.Name, err)
 	}
 
 	ginkgo.By("waiting for loadbalancer for service " + namespace + "/" + serviceName)
-	return j.WaitForLoadBalancerOrFail(namespace, serviceName, timeout)
+	return j.WaitForLoadBalancer(namespace, serviceName, timeout)
 }
 
 // GetEndpointNodes returns a map of nodenames:external-ip on which the
 // endpoints of the given Service are running.
-func (j *TestJig) GetEndpointNodes(svc *v1.Service) map[string][]string {
+func (j *TestJig) GetEndpointNodes(svc *v1.Service) (map[string][]string, error) {
 	nodes, err := e2enode.GetBoundedReadySchedulableNodes(j.Client, MaxNodesForEndpointsTests)
-	framework.ExpectNoError(err)
-	epNodes := j.GetEndpointNodeNames(svc)
+	if err != nil {
+		return nil, err
+	}
+	epNodes, err := j.GetEndpointNodeNames(svc)
+	if err != nil {
+		return nil, err
+	}
 	nodeMap := map[string][]string{}
 	for _, n := range nodes.Items {
 		if epNodes.Has(n.Name) {
 			nodeMap[n.Name] = e2enode.GetAddresses(&n, v1.NodeExternalIP)
 		}
 	}
-	return nodeMap
+	return nodeMap, nil
 }
 
 // GetEndpointNodeNames returns a string set of node names on which the
 // endpoints of the given Service are running.
-func (j *TestJig) GetEndpointNodeNames(svc *v1.Service) sets.String {
+func (j *TestJig) GetEndpointNodeNames(svc *v1.Service) (sets.String, error) {
 	endpoints, err := j.Client.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
 	if err != nil {
-		framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+		return nil, fmt.Errorf("get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
 	}
 	if len(endpoints.Subsets) == 0 {
-		framework.Failf("Endpoint has no subsets, cannot determine node addresses.")
+		return nil, fmt.Errorf("endpoint has no subsets, cannot determine node addresses")
 	}
 	epNodes := sets.NewString()
 	for _, ss := range endpoints.Subsets {
@@ -278,12 +295,12 @@ func (j *TestJig) GetEndpointNodeNames(svc *v1.Service) sets.String {
 			}
 		}
 	}
-	return epNodes
+	return epNodes, nil
 }
 
 // WaitForEndpointOnNode waits for a service endpoint on the given node.
-func (j *TestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName string) {
-	err := wait.PollImmediate(framework.Poll, LoadBalancerCreateTimeoutDefault, func() (bool, error) {
+func (j *TestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName string) error {
+	return wait.PollImmediate(framework.Poll, LoadBalancerCreateTimeoutDefault, func() (bool, error) {
 		endpoints, err := j.Client.CoreV1().Endpoints(namespace).Get(serviceName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("Get endpoints for service %s/%s failed (%s)", namespace, serviceName, err)
@@ -306,11 +323,10 @@ func (j *TestJig) WaitForEndpointOnNode(namespace, serviceName, nodeName string)
 		}
 		return true, nil
 	})
-	framework.ExpectNoError(err)
 }
 
 // WaitForAvailableEndpoint waits for at least 1 endpoint to be available till timeout
-func (j *TestJig) WaitForAvailableEndpoint(namespace, serviceName string, timeout time.Duration) {
+func (j *TestJig) WaitForAvailableEndpoint(namespace, serviceName string, timeout time.Duration) error {
 	//Wait for endpoints to be created, this may take longer time if service backing pods are taking longer time to run
 	endpointSelector := fields.OneTermEqualSelector("metadata.name", serviceName)
 	stopCh := make(chan struct{})
@@ -356,29 +372,32 @@ func (j *TestJig) WaitForAvailableEndpoint(namespace, serviceName string, timeou
 	err := wait.Poll(1*time.Second, timeout, func() (bool, error) {
 		return endpointAvailable, nil
 	})
-	framework.ExpectNoError(err, "No subset of available IP address found for the endpoint %s within timeout %v", serviceName, timeout)
+	if err != nil {
+		return fmt.Errorf("no subset of available IP address found for the endpoint %s within timeout %v", serviceName, timeout)
+	}
+	return nil
 }
 
 // sanityCheckService performs sanity checks on the given service; in particular, ensuring
 // that creating/updating a service allocates IPs, ports, etc, as needed.
-func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) {
+func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) (*v1.Service, error) {
 	if svcType == "" {
 		svcType = v1.ServiceTypeClusterIP
 	}
 	if svc.Spec.Type != svcType {
-		framework.Failf("unexpected Spec.Type (%s) for service, expected %s", svc.Spec.Type, svcType)
+		return nil, fmt.Errorf("unexpected Spec.Type (%s) for service, expected %s", svc.Spec.Type, svcType)
 	}
 
 	if svcType != v1.ServiceTypeExternalName {
 		if svc.Spec.ExternalName != "" {
-			framework.Failf("unexpected Spec.ExternalName (%s) for service, expected empty", svc.Spec.ExternalName)
+			return nil, fmt.Errorf("unexpected Spec.ExternalName (%s) for service, expected empty", svc.Spec.ExternalName)
 		}
 		if svc.Spec.ClusterIP == "" {
-			framework.Failf("didn't get ClusterIP for non-ExternalName service")
+			return nil, fmt.Errorf("didn't get ClusterIP for non-ExternalName service")
 		}
 	} else {
 		if svc.Spec.ClusterIP != "" {
-			framework.Failf("unexpected Spec.ClusterIP (%s) for ExternalName service, expected empty", svc.Spec.ClusterIP)
+			return nil, fmt.Errorf("unexpected Spec.ClusterIP (%s) for ExternalName service, expected empty", svc.Spec.ClusterIP)
 		}
 	}
 
@@ -389,11 +408,11 @@ func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) {
 	for i, port := range svc.Spec.Ports {
 		hasNodePort := (port.NodePort != 0)
 		if hasNodePort != expectNodePorts {
-			framework.Failf("unexpected Spec.Ports[%d].NodePort (%d) for service", i, port.NodePort)
+			return nil, fmt.Errorf("unexpected Spec.Ports[%d].NodePort (%d) for service", i, port.NodePort)
 		}
 		if hasNodePort {
 			if !NodePortRange.Contains(int(port.NodePort)) {
-				framework.Failf("out-of-range nodePort (%d) for service", port.NodePort)
+				return nil, fmt.Errorf("out-of-range nodePort (%d) for service", port.NodePort)
 			}
 		}
 	}
@@ -403,15 +422,17 @@ func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) {
 	}
 	hasIngress := len(svc.Status.LoadBalancer.Ingress) != 0
 	if hasIngress != expectIngress {
-		framework.Failf("unexpected number of Status.LoadBalancer.Ingress (%d) for service", len(svc.Status.LoadBalancer.Ingress))
+		return nil, fmt.Errorf("unexpected number of Status.LoadBalancer.Ingress (%d) for service", len(svc.Status.LoadBalancer.Ingress))
 	}
 	if hasIngress {
 		for i, ing := range svc.Status.LoadBalancer.Ingress {
 			if ing.IP == "" && ing.Hostname == "" {
-				framework.Failf("unexpected Status.LoadBalancer.Ingress[%d] for service: %#v", i, ing)
+				return nil, fmt.Errorf("unexpected Status.LoadBalancer.Ingress[%d] for service: %#v", i, ing)
 			}
 		}
 	}
+
+	return svc, nil
 }
 
 // UpdateService fetches a service, calls the update function on it, and
@@ -426,8 +447,7 @@ func (j *TestJig) UpdateService(namespace, name string, update func(*v1.Service)
 		update(service)
 		result, err := j.Client.CoreV1().Services(namespace).Update(service)
 		if err == nil {
-			j.sanityCheckService(result, service.Spec.Type)
-			return result, nil
+			return j.sanityCheckService(result, service.Spec.Type)
 		}
 		if !errors.IsConflict(err) && !errors.IsServerTimeout(err) {
 			return nil, fmt.Errorf("failed to update Service %q: %v", name, err)
@@ -436,21 +456,10 @@ func (j *TestJig) UpdateService(namespace, name string, update func(*v1.Service)
 	return nil, fmt.Errorf("too many retries updating Service %q", name)
 }
 
-// UpdateServiceOrFail fetches a service, calls the update function on it, and
-// then attempts to send the updated service. It tries up to 3 times in the
-// face of timeouts and conflicts.
-func (j *TestJig) UpdateServiceOrFail(namespace, name string, update func(*v1.Service)) *v1.Service {
-	svc, err := j.UpdateService(namespace, name, update)
-	if err != nil {
-		framework.Failf(err.Error())
-	}
-	return svc
-}
-
-// WaitForNewIngressIPOrFail waits for the given service to get a new ingress IP, or fails after the given timeout
-func (j *TestJig) WaitForNewIngressIPOrFail(namespace, name, existingIP string, timeout time.Duration) *v1.Service {
+// WaitForNewIngressIP waits for the given service to get a new ingress IP, or returns an error after the given timeout
+func (j *TestJig) WaitForNewIngressIP(namespace, name, existingIP string, timeout time.Duration) (*v1.Service, error) {
 	framework.Logf("Waiting up to %v for service %q to get a new ingress IP", timeout, name)
-	service := j.waitForConditionOrFail(namespace, name, timeout, "have a new ingress IP", func(svc *v1.Service) bool {
+	service, err := j.waitForCondition(namespace, name, timeout, "have a new ingress IP", func(svc *v1.Service) bool {
 		if len(svc.Status.LoadBalancer.Ingress) == 0 {
 			return false
 		}
@@ -460,12 +469,14 @@ func (j *TestJig) WaitForNewIngressIPOrFail(namespace, name, existingIP string, 
 		}
 		return true
 	})
-	j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
-	return service
+	if err != nil {
+		return nil, err
+	}
+	return j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
 }
 
-// ChangeServiceNodePortOrFail changes node ports of the given service.
-func (j *TestJig) ChangeServiceNodePortOrFail(namespace, name string, initial int) *v1.Service {
+// ChangeServiceNodePort changes node ports of the given service.
+func (j *TestJig) ChangeServiceNodePort(namespace, name string, initial int) (*v1.Service, error) {
 	var err error
 	var service *v1.Service
 	for i := 1; i < NodePortRange.Size; i++ {
@@ -482,24 +493,23 @@ func (j *TestJig) ChangeServiceNodePortOrFail(namespace, name string, initial in
 		// Otherwise err was nil or err was a real error
 		break
 	}
-	if err != nil {
-		framework.Failf("Could not change the nodePort: %v", err)
-	}
-	return service
+	return service, err
 }
 
-// WaitForLoadBalancerOrFail waits the given service to have a LoadBalancer, or fails after the given timeout
-func (j *TestJig) WaitForLoadBalancerOrFail(namespace, name string, timeout time.Duration) *v1.Service {
+// WaitForLoadBalancer waits the given service to have a LoadBalancer, or returns an error after the given timeout
+func (j *TestJig) WaitForLoadBalancer(namespace, name string, timeout time.Duration) (*v1.Service, error) {
 	framework.Logf("Waiting up to %v for service %q to have a LoadBalancer", timeout, name)
-	service := j.waitForConditionOrFail(namespace, name, timeout, "have a load balancer", func(svc *v1.Service) bool {
+	service, err := j.waitForCondition(namespace, name, timeout, "have a load balancer", func(svc *v1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) > 0
 	})
-	j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
-	return service
+	if err != nil {
+		return nil, err
+	}
+	return j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
 }
 
-// WaitForLoadBalancerDestroyOrFail waits the given service to destroy a LoadBalancer, or fails after the given timeout
-func (j *TestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip string, port int, timeout time.Duration) *v1.Service {
+// WaitForLoadBalancerDestroy waits the given service to destroy a LoadBalancer, or returns an error after the given timeout
+func (j *TestJig) WaitForLoadBalancerDestroy(namespace, name string, ip string, port int, timeout time.Duration) (*v1.Service, error) {
 	// TODO: once support ticket 21807001 is resolved, reduce this timeout back to something reasonable
 	defer func() {
 		if err := framework.EnsureLoadBalancerResourcesDeleted(ip, strconv.Itoa(port)); err != nil {
@@ -508,14 +518,16 @@ func (j *TestJig) WaitForLoadBalancerDestroyOrFail(namespace, name string, ip st
 	}()
 
 	framework.Logf("Waiting up to %v for service %q to have no LoadBalancer", timeout, name)
-	service := j.waitForConditionOrFail(namespace, name, timeout, "have no load balancer", func(svc *v1.Service) bool {
+	service, err := j.waitForCondition(namespace, name, timeout, "have no load balancer", func(svc *v1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) == 0
 	})
-	j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
-	return service
+	if err != nil {
+		return nil, err
+	}
+	return j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
 }
 
-func (j *TestJig) waitForConditionOrFail(namespace, name string, timeout time.Duration, message string, conditionFn func(*v1.Service) bool) *v1.Service {
+func (j *TestJig) waitForCondition(namespace, name string, timeout time.Duration, message string, conditionFn func(*v1.Service) bool) (*v1.Service, error) {
 	var service *v1.Service
 	pollFunc := func() (bool, error) {
 		svc, err := j.Client.CoreV1().Services(namespace).Get(name, metav1.GetOptions{})
@@ -529,9 +541,9 @@ func (j *TestJig) waitForConditionOrFail(namespace, name string, timeout time.Du
 		return false, nil
 	}
 	if err := wait.PollImmediate(framework.Poll, timeout, pollFunc); err != nil {
-		framework.Failf("Timed out waiting for service %q to %s", name, message)
+		return nil, fmt.Errorf("timed out waiting for service %q to %s", name, message)
 	}
-	return service
+	return service, nil
 }
 
 // newRCTemplate returns the default v1.ReplicationController object for
@@ -599,18 +611,18 @@ func (j *TestJig) AddRCAntiAffinity(rc *v1.ReplicationController) {
 		})
 }
 
-// CreatePDBOrFail returns a PodDisruptionBudget for the given ReplicationController, or fails if a PodDisruptionBudget isn't ready
-func (j *TestJig) CreatePDBOrFail(namespace string, rc *v1.ReplicationController) *policyv1beta1.PodDisruptionBudget {
+// CreatePDB returns a PodDisruptionBudget for the given ReplicationController, or returns an error if a PodDisruptionBudget isn't ready
+func (j *TestJig) CreatePDB(namespace string, rc *v1.ReplicationController) (*policyv1beta1.PodDisruptionBudget, error) {
 	pdb := j.newPDBTemplate(namespace, rc)
 	newPdb, err := j.Client.PolicyV1beta1().PodDisruptionBudgets(namespace).Create(pdb)
 	if err != nil {
-		framework.Failf("Failed to create PDB %q %v", pdb.Name, err)
+		return nil, fmt.Errorf("failed to create PDB %q %v", pdb.Name, err)
 	}
 	if err := j.waitForPdbReady(namespace); err != nil {
-		framework.Failf("Failed waiting for PDB to be ready: %v", err)
+		return nil, fmt.Errorf("failed waiting for PDB to be ready: %v", err)
 	}
 
-	return newPdb
+	return newPdb, nil
 }
 
 // newPDBTemplate returns the default policyv1beta1.PodDisruptionBudget object for
@@ -634,48 +646,49 @@ func (j *TestJig) newPDBTemplate(namespace string, rc *v1.ReplicationController)
 	return pdb
 }
 
-// RunOrFail creates a ReplicationController and Pod(s) and waits for the
+// Run creates a ReplicationController and Pod(s) and waits for the
 // Pod(s) to be running. Callers can provide a function to tweak the RC object
 // before it is created.
-func (j *TestJig) RunOrFail(namespace string, tweak func(rc *v1.ReplicationController)) *v1.ReplicationController {
+func (j *TestJig) Run(namespace string, tweak func(rc *v1.ReplicationController)) (*v1.ReplicationController, error) {
 	rc := j.newRCTemplate(namespace)
 	if tweak != nil {
 		tweak(rc)
 	}
 	result, err := j.Client.CoreV1().ReplicationControllers(namespace).Create(rc)
 	if err != nil {
-		framework.Failf("Failed to create RC %q: %v", rc.Name, err)
+		return nil, fmt.Errorf("failed to create RC %q: %v", rc.Name, err)
 	}
 	pods, err := j.waitForPodsCreated(namespace, int(*(rc.Spec.Replicas)))
 	if err != nil {
-		framework.Failf("Failed to create pods: %v", err)
+		return nil, fmt.Errorf("failed to create pods: %v", err)
 	}
 	if err := j.waitForPodsReady(namespace, pods); err != nil {
-		framework.Failf("Failed waiting for pods to be running: %v", err)
+		return nil, fmt.Errorf("failed waiting for pods to be running: %v", err)
 	}
-	return result
+	return result, nil
 }
 
 // Scale scales pods to the given replicas
-func (j *TestJig) Scale(namespace string, replicas int) {
+func (j *TestJig) Scale(namespace string, replicas int) error {
 	rc := j.Name
 	scale, err := j.Client.CoreV1().ReplicationControllers(namespace).GetScale(rc, metav1.GetOptions{})
 	if err != nil {
-		framework.Failf("Failed to get scale for RC %q: %v", rc, err)
+		return fmt.Errorf("failed to get scale for RC %q: %v", rc, err)
 	}
 
 	scale.Spec.Replicas = int32(replicas)
 	_, err = j.Client.CoreV1().ReplicationControllers(namespace).UpdateScale(rc, scale)
 	if err != nil {
-		framework.Failf("Failed to scale RC %q: %v", rc, err)
+		return fmt.Errorf("failed to scale RC %q: %v", rc, err)
 	}
 	pods, err := j.waitForPodsCreated(namespace, replicas)
 	if err != nil {
-		framework.Failf("Failed waiting for pods: %v", err)
+		return fmt.Errorf("failed waiting for pods: %v", err)
 	}
 	if err := j.waitForPodsReady(namespace, pods); err != nil {
-		framework.Failf("Failed waiting for pods to be running: %v", err)
+		return fmt.Errorf("failed waiting for pods to be running: %v", err)
 	}
+	return nil
 }
 
 func (j *TestJig) waitForPdbReady(namespace string) error {
@@ -729,20 +742,23 @@ func (j *TestJig) waitForPodsReady(namespace string, pods []string) error {
 	return nil
 }
 
-func testReachabilityOverServiceName(serviceName string, sp v1.ServicePort, execPod *v1.Pod) {
-	testEndpointReachability(serviceName, sp.Port, sp.Protocol, execPod)
+func testReachabilityOverServiceName(serviceName string, sp v1.ServicePort, execPod *v1.Pod) error {
+	return testEndpointReachability(serviceName, sp.Port, sp.Protocol, execPod)
 }
 
-func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod *v1.Pod) {
+func testReachabilityOverClusterIP(clusterIP string, sp v1.ServicePort, execPod *v1.Pod) error {
 	// If .spec.clusterIP is set to "" or "None" for service, ClusterIP is not created, so reachability can not be tested over clusterIP:servicePort
 	isClusterIPV46, err := regexp.MatchString(framework.RegexIPv4+"||"+framework.RegexIPv6, clusterIP)
-	framework.ExpectNoError(err, "Unable to parse ClusterIP: %s", clusterIP)
-	if isClusterIPV46 {
-		testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
+	if err != nil {
+		return fmt.Errorf("unable to parse ClusterIP: %s", clusterIP)
 	}
+	if isClusterIPV46 {
+		return testEndpointReachability(clusterIP, sp.Port, sp.Protocol, execPod)
+	}
+	return nil
 }
 
-func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod) {
+func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v1.Pod) error {
 	internalAddrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 	externalAddrs := e2enode.CollectAddresses(nodes, v1.NodeExternalIP)
 	for _, internalAddr := range internalAddrs {
@@ -752,11 +768,18 @@ func testReachabilityOverNodePorts(nodes *v1.NodeList, sp v1.ServicePort, pod *v
 			framework.Logf("skipping testEndpointReachability() for internal adddress %s", internalAddr)
 			continue
 		}
-		testEndpointReachability(internalAddr, sp.NodePort, sp.Protocol, pod)
+		err := testEndpointReachability(internalAddr, sp.NodePort, sp.Protocol, pod)
+		if err != nil {
+			return err
+		}
 	}
 	for _, externalAddr := range externalAddrs {
-		testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
+		err := testEndpointReachability(externalAddr, sp.NodePort, sp.Protocol, pod)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // isInvalidOrLocalhostAddress returns `true` if the provided `ip` is either not
@@ -772,7 +795,7 @@ func isInvalidOrLocalhostAddress(ip string) bool {
 // testEndpointReachability tests reachability to endpoints (i.e. IP, ServiceName) and ports. Test request is initiated from specified execPod.
 // TCP and UDP protocol based service are supported at this moment
 // TODO: add support to test SCTP Protocol based services.
-func testEndpointReachability(endpoint string, port int32, protocol v1.Protocol, execPod *v1.Pod) {
+func testEndpointReachability(endpoint string, port int32, protocol v1.Protocol, execPod *v1.Pod) error {
 	ep := net.JoinHostPort(endpoint, strconv.Itoa(int(port)))
 	cmd := ""
 	switch protocol {
@@ -781,32 +804,44 @@ func testEndpointReachability(endpoint string, port int32, protocol v1.Protocol,
 	case v1.ProtocolUDP:
 		cmd = fmt.Sprintf("nc -zv -u -w 2 %s %v", endpoint, port)
 	default:
-		framework.Failf("Service reachablity check is not supported for %v", protocol)
+		return fmt.Errorf("service reachablity check is not supported for %v", protocol)
 	}
-	if cmd != "" {
-		err := wait.PollImmediate(1*time.Second, ServiceReachabilityShortPollTimeout, func() (bool, error) {
-			if _, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
-				framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
-				return false, nil
-			}
-			return true, nil
-		})
-		framework.ExpectNoError(err, "Service is not reachable within %v timeout on endpoint %s over %s protocol", ServiceReachabilityShortPollTimeout, ep, protocol)
+
+	err := wait.PollImmediate(1*time.Second, ServiceReachabilityShortPollTimeout, func() (bool, error) {
+		if _, err := framework.RunHostCmd(execPod.Namespace, execPod.Name, cmd); err != nil {
+			framework.Logf("Service reachability failing with error: %v\nRetrying...", err)
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return fmt.Errorf("service is not reachable within %v timeout on endpoint %s over %s protocol", ServiceReachabilityShortPollTimeout, ep, protocol)
 	}
+	return nil
 }
 
 // checkClusterIPServiceReachability ensures that service of type ClusterIP is reachable over
 // - ServiceName:ServicePort, ClusterIP:ServicePort
-func (j *TestJig) checkClusterIPServiceReachability(namespace string, svc *v1.Service, pod *v1.Pod) {
+func (j *TestJig) checkClusterIPServiceReachability(namespace string, svc *v1.Service, pod *v1.Pod) error {
 	clusterIP := svc.Spec.ClusterIP
 	servicePorts := svc.Spec.Ports
 
-	j.WaitForAvailableEndpoint(namespace, svc.Name, ServiceEndpointsTimeout)
+	err := j.WaitForAvailableEndpoint(namespace, svc.Name, ServiceEndpointsTimeout)
+	if err != nil {
+		return err
+	}
 
 	for _, servicePort := range servicePorts {
-		testReachabilityOverServiceName(svc.Name, servicePort, pod)
-		testReachabilityOverClusterIP(clusterIP, servicePort, pod)
+		err = testReachabilityOverServiceName(svc.Name, servicePort, pod)
+		if err != nil {
+			return err
+		}
+		err = testReachabilityOverClusterIP(clusterIP, servicePort, pod)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // checkNodePortServiceReachability ensures that service of type nodePort are reachable
@@ -814,52 +849,74 @@ func (j *TestJig) checkClusterIPServiceReachability(namespace string, svc *v1.Se
 //   	ServiceName:ServicePort, ClusterIP:ServicePort and NodeInternalIPs:NodePort
 // - External clients should be reachable to service over -
 //   	NodePublicIPs:NodePort
-func (j *TestJig) checkNodePortServiceReachability(namespace string, svc *v1.Service, pod *v1.Pod) {
+func (j *TestJig) checkNodePortServiceReachability(namespace string, svc *v1.Service, pod *v1.Pod) error {
 	clusterIP := svc.Spec.ClusterIP
 	servicePorts := svc.Spec.Ports
 
 	// Consider only 2 nodes for testing
 	nodes, err := e2enode.GetBoundedReadySchedulableNodes(j.Client, 2)
-	framework.ExpectNoError(err)
+	if err != nil {
+		return err
+	}
 
-	j.WaitForAvailableEndpoint(namespace, svc.Name, ServiceEndpointsTimeout)
+	err = j.WaitForAvailableEndpoint(namespace, svc.Name, ServiceEndpointsTimeout)
+	if err != nil {
+		return err
+	}
 
 	for _, servicePort := range servicePorts {
-		testReachabilityOverServiceName(svc.Name, servicePort, pod)
-		testReachabilityOverClusterIP(clusterIP, servicePort, pod)
-		testReachabilityOverNodePorts(nodes, servicePort, pod)
+		err = testReachabilityOverServiceName(svc.Name, servicePort, pod)
+		if err != nil {
+			return err
+		}
+		err = testReachabilityOverClusterIP(clusterIP, servicePort, pod)
+		if err != nil {
+			return err
+		}
+		err = testReachabilityOverNodePorts(nodes, servicePort, pod)
+		if err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // checkExternalServiceReachability ensures service of type externalName resolves to IP address and no fake externalName is set
 // FQDN of kubernetes is used as externalName(for air tight platforms).
-func (j *TestJig) checkExternalServiceReachability(svc *v1.Service, pod *v1.Pod) {
+func (j *TestJig) checkExternalServiceReachability(svc *v1.Service, pod *v1.Pod) error {
 	// Service must resolve to IP
 	cmd := fmt.Sprintf("nslookup %s", svc.Name)
 	_, err := framework.RunHostCmd(pod.Namespace, pod.Name, cmd)
-	framework.ExpectNoError(err, "ExternalName service must resolve to IP")
+	if err != nil {
+		return fmt.Errorf("ExternalName service %q must resolve to IP", pod.Namespace+"/"+pod.Name)
+	}
+	return nil
 }
 
 // CheckServiceReachability ensures that request are served by the services. Only supports Services with type ClusterIP, NodePort and ExternalName.
-func (j *TestJig) CheckServiceReachability(namespace string, svc *v1.Service, pod *v1.Pod) {
+func (j *TestJig) CheckServiceReachability(namespace string, svc *v1.Service, pod *v1.Pod) error {
 	svcType := svc.Spec.Type
 
-	j.sanityCheckService(svc, svcType)
+	_, err := j.sanityCheckService(svc, svcType)
+	if err != nil {
+		return err
+	}
 
 	switch svcType {
 	case v1.ServiceTypeClusterIP:
-		j.checkClusterIPServiceReachability(namespace, svc, pod)
+		return j.checkClusterIPServiceReachability(namespace, svc, pod)
 	case v1.ServiceTypeNodePort:
-		j.checkNodePortServiceReachability(namespace, svc, pod)
+		return j.checkNodePortServiceReachability(namespace, svc, pod)
 	case v1.ServiceTypeExternalName:
-		j.checkExternalServiceReachability(svc, pod)
+		return j.checkExternalServiceReachability(svc, pod)
 	default:
-		framework.Failf("Unsupported service type \"%s\" to verify service reachability for \"%s\" service. This may due to diverse implementation of the service type.", svcType, svc.Name)
+		return fmt.Errorf("unsupported service type \"%s\" to verify service reachability for \"%s\" service. This may due to diverse implementation of the service type", svcType, svc.Name)
 	}
 }
 
 // CreateServicePods creates a replication controller with the label same as service. Service listens to HTTP.
-func (j *TestJig) CreateServicePods(c clientset.Interface, ns string, replica int) {
+func (j *TestJig) CreateServicePods(c clientset.Interface, ns string, replica int) error {
 	config := testutils.RCConfig{
 		Client:       c,
 		Name:         j.Name,
@@ -871,12 +928,11 @@ func (j *TestJig) CreateServicePods(c clientset.Interface, ns string, replica in
 		Timeout:      framework.PodReadyBeforeTimeout,
 		Replicas:     replica,
 	}
-	err := framework.RunRC(config)
-	framework.ExpectNoError(err, "Replica must be created")
+	return framework.RunRC(config)
 }
 
 // CreateTCPUDPServicePods creates a replication controller with the label same as service. Service listens to TCP and UDP.
-func (j *TestJig) CreateTCPUDPServicePods(c clientset.Interface, ns string, replica int) {
+func (j *TestJig) CreateTCPUDPServicePods(c clientset.Interface, ns string, replica int) error {
 	config := testutils.RCConfig{
 		Client:       c,
 		Name:         j.Name,
@@ -888,6 +944,5 @@ func (j *TestJig) CreateTCPUDPServicePods(c clientset.Interface, ns string, repl
 		Timeout:      framework.PodReadyBeforeTimeout,
 		Replicas:     replica,
 	}
-	err := framework.RunRC(config)
-	framework.ExpectNoError(err, "Replica must be created")
+	return framework.RunRC(config)
 }

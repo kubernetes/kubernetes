@@ -48,21 +48,25 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 	ns := f.Namespace
 
 	ginkgo.By("creating a TCP service " + serviceName + " with type=LoadBalancer in namespace " + ns.Name)
-	tcpService := jig.CreateTCPServiceOrFail(ns.Name, func(s *v1.Service) {
+	tcpService, err := jig.CreateTCPService(ns.Name, func(s *v1.Service) {
 		s.Spec.Type = v1.ServiceTypeLoadBalancer
 	})
-	tcpService = jig.WaitForLoadBalancerOrFail(ns.Name, tcpService.Name, e2eservice.LoadBalancerCreateTimeoutDefault)
+	framework.ExpectNoError(err)
+	tcpService, err = jig.WaitForLoadBalancer(ns.Name, tcpService.Name, e2eservice.LoadBalancerCreateTimeoutDefault)
+	framework.ExpectNoError(err)
 
 	// Get info to hit it with
 	tcpIngressIP := e2eservice.GetIngressPoint(&tcpService.Status.LoadBalancer.Ingress[0])
 	svcPort := int(tcpService.Spec.Ports[0].Port)
 
 	ginkgo.By("creating pod to be part of service " + serviceName)
-	rc := jig.RunOrFail(ns.Name, jig.AddRCAntiAffinity)
+	rc, err := jig.Run(ns.Name, jig.AddRCAntiAffinity)
+	framework.ExpectNoError(err)
 
 	if shouldTestPDBs() {
 		ginkgo.By("creating a PodDisruptionBudget to cover the ReplicationController")
-		jig.CreatePDBOrFail(ns.Name, rc)
+		_, err = jig.CreatePDB(ns.Name, rc)
+		framework.ExpectNoError(err)
 	}
 
 	// Hit it once before considering ourselves ready
