@@ -14,6 +14,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/protobuf v1.3.1
 	github.com/google/gofuzz v1.0.0
+	github.com/google/uuid v1.1.1
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/gophercloud/gophercloud v0.1.0
 	github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7
