@@ -21,7 +21,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeserializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
-	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 )
 
@@ -58,18 +58,18 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 		DNS: kubeadm.DNS{
 			Type: kubeadm.CoreDNS,
 		},
-		CertificatesDir: v1beta2.DefaultCertificatesDir,
-		ClusterName:     v1beta2.DefaultClusterName,
+		CertificatesDir: v1beta3.DefaultCertificatesDir,
+		ClusterName:     v1beta3.DefaultClusterName,
 		Etcd: kubeadm.Etcd{
 			Local: &kubeadm.LocalEtcd{
-				DataDir: v1beta2.DefaultEtcdDataDir,
+				DataDir: v1beta3.DefaultEtcdDataDir,
 			},
 		},
-		ImageRepository:   v1beta2.DefaultImageRepository,
-		KubernetesVersion: v1beta2.DefaultKubernetesVersion,
+		ImageRepository:   v1beta3.DefaultImageRepository,
+		KubernetesVersion: v1beta3.DefaultKubernetesVersion,
 		Networking: kubeadm.Networking{
-			ServiceSubnet: v1beta2.DefaultServicesSubnet,
-			DNSDomain:     v1beta2.DefaultServiceDNSDomain,
+			ServiceSubnet: v1beta3.DefaultServicesSubnet,
+			DNSDomain:     v1beta3.DefaultServiceDNSDomain,
 		},
 	}
 	// Adds the default bootstrap token to get the round working

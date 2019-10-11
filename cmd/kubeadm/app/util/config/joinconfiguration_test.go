@@ -26,12 +26,14 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
 	kubeadmapiv1beta1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta1"
 	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 )
 
 const (
 	nodeV1beta1YAML    = "testdata/conversion/node/v1beta1.yaml"
 	nodeV1beta2YAML    = "testdata/conversion/node/v1beta2.yaml"
+	nodeV1beta3YAML    = "testdata/conversion/node/v1beta3.yaml"
 	nodeInternalYAML   = "testdata/conversion/node/internal.yaml"
 	nodeIncompleteYAML = "testdata/defaulting/node/incomplete.yaml"
 	nodeDefaultedYAML  = "testdata/defaulting/node/defaulted.yaml"
@@ -70,15 +72,27 @@ func TestLoadJoinConfigurationFromFile(t *testing.T) {
 			out:          nodeV1beta2YAML,
 			groupVersion: kubeadmapiv1beta2.SchemeGroupVersion,
 		},
+		{ // v1beta3 -> internal
+			name:         "v1beta3ToInternal",
+			in:           nodeV1beta3YAML,
+			out:          nodeInternalYAML,
+			groupVersion: kubeadm.SchemeGroupVersion,
+		},
+		{ // v1beta3 -> internal -> v1beta3
+			name:         "v1beta3Tov1beta3",
+			in:           nodeV1beta3YAML,
+			out:          nodeV1beta3YAML,
+			groupVersion: kubeadmapiv1.SchemeGroupVersion,
+		},
 		// These tests are reading one file that has only a subset of the fields populated, loading it using LoadJoinConfigurationFromFile,
 		// and then marshals the internal object to the expected groupVersion
-		{ // v1beta2 -> default -> validate -> internal -> v1beta2
-			name:         "incompleteYAMLToDefaultedv1beta2",
+		{ // v1beta3 -> default -> validate -> internal -> v1beta3
+			name:         "incompleteYAMLToDefaultedv1beta3",
 			in:           nodeIncompleteYAML,
 			out:          nodeDefaultedYAML,
-			groupVersion: kubeadmapiv1beta2.SchemeGroupVersion,
+			groupVersion: kubeadmapiv1.SchemeGroupVersion,
 		},
-		{ // v1beta2 -> validation should fail
+		{ // v1beta3 -> validation should fail
 			name:        "invalidYAMLShouldFail",
 			in:          nodeInvalidYAML,
 			expectedErr: true,

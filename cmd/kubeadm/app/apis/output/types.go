@@ -18,7 +18,7 @@ package output
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -29,5 +29,5 @@ import (
 type BootstrapToken struct {
 	metav1.TypeMeta
 
-	kubeadmapiv1beta2.BootstrapToken
+	kubeadmapiv1.BootstrapToken
 }

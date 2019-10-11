@@ -11,7 +11,7 @@ go_library(
     srcs = ["fuzzer.go"],
     importpath = "k8s.io/kubernetes/cmd/kubeadm/app/apis/output/fuzzer",
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm/v1beta2:go_default_library",
+        "//cmd/kubeadm/app/apis/kubeadm/v1beta3:go_default_library",
         "//cmd/kubeadm/app/apis/output:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime/serializer:go_default_library",

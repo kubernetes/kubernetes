@@ -28,7 +28,7 @@ import (
 	"github.com/spf13/cobra"
 
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/validation"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
@@ -72,7 +72,7 @@ func NewCmdSelfhosting(in io.Reader) *cobra.Command {
 // getSelfhostingSubCommand returns sub commands for Self-hosting phase
 func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 
-	cfg := &kubeadmapiv1beta2.ClusterConfiguration{}
+	cfg := &kubeadmapiv1.ClusterConfiguration{}
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(cfg)
 
@@ -127,7 +127,7 @@ func getSelfhostingSubCommand(in io.Reader) *cobra.Command {
 			phases.SetKubernetesVersion(cfg)
 
 			// This call returns the ready-to-use configuration based on the configuration file that might or might not exist and the default cfg populated by flags
-			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, &kubeadmapiv1beta2.InitConfiguration{}, cfg)
+			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(cfgPath, &kubeadmapiv1.InitConfiguration{}, cfg)
 			if err != nil {
 				return err
 			}

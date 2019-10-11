@@ -22,7 +22,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
@@ -59,8 +59,8 @@ func newCmdKubeConfigUtility(out io.Writer) *cobra.Command {
 // newCmdUserKubeConfig returns sub commands for kubeconfig phase
 func newCmdUserKubeConfig(out io.Writer) *cobra.Command {
 
-	initCfg := &kubeadmapiv1beta2.InitConfiguration{}
-	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
+	initCfg := &kubeadmapiv1.InitConfiguration{}
+	clusterCfg := &kubeadmapiv1.ClusterConfiguration{}
 
 	// Default values for the cobra help text
 	kubeadmscheme.Scheme.Default(initCfg)

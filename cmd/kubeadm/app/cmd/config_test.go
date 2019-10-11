@@ -30,7 +30,7 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/spf13/cobra"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/componentconfigs"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
@@ -76,7 +76,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				constants.CurrentKubernetesVersion.String(),
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: kubeadm.k8s.io/v1beta2
+				apiVersion: kubeadm.k8s.io/v1beta3
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
 			`, constants.CurrentKubernetesVersion))),
@@ -88,7 +88,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				"coredns",
 			},
 			configContents: []byte(dedent.Dedent(fmt.Sprintf(`
-				apiVersion: kubeadm.k8s.io/v1beta2
+				apiVersion: kubeadm.k8s.io/v1beta3
 				kind: ClusterConfiguration
 				kubernetesVersion: %s
 			`, constants.MinimumControlPlaneVersion))),
@@ -108,7 +108,7 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 				t.Fatalf("Failed writing a config file: %v", err)
 			}
 
-			i, err := NewImagesList(configFilePath, &kubeadmapiv1beta2.ClusterConfiguration{
+			i, err := NewImagesList(configFilePath, &kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersion,
 			})
 			if err != nil {
@@ -135,21 +135,21 @@ func TestImagesListRunWithCustomConfigPath(t *testing.T) {
 func TestConfigImagesListRunWithoutPath(t *testing.T) {
 	testcases := []struct {
 		name           string
-		cfg            kubeadmapiv1beta2.ClusterConfiguration
+		cfg            kubeadmapiv1.ClusterConfiguration
 		expectedImages int
 	}{
 		{
 			name:           "empty config",
 			expectedImages: defaultNumberOfImages,
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersion,
 			},
 		},
 		{
 			name: "external etcd configuration",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
-				Etcd: kubeadmapiv1beta2.Etcd{
-					External: &kubeadmapiv1beta2.ExternalEtcd{
+			cfg: kubeadmapiv1.ClusterConfiguration{
+				Etcd: kubeadmapiv1.Etcd{
+					External: &kubeadmapiv1.ExternalEtcd{
 						Endpoints: []string{"https://some.etcd.com:2379"},
 					},
 				},
@@ -159,17 +159,17 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 		},
 		{
 			name: "coredns enabled",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersion,
 			},
 			expectedImages: defaultNumberOfImages,
 		},
 		{
 			name: "kube-dns enabled",
-			cfg: kubeadmapiv1beta2.ClusterConfiguration{
+			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersion,
-				DNS: kubeadmapiv1beta2.DNS{
-					Type: kubeadmapiv1beta2.KubeDNS,
+				DNS: kubeadmapiv1.DNS{
+					Type: kubeadmapiv1.KubeDNS,
 				},
 			},
 			expectedImages: defaultNumberOfImages + 2,

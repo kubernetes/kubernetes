@@ -28,7 +28,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/duration"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -119,7 +119,7 @@ func newCmdCertsRenewal() *cobra.Command {
 type renewFlags struct {
 	cfgPath        string
 	kubeconfigPath string
-	cfg            kubeadmapiv1beta2.ClusterConfiguration
+	cfg            kubeadmapiv1.ClusterConfiguration
 	useAPI         bool
 	csrOnly        bool
 	csrPath        string
@@ -127,7 +127,7 @@ type renewFlags struct {
 
 func getRenewSubCommands(kdir string) []*cobra.Command {
 	flags := &renewFlags{
-		cfg: kubeadmapiv1beta2.ClusterConfiguration{
+		cfg: kubeadmapiv1.ClusterConfiguration{
 			// Setting kubernetes version to a default value in order to allow a not necessary internet lookup
 			KubernetesVersion: constants.CurrentKubernetesVersion.String(),
 		},
@@ -195,7 +195,7 @@ func addRenewFlags(cmd *cobra.Command, flags *renewFlags) {
 }
 
 func renewCert(flags *renewFlags, kdir string, handler *renewal.CertificateRenewHandler) error {
-	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(flags.cfgPath, &kubeadmapiv1beta2.InitConfiguration{}, &flags.cfg)
+	internalcfg, err := configutil.LoadOrDefaultInitConfiguration(flags.cfgPath, &kubeadmapiv1.InitConfiguration{}, &flags.cfg)
 	if err != nil {
 		return err
 	}
@@ -248,7 +248,7 @@ func renewCert(flags *renewFlags, kdir string, handler *renewal.CertificateRenew
 // newCmdCertsExpiration creates a new `cert check-expiration` command.
 func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 	flags := &expirationFlags{
-		cfg: kubeadmapiv1beta2.ClusterConfiguration{
+		cfg: kubeadmapiv1.ClusterConfiguration{
 			// Setting kubernetes version to a default value in order to allow a not necessary internet lookup
 			KubernetesVersion: constants.CurrentKubernetesVersion.String(),
 		},
@@ -261,7 +261,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 		Short: "Check certificates expiration for a Kubernetes cluster",
 		Long:  expirationLongDesc,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(flags.cfgPath, &kubeadmapiv1beta2.InitConfiguration{}, &flags.cfg)
+			internalcfg, err := configutil.LoadOrDefaultInitConfiguration(flags.cfgPath, &kubeadmapiv1.InitConfiguration{}, &flags.cfg)
 			if err != nil {
 				return err
 			}
@@ -325,7 +325,7 @@ func newCmdCertsExpiration(out io.Writer, kdir string) *cobra.Command {
 
 type expirationFlags struct {
 	cfgPath string
-	cfg     kubeadmapiv1beta2.ClusterConfiguration
+	cfg     kubeadmapiv1.ClusterConfiguration
 }
 
 func addExpirationFlags(cmd *cobra.Command, flags *expirationFlags) {

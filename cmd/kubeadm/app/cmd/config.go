@@ -33,7 +33,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmscheme "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/scheme"
-	kubeadmapiv1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	kubeadmapiv1 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	phaseutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
@@ -50,8 +50,8 @@ import (
 
 var (
 	// placeholderToken is only set statically to make kubeadm not randomize the token on every run
-	placeholderToken = kubeadmapiv1beta2.BootstrapToken{
-		Token: &kubeadmapiv1beta2.BootstrapTokenString{
+	placeholderToken = kubeadmapiv1.BootstrapToken{
+		Token: &kubeadmapiv1.BootstrapTokenString{
 			ID:     "abcdef",
 			Secret: "0123456789abcdef",
 		},
@@ -97,7 +97,7 @@ func NewCmdConfigPrint(out io.Writer) *cobra.Command {
 		Short: "Print configuration",
 		Long: dedent.Dedent(`
 			This command prints configurations for subcommands provided.
-			For details, see: https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2`),
+			For details, see: https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3`),
 		RunE: cmdutil.SubCmdRunE("print"),
 	}
 	cmd.AddCommand(NewCmdConfigPrintInitDefaults(out))
@@ -184,14 +184,14 @@ func getSupportedComponentConfigAPIObjects() []string {
 }
 
 func getDefaultedInitConfig() (*kubeadmapi.InitConfiguration, error) {
-	initCfg := &kubeadmapiv1beta2.InitConfiguration{
-		LocalAPIEndpoint: kubeadmapiv1beta2.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
-		BootstrapTokens:  []kubeadmapiv1beta2.BootstrapToken{placeholderToken},
-		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+	initCfg := &kubeadmapiv1.InitConfiguration{
+		LocalAPIEndpoint: kubeadmapiv1.APIEndpoint{AdvertiseAddress: "1.2.3.4"},
+		BootstrapTokens:  []kubeadmapiv1.BootstrapToken{placeholderToken},
+		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
 		},
 	}
-	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{
+	clusterCfg := &kubeadmapiv1.ClusterConfiguration{
 		KubernetesVersion: constants.CurrentKubernetesVersion.String(), // avoid going to the Internet for the current Kubernetes version
 	}
 	return configutil.DefaultedInitConfiguration(initCfg, clusterCfg)
@@ -207,15 +207,15 @@ func getDefaultInitConfigBytes() ([]byte, error) {
 }
 
 func getDefaultNodeConfigBytes() ([]byte, error) {
-	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1beta2.JoinConfiguration{
-		Discovery: kubeadmapiv1beta2.Discovery{
-			BootstrapToken: &kubeadmapiv1beta2.BootstrapTokenDiscovery{
+	internalcfg, err := configutil.DefaultedJoinConfiguration(&kubeadmapiv1.JoinConfiguration{
+		Discovery: kubeadmapiv1.Discovery{
+			BootstrapToken: &kubeadmapiv1.BootstrapTokenDiscovery{
 				Token:                    placeholderToken.Token.String(),
 				APIServerEndpoint:        "kube-apiserver:6443",
 				UnsafeSkipCAVerification: true, // TODO: UnsafeSkipCAVerification: true needs to be set for validation to pass, but shouldn't be recommended as the default
 			},
 		},
-		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 			CRISocket: constants.DefaultDockerCRISocket, // avoid CRI detection
 		},
 	})
@@ -245,7 +245,7 @@ func NewCmdConfigMigrate(out io.Writer) *cobra.Command {
 
 			In other words, the output of this command is what kubeadm actually would read internally if you
 			submitted this file to "kubeadm init"
-		`), kubeadmapiv1beta2.SchemeGroupVersion, kubeadmapiv1beta2.SchemeGroupVersion),
+		`), kubeadmapiv1.SchemeGroupVersion, kubeadmapiv1.SchemeGroupVersion),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(oldCfgPath) == 0 {
 				return errors.New("the --old-config flag is mandatory")
@@ -358,10 +358,10 @@ func NewCmdConfigUploadFromFile(out io.Writer, kubeConfigFile *string) *cobra.Co
 // NewCmdConfigUploadFromFlags returns cobra.Command for "kubeadm config upload from-flags" command
 // Deprecated: please see kubeadm init phase upload-config
 func NewCmdConfigUploadFromFlags(out io.Writer, kubeConfigFile *string) *cobra.Command {
-	initCfg := &kubeadmapiv1beta2.InitConfiguration{}
+	initCfg := &kubeadmapiv1.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(initCfg)
 
-	clusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
+	clusterCfg := &kubeadmapiv1.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(clusterCfg)
 
 	var featureGatesString string
@@ -437,9 +437,9 @@ func NewCmdConfigImages(out io.Writer) *cobra.Command {
 
 // NewCmdConfigImagesPull returns the `kubeadm config images pull` command
 func NewCmdConfigImagesPull() *cobra.Command {
-	externalClusterCfg := &kubeadmapiv1beta2.ClusterConfiguration{}
+	externalClusterCfg := &kubeadmapiv1.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(externalClusterCfg)
-	externalInitCfg := &kubeadmapiv1beta2.InitConfiguration{}
+	externalInitCfg := &kubeadmapiv1.InitConfiguration{}
 	kubeadmscheme.Scheme.Default(externalInitCfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -497,7 +497,7 @@ func PullControlPlaneImages(runtime utilruntime.ContainerRuntime, cfg *kubeadmap
 
 // NewCmdConfigImagesList returns the "kubeadm config images list" command
 func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Command {
-	externalcfg := &kubeadmapiv1beta2.ClusterConfiguration{}
+	externalcfg := &kubeadmapiv1.ClusterConfiguration{}
 	kubeadmscheme.Scheme.Default(externalcfg)
 	var cfgPath, featureGatesString string
 	var err error
@@ -530,10 +530,10 @@ func NewCmdConfigImagesList(out io.Writer, mockK8sVersion *string) *cobra.Comman
 }
 
 // NewImagesList returns the underlying struct for the "kubeadm config images list" command
-func NewImagesList(cfgPath string, cfg *kubeadmapiv1beta2.ClusterConfiguration) (*ImagesList, error) {
+func NewImagesList(cfgPath string, cfg *kubeadmapiv1.ClusterConfiguration) (*ImagesList, error) {
 	// Avoid running the CRI auto-detection code as we don't need it
-	versionedInitCfg := &kubeadmapiv1beta2.InitConfiguration{
-		NodeRegistration: kubeadmapiv1beta2.NodeRegistrationOptions{
+	versionedInitCfg := &kubeadmapiv1.InitConfiguration{
+		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 			CRISocket: constants.DefaultDockerCRISocket,
 		},
 	}
@@ -564,7 +564,7 @@ func (i *ImagesList) Run(out io.Writer) error {
 }
 
 // AddImagesCommonConfigFlags adds the flags that configure kubeadm (and affect the images kubeadm will use)
-func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1beta2.ClusterConfiguration, cfgPath *string, featureGatesString *string) {
+func AddImagesCommonConfigFlags(flagSet *flag.FlagSet, cfg *kubeadmapiv1.ClusterConfiguration, cfgPath *string, featureGatesString *string) {
 	options.AddKubernetesVersionFlag(flagSet, &cfg.KubernetesVersion)
 	options.AddFeatureGatesStringFlag(flagSet, featureGatesString)
 	options.AddImageMetaFlags(flagSet, &cfg.ImageRepository)

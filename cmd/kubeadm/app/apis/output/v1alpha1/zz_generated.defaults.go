@@ -22,7 +22,7 @@ package v1alpha1
 
 import (
 	runtime "k8s.io/apimachinery/pkg/runtime"
-	v1beta2 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2"
+	v1beta3 "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta3"
 )
 
 // RegisterDefaults adds defaulters functions to the given scheme.
@@ -34,5 +34,5 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_BootstrapToken(in *BootstrapToken) {
-	v1beta2.SetDefaults_BootstrapToken(&in.BootstrapToken)
+	v1beta3.SetDefaults_BootstrapToken(&in.BootstrapToken)
 }
