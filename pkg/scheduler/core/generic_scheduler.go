@@ -178,11 +178,14 @@ func (g *genericScheduler) Schedule(state *framework.CycleState, pod *v1.Pod) (r
 	if err := podPassesBasicChecks(pod, g.pvcLister); err != nil {
 		return result, err
 	}
+	trace.Step("Basic checks done")
+
 	// Run "prefilter" plugins.
 	preFilterStatus := g.framework.RunPreFilterPlugins(state, pod)
 	if !preFilterStatus.IsSuccess() {
 		return result, preFilterStatus.AsError()
 	}
+	trace.Step("Running prefilter plugins done")
 
 	numNodes := g.cache.NodeTree().NumNodes()
 	if numNodes == 0 {
@@ -192,13 +195,14 @@ func (g *genericScheduler) Schedule(state *framework.CycleState, pod *v1.Pod) (r
 	if err := g.snapshot(); err != nil {
 		return result, err
 	}
+	trace.Step("Snapshoting scheduler cache and node infos done")
 
-	trace.Step("Basic checks done")
 	startPredicateEvalTime := time.Now()
 	filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(state, pod)
 	if err != nil {
 		return result, err
 	}
+	trace.Step("Computing predicates done")
 
 	// Run "postfilter" plugins.
 	postfilterStatus := g.framework.RunPostFilterPlugins(state, pod, filteredNodes, filteredNodesStatuses)
@@ -214,7 +218,7 @@ func (g *genericScheduler) Schedule(state *framework.CycleState, pod *v1.Pod) (r
 			FilteredNodesStatuses: filteredNodesStatuses,
 		}
 	}
-	trace.Step("Computing predicates done")
+	trace.Step("Running postfilter plugins done")
 	metrics.SchedulingAlgorithmPredicateEvaluationDuration.Observe(metrics.SinceInSeconds(startPredicateEvalTime))
 	metrics.DeprecatedSchedulingAlgorithmPredicateEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPredicateEvalTime))
 	metrics.SchedulingLatency.WithLabelValues(metrics.PredicateEvaluation).Observe(metrics.SinceInSeconds(startPredicateEvalTime))
@@ -237,14 +241,15 @@ func (g *genericScheduler) Schedule(state *framework.CycleState, pod *v1.Pod) (r
 	if err != nil {
 		return result, err
 	}
-	trace.Step("Prioritizing done")
+
 	metrics.SchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInSeconds(startPriorityEvalTime))
 	metrics.DeprecatedSchedulingAlgorithmPriorityEvaluationDuration.Observe(metrics.SinceInMicroseconds(startPriorityEvalTime))
 	metrics.SchedulingLatency.WithLabelValues(metrics.PriorityEvaluation).Observe(metrics.SinceInSeconds(startPriorityEvalTime))
 	metrics.DeprecatedSchedulingLatency.WithLabelValues(metrics.PriorityEvaluation).Observe(metrics.SinceInSeconds(startPriorityEvalTime))
 
 	host, err := g.selectHost(priorityList)
-	trace.Step("Selecting host done")
+	trace.Step("Prioritizing done")
+
 	return ScheduleResult{
 		SuggestedHost:  host,
 		EvaluatedNodes: len(filteredNodes) + len(failedPredicateMap) + len(filteredNodesStatuses),
