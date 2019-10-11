@@ -3145,6 +3145,15 @@ message PodLogOptions {
   // slightly more or slightly less than the specified limit.
   // +optional
   optional int64 limitBytes = 8;
+
+  // insecureSkipTLSVerifyBackend indicates that the apiserver should not confirm the validity of the
+  // serving certificate of the backend it is connecting to.  This will make the HTTPS connection between the apiserver
+  // and the backend insecure. This means the apiserver cannot verify the log data it is receiving came from the real
+  // kubelet.  If the kubelet is configured to verify the apiserver's TLS credentials, it does not mean the
+  // connection to the real kubelet is vulnerable to a man in the middle attack (e.g. an attacker could not intercept
+  // the actual log data coming from the real kubelet).
+  // +optional
+  optional bool insecureSkipTLSVerifyBackend = 9;
 }
 
 // PodPortForwardOptions is the query options to a Pod's port forward call
