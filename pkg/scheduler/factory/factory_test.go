@@ -251,6 +251,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "bar"},
 		Spec:       apitesting.V1DeepEqualSafePodSpec(),
 	}
+	testPodInfo := &framework.PodInfo{Pod: testPod}
 	client := fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testPod}})
 	stopCh := make(chan struct{})
 	defer close(stopCh)
@@ -258,10 +259,10 @@ func TestDefaultErrorFunc(t *testing.T) {
 	timestamp := time.Now()
 	queue := internalqueue.NewPriorityQueue(nil, nil, internalqueue.WithClock(clock.NewFakeClock(timestamp)))
 	schedulerCache := internalcache.New(30*time.Second, stopCh)
-	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache, stopCh)
+	errFunc := MakeDefaultErrorFunc(client, queue, schedulerCache)
 
 	// Trigger error handling again to put the pod in unschedulable queue
-	errFunc(testPod, nil)
+	errFunc(testPodInfo, nil)
 
 	// Try up to a minute to retrieve the error pod from priority queue
 	foundPodFlag := false
@@ -295,7 +296,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	queue.MoveAllToActiveQueue()
 
 	// Trigger error handling again to put the pod in backoff queue
-	errFunc(testPod, nil)
+	errFunc(testPodInfo, nil)
 
 	foundPodFlag = false
 	for i := 0; i < maxIterations; i++ {
