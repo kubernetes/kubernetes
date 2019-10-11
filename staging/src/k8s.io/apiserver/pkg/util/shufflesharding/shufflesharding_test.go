@@ -17,55 +17,80 @@ limitations under the License.
 package shufflesharding
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
+	"reflect"
 	"sort"
-	"strings"
 	"testing"
 )
 
-func TestValidateParameters(t *testing.T) {
+func TestRequiredEntropyBits(t *testing.T) {
+	tests := []struct {
+		name         string
+		deckSize     int
+		handSize     int
+		expectedBits int
+	}{
+		{
+			"deckSize: 1024 handSize: 6",
+			1024,
+			6,
+			60,
+		},
+		{
+			"deckSize: 512 handSize: 8",
+			512,
+			8,
+			72,
+		},
+	}
+
+	for _, test := range tests {
+		bits := RequiredEntropyBits(test.deckSize, test.handSize)
+		if bits != test.expectedBits {
+			t.Errorf("test %s fails: expected %v but got %v", test.name, test.expectedBits, bits)
+			return
+		}
+	}
+}
+
+func TestNewDealer(t *testing.T) {
 	tests := []struct {
 		name     string
 		deckSize int
 		handSize int
-		errors   []string
+		err      error
 	}{
 		{
-			"deckSize is < 0",
+			"deckSize <= 0",
 			-100,
 			8,
-			[]string{"deckSize is not positive"},
+			fmt.Errorf("deckSize -100 or handSize 8 is not positive"),
 		},
 		{
-			"handSize is < 0",
-			128,
-			-100,
-			[]string{"handSize is not positive"},
-		},
-		{
-			"deckSize is 0",
+			"handSize <= 0",
+			100,
 			0,
-			8,
-			[]string{"deckSize is not positive"},
-		},
-		{
-			"handSize is 0",
-			128,
-			0,
-			[]string{"handSize is not positive"},
+			fmt.Errorf("deckSize 100 or handSize 0 is not positive"),
 		},
 		{
 			"handSize is greater than deckSize",
-			128,
-			129,
-			[]string{"handSize is greater than deckSize"},
+			100,
+			101,
+			fmt.Errorf("handSize 101 is greater than deckSize 100"),
 		},
 		{
-			"deckSize: 128 handSize: 6",
-			128,
-			6,
-			nil,
+			"deckSize is impractically large",
+			1 << 27,
+			2,
+			fmt.Errorf("deckSize 134217728 is impractically large"),
+		},
+		{
+			"required entropy bits is greater than MaxHashBits",
+			512,
+			8,
+			fmt.Errorf("required entropy bits of deckSize 512 and handSize 8 is greater than 60"),
 		},
 		{
 			"deckSize: 1024 handSize: 6",
@@ -73,211 +98,92 @@ func TestValidateParameters(t *testing.T) {
 			6,
 			nil,
 		},
-		{
-			"deckSize: 512 handSize: 8",
-			512,
-			8,
-			[]string{"more than 60 bits of entropy required"},
-		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			got := strings.Join(ValidateParameters(test.deckSize, test.handSize), ";")
-			expected := strings.Join(test.errors, ";")
-			if got != expected {
-				t.Errorf("test case %s got %q but expected %q", test.name, got, expected)
+			_, err := NewDealer(test.deckSize, test.handSize)
+			if !reflect.DeepEqual(err, test.err) {
+				t.Errorf("test %s fails: expected %v but got %v", test.name, test.err, err)
 				return
 			}
 		})
 	}
 }
 
-func BenchmarkValidateParameters(b *testing.B) {
-	deckSize, handSize := 512, 8
-	for i := 0; i < b.N; i++ {
-		_ = ValidateParameters(deckSize, handSize)
-	}
-}
-
-func TestShuffleAndDealWithValidation(t *testing.T) {
+func TestCardDuplication(t *testing.T) {
 	tests := []struct {
-		name      string
-		deckSize  int
-		handSize  int
-		pick      func(int)
-		validated bool
+		name     string
+		deckSize int
+		handSize int
 	}{
-		{
-			"deckSize is < 0",
-			-100,
-			8,
-			func(int) {},
-			false,
-		},
-		{
-			"handSize is < 0",
-			128,
-			-100,
-			func(int) {},
-			false,
-		},
-		{
-			"deckSize is 0",
-			0,
-			8,
-			func(int) {},
-			false,
-		},
-		{
-			"handSize is 0",
-			128,
-			0,
-			func(int) {},
-			false,
-		},
-		{
-			"handSize is greater than deckSize",
-			128,
-			129,
-			func(int) {},
-			false,
-		},
-		{
-			"deckSize: 128 handSize: 6",
-			128,
-			6,
-			func(int) {},
-			true,
-		},
-		{
-			"deckSize: 1024 handSize: 6",
-			1024,
-			6,
-			func(int) {},
-			true,
-		},
-		{
-			"deckSize: 512 handSize: 8",
-			512,
-			8,
-			func(int) {},
-			false,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			if (ShuffleAndDealWithValidation(rand.Uint64(), test.deckSize, test.handSize, test.pick) == nil) != test.validated {
-				t.Errorf("test case %s fails", test.name)
-				return
-			}
-		})
-	}
-}
-
-func BenchmarkShuffleAndDeal(b *testing.B) {
-	hashValueBase := math.MaxUint64 / uint64(b.N)
-	deckSize, handSize := 512, 8
-	pick := func(int) {}
-	for i := 0; i < b.N; i++ {
-		ShuffleAndDeal(hashValueBase*uint64(i), deckSize, handSize, pick)
-	}
-}
-
-func TestShuffleAndDealToSliceWithValidation(t *testing.T) {
-	tests := []struct {
-		name      string
-		deckSize  int
-		handSize  int
-		validated bool
-	}{
-		{
-			"validation fails",
-			-100,
-			-100,
-			false,
-		},
 		{
 			"deckSize = handSize = 4",
 			4,
 			4,
-			true,
 		},
 		{
 			"deckSize = handSize = 8",
 			8,
 			8,
-			true,
 		},
 		{
 			"deckSize = handSize = 10",
 			10,
 			10,
-			true,
 		},
 		{
 			"deckSize = handSize = 12",
 			12,
 			12,
-			true,
 		},
 		{
 			"deckSize = 128, handSize = 8",
 			128,
 			8,
-			true,
 		},
 		{
 			"deckSize = 256, handSize = 7",
 			256,
 			7,
-			true,
 		},
 		{
 			"deckSize = 512, handSize = 6",
 			512,
 			6,
-			true,
 		},
 	}
 	for _, test := range tests {
 		hashValue := rand.Uint64()
 		t.Run(test.name, func(t *testing.T) {
-			cards, err := ShuffleAndDealToSliceWithValidation(hashValue, test.deckSize, test.handSize)
-			if (err == nil) != test.validated {
-				t.Errorf("test case %s fails in validation check", test.name)
+			dealer, err := NewDealer(test.deckSize, test.handSize)
+			if err != nil {
+				t.Errorf("fail to create Dealer: %v", err)
+				return
+			}
+			hand := make([]int, 0)
+			hand = dealer.DealIntoHand(hashValue, hand)
+
+			// check cards number
+			if len(hand) != int(test.handSize) {
+				t.Errorf("test case %s fails in cards number", test.name)
 				return
 			}
 
-			if test.validated {
-				// check cards number
-				if len(cards) != int(test.handSize) {
-					t.Errorf("test case %s fails in cards number", test.name)
+			// check cards range and duplication
+			cardMap := make(map[int]struct{})
+			for _, card := range hand {
+				if card < 0 || card >= int(test.deckSize) {
+					t.Errorf("test case %s fails in range check", test.name)
 					return
 				}
-
-				// check cards range and duplication
-				cardMap := make(map[int]struct{})
-				for _, card := range cards {
-					if card < 0 || card >= int(test.deckSize) {
-						t.Errorf("test case %s fails in range check", test.name)
-						return
-					}
-					cardMap[card] = struct{}{}
-				}
-				if len(cardMap) != int(test.handSize) {
-					t.Errorf("test case %s fails in duplication check", test.name)
-					return
-				}
+				cardMap[card] = struct{}{}
 			}
-		})
-	}
-}
+			if len(cardMap) != int(test.handSize) {
+				t.Errorf("test case %s fails in duplication check", test.name)
+				return
+			}
 
-func BenchmarkShuffleAndDealToSlice(b *testing.B) {
-	hashValueBase := math.MaxUint64 / uint64(b.N)
-	deckSize, handSize := 512, 8
-	for i := 0; i < b.N; i++ {
-		_ = ShuffleAndDealToSlice(hashValueBase*uint64(i), deckSize, handSize)
+		})
 	}
 }
 
@@ -293,7 +199,7 @@ func ff(n, m int) int {
 }
 
 func TestUniformDistribution(t *testing.T) {
-	const spare = 64 - maxHashBits
+	const spare = 64 - MaxHashBits
 	tests := []struct {
 		deckSize, handSize int
 		hashMax            int
@@ -304,6 +210,11 @@ func TestUniformDistribution(t *testing.T) {
 		{70, 4, ff(70, 4)},
 	}
 	for _, test := range tests {
+		dealer, err := NewDealer(test.deckSize, test.handSize)
+		if err != nil {
+			t.Errorf("fail to create Dealer: %v", err)
+			return
+		}
 		handCoordinateMap := make(map[int]int) // maps coded hand to count of times seen
 
 		fallingFactorial := ff(test.deckSize, test.handSize)
@@ -314,7 +225,7 @@ func TestUniformDistribution(t *testing.T) {
 		maxCount := permutations * int(math.Ceil(nff))
 		aHand := make([]int, test.handSize)
 		for i := 0; i < test.hashMax; i++ {
-			ShuffleAndDealIntoHand(uint64(i), test.deckSize, aHand)
+			aHand = dealer.DealIntoHand(uint64(i), aHand)
 			sort.IntSlice(aHand).Sort()
 			handCoordinate := 0
 			for _, card := range aHand {
@@ -344,4 +255,64 @@ func TestUniformDistribution(t *testing.T) {
 		}
 	}
 	return
+}
+
+func TestDealer_DealIntoHand(t *testing.T) {
+	dealer, _ := NewDealer(6, 6)
+
+	tests := []struct {
+		name         string
+		hand         []int
+		expectedSize int
+	}{
+		{
+			"nil slice",
+			nil,
+			6,
+		},
+		{
+			"empty slice",
+			make([]int, 0),
+			6,
+		},
+		{
+			"size: 6 cap: 6 slice",
+			make([]int, 6, 6),
+			6,
+		},
+		{
+			"size: 6 cap: 12 slice",
+			make([]int, 6, 12),
+			6,
+		},
+		{
+			"size: 4 cap: 4 slice",
+			make([]int, 4, 4),
+			6,
+		},
+		{
+			"size: 4 cap: 12 slice",
+			make([]int, 4, 12),
+			6,
+		},
+		{
+			"size: 10 cap: 10 slice",
+			make([]int, 10, 10),
+			6,
+		},
+		{
+			"size: 10 cap: 12 slice",
+			make([]int, 10, 12),
+			6,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			h := dealer.DealIntoHand(0, test.hand)
+			if len(h) != test.expectedSize {
+				t.Errorf("test %s fails: expetced size %d but got %d", test.name, test.expectedSize, len(h))
+				return
+			}
+		})
+	}
 }

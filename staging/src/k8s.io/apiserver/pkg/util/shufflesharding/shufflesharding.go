@@ -17,117 +17,91 @@ limitations under the License.
 package shufflesharding
 
 import (
-	"errors"
 	"fmt"
 	"math"
-	"strings"
 )
 
-const maxHashBits = 60
+// MaxHashBits is the max bit length which can be used from hash value.
+// If we use all bits of hash value, the critical(last) card shuffled by
+// Dealer will be uneven to 2:3 (first half:second half) at most,
+// in order to reduce this unevenness to 32:33, we set MaxHashBits to 60 here.
+const MaxHashBits = 60
 
-// ValidateParameters finds errors in the parameters for shuffle
-// sharding.  Returns a slice for which `len()` is 0 if and only if
-// there are no errors.  The entropy requirement is evaluated in a
-// fast but approximate way: bits(deckSize^handSize).
-func ValidateParameters(deckSize, handSize int) (errs []string) {
-	if handSize <= 0 {
-		errs = append(errs, "handSize is not positive")
-	}
-	if deckSize <= 0 {
-		errs = append(errs, "deckSize is not positive")
-	}
-	if len(errs) > 0 {
-		return
-	}
-	if handSize > deckSize {
-		return []string{"handSize is greater than deckSize"}
-	}
-	if math.Log2(float64(deckSize))*float64(handSize) > maxHashBits {
-		return []string{fmt.Sprintf("more than %d bits of entropy required", maxHashBits)}
-	}
-	return
+// RequiredEntropyBits makes a quick and slightly conservative estimate of the number
+// of bits of hash value that are consumed in shuffle sharding a deck of the given size
+// to a hand of the given size.  The result is meaningful only if
+// 1 <= handSize <= deckSize <= 1<<26.
+func RequiredEntropyBits(deckSize, handSize int) int {
+	return int(math.Ceil(math.Log2(float64(deckSize)) * float64(handSize)))
 }
 
-// ShuffleAndDeal can shuffle a hash value to handSize-quantity and non-redundant
-// indices of decks, with the pick function, we can get the optimal deck index
-// Eg. From deckSize=128, handSize=8, we can get an index array [12 14 73 18 119 51 117 26],
-// then pick function will choose the optimal index from these
-// Algorithm: https://github.com/kubernetes/enhancements/blob/master/keps/sig-api-machinery/20190228-priority-and-fairness.md#queue-assignment-proof-of-concept
-func ShuffleAndDeal(hashValue uint64, deckSize, handSize int, pick func(int)) {
-	remainders := make([]int, handSize)
+// Dealer contains some necessary parameters and provides some methods for shuffle sharding.
+// Dealer is thread-safe.
+type Dealer struct {
+	deckSize int
+	handSize int
+}
 
-	for i := 0; i < handSize; i++ {
-		hashValueNext := hashValue / uint64(deckSize-i)
-		remainders[i] = int(hashValue - uint64(deckSize-i)*hashValueNext)
+// NewDealer will create a Dealer with the given deckSize and handSize, will return error when
+// deckSize or handSize is invalid as below.
+// 1. deckSize or handSize is not positive
+// 2. handSize is greater than deckSize
+// 3. deckSize is impractically large (greater than 1<<26)
+// 4. required entropy bits of deckSize and handSize is greater than MaxHashBits
+func NewDealer(deckSize, handSize int) (*Dealer, error) {
+	if deckSize <= 0 || handSize <= 0 {
+		return nil, fmt.Errorf("deckSize %d or handSize %d is not positive", deckSize, handSize)
+	}
+	if handSize > deckSize {
+		return nil, fmt.Errorf("handSize %d is greater than deckSize %d", handSize, deckSize)
+	}
+	if deckSize > 1<<26 {
+		return nil, fmt.Errorf("deckSize %d is impractically large", deckSize)
+	}
+	if RequiredEntropyBits(deckSize, handSize) > MaxHashBits {
+		return nil, fmt.Errorf("required entropy bits of deckSize %d and handSize %d is greater than %d", deckSize, handSize, MaxHashBits)
+	}
+
+	return &Dealer{
+		deckSize: deckSize,
+		handSize: handSize,
+	}, nil
+}
+
+// Deal shuffles a card deck and deals a hand of cards, using the given hashValue as the source of entropy.
+// The deck size and hand size are properties of the Dealer.
+// This function synchronously makes sequential calls to pick, one for each dealt card.
+// Each card is identified by an integer in the range [0, deckSize).
+// For example, for deckSize=128 and handSize=4 this function might call pick(14); pick(73); pick(119); pick(26).
+func (d *Dealer) Deal(hashValue uint64, pick func(int)) {
+	// 15 is the largest possible value of handSize
+	var remainders [15]int
+
+	for i := 0; i < d.handSize; i++ {
+		hashValueNext := hashValue / uint64(d.deckSize-i)
+		remainders[i] = int(hashValue - uint64(d.deckSize-i)*hashValueNext)
 		hashValue = hashValueNext
 	}
 
-	for i := 0; i < handSize; i++ {
-		candidate := remainders[i]
+	for i := 0; i < d.handSize; i++ {
+		card := remainders[i]
 		for j := i; j > 0; j-- {
-			if candidate >= remainders[j-1] {
-				candidate++
+			if card >= remainders[j-1] {
+				card++
 			}
 		}
-		pick(candidate)
+		pick(card)
 	}
 }
 
-// ShuffleAndDealWithValidation will do validation before ShuffleAndDeal
-func ShuffleAndDealWithValidation(hashValue uint64, deckSize, handSize int, pick func(int)) error {
-	if errs := ValidateParameters(deckSize, handSize); len(errs) > 0 {
-		return errors.New(strings.Join(errs, ";"))
-	}
-
-	ShuffleAndDeal(hashValue, deckSize, handSize, pick)
-	return nil
-}
-
-// ShuffleAndDealToSlice will use specific pick function to return slices of indices
-// after ShuffleAndDeal
-func ShuffleAndDealToSlice(hashValue uint64, deckSize, handSize int) []int {
-	var (
-		candidates = make([]int, handSize)
-		idx        = 0
-	)
-
-	pickToSlices := func(can int) {
-		candidates[idx] = int(can)
-		idx++
-	}
-
-	ShuffleAndDeal(hashValue, deckSize, handSize, pickToSlices)
-
-	return candidates
-}
-
-// ShuffleAndDealIntoHand shuffles a deck of the given size by the
-// given hash value and deals cards into the given slice.  The virtue
-// of this function compared to ShuffleAndDealToSlice is that the
-// caller provides the storage for the hand.
-func ShuffleAndDealIntoHand(hashValue uint64, deckSize int, hand []int) {
-	handSize := len(hand)
-	var idx int
-	ShuffleAndDeal(hashValue, deckSize, handSize, func(card int) {
-		hand[idx] = int(card)
-		idx++
-	})
-}
-
-// ShuffleAndDealToSliceWithValidation will do validation before ShuffleAndDealToSlice
-func ShuffleAndDealToSliceWithValidation(hashValue uint64, deckSize, handSize int) ([]int, error) {
-	if errs := ValidateParameters(deckSize, handSize); len(errs) > 0 {
-		return nil, errors.New(strings.Join(errs, ";"))
-	}
-
-	return ShuffleAndDealToSlice(hashValue, deckSize, handSize), nil
-}
-
-// ShuffleAndDealIntoHandWithValidation does validation and then ShuffleAndDealIntoHand
-func ShuffleAndDealIntoHandWithValidation(hashValue uint64, deckSize int, hand []int) error {
-	if errs := ValidateParameters(deckSize, len(hand)); len(errs) > 0 {
-		return errors.New(strings.Join(errs, ";"))
-	}
-	ShuffleAndDealIntoHand(hashValue, deckSize, hand)
-	return nil
+// DealIntoHand shuffles and deals according to the Dealer's parameters,
+// using the given hashValue as the source of entropy and then
+// returns the dealt cards as a slice of `int`.
+// If `hand` has the correct length as Dealer's handSize, it will be used as-is and no allocations will be made.
+// If `hand` is nil or too small, it will be extended (performing an allocation).
+// If `hand` is too large, a sub-slice will be returned.
+func (d *Dealer) DealIntoHand(hashValue uint64, hand []int) []int {
+	h := hand[:0]
+	d.Deal(hashValue, func(card int) { h = append(h, card) })
+	return h
 }
