@@ -19,6 +19,7 @@ package net
 import (
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"net"
 	"strconv"
@@ -165,10 +166,15 @@ func AddIPOffset(base *big.Int, offset int) net.IP {
 }
 
 // RangeSize returns the size of a range in valid addresses.
+// returns the size of the subnet (or math.MaxInt64 if the range size would overflow int64)
 func RangeSize(subnet *net.IPNet) int64 {
 	ones, bits := subnet.Mask.Size()
 	if bits == 32 && (bits-ones) >= 31 || bits == 128 && (bits-ones) >= 127 {
 		return 0
+	}
+	// this checks that we are not overflowing an int64
+	if bits-ones >= 63 {
+		return math.MaxInt64
 	}
 	return int64(1) << uint(bits-ones)
 }
