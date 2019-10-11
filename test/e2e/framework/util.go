@@ -675,10 +675,10 @@ func ContainerInitInvariant(older, newer runtime.Object) error {
 	if err := initContainersInvariants(newPod); err != nil {
 		return err
 	}
-	oldInit, _, _ := e2epod.Initialized(oldPod)
-	newInit, _, _ := e2epod.Initialized(newPod)
+	oldInit, _, _ := initialized(oldPod)
+	newInit, _, _ := initialized(newPod)
 	if oldInit && !newInit {
-		// TODO: we may in the future enable resetting Initialized = false if the kubelet needs to restart it
+		// TODO: we may in the future enable resetting initialized = false if the kubelet needs to restart it
 		// from scratch
 		return fmt.Errorf("pod cannot be initialized and then regress to not being initialized")
 	}
@@ -686,7 +686,7 @@ func ContainerInitInvariant(older, newer runtime.Object) error {
 }
 
 func initContainersInvariants(pod *v1.Pod) error {
-	allInit, initFailed, err := e2epod.Initialized(pod)
+	allInit, initFailed, err := initialized(pod)
 	if err != nil {
 		return err
 	}
@@ -2836,4 +2836,26 @@ func PrettyPrintJSON(metrics interface{}) string {
 		return ""
 	}
 	return string(formatted.Bytes())
+}
+
+// initialized checks the state of all init containers in the pod.
+func initialized(pod *v1.Pod) (ok bool, failed bool, err error) {
+	allInit := true
+	initFailed := false
+	for _, s := range pod.Status.InitContainerStatuses {
+		switch {
+		case initFailed && s.State.Waiting == nil:
+			return allInit, initFailed, fmt.Errorf("container %s is after a failed container but isn't waiting", s.Name)
+		case allInit && s.State.Waiting == nil:
+			return allInit, initFailed, fmt.Errorf("container %s is after an initializing container but isn't waiting", s.Name)
+		case s.State.Terminated == nil:
+			allInit = false
+		case s.State.Terminated.ExitCode != 0:
+			allInit = false
+			initFailed = true
+		case !s.Ready:
+			return allInit, initFailed, fmt.Errorf("container %s initialized but isn't marked as ready", s.Name)
+		}
+	}
+	return allInit, initFailed, nil
 }

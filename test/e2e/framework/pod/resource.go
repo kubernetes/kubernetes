@@ -175,28 +175,6 @@ func CountRemainingPods(c clientset.Interface, namespace string) (int, int, erro
 	return numPods, missingTimestamp, nil
 }
 
-// Initialized checks the state of all init containers in the pod.
-func Initialized(pod *v1.Pod) (ok bool, failed bool, err error) {
-	allInit := true
-	initFailed := false
-	for _, s := range pod.Status.InitContainerStatuses {
-		switch {
-		case initFailed && s.State.Waiting == nil:
-			return allInit, initFailed, fmt.Errorf("container %s is after a failed container but isn't waiting", s.Name)
-		case allInit && s.State.Waiting == nil:
-			return allInit, initFailed, fmt.Errorf("container %s is after an initializing container but isn't waiting", s.Name)
-		case s.State.Terminated == nil:
-			allInit = false
-		case s.State.Terminated.ExitCode != 0:
-			allInit = false
-			initFailed = true
-		case !s.Ready:
-			return allInit, initFailed, fmt.Errorf("container %s initialized but isn't marked as ready", s.Name)
-		}
-	}
-	return allInit, initFailed, nil
-}
-
 func podRunning(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
 	return func() (bool, error) {
 		pod, err := c.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
