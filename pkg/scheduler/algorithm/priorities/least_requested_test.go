@@ -99,14 +99,14 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Node1 scores (remaining resources) on 0-10 scale
-				CPU Score: ((4000 - 0) *10) / 4000 = 10
-				Memory Score: ((10000 - 0) *10) / 10000 = 10
-				Node1 Score: (10 + 10) / 2 = 10
+				CPU Score: ((4000 - 0) *100) / 4000 = 100
+				Memory Score: ((10000 - 0) *100) / 10000 = 100
+				Node1 Score: (100 + 100) / 2 = 100
 
 				Node2 scores (remaining resources) on 0-10 scale
-				CPU Score: ((4000 - 0) *10) / 4000 = 10
-				Memory Score: ((10000 - 0) *10) / 10000 = 10
-				Node2 Score: (10 + 10) / 2 = 10
+				CPU Score: ((4000 - 0) *100) / 4000 = 100
+				Memory Score: ((10000 - 0) *10) / 10000 = 100
+				Node2 Score: (100 + 100) / 2 = 100
 			*/
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
@@ -116,31 +116,31 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Node1 scores on 0-10 scale
-				CPU Score: ((4000 - 3000) *10) / 4000 = 2.5
-				Memory Score: ((10000 - 5000) *10) / 10000 = 5
-				Node1 Score: (2.5 + 5) / 2 = 3
+				CPU Score: ((4000 - 3000) *100) / 4000 = 25
+				Memory Score: ((10000 - 5000) *100) / 10000 = 50
+				Node1 Score: (25 + 50) / 2 = 37
 
 				Node2 scores on 0-10 scale
-				CPU Score: ((6000 - 3000) *10) / 6000 = 5
-				Memory Score: ((10000 - 5000) *10) / 10000 = 5
-				Node2 Score: (5 + 5) / 2 = 5
+				CPU Score: ((6000 - 3000) *100) / 6000 = 50
+				Memory Score: ((10000 - 5000) *100) / 10000 = 50
+				Node2 Score: (50 + 50) / 2 = 50
 			*/
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 6000, 10000)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 3}, {Name: "machine2", Score: 5}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 37}, {Name: "machine2", Score: 50}},
 			name:         "nothing scheduled, resources requested, differently sized machines",
 		},
 		{
 			/*
 				Node1 scores on 0-10 scale
-				CPU Score: ((4000 - 0) *10) / 4000 = 10
-				Memory Score: ((10000 - 0) *10) / 10000 = 10
-				Node1 Score: (10 + 10) / 2 = 10
+				CPU Score: ((4000 - 0) *100) / 4000 = 100
+				Memory Score: ((10000 - 0) *100) / 10000 = 100
+				Node1 Score: (100 + 100) / 2 = 100
 
 				Node2 scores on 0-10 scale
-				CPU Score: ((4000 - 0) *10) / 4000 = 10
-				Memory Score: ((10000 - 0) *10) / 10000 = 10
-				Node2 Score: (10 + 10) / 2 = 10
+				CPU Score: ((4000 - 0) *100) / 4000 = 100
+				Memory Score: ((10000 - 0) *100) / 10000 = 100
+				Node2 Score: (100 + 100) / 2 = 100
 			*/
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
@@ -156,18 +156,18 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Node1 scores on 0-10 scale
-				CPU Score: ((10000 - 6000) *10) / 10000 = 4
-				Memory Score: ((20000 - 0) *10) / 20000 = 10
-				Node1 Score: (4 + 10) / 2 = 7
+				CPU Score: ((10000 - 6000) *100) / 10000 = 40
+				Memory Score: ((20000 - 0) *100) / 20000 = 100
+				Node1 Score: (40 + 100) / 2 = 70
 
 				Node2 scores on 0-10 scale
-				CPU Score: ((10000 - 6000) *10) / 10000 = 4
-				Memory Score: ((20000 - 5000) *10) / 20000 = 7.5
-				Node2 Score: (4 + 7.5) / 2 = 5
+				CPU Score: ((10000 - 6000) *100) / 10000 = 40
+				Memory Score: ((20000 - 5000) *100) / 20000 = 75
+				Node2 Score: (40 + 75) / 2 = 57
 			*/
 			pod:          &v1.Pod{Spec: noResources},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 7}, {Name: "machine2", Score: 5}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 70}, {Name: "machine2", Score: 57}},
 			name:         "no resources requested, pods scheduled with resources",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly, ObjectMeta: metav1.ObjectMeta{Labels: labels2}},
@@ -179,18 +179,18 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Node1 scores on 0-10 scale
-				CPU Score: ((10000 - 6000) *10) / 10000 = 4
-				Memory Score: ((20000 - 5000) *10) / 20000 = 7.5
-				Node1 Score: (4 + 7.5) / 2 = 5
+				CPU Score: ((10000 - 6000) *10) / 10000 = 40
+				Memory Score: ((20000 - 5000) *10) / 20000 = 75
+				Node1 Score: (40 + 75) / 2 = 57
 
 				Node2 scores on 0-10 scale
-				CPU Score: ((10000 - 6000) *10) / 10000 = 4
-				Memory Score: ((20000 - 10000) *10) / 20000 = 5
-				Node2 Score: (4 + 5) / 2 = 4
+				CPU Score: ((10000 - 6000) *100) / 10000 = 40
+				Memory Score: ((20000 - 10000) *100) / 20000 = 50
+				Node2 Score: (40 + 50) / 2 = 45
 			*/
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 20000)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 4}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 57}, {Name: "machine2", Score: 45}},
 			name:         "resources requested, pods scheduled with resources",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly},
@@ -200,18 +200,18 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Node1 scores on 0-10 scale
-				CPU Score: ((10000 - 6000) *10) / 10000 = 4
-				Memory Score: ((20000 - 5000) *10) / 20000 = 7.5
-				Node1 Score: (4 + 7.5) / 2 = 5
+				CPU Score: ((10000 - 6000) *100) / 10000 = 40
+				Memory Score: ((20000 - 5000) *100) / 20000 = 75
+				Node1 Score: (40 + 75) / 2 = 57
 
 				Node2 scores on 0-10 scale
-				CPU Score: ((10000 - 6000) *10) / 10000 = 4
-				Memory Score: ((50000 - 10000) *10) / 50000 = 8
-				Node2 Score: (4 + 8) / 2 = 6
+				CPU Score: ((10000 - 6000) *100) / 10000 = 40
+				Memory Score: ((50000 - 10000) *100) / 50000 = 80
+				Node2 Score: (40 + 80) / 2 = 60
 			*/
 			pod:          &v1.Pod{Spec: cpuAndMemory},
 			nodes:        []*v1.Node{makeNode("machine1", 10000, 20000), makeNode("machine2", 10000, 50000)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 6}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 57}, {Name: "machine2", Score: 60}},
 			name:         "resources requested, pods scheduled with resources, differently sized machines",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly},
@@ -221,18 +221,18 @@ func TestLeastRequested(t *testing.T) {
 		{
 			/*
 				Node1 scores on 0-10 scale
-				CPU Score: ((4000 - 6000) *10) / 4000 = 0
-				Memory Score: ((10000 - 0) *10) / 10000 = 10
-				Node1 Score: (0 + 10) / 2 = 5
+				CPU Score: ((4000 - 6000) *100) / 4000 = 0
+				Memory Score: ((10000 - 0) *100) / 10000 = 100
+				Node1 Score: (0 + 100) / 2 = 50
 
 				Node2 scores on 0-10 scale
-				CPU Score: ((4000 - 6000) *10) / 4000 = 0
-				Memory Score: ((10000 - 5000) *10) / 10000 = 5
-				Node2 Score: (0 + 5) / 2 = 2
+				CPU Score: ((4000 - 6000) *100) / 4000 = 0
+				Memory Score: ((10000 - 5000) *100) / 10000 = 50
+				Node2 Score: (0 + 50) / 2 = 25
 			*/
 			pod:          &v1.Pod{Spec: cpuOnly},
 			nodes:        []*v1.Node{makeNode("machine1", 4000, 10000), makeNode("machine2", 4000, 10000)},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 2}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 50}, {Name: "machine2", Score: 25}},
 			name:         "requested resources exceed node capacity",
 			pods: []*v1.Pod{
 				{Spec: cpuOnly},

@@ -158,7 +158,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 5}, {Name: "machine2", Score: 0}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 50}, {Name: "machine2", Score: 0}},
 			name:         "four pods, three service pods",
 		},
 		{
@@ -170,7 +170,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			},
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 5}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 50}},
 			name:         "service with partial pod label matches",
 		},
 		{
@@ -226,7 +226,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			rcs:      []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"foo": "bar"}}}},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
 			// Taken together Service and Replication Controller should match no pods.
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 10}, {Name: "machine2", Score: 10}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "disjoined service and replication controller matches no pods",
 		},
 		{
@@ -240,7 +240,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
 			rss:      []*apps.ReplicaSet{{Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 10}, {Name: "machine2", Score: 10}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "disjoined service and replica set matches no pods",
 		},
 		{
@@ -253,7 +253,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			nodes:        []string{"machine1", "machine2"},
 			services:     []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"bar": "foo"}}}},
 			sss:          []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}}}}},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 10}, {Name: "machine2", Score: 10}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}},
 			name:         "disjoined service and stateful set matches no pods",
 		},
 		{
@@ -304,7 +304,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			},
 			nodes:        []string{"machine1", "machine2"},
 			rcs:          []*v1.ReplicationController{{Spec: v1.ReplicationControllerSpec{Selector: map[string]string{"baz": "blah"}}}},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 5}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 50}},
 			name:         "Another replication controller with partial pod label matches",
 		},
 		{
@@ -317,7 +317,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			nodes: []string{"machine1", "machine2"},
 			rss:   []*apps.ReplicaSet{{Spec: apps.ReplicaSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
 			// We use ReplicaSet, instead of ReplicationController. The result should be exactly as above.
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 5}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 50}},
 			name:         "Another replication set with partial pod label matches",
 		},
 		{
@@ -330,7 +330,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 			nodes: []string{"machine1", "machine2"},
 			sss:   []*apps.StatefulSet{{Spec: apps.StatefulSetSpec{Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"baz": "blah"}}}}},
 			// We use StatefulSet, instead of ReplicationController. The result should be exactly as above.
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 5}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: 50}},
 			name:         "Another stateful set with partial pod label matches",
 		},
 	}
@@ -478,8 +478,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
 				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
-				{Name: nodeMachine1Zone2, Score: 0}, // Already have pod on machine
-				{Name: nodeMachine2Zone2, Score: 3}, // Already have pod in zone
+				{Name: nodeMachine1Zone2, Score: 0},  // Already have pod on machine
+				{Name: nodeMachine2Zone2, Score: 33}, // Already have pod in zone
 				{Name: nodeMachine1Zone3, Score: framework.MaxNodeScore},
 				{Name: nodeMachine2Zone3, Score: framework.MaxNodeScore},
 				{Name: nodeMachine3Zone3, Score: framework.MaxNodeScore},
@@ -498,11 +498,11 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
 				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore},
-				{Name: nodeMachine1Zone2, Score: 0}, // Pod on node
-				{Name: nodeMachine2Zone2, Score: 0}, // Pod on node
-				{Name: nodeMachine1Zone3, Score: 6}, // Pod in zone
-				{Name: nodeMachine2Zone3, Score: 3}, // Pod on node
-				{Name: nodeMachine3Zone3, Score: 6}, // Pod in zone
+				{Name: nodeMachine1Zone2, Score: 0},  // Pod on node
+				{Name: nodeMachine2Zone2, Score: 0},  // Pod on node
+				{Name: nodeMachine1Zone3, Score: 66}, // Pod in zone
+				{Name: nodeMachine2Zone3, Score: 33}, // Pod on node
+				{Name: nodeMachine3Zone3, Score: 66}, // Pod in zone
 			},
 			name: "five pods, 3 matching (z2=2, z3=1)",
 		},
@@ -516,12 +516,12 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
-				{Name: nodeMachine1Zone1, Score: 0}, // Pod on node
-				{Name: nodeMachine1Zone2, Score: 0}, // Pod on node
-				{Name: nodeMachine2Zone2, Score: 3}, // Pod in zone
-				{Name: nodeMachine1Zone3, Score: 0}, // Pod on node
-				{Name: nodeMachine2Zone3, Score: 3}, // Pod in zone
-				{Name: nodeMachine3Zone3, Score: 3}, // Pod in zone
+				{Name: nodeMachine1Zone1, Score: 0},  // Pod on node
+				{Name: nodeMachine1Zone2, Score: 0},  // Pod on node
+				{Name: nodeMachine2Zone2, Score: 33}, // Pod in zone
+				{Name: nodeMachine1Zone3, Score: 0},  // Pod on node
+				{Name: nodeMachine2Zone3, Score: 33}, // Pod in zone
+				{Name: nodeMachine3Zone3, Score: 33}, // Pod in zone
 			},
 			name: "four pods, 3 matching (z1=1, z2=1, z3=1)",
 		},
@@ -535,12 +535,12 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 			},
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
 			expectedList: []framework.NodeScore{
-				{Name: nodeMachine1Zone1, Score: 0}, // Pod on node
-				{Name: nodeMachine1Zone2, Score: 0}, // Pod on node
-				{Name: nodeMachine2Zone2, Score: 3}, // Pod in zone
-				{Name: nodeMachine1Zone3, Score: 0}, // Pod on node
-				{Name: nodeMachine2Zone3, Score: 3}, // Pod in zone
-				{Name: nodeMachine3Zone3, Score: 3}, // Pod in zone
+				{Name: nodeMachine1Zone1, Score: 0},  // Pod on node
+				{Name: nodeMachine1Zone2, Score: 0},  // Pod on node
+				{Name: nodeMachine2Zone2, Score: 33}, // Pod in zone
+				{Name: nodeMachine1Zone3, Score: 0},  // Pod on node
+				{Name: nodeMachine2Zone3, Score: 33}, // Pod in zone
+				{Name: nodeMachine3Zone3, Score: 33}, // Pod in zone
 			},
 			name: "four pods, 3 matching (z1=1, z2=1, z3=1)",
 		},
@@ -561,11 +561,11 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				// pod on m1.z2 and putting a pod on m2.z2, but the ordering is correct.
 				// This is also consistent with what we have already.
 				{Name: nodeMachine1Zone1, Score: framework.MaxNodeScore}, // No pods in zone
-				{Name: nodeMachine1Zone2, Score: 5},                      // Pod on node
-				{Name: nodeMachine2Zone2, Score: 6},                      // Pod in zone
+				{Name: nodeMachine1Zone2, Score: 50},                     // Pod on node
+				{Name: nodeMachine2Zone2, Score: 66},                     // Pod in zone
 				{Name: nodeMachine1Zone3, Score: 0},                      // Two pods on node
-				{Name: nodeMachine2Zone3, Score: 3},                      // Pod in zone
-				{Name: nodeMachine3Zone3, Score: 3},                      // Pod in zone
+				{Name: nodeMachine2Zone3, Score: 33},                     // Pod in zone
+				{Name: nodeMachine3Zone3, Score: 33},                     // Pod in zone
 			},
 			name: "Replication controller spreading (z1=0, z2=1, z3=2)",
 		},
@@ -692,8 +692,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: 5}, {Name: "machine12", Score: 5},
-				{Name: "machine21", Score: 5}, {Name: "machine22", Score: 5},
+			expectedList: []framework.NodeScore{{Name: "machine11", Score: 50}, {Name: "machine12", Score: 50},
+				{Name: "machine21", Score: 50}, {Name: "machine22", Score: 50},
 				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
 			name: "three pods, two service pods on different machines",
 		},
@@ -722,8 +722,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: 6}, {Name: "machine12", Score: 6},
-				{Name: "machine21", Score: 3}, {Name: "machine22", Score: 3},
+			expectedList: []framework.NodeScore{{Name: "machine11", Score: 66}, {Name: "machine12", Score: 66},
+				{Name: "machine21", Score: 33}, {Name: "machine22", Score: 33},
 				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
 			name: "four pods, three service pods",
 		},
@@ -736,8 +736,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: map[string]string{"baz": "blah"}}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: 3}, {Name: "machine12", Score: 3},
-				{Name: "machine21", Score: 6}, {Name: "machine22", Score: 6},
+			expectedList: []framework.NodeScore{{Name: "machine11", Score: 33}, {Name: "machine12", Score: 33},
+				{Name: "machine21", Score: 66}, {Name: "machine22", Score: 66},
 				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
 			name: "service with partial pod label matches",
 		},
@@ -751,8 +751,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 			},
 			nodes:    labeledNodes,
 			services: []*v1.Service{{Spec: v1.ServiceSpec{Selector: labels1}}},
-			expectedList: []framework.NodeScore{{Name: "machine11", Score: 7}, {Name: "machine12", Score: 7},
-				{Name: "machine21", Score: 5}, {Name: "machine22", Score: 5},
+			expectedList: []framework.NodeScore{{Name: "machine11", Score: 75}, {Name: "machine12", Score: 75},
+				{Name: "machine21", Score: 50}, {Name: "machine22", Score: 50},
 				{Name: "machine01", Score: 0}, {Name: "machine02", Score: 0}},
 			name: "service pod on non-zoned node",
 		},

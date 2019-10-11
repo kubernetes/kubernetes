@@ -56,17 +56,17 @@ func TestCreatingFunctionShapeErrorsIfXIsNotSorted(t *testing.T) {
 
 func TestCreatingFunctionPointNotInAllowedRange(t *testing.T) {
 	var err error
-	_, err = NewFunctionShape([]FunctionShapePoint{{-1, 0}, {100, 10}})
+	_, err = NewFunctionShape([]FunctionShapePoint{{-1, 0}, {100, 100}})
 	assert.Equal(t, "utilization values must not be less than 0. Utilization[0]==-1", err.Error())
 
-	_, err = NewFunctionShape([]FunctionShapePoint{{0, 0}, {101, 10}})
+	_, err = NewFunctionShape([]FunctionShapePoint{{0, 0}, {101, 100}})
 	assert.Equal(t, "utilization values must not be greater than 100. Utilization[1]==101", err.Error())
 
-	_, err = NewFunctionShape([]FunctionShapePoint{{0, -1}, {100, 10}})
+	_, err = NewFunctionShape([]FunctionShapePoint{{0, -1}, {100, 100}})
 	assert.Equal(t, "score values must not be less than 0. Score[0]==-1", err.Error())
 
-	_, err = NewFunctionShape([]FunctionShapePoint{{0, 0}, {100, 11}})
-	assert.Equal(t, "score valuses not be greater than 10. Score[1]==11", err.Error())
+	_, err = NewFunctionShape([]FunctionShapePoint{{0, 0}, {100, 101}})
+	assert.Equal(t, "score valuses not be greater than 100. Score[1]==101", err.Error())
 }
 
 func TestBrokenLinearFunction(t *testing.T) {
@@ -167,7 +167,7 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 					used:     resources{0, 0},
 				},
 			},
-			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 10}, {Name: "node2", Score: 10}},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 100}, {Name: "node2", Score: 100}},
 		},
 		{
 			test:      "nothing scheduled, resources requested, differently sized machines (default - least requested nodes have priority)",
@@ -182,7 +182,7 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 					used:     resources{0, 0},
 				},
 			},
-			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 4}, {Name: "node2", Score: 5}},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 38}, {Name: "node2", Score: 50}},
 		},
 		{
 			test:      "no resources requested, pods scheduled with resources (default - least requested nodes have priority)",
@@ -197,7 +197,7 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 					used:     resources{3000, 5000},
 				},
 			},
-			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 4}, {Name: "node2", Score: 5}},
+			expectedPriorities: []framework.NodeScore{{Name: "node1", Score: 38}, {Name: "node2", Score: 50}},
 		},
 	}
 

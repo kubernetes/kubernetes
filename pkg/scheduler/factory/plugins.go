@@ -417,7 +417,13 @@ func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *s
 	n := len(arguments.UtilizationShape)
 	points := make([]priorities.FunctionShapePoint, 0, n)
 	for _, point := range arguments.UtilizationShape {
-		points = append(points, priorities.FunctionShapePoint{Utilization: int64(point.Utilization), Score: int64(point.Score)})
+		points = append(points, priorities.FunctionShapePoint{
+			Utilization: int64(point.Utilization),
+			// CustomPriorityMaxScore may diverge from the max score used in the scheduler and defined by MaxNodeScore,
+			// therefore we need to scale the score returned by requested to capacity ratio to the score range
+			// used by the scheduler.
+			Score: int64(point.Score) * (framework.MaxNodeScore / schedulerapi.CustomPriorityMaxScore),
+		})
 	}
 	shape, err := priorities.NewFunctionShape(points)
 	if err != nil {

@@ -27,6 +27,9 @@ const (
 	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
 	// that once found feasible, the scheduler stops looking for more nodes.
 	DefaultPercentageOfNodesToScore = 50
+
+	// CustomPriorityMaxScore is the max score UtilizationShapePoint expects.
+	CustomPriorityMaxScore int64 = 10
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

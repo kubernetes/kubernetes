@@ -160,7 +160,7 @@ func TestNodeAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine5", Labels: label5}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: label2}},
 			},
-			expectedList: []framework.NodeScore{{Name: "machine1", Score: 1}, {Name: "machine5", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 3}},
+			expectedList: []framework.NodeScore{{Name: "machine1", Score: 18}, {Name: "machine5", Score: framework.MaxNodeScore}, {Name: "machine2", Score: 36}},
 			name:         "all machines matches the preferred scheduling requirements of pod but with different priorities ",
 		},
 	}

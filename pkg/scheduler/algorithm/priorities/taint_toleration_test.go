@@ -157,7 +157,7 @@ func TestTaintAndToleration(t *testing.T) {
 			},
 			expectedList: []framework.NodeScore{
 				{Name: "nodeA", Score: framework.MaxNodeScore},
-				{Name: "nodeB", Score: 5},
+				{Name: "nodeB", Score: 50},
 				{Name: "nodeC", Score: 0},
 			},
 		},

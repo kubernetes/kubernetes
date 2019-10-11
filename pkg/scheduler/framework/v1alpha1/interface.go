@@ -74,7 +74,7 @@ const (
 
 const (
 	// MaxNodeScore is the maximum score a Score plugin is expected to return.
-	MaxNodeScore int64 = 10
+	MaxNodeScore int64 = 100
 
 	// MinNodeScore is the minimum score a Score plugin is expected to return.
 	MinNodeScore int64 = 0

@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -157,7 +157,7 @@ func TestTaintTolerationScore(t *testing.T) {
 			},
 			expectedList: []framework.NodeScore{
 				{Name: "nodeA", Score: framework.MaxNodeScore},
-				{Name: "nodeB", Score: 5},
+				{Name: "nodeB", Score: 50},
 				{Name: "nodeC", Score: 0},
 			},
 		},

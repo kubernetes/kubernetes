@@ -106,9 +106,9 @@ func machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.Node
 func machine2Prioritizer(_ *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (framework.NodeScoreList, error) {
 	result := []framework.NodeScore{}
 	for _, node := range nodes {
-		score := 1
+		score := 10
 		if node.Name == "machine2" {
-			score = 10
+			score = 100
 		}
 		result = append(result, framework.NodeScore{Name: node.Name, Score: int64(score)})
 	}
