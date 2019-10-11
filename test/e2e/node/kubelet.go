@@ -284,8 +284,14 @@ var _ = SIGDescribe("kubelet", func() {
 				}
 			}
 
+			// While we only use a bounded number of nodes in the test. We need to know
+			// the actual number of nodes in the cluster, to avoid running resourceMonitor
+			// against large clusters.
+			actualNodes, err := e2enode.GetReadySchedulableNodes(c)
+			framework.ExpectNoError(err)
+
 			// Start resourceMonitor only in small clusters.
-			if numNodes <= maxNodesToCheck {
+			if len(actualNodes.Items) <= maxNodesToCheck {
 				resourceMonitor = e2ekubelet.NewResourceMonitor(f.ClientSet, e2ekubelet.TargetContainers(), containerStatsPollingInterval)
 				resourceMonitor.Start()
 			}
