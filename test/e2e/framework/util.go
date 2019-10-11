@@ -1668,7 +1668,7 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 		timeout = timeout + 3*time.Minute
 	}
 
-	err = e2epod.WaitForPodsInactive(ps, interval, timeout)
+	err = waitForPodsInactive(ps, interval, timeout)
 	if err != nil {
 		return fmt.Errorf("error while waiting for pods to become inactive %s: %v", name, err)
 	}
@@ -1683,6 +1683,30 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 		return fmt.Errorf("error while waiting for pods gone %s: %v", name, err)
 	}
 	return nil
+}
+
+// waitForPodsInactive waits until there are no active pods left in the PodStore.
+// This is to make a fair comparison of deletion time between DeleteRCAndPods
+// and DeleteRCAndWaitForGC, because the RC controller decreases status.replicas
+// when the pod is inactvie.
+func waitForPodsInactive(ps *testutils.PodStore, interval, timeout time.Duration) error {
+	var activePods []*v1.Pod
+	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
+		pods := ps.List()
+		activePods = controller.FilterActivePods(pods)
+		if len(activePods) != 0 {
+			return false, nil
+		}
+		return true, nil
+	})
+
+	if err == wait.ErrWaitTimeout {
+		for _, pod := range activePods {
+			Logf("ERROR: Pod %q running on %q is still active", pod.Name, pod.Spec.NodeName)
+		}
+		return fmt.Errorf("there are %d active pods. E.g. %q on node %q", len(activePods), activePods[0].Name, activePods[0].Spec.NodeName)
+	}
+	return err
 }
 
 type updateDSFunc func(*appsv1.DaemonSet)
