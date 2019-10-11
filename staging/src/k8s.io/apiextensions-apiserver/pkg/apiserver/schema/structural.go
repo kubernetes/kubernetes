@@ -30,7 +30,7 @@ type Structural struct {
 	Generic
 	Extensions
 
-	*ValueValidation
+	ValueValidation *ValueValidation
 }
 
 // +k8s:deepcopy-gen=true
