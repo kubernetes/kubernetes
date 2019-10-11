@@ -17,6 +17,7 @@ limitations under the License.
 package internalversion
 
 import (
+	"bytes"
 	"reflect"
 	"strconv"
 	"strings"
@@ -33,17 +34,107 @@ import (
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	"k8s.io/kubernetes/pkg/apis/batch"
+	"k8s.io/kubernetes/pkg/apis/certificates"
 	"k8s.io/kubernetes/pkg/apis/coordination"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/discovery"
 	"k8s.io/kubernetes/pkg/apis/networking"
 	nodeapi "k8s.io/kubernetes/pkg/apis/node"
 	"k8s.io/kubernetes/pkg/apis/policy"
+	"k8s.io/kubernetes/pkg/apis/rbac"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 	"k8s.io/kubernetes/pkg/apis/storage"
 	"k8s.io/kubernetes/pkg/printers"
 	utilpointer "k8s.io/utils/pointer"
 )
+
+type TestPrintHandler struct {
+	numCalls int
+}
+
+func (t *TestPrintHandler) TableHandler(columnDefinitions []metav1beta1.TableColumnDefinition, printFunc interface{}) error {
+	t.numCalls++
+	return nil
+}
+
+func (t *TestPrintHandler) getNumCalls() int {
+	return t.numCalls
+}
+
+func TestAllHandlers(t *testing.T) {
+	h := &TestPrintHandler{numCalls: 0}
+	AddHandlers(h)
+	if h.getNumCalls() == 0 {
+		t.Error("TableHandler not called in AddHandlers")
+	}
+}
+
+func TestPrintEvent(t *testing.T) {
+	tests := []struct {
+		event    api.Event
+		options  printers.GenerateOptions
+		expected []metav1beta1.TableRow
+	}{
+		// Basic event; no generate options
+		{
+			event: api.Event{
+				Source: api.EventSource{Component: "kubelet"},
+				InvolvedObject: api.ObjectReference{
+					Kind:      "Pod",
+					Name:      "Pod Name",
+					FieldPath: "spec.containers{foo}",
+				},
+				Reason:         "Event Reason",
+				Message:        "Message Data",
+				FirstTimestamp: metav1.Time{Time: time.Now().UTC().AddDate(0, 0, -3)},
+				LastTimestamp:  metav1.Time{Time: time.Now().UTC().AddDate(0, 0, -2)},
+				Count:          6,
+				Type:           api.EventTypeNormal,
+				ObjectMeta:     metav1.ObjectMeta{Name: "event1"},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Last Seen, Type, Reason, Object, Message
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"2d", "Normal", "Event Reason", "pod/Pod Name", "Message Data"}}},
+		},
+		// Basic event; generate options=Wide
+		{
+			event: api.Event{
+				Source: api.EventSource{
+					Component: "kubelet",
+					Host:      "Node1",
+				},
+				InvolvedObject: api.ObjectReference{
+					Kind:      "Deployment",
+					Name:      "Deployment Name",
+					FieldPath: "spec.containers{foo}",
+				},
+				Reason:         "Event Reason",
+				Message:        "Message Data",
+				FirstTimestamp: metav1.Time{Time: time.Now().UTC().AddDate(0, 0, -3)},
+				LastTimestamp:  metav1.Time{Time: time.Now().UTC().AddDate(0, 0, -2)},
+				Count:          6,
+				Type:           api.EventTypeWarning,
+				ObjectMeta:     metav1.ObjectMeta{Name: "event2"},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Last Seen, Type, Reason, Object, Subobject, Message, First Seen, Count, Name
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"2d", "Warning", "Event Reason", "deployment/Deployment Name", "spec.containers{foo}", "kubelet, Node1", "Message Data", "3d", int64(6), "event2"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printEvent(&test.event, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
 
 func TestPrintEventsResultSorted(t *testing.T) {
 
@@ -98,6 +189,147 @@ func TestPrintEventsResultSorted(t *testing.T) {
 	message3 := thirdRow.Cells[4]
 	if message3 != "Item 3" {
 		t.Errorf("Wrong event ordering: expecting (Item 3), got (%s)", message3)
+	}
+}
+
+func TestPrintNamespace(t *testing.T) {
+	tests := []struct {
+		namespace api.Namespace
+		expected  []metav1beta1.TableRow
+	}{
+		// Basic namespace with status and age.
+		{
+			namespace: api.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "namespace1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Status: api.NamespaceStatus{
+					Phase: "FooStatus",
+				},
+			},
+			// Columns: Name, Status, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"namespace1", "FooStatus", "0s"}}},
+		},
+		// Basic namespace without status or age.
+		{
+			namespace: api.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "namespace2",
+				},
+			},
+			// Columns: Name, Status, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"namespace2", "", "<unknown>"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printNamespace(&test.namespace, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintSecret(t *testing.T) {
+	tests := []struct {
+		secret   api.Secret
+		expected []metav1beta1.TableRow
+	}{
+		// Basic namespace with type, data, and age.
+		{
+			secret: api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "secret1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Type: "kubernetes.io/service-account-token",
+				Data: map[string][]byte{
+					"token": []byte("secret data"),
+				},
+			},
+			// Columns: Name, Type, Data, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"secret1", "kubernetes.io/service-account-token", int64(1), "0s"}}},
+		},
+		// Basic namespace with type and age; no data.
+		{
+			secret: api.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "secret1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Type: "kubernetes.io/service-account-token",
+			},
+			// Columns: Name, Type, Data, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"secret1", "kubernetes.io/service-account-token", int64(0), "0s"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printSecret(&test.secret, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintServiceAccount(t *testing.T) {
+	tests := []struct {
+		serviceAccount api.ServiceAccount
+		expected       []metav1beta1.TableRow
+	}{
+		// Basic service account without secrets
+		{
+			serviceAccount: api.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sa1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Secrets: []api.ObjectReference{},
+			},
+			// Columns: Name, (Num) Secrets, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sa1", int64(0), "0s"}}},
+		},
+		// Basic service account with two secrets.
+		{
+			serviceAccount: api.ServiceAccount{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "sa1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Secrets: []api.ObjectReference{
+					{Name: "Secret1"},
+					{Name: "Secret2"},
+				},
+			},
+			// Columns: Name, (Num) Secrets, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"sa1", int64(2), "0s"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printServiceAccount(&test.serviceAccount, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
 	}
 }
 
@@ -739,7 +971,7 @@ func TestPrintHumanReadableWithNamespace(t *testing.T) {
 						Spec: api.PodSpec{
 							Containers: []api.Container{
 								{
-									Image:                  "foo/bar",
+									Image: "foo/bar",
 									TerminationMessagePath: api.TerminationMessagePathDefault,
 									ImagePullPolicy:        api.PullIfNotPresent,
 								},
@@ -1206,6 +1438,88 @@ func TestPrintPodwide(t *testing.T) {
 	}
 }
 
+func TestPrintPodConditions(t *testing.T) {
+	runningPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test1", Labels: map[string]string{"a": "1", "b": "2"}},
+		Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+		Status: api.PodStatus{
+			Phase: "Running",
+			ContainerStatuses: []api.ContainerStatus{
+				{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				{RestartCount: 3},
+			},
+		},
+	}
+	succeededPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test1", Labels: map[string]string{"a": "1", "b": "2"}},
+		Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+		Status: api.PodStatus{
+			Phase: "Succeeded",
+			ContainerStatuses: []api.ContainerStatus{
+				{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				{RestartCount: 3},
+			},
+		},
+	}
+	failedPod := &api.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "test2", Labels: map[string]string{"b": "2"}},
+		Spec:       api.PodSpec{Containers: make([]api.Container, 2)},
+		Status: api.PodStatus{
+			Phase: "Failed",
+			ContainerStatuses: []api.ContainerStatus{
+				{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
+				{RestartCount: 3},
+			},
+		},
+	}
+	tests := []struct {
+		pod    *api.Pod
+		expect []metav1beta1.TableRow
+	}{
+		// Should not have TableRowCondition
+		{
+			pod: runningPod,
+			// Columns: Name, Ready, Reason, Restarts, Age
+			expect: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "1/2", "Running", int64(6), "<unknown>"}}},
+		},
+		// Should have TableRowCondition: podSuccessConditions
+		{
+			pod: succeededPod,
+			expect: []metav1beta1.TableRow{
+				{
+					// Columns: Name, Ready, Reason, Restarts, Age
+					Cells:      []interface{}{"test1", "1/2", "Succeeded", int64(6), "<unknown>"},
+					Conditions: podSuccessConditions,
+				},
+			},
+		},
+		// Should have TableRowCondition: podFailedCondition
+		{
+			pod: failedPod,
+			expect: []metav1beta1.TableRow{
+				{
+					// Columns: Name, Ready, Reason, Restarts, Age
+					Cells:      []interface{}{"test2", "1/2", "Failed", int64(6), "<unknown>"},
+					Conditions: podFailedConditions,
+				},
+			},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printPod(test.pod, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expect, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expect, rows))
+		}
+	}
+}
+
 func TestPrintPodList(t *testing.T) {
 	tests := []struct {
 		pods   api.PodList
@@ -1368,95 +1682,134 @@ func TestPrintNonTerminatedPod(t *testing.T) {
 	}
 }
 
-func TestPrintPodWithLabels(t *testing.T) {
+func TestPrintPodTemplate(t *testing.T) {
 	tests := []struct {
-		pod                 api.Pod
-		labelColumns        []string
-		expectedLabelValues []string
-		labelsPrinted       bool
+		podTemplate api.PodTemplate
+		options     printers.GenerateOptions
+		expected    []metav1beta1.TableRow
 	}{
+		// Test basic pod template with no containers.
 		{
-			// Test name, num of containers, restarts, container ready status
-			api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "test1",
-					Labels: map[string]string{"col1": "asd", "COL2": "zxc"},
-				},
-				Spec: api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
-					Phase: "podPhase",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
-						{RestartCount: 3},
+			podTemplate: api.PodTemplate{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-template-1"},
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-template-1"},
+					Spec: api.PodSpec{
+						Containers: []api.Container{},
 					},
 				},
 			},
-			[]string{"col1", "COL2"},
-			[]string{"asd", "zxc"},
-			true,
+
+			options: printers.GenerateOptions{},
+			// Columns: Name, Containers, Images, Pod Labels
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"pod-template-1", "", "", "<none>"}}},
 		},
+		// Test basic pod template with two containers.
 		{
-			// Test name, num of containers, restarts, container ready status
-			api.Pod{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:   "test1",
-					Labels: map[string]string{"col1": "asd", "COL2": "zxc"},
-				},
-				Spec: api.PodSpec{Containers: make([]api.Container, 2)},
-				Status: api.PodStatus{
-					Phase: "podPhase",
-					ContainerStatuses: []api.ContainerStatus{
-						{Ready: true, RestartCount: 3, State: api.ContainerState{Running: &api.ContainerStateRunning{}}},
-						{RestartCount: 3},
+			podTemplate: api.PodTemplate{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-template-2"},
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{Name: "pod-template-2"},
+					Spec: api.PodSpec{
+						Containers: []api.Container{
+							{
+								Name:  "fake-container1",
+								Image: "fake-image1",
+							},
+							{
+								Name:  "fake-container2",
+								Image: "fake-image2",
+							},
+						},
 					},
 				},
 			},
-			[]string{"col1", "COL2"},
-			[]string{"asd", "zxc"},
-			false,
+
+			options: printers.GenerateOptions{},
+			// Columns: Name, Containers, Images, Pod Labels
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"pod-template-2", "fake-container1,fake-container2", "fake-image1,fake-image2", "<none>"}}},
+		},
+		// Test basic pod template with pod labels
+		{
+			podTemplate: api.PodTemplate{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-template-3"},
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "pod-template-3",
+						Labels: map[string]string{"foo": "bar"},
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{},
+					},
+				},
+			},
+
+			options: printers.GenerateOptions{},
+			// Columns: Name, Containers, Images, Pod Labels
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"pod-template-3", "", "", "foo=bar"}}},
 		},
 	}
 
-	for _, test := range tests {
-		table, err := printers.NewTableGenerator().With(AddHandlers).GenerateTable(&test.pod, printers.GenerateOptions{})
+	for i, test := range tests {
+		rows, err := printPodTemplate(&test.podTemplate, test.options)
 		if err != nil {
 			t.Fatal(err)
 		}
-		buf := bytes.NewBuffer([]byte{})
-		options := printers.PrintOptions{}
-		if test.labelsPrinted {
-			options = printers.PrintOptions{ColumnLabels: test.labelColumns}
+		for i := range rows {
+			rows[i].Object.Object = nil
 		}
-		printer := printers.NewTablePrinter(options)
-		if err := printer.PrintObj(table, buf); err != nil {
-			t.Errorf("Error printing table: %v", err)
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
+	}
+}
 
-		if test.labelsPrinted {
-			// Labels columns should be printed.
-			for _, columnName := range test.labelColumns {
-				if !strings.Contains(buf.String(), strings.ToUpper(columnName)) {
-					t.Errorf("Error printing table: expected column %s not printed", columnName)
-				}
-			}
-			for _, labelValue := range test.expectedLabelValues {
-				if !strings.Contains(buf.String(), labelValue) {
-					t.Errorf("Error printing table: expected column value %s not printed", labelValue)
-				}
-			}
-		} else {
-			// Lable columns should not be printed.
-			for _, columnName := range test.labelColumns {
-				if strings.Contains(buf.String(), strings.ToUpper(columnName)) {
-					t.Errorf("Error printing table: expected column %s not printed", columnName)
-				}
-			}
-			for _, labelValue := range test.expectedLabelValues {
-				if strings.Contains(buf.String(), labelValue) {
-					t.Errorf("Error printing table: expected column value %s not printed", labelValue)
-				}
-			}
-		}
+func TestPrintPodTemplateList(t *testing.T) {
+
+	templateList := api.PodTemplateList{
+		Items: []api.PodTemplate{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-template-1"},
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "pod-template-2",
+						Labels: map[string]string{"foo": "bar"},
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{},
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "pod-template-2"},
+				Template: api.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:   "pod-template-2",
+						Labels: map[string]string{"a": "b"},
+					},
+					Spec: api.PodSpec{
+						Containers: []api.Container{},
+					},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Containers, Images, Pod Labels
+	expectedRows := []metav1beta1.TableRow{
+		{Cells: []interface{}{"pod-template-1", "", "", "foo=bar"}},
+		{Cells: []interface{}{"pod-template-2", "", "", "a=b"}},
+	}
+
+	rows, err := printPodTemplateList(&templateList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error printing pod template list: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+	if !reflect.DeepEqual(expectedRows, rows) {
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
 	}
 }
 
@@ -1646,6 +1999,77 @@ func TestPrintDaemonSet(t *testing.T) {
 	}
 }
 
+func TestPrintDaemonSetList(t *testing.T) {
+
+	daemonSetList := apps.DaemonSetList{
+		Items: []apps.DaemonSet{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "daemonset1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: apps.DaemonSetSpec{
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.DaemonSetStatus{
+					CurrentNumberScheduled: 2,
+					DesiredNumberScheduled: 3,
+					NumberReady:            1,
+					UpdatedNumberScheduled: 2,
+					NumberAvailable:        0,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "daemonset2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: apps.DaemonSetSpec{
+					Template: api.PodTemplateSpec{},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				},
+				Status: apps.DaemonSetStatus{
+					CurrentNumberScheduled: 4,
+					DesiredNumberScheduled: 2,
+					NumberReady:            9,
+					UpdatedNumberScheduled: 3,
+					NumberAvailable:        3,
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Num Desired, Num Current, Num Ready, Num Updated, Num Available, Selectors, Age
+	expectedRows := []metav1beta1.TableRow{
+		{Cells: []interface{}{"daemonset1", int64(3), int64(2), int64(1), int64(2), int64(0), "<none>", "0s"}},
+		{Cells: []interface{}{"daemonset2", int64(2), int64(4), int64(9), int64(3), int64(3), "<none>", "0s"}},
+	}
+
+	rows, err := printDaemonSetList(&daemonSetList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error printing daemon set list: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+	if !reflect.DeepEqual(expectedRows, rows) {
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
+	}
+}
+
 func TestPrintJob(t *testing.T) {
 	now := time.Now()
 	completions := int32(2)
@@ -1793,6 +2217,86 @@ func TestPrintJob(t *testing.T) {
 		if !reflect.DeepEqual(test.expected, rows) {
 			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
+	}
+}
+
+func TestPrintJobList(t *testing.T) {
+	completions := int32(2)
+	jobList := batch.JobList{
+		Items: []batch.Job{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: &completions,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-job-container1",
+									Image: "fake-job-image1",
+								},
+								{
+									Name:  "fake-job-container2",
+									Image: "fake-job-image2",
+								},
+							},
+						},
+					},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"job-label": "job-lable-value"}},
+				},
+				Status: batch.JobStatus{
+					Succeeded: 1,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "job2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.JobSpec{
+					Completions: &completions,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-job-container1",
+									Image: "fake-job-image1",
+								},
+								{
+									Name:  "fake-job-container2",
+									Image: "fake-job-image2",
+								},
+							},
+						},
+					},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"job-label": "job-lable-value"}},
+				},
+				Status: batch.JobStatus{
+					Succeeded: 2,
+					StartTime: &metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Completions, Duration, Age
+	expectedRows := []metav1beta1.TableRow{
+		{Cells: []interface{}{"job1", "1/2", "", "0s"}},
+		{Cells: []interface{}{"job2", "2/2", "20m", "0s"}},
+	}
+
+	rows, err := printJobList(&jobList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error printing job list: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+	if !reflect.DeepEqual(expectedRows, rows) {
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
 	}
 }
 
@@ -2692,6 +3196,56 @@ func TestPrintService(t *testing.T) {
 	}
 }
 
+func TestPrintServiceList(t *testing.T) {
+	serviceList := api.ServiceList{
+		Items: []api.Service{
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "service1"},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeClusterIP,
+					Ports: []api.ServicePort{
+						{
+							Protocol: "tcp",
+							Port:     2233,
+						},
+					},
+					ClusterIP: "10.9.8.7",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{Name: "service2"},
+				Spec: api.ServiceSpec{
+					Type: api.ServiceTypeNodePort,
+					Ports: []api.ServicePort{
+						{
+							Protocol: "udp",
+							Port:     5566,
+						},
+					},
+					ClusterIP: "1.2.3.4",
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Type, Cluster-IP, External-IP, Port(s), Age
+	expectedRows := []metav1beta1.TableRow{
+		{Cells: []interface{}{"service1", "ClusterIP", "10.9.8.7", "<none>", "2233/tcp", "<unknown>"}},
+		{Cells: []interface{}{"service2", "NodePort", "1.2.3.4", "<none>", "5566/udp", "<unknown>"}},
+	}
+
+	rows, err := printServiceList(&serviceList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error printing service list: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+	if !reflect.DeepEqual(expectedRows, rows) {
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
+	}
+}
+
 func TestPrintPodDisruptionBudget(t *testing.T) {
 	minAvailable := intstr.FromInt(22)
 	maxUnavailable := intstr.FromInt(11)
@@ -2747,6 +3301,59 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 		if !reflect.DeepEqual(test.expected, rows) {
 			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
+	}
+}
+
+func TestPrintPodDisruptionBudgetList(t *testing.T) {
+	minAvailable := intstr.FromInt(22)
+	maxUnavailable := intstr.FromInt(11)
+
+	pdbList := policy.PodDisruptionBudgetList{
+		Items: []policy.PodDisruptionBudget{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:         "ns1",
+					Name:              "pdb1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: policy.PodDisruptionBudgetSpec{
+					MaxUnavailable: &maxUnavailable,
+				},
+				Status: policy.PodDisruptionBudgetStatus{
+					PodDisruptionsAllowed: 5,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace:         "ns2",
+					Name:              "pdb2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: policy.PodDisruptionBudgetSpec{
+					MinAvailable: &minAvailable,
+				},
+				Status: policy.PodDisruptionBudgetStatus{
+					PodDisruptionsAllowed: 3,
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Min Available, Max Available, Allowed Disruptions, Age
+	expectedRows := []metav1beta1.TableRow{
+		{Cells: []interface{}{"pdb1", "N/A", "11", int64(5), "0s"}},
+		{Cells: []interface{}{"pdb2", "22", "N/A", int64(3), "0s"}},
+	}
+
+	rows, err := printPodDisruptionBudgetList(&pdbList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error printing pod template list: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+	if !reflect.DeepEqual(expectedRows, rows) {
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
 	}
 }
 
@@ -2832,6 +3439,490 @@ func boolP(b bool) *bool {
 	return &b
 }
 
+func TestPrintConfigMap(t *testing.T) {
+	tests := []struct {
+		configMap api.ConfigMap
+		expected  []metav1beta1.TableRow
+	}{
+		// Basic config map with no data.
+		{
+			configMap: api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "configmap1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+			},
+			// Columns: Name, Data, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"configmap1", int64(0), "0s"}}},
+		},
+		// Basic config map with one data entry
+		{
+			configMap: api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "configmap2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Data: map[string]string{
+					"foo": "bar",
+				},
+			},
+			// Columns: Name, (Num) Data, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"configmap2", int64(1), "0s"}}},
+		},
+		// Basic config map with one data and one binary data entry.
+		{
+			configMap: api.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "configmap3",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Data: map[string]string{
+					"foo": "bar",
+				},
+				BinaryData: map[string][]byte{
+					"bin": []byte("binary data"),
+				},
+			},
+			// Columns: Name, (Num) Data, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"configmap3", int64(2), "0s"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printConfigMap(&test.configMap, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintNetworkPolicy(t *testing.T) {
+	tests := []struct {
+		policy   networking.NetworkPolicy
+		expected []metav1beta1.TableRow
+	}{
+		// Basic network policy with empty spec.
+		{
+			policy: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "policy1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: networking.NetworkPolicySpec{},
+			},
+			// Columns: Name, Pod-Selector, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"policy1", "<none>", "0s"}}},
+		},
+		// Basic network policy with pod selector.
+		{
+			policy: networking.NetworkPolicy{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "policy2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: networking.NetworkPolicySpec{
+					PodSelector: metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				},
+			},
+			// Columns: Name, Pod-Selector, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"policy2", "foo=bar", "0s"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printNetworkPolicy(&test.policy, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintRoleBinding(t *testing.T) {
+	tests := []struct {
+		binding  rbac.RoleBinding
+		options  printers.GenerateOptions
+		expected []metav1beta1.TableRow
+	}{
+		// Basic role binding
+		{
+			binding: rbac.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "binding1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Subjects: []rbac.Subject{
+					{
+						Kind: "User",
+						Name: "system:kube-controller-manager",
+					},
+				},
+				RoleRef: rbac.RoleRef{
+					Kind: "Role",
+					Name: "extension-apiserver-authentication-reader",
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"binding1", "0s"}}},
+		},
+		// Generate options=Wide; print subject and roles.
+		{
+			binding: rbac.RoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "binding2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Subjects: []rbac.Subject{
+					{
+						Kind: "User",
+						Name: "user-name",
+					},
+					{
+						Kind: "Group",
+						Name: "group-name",
+					},
+					{
+						Kind:      "ServiceAccount",
+						Name:      "service-account-name",
+						Namespace: "service-account-namespace",
+					},
+				},
+				RoleRef: rbac.RoleRef{
+					Kind: "Role",
+					Name: "role-name",
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Name, Age, Role, Users, Groups, ServiceAccounts
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"binding2", "0s", "Role/role-name", "user-name", "group-name", "service-account-namespace/service-account-name"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printRoleBinding(&test.binding, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintClusterRoleBinding(t *testing.T) {
+	tests := []struct {
+		binding  rbac.ClusterRoleBinding
+		options  printers.GenerateOptions
+		expected []metav1beta1.TableRow
+	}{
+		// Basic cluster role binding
+		{
+			binding: rbac.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "binding1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Subjects: []rbac.Subject{
+					{
+						Kind: "User",
+						Name: "system:kube-controller-manager",
+					},
+				},
+				RoleRef: rbac.RoleRef{
+					Kind: "Role",
+					Name: "extension-apiserver-authentication-reader",
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"binding1", "0s"}}},
+		},
+		// Generate options=Wide; print subject and roles.
+		{
+			binding: rbac.ClusterRoleBinding{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "binding2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Subjects: []rbac.Subject{
+					{
+						Kind: "User",
+						Name: "user-name",
+					},
+					{
+						Kind: "Group",
+						Name: "group-name",
+					},
+					{
+						Kind:      "ServiceAccount",
+						Name:      "service-account-name",
+						Namespace: "service-account-namespace",
+					},
+				},
+				RoleRef: rbac.RoleRef{
+					Kind: "Role",
+					Name: "role-name",
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Name, Age, Role, Users, Groups, ServiceAccounts
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"binding2", "0s", "Role/role-name", "user-name", "group-name", "service-account-namespace/service-account-name"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printClusterRoleBinding(&test.binding, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+func TestPrintCertificateSigningRequest(t *testing.T) {
+	tests := []struct {
+		csr      certificates.CertificateSigningRequest
+		expected []metav1beta1.TableRow
+	}{
+		// Basic CSR with no spec or status; defaults to status: Pending.
+		{
+			csr: certificates.CertificateSigningRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "csr1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec:   certificates.CertificateSigningRequestSpec{},
+				Status: certificates.CertificateSigningRequestStatus{},
+			},
+			// Columns: Name, Age, Requestor, Condition
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"csr1", "0s", "", "Pending"}}},
+		},
+		// Basic CSR with Spec and Status=Approved.
+		{
+			csr: certificates.CertificateSigningRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "csr2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: certificates.CertificateSigningRequestSpec{
+					Username: "CSR Requestor",
+				},
+				Status: certificates.CertificateSigningRequestStatus{
+					Conditions: []certificates.CertificateSigningRequestCondition{
+						{
+							Type: certificates.CertificateApproved,
+						},
+					},
+				},
+			},
+			// Columns: Name, Age, Requestor, Condition
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"csr2", "0s", "CSR Requestor", "Approved"}}},
+		},
+		// Basic CSR with Spec and Status=Approved; certificate issued.
+		{
+			csr: certificates.CertificateSigningRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "csr2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: certificates.CertificateSigningRequestSpec{
+					Username: "CSR Requestor",
+				},
+				Status: certificates.CertificateSigningRequestStatus{
+					Conditions: []certificates.CertificateSigningRequestCondition{
+						{
+							Type: certificates.CertificateApproved,
+						},
+					},
+					Certificate: []byte("cert data"),
+				},
+			},
+			// Columns: Name, Age, Requestor, Condition
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"csr2", "0s", "CSR Requestor", "Approved,Issued"}}},
+		},
+		// Basic CSR with Spec and Status=Denied.
+		{
+			csr: certificates.CertificateSigningRequest{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "csr3",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: certificates.CertificateSigningRequestSpec{
+					Username: "CSR Requestor",
+				},
+				Status: certificates.CertificateSigningRequestStatus{
+					Conditions: []certificates.CertificateSigningRequestCondition{
+						{
+							Type: certificates.CertificateDenied,
+						},
+					},
+				},
+			},
+			// Columns: Name, Age, Requestor, Condition
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"csr3", "0s", "CSR Requestor", "Denied"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printCertificateSigningRequest(&test.csr, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintReplicationController(t *testing.T) {
+	tests := []struct {
+		rc       api.ReplicationController
+		options  printers.GenerateOptions
+		expected []metav1beta1.TableRow
+	}{
+		// Basic print replication controller without replicas or status.
+		{
+			rc: api.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rc1",
+					Namespace: "test-namespace",
+				},
+				Spec: api.ReplicationControllerSpec{
+					Selector: map[string]string{"a": "b"},
+					Template: &api.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"a": "b"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:                     "test",
+									Image:                    "test_image",
+									ImagePullPolicy:          api.PullIfNotPresent,
+									TerminationMessagePolicy: api.TerminationMessageReadFile,
+								},
+							},
+							RestartPolicy: api.RestartPolicyAlways,
+							DNSPolicy:     api.DNSClusterFirst,
+						},
+					},
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Desired, Current, Ready, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"rc1", int64(0), int64(0), int64(0), "<unknown>"}}},
+		},
+		// Basic print replication controller with replicas; does not print containers or labels
+		{
+			rc: api.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "rc1",
+					Namespace: "test-namespace",
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 5,
+					Selector: map[string]string{"a": "b"},
+					Template: &api.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"a": "b"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:                     "test",
+									Image:                    "test_image",
+									ImagePullPolicy:          api.PullIfNotPresent,
+									TerminationMessagePolicy: api.TerminationMessageReadFile,
+								},
+							},
+							RestartPolicy: api.RestartPolicyAlways,
+							DNSPolicy:     api.DNSClusterFirst,
+						},
+					},
+				},
+				Status: api.ReplicationControllerStatus{
+					Replicas:      3,
+					ReadyReplicas: 1,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Desired, Current, Ready, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(3), int64(1), "<unknown>"}}},
+		},
+		// Generate options: Wide; print containers and labels.
+		{
+			rc: api.ReplicationController{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "rc1",
+				},
+				Spec: api.ReplicationControllerSpec{
+					Replicas: 5,
+					Selector: map[string]string{"a": "b"},
+					Template: &api.PodTemplateSpec{
+						ObjectMeta: metav1.ObjectMeta{
+							Labels: map[string]string{"a": "b"},
+						},
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:                     "test",
+									Image:                    "test_image",
+									ImagePullPolicy:          api.PullIfNotPresent,
+									TerminationMessagePolicy: api.TerminationMessageReadFile,
+								},
+							},
+							RestartPolicy: api.RestartPolicyAlways,
+							DNSPolicy:     api.DNSClusterFirst,
+						},
+					},
+				},
+				Status: api.ReplicationControllerStatus{
+					Replicas:      3,
+					ReadyReplicas: 1,
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Name, Desired, Current, Ready, Age, Containers, Images, Selector
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"rc1", int64(5), int64(3), int64(1), "<unknown>", "test", "test_image", "a=b"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printReplicationController(&test.rc, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
 func TestPrintReplicaSet(t *testing.T) {
 	tests := []struct {
 		replicaSet apps.ReplicaSet
@@ -2910,6 +4001,161 @@ func TestPrintReplicaSet(t *testing.T) {
 
 	for i, test := range tests {
 		rows, err := printReplicaSet(&test.replicaSet, test.options)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
+func TestPrintReplicaSetList(t *testing.T) {
+
+	replicaSetList := apps.ReplicaSetList{
+		Items: []apps.ReplicaSet{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "replicaset1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.ReplicaSetStatus{
+					Replicas:      5,
+					ReadyReplicas: 2,
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "replicaset2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: apps.ReplicaSetSpec{
+					Replicas: 4,
+					Template: api.PodTemplateSpec{},
+					Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
+				},
+				Status: apps.ReplicaSetStatus{
+					Replicas:      3,
+					ReadyReplicas: 1,
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Desired, Current, Ready, Age
+	expectedRows := []metav1beta1.TableRow{
+		{Cells: []interface{}{"replicaset1", int64(5), int64(5), int64(2), "0s"}},
+		{Cells: []interface{}{"replicaset2", int64(4), int64(3), int64(1), "0s"}},
+	}
+
+	rows, err := printReplicaSetList(&replicaSetList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error printing replica set list: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+	if !reflect.DeepEqual(expectedRows, rows) {
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
+	}
+}
+
+func TestPrintStatefulSet(t *testing.T) {
+	tests := []struct {
+		statefulSet apps.StatefulSet
+		options     printers.GenerateOptions
+		expected    []metav1beta1.TableRow
+	}{
+		// Basic stateful set; no generate options.
+		{
+			statefulSet: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.StatefulSetStatus{
+					Replicas:      5,
+					ReadyReplicas: 2,
+				},
+			},
+			options: printers.GenerateOptions{},
+			// Columns: Name, Ready, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s"}}},
+		},
+		// Generate options "Wide"; includes containers and images.
+		{
+			statefulSet: apps.StatefulSet{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "test1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: apps.StatefulSetSpec{
+					Replicas: 5,
+					Template: api.PodTemplateSpec{
+						Spec: api.PodSpec{
+							Containers: []api.Container{
+								{
+									Name:  "fake-container1",
+									Image: "fake-image1",
+								},
+								{
+									Name:  "fake-container2",
+									Image: "fake-image2",
+								},
+							},
+						},
+					},
+				},
+				Status: apps.StatefulSetStatus{
+					Replicas:      5,
+					ReadyReplicas: 2,
+				},
+			},
+			options: printers.GenerateOptions{Wide: true},
+			// Columns: Name, Ready, Age, Containers, Images
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"test1", "2/5", "0s", "fake-container1,fake-container2", "fake-image1,fake-image2"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printStatefulSet(&test.statefulSet, test.options)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -3189,6 +4435,74 @@ func TestPrintPersistentVolumeClaim(t *testing.T) {
 	}
 }
 
+func TestPrintComponentStatus(t *testing.T) {
+	tests := []struct {
+		componentStatus api.ComponentStatus
+		expected        []metav1beta1.TableRow
+	}{
+		// Basic component status without conditions
+		{
+			componentStatus: api.ComponentStatus{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cs1",
+				},
+				Conditions: []api.ComponentCondition{},
+			},
+			// Columns: Name, Status, Message, Error
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"cs1", "Unknown", "", ""}}},
+		},
+		// Basic component status with healthy condition.
+		{
+			componentStatus: api.ComponentStatus{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cs2",
+				},
+				Conditions: []api.ComponentCondition{
+					{
+						Type:    "Healthy",
+						Status:  api.ConditionTrue,
+						Message: "test message",
+						Error:   "test error",
+					},
+				},
+			},
+			// Columns: Name, Status, Message, Error
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"cs2", "Healthy", "test message", "test error"}}},
+		},
+		// Basic component status with healthy condition.
+		{
+			componentStatus: api.ComponentStatus{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cs3",
+				},
+				Conditions: []api.ComponentCondition{
+					{
+						Type:    "Healthy",
+						Status:  api.ConditionFalse,
+						Message: "test message",
+						Error:   "test error",
+					},
+				},
+			},
+			// Columns: Name, Status, Message, Error
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"cs3", "Unhealthy", "test message", "test error"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printComponentStatus(&test.componentStatus, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+}
+
 func TestPrintCronJob(t *testing.T) {
 	completions := int32(2)
 	suspend := false
@@ -3324,6 +4638,71 @@ func TestPrintCronJob(t *testing.T) {
 		if !reflect.DeepEqual(test.expected, rows) {
 			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
+	}
+}
+
+func TestPrintCronJobList(t *testing.T) {
+	completions := int32(2)
+	suspend := false
+
+	cronJobList := batch.CronJobList{
+		Items: []batch.CronJob{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "cronjob1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.CronJobSpec{
+					Schedule: "0/5 * * * ?",
+					Suspend:  &suspend,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Completions: &completions,
+							Selector:    &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+						},
+					},
+				},
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "cronjob2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Spec: batch.CronJobSpec{
+					Schedule: "4/5 1 1 1 ?",
+					Suspend:  &suspend,
+					JobTemplate: batch.JobTemplateSpec{
+						Spec: batch.JobSpec{
+							Completions: &completions,
+							Selector:    &metav1.LabelSelector{MatchLabels: map[string]string{"a": "b"}},
+						},
+					},
+				},
+				Status: batch.CronJobStatus{
+					LastScheduleTime: &metav1.Time{Time: time.Now().Add(-20 * time.Minute)},
+				},
+			},
+		},
+	}
+
+	// Columns: Name, Schedule, Suspend, Active, Last Schedule, Age
+	expectedRows := []metav1beta1.TableRow{
+		{Cells: []interface{}{"cronjob1", "0/5 * * * ?", "False", int64(0), "0s", "0s"}},
+		{Cells: []interface{}{"cronjob2", "4/5 1 1 1 ?", "False", int64(0), "20m", "0s"}},
+	}
+
+	rows, err := printCronJobList(&cronJobList, printers.GenerateOptions{})
+	if err != nil {
+		t.Fatalf("Error printing job list: %#v", err)
+	}
+	for i := range rows {
+		rows[i].Object.Object = nil
+	}
+	if !reflect.DeepEqual(expectedRows, rows) {
+		t.Errorf("mismatch: %s", diff.ObjectReflectDiff(expectedRows, rows))
 	}
 }
 
@@ -3496,6 +4875,127 @@ func TestPrintRuntimeClass(t *testing.T) {
 			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
 		}
 	}
+}
+
+func TestPrintEndpoint(t *testing.T) {
+
+	tests := []struct {
+		endpoint api.Endpoints
+		expected []metav1beta1.TableRow
+	}{
+		// Basic endpoint with no IP's
+		{
+			endpoint: api.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "endpoint1",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+			},
+			// Columns: Name, Endpoints, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"endpoint1", "<none>", "0s"}}},
+		},
+		// Endpoint with no ports
+		{
+			endpoint: api.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "endpoint3",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(-3e11)},
+				},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{
+							{
+								IP: "1.2.3.4",
+							},
+							{
+								IP: "5.6.7.8",
+							},
+						},
+					},
+				},
+			},
+			// Columns: Name, Endpoints, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"endpoint3", "1.2.3.4,5.6.7.8", "5m"}}},
+		},
+		// Basic endpoint with two IP's and one port
+		{
+			endpoint: api.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "endpoint2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{
+							{
+								IP: "1.2.3.4",
+							},
+							{
+								IP: "5.6.7.8",
+							},
+						},
+						Ports: []api.EndpointPort{
+							{
+								Port:     8001,
+								Protocol: "tcp",
+							},
+						},
+					},
+				},
+			},
+			// Columns: Name, Endpoints, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"endpoint2", "1.2.3.4:8001,5.6.7.8:8001", "0s"}}},
+		},
+		// Basic endpoint with greater than three IP's triggering "more" string
+		{
+			endpoint: api.Endpoints{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "endpoint2",
+					CreationTimestamp: metav1.Time{Time: time.Now().Add(1.9e9)},
+				},
+				Subsets: []api.EndpointSubset{
+					{
+						Addresses: []api.EndpointAddress{
+							{
+								IP: "1.2.3.4",
+							},
+							{
+								IP: "5.6.7.8",
+							},
+							{
+								IP: "9.8.7.6",
+							},
+							{
+								IP: "6.6.6.6",
+							},
+						},
+						Ports: []api.EndpointPort{
+							{
+								Port:     8001,
+								Protocol: "tcp",
+							},
+						},
+					},
+				},
+			},
+			// Columns: Name, Endpoints, Age
+			expected: []metav1beta1.TableRow{{Cells: []interface{}{"endpoint2", "1.2.3.4:8001,5.6.7.8:8001,9.8.7.6:8001 + 1 more...", "0s"}}},
+		},
+	}
+
+	for i, test := range tests {
+		rows, err := printEndpoints(&test.endpoint, printers.GenerateOptions{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := range rows {
+			rows[i].Object.Object = nil
+		}
+		if !reflect.DeepEqual(test.expected, rows) {
+			t.Errorf("%d mismatch: %s", i, diff.ObjectReflectDiff(test.expected, rows))
+		}
+	}
+
 }
 
 func TestPrintEndpointSlice(t *testing.T) {
