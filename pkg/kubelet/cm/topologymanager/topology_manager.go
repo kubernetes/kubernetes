@@ -323,23 +323,17 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	}
 	pod := attrs.Pod
 	c := make(map[string]TopologyHint)
-	klog.Infof("[topologymanager] Pod QoS Level: %v", pod.Status.QOSClass)
 
-	if pod.Status.QOSClass == v1.PodQOSGuaranteed {
-		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			result := m.calculateAffinity(*pod, container)
-			admitPod := m.policy.CanAdmitPodResult(&result)
-			if !admitPod.Admit {
-				return admitPod
-			}
-			c[container.Name] = result
+	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+		result := m.calculateAffinity(*pod, container)
+		admitPod := m.policy.CanAdmitPodResult(&result)
+		if !admitPod.Admit {
+			return admitPod
 		}
-		m.podTopologyHints[string(pod.UID)] = c
-		klog.Infof("[topologymanager] Topology Affinity for Pod: %v are %v", pod.UID, m.podTopologyHints[string(pod.UID)])
-
-	} else {
-		klog.Infof("[topologymanager] Topology Manager only affinitises Guaranteed pods.")
+		c[container.Name] = result
 	}
+	m.podTopologyHints[string(pod.UID)] = c
+	klog.Infof("[topologymanager] Topology Affinity for Pod: %v are %v", pod.UID, m.podTopologyHints[string(pod.UID)])
 
 	return lifecycle.PodAdmitResult{
 		Admit: true,
