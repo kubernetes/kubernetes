@@ -94,7 +94,7 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// resultCh is used as both errCh and stopCh
-	resultCh := make(chan interface{})
+	resultCh := make(chan interface{}, 1)
 	tw := newTimeoutWriter(w)
 	go func() {
 		defer func() {
@@ -108,6 +108,16 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				buf = buf[:runtime.Stack(buf, false)]
 				err = fmt.Sprintf("%v\n%s", err, buf)
 			}
+
+			if err != nil {
+				switch t := err.(type) {
+				case error:
+					utilruntime.HandleError(t)
+				default:
+					utilruntime.HandleError(fmt.Errorf("%v", err))
+				}
+			}
+
 			resultCh <- err
 		}()
 		t.handler.ServeHTTP(tw, r)
@@ -120,23 +130,6 @@ func (t *timeoutHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	case <-after:
-		defer func() {
-			// resultCh needs to have a reader, since the function doing
-			// the work needs to send to it. This is defer'd to ensure it runs
-			// ever if the post timeout work itself panics.
-			go func() {
-				res := <-resultCh
-				if res != nil {
-					switch t := res.(type) {
-					case error:
-						utilruntime.HandleError(t)
-					default:
-						utilruntime.HandleError(fmt.Errorf("%v", res))
-					}
-				}
-			}()
-		}()
-
 		postTimeoutFn()
 		tw.timeout(err)
 	}
