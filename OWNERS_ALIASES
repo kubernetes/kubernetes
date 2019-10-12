@@ -17,7 +17,6 @@ aliases:
   sig-auth-authenticators-reviewers:
     - deads2k
     - enj
-    - jianhuiz
     - lavalamp
     - liggitt
     - mbohlool
@@ -81,7 +80,6 @@ aliases:
     - immutableT
     - lavalamp
     - liggitt
-    - sakshamsharma
     - smarterclayton
     - wojtek-t
 
@@ -181,9 +179,7 @@ aliases:
     - derekwaynecarr
     - dixudx
     - dims
-    - dshulyak
     - eparis
-    - ghodss
     - juanvallejo
     - mengqiy
     - rootfs
@@ -223,9 +219,7 @@ aliases:
     - pmorie
     - resouer
     - sjenning
-    - sjpotter
     - tallclair
-    - tmrts
     - vishh
     - yifan-gu
     - yujuhong
@@ -236,7 +230,6 @@ aliases:
     - caseydavenport
     - danwinship
     - dcbw
-    - dnardo
     - freehan
     - johnbelamaric
     - mrhohn
@@ -247,7 +240,6 @@ aliases:
     - caseydavenport
     - danwinship
     - dcbw
-    - dnardo
     - freehan
     - johnbelamaric
     - mrhohn
@@ -473,7 +465,6 @@ aliases:
     - kow3ns          # Apps
     - lavalamp        # API Machinery
     - liggitt         # Auth
-    - lukemarsden     # Cluster Lifecycle
     - luxas           # Cluster Lifecycle
     - marcoceppi      # On Premise
     - mattfarina      # Apps
