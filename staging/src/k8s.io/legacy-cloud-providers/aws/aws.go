@@ -47,7 +47,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/kms"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"gopkg.in/gcfg.v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -63,7 +63,7 @@ import (
 	"k8s.io/client-go/pkg/version"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/cloud-provider"
+	cloudprovider "k8s.io/cloud-provider"
 	nodehelpers "k8s.io/cloud-provider/node/helpers"
 	servicehelpers "k8s.io/cloud-provider/service/helpers"
 	cloudvolume "k8s.io/cloud-provider/volume"
@@ -1861,6 +1861,7 @@ func (c *Cloud) getMountDevice(
 	assign bool) (assigned mountDevice, alreadyAttached bool, err error) {
 
 	deviceMappings := map[mountDevice]EBSVolumeID{}
+	volumeStatus := map[EBSVolumeID]string{} // for better logging of volume status
 	for _, blockDevice := range info.BlockDeviceMappings {
 		name := aws.StringValue(blockDevice.DeviceName)
 		if strings.HasPrefix(name, "/dev/sd") {
@@ -1872,6 +1873,10 @@ func (c *Cloud) getMountDevice(
 		if len(name) < 1 || len(name) > 2 {
 			klog.Warningf("Unexpected EBS DeviceName: %q", aws.StringValue(blockDevice.DeviceName))
 		}
+		if blockDevice.Ebs != nil && blockDevice.Ebs.VolumeId != nil {
+			volumeStatus[EBSVolumeID(*blockDevice.Ebs.VolumeId)] = aws.StringValue(blockDevice.Ebs.Status)
+		}
+
 		deviceMappings[mountDevice(name)] = EBSVolumeID(aws.StringValue(blockDevice.Ebs.VolumeId))
 	}
 
@@ -1889,7 +1894,15 @@ func (c *Cloud) getMountDevice(
 	for mountDevice, mappingVolumeID := range deviceMappings {
 		if volumeID == mappingVolumeID {
 			if assign {
-				klog.Warningf("Got assignment call for already-assigned volume: %s@%s", mountDevice, mappingVolumeID)
+				// DescribeInstances shows the volume as attached / detaching, while Kubernetes
+				// cloud provider thinks it's detached.
+				// This can happened when the volume has just been detached from the same node
+				// and AWS API returns stale data in this DescribeInstances ("eventual consistency").
+				// Fail the attachment and let A/D controller retry in a while, hoping that
+				// AWS API returns consistent result next time (i.e. the volume is detached).
+				status := volumeStatus[mappingVolumeID]
+				klog.Warningf("Got assignment call for already-assigned volume: %s@%s, volume status: %s", mountDevice, mappingVolumeID, status)
+				return mountDevice, false, fmt.Errorf("volume is still being detached from the node")
 			}
 			return mountDevice, true, nil
 		}
