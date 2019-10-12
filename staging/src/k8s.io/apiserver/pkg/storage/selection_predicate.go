@@ -93,7 +93,7 @@ func (s *SelectionPredicate) Matches(obj runtime.Object) (bool, error) {
 	}
 	matched := s.Label.Matches(labels)
 	if matched && s.Field != nil {
-		matched = matched && s.Field.Matches(fields)
+		matched = s.Field.Matches(fields)
 	}
 	return matched, nil
 }
@@ -106,7 +106,7 @@ func (s *SelectionPredicate) MatchesObjectAttributes(l labels.Set, f fields.Set)
 	}
 	matched := s.Label.Matches(l)
 	if matched && s.Field != nil {
-		matched = (matched && s.Field.Matches(f))
+		matched = s.Field.Matches(f)
 	}
 	return matched
 }
