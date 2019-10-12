@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"strings"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -28,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	"k8s.io/apiserver/pkg/authentication/request/x509"
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/client-go/kubernetes"
@@ -47,6 +49,35 @@ type RequestHeaderAuthenticationOptions struct {
 	GroupHeaders        []string
 	ExtraHeaderPrefixes []string
 	AllowedNames        []string
+}
+
+func (s *RequestHeaderAuthenticationOptions) Validate() []error {
+	allErrors := []error{}
+
+	if err := checkForWhiteSpaceOnly("requestheader-username-headers", s.UsernameHeaders...); err != nil {
+		allErrors = append(allErrors, err)
+	}
+	if err := checkForWhiteSpaceOnly("requestheader-group-headers", s.GroupHeaders...); err != nil {
+		allErrors = append(allErrors, err)
+	}
+	if err := checkForWhiteSpaceOnly("requestheader-extra-headers-prefix", s.ExtraHeaderPrefixes...); err != nil {
+		allErrors = append(allErrors, err)
+	}
+	if err := checkForWhiteSpaceOnly("requestheader-allowed-names", s.AllowedNames...); err != nil {
+		allErrors = append(allErrors, err)
+	}
+
+	return allErrors
+}
+
+func checkForWhiteSpaceOnly(flag string, headerNames ...string) error {
+	for _, headerName := range headerNames {
+		if len(strings.TrimSpace(headerName)) == 0 {
+			return fmt.Errorf("empty value in %q", flag)
+		}
+	}
+
+	return nil
 }
 
 func (s *RequestHeaderAuthenticationOptions) AddFlags(fs *pflag.FlagSet) {
@@ -87,11 +118,11 @@ func (s *RequestHeaderAuthenticationOptions) ToAuthenticationRequestHeaderConfig
 	}
 
 	return &authenticatorfactory.RequestHeaderConfig{
-		UsernameHeaders:     s.UsernameHeaders,
-		GroupHeaders:        s.GroupHeaders,
-		ExtraHeaderPrefixes: s.ExtraHeaderPrefixes,
+		UsernameHeaders:     headerrequest.StaticStringSlice(s.UsernameHeaders),
+		GroupHeaders:        headerrequest.StaticStringSlice(s.GroupHeaders),
+		ExtraHeaderPrefixes: headerrequest.StaticStringSlice(s.ExtraHeaderPrefixes),
 		VerifyOptionFn:      verifyFn,
-		AllowedClientNames:  s.AllowedNames,
+		AllowedClientNames:  headerrequest.StaticStringSlice(s.AllowedNames),
 	}, nil
 }
 
@@ -167,6 +198,8 @@ func NewDelegatingAuthenticationOptions() *DelegatingAuthenticationOptions {
 
 func (s *DelegatingAuthenticationOptions) Validate() []error {
 	allErrors := []error{}
+	allErrors = append(allErrors, s.RequestHeader.Validate()...)
+
 	return allErrors
 }
 

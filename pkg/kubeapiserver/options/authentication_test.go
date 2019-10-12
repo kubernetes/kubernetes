@@ -27,6 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/authenticatorfactory"
+	"k8s.io/apiserver/pkg/authentication/request/headerrequest"
 	apiserveroptions "k8s.io/apiserver/pkg/server/options"
 	kubeauthenticator "k8s.io/kubernetes/pkg/kubeapiserver/authenticator"
 )
@@ -161,11 +162,11 @@ func TestToAuthenticationConfig(t *testing.T) {
 		TokenFailureCacheTTL: 0,
 
 		RequestHeaderConfig: &authenticatorfactory.RequestHeaderConfig{
-			UsernameHeaders:     []string{"x-remote-user"},
-			GroupHeaders:        []string{"x-remote-group"},
-			ExtraHeaderPrefixes: []string{"x-remote-extra-"},
+			UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
+			GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
+			ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
 			VerifyOptionFn:      nil, // this is nil because you can't compare functions
-			AllowedClientNames:  []string{"kube-aggregator"},
+			AllowedClientNames:  headerrequest.StaticStringSlice{"kube-aggregator"},
 		},
 	}
 

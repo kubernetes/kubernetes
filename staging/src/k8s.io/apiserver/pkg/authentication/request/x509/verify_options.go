@@ -47,3 +47,25 @@ func NewStaticVerifierFromFile(clientCA string) (VerifyOptionFunc, error) {
 
 	return StaticVerifierFn(opts), nil
 }
+
+// StringSliceProvider is a way to get a string slice value.  It is heavily used for authentication headers among other places.
+type StringSliceProvider interface {
+	// Value returns the current string slice.  Callers should never mutate the returned value.
+	Value() []string
+}
+
+// StringSliceProviderFunc is a function that matches the StringSliceProvider interface
+type StringSliceProviderFunc func() []string
+
+// Value returns the current string slice.  Callers should never mutate the returned value.
+func (d StringSliceProviderFunc) Value() []string {
+	return d()
+}
+
+// StaticStringSlice a StringSliceProvider that returns a fixed value
+type StaticStringSlice []string
+
+// Value returns the current string slice.  Callers should never mutate the returned value.
+func (s StaticStringSlice) Value() []string {
+	return s
+}

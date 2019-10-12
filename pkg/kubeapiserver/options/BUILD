@@ -102,6 +102,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/errors:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/request/headerrequest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/options:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],

@@ -148,17 +148,17 @@ type Verifier struct {
 
 	// allowedCommonNames contains the common names which a verified certificate is allowed to have.
 	// If empty, all verified certificates are allowed.
-	allowedCommonNames sets.String
+	allowedCommonNames StringSliceProvider
 }
 
 // NewVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
 func NewVerifier(opts x509.VerifyOptions, auth authenticator.Request, allowedCommonNames sets.String) authenticator.Request {
-	return NewDynamicCAVerifier(StaticVerifierFn(opts), auth, allowedCommonNames)
+	return NewDynamicCAVerifier(StaticVerifierFn(opts), auth, StaticStringSlice(allowedCommonNames.List()))
 }
 
 // NewDynamicCAVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
 // TODO make the allowedCommonNames dynamic
-func NewDynamicCAVerifier(verifyOptionsFn VerifyOptionFunc, auth authenticator.Request, allowedCommonNames sets.String) authenticator.Request {
+func NewDynamicCAVerifier(verifyOptionsFn VerifyOptionFunc, auth authenticator.Request, allowedCommonNames StringSliceProvider) authenticator.Request {
 	return &Verifier{verifyOptionsFn, auth, allowedCommonNames}
 }
 
@@ -188,12 +188,14 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 
 func (a *Verifier) verifySubject(subject pkix.Name) error {
 	// No CN restrictions
-	if len(a.allowedCommonNames) == 0 {
+	if len(a.allowedCommonNames.Value()) == 0 {
 		return nil
 	}
 	// Enforce CN restrictions
-	if a.allowedCommonNames.Has(subject.CommonName) {
-		return nil
+	for _, allowedCommonName := range a.allowedCommonNames.Value() {
+		if allowedCommonName == subject.CommonName {
+			return nil
+		}
 	}
 	return fmt.Errorf("x509: subject with cn=%s is not in the allowed list", subject.CommonName)
 }
