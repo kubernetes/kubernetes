@@ -596,6 +596,15 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 			Type: newHostPathType(string(core.HostPathDirectory)),
 		},
 	}
+	invalidPvSourceUpdateSize := validVolume.DeepCopy()
+	invalidPvSourceUpdateSize.Spec.Capacity = core.ResourceList{
+		core.ResourceName(core.ResourceStorage): resource.MustParse("100M"),
+	}
+
+	validPvSourceUpdateSize := validVolume.DeepCopy()
+	validPvSourceUpdateSize.Spec.Capacity = core.ResourceList{
+		core.ResourceName(core.ResourceStorage): resource.MustParse("10G"),
+	}
 
 	validCSIVolume := testVolume("csi-volume", "", core.PersistentVolumeSpec{
 		Capacity: core.ResourceList{
@@ -636,6 +645,16 @@ func TestValidatePersistentVolumeSourceUpdate(t *testing.T) {
 			isExpectedFailure: true,
 			oldVolume:         validVolume,
 			newVolume:         invalidPvSourceUpdateDeep,
+		},
+		"pv-size-shrink": {
+			isExpectedFailure: true,
+			oldVolume:         validVolume,
+			newVolume:         invalidPvSourceUpdateSize,
+		},
+		"pv-size-expand": {
+			isExpectedFailure: false,
+			oldVolume:         validVolume,
+			newVolume:         validPvSourceUpdateSize,
 		},
 		"csi-expansion-enabled-with-pv-secret": {
 			csiExpansionEnabled: true,

@@ -1867,6 +1867,13 @@ func ValidatePersistentVolumeUpdate(newPv, oldPv *core.PersistentVolume) field.E
 	}
 	allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.VolumeMode, oldPv.Spec.VolumeMode, field.NewPath("volumeMode"))...)
 
+	oldSize := oldPv.Spec.Capacity["storage"]
+	newSize := newPv.Spec.Capacity["storage"]
+
+	if newSize.Cmp(oldSize) < 0 {
+		allErrs = append(allErrs, field.Forbidden(field.NewPath("spec", "capacity", "storage"), "field can not be less than previous value"))
+	}
+
 	// Allow setting NodeAffinity if oldPv NodeAffinity was not set
 	if oldPv.Spec.NodeAffinity != nil {
 		allErrs = append(allErrs, ValidateImmutableField(newPv.Spec.NodeAffinity, oldPv.Spec.NodeAffinity, field.NewPath("nodeAffinity"))...)
