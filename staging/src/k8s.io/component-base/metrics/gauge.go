@@ -19,6 +19,8 @@ package metrics
 import (
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"k8s.io/component-base/version"
 )
 
 // Gauge is our internal representation for our wrapping struct around prometheus
@@ -157,4 +159,26 @@ func (v *GaugeVec) Delete(labels map[string]string) bool {
 		return false // since we haven't created the metric, we haven't deleted a metric with the passed in values
 	}
 	return v.GaugeVec.Delete(labels)
+}
+
+func newGaugeFunc(opts GaugeOpts, function func() float64, v semver.Version) GaugeFunc {
+	g := NewGauge(&opts)
+
+	if !g.Create(&v) {
+		return nil
+	}
+
+	return prometheus.NewGaugeFunc(g.GaugeOpts.toPromGaugeOpts(), function)
+}
+
+// NewGaugeFunc creates a new GaugeFunc based on the provided GaugeOpts. The
+// value reported is determined by calling the given function from within the
+// Write method. Take into account that metric collection may happen
+// concurrently. If that results in concurrent calls to Write, like in the case
+// where a GaugeFunc is directly registered with Prometheus, the provided
+// function must be concurrency-safe.
+func NewGaugeFunc(opts GaugeOpts, function func() float64) GaugeFunc {
+	v := parseVersion(version.Get())
+
+	return newGaugeFunc(opts, function, v)
 }
