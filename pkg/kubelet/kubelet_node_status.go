@@ -503,7 +503,7 @@ func (kl *Kubelet) setNodeStatus(node *v1.Node) {
 	for i, f := range kl.setNodeStatusFuncs {
 		klog.V(5).Infof("Setting node status at position %v", i)
 		if err := f(node); err != nil {
-			klog.Warningf("Failed to set some node status fields: %s", err)
+			klog.Errorf("Failed to set some node status fields: %s", err)
 		}
 	}
 }

@@ -376,8 +376,6 @@ func VersionInfo(versionInfoFunc func() (*cadvisorapiv1.VersionInfo, error), // 
 	return func(node *v1.Node) error {
 		verinfo, err := versionInfoFunc()
 		if err != nil {
-			// TODO(mtaufen): consider removing this log line, since returned error will be logged
-			klog.Errorf("Error getting version info: %v", err)
 			return fmt.Errorf("error getting version info: %v", err)
 		}
 
@@ -416,8 +414,6 @@ func Images(nodeStatusMaxImages int32,
 		var imagesOnNode []v1.ContainerImage
 		containerImages, err := imageListFunc()
 		if err != nil {
-			// TODO(mtaufen): consider removing this log line, since returned error will be logged
-			klog.Errorf("Error getting image list: %v", err)
 			node.Status.Images = imagesOnNode
 			return fmt.Errorf("error getting image list: %v", err)
 		}
