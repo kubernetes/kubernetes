@@ -363,6 +363,9 @@ func (sched *Scheduler) Run() {
 		return
 	}
 
+	metrics.ReadyTime.WithLabelValues(metrics.CurrentHostName).SetToCurrentTime()
+	metrics.StartLatency.WithLabelValues(metrics.CurrentHostName).Set(metrics.SinceInMicroseconds(metrics.BeginRunTime))
+
 	go wait.Until(sched.scheduleOne, 0, sched.StopEverything)
 }
 

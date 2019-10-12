@@ -24,6 +24,8 @@ import (
 	"net/http"
 	"os"
 	goruntime "runtime"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -238,8 +240,16 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 	// Wait for all caches to sync before scheduling.
 	cc.InformerFactory.WaitForCacheSync(stopCh)
 
+	metrics.CurrentHostName = strings.Split(cc.LeaderElection.Lock.Identity(), "_")[0]
+	metrics.InitLatency.WithLabelValues(metrics.CurrentHostName).Set(metrics.SinceInMicroseconds(metrics.BeginInitTime))
+
 	// Prepare a reusable runCommand function.
 	run := func(ctx context.Context) {
+		if metrics.CurrentHostName != "" {
+			metrics.HasLeader.WithLabelValues(metrics.CurrentHostName).Set(1)
+		}
+		metrics.BeginRunTime = time.Now()
+
 		sched.Run()
 		<-ctx.Done()
 	}
@@ -260,6 +270,7 @@ func Run(cc schedulerserverconfig.CompletedConfig, stopCh <-chan struct{}, regis
 		cc.LeaderElection.Callbacks = leaderelection.LeaderCallbacks{
 			OnStartedLeading: run,
 			OnStoppedLeading: func() {
+				metrics.HasLeader.WithLabelValues(metrics.CurrentHostName).Set(0)
 				klog.Fatalf("leaderelection lost")
 			},
 		}
