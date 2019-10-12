@@ -19,6 +19,7 @@ package core
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -202,7 +203,7 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 	// and get cached node info by given node name.
 	nodeInfoCopy := f.cachedNodeNameToInfo[node.GetName()].Clone()
 
-	potentialVictims := util.SortableList{CompFunc: util.MoreImportantPod}
+	var potentialVictims []*v1.Pod
 
 	removePod := func(rp *v1.Pod) {
 		nodeInfoCopy.RemovePod(rp)
@@ -215,11 +216,11 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 	podPriority := podutil.GetPodPriority(pod)
 	for _, p := range nodeInfoCopy.Pods() {
 		if podutil.GetPodPriority(p) < podPriority {
-			potentialVictims.Items = append(potentialVictims.Items, p)
+			potentialVictims = append(potentialVictims, p)
 			removePod(p)
 		}
 	}
-	potentialVictims.Sort()
+	sort.Slice(potentialVictims, func(i, j int) bool { return util.MoreImportantPod(potentialVictims[i], potentialVictims[j]) })
 
 	// If the new pod does not fit after removing all the lower priority pods,
 	// we are almost done and this node is not suitable for preemption.
@@ -248,8 +249,8 @@ func (f *FakeExtender) selectVictimsOnNodeByExtender(
 
 	// For now, assume all potential victims to be non-violating.
 	// Now we try to reprieve non-violating victims.
-	for _, p := range potentialVictims.Items {
-		reprievePod(p.(*v1.Pod))
+	for _, p := range potentialVictims {
+		reprievePod(p)
 	}
 
 	return victims, numViolatingVictim, true, nil
