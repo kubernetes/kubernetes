@@ -58,11 +58,12 @@ var (
 			Namespace: namespace,
 			Subsystem: subsystem,
 			Name:      "transformation_latencies_microseconds",
-			Help:      "(Deprecated) Latencies in microseconds of value transformation operations.",
+			Help:      "Latencies in microseconds of value transformation operations.",
 			// In-process transformations (ex. AES CBC) complete on the order of 20 microseconds. However, when
 			// external KMS is involved latencies may climb into milliseconds.
-			Buckets:        metrics.ExponentialBuckets(5, 2, 14),
-			StabilityLevel: metrics.ALPHA,
+			Buckets:           metrics.ExponentialBuckets(5, 2, 14),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"transformation_type"},
 	)
@@ -111,12 +112,13 @@ var (
 	)
 	deprecatedDataKeyGenerationLatencies = metrics.NewHistogram(
 		&metrics.HistogramOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "data_key_generation_latencies_microseconds",
-			Help:           "(Deprecated) Latencies in microseconds of data encryption key(DEK) generation operations.",
-			Buckets:        metrics.ExponentialBuckets(5, 2, 14),
-			StabilityLevel: metrics.ALPHA,
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "data_key_generation_latencies_microseconds",
+			Help:              "Latencies in microseconds of data encryption key(DEK) generation operations.",
+			Buckets:           metrics.ExponentialBuckets(5, 2, 14),
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 	)
 	dataKeyGenerationFailuresTotal = metrics.NewCounter(
