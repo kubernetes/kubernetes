@@ -117,11 +117,11 @@ func (c *mutationCache) GetByKey(key string) (interface{}, bool, error) {
 // ByIndex returns the newer objects that match the provided index and indexer key.
 // Will return an error if no indexer was provided.
 func (c *mutationCache) ByIndex(name string, indexKey string) ([]interface{}, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
 	if c.indexer == nil {
 		return nil, fmt.Errorf("no indexer has been provided to the mutation cache")
 	}
+	c.lock.Lock()
+	defer c.lock.Unlock()
 	keys, err := c.indexer.IndexKeys(name, indexKey)
 	if err != nil {
 		return nil, err
@@ -148,11 +148,11 @@ func (c *mutationCache) ByIndex(name string, indexKey string) ([]interface{}, er
 		fn := c.indexer.GetIndexers()[name]
 		// Keys() is returned oldest to newest, so full traversal does not alter the LRU behavior
 		for _, key := range c.mutationCache.Keys() {
-			updated, ok := c.mutationCache.Get(key)
-			if !ok {
+			if keySet.Has(key.(string)) {
 				continue
 			}
-			if keySet.Has(key.(string)) {
+			updated, ok := c.mutationCache.Get(key)
+			if !ok {
 				continue
 			}
 			elements, err := fn(updated)
