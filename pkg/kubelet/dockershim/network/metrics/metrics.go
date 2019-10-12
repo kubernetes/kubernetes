@@ -54,10 +54,11 @@ var (
 	// type.
 	DeprecatedNetworkPluginOperationsLatency = metrics.NewSummaryVec(
 		&metrics.SummaryOpts{
-			Subsystem:      kubeletSubsystem,
-			Name:           DeprecatedNetworkPluginOperationsLatencyKey,
-			Help:           "(Deprecated) Latency in microseconds of network plugin operations. Broken down by operation type.",
-			StabilityLevel: metrics.ALPHA,
+			Subsystem:         kubeletSubsystem,
+			Name:              DeprecatedNetworkPluginOperationsLatencyKey,
+			Help:              "Latency in microseconds of network plugin operations. Broken down by operation type.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.14.0",
 		},
 		[]string{"operation_type"},
 	)
