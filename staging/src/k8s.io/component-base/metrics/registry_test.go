@@ -22,6 +22,7 @@ import (
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 

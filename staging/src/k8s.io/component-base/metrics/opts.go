@@ -18,9 +18,10 @@ package metrics
 
 import (
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"sync"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // KubeOpts is superset struct for prometheus.Opts. The prometheus Opts structure

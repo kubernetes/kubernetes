@@ -17,10 +17,12 @@ limitations under the License.
 package metrics
 
 import (
+	"testing"
+
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
+
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	"testing"
 )
 
 func TestHistogram(t *testing.T) {

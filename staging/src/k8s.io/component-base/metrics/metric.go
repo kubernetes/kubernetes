@@ -17,11 +17,13 @@ limitations under the License.
 package metrics
 
 import (
+	"sync"
+
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+
 	"k8s.io/klog"
-	"sync"
 )
 
 /*
