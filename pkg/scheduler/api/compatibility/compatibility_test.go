@@ -69,7 +69,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsPorts",
-				"NoDiskConflict",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -79,6 +78,11 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAntiAffinity",
 				"TestLabelPreference",
 			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "VolumeRestrictions"},
+				},
+			},
 		},
 
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -108,7 +112,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsHostPorts",
 				"PodFitsResources",
-				"NoDiskConflict",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -123,6 +126,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 				},
 			},
 		},
@@ -160,7 +164,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
@@ -181,6 +184,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 				},
 			},
 		},
@@ -222,7 +226,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"MaxEBSVolumeCount",
@@ -245,6 +248,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
@@ -291,7 +295,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
@@ -317,6 +320,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
@@ -372,7 +376,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
@@ -398,6 +401,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
@@ -465,7 +469,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
@@ -492,6 +495,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 				},
 				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
@@ -560,7 +564,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
@@ -587,6 +590,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
@@ -660,7 +664,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
@@ -688,6 +691,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
@@ -773,7 +777,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
@@ -802,6 +805,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
@@ -888,7 +892,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
@@ -918,6 +921,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
@@ -1003,7 +1007,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
@@ -1034,6 +1037,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
@@ -1123,7 +1127,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MatchNodeSelector",
 				"PodFitsResources",
 				"PodFitsHostPorts",
-				"NoDiskConflict",
 				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
@@ -1154,6 +1157,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeName"},
+					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
@@ -1180,9 +1184,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	seenPriorities := sets.NewString()
 	mandatoryPredicates := sets.NewString("CheckNodeCondition")
 	filterToPredicateMap := map[string]string{
-		"TaintToleration": "PodToleratesNodeTaints",
-		"NodeName":        "HostName",
-		"VolumeBinding":   "CheckVolumeBinding",
+		"VolumeRestrictions": "NoDiskConflict",
+		"TaintToleration":    "PodToleratesNodeTaints",
+		"NodeName":           "HostName",
+		"VolumeBinding":      "CheckVolumeBinding",
 	}
 	scoreToPriorityMap := map[string]string{
 		"TaintToleration": "TaintTolerationPriority",
