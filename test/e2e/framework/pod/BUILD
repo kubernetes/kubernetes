@@ -7,7 +7,6 @@ go_library(
         "delete.go",
         "node_selection.go",
         "resource.go",
-        "test_verify.go",
         "wait.go",
     ],
     importpath = "k8s.io/kubernetes/test/e2e/framework/pod",
