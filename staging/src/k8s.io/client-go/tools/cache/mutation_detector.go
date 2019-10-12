@@ -118,6 +118,7 @@ func (d *defaultCacheMutationDetector) CompareObjects() {
 		if !reflect.DeepEqual(obj.cached, obj.copied) {
 			fmt.Printf("CACHE %s[%d] ALTERED!\n%v\n", d.name, i, diff.ObjectGoPrintSideBySide(obj.cached, obj.copied))
 			altered = true
+			break
 		}
 	}
 
