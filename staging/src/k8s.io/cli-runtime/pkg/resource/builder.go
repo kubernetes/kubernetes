@@ -820,7 +820,14 @@ func (b *Builder) visitorResult() *Result {
 	}
 
 	if len(b.resources) != 0 {
-		return &Result{err: fmt.Errorf("resource(s) were provided, but no name, label selector, or --all flag specified")}
+		for _, r := range b.resources {
+			_, err := b.mappingFor(r)
+			if err != nil {
+				return &Result{err: err}
+			} else {
+				return &Result{err: fmt.Errorf("resource(s) were provided, but no name, label selector, or --all flag specified")}
+			}
+		}
 	}
 	return &Result{err: missingResourceError}
 }

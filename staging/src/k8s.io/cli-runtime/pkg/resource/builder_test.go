@@ -1228,7 +1228,18 @@ func TestFieldSelectorRequiresKnownTypes(t *testing.T) {
 		t.Errorf("unexpected non-error")
 	}
 }
+func TestNoSelectorUnknowResourceType(t *testing.T) {
+	b := newDefaultBuilder().
+		NamespaceParam("test").
+		ResourceTypeOrNameArgs(false, "unknown")
 
+	err := b.Do().Err()
+	if err != nil {
+		if !strings.Contains(err.Error(), "server doesn't have a resource type \"unknown\"") {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	}
+}
 func TestSingleResourceType(t *testing.T) {
 	b := newDefaultBuilder().
 		LabelSelectorParam("a=b").
