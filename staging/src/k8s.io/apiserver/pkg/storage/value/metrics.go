@@ -81,11 +81,12 @@ var (
 
 	deprecatedTransformerFailuresTotal = metrics.NewCounterVec(
 		&metrics.CounterOpts{
-			Namespace:      namespace,
-			Subsystem:      subsystem,
-			Name:           "transformation_failures_total",
-			Help:           "(Deprecated) Total number of failed transformation operations.",
-			StabilityLevel: metrics.ALPHA,
+			Namespace:         namespace,
+			Subsystem:         subsystem,
+			Name:              "transformation_failures_total",
+			Help:              "Total number of failed transformation operations.",
+			StabilityLevel:    metrics.ALPHA,
+			DeprecatedVersion: "1.15.0",
 		},
 		[]string{"transformation_type"},
 	)
