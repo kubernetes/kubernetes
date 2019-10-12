@@ -79,9 +79,6 @@ type Config struct {
 
 	Algorithm core.ScheduleAlgorithm
 	GetBinder func(pod *v1.Pod) Binder
-	// PodPreemptor is used to evict pods and update 'NominatedNode' field of
-	// the preemptor pod.
-	PodPreemptor PodPreemptor
 	// Framework runs scheduler plugins at configured extension points.
 	Framework framework.Framework
 
@@ -117,15 +114,6 @@ type Config struct {
 	// The final configuration of the framework.
 	Plugins      config.Plugins
 	PluginConfig []config.PluginConfig
-}
-
-// PodPreemptor has methods needed to delete a pod and to update 'NominatedPod'
-// field of the preemptor pod.
-type PodPreemptor interface {
-	GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error)
-	DeletePod(pod *v1.Pod) error
-	SetNominatedNodeName(pod *v1.Pod, nominatedNode string) error
-	RemoveNominatedNodeName(pod *v1.Pod) error
 }
 
 // Configurator defines I/O, caching, and other functionality needed to
@@ -471,7 +459,6 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		SchedulerCache: c.schedulerCache,
 		Algorithm:      algo,
 		GetBinder:      getBinderFunc(c.client, extenders),
-		PodPreemptor:   &podPreemptor{c.client},
 		Framework:      framework,
 		WaitForCacheSync: func() bool {
 			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
@@ -718,30 +705,4 @@ type binder struct {
 func (b *binder) Bind(binding *v1.Binding) error {
 	klog.V(3).Infof("Attempting to bind %v to %v", binding.Name, binding.Target.Name)
 	return b.Client.CoreV1().Pods(binding.Namespace).Bind(binding)
-}
-
-type podPreemptor struct {
-	Client clientset.Interface
-}
-
-func (p *podPreemptor) GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
-	return p.Client.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
-}
-
-func (p *podPreemptor) DeletePod(pod *v1.Pod) error {
-	return p.Client.CoreV1().Pods(pod.Namespace).Delete(pod.Name, &metav1.DeleteOptions{})
-}
-
-func (p *podPreemptor) SetNominatedNodeName(pod *v1.Pod, nominatedNodeName string) error {
-	podCopy := pod.DeepCopy()
-	podCopy.Status.NominatedNodeName = nominatedNodeName
-	_, err := p.Client.CoreV1().Pods(pod.Namespace).UpdateStatus(podCopy)
-	return err
-}
-
-func (p *podPreemptor) RemoveNominatedNodeName(pod *v1.Pod) error {
-	if len(pod.Status.NominatedNodeName) == 0 {
-		return nil
-	}
-	return p.SetNominatedNodeName(pod, "")
 }

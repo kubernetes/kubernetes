@@ -78,19 +78,19 @@ func (fc fakePodConditionUpdater) update(pod *v1.Pod, podCondition *v1.PodCondit
 
 type fakePodPreemptor struct{}
 
-func (fp fakePodPreemptor) GetUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
+func (fp fakePodPreemptor) getUpdatedPod(pod *v1.Pod) (*v1.Pod, error) {
 	return pod, nil
 }
 
-func (fp fakePodPreemptor) DeletePod(pod *v1.Pod) error {
+func (fp fakePodPreemptor) deletePod(pod *v1.Pod) error {
 	return nil
 }
 
-func (fp fakePodPreemptor) SetNominatedNodeName(pod *v1.Pod, nomNodeName string) error {
+func (fp fakePodPreemptor) setNominatedNodeName(pod *v1.Pod, nomNodeName string) error {
 	return nil
 }
 
-func (fp fakePodPreemptor) RemoveNominatedNodeName(pod *v1.Pod) error {
+func (fp fakePodPreemptor) removeNominatedNodeName(pod *v1.Pod) error {
 	return nil
 }
 
@@ -674,7 +674,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		},
 		Recorder:            &events.FakeRecorder{},
 		podConditionUpdater: fakePodConditionUpdater{},
-		PodPreemptor:        fakePodPreemptor{},
+		podPreemptor:        fakePodPreemptor{},
 		Framework:           emptyFramework,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
 	}
@@ -728,7 +728,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		},
 		Recorder:            &events.FakeRecorder{},
 		podConditionUpdater: fakePodConditionUpdater{},
-		PodPreemptor:        fakePodPreemptor{},
+		podPreemptor:        fakePodPreemptor{},
 		StopEverything:      stop,
 		Framework:           fwk,
 		VolumeBinder:        volumebinder.NewFakeVolumeBinder(&volumescheduling.FakeVolumeBinderConfig{AllBound: true}),
