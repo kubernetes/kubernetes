@@ -17,7 +17,7 @@ require (
 	github.com/google/uuid v1.1.1
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/hashicorp/golang-lru v0.5.1
-	github.com/json-iterator/go v1.1.7
+	github.com/json-iterator/go v1.1.8
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/modern-go/reflect2 v1.0.1
 	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f

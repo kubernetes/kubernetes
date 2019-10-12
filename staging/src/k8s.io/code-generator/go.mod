@@ -9,7 +9,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.19.3 // indirect
 	github.com/go-openapi/spec v0.19.2 // indirect
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
-	github.com/json-iterator/go v1.1.7 // indirect
+	github.com/json-iterator/go v1.1.8 // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/spf13/pflag v1.0.5
 	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9 // indirect
