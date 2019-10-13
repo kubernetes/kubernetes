@@ -135,7 +135,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"MaxCSIVolumeCountPred",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
-				"NoVolumeZoneConflict",
 			),
 			expectedPrioritizers: sets.NewString(
 				"BalancedResourceAllocation",
@@ -150,6 +149,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 1},
@@ -206,7 +206,6 @@ kind: Policy
 				"MaxCSIVolumeCountPred",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
-				"NoVolumeZoneConflict",
 			),
 			expectedPrioritizers: sets.NewString(
 				"BalancedResourceAllocation",
@@ -221,6 +220,7 @@ kind: Policy
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 1},

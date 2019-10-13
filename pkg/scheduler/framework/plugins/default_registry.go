@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -57,6 +58,10 @@ type RegistryArgs struct {
 // This is the registry that Kubernetes default scheduler uses. A scheduler that
 // runs custom plugins, can pass a different Registry when initializing the scheduler.
 func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
+	pvInfo := &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: args.PVLister}
+	pvcInfo := &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: args.PVCLister}
+	classInfo := &predicates.CachedStorageClassInfo{StorageClassLister: args.StorageClassLister}
+
 	return framework.Registry{
 		imagelocality.Name:   imagelocality.New,
 		tainttoleration.Name: tainttoleration.New,
@@ -68,6 +73,9 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 			return volumebinding.NewFromVolumeBinder(args.VolumeBinder), nil
 		},
 		volumerestrictions.Name: volumerestrictions.New,
+		volumezone.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+			return volumezone.New(pvInfo, pvcInfo, classInfo), nil
+		},
 	}
 }
 
@@ -128,6 +136,11 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPredicate(predicates.NoDiskConflictPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, volumerestrictions.Name, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.NoVolumeZoneConflictPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, volumezone.Name, nil)
 			return
 		})
 
