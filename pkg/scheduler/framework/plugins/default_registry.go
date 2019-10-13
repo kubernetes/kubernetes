@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
@@ -56,6 +57,7 @@ type RegistryArgs struct {
 func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 	return framework.Registry{
 		tainttoleration.Name: tainttoleration.New,
+		noderesources.Name:   noderesources.New,
 		nodename.Name:        nodename.New,
 		nodeaffinity.Name:    nodeaffinity.New,
 		volumebinding.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
@@ -92,6 +94,11 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPredicate(predicates.PodToleratesNodeTaintsPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, tainttoleration.Name, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.PodFitsResourcesPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.Name, nil)
 			return
 		})
 	registry.RegisterPredicate(predicates.HostNamePred,
