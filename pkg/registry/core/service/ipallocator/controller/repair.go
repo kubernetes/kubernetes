@@ -230,7 +230,9 @@ func (c *Repair) runOnce() error {
 			actualStored := c.selectAllocForIP(ip, stored, secondaryStored)
 			if actualStored.Has(ip) {
 				// remove it from the old set, so we can find leaks
-				actualStored.Release(ip)
+				if releaseErr := actualStored.Release(ip); releaseErr != nil {
+					runtime.HandleError(fmt.Errorf("releasing %v encountered %v", ip, releaseErr))
+				}
 			} else {
 				// cluster IP doesn't seem to be allocated
 				c.recorder.Eventf(&svc, v1.EventTypeWarning, "ClusterIPNotAllocated", "Cluster IP %s is not allocated; repairing", ip)
