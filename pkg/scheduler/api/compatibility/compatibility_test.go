@@ -173,7 +173,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"NodeAffinityPriority",
-				"ImageLocalityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -185,6 +184,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeName"},
 					{Name: "NodeAffinity"},
 					{Name: "VolumeRestrictions"},
+				},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 2},
 				},
 			},
 		},
@@ -237,7 +239,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"ImageLocalityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -251,7 +252,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 2},
+					{Name: "TaintToleration", Weight: 2},
+				},
 			},
 		},
 
@@ -307,7 +311,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"ImageLocalityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -323,7 +326,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 2},
+					{Name: "TaintToleration", Weight: 2},
+				},
 			},
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
@@ -388,7 +394,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"ImageLocalityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -404,7 +409,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 2},
+					{Name: "TaintToleration", Weight: 2},
+				},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -482,7 +490,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"ImageLocalityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -498,7 +505,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 2},
+					{Name: "TaintToleration", Weight: 2},
+				},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -577,7 +587,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"ImageLocalityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -594,7 +603,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 2},
+					{Name: "TaintToleration", Weight: 2},
+				},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -678,7 +690,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"ImageLocalityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -695,7 +706,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 2},
+					{Name: "TaintToleration", Weight: 2},
+				},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -791,7 +805,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"ImageLocalityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -809,7 +822,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 2},
+					{Name: "TaintToleration", Weight: 2},
+				},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -907,7 +923,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"ImageLocalityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -925,7 +940,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 2},
+					{Name: "TaintToleration", Weight: 2},
+				},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -1023,7 +1041,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"ImageLocalityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -1041,7 +1058,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 2},
+					{Name: "TaintToleration", Weight: 2},
+				},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -1143,7 +1163,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"ImageLocalityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -1161,7 +1180,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 2}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 2},
+					{Name: "TaintToleration", Weight: 2},
+				},
 			},
 			wantExtenders: []schedulerapi.ExtenderConfig{{
 				URLPrefix:        "/prefix",
@@ -1192,6 +1214,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	}
 	scoreToPriorityMap := map[string]string{
 		"TaintToleration": "TaintTolerationPriority",
+		"ImageLocality":   "ImageLocalityPriority",
 	}
 
 	for v, tc := range schedulerFiles {
@@ -1245,7 +1268,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				seenPredicates.Insert(filterToPredicateMap[p.Name])
 
 			}
-			for _, p := range gotPlugins["FilterPlugin"] {
+			for _, p := range gotPlugins["ScorePlugin"] {
 				seenPriorities.Insert(scoreToPriorityMap[p.Name])
 
 			}
