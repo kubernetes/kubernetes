@@ -42,7 +42,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -86,10 +85,10 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
 
 	// Pre-register some predicate and priority functions
-	factory.RegisterFitPredicate("PredicateOne", PredicateOne)
-	factory.RegisterFitPredicate("PredicateTwo", PredicateTwo)
-	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
-	factory.RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
+	scheduler.RegisterFitPredicate("PredicateOne", PredicateOne)
+	scheduler.RegisterFitPredicate("PredicateTwo", PredicateTwo)
+	scheduler.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+	scheduler.RegisterPriorityFunction("PriorityTwo", PriorityTwo, 1)
 
 	for i, test := range []struct {
 		policy               string
@@ -255,7 +254,7 @@ priorities: []
 
 		sched, err := scheduler.New(clientSet,
 			informerFactory,
-			factory.NewPodInformer(clientSet, 0),
+			scheduler.NewPodInformer(clientSet, 0),
 			eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
 			kubeschedulerconfig.SchedulerAlgorithmSource{
 				Policy: &kubeschedulerconfig.SchedulerPolicySource{
@@ -318,7 +317,7 @@ func TestSchedulerCreationFromNonExistentConfigMap(t *testing.T) {
 
 	_, err := scheduler.New(clientSet,
 		informerFactory,
-		factory.NewPodInformer(clientSet, 0),
+		scheduler.NewPodInformer(clientSet, 0),
 		eventBroadcaster.NewRecorder(legacyscheme.Scheme, v1.DefaultSchedulerName),
 		kubeschedulerconfig.SchedulerAlgorithmSource{
 			Policy: &kubeschedulerconfig.SchedulerPolicySource{

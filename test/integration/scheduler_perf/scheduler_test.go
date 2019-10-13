@@ -31,7 +31,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
+	"k8s.io/kubernetes/pkg/scheduler"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"k8s.io/klog"
@@ -138,7 +138,7 @@ func schedulePods(config *testConfig) int32 {
 	minQPS := int32(math.MaxInt32)
 	start := time.Now()
 
-	podInformer := factory.NewPodInformer(config.clientset, 0)
+	podInformer := scheduler.NewPodInformer(config.clientset, 0)
 	// Bake in time for the first pod scheduling event.
 	for {
 		time.Sleep(50 * time.Millisecond)

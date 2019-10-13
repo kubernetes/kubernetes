@@ -48,7 +48,6 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	fakecache "k8s.io/kubernetes/pkg/scheduler/internal/cache/fake"
@@ -176,15 +175,15 @@ func TestSchedulerCreation(t *testing.T) {
 	testSource := "testProvider"
 	eventBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{Interface: client.EventsV1beta1().Events("")})
 
-	factory.RegisterFitPredicate("PredicateOne", PredicateOne)
-	factory.RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
-	factory.RegisterAlgorithmProvider(testSource, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
+	RegisterFitPredicate("PredicateOne", PredicateOne)
+	RegisterPriorityFunction("PriorityOne", PriorityOne, 1)
+	RegisterAlgorithmProvider(testSource, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
 	stopCh := make(chan struct{})
 	defer close(stopCh)
 	_, err := New(client,
 		informerFactory,
-		factory.NewPodInformer(client, 0),
+		NewPodInformer(client, 0),
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
 		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
@@ -276,7 +275,7 @@ func TestScheduler(t *testing.T) {
 			s := &Scheduler{
 				SchedulerCache: sCache,
 				Algorithm:      item.algo,
-				GetBinder: func(pod *v1.Pod) factory.Binder {
+				GetBinder: func(pod *v1.Pod) Binder {
 					return fakeBinder{func(b *v1.Binding) error {
 						gotBinding = b
 						return item.injectBindError
@@ -660,7 +659,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 	sched := &Scheduler{
 		SchedulerCache: scache,
 		Algorithm:      algo,
-		GetBinder: func(pod *v1.Pod) factory.Binder {
+		GetBinder: func(pod *v1.Pod) Binder {
 			return fakeBinder{func(b *v1.Binding) error {
 				bindingChan <- b
 				return nil
@@ -710,7 +709,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 	sched := &Scheduler{
 		SchedulerCache: scache,
 		Algorithm:      algo,
-		GetBinder: func(pod *v1.Pod) factory.Binder {
+		GetBinder: func(pod *v1.Pod) Binder {
 			return fakeBinder{func(b *v1.Binding) error {
 				time.Sleep(bindingTime)
 				bindingChan <- b

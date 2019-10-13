@@ -33,7 +33,6 @@ import (
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
-	"k8s.io/kubernetes/pkg/scheduler/factory"
 )
 
 func TestCompatibility_v1_Scheduler(t *testing.T) {
@@ -1178,8 +1177,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			}},
 		},
 	}
-	registeredPredicates := sets.NewString(factory.ListRegisteredFitPredicates()...)
-	registeredPriorities := sets.NewString(factory.ListRegisteredPriorityFunctions()...)
+	registeredPredicates := sets.NewString(scheduler.ListRegisteredFitPredicates()...)
+	registeredPriorities := sets.NewString(scheduler.ListRegisteredPriorityFunctions()...)
 	seenPredicates := sets.NewString()
 	seenPriorities := sets.NewString()
 	mandatoryPredicates := sets.NewString("CheckNodeCondition")
