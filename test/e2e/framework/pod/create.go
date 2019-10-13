@@ -104,7 +104,7 @@ func CreatePod(client clientset.Interface, namespace string, nodeSelector map[st
 
 // CreateNginxPod creates an enginx pod.
 func CreateNginxPod(client clientset.Interface, namespace string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim) (*v1.Pod, error) {
-	pod := MakeNginxPod(namespace, nodeSelector, pvclaims)
+	pod := makeNginxPod(namespace, nodeSelector, pvclaims)
 	pod, err := client.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
 		return nil, fmt.Errorf("pod Create API error: %v", err)
@@ -198,8 +198,8 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 	return podSpec
 }
 
-// MakeNginxPod returns a pod definition based on the namespace using nginx image
-func MakeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim) *v1.Pod {
+// makeNginxPod returns a pod definition based on the namespace using nginx image
+func makeNginxPod(ns string, nodeSelector map[string]string, pvclaims []*v1.PersistentVolumeClaim) *v1.Pod {
 	podSpec := &v1.Pod{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Pod",
