@@ -182,7 +182,6 @@ pkg/registry/core/replicationcontroller/storage
 pkg/registry/core/resourcequota/storage
 pkg/registry/core/rest
 pkg/registry/core/secret
-pkg/registry/core/secret/storage
 pkg/registry/core/service
 pkg/registry/core/service/allocator
 pkg/registry/core/service/allocator/storage
