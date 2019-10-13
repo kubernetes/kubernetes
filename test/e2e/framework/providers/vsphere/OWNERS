@@ -4,7 +4,6 @@ approvers:
 - pmorie
 - saad-ali
 - thockin
-- matchstick
 - SandeepPissay
 - divyenpatel
 - BaluDontu
@@ -13,8 +12,9 @@ approvers:
 - frapposelli
 - dougm
 - sandeeppsunny
+emeritus_approvers:
+- matchstick
 reviewers:
-- abithap
 - abrarshivani
 - saad-ali
 - justinsb
