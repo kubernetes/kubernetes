@@ -144,7 +144,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"NodeAffinityPriority",
 				"NodePreferAvoidPodsPriority",
 				"SelectorSpreadPriority",
-				"ImageLocalityPriority",
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -152,7 +151,10 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 1}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 1},
+					{Name: "TaintToleration", Weight: 1},
+				},
 			},
 		},
 		{
@@ -213,7 +215,6 @@ kind: Policy
 				"NodeAffinityPriority",
 				"NodePreferAvoidPodsPriority",
 				"SelectorSpreadPriority",
-				"ImageLocalityPriority",
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -221,7 +222,10 @@ kind: Policy
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 				},
-				"ScorePlugin": {{Name: "TaintToleration", Weight: 1}},
+				"ScorePlugin": {
+					{Name: "ImageLocality", Weight: 1},
+					{Name: "TaintToleration", Weight: 1},
+				},
 			},
 		},
 		{
