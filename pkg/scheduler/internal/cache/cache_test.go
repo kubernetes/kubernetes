@@ -24,6 +24,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apiErrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1123,6 +1124,47 @@ func TestNodeOperators(t *testing.T) {
 		if cache.nodeTree.NumNodes() != 0 || cache.nodeTree.Next() != "" {
 			t.Errorf("unexpected cache.nodeTree after removing node: %v", node.Name)
 		}
+	}
+}
+
+// TestSchedulerCache_GetNodeInfo tests GetNodeInfo when the cache is empty.
+func TestSchedulerCache_GetNodeInfo_whenCacheIsEmpty(t *testing.T) {
+	cache := newSchedulerCache(time.Second, time.Second, nil)
+	_, err := cache.GetNodeInfo("blargle")
+	if !apiErrors.IsNotFound(err) {
+		t.Errorf("unexpected state in non-empty cache")
+	}
+
+	if err.Error() != fmt.Sprintf("%s %q not found", v1.Resource("node").String(), "blargle") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+// TestSchedulerCache_GetNodeInfo tests GetNodeInfo the cache gets emptied
+func TestSchedulerCache_GetNodeInfo_whenCacheIsEventuallytEmpty(t *testing.T) {
+	cache := newSchedulerCache(time.Second, time.Second, nil)
+
+	node := &v1.Node{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "blargle",
+		},
+	}
+
+	if err := cache.AddNode(node); err != nil {
+		t.Errorf("unexpected error adding node from cache: %v", err)
+	}
+
+	if err := cache.RemoveNode(node); err != nil {
+		t.Errorf("unexpected error removing last node from cache: %v", err)
+	}
+
+	_, err := cache.GetNodeInfo("blargle")
+	if !apiErrors.IsNotFound(err) {
+		t.Errorf("unexpected state in non-empty cache")
+	}
+
+	if err.Error() != fmt.Sprintf("%s %q not found", v1.Resource("node").String(), "blargle") {
+		t.Errorf("unexpected error message: %v", err)
 	}
 }
 
