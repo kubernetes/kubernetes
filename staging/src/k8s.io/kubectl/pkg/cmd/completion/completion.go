@@ -307,6 +307,56 @@ BASH_COMPLETION_EOF
 }
 
 __kubectl_bash_source <(__kubectl_convert_bash_to_zsh)
+
+# function re-written to use cache
+__kubectl_parse_get()
+{
+    emulate zsh
+
+    local template
+    template="${2:-"{{ range .items  }}{{ .metadata.name }} {{ end }}"}"
+    local -a kubectl_out
+    local cache_name="kubectl_$1_$(kubectl config current-context | sed 's,[/:.-],_,g')"
+    if _cache_invalid $cache_name || ! _retrieve_cache $cache_name; then
+        if kubectl_out=( $(kubectl get $(__kubectl_override_flags) -o template --template="${template}" "$1" 2>/dev/null) ); then
+            _store_cache $cache_name kubectl_out;
+        fi
+    fi
+    COMPREPLY+=( $( compgen -W "${kubectl_out[*]}" -- "$cur" ) )
+
+    emulate -L sh
+}
+
+__kubectl_cache_period_qualifier() {
+    if ! (( ${+_KUBECTL_CACHE_PERIOD_QUALIFIER} )); then
+        local period=${KUBECTL_COMPLETION_CACHE_INVALID_AFTER}
+
+        # seconds, minutes, hours or weeks
+        if [[ $period =~ "^[0-9]+[smhw]$" ]]; then
+            _KUBECTL_CACHE_PERIOD_QUALIFIER="Nm${period##*[0-9]}+${period%[smhw]}"
+        # days
+        elif [[ $period =~ "^[0-9]+d$" ]]; then
+            _KUBECTL_CACHE_PERIOD_QUALIFIER="Nmh+$(( ${period%d} * 24 ))"
+        fi
+    fi
+
+    echo ${_KUBECTL_CACHE_PERIOD_QUALIFIER:-Nmm+15}
+}
+
+__kubectl_completion_caching_policy() {
+    emulate zsh
+
+    local -a oldp
+    oldp=( $1($(__kubectl_cache_period_qualifier)) )
+
+    ret=$(( $#oldp == 0 ))
+    emulate -L sh
+
+    return ret
+}
+
+zstyle ":completion:${curcontext%:*}:*" cache-policy __kubectl_completion_caching_policy
+
 _complete kubectl 2>/dev/null
 `
 	out.Write([]byte(zshTail))
