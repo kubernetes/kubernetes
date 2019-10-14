@@ -3392,6 +3392,12 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 		}
 		w.Write(LEVEL_0, "Min replicas:\t%s\n", minReplicas)
 		w.Write(LEVEL_0, "Max replicas:\t%d\n", hpa.Spec.MaxReplicas)
+		// only print the hpa behavior if present
+		if hpa.Spec.Behavior != nil {
+			w.Write(LEVEL_0, "Behavior:\n")
+			printDirectionBehavior(w, "Scale Up", hpa.Spec.Behavior.ScaleUp)
+			printDirectionBehavior(w, "Scale Down", hpa.Spec.Behavior.ScaleDown)
+		}
 		w.Write(LEVEL_0, "%s pods:\t", hpa.Spec.ScaleTargetRef.Kind)
 		w.Write(LEVEL_0, "%d current / %d desired\n", hpa.Status.CurrentReplicas, hpa.Status.DesiredReplicas)
 
@@ -3410,6 +3416,26 @@ func describeHorizontalPodAutoscalerV2beta2(hpa *autoscalingv2beta2.HorizontalPo
 
 		return nil
 	})
+}
+
+func printDirectionBehavior(w PrefixWriter, direction string, rules *autoscalingv2beta2.HPAScalingRules) {
+	if rules != nil {
+		w.Write(LEVEL_1, "%s:\n", direction)
+		if rules.StabilizationWindowSeconds != nil {
+			w.Write(LEVEL_2, "Stabilization Window: %d seconds\n", *rules.StabilizationWindowSeconds)
+		}
+		if len(rules.Policies) > 0 {
+			if rules.SelectPolicy != nil {
+				w.Write(LEVEL_2, "Select Policy: %s\n", *rules.SelectPolicy)
+			} else {
+				w.Write(LEVEL_2, "Select Policy: %s\n", autoscalingv2beta2.MaxPolicySelect)
+			}
+			w.Write(LEVEL_2, "Policies:\n")
+			for _, p := range rules.Policies {
+				w.Write(LEVEL_3, "- Type: %s\tValue: %d\tPeriod: %d seconds\n", p.Type, p.Value, p.PeriodSeconds)
+			}
+		}
+	}
 }
 
 func describeHorizontalPodAutoscalerV1(hpa *autoscalingv1.HorizontalPodAutoscaler, events *corev1.EventList, d *HorizontalPodAutoscalerDescriber) (string, error) {
