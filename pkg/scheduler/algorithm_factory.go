@@ -41,7 +41,6 @@ type PluginFactoryArgs struct {
 	ControllerLister               algorithm.ControllerLister
 	ReplicaSetLister               algorithm.ReplicaSetLister
 	StatefulSetLister              algorithm.StatefulSetLister
-	NodeLister                     algorithm.NodeLister
 	PDBLister                      algorithm.PDBLister
 	NodeInfo                       predicates.NodeInfo
 	CSINodeInfo                    predicates.CSINodeInfo

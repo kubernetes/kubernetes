@@ -999,7 +999,7 @@ func TestZeroRequest(t *testing.T) {
 
 			list, err := PrioritizeNodes(
 				test.pod, nodeNameToInfo, metaData, priorityConfigs,
-				schedulertesting.FakeNodeLister(test.nodes), []algorithm.SchedulerExtender{}, emptyFramework, framework.NewCycleState())
+				test.nodes, []algorithm.SchedulerExtender{}, emptyFramework, framework.NewCycleState())
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -1795,7 +1795,7 @@ func TestNodesWherePreemptionMightHelp(t *testing.T) {
 				FailedPredicates:      test.failedPredMap,
 				FilteredNodesStatuses: test.nodesStatuses,
 			}
-			nodes := nodesWherePreemptionMightHelp(makeNodeList(nodeNames), &fitErr)
+			nodes := nodesWherePreemptionMightHelp(schedulernodeinfo.CreateNodeNameToInfoMap(nil, makeNodeList(nodeNames)), &fitErr)
 			if len(test.expected) != len(nodes) {
 				t.Errorf("number of nodes is not the same as expected. exptectd: %d, got: %d. Nodes: %v", len(test.expected), len(nodes), nodes)
 			}

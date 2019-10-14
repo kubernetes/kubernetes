@@ -592,7 +592,6 @@ func (c *Configurator) getAlgorithmArgs() (*PluginFactoryArgs, *plugins.ConfigPr
 		ControllerLister:               c.controllerLister,
 		ReplicaSetLister:               c.replicaSetLister,
 		StatefulSetLister:              c.statefulSetLister,
-		NodeLister:                     c.schedulerCache,
 		PDBLister:                      c.pdbLister,
 		NodeInfo:                       c.schedulerCache,
 		CSINodeInfo:                    c.schedulerCache,

@@ -59,7 +59,6 @@ import (
 //   a pod might have changed its state (e.g. added and deleted) without delivering notification to the cache.
 type Cache interface {
 	algorithm.PodLister
-	algorithm.NodeLister
 
 	// AssumePod assumes a pod scheduled and aggregates the pod's information into its node.
 	// The implementation also decides the policy to expire pod before being confirmed (receiving Add event).
