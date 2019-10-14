@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package algorithm
+package lister
 
 import (
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	"k8s.io/apimachinery/pkg/labels"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -71,43 +71,8 @@ type PDBLister interface {
 	List(labels.Selector) ([]*policyv1beta1.PodDisruptionBudget, error)
 }
 
-var _ ControllerLister = &EmptyControllerLister{}
-
-// EmptyControllerLister implements ControllerLister on []v1.ReplicationController returning empty data
-type EmptyControllerLister struct{}
-
-// List returns nil
-func (f EmptyControllerLister) List(labels.Selector) ([]*v1.ReplicationController, error) {
-	return nil, nil
-}
-
-// GetPodControllers returns nil
-func (f EmptyControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.ReplicationController, err error) {
-	return nil, nil
-}
-
-var _ ReplicaSetLister = &EmptyReplicaSetLister{}
-
-// EmptyReplicaSetLister implements ReplicaSetLister on []extensions.ReplicaSet returning empty data
-type EmptyReplicaSetLister struct{}
-
-// GetPodReplicaSets returns nil
-func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*apps.ReplicaSet, err error) {
-	return nil, nil
-}
-
 // StatefulSetLister interface represents anything that can produce a list of StatefulSet; the list is consumed by a scheduler.
 type StatefulSetLister interface {
 	// Gets the StatefulSet for the given pod.
 	GetPodStatefulSets(*v1.Pod) ([]*apps.StatefulSet, error)
-}
-
-var _ StatefulSetLister = &EmptyStatefulSetLister{}
-
-// EmptyStatefulSetLister implements StatefulSetLister on []apps.StatefulSet returning empty data.
-type EmptyStatefulSetLister struct{}
-
-// GetPodStatefulSets of EmptyStatefulSetLister returns nil.
-func (f EmptyStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.StatefulSet, err error) {
-	return nil, nil
 }

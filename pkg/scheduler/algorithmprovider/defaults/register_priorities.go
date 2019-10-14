@@ -18,9 +18,9 @@ package defaults
 
 import (
 	"k8s.io/kubernetes/pkg/scheduler"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/core"
+	"k8s.io/kubernetes/pkg/scheduler/lister"
 )
 
 func init() {
@@ -38,7 +38,7 @@ func init() {
 		priorities.ServiceSpreadingPriority,
 		scheduler.PriorityConfigFactory{
 			MapReduceFunction: func(args scheduler.PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-				return priorities.NewSelectorSpreadPriority(args.ServiceLister, algorithm.EmptyControllerLister{}, algorithm.EmptyReplicaSetLister{}, algorithm.EmptyStatefulSetLister{})
+				return priorities.NewSelectorSpreadPriority(args.ServiceLister, lister.EmptyControllerLister{}, lister.EmptyReplicaSetLister{}, lister.EmptyStatefulSetLister{})
 			},
 			Weight: 1,
 		},

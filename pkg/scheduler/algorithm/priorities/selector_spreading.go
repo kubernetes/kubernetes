@@ -21,8 +21,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/lister"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
@@ -35,18 +35,18 @@ const zoneWeighting float64 = 2.0 / 3.0
 
 // SelectorSpread contains information to calculate selector spread priority.
 type SelectorSpread struct {
-	serviceLister     algorithm.ServiceLister
-	controllerLister  algorithm.ControllerLister
-	replicaSetLister  algorithm.ReplicaSetLister
-	statefulSetLister algorithm.StatefulSetLister
+	serviceLister     lister.ServiceLister
+	controllerLister  lister.ControllerLister
+	replicaSetLister  lister.ReplicaSetLister
+	statefulSetLister lister.StatefulSetLister
 }
 
 // NewSelectorSpreadPriority creates a SelectorSpread.
 func NewSelectorSpreadPriority(
-	serviceLister algorithm.ServiceLister,
-	controllerLister algorithm.ControllerLister,
-	replicaSetLister algorithm.ReplicaSetLister,
-	statefulSetLister algorithm.StatefulSetLister) (PriorityMapFunction, PriorityReduceFunction) {
+	serviceLister lister.ServiceLister,
+	controllerLister lister.ControllerLister,
+	replicaSetLister lister.ReplicaSetLister,
+	statefulSetLister lister.StatefulSetLister) (PriorityMapFunction, PriorityReduceFunction) {
 	selectorSpread := &SelectorSpread{
 		serviceLister:     serviceLister,
 		controllerLister:  controllerLister,
@@ -153,13 +153,13 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 
 // ServiceAntiAffinity contains information to calculate service anti-affinity priority.
 type ServiceAntiAffinity struct {
-	podLister     algorithm.PodLister
-	serviceLister algorithm.ServiceLister
+	podLister     lister.PodLister
+	serviceLister lister.ServiceLister
 	label         string
 }
 
 // NewServiceAntiAffinityPriority creates a ServiceAntiAffinity.
-func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, label string) (PriorityMapFunction, PriorityReduceFunction) {
+func NewServiceAntiAffinityPriority(podLister lister.PodLister, serviceLister lister.ServiceLister, label string) (PriorityMapFunction, PriorityReduceFunction) {
 	antiAffinity := &ServiceAntiAffinity{
 		podLister:     podLister,
 		serviceLister: serviceLister,

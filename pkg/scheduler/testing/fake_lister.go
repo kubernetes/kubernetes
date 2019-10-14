@@ -20,15 +20,15 @@ import (
 	"fmt"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/lister"
 )
 
-var _ algorithm.PodLister = &FakePodLister{}
+var _ lister.PodLister = &FakePodLister{}
 
 // FakePodLister implements PodLister on an []v1.Pods for test purposes.
 type FakePodLister []*v1.Pod
@@ -44,7 +44,7 @@ func (f FakePodLister) List(s labels.Selector) (selected []*v1.Pod, err error) {
 }
 
 // FilteredList returns pods matching a pod filter and a label selector.
-func (f FakePodLister) FilteredList(podFilter algorithm.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
+func (f FakePodLister) FilteredList(podFilter lister.PodFilter, s labels.Selector) (selected []*v1.Pod, err error) {
 	for _, pod := range f {
 		if podFilter(pod) && s.Matches(labels.Set(pod.Labels)) {
 			selected = append(selected, pod)
@@ -53,7 +53,7 @@ func (f FakePodLister) FilteredList(podFilter algorithm.PodFilter, s labels.Sele
 	return selected, nil
 }
 
-var _ algorithm.ServiceLister = &FakeServiceLister{}
+var _ lister.ServiceLister = &FakeServiceLister{}
 
 // FakeServiceLister implements ServiceLister on []v1.Service for test purposes.
 type FakeServiceLister []*v1.Service
@@ -81,7 +81,7 @@ func (f FakeServiceLister) GetPodServices(pod *v1.Pod) (services []*v1.Service, 
 	return
 }
 
-var _ algorithm.ControllerLister = &FakeControllerLister{}
+var _ lister.ControllerLister = &FakeControllerLister{}
 
 // FakeControllerLister implements ControllerLister on []v1.ReplicationController for test purposes.
 type FakeControllerLister []*v1.ReplicationController
@@ -112,7 +112,7 @@ func (f FakeControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.
 	return
 }
 
-var _ algorithm.ReplicaSetLister = &FakeReplicaSetLister{}
+var _ lister.ReplicaSetLister = &FakeReplicaSetLister{}
 
 // FakeReplicaSetLister implements ControllerLister on []extensions.ReplicaSet for test purposes.
 type FakeReplicaSetLister []*apps.ReplicaSet
@@ -141,7 +141,7 @@ func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*apps.Replic
 	return
 }
 
-var _ algorithm.StatefulSetLister = &FakeStatefulSetLister{}
+var _ lister.StatefulSetLister = &FakeStatefulSetLister{}
 
 // FakeStatefulSetLister implements ControllerLister on []apps.StatefulSet for testing purposes.
 type FakeStatefulSetLister []*apps.StatefulSet

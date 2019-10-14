@@ -42,14 +42,20 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/scheduler/lister"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
+
+// nodeFieldSelectorKeys is a map that: the keys are node field selector keys; the values are
+// the functions to get the value of the node field.
+var nodeFieldSelectorKeys = map[string]func(*v1.Node) string{
+	schedulerapi.NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
+}
 
 const (
 	// MatchInterPodAffinityPred defines the name of predicate MatchInterPodAffinity.
@@ -922,7 +928,7 @@ func PodFitsResources(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulerno
 // terms are ORed, and an empty list of terms will match nothing.
 func nodeMatchesNodeSelectorTerms(node *v1.Node, nodeSelectorTerms []v1.NodeSelectorTerm) bool {
 	nodeFields := map[string]string{}
-	for k, f := range algorithm.NodeFieldSelectorKeys {
+	for k, f := range nodeFieldSelectorKeys {
 		nodeFields[k] = f(node)
 	}
 	return v1helper.MatchNodeSelectorTerms(nodeSelectorTerms, labels.Set(node.Labels), fields.Set(nodeFields))
@@ -1049,8 +1055,8 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *v1.Pod, meta PredicateMet
 
 // ServiceAffinity defines a struct used for creating service affinity predicates.
 type ServiceAffinity struct {
-	podLister     algorithm.PodLister
-	serviceLister algorithm.ServiceLister
+	podLister     lister.PodLister
+	serviceLister lister.ServiceLister
 	nodeInfo      NodeInfo
 	labels        []string
 }
@@ -1082,7 +1088,7 @@ func (s *ServiceAffinity) serviceAffinityMetadataProducer(pm *predicateMetadata)
 }
 
 // NewServiceAffinityPredicate creates a ServiceAffinity.
-func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, nodeInfo NodeInfo, labels []string) (FitPredicate, predicateMetadataProducer) {
+func NewServiceAffinityPredicate(podLister lister.PodLister, serviceLister lister.ServiceLister, nodeInfo NodeInfo, labels []string) (FitPredicate, predicateMetadataProducer) {
 	affinity := &ServiceAffinity{
 		podLister:     podLister,
 		serviceLister: serviceLister,
@@ -1251,11 +1257,11 @@ func EssentialPredicates(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedule
 // PodAffinityChecker contains information to check pod affinity.
 type PodAffinityChecker struct {
 	info      NodeInfo
-	podLister algorithm.PodLister
+	podLister lister.PodLister
 }
 
 // NewPodAffinityPredicate creates a PodAffinityChecker.
-func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister) FitPredicate {
+func NewPodAffinityPredicate(info NodeInfo, podLister lister.PodLister) FitPredicate {
 	checker := &PodAffinityChecker{
 		info:      info,
 		podLister: podLister,

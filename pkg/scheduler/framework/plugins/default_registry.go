@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -38,17 +37,18 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/kubernetes/pkg/scheduler/lister"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 // RegistryArgs arguments needed to create default plugin factories.
 type RegistryArgs struct {
 	SchedulerCache     internalcache.Cache
-	ServiceLister      algorithm.ServiceLister
-	ControllerLister   algorithm.ControllerLister
-	ReplicaSetLister   algorithm.ReplicaSetLister
-	StatefulSetLister  algorithm.StatefulSetLister
-	PDBLister          algorithm.PDBLister
+	ServiceLister      lister.ServiceLister
+	ControllerLister   lister.ControllerLister
+	ReplicaSetLister   lister.ReplicaSetLister
+	StatefulSetLister  lister.StatefulSetLister
+	PDBLister          lister.PDBLister
 	PVLister           corelisters.PersistentVolumeLister
 	PVCLister          corelisters.PersistentVolumeClaimLister
 	StorageClassLister storagelistersv1.StorageClassLister

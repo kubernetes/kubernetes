@@ -19,9 +19,9 @@ package priorities
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	"k8s.io/kubernetes/pkg/scheduler/lister"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -40,7 +40,7 @@ func TestEmptyPriorityMetadataProducer(t *testing.T) {
 		t.Errorf("failed to produce empty metadata: got %v, expected nil", metadata)
 	}
 	// Test EmptyControllerLister should return nill
-	controllerLister := algorithm.EmptyControllerLister{}
+	controllerLister := lister.EmptyControllerLister{}
 	nilController, nilError := controllerLister.List(fakeLabelSelector)
 	if nilController != nil || nilError != nil {
 		t.Errorf("failed to produce empty controller lister: got %v, expected nil", nilController)
@@ -51,14 +51,14 @@ func TestEmptyPriorityMetadataProducer(t *testing.T) {
 		t.Errorf("failed to produce empty controller lister: got %v, expected nil", nilController)
 	}
 	// Test GetPodReplicaSets on empty replica sets should return nill
-	replicaSetLister := algorithm.EmptyReplicaSetLister{}
+	replicaSetLister := lister.EmptyReplicaSetLister{}
 	nilRss, nilErrRss := replicaSetLister.GetPodReplicaSets(fakePod)
 	if nilRss != nil || nilErrRss != nil {
 		t.Errorf("failed to produce empty replicaSetLister: got %v, expected nil", nilRss)
 	}
 
 	// Test GetPodStatefulSets on empty replica sets should return nill
-	statefulSetLister := algorithm.EmptyStatefulSetLister{}
+	statefulSetLister := lister.EmptyStatefulSetLister{}
 	nilSSL, nilErrSSL := statefulSetLister.GetPodStatefulSets(fakePod)
 	if nilSSL != nil || nilErrSSL != nil {
 		t.Errorf("failed to produce empty statefulSetLister: got %v, expected nil", nilSSL)
