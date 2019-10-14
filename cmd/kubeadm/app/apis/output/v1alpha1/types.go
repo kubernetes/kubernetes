@@ -31,3 +31,24 @@ type BootstrapToken struct {
 
 	kubeadmapiv1beta2.BootstrapToken
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// ComponentUpgradePlan represents information about upgrade plan for one component
+type ComponentUpgradePlan struct {
+	metav1.TypeMeta
+
+	Name           string `json:"name"`
+	CurrentVersion string `json:"currentVersion"`
+	NewVersion     string `json:"newVersion"`
+}
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// UpgradePlan represents information about upgrade plan for the output
+// produced by 'kubeadm upgrade plan'
+type UpgradePlan struct {
+	metav1.TypeMeta
+
+	Components []ComponentUpgradePlan `json:"components"`
+}
