@@ -103,7 +103,7 @@ func (cm *containerManagerStub) UpdatePluginResources(*schedulernodeinfo.NodeInf
 }
 
 func (cm *containerManagerStub) InternalContainerLifecycle() InternalContainerLifecycle {
-	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), topologymanager.NewFakeManager(), hugepagehandler.NewFakeHandler()}
+	return &internalContainerLifecycleImpl{cpumanager.NewFakeManager(), topologymanager.NewFakeManager(), hugepagehandler.NewUnsupportedHugepageHandler()}
 }
 
 func (cm *containerManagerStub) GetPodCgroupRoot() string {

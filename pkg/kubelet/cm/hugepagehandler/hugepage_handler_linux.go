@@ -31,21 +31,6 @@ import (
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
-type runtimeService interface {
-	UpdateContainerResources(id string, resources *runtimeapi.LinuxContainerResources) error
-}
-
-// Handler interface provides methods for Kubelet to set container hugetlb cgroup.
-type Handler interface {
-	// Start is called during Kubelet initialization.
-	Start(containerRuntime runtimeService)
-
-	// AddContainer is called between container create and container start
-	// so that initial hugepage limit settings can be written through to the
-	// container runtime before the first process begins to execute.
-	AddContainer(p *v1.Pod, c *v1.Container, containerID string) error
-}
-
 type handler struct {
 	// containerRuntime is the container runtime service interface needed
 	// to make UpdateContainerResources() calls against the containers.
