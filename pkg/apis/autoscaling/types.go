@@ -95,6 +95,90 @@ type HorizontalPodAutoscalerSpec struct {
 	// more information about how each type of metric must respond.
 	// +optional
 	Metrics []MetricSpec
+
+	// behavior configures the scaling behavior of the target
+	// in both Up and Down directions (scaleUp and scaleDown fields respectively).
+	// If not set, the default HPAScalingRules for scale up and scale down are used.
+	// +optional
+	Behavior *HorizontalPodAutoscalerBehavior
+}
+
+// HorizontalPodAutoscalerBehavior configures a scaling behavior for Up and Down direction
+// (scaleUp and scaleDown fields respectively).
+type HorizontalPodAutoscalerBehavior struct {
+	// scaleUp is scaling policy for scaling Up.
+	// If not set, the default value is the higher of:
+	//   * increase no more than 4 pods per 60 seconds
+	//   * double the number of pods per 60 seconds
+	// No stabilization is used.
+	// +optional
+	ScaleUp *HPAScalingRules
+	// scaleDown is scaling policy for scaling Down.
+	// If not set, the default value is to allow to scale down to minReplicas pods, with a
+	// 300 second stabilization window (i.e., the highest recommendation for
+	// the last 300sec is used).
+	// +optional
+	ScaleDown *HPAScalingRules
+}
+
+// ScalingPolicySelect is used to specify which policy should be used while scaling in a certain direction
+type ScalingPolicySelect string
+
+const (
+	// MaxPolicySelect selects the policy with the highest possible change.
+	MaxPolicySelect ScalingPolicySelect = "Max"
+	// MinPolicySelect selects the policy with the lowest possible change.
+	MinPolicySelect ScalingPolicySelect = "Min"
+	// DisabledPolicySelect disables the scaling in this direction.
+	DisabledPolicySelect ScalingPolicySelect = "Disabled"
+)
+
+// HPAScalingRules configures the scaling behavior for one direction.
+// These Rules are applied after calculating DesiredReplicas from metrics for the HPA.
+// They can limit the scaling velocity by specifying scaling policies.
+// They can prevent flapping by specifying the stabilization window, so that the
+// number of replicas is not set instantly, instead, the safest value from the stabilization
+// window is chosen.
+type HPAScalingRules struct {
+	// StabilizationWindowSeconds is the number of seconds for which past recommendations should be
+	// considered while scaling up or scaling down.
+	// StabilizationWindowSeconds must be greater than or equal to zero and less than or equal to 3600 (one hour).
+	// If not set, use the default values:
+	// - For scale up: 0 (i.e. no stabilization is done).
+	// - For scale down: 300 (i.e. the stabilization window is 300 seconds long).
+	// +optional
+	StabilizationWindowSeconds *int32
+	// selectPolicy is used to specify which policy should be used.
+	// If not set, the default value MaxPolicySelect is used.
+	// +optional
+	SelectPolicy *ScalingPolicySelect
+	// policies is a list of potential scaling polices which can used during scaling.
+	// At least one policy must be specified, otherwise the HPAScalingRules will be discarded as invalid
+	// +optional
+	Policies []HPAScalingPolicy
+}
+
+// HPAScalingPolicyType is the type of the policy which could be used while making scaling decisions.
+type HPAScalingPolicyType string
+
+const (
+	// PodsScalingPolicy is a policy used to specify a change in absolute number of pods.
+	PodsScalingPolicy HPAScalingPolicyType = "Pods"
+	// PercentScalingPolicy is a policy used to specify a relative amount of change with respect to
+	// the current number of pods.
+	PercentScalingPolicy HPAScalingPolicyType = "Percent"
+)
+
+// HPAScalingPolicy is a single policy which must hold true for a specified past interval.
+type HPAScalingPolicy struct {
+	// Type is used to specify the scaling policy.
+	Type HPAScalingPolicyType
+	// Value contains the amount of change which is permitted by the policy.
+	// It must be greater than zero
+	Value int32
+	// PeriodSeconds specifies the window of time for which the policy should hold true.
+	// PeriodSeconds must be greater than zero and less than or equal to 1800 (30 min).
+	PeriodSeconds int32
 }
 
 // MetricSourceType indicates the type of metric.

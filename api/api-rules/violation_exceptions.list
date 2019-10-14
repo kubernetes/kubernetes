@@ -83,6 +83,7 @@ API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta1,HorizontalP
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta1,HorizontalPodAutoscalerSpec,Metrics
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta1,HorizontalPodAutoscalerStatus,Conditions
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta1,HorizontalPodAutoscalerStatus,CurrentMetrics
+API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta2,HPAScalingRules,Policies
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta2,HorizontalPodAutoscalerList,Items
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta2,HorizontalPodAutoscalerSpec,Metrics
 API rule violation: list_type_missing,k8s.io/api/autoscaling/v2beta2,HorizontalPodAutoscalerStatus,Conditions

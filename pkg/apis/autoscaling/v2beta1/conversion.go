@@ -17,6 +17,8 @@ limitations under the License.
 package v2beta1
 
 import (
+	"encoding/json"
+
 	autoscalingv2beta1 "k8s.io/api/autoscaling/v2beta1"
 
 	v1 "k8s.io/api/core/v1"
@@ -256,4 +258,46 @@ func Convert_v2beta1_PodsMetricStatus_To_autoscaling_PodsMetricStatus(in *autosc
 		Selector: in.Selector,
 	}
 	return nil
+}
+
+func Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta1_HorizontalPodAutoscaler(in *autoscaling.HorizontalPodAutoscaler, out *autoscalingv2beta1.HorizontalPodAutoscaler, s conversion.Scope) error {
+	if err := autoConvert_autoscaling_HorizontalPodAutoscaler_To_v2beta1_HorizontalPodAutoscaler(in, out, s); err != nil {
+		return err
+	}
+	if in.Spec.Behavior != nil {
+		old := out.Annotations
+		out.Annotations = make(map[string]string, len(old)+1)
+		for k, v := range old {
+			out.Annotations[k] = v
+		}
+
+		behaviorEnc, err := json.Marshal(in.Spec.Behavior)
+		if err != nil {
+			return err
+		}
+		// Even if the annotation for behavior exists, we will just overwrite it
+		out.Annotations[autoscaling.BehaviorSpecsAnnotation] = string(behaviorEnc)
+	}
+
+	return nil
+}
+
+func Convert_v2beta1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in *autoscalingv2beta1.HorizontalPodAutoscaler, out *autoscaling.HorizontalPodAutoscaler, s conversion.Scope) error {
+	if err := autoConvert_v2beta1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler(in, out, s); err != nil {
+		return err
+	}
+
+	if behaviorEnc, hasBehaviors := out.Annotations[autoscaling.BehaviorSpecsAnnotation]; hasBehaviors {
+		var behavior autoscaling.HorizontalPodAutoscalerBehavior
+		if err := json.Unmarshal([]byte(behaviorEnc), &behavior); err != nil {
+			return err
+		}
+		out.Spec.Behavior = &behavior
+		delete(out.Annotations, autoscaling.BehaviorSpecsAnnotation)
+	}
+	return nil
+}
+
+func Convert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta1_HorizontalPodAutoscalerSpec(in *autoscaling.HorizontalPodAutoscalerSpec, out *autoscalingv2beta1.HorizontalPodAutoscalerSpec, s conversion.Scope) error {
+	return autoConvert_autoscaling_HorizontalPodAutoscalerSpec_To_v2beta1_HorizontalPodAutoscalerSpec(in, out, s)
 }
