@@ -48,6 +48,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&BootstrapToken{},
 		&Images{},
+		&UpgradePlan{},
 	)
 	return nil
 }
