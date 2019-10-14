@@ -100,12 +100,6 @@ func (sf *stateFile) tryRestoreState() error {
 	sf.Lock()
 	defer sf.Unlock()
 	var err error
-
-	// used when all parsing is ok
-	tmpAssignments := make(ContainerCPUAssignments)
-	tmpDefaultCPUSet := cpuset.NewCPUSet()
-	tmpContainerCPUSet := cpuset.NewCPUSet()
-
 	var content []byte
 
 	content, err = ioutil.ReadFile(sf.stateFilePath)
@@ -143,11 +137,14 @@ func (sf *stateFile) tryRestoreState() error {
 		return fmt.Errorf("policy configured \"%s\" != policy from state file \"%s\"", sf.policyName, readStateV2.PolicyName)
 	}
 
+	var tmpDefaultCPUSet cpuset.CPUSet
 	if tmpDefaultCPUSet, err = cpuset.Parse(readStateV2.DefaultCPUSet); err != nil {
 		klog.Errorf("[cpumanager] state file: could not parse state file - [defaultCpuSet:\"%s\"]", readStateV2.DefaultCPUSet)
 		return err
 	}
 
+	var tmpContainerCPUSet cpuset.CPUSet
+	tmpAssignments := ContainerCPUAssignments{}
 	for pod := range readStateV2.Entries {
 		tmpAssignments[pod] = make(map[string]cpuset.CPUSet)
 		for container, cpuString := range readStateV2.Entries[pod] {

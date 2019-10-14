@@ -93,11 +93,6 @@ func (sc *stateCheckpoint) restoreState() error {
 	defer sc.mux.Unlock()
 	var err error
 
-	// used when all parsing is ok
-	tmpAssignments := make(ContainerCPUAssignments)
-	tmpDefaultCPUSet := cpuset.NewCPUSet()
-	tmpContainerCPUSet := cpuset.NewCPUSet()
-
 	checkpointV1 := newCPUManagerCheckpointV1()
 	checkpointV2 := newCPUManagerCheckpointV2()
 
@@ -120,10 +115,13 @@ func (sc *stateCheckpoint) restoreState() error {
 		return fmt.Errorf("configured policy %q differs from state checkpoint policy %q", sc.policyName, checkpointV2.PolicyName)
 	}
 
+	var tmpDefaultCPUSet cpuset.CPUSet
 	if tmpDefaultCPUSet, err = cpuset.Parse(checkpointV2.DefaultCPUSet); err != nil {
 		return fmt.Errorf("could not parse default cpu set %q: %v", checkpointV2.DefaultCPUSet, err)
 	}
 
+	var tmpContainerCPUSet cpuset.CPUSet
+	tmpAssignments := ContainerCPUAssignments{}
 	for pod := range checkpointV2.Entries {
 		tmpAssignments[pod] = make(map[string]cpuset.CPUSet)
 		for container, cpuString := range checkpointV2.Entries[pod] {
