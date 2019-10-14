@@ -295,26 +295,12 @@ func isDeletionDup(a, b *Delta) *Delta {
 	return b
 }
 
-// willObjectBeDeletedLocked returns true only if the last delta for the
-// given object is Delete. Caller must lock first.
-func (f *DeltaFIFO) willObjectBeDeletedLocked(id string) bool {
-	deltas := f.items[id]
-	return len(deltas) > 0 && deltas[len(deltas)-1].Type == Deleted
-}
-
 // queueActionLocked appends to the delta list for the object.
 // Caller must lock first.
 func (f *DeltaFIFO) queueActionLocked(actionType DeltaType, obj interface{}) error {
 	id, err := f.KeyOf(obj)
 	if err != nil {
 		return KeyError{obj, err}
-	}
-
-	// If object is supposed to be deleted (last event is Deleted),
-	// then we should ignore Sync events, because it would result in
-	// recreation of this object.
-	if actionType == Sync && f.willObjectBeDeletedLocked(id) {
-		return nil
 	}
 
 	newDeltas := append(f.items[id], Delta{actionType, obj})
