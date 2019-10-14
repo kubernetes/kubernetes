@@ -345,7 +345,7 @@ func (g *ContainerResourceGatherer) StartGatheringData() {
 func (g *ContainerResourceGatherer) StopAndSummarize(percentiles []int, constraints map[string]ResourceConstraint) (*ResourceUsageSummary, error) {
 	close(g.stopCh)
 	Logf("Closed stop channel. Waiting for %v workers", len(g.workers))
-	finished := make(chan struct{})
+	finished := make(chan struct{}, 1)
 	go func() {
 		g.workerWg.Wait()
 		finished <- struct{}{}
