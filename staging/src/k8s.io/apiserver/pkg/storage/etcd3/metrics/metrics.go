@@ -58,6 +58,29 @@ var (
 		},
 		[]string{"operation", "type"},
 	)
+
+	etcdWatcherChannelLength = compbasemetrics.NewGaugeVec(
+		&compbasemetrics.GaugeOpts{
+			Name: "etcd_watcher_channel_length",
+			Help: "Channel length of etcd watchers broken by resource key and channel name",
+		},
+		[]string{"key", "channel"},
+	)
+	etcdEventsCounter = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name: "etcd_watcher_received_events",
+			Help: "Counter of events received from etcd broken by resource key",
+		},
+		[]string{"key"},
+	)
+	etcdEventsSentLatency = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:    "etcd_watcher_events_sent_latency_milliseconds",
+			Help:    "Latency bucket of etcd watchers sent events broken by resource key",
+			Buckets: compbasemetrics.DefBuckets,
+		},
+		[]string{"resource"},
+	)
 )
 
 var registerMetrics sync.Once
@@ -68,6 +91,9 @@ func Register() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(etcdRequestLatency)
 		legacyregistry.MustRegister(objectCounts)
+		legacyregistry.MustRegister(etcdWatcherChannelLength)
+		legacyregistry.MustRegister(etcdEventsCounter)
+		legacyregistry.MustRegister(etcdEventsSentLatency)
 
 		// TODO(danielqsj): Remove the following metrics, they are deprecated
 		legacyregistry.MustRegister(deprecatedEtcdRequestLatenciesSummary)
@@ -100,4 +126,19 @@ func sinceInMicroseconds(start time.Time) float64 {
 // sinceInSeconds gets the time since the specified start in seconds.
 func sinceInSeconds(start time.Time) float64 {
 	return time.Since(start).Seconds()
+}
+
+// RecordEtcdWatcherChannelLength sets the length of a watcher channel.
+func RecordEtcdWatcherChannelLength(key, name string, length int) {
+	etcdWatcherChannelLength.WithLabelValues(key, name).Set(float64(length))
+}
+
+// RecordEtcdWatcherEventCount adds event count to the event counter.
+func RecordEtcdWatcherEventCount(key string, count int) {
+	etcdEventsCounter.WithLabelValues(key).Add(float64(count))
+}
+
+// RecordEtcdWatcherEventLatency adds a duration to the latency bucket.
+func RecordEtcdWatcherEventLatency(key string, duration time.Duration) {
+	etcdEventsSentLatency.WithLabelValues(key).Observe(float64(duration/time.Microsecond) / 1000)
 }

@@ -62,6 +62,28 @@ var (
 		},
 		[]string{"resource"},
 	)
+	cacherEventsCounter = metrics.NewCounterVec(
+		&metrics.CounterOpts{
+			Name: "apiserver_cacher_received_events",
+			Help: "Counter of events received from etcd broken by resource type",
+		},
+		[]string{"resource"},
+	)
+	cacherEventsSentLatency = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Name:    "apiserver_cacher_events_sent_latency_milliseconds",
+			Help:    "Latency buckets of cacher watchers sent events in watchcache broken by resource type",
+			Buckets: metrics.DefBuckets,
+		},
+		[]string{"resource"},
+	)
+	cacherWatcherChannelLength = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Name: "apiserver_cacher_watcher_channel_length",
+			Help: "Channel length of cacher watchers broken by resource type and channel name",
+		},
+		[]string{"resource", "channel"},
+	)
 	emptyFunc = func() {}
 )
 
@@ -73,6 +95,9 @@ const (
 
 func init() {
 	legacyregistry.MustRegister(initCounter)
+	legacyregistry.MustRegister(cacherEventsCounter)
+	legacyregistry.MustRegister(cacherEventsSentLatency)
+	legacyregistry.MustRegister(cacherWatcherChannelLength)
 }
 
 // Config contains the configuration for a given Cache.
@@ -781,6 +806,7 @@ func (c *Cacher) processEvent(event *watchCacheEvent) {
 		// Monitor if this gets backed up, and how much.
 		klog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.objectType.String(), curLen)
 	}
+	cacherWatcherChannelLength.WithLabelValues(c.objectType.String(), "incoming").Set(float64(len(c.incoming)))
 	c.incoming <- *event
 }
 
@@ -790,13 +816,18 @@ func (c *Cacher) dispatchEvents() {
 	defer bookmarkTimer.Stop()
 
 	lastProcessedResourceVersion := uint64(0)
+	metricLabelValue := c.objectType.String()
 	for {
 		select {
 		case event, ok := <-c.incoming:
 			if !ok {
 				return
 			}
+			now := c.clock.Now()
+			cacherEventsCounter.WithLabelValues(metricLabelValue).Inc()
 			c.dispatchEvent(&event)
+			cacherEventsSentLatency.WithLabelValues(metricLabelValue).Observe(float64(c.clock.Since(now)/time.Microsecond) / 1000.0)
+
 			lastProcessedResourceVersion = event.ResourceVersion
 		case <-bookmarkTimer.C():
 			bookmarkTimer.Reset(wait.Jitter(time.Second, 0.25))
