@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // nodeOptions defines all the options exposed via flags by kubeadm upgrade node.
@@ -138,7 +139,7 @@ func newNodeData(cmd *cobra.Command, args []string, options *nodeOptions) (*node
 	// Fetches the cluster configuration
 	// NB in case of control-plane node, we are reading all the info for the node; in case of NOT control-plane node
 	//    (worker node), we are not reading local API address and the CRI socket from the node object
-	cfg, err := configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade", !isControlPlaneNode)
+	cfg, err := configutil.FetchInitConfigurationFromCluster(client, &output.TextPrinter{}, "upgrade", !isControlPlaneNode)
 	if err != nil {
 		return nil, errors.Wrap(err, "unable to fetch the kubeadm-config ConfigMap")
 	}

@@ -24,6 +24,7 @@ import (
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 func TestGetK8sVersionFromUserInput(t *testing.T) {
@@ -139,7 +140,7 @@ func TestEnforceRequirements(t *testing.T) {
 	}
 	for _, tt := range tcases {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, _, err := enforceRequirements(&tt.flags, tt.dryRun, tt.newK8sVersion)
+			_, _, _, err := enforceRequirements(&tt.flags, tt.dryRun, tt.newK8sVersion, &output.TextPrinter{})
 
 			if err == nil && tt.expectedErr {
 				t.Error("Expected error, but got success")

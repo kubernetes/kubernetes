@@ -17,7 +17,6 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 
@@ -60,8 +59,6 @@ func (c *healthCheck) Name() string {
 // - (if self-hosted) that there are DaemonSets with at least one Pod for all control plane components
 // - (if static pod-hosted) that all required Static Pod manifests exist on disk
 func CheckClusterHealth(client clientset.Interface, ignoreChecksErrors sets.String) error {
-	fmt.Println("[upgrade] Making sure the cluster is healthy:")
-
 	healthChecks := []preflight.Checker{
 		&healthCheck{
 			name:   "APIServerHealth",

@@ -35,6 +35,7 @@ import (
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 type diffFlags struct {
@@ -91,7 +92,7 @@ func runDiff(flags *diffFlags, args []string) error {
 		if err != nil {
 			return errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
 		}
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, flags.out, "upgrade/diff", false)
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, &output.TextPrinter{}, "upgrade/diff", false)
 	}
 	if err != nil {
 		return err

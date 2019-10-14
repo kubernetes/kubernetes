@@ -272,12 +272,18 @@ const (
 	KubeAPIServer = "kube-apiserver"
 	// KubeControllerManager defines variable used internally when referring to kube-controller-manager component
 	KubeControllerManager = "kube-controller-manager"
-	// KubeScheduler defines variable used internally when referring to kube-scheduler component
+	// KubeScheduler defines variable used internally when referring kube-scheduler component
 	KubeScheduler = "kube-scheduler"
 	// KubeProxy defines variable used internally when referring to kube-proxy component
 	KubeProxy = "kube-proxy"
 	// HyperKube defines variable used internally when referring to the hyperkube image
 	HyperKube = "hyperkube"
+	// CoreDNS defines variable used internally when referring to the CoreDNS component
+	CoreDNS = "CoreDNS"
+	// KubeDNS defines variable used internally when referring to the KubeDNS component
+	KubeDNS = "kube-dns"
+	// Kubelet defines variable used internally when referring to the Kubelet
+	Kubelet = "kubelet"
 
 	// SelfHostingPrefix describes the prefix workloads that are self-hosted by kubeadm has
 	SelfHostingPrefix = "self-hosted-"

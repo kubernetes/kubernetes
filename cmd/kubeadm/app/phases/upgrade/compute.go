@@ -75,8 +75,6 @@ type ClusterState struct {
 // GetAvailableUpgrades fetches all versions from the specified VersionGetter and computes which
 // kinds of upgrades can be performed
 func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesAllowed, rcUpgradesAllowed bool, etcdClient etcdutil.ClusterInterrogator, dnsType kubeadmapi.DNSAddOnType, client clientset.Interface) ([]Upgrade, error) {
-	fmt.Println("[upgrade] Fetching available versions to upgrade to")
-
 	// Collect the upgrades kubeadm can do in this list
 	upgrades := []Upgrade{}
 
@@ -263,9 +261,6 @@ func GetAvailableUpgrades(versionGetterImpl VersionGetter, experimentalUpgradesA
 			})
 		}
 	}
-
-	// Add a newline in the end of this output to leave some space to the next output section
-	fmt.Println("")
 
 	return upgrades, nil
 }

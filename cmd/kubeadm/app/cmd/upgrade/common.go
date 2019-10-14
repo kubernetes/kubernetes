@@ -43,6 +43,7 @@ import (
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
 	kubeconfigutil "k8s.io/kubernetes/cmd/kubeadm/app/util/kubeconfig"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 func getK8sVersionFromUserInput(flags *applyPlanFlags, args []string, versionIsMandatory bool) (string, error) {
@@ -75,7 +76,7 @@ func getK8sVersionFromUserInput(flags *applyPlanFlags, args []string, versionIsM
 }
 
 // enforceRequirements verifies that it's okay to upgrade and then returns the variables needed for the rest of the procedure
-func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
+func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion string, printer output.Printer) (clientset.Interface, upgrade.VersionGetter, *kubeadmapi.InitConfiguration, error) {
 	client, err := getClient(flags.kubeConfigPath, dryRun)
 	if err != nil {
 		return nil, nil, nil, errors.Wrapf(err, "couldn't create a Kubernetes client from file %q", flags.kubeConfigPath)
@@ -87,14 +88,14 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	}
 
 	// Fetch the configuration from a file or ConfigMap and validate it
-	fmt.Println("[upgrade/config] Making sure the configuration is correct:")
+	printer.Printf("[upgrade/config] Making sure the configuration is correct:\n")
 
 	var cfg *kubeadmapi.InitConfiguration
 	if flags.cfgPath != "" {
 		klog.Warning("WARNING: Usage of the --config flag for reconfiguring the cluster during upgrade is not recommended!")
 		cfg, err = configutil.LoadInitConfigurationFromFile(flags.cfgPath)
 	} else {
-		cfg, err = configutil.FetchInitConfigurationFromCluster(client, os.Stdout, "upgrade/config", false)
+		cfg, err = configutil.FetchInitConfigurationFromCluster(client, printer, "upgrade/config", false)
 	}
 
 	if err != nil {
@@ -121,11 +122,12 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 
 	// Ensure the user is root
 	klog.V(1).Info("running preflight checks")
-	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration); err != nil {
+	if err := runPreflightChecks(client, ignorePreflightErrorsSet, &cfg.ClusterConfiguration, printer); err != nil {
 		return nil, nil, nil, err
 	}
 
 	// Run healthchecks against the cluster
+	printer.Printf("[upgrade] Making sure the cluster is healthy:")
 	if err := upgrade.CheckClusterHealth(client, ignorePreflightErrorsSet); err != nil {
 		return nil, nil, nil, errors.Wrap(err, "[upgrade/health] FATAL")
 	}
@@ -146,7 +148,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	// Check if feature gate flags used in the cluster are consistent with the set of features currently supported by kubeadm
 	if msg := features.CheckDeprecatedFlags(&features.InitFeatureGates, cfg.FeatureGates); len(msg) > 0 {
 		for _, m := range msg {
-			fmt.Printf("[upgrade/config] %s\n", m)
+			printer.Printf("[upgrade/config] %s\n", m)
 		}
 		return nil, nil, nil, errors.New("[upgrade/config] FATAL. Unable to upgrade a cluster using deprecated feature-gate flags. Please see the release notes")
 	}
@@ -157,7 +159,7 @@ func enforceRequirements(flags *applyPlanFlags, dryRun bool, newK8sVersion strin
 	}
 
 	// Use a real version getter interface that queries the API server, the kubeadm client and the Kubernetes CI system for latest versions
-	return client, upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, os.Stdout), newK8sVersion), cfg, nil
+	return client, upgrade.NewOfflineVersionGetter(upgrade.NewKubeVersionGetter(client, printer), newK8sVersion), cfg, nil
 }
 
 // printConfiguration prints the external version of the API to yaml
@@ -179,8 +181,8 @@ func printConfiguration(clustercfg *kubeadmapi.ClusterConfiguration, w io.Writer
 }
 
 // runPreflightChecks runs the root preflight check
-func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration) error {
-	fmt.Println("[preflight] Running pre-flight checks.")
+func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.String, cfg *kubeadmapi.ClusterConfiguration, printer output.Printer) error {
+	printer.Printf("[preflight] Running pre-flight checks.\n")
 	err := preflight.RunRootCheckOnly(ignorePreflightErrors)
 	if err != nil {
 		return err

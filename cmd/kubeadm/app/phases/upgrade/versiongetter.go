@@ -17,9 +17,6 @@ limitations under the License.
 package upgrade
 
 import (
-	"fmt"
-	"io"
-
 	"github.com/pkg/errors"
 
 	"k8s.io/api/core/v1"
@@ -28,6 +25,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/version"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/output"
 )
 
 // VersionGetter defines an interface for fetching different versions.
@@ -45,15 +43,15 @@ type VersionGetter interface {
 
 // KubeVersionGetter handles the version-fetching mechanism from external sources
 type KubeVersionGetter struct {
-	client clientset.Interface
-	w      io.Writer
+	client  clientset.Interface
+	printer output.Printer
 }
 
 // NewKubeVersionGetter returns a new instance of KubeVersionGetter
-func NewKubeVersionGetter(client clientset.Interface, writer io.Writer) VersionGetter {
+func NewKubeVersionGetter(client clientset.Interface, printer output.Printer) VersionGetter {
 	return &KubeVersionGetter{
-		client: client,
-		w:      writer,
+		client:  client,
+		printer: printer,
 	}
 }
 
@@ -63,7 +61,7 @@ func (g *KubeVersionGetter) ClusterVersion() (string, *versionutil.Version, erro
 	if err != nil {
 		return "", nil, errors.Wrap(err, "Couldn't fetch cluster version from the API Server")
 	}
-	fmt.Fprintf(g.w, "[upgrade/versions] Cluster version: %s\n", clusterVersionInfo.String())
+	g.printer.Printf("[upgrade/versions] Cluster version: %s\n", clusterVersionInfo.String())
 
 	clusterVersion, err := versionutil.ParseSemantic(clusterVersionInfo.String())
 	if err != nil {
@@ -75,7 +73,7 @@ func (g *KubeVersionGetter) ClusterVersion() (string, *versionutil.Version, erro
 // KubeadmVersion gets kubeadm version
 func (g *KubeVersionGetter) KubeadmVersion() (string, *versionutil.Version, error) {
 	kubeadmVersionInfo := version.Get()
-	fmt.Fprintf(g.w, "[upgrade/versions] kubeadm version: %s\n", kubeadmVersionInfo.String())
+	g.printer.Printf("[upgrade/versions] kubeadm version: %s\n", kubeadmVersionInfo.String())
 
 	kubeadmVersion, err := versionutil.ParseSemantic(kubeadmVersionInfo.String())
 	if err != nil {
@@ -92,7 +90,7 @@ func (g *KubeVersionGetter) VersionFromCILabel(ciVersionLabel, description strin
 	}
 
 	if description != "" {
-		fmt.Fprintf(g.w, "[upgrade/versions] Latest %s: %s\n", description, versionStr)
+		g.printer.Printf("[upgrade/versions] Latest %s: %s\n", description, versionStr)
 	}
 
 	ver, err := versionutil.ParseSemantic(versionStr)
