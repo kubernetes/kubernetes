@@ -24,8 +24,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/testutil"
+	"k8s.io/component-base/metrics/legacyregistry"
+	"k8s.io/component-base/metrics/testutil"
 )
 
 func TestTotals(t *testing.T) {
@@ -122,7 +122,7 @@ apiserver_storage_transformation_operations_total{status="Internal",transformati
 			tt.prefix.TransformFromStorage([]byte("k8s:enc:kms:v1:value"), nil)
 			defer transformerOperationsTotal.Reset()
 			defer deprecatedTransformerFailuresTotal.Reset()
-			if err := testutil.GatherAndCompare(prometheus.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
+			if err := testutil.GatherAndCompare(legacyregistry.DefaultGatherer, strings.NewReader(tt.want), tt.metrics...); err != nil {
 				t.Fatal(err)
 			}
 		})
