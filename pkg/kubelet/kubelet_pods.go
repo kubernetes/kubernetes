@@ -983,7 +983,7 @@ func (kl *Kubelet) removeOrphanedPodStatuses(pods []*v1.Pod, mirrorPods []*v1.Po
 // directories.
 // NOTE: This function is executed by the main sync loop, so it
 // should not contain any blocking calls.
-func (kl *Kubelet) HandlePodCleanups() error {
+func (kl *Kubelet) HandlePodCleanups() {
 	// The kubelet lacks checkpointing, so we need to introspect the set of pods
 	// in the cgroup tree prior to inspecting the set of pods in our pod manager.
 	// this ensures our view of the cgroup tree does not mistakenly observe pods
@@ -992,11 +992,19 @@ func (kl *Kubelet) HandlePodCleanups() error {
 		cgroupPods map[types.UID]cm.CgroupName
 		err        error
 	)
+
+	defer func(err error) {
+		if err != nil {
+			klog.Errorf("Failed cleaning pods: %v", err)
+		}
+	}(err)
+
 	if kl.cgroupsPerQOS {
 		pcm := kl.containerManager.NewPodContainerManager()
 		cgroupPods, err = pcm.GetAllPodsFromCgroups()
 		if err != nil {
-			return fmt.Errorf("failed to get list of pods that still exist on cgroup mounts: %v", err)
+			err = fmt.Errorf("failed to get list of pods that still exist on cgroup mounts: %v", err)
+			return
 		}
 	}
 
@@ -1025,7 +1033,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	runningPods, err := kl.runtimeCache.GetPods()
 	if err != nil {
 		klog.Errorf("Error listing containers: %#v", err)
-		return err
+		return
 	}
 	for _, pod := range runningPods {
 		if _, found := desiredPods[pod.ID]; !found {
@@ -1041,7 +1049,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	runningPods, err = kl.containerRuntime.GetPods(false)
 	if err != nil {
 		klog.Errorf("Error listing containers: %#v", err)
-		return err
+		return
 	}
 
 	// Remove any orphaned volumes.
@@ -1065,7 +1073,7 @@ func (kl *Kubelet) HandlePodCleanups() error {
 	}
 
 	kl.backOff.GC()
-	return nil
+	return
 }
 
 // podKiller launches a goroutine to kill a pod received from the channel if

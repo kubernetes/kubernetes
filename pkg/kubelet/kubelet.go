@@ -186,7 +186,7 @@ type SyncHandler interface {
 	HandlePodRemoves(pods []*v1.Pod)
 	HandlePodReconcile(pods []*v1.Pod)
 	HandlePodSyncs(pods []*v1.Pod)
-	HandlePodCleanups() error
+	HandlePodCleanups()
 }
 
 // Option is a functional option type for Kubelet
@@ -1902,25 +1902,25 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			// ADD as if they are new pods. These pods will then go through the
 			// admission process and *may* be rejected. This can be resolved
 			// once we have checkpointing.
-			handler.HandlePodAdditions(u.Pods)
+			go handler.HandlePodAdditions(u.Pods)
 		case kubetypes.UPDATE:
 			klog.V(2).Infof("SyncLoop (UPDATE, %q): %q", u.Source, format.PodsWithDeletionTimestamps(u.Pods))
-			handler.HandlePodUpdates(u.Pods)
+			go handler.HandlePodUpdates(u.Pods)
 		case kubetypes.REMOVE:
 			klog.V(2).Infof("SyncLoop (REMOVE, %q): %q", u.Source, format.Pods(u.Pods))
-			handler.HandlePodRemoves(u.Pods)
+			go handler.HandlePodRemoves(u.Pods)
 		case kubetypes.RECONCILE:
 			klog.V(4).Infof("SyncLoop (RECONCILE, %q): %q", u.Source, format.Pods(u.Pods))
-			handler.HandlePodReconcile(u.Pods)
+			go handler.HandlePodReconcile(u.Pods)
 		case kubetypes.DELETE:
 			klog.V(2).Infof("SyncLoop (DELETE, %q): %q", u.Source, format.Pods(u.Pods))
 			// DELETE is treated as a UPDATE because of graceful deletion.
-			handler.HandlePodUpdates(u.Pods)
+			go handler.HandlePodUpdates(u.Pods)
 		case kubetypes.RESTORE:
 			klog.V(2).Infof("SyncLoop (RESTORE, %q): %q", u.Source, format.Pods(u.Pods))
 			// These are pods restored from the checkpoint. Treat them as new
 			// pods.
-			handler.HandlePodAdditions(u.Pods)
+			go handler.HandlePodAdditions(u.Pods)
 		case kubetypes.SET:
 			// TODO: Do we want to support this?
 			klog.Errorf("Kubelet does not support snapshot update")
@@ -1943,7 +1943,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			// PLEG event for a pod; sync it.
 			if pod, ok := kl.podManager.GetPodByUID(e.ID); ok {
 				klog.V(2).Infof("SyncLoop (PLEG): %q, event: %#v", format.Pod(pod), e)
-				handler.HandlePodSyncs([]*v1.Pod{pod})
+				go handler.HandlePodSyncs([]*v1.Pod{pod})
 			} else {
 				// If the pod no longer exists, ignore the event.
 				klog.V(4).Infof("SyncLoop (PLEG): ignore irrelevant event: %#v", e)
@@ -1952,7 +1952,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 
 		if e.Type == pleg.ContainerDied {
 			if containerID, ok := e.Data.(string); ok {
-				kl.cleanUpContainersInPod(e.ID, containerID)
+				go kl.cleanUpContainersInPod(e.ID, containerID)
 			}
 		}
 	case <-syncCh:
@@ -1962,7 +1962,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			break
 		}
 		klog.V(4).Infof("SyncLoop (SYNC): %d pods; %s", len(podsToSync), format.Pods(podsToSync))
-		handler.HandlePodSyncs(podsToSync)
+		go handler.HandlePodSyncs(podsToSync)
 	case update := <-kl.livenessManager.Updates():
 		if update.Result == proberesults.Failure {
 			// The liveness manager detected a failure; sync the pod.
@@ -1976,7 +1976,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 				break
 			}
 			klog.V(1).Infof("SyncLoop (container unhealthy): %q", format.Pod(pod))
-			handler.HandlePodSyncs([]*v1.Pod{pod})
+			go handler.HandlePodSyncs([]*v1.Pod{pod})
 		}
 	case <-housekeepingCh:
 		if !kl.sourcesReady.AllReady() {
@@ -1985,9 +1985,7 @@ func (kl *Kubelet) syncLoopIteration(configCh <-chan kubetypes.PodUpdate, handle
 			klog.V(4).Infof("SyncLoop (housekeeping, skipped): sources aren't ready yet.")
 		} else {
 			klog.V(4).Infof("SyncLoop (housekeeping)")
-			if err := handler.HandlePodCleanups(); err != nil {
-				klog.Errorf("Failed cleaning pods: %v", err)
-			}
+			go handler.HandlePodCleanups()
 		}
 	}
 	return true
