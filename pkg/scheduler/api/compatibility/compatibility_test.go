@@ -160,7 +160,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			wantPredicates: sets.NewString(
-				"NoVolumeZoneConflict",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
@@ -183,6 +182,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeAffinity"},
 					{Name: "NodeResources"},
 					{Name: "VolumeRestrictions"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -224,7 +224,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			wantPredicates: sets.NewString(
-				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
@@ -250,6 +249,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResources"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -295,7 +295,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			wantPredicates: sets.NewString(
-				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"MaxEBSVolumeCount",
@@ -324,6 +323,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResources"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -378,7 +378,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"MaxEBSVolumeCount",
@@ -407,6 +406,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResources"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -473,7 +473,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodeCondition",
@@ -503,6 +502,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResources"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -570,7 +570,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodeCondition",
@@ -601,6 +600,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -672,7 +672,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodePIDPressure",
@@ -704,6 +703,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -787,7 +787,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodePIDPressure",
@@ -820,6 +819,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -904,7 +904,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodePIDPressure",
@@ -938,6 +937,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -1021,7 +1021,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodePIDPressure",
@@ -1056,6 +1055,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -1143,7 +1143,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"NoVolumeZoneConflict",
 				"CheckNodeMemoryPressure",
 				"CheckNodeDiskPressure",
 				"CheckNodePIDPressure",
@@ -1178,6 +1177,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
+					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -1212,6 +1212,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		"NodeAffinity":       "MatchNodeSelector",
 		"VolumeBinding":      "CheckVolumeBinding",
 		"VolumeRestrictions": "NoDiskConflict",
+		"VolumeZone":         "NoVolumeZoneConflict",
 	}
 	scoreToPriorityMap := map[string]string{
 		"TaintToleration": "TaintTolerationPriority",
