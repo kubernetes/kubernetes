@@ -10,6 +10,7 @@ go_library(
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/algorithm/priorities:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
+        "//pkg/scheduler/framework/plugins/balancedresourceallocation:go_default_library",
         "//pkg/scheduler/framework/plugins/imagelocality:go_default_library",
         "//pkg/scheduler/framework/plugins/nodeaffinity:go_default_library",
         "//pkg/scheduler/framework/plugins/nodename:go_default_library",
@@ -38,6 +39,7 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
+        "//pkg/scheduler/framework/plugins/balancedresourceallocation:all-srcs",
         "//pkg/scheduler/framework/plugins/examples:all-srcs",
         "//pkg/scheduler/framework/plugins/imagelocality:all-srcs",
         "//pkg/scheduler/framework/plugins/migration:all-srcs",

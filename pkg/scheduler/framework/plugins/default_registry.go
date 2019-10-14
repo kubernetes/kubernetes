@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/balancedresourceallocation"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
@@ -58,12 +59,13 @@ type RegistryArgs struct {
 // runs custom plugins, can pass a different Registry when initializing the scheduler.
 func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 	return framework.Registry{
-		imagelocality.Name:   imagelocality.New,
-		tainttoleration.Name: tainttoleration.New,
-		noderesources.Name:   noderesources.New,
-		nodename.Name:        nodename.New,
-		nodeports.Name:       nodeports.New,
-		nodeaffinity.Name:    nodeaffinity.New,
+		imagelocality.Name:              imagelocality.New,
+		tainttoleration.Name:            tainttoleration.New,
+		noderesources.Name:              noderesources.New,
+		nodename.Name:                   nodename.New,
+		nodeports.Name:                  nodeports.New,
+		nodeaffinity.Name:               nodeaffinity.New,
+		balancedresourceallocation.Name: balancedresourceallocation.New,
 		volumebinding.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return volumebinding.NewFromVolumeBinder(args.VolumeBinder), nil
 		},
@@ -140,6 +142,11 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPriority(priorities.ImageLocalityPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, imagelocality.Name, &args.Weight)
+			return
+		})
+	registry.RegisterPriority(priorities.BalancedResourceAllocation,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, balancedresourceallocation.Name, &args.Weight)
 			return
 		})
 
