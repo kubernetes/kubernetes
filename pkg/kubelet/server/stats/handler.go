@@ -108,7 +108,7 @@ type handler struct {
 }
 
 // CreateHandlers creates the REST handlers for the stats.
-func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryProvider, enableCAdvisorJSONEndpoints bool) *restful.WebService {
+func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryProvider, enableContainerMonitoringEndpoints, enableCAdvisorJSONEndpoints bool) *restful.WebService {
 	h := &handler{provider, summaryProvider}
 
 	ws := &restful.WebService{}
@@ -120,8 +120,12 @@ func CreateHandlers(rootPath string, provider Provider, summaryProvider SummaryP
 		handler restful.RouteFunction
 	}
 
-	endpoints := []endpoint{
-		{"/summary", h.handleSummary},
+	endpoints := []endpoint{}
+
+	if enableContainerMonitoringEndpoints {
+		endpoints = append(endpoints,
+			endpoint{"/summary", h.handleSummary},
+		)
 	}
 
 	if enableCAdvisorJSONEndpoints {

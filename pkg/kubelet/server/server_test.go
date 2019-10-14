@@ -337,6 +337,7 @@ func newServerTestWithDebug(enableDebugging, redirectContainerStreaming bool, st
 		stats.NewResourceAnalyzer(fw.fakeKubelet, time.Minute),
 		fw.fakeAuth,
 		true,
+		true,
 		enableDebugging,
 		false,
 		redirectContainerStreaming,
