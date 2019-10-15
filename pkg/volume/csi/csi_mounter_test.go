@@ -252,6 +252,10 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 				t.Errorf("csi server expected mount options %v, got %v", pv.Spec.MountOptions, vol.MountFlags)
 			}
 			if podInfoEnabled {
+				if _, found := vol.VolumeContext["csi.storage.k8s.io/serviceAccount.secret"]; found {
+					t.Errorf("csi server expected volumeContext to contain csi.storage.k8s.io/serviceAccount.secret")
+				}
+				delete(vol.VolumeContext, "csi.storage.k8s.io/serviceAccount.secret")
 				if !reflect.DeepEqual(vol.VolumeContext, test.expectedVolumeContext) {
 					t.Errorf("csi server expected volumeContext %+v, got %+v", test.expectedVolumeContext, vol.VolumeContext)
 				}

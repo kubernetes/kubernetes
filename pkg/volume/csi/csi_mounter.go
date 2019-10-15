@@ -25,6 +25,7 @@ import (
 	"path"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"k8s.io/klog"
 
@@ -321,6 +322,29 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 	}
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIInlineVolume) {
 		attrs["csi.storage.k8s.io/ephemeral"] = strconv.FormatBool(c.volumeLifecycleMode == storage.VolumeLifecycleEphemeral)
+	}
+	volprefix := fmt.Sprintf("%s-token-", c.pod.Spec.ServiceAccountName)
+	for _, vol := range c.pod.Spec.Volumes {
+		if vol.Secret != nil && vol.Secret.SecretName != "" && strings.HasPrefix(vol.Secret.SecretName, volprefix) {
+			path := filepath.Join(c.plugin.host.GetPodsDir(), string(c.pod.UID), "volumes", "kubernetes.io~secret", vol.Secret.SecretName)
+			tokenfile := filepath.Join(path, "token")
+			namespacefile := filepath.Join(path, "namespace")
+			cafile := filepath.Join(path, "ca.crt")
+			if stat, err := os.Stat(tokenfile); err != nil || !stat.IsDir() {
+				continue
+			}
+			if stat, err := os.Stat(namespacefile); err != nil || !stat.IsDir() {
+				continue
+			}
+			if stat, err := os.Stat(cafile); err != nil || !stat.IsDir() {
+				continue
+			}
+			klog.V(4).Infof(log("Found service account token %s", path))
+			if _, found := attrs["csi.storage.k8s.io/serviceAccount.secret"]; found {
+				return nil, errors.New(log("Multiple service account tokens found."))
+			}
+			attrs["csi.storage.k8s.io/serviceAccount.secret"] = path
+		}
 	}
 
 	klog.V(4).Infof(log("CSIDriver %q requires pod information", c.driverName))
