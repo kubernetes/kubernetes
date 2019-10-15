@@ -30,7 +30,7 @@ spec:
       serviceAccountName: csi-resizer
       containers:
         - name: csi-resizer
-          image: quay.io/k8scsi/csi-resizer:v0.2.0
+          image: quay.io/k8scsi/csi-resizer:v0.3.0
           args:
             - "--v=5"
             - "--csi-address=$(ADDRESS)"

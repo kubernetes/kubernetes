@@ -36,7 +36,7 @@ spec:
     spec:
       containers:
         - name: node-driver-registrar
-          image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
+          image: quay.io/k8scsi/csi-node-driver-registrar:v1.2.0
           lifecycle:
             preStop:
               exec:
@@ -62,7 +62,7 @@ spec:
             name: csi-data-dir
 
         - name: hostpath
-          image: quay.io/k8scsi/hostpathplugin:v1.2.0-rc5
+          image: quay.io/k8scsi/hostpathplugin:v1.2.0
           args:
             - "--drivername=hostpath.csi.k8s.io"
             - "--v=5"
