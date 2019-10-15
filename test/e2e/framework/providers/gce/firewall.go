@@ -75,7 +75,7 @@ func ConstructHealthCheckFirewallForLBService(clusterID string, svc *v1.Service,
 	fw := compute.Firewall{}
 	fw.Name = MakeHealthCheckFirewallNameForLBService(clusterID, cloudprovider.DefaultLoadBalancerName(svc), isNodesHealthCheck)
 	fw.TargetTags = []string{nodeTag}
-	fw.SourceRanges = gcecloud.LoadBalancerSrcRanges()
+	fw.SourceRanges = gcecloud.L4LoadBalancerSrcRanges()
 	healthCheckPort := gcecloud.GetNodesHealthCheckPort()
 	if !isNodesHealthCheck {
 		healthCheckPort = svc.Spec.HealthCheckNodePort

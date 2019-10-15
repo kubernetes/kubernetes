@@ -43,7 +43,6 @@ import (
 // TODO(yankaiz): Create shared error types for both test/non-test codes.
 const (
 	eventReasonManualChange = "LoadBalancerManualChange"
-	eventMsgFirewallChange  = "Firewall change required by network admin"
 	errPrefixGetTargetPool  = "error getting load balancer's target pool:"
 	wrongTier               = "SupremeLuxury"
 	errStrUnsupportedTier   = "unsupported network tier: \"" + wrongTier + "\""

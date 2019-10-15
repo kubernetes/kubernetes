@@ -310,10 +310,10 @@ func (p *Provider) cleanupGCEResources(c clientset.Interface, loadBalancerName, 
 	return
 }
 
-// LoadBalancerSrcRanges contains the ranges of ips used by the GCE load balancers (l4 & L7)
-// for proxying client requests and performing health checks.
-func (p *Provider) LoadBalancerSrcRanges() []string {
-	return gcecloud.LoadBalancerSrcRanges()
+// L4LoadBalancerSrcRanges contains the ranges of ips used by the GCE L4 load
+// balancers for proxying client requests and performing health checks.
+func (p *Provider) L4LoadBalancerSrcRanges() []string {
+	return gcecloud.L4LoadBalancerSrcRanges()
 }
 
 // EnableAndDisableInternalLB returns functions for both enabling and disabling internal Load Balancer
