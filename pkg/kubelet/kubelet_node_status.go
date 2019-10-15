@@ -63,7 +63,7 @@ func (kl *Kubelet) registerWithAPIServer() {
 			step = 7 * time.Second
 		}
 
-		node, err := kl.initialNode()
+		node, err := kl.initialNode(context.TODO())
 		if err != nil {
 			klog.Errorf("Unable to construct v1.Node object for kubelet: %v", err)
 			continue
@@ -214,7 +214,7 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 
 // initialNode constructs the initial v1.Node for this Kubelet, incorporating node
 // labels, information from the cloud provider, and Kubelet configuration.
-func (kl *Kubelet) initialNode() (*v1.Node, error) {
+func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
@@ -320,13 +320,13 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		// local metadata server here.
 		var err error
 		if node.Spec.ProviderID == "" {
-			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(context.TODO(), kl.cloud, kl.nodeName)
+			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(ctx, kl.cloud, kl.nodeName)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		instanceType, err := instances.InstanceType(context.TODO(), kl.nodeName)
+		instanceType, err := instances.InstanceType(ctx, kl.nodeName)
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +337,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		// If the cloud has zone information, label the node with the zone information
 		zones, ok := kl.cloud.Zones()
 		if ok {
-			zone, err := zones.GetZone(context.TODO())
+			zone, err := zones.GetZone(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}
