@@ -24,7 +24,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	netutil "k8s.io/apimachinery/pkg/util/net"
@@ -135,7 +135,6 @@ func (w *KubeWaiter) WaitForPodToDisappear(podName string) error {
 // WaitForHealthyKubelet blocks until the kubelet /healthz endpoint returns 'ok'
 func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzEndpoint string) error {
 	time.Sleep(initalTimeout)
-	fmt.Printf("[kubelet-check] Initial timeout of %v passed.\n", initalTimeout)
 	return TryRunCommand(func() error {
 		client := &http.Client{Transport: netutil.SetOldTransportDefaults(&http.Transport{})}
 		resp, err := client.Get(healthzEndpoint)
