@@ -1,60 +1,68 @@
 <!-- BEGIN MUNGE: GENERATED_TOC -->
-- [v1.14.7](#v1147)
-  - [Downloads for v1.14.7](#downloads-for-v1147)
+- [v1.14.8](#v1148)
+  - [Downloads for v1.14.8](#downloads-for-v1148)
     - [Client Binaries](#client-binaries)
     - [Server Binaries](#server-binaries)
     - [Node Binaries](#node-binaries)
-  - [Changelog since v1.14.6](#changelog-since-v1146)
+  - [Changelog since v1.14.7](#changelog-since-v1147)
     - [Other notable changes](#other-notable-changes)
-- [v1.14.6](#v1146)
-  - [Downloads for v1.14.6](#downloads-for-v1146)
+- [v1.14.7](#v1147)
+  - [Downloads for v1.14.7](#downloads-for-v1147)
     - [Client Binaries](#client-binaries-1)
     - [Server Binaries](#server-binaries-1)
     - [Node Binaries](#node-binaries-1)
-  - [Changelog since v1.14.5](#changelog-since-v1145)
+  - [Known Issues](#known-issues)
+  - [Changelog since v1.14.6](#changelog-since-v1146)
     - [Other notable changes](#other-notable-changes-1)
-- [v1.14.5](#v1145)
-  - [Downloads for v1.14.5](#downloads-for-v1145)
+- [v1.14.6](#v1146)
+  - [Downloads for v1.14.6](#downloads-for-v1146)
     - [Client Binaries](#client-binaries-2)
     - [Server Binaries](#server-binaries-2)
     - [Node Binaries](#node-binaries-2)
-  - [Changelog since v1.14.4](#changelog-since-v1144)
-- [v1.14.4](#v1144)
-  - [Downloads for v1.14.4](#downloads-for-v1144)
+  - [Changelog since v1.14.5](#changelog-since-v1145)
+    - [Other notable changes](#other-notable-changes-2)
+- [v1.14.5](#v1145)
+  - [Downloads for v1.14.5](#downloads-for-v1145)
     - [Client Binaries](#client-binaries-3)
     - [Server Binaries](#server-binaries-3)
     - [Node Binaries](#node-binaries-3)
-  - [Changelog since v1.14.3](#changelog-since-v1143)
-    - [Other notable changes](#other-notable-changes-2)
-- [v1.14.3](#v1143)
-  - [Downloads for v1.14.3](#downloads-for-v1143)
+  - [Changelog since v1.14.4](#changelog-since-v1144)
+- [v1.14.4](#v1144)
+  - [Downloads for v1.14.4](#downloads-for-v1144)
     - [Client Binaries](#client-binaries-4)
     - [Server Binaries](#server-binaries-4)
     - [Node Binaries](#node-binaries-4)
-  - [Changelog since v1.14.2](#changelog-since-v1142)
+  - [Changelog since v1.14.3](#changelog-since-v1143)
     - [Other notable changes](#other-notable-changes-3)
-- [v1.14.2](#v1142)
-  - [Downloads for v1.14.2](#downloads-for-v1142)
+- [v1.14.3](#v1143)
+  - [Downloads for v1.14.3](#downloads-for-v1143)
     - [Client Binaries](#client-binaries-5)
     - [Server Binaries](#server-binaries-5)
     - [Node Binaries](#node-binaries-5)
-  - [Changelog since v1.14.1](#changelog-since-v1141)
+  - [Changelog since v1.14.2](#changelog-since-v1142)
     - [Other notable changes](#other-notable-changes-4)
-- [v1.14.1](#v1141)
-  - [Downloads for v1.14.1](#downloads-for-v1141)
+- [v1.14.2](#v1142)
+  - [Downloads for v1.14.2](#downloads-for-v1142)
     - [Client Binaries](#client-binaries-6)
     - [Server Binaries](#server-binaries-6)
     - [Node Binaries](#node-binaries-6)
-  - [Changelog since v1.14.0](#changelog-since-v1140)
+  - [Changelog since v1.14.1](#changelog-since-v1141)
     - [Other notable changes](#other-notable-changes-5)
-- [v1.14.0](#v1140)
-  - [Downloads for v1.14.0](#downloads-for-v1140)
+- [v1.14.1](#v1141)
+  - [Downloads for v1.14.1](#downloads-for-v1141)
     - [Client Binaries](#client-binaries-7)
     - [Server Binaries](#server-binaries-7)
     - [Node Binaries](#node-binaries-7)
+  - [Changelog since v1.14.0](#changelog-since-v1140)
+    - [Other notable changes](#other-notable-changes-6)
+- [v1.14.0](#v1140)
+  - [Downloads for v1.14.0](#downloads-for-v1140)
+    - [Client Binaries](#client-binaries-8)
+    - [Server Binaries](#server-binaries-8)
+    - [Node Binaries](#node-binaries-8)
 - [Kubernetes v1.14 Release Notes](#kubernetes-v114-release-notes)
   - [1.14 What’s New](#114-whats-new)
-  - [Known Issues](#known-issues)
+  - [Known Issues](#known-issues-1)
   - [Urgent Upgrade Notes](#urgent-upgrade-notes)
     - [(No, really, you MUST read this before you upgrade)](#no-really-you-must-read-this-before-you-upgrade)
   - [Deprecations](#deprecations)
@@ -83,55 +91,116 @@
   - [External Dependencies](#external-dependencies)
 - [v1.14.0-rc.1](#v1140-rc1)
   - [Downloads for v1.14.0-rc.1](#downloads-for-v1140-rc1)
-    - [Client Binaries](#client-binaries-8)
-    - [Server Binaries](#server-binaries-8)
-    - [Node Binaries](#node-binaries-8)
-  - [Changelog since v1.14.0-beta.2](#changelog-since-v1140-beta2)
-    - [Action Required](#action-required)
-    - [Other notable changes](#other-notable-changes-6)
-- [v1.14.0-beta.2](#v1140-beta2)
-  - [Downloads for v1.14.0-beta.2](#downloads-for-v1140-beta2)
     - [Client Binaries](#client-binaries-9)
     - [Server Binaries](#server-binaries-9)
     - [Node Binaries](#node-binaries-9)
-  - [Changelog since v1.14.0-beta.1](#changelog-since-v1140-beta1)
-    - [Action Required](#action-required-1)
+  - [Changelog since v1.14.0-beta.2](#changelog-since-v1140-beta2)
+    - [Action Required](#action-required)
     - [Other notable changes](#other-notable-changes-7)
-- [v1.14.0-beta.1](#v1140-beta1)
-  - [Downloads for v1.14.0-beta.1](#downloads-for-v1140-beta1)
+- [v1.14.0-beta.2](#v1140-beta2)
+  - [Downloads for v1.14.0-beta.2](#downloads-for-v1140-beta2)
     - [Client Binaries](#client-binaries-10)
     - [Server Binaries](#server-binaries-10)
     - [Node Binaries](#node-binaries-10)
-  - [Changelog since v1.14.0-alpha.3](#changelog-since-v1140-alpha3)
-    - [Action Required](#action-required-2)
+  - [Changelog since v1.14.0-beta.1](#changelog-since-v1140-beta1)
+    - [Action Required](#action-required-1)
     - [Other notable changes](#other-notable-changes-8)
-- [v1.14.0-alpha.3](#v1140-alpha3)
-  - [Downloads for v1.14.0-alpha.3](#downloads-for-v1140-alpha3)
+- [v1.14.0-beta.1](#v1140-beta1)
+  - [Downloads for v1.14.0-beta.1](#downloads-for-v1140-beta1)
     - [Client Binaries](#client-binaries-11)
     - [Server Binaries](#server-binaries-11)
     - [Node Binaries](#node-binaries-11)
-  - [Changelog since v1.14.0-alpha.2](#changelog-since-v1140-alpha2)
-    - [Action Required](#action-required-3)
+  - [Changelog since v1.14.0-alpha.3](#changelog-since-v1140-alpha3)
+    - [Action Required](#action-required-2)
     - [Other notable changes](#other-notable-changes-9)
-- [v1.14.0-alpha.2](#v1140-alpha2)
-  - [Downloads for v1.14.0-alpha.2](#downloads-for-v1140-alpha2)
+- [v1.14.0-alpha.3](#v1140-alpha3)
+  - [Downloads for v1.14.0-alpha.3](#downloads-for-v1140-alpha3)
     - [Client Binaries](#client-binaries-12)
     - [Server Binaries](#server-binaries-12)
     - [Node Binaries](#node-binaries-12)
-  - [Changelog since v1.14.0-alpha.1](#changelog-since-v1140-alpha1)
-    - [Action Required](#action-required-4)
+  - [Changelog since v1.14.0-alpha.2](#changelog-since-v1140-alpha2)
+    - [Action Required](#action-required-3)
     - [Other notable changes](#other-notable-changes-10)
-- [v1.14.0-alpha.1](#v1140-alpha1)
-  - [Downloads for v1.14.0-alpha.1](#downloads-for-v1140-alpha1)
+- [v1.14.0-alpha.2](#v1140-alpha2)
+  - [Downloads for v1.14.0-alpha.2](#downloads-for-v1140-alpha2)
     - [Client Binaries](#client-binaries-13)
     - [Server Binaries](#server-binaries-13)
     - [Node Binaries](#node-binaries-13)
+  - [Changelog since v1.14.0-alpha.1](#changelog-since-v1140-alpha1)
+    - [Action Required](#action-required-4)
+    - [Other notable changes](#other-notable-changes-11)
+- [v1.14.0-alpha.1](#v1140-alpha1)
+  - [Downloads for v1.14.0-alpha.1](#downloads-for-v1140-alpha1)
+    - [Client Binaries](#client-binaries-14)
+    - [Server Binaries](#server-binaries-14)
+    - [Node Binaries](#node-binaries-14)
   - [Changelog since v1.13.0](#changelog-since-v1130)
     - [Action Required](#action-required-5)
-    - [Other notable changes](#other-notable-changes-11)
+    - [Other notable changes](#other-notable-changes-12)
 <!-- END MUNGE: GENERATED_TOC -->
 
 <!-- NEW RELEASE NOTES ENTRY -->
+
+
+# v1.14.8
+
+[Documentation](https://docs.k8s.io)
+
+## Downloads for v1.14.8
+
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes.tar.gz) | `1aeaa04a0dfb3656204589fb503a0da98d085514ef82d1da930cf093fb17a0e11887c52aaeb1351ec87eb80227510de3a667984e6eb4acfcc1d3b5c8fb3681eb`
+[kubernetes-src.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-src.tar.gz) | `1946bb8035d3cf6b40b6e58a8d886cb0fbd023e656af5a1c68047cc2eb3c28541ec4fb07d7420ff269ca83e40dad0579d14faf745838b4db210df52f4d4f2117`
+
+### Client Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-client-darwin-386.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-client-darwin-386.tar.gz) | `429099a2fface3c82650ec76b2b422d39f18b4efbfd209431a3f60d218f3c1874eff90499d9ec95a35c41b0a7e82579a25c05ac1a49c6bb530cc3fbf5b70cf6e`
+[kubernetes-client-darwin-amd64.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-client-darwin-amd64.tar.gz) | `e51446c4557eebe65f9c36bd19bc23b72fc90c7a5e3bf3fb070d63ddc518ee5ab2e12163933da70b353ce0e4bdee016b24f8393c9cddee31445b2ccc8a0868a9`
+[kubernetes-client-linux-386.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-client-linux-386.tar.gz) | `6efe1d19c0c3998c0af559f33468bccc026b7e98d4efda1566b1e8adb9a4bb15dfa3dbc392a4ca211e40e21a8cf0ae27ce222beb1c8949922a532a8116316325`
+[kubernetes-client-linux-amd64.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-client-linux-amd64.tar.gz) | `fe1d0816e843c228fdb9da659d61b217f2af9c05a4206bd091b93579142256354312a1fc4173193a0cf4c7f55f871c50eafc34358ecc128a7e790cd0c125a4f9`
+[kubernetes-client-linux-arm.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-client-linux-arm.tar.gz) | `cef8f09eb298569582c4861ef9bace4dc9ff3302bae798756f01d42bfb1e933379a9c842942b9c442de7b3d19cdc48f31c4aab2c4b5f48a9227fc790b4584cbd`
+[kubernetes-client-linux-arm64.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-client-linux-arm64.tar.gz) | `47c64414d87e68382652db2e5292fda0a86fdda6b9e3abab61f8647d07005c22692225535966838b5a61b3d48805978b2f599eea2446923cab60f8ffb04d2845`
+[kubernetes-client-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-client-linux-ppc64le.tar.gz) | `0c4c026912b4ecd27c7ee9c995cc16b688c59cabd01f4702adbb6cceecf12f0fef311808d14d8482bf255c6cc06859214fb50d48a827a7dbece6a40d369e661c`
+[kubernetes-client-linux-s390x.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-client-linux-s390x.tar.gz) | `9c7aac67511ec12b9176e9067c1d713605bf65f91c5adbf40b82f6e3598fb0676d9504377d7e653fb4a7958d3b14cee54256f9f07b968906985794f4e3e8068d`
+[kubernetes-client-windows-386.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-client-windows-386.tar.gz) | `579c0276d3755a6cad3806fc2c5fce80d19dcbc3301a6dd5a2bf3853265444f8e8daed8156c30f8c7c337e6251a3e003239aa12e627225e2adc11a9f6f474640`
+[kubernetes-client-windows-amd64.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-client-windows-amd64.tar.gz) | `7a7a7f4d3543d922c9526b601293f486973137c748e668f048329a375943b26fa5721cc00781b11ea7c6b75e60fa85c88cd95fe311656e4c9f49ec14544ca6fc`
+
+### Server Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-server-linux-amd64.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-server-linux-amd64.tar.gz) | `9fbdf873ff96bb47172157022182219ecce92131f1cea8f470340f5237532d8388c56ee4c821e3504ffcad16ade6193a216ffede44c2133d1907c320a255aafa`
+[kubernetes-server-linux-arm.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-server-linux-arm.tar.gz) | `7e0fb35a4322ca960b20feab1e9265daff3823bb83245753fa4ff763b55d5a2e91426bccb58bb4166fb1ee45bf58cb6452b9611b63609bff17fd694ac0d9d382`
+[kubernetes-server-linux-arm64.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-server-linux-arm64.tar.gz) | `d5f48ee89bb0cd4151c636c8f6f777c49af31bfe5aca6ee62ad1327bbcff5430338a342b8ed023c5b030a4ee1e13e84f284a353520619092814e5aa542d7f1bd`
+[kubernetes-server-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-server-linux-ppc64le.tar.gz) | `1c2f57ae61e3facb8ec5e9cb47f36173df49870c6c51d08a6eef414c5568cdcdf8fa4ecd70c78851454a9caf05a1232ff0908ad7cebbf846553f824f413dded5`
+[kubernetes-server-linux-s390x.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-server-linux-s390x.tar.gz) | `4eb8b48ceca578eb88446391858911c229f04bb8948930b521b40406ccc191295e7808d1353be8f4554319df669eb6953db3035f15dcaf88a3fe76d444b720db`
+
+### Node Binaries
+
+filename | sha512 hash
+-------- | -----------
+[kubernetes-node-linux-amd64.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-node-linux-amd64.tar.gz) | `05d32dde64178f71e4f95bd0354d25536b298a017c968803c1a9c7e34a591b63beb478c43909e3113dd8039a62df02455f4e8fc58d4a5ed22ade4e04087e6aee`
+[kubernetes-node-linux-arm.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-node-linux-arm.tar.gz) | `ce80d5df529a08dc03c27e53f9dcd79a36159e2e9f1a44d475b8151b55e3f94ee47c74f9ca18c169a8a536fdce5aef0afb464d94a17a650410eb34bcfe3191ce`
+[kubernetes-node-linux-arm64.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-node-linux-arm64.tar.gz) | `8905f2fc110439bf992239e09d0dca7cbba918ef2652ab9a1e511361ba3770433edbad0a13fb66b30c08530e4190f8a26c9e984f0a7126ee0c04262b77c8e623`
+[kubernetes-node-linux-ppc64le.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-node-linux-ppc64le.tar.gz) | `ccf0dd819fdba4c8e3a32e16fb2d26088b8bce84946a885b5ff2ce56c4704d1d95a855bae8929388af4c714a83b87a77b1febf4d4fc255f2737fc1ce402235c5`
+[kubernetes-node-linux-s390x.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-node-linux-s390x.tar.gz) | `c157679a832d0f76bde570d243bc9ddaf21663808a12f6ab4a3477118dea63aafeab67f0118460efd81e8770547f9ed0f6b0064221ecb72ddea424eba6198cc9`
+[kubernetes-node-windows-amd64.tar.gz](https://dl.k8s.io/v1.14.8/kubernetes-node-windows-amd64.tar.gz) | `7c87c34736ead06b1823ce004edf27a24773d873d6dff594a587621f3480ff134c7d912fcddc1eb30d4a66538a2403e2ccb477920676c2cddc8a8bcf81e20d4b`
+
+## Changelog since v1.14.7
+
+### Other notable changes
+
+* Fixes a goroutine leak in kube-apiserver when a request times out. ([#83333](https://github.com/kubernetes/kubernetes/pull/83333), [@lavalamp](https://github.com/lavalamp))
+* Fix aggressive VM calls for Azure VMSS ([#83102](https://github.com/kubernetes/kubernetes/pull/83102), [@feiskyer](https://github.com/feiskyer))
+* Fixes a flaw (CVE-2019-11253) in json/yaml decoding where large or malformed documents could consume excessive server resources. Request bodies for normal API requests (create/delete/update/patch operations of regular resources) are now limited to 3MB. ([#83261](https://github.com/kubernetes/kubernetes/pull/83261), [@liggitt](https://github.com/liggitt))
+* Resolves bottleneck in internal API server communication that can cause increased goroutines and degrade API Server performance ([#80465](https://github.com/kubernetes/kubernetes/pull/80465), [@answer1991](https://github.com/answer1991))
+* Update to go 1.12.10 ([#83139](https://github.com/kubernetes/kubernetes/pull/83139), [@cblecker](https://github.com/cblecker))
+* fix: azure disk detach failure if node not exists ([#82640](https://github.com/kubernetes/kubernetes/pull/82640), [@andyzhangx](https://github.com/andyzhangx))
+
 
 
 # v1.14.7
