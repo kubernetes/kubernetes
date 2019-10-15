@@ -22,6 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
 	"k8s.io/klog"
@@ -57,8 +58,9 @@ func StartApiserver() (string, ShutdownFunc) {
 
 // StartScheduler configures and starts a scheduler given a handle to the clientSet interface
 // and event broadcaster. It returns the running scheduler and the shutdown function to stop it.
-func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, ShutdownFunc) {
+func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, coreinformers.PodInformer, ShutdownFunc) {
 	informerFactory := informers.NewSharedInformerFactory(clientSet, 0)
+	podInformer := informerFactory.Core().V1().Pods()
 	stopCh := make(chan struct{})
 	evtBroadcaster := events.NewBroadcaster(&events.EventSinkImpl{
 		Interface: clientSet.EventsV1beta1().Events("")})
@@ -70,15 +72,10 @@ func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, Shutdo
 		v1.DefaultSchedulerName,
 	)
 
-	sched, err := createScheduler(clientSet, informerFactory, recorder, stopCh)
+	sched, err := createScheduler(clientSet, informerFactory, podInformer, recorder, stopCh)
 	if err != nil {
 		klog.Fatalf("Error creating scheduler: %v", err)
 	}
-	scheduler.AddAllEventHandlers(sched,
-		v1.DefaultSchedulerName,
-		informerFactory,
-		informerFactory.Core().V1().Pods(),
-	)
 
 	informerFactory.Start(stopCh)
 	sched.Run()
@@ -88,13 +85,14 @@ func StartScheduler(clientSet clientset.Interface) (*scheduler.Scheduler, Shutdo
 		close(stopCh)
 		klog.Infof("destroyed scheduler")
 	}
-	return sched, shutdownFunc
+	return sched, podInformer, shutdownFunc
 }
 
 // createScheduler create a scheduler with given informer factory and default name.
 func createScheduler(
 	clientSet clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
+	podInformer coreinformers.PodInformer,
 	recorder events.EventRecorder,
 	stopCh <-chan struct{},
 ) (*scheduler.Scheduler, error) {
@@ -103,7 +101,7 @@ func createScheduler(
 	return scheduler.New(
 		clientSet,
 		informerFactory,
-		informerFactory.Core().V1().Pods(),
+		podInformer,
 		recorder,
 		schedulerconfig.SchedulerAlgorithmSource{
 			Provider: &defaultProviderName,

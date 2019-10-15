@@ -36,7 +36,6 @@ go_test(
     tags = ["integration"],
     deps = [
         "//pkg/features:go_default_library",
-        "//pkg/scheduler:go_default_library",
         "//pkg/volume/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/api/storage/v1beta1:go_default_library",

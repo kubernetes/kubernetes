@@ -33,7 +33,7 @@ import (
 // remove resources after finished.
 // Notes on rate limiter:
 //   - client rate limit is set to 5000.
-func mustSetupScheduler() (util.ShutdownFunc, clientset.Interface) {
+func mustSetupScheduler() (util.ShutdownFunc, coreinformers.PodInformer, clientset.Interface) {
 	apiURL, apiShutdown := util.StartApiserver()
 	clientSet := clientset.NewForConfigOrDie(&restclient.Config{
 		Host:          apiURL,
@@ -41,14 +41,14 @@ func mustSetupScheduler() (util.ShutdownFunc, clientset.Interface) {
 		QPS:           5000.0,
 		Burst:         5000,
 	})
-	_, schedulerShutdown := util.StartScheduler(clientSet)
+	_, podInformer, schedulerShutdown := util.StartScheduler(clientSet)
 
 	shutdownFunc := func() {
 		schedulerShutdown()
 		apiShutdown()
 	}
 
-	return shutdownFunc, clientSet
+	return shutdownFunc, podInformer, clientSet
 }
 
 func getScheduledPods(podInformer coreinformers.PodInformer) ([]*v1.Pod, error) {
@@ -56,6 +56,7 @@ func getScheduledPods(podInformer coreinformers.PodInformer) ([]*v1.Pod, error) 
 	if err != nil {
 		return nil, err
 	}
+
 	scheduled := make([]*v1.Pod, 0, len(pods))
 	for i := range pods {
 		pod := pods[i]
