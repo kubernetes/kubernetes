@@ -365,8 +365,8 @@ func groupPods(pods []*v1.Pod, metrics metricsclient.PodMetricsInfo, resource v1
 		if pod.DeletionTimestamp != nil || pod.Status.Phase == v1.PodFailed {
 			continue
 		}
-		// Pending pods are ignored.
-		if pod.Status.Phase == v1.PodPending {
+		// Pending and deleted pods are ignored.
+		if pod.Status.Phase == v1.PodPending || pod.ObjectMeta.DeletionTimestamp != nil {
 			ignoredPods.Insert(pod.Name)
 			continue
 		}
