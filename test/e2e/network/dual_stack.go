@@ -30,7 +30,9 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2edeploy "k8s.io/kubernetes/test/e2e/framework/deployment"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	netutils "k8s.io/utils/net"
 )
 
 // Tests for ipv6 dual stack feature
@@ -204,7 +206,151 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 		assertNetworkConnectivity(f, *serverPods, *clientPods, "dualstack-test-client", "80")
 	})
+
+	ginkgo.It("should create service with cluster ip from primary service range [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
+		serviceName := "defaultclusterip"
+		ns := f.Namespace.Name
+		jig := e2eservice.NewTestJig(cs, serviceName)
+
+		defaultIPFamily := v1.IPv4Protocol
+		if framework.TestContext.ClusterIsIPv6() {
+			defaultIPFamily = v1.IPv6Protocol
+		}
+
+		t := e2eservice.NewServerTest(cs, ns, serviceName)
+		defer func() {
+			defer ginkgo.GinkgoRecover()
+			if errs := t.Cleanup(); len(errs) != 0 {
+				framework.Failf("errors in cleanup: %v", errs)
+			}
+		}()
+
+		ginkgo.By("creating service " + ns + "/" + serviceName + " with Service.Spec.IPFamily not set")
+		service := createService(t.ServiceName, t.Namespace, t.Labels, nil)
+
+		jig.Labels = t.Labels
+		jig.CreateServicePods(cs, ns, 2)
+		svc, err := t.CreateService(service)
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+
+		validateNumOfServicePorts(svc, 2)
+
+		// check the spec has been set to default ip family
+		validateServiceAndClusterIPFamily(svc, defaultIPFamily)
+
+		// ensure endpoint belong to same ipfamily as service
+		endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+		if err != nil {
+			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+		}
+		validateEndpointsBelongToIPFamily(svc, endpoint, defaultIPFamily)
+	})
+
+	ginkgo.It("should create service with ipv4 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
+		serviceName := "ipv4clusterip"
+		ns := f.Namespace.Name
+		ipv4 := v1.IPv4Protocol
+
+		jig := e2eservice.NewTestJig(cs, serviceName)
+
+		t := e2eservice.NewServerTest(cs, ns, serviceName)
+		defer func() {
+			defer ginkgo.GinkgoRecover()
+			if errs := t.Cleanup(); len(errs) != 0 {
+				framework.Failf("errors in cleanup: %v", errs)
+			}
+		}()
+
+		ginkgo.By("creating service " + ns + "/" + serviceName + " with Service.Spec.IPFamily IPv4" + ns)
+		service := createService(t.ServiceName, t.Namespace, t.Labels, &ipv4)
+
+		jig.Labels = t.Labels
+		jig.CreateServicePods(cs, ns, 2)
+		svc, err := t.CreateService(service)
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+
+		validateNumOfServicePorts(svc, 2)
+
+		// check the spec has been set to IPv4 and cluster ip belong to IPv4 family
+		validateServiceAndClusterIPFamily(svc, ipv4)
+
+		// ensure endpoints belong to same ipfamily as service
+		endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+		if err != nil {
+			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+		}
+		validateEndpointsBelongToIPFamily(svc, endpoint, ipv4)
+	})
+
+	ginkgo.It("should create service with ipv6 cluster ip [Feature:IPv6DualStackAlphaFeature:Phase2]", func() {
+		serviceName := "ipv6clusterip"
+		ns := f.Namespace.Name
+		ipv6 := v1.IPv6Protocol
+
+		jig := e2eservice.NewTestJig(cs, serviceName)
+
+		t := e2eservice.NewServerTest(cs, ns, serviceName)
+		defer func() {
+			defer ginkgo.GinkgoRecover()
+			if errs := t.Cleanup(); len(errs) != 0 {
+				framework.Failf("errors in cleanup: %v", errs)
+			}
+		}()
+
+		ginkgo.By("creating service " + ns + "/" + serviceName + " with Service.Spec.IPFamily IPv6" + ns)
+		service := createService(t.ServiceName, t.Namespace, t.Labels, &ipv6)
+
+		jig.Labels = t.Labels
+		jig.CreateServicePods(cs, ns, 2)
+		svc, err := t.CreateService(service)
+		framework.ExpectNoError(err, "failed to create service: %s in namespace: %s", serviceName, ns)
+
+		validateNumOfServicePorts(svc, 2)
+
+		// check the spec has been set to IPv6 and cluster ip belongs to IPv6 family
+		validateServiceAndClusterIPFamily(svc, ipv6)
+
+		// ensure endpoints belong to same ipfamily as service
+		endpoint, err := cs.CoreV1().Endpoints(svc.Namespace).Get(svc.Name, metav1.GetOptions{})
+		if err != nil {
+			framework.Failf("Get endpoints for service %s/%s failed (%s)", svc.Namespace, svc.Name, err)
+		}
+		validateEndpointsBelongToIPFamily(svc, endpoint, ipv6)
+	})
 })
+
+func validateNumOfServicePorts(svc *v1.Service, expectedNumOfPorts int) {
+	if len(svc.Spec.Ports) != expectedNumOfPorts {
+		framework.Failf("got unexpected len(Spec.Ports) for service: %v", svc)
+	}
+}
+
+func validateServiceAndClusterIPFamily(svc *v1.Service, expectedIPFamily v1.IPFamily) {
+	if svc.Spec.IPFamily == nil {
+		framework.Failf("service ip family nil for service %s/%s", svc.Namespace, svc.Name)
+	}
+	if *svc.Spec.IPFamily != expectedIPFamily {
+		framework.Failf("ip family mismatch for service: %s/%s, expected: %s, actual: %s", svc.Namespace, svc.Name, expectedIPFamily, *svc.Spec.IPFamily)
+	}
+
+	isIPv6ClusterIP := netutils.IsIPv6String(svc.Spec.ClusterIP)
+	if (expectedIPFamily == v1.IPv4Protocol && isIPv6ClusterIP) || (expectedIPFamily == v1.IPv6Protocol && !isIPv6ClusterIP) {
+		framework.Failf("got unexpected service ip %s, should belong to %s ip family", svc.Spec.ClusterIP, expectedIPFamily)
+	}
+}
+
+func validateEndpointsBelongToIPFamily(svc *v1.Service, endpoint *v1.Endpoints, expectedIPFamily v1.IPFamily) {
+	if len(endpoint.Subsets) == 0 {
+		framework.Failf("Endpoint has no subsets, cannot determine service ip family matches endpoints ip family for service %s/%s", svc.Namespace, svc.Name)
+	}
+	for _, ss := range endpoint.Subsets {
+		for _, e := range ss.Addresses {
+			if (expectedIPFamily == v1.IPv6Protocol && isIPv4(e.IP)) || (expectedIPFamily == v1.IPv4Protocol && netutils.IsIPv6String(e.IP)) {
+				framework.Failf("service endpoint %s doesn't belong to %s ip family", e.IP, expectedIPFamily)
+			}
+		}
+	}
+}
 
 func assertNetworkConnectivity(f *framework.Framework, serverPods v1.PodList, clientPods v1.PodList, containerName, port string) {
 	// curl from each client pod to all server pods to assert connectivity
@@ -255,4 +401,31 @@ func isIPv4CIDR(cidr string) bool {
 	ip, _, err := net.ParseCIDR(cidr)
 	framework.ExpectNoError(err)
 	return isIPv4(ip.String())
+}
+
+// createService returns a service spec with defined arguments
+func createService(name, ns string, labels map[string]string, ipFamily *v1.IPFamily) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: ns,
+		},
+		Spec: v1.ServiceSpec{
+			Selector: labels,
+			Type:     v1.ServiceTypeNodePort,
+			IPFamily: ipFamily,
+			Ports: []v1.ServicePort{
+				{
+					Name:     "tcp-port",
+					Port:     53,
+					Protocol: v1.ProtocolTCP,
+				},
+				{
+					Name:     "udp-port",
+					Port:     53,
+					Protocol: v1.ProtocolUDP,
+				},
+			},
+		},
+	}
 }
