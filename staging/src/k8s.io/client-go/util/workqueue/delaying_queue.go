@@ -227,21 +227,15 @@ func (q *delayingType) waitingLoop() {
 			// continue the loop, which will add ready items
 
 		case waitEntry := <-q.waitingForAddCh:
-			if waitEntry.readyAt.After(q.clock.Now()) {
-				insert(waitingForQueue, waitingEntryByData, waitEntry)
-			} else {
-				q.Add(waitEntry.data)
-			}
-
 			drained := false
 			for !drained {
+				if waitEntry.readyAt.After(q.clock.Now()) {
+					insert(waitingForQueue, waitingEntryByData, waitEntry)
+				} else {
+					q.Add(waitEntry.data)
+				}
 				select {
-				case waitEntry := <-q.waitingForAddCh:
-					if waitEntry.readyAt.After(q.clock.Now()) {
-						insert(waitingForQueue, waitingEntryByData, waitEntry)
-					} else {
-						q.Add(waitEntry.data)
-					}
+				case waitEntry = <-q.waitingForAddCh:
 				default:
 					drained = true
 				}
