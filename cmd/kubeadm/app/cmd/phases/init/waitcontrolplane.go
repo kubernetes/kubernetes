@@ -26,12 +26,14 @@ import (
 
 	"github.com/lithammer/dedent"
 	"github.com/pkg/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/apiclient"
 	dryrunutil "k8s.io/kubernetes/cmd/kubeadm/app/util/dryrun"
+	"k8s.io/kubernetes/cmd/kubeadm/app/util/staticpod"
 )
 
 var (
@@ -106,6 +108,19 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
 	if err := os.Remove(bootstrapKubeConfigFile); err != nil {
 		klog.Warningf("[wait-control-plane] could not delete the file %q: %v", bootstrapKubeConfigFile, err)
+	}
+
+	// Apply namespace annotations once the kube-apiserver is running
+	klog.V(1).Infof("[control-plane] Annotating the %q namespace to allow static Pods with kubeadm managed labels",
+		metav1.NamespaceSystem)
+	if err := staticpod.WhitelistStaticPodLabels(client); err != nil {
+		// If the annotation is already present just show a warning with its current value.
+		// This can happen if the user is using standalone phases to manually apply a custom whitelist.
+		if staticpod.IsWhitelistStaticPodLabelsError(err) {
+			klog.Warning(err)
+			return nil
+		}
+		return err
 	}
 
 	return nil

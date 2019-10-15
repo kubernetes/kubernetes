@@ -29,6 +29,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	fakeclient "k8s.io/client-go/kubernetes/fake"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	testutil "k8s.io/kubernetes/cmd/kubeadm/test"
@@ -602,5 +603,77 @@ func TestKustomizeStaticPod(t *testing.T) {
 
 	if _, ok := kpod.ObjectMeta.Annotations["kustomize"]; !ok {
 		t.Error("Kustomize did not apply patches corresponding to the resource")
+	}
+}
+
+func TestWhitelistStaticPodLabels(t *testing.T) {
+	var tests = []struct {
+		description   string
+		meta          metav1.ObjectMeta
+		expectedError bool
+	}{
+		{
+			description: "invalid: annotation is already present",
+			meta: metav1.ObjectMeta{
+				Name: metav1.NamespaceSystem,
+				Annotations: map[string]string{
+					whiteListStaticPodLabelsAnnotationKey: whiteListStaticPodLabels,
+				},
+			},
+			expectedError: true,
+		},
+		{
+			description: "invalid: missing kube-system namespace",
+			meta: metav1.ObjectMeta{
+				Name: "foo",
+			},
+			expectedError: true,
+		},
+		{
+			description: "valid: annotation is missing",
+			meta: metav1.ObjectMeta{
+				Name: metav1.NamespaceSystem,
+			},
+		},
+	}
+
+	cs := fakeclient.NewSimpleClientset()
+	for _, rt := range tests {
+		t.Run(rt.description, func(t *testing.T) {
+			ns := &v1.Namespace{
+				ObjectMeta: rt.meta,
+			}
+			if _, err := cs.CoreV1().Namespaces().Create(ns); err != nil {
+				t.Fatalf("cannot create namespace %q; error: %v", ns.Name, err)
+			}
+
+			if err := WhitelistStaticPodLabels(cs); (err != nil) != rt.expectedError {
+				t.Fatalf("expected error: %v; got: %v; error: %v", rt.expectedError, err != nil, err)
+			}
+
+			if ns.Name != metav1.NamespaceSystem {
+				return
+			}
+
+			ns, err := cs.CoreV1().Namespaces().Get(ns.Name, metav1.GetOptions{})
+			if err != nil {
+				t.Fatalf("cannot get namespace %q; error: %v", ns.Name, err)
+			}
+			val, ok := ns.ObjectMeta.Annotations[whiteListStaticPodLabelsAnnotationKey]
+
+			if !ok {
+				t.Fatalf("namespace %q is missing the %q annotation",
+					ns.Name, whiteListStaticPodLabelsAnnotationKey)
+			}
+
+			if val != whiteListStaticPodLabels {
+				t.Fatalf("wrong value for annotation %q in namespace %q: expected: %q, got: %q",
+					whiteListStaticPodLabelsAnnotationKey, ns.Name, whiteListStaticPodLabels, val)
+			}
+
+			if err := cs.CoreV1().Namespaces().Delete(ns.Name, &metav1.DeleteOptions{}); err != nil {
+				t.Fatalf("cannot delete namespace %q; error: %v", ns.Name, err)
+			}
+		})
 	}
 }

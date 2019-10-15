@@ -31,9 +31,11 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	clientset "k8s.io/client-go/kubernetes"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util"
+
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/kustomize"
 )
 
@@ -43,6 +45,12 @@ const (
 
 	// kubeSchedulerAddressArg represents the address argument of the kube-scheduler configuration.
 	kubeSchedulerAddressArg = "address"
+
+	// whiteListStaticPodLabelsAnnotationKey is the annotation key used to whitelist static pod labels
+	whiteListStaticPodLabelsAnnotationKey = "node.kubernetes.io/mirror.allowed-label-key"
+
+	// whiteListStaticPodLabels contains a comma separated list of labels to whitelist
+	whiteListStaticPodLabels = "component,tier"
 )
 
 // ComponentPod returns a Pod object from the container and volume specifications
@@ -317,4 +325,53 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
 	}
 
 	return bytes.Equal(content1, content2), nil
+}
+
+// whitelistStaticPodLabelsError is returned in case the annotation for whitlisting Pod labels is already present
+type whitelistStaticPodLabelsError struct {
+	error
+}
+
+// IsWhitelistStaticPodLabelsError returns true if a given error is of type whitelistStaticPodLabelsError
+func IsWhitelistStaticPodLabelsError(err error) bool {
+	_, ok := err.(whitelistStaticPodLabelsError)
+	return ok
+}
+
+// WhitelistStaticPodLabels applies an annotation to the "kube-system" namespace to whitelist
+// the kubeadm static Pods for the control-plane that have the "tier" and "component" labels.
+// Without this annotation the NodeRestriction admission controller (which kubeadm enables by default)
+// will block the creation of mirror Pods for these static Pods at API server level.
+//
+// This annotation will be required in Kubernetes version 1.20 and later when the MirrorPodNodeRestriction
+// feature gate will be enabled by default:
+// https://github.com/kubernetes/enhancements/blob/master/keps/sig-auth/20190916-noderestriction-pods.md
+func WhitelistStaticPodLabels(client clientset.Interface) error {
+	errorMessage := fmt.Sprintf("cannot whitelist the static Pod labels %q for namespace %q",
+		whiteListStaticPodLabels, metav1.NamespaceSystem)
+
+	ns, err := client.CoreV1().Namespaces().Get(metav1.NamespaceSystem, metav1.GetOptions{})
+	if err != nil {
+		return errors.Wrapf(err, errorMessage)
+	}
+
+	if ns.Annotations == nil {
+		ns.Annotations = map[string]string{}
+	}
+
+	val, ok := ns.Annotations[whiteListStaticPodLabelsAnnotationKey]
+	if ok {
+		// return an error if the annotation is already present and let the caller handle that
+		return whitelistStaticPodLabelsError{
+			error: errors.Wrapf(errors.New(errorMessage),
+				"the namespace annotation %q is already present and has a value of %q",
+				whiteListStaticPodLabelsAnnotationKey, val),
+		}
+	}
+
+	ns.ObjectMeta.Annotations[whiteListStaticPodLabelsAnnotationKey] = whiteListStaticPodLabels
+	if _, err := client.CoreV1().Namespaces().Update(ns); err != nil {
+		return errors.Wrapf(err, errorMessage)
+	}
+	return nil
 }
