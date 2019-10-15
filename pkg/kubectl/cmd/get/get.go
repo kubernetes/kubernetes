@@ -129,6 +129,9 @@ var (
 		# List all replication controllers and services together in ps output format.
 		kubectl get rc,services
 
+		# List all Kubernetes objects in ps output format.
+		kubectl get all
+
 		# List one or more resources by their type and names.
 		kubectl get rc/web service/frontend pods/web-pod-13je7`))
 )
