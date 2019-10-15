@@ -23,7 +23,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -31,6 +31,7 @@ import (
 	runtimetesting "k8s.io/cri-api/pkg/apis/testing"
 	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/types"
 )
 
 func TestStableKey(t *testing.T) {
@@ -67,7 +68,7 @@ func TestToKubeContainer(t *testing.T) {
 		ImageRef: "test-image-ref",
 		State:    runtimeapi.ContainerState_CONTAINER_RUNNING,
 		Annotations: map[string]string{
-			containerHashLabel: "1234",
+			types.ContainerHashLabel: "1234",
 		},
 	}
 	expect := &kubecontainer.Container{

@@ -20,25 +20,12 @@ import (
 	"encoding/json"
 	"strconv"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-)
-
-const (
-	// TODO: change those label names to follow kubernetes's format
-	podDeletionGracePeriodLabel    = "io.kubernetes.pod.deletionGracePeriod"
-	podTerminationGracePeriodLabel = "io.kubernetes.pod.terminationGracePeriod"
-
-	containerHashLabel                     = "io.kubernetes.container.hash"
-	containerRestartCountLabel             = "io.kubernetes.container.restartCount"
-	containerTerminationMessagePathLabel   = "io.kubernetes.container.terminationMessagePath"
-	containerTerminationMessagePolicyLabel = "io.kubernetes.container.terminationMessagePolicy"
-	containerPreStopHandlerLabel           = "io.kubernetes.container.preStopHandler"
-	containerPortsLabel                    = "io.kubernetes.container.ports"
 )
 
 type labeledPodSandboxInfo struct {
@@ -113,16 +100,16 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 		annotations[a.Name] = a.Value
 	}
 
-	annotations[containerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
-	annotations[containerRestartCountLabel] = strconv.Itoa(restartCount)
-	annotations[containerTerminationMessagePathLabel] = container.TerminationMessagePath
-	annotations[containerTerminationMessagePolicyLabel] = string(container.TerminationMessagePolicy)
+	annotations[types.ContainerHashLabel] = strconv.FormatUint(kubecontainer.HashContainer(container), 16)
+	annotations[types.ContainerRestartCountLabel] = strconv.Itoa(restartCount)
+	annotations[types.ContainerTerminationMessagePathLabel] = container.TerminationMessagePath
+	annotations[types.ContainerTerminationMessagePolicyLabel] = string(container.TerminationMessagePolicy)
 
 	if pod.DeletionGracePeriodSeconds != nil {
-		annotations[podDeletionGracePeriodLabel] = strconv.FormatInt(*pod.DeletionGracePeriodSeconds, 10)
+		annotations[types.PodDeletionGracePeriodLabel] = strconv.FormatInt(*pod.DeletionGracePeriodSeconds, 10)
 	}
 	if pod.Spec.TerminationGracePeriodSeconds != nil {
-		annotations[podTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)
+		annotations[types.PodTerminationGracePeriodLabel] = strconv.FormatInt(*pod.Spec.TerminationGracePeriodSeconds, 10)
 	}
 
 	if container.Lifecycle != nil && container.Lifecycle.PreStop != nil {
@@ -131,7 +118,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 		if err != nil {
 			klog.Errorf("Unable to marshal lifecycle PreStop handler for container %q of pod %q: %v", container.Name, format.Pod(pod), err)
 		} else {
-			annotations[containerPreStopHandlerLabel] = string(rawPreStop)
+			annotations[types.ContainerPreStopHandlerLabel] = string(rawPreStop)
 		}
 	}
 
@@ -140,7 +127,7 @@ func newContainerAnnotations(container *v1.Container, pod *v1.Pod, restartCount 
 		if err != nil {
 			klog.Errorf("Unable to marshal container ports for container %q for pod %q: %v", container.Name, format.Pod(pod), err)
 		} else {
-			annotations[containerPortsLabel] = string(rawContainerPorts)
+			annotations[types.ContainerPortsLabel] = string(rawContainerPorts)
 		}
 	}
 
@@ -187,33 +174,33 @@ func getContainerInfoFromLabels(labels map[string]string) *labeledContainerInfo 
 func getContainerInfoFromAnnotations(annotations map[string]string) *annotatedContainerInfo {
 	var err error
 	containerInfo := &annotatedContainerInfo{
-		TerminationMessagePath:   getStringValueFromLabel(annotations, containerTerminationMessagePathLabel),
-		TerminationMessagePolicy: v1.TerminationMessagePolicy(getStringValueFromLabel(annotations, containerTerminationMessagePolicyLabel)),
+		TerminationMessagePath:   getStringValueFromLabel(annotations, types.ContainerTerminationMessagePathLabel),
+		TerminationMessagePolicy: v1.TerminationMessagePolicy(getStringValueFromLabel(annotations, types.ContainerTerminationMessagePolicyLabel)),
 	}
 
-	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, containerHashLabel); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", containerHashLabel, annotations, err)
+	if containerInfo.Hash, err = getUint64ValueFromLabel(annotations, types.ContainerHashLabel); err != nil {
+		klog.Errorf("Unable to get %q from annotations %q: %v", types.ContainerHashLabel, annotations, err)
 	}
-	if containerInfo.RestartCount, err = getIntValueFromLabel(annotations, containerRestartCountLabel); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", containerRestartCountLabel, annotations, err)
+	if containerInfo.RestartCount, err = getIntValueFromLabel(annotations, types.ContainerRestartCountLabel); err != nil {
+		klog.Errorf("Unable to get %q from annotations %q: %v", types.ContainerRestartCountLabel, annotations, err)
 	}
-	if containerInfo.PodDeletionGracePeriod, err = getInt64PointerFromLabel(annotations, podDeletionGracePeriodLabel); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", podDeletionGracePeriodLabel, annotations, err)
+	if containerInfo.PodDeletionGracePeriod, err = getInt64PointerFromLabel(annotations, types.PodDeletionGracePeriodLabel); err != nil {
+		klog.Errorf("Unable to get %q from annotations %q: %v", types.PodDeletionGracePeriodLabel, annotations, err)
 	}
-	if containerInfo.PodTerminationGracePeriod, err = getInt64PointerFromLabel(annotations, podTerminationGracePeriodLabel); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", podTerminationGracePeriodLabel, annotations, err)
+	if containerInfo.PodTerminationGracePeriod, err = getInt64PointerFromLabel(annotations, types.PodTerminationGracePeriodLabel); err != nil {
+		klog.Errorf("Unable to get %q from annotations %q: %v", types.PodTerminationGracePeriodLabel, annotations, err)
 	}
 
 	preStopHandler := &v1.Handler{}
-	if found, err := getJSONObjectFromLabel(annotations, containerPreStopHandlerLabel, preStopHandler); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", containerPreStopHandlerLabel, annotations, err)
+	if found, err := getJSONObjectFromLabel(annotations, types.ContainerPreStopHandlerLabel, preStopHandler); err != nil {
+		klog.Errorf("Unable to get %q from annotations %q: %v", types.ContainerPreStopHandlerLabel, annotations, err)
 	} else if found {
 		containerInfo.PreStopHandler = preStopHandler
 	}
 
 	containerPorts := []v1.ContainerPort{}
-	if found, err := getJSONObjectFromLabel(annotations, containerPortsLabel, &containerPorts); err != nil {
-		klog.Errorf("Unable to get %q from annotations %q: %v", containerPortsLabel, annotations, err)
+	if found, err := getJSONObjectFromLabel(annotations, types.ContainerPortsLabel, &containerPorts); err != nil {
+		klog.Errorf("Unable to get %q from annotations %q: %v", types.ContainerPortsLabel, annotations, err)
 	} else if found {
 		containerInfo.ContainerPorts = containerPorts
 	}

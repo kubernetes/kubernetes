@@ -17,10 +17,20 @@ limitations under the License.
 package types
 
 const (
-	KubernetesPodNameLabel       = "io.kubernetes.pod.name"
-	KubernetesPodNamespaceLabel  = "io.kubernetes.pod.namespace"
-	KubernetesPodUIDLabel        = "io.kubernetes.pod.uid"
-	KubernetesContainerNameLabel = "io.kubernetes.container.name"
+	KubernetesPodNameLabel       = "k8s.io/pod-name"
+	KubernetesPodNamespaceLabel  = "k8s.io/pod-namespace"
+	KubernetesPodUIDLabel        = "k8s.io/pod-uid"
+	KubernetesContainerNameLabel = "k8s.io/container-name"
+
+	PodDeletionGracePeriodLabel    = "k8s.io/pod-deletionGracePeriod"
+	PodTerminationGracePeriodLabel = "k8s.io/pod-terminationGracePeriod"
+
+	ContainerHashLabel                     = "k8s.io/container-hash"
+	ContainerRestartCountLabel             = "k8s.io/container-restartCount"
+	ContainerTerminationMessagePathLabel   = "k8s.io/container-terminationMessagePath"
+	ContainerTerminationMessagePolicyLabel = "k8s.io/container-terminationMessagePolicy"
+	ContainerPreStopHandlerLabel           = "k8s.io/container-preStopHandler"
+	ContainerPortsLabel                    = "k8s.io/container-ports"
 )
 
 func GetContainerName(labels map[string]string) string {
