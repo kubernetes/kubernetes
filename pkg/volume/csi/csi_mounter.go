@@ -67,6 +67,7 @@ type csiMountMgr struct {
 	volumeID            string
 	specVolumeID        string
 	readOnly            bool
+	supportsSELinux     bool
 	spec                *volume.Spec
 	pod                 *api.Pod
 	podUID              types.UID
@@ -259,6 +260,11 @@ func (c *csiMountMgr) SetUpAt(dir string, mounterArgs volume.MounterArgs) error 
 		return errors.New(log("mounter.SetupAt failed: %v", err))
 	}
 
+	c.supportsSELinux, err = c.kubeVolHost.GetHostUtil().GetSELinuxSupport(dir)
+	if err != nil {
+		klog.V(2).Info(log("error checking for SELinux support: %s", err))
+	}
+
 	// apply volume ownership
 	// The following logic is derived from https://github.com/kubernetes/kubernetes/issues/66323
 	// if fstype is "", then skip fsgroup (could be indication of non-block filesystem)
@@ -328,18 +334,10 @@ func (c *csiMountMgr) podAttributes() (map[string]string, error) {
 }
 
 func (c *csiMountMgr) GetAttributes() volume.Attributes {
-	path := c.GetPath()
-	hu := c.kubeVolHost.GetHostUtil()
-	supportSelinux, err := hu.GetSELinuxSupport(path)
-	if err != nil {
-		klog.V(2).Info(log("error checking for SELinux support: %s", err))
-		// Best guess
-		supportSelinux = false
-	}
 	return volume.Attributes{
 		ReadOnly:        c.readOnly,
 		Managed:         !c.readOnly,
-		SupportsSELinux: supportSelinux,
+		SupportsSELinux: c.supportsSELinux,
 	}
 }
 
