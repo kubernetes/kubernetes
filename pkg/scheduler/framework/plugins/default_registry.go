@@ -27,6 +27,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
@@ -81,6 +82,9 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 		},
 		nodevolumelimits.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return nodevolumelimits.New(args.SchedulerCache, pvInfo, pvcInfo, classInfo), nil
+		},
+		interpodaffinity.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+			return interpodaffinity.New(args.SchedulerCache, args.SchedulerCache), nil
 		},
 	}
 }
@@ -161,6 +165,11 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPredicate(predicates.MaxCSIVolumeCountPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.Name, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.MatchInterPodAffinityPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, interpodaffinity.Name, nil)
 			return
 		})
 
