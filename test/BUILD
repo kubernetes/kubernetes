@@ -17,6 +17,7 @@ filegroup(
         "//test/e2e_kubeadm:all-srcs",
         "//test/e2e_node:all-srcs",
         "//test/fixtures:all-srcs",
+        "//test/fuzz/yaml:all-srcs",
         "//test/images:all-srcs",
         "//test/instrumentation:all-srcs",
         "//test/integration:all-srcs",
