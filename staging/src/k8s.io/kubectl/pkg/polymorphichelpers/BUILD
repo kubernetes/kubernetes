@@ -49,6 +49,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes/typed/apps/v1:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
+        "//staging/src/k8s.io/client-go/tools/reference:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/apps:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/describe/versioned:go_default_library",
