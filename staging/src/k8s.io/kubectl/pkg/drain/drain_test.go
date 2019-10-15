@@ -17,6 +17,7 @@ limitations under the License.
 package drain
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -105,7 +106,8 @@ func TestDeletePods(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.description, func(t *testing.T) {
 			_, pods := createPods(false)
-			pendingPods, err := waitForDelete(pods, test.interval, test.timeout, false, test.getPodFn, nil)
+			ctx := context.TODO()
+			pendingPods, err := waitForDelete(ctx, pods, test.interval, test.timeout, false, test.getPodFn, nil)
 
 			if test.expectError {
 				if err == nil {
