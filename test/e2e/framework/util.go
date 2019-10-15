@@ -339,6 +339,17 @@ func ProxyMode(f *Framework) (string, error) {
 	return stdout, nil
 }
 
+// SkipUnlessServerVersionLT skips if the server version is greater than or equal v.
+func SkipUnlessServerVersionLT(v *utilversion.Version, c discovery.ServerVersionInterface) {
+	gte, err := ServerVersionGTE(v, c)
+	if err != nil {
+		Failf("Failed to get server version: %v", err)
+	}
+	if gte {
+		skipInternalf(1, "The feature has been removed for server versions after %q", v)
+	}
+}
+
 // SkipUnlessServerVersionGTE skips if the server version is less than v.
 func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) {
 	gte, err := ServerVersionGTE(v, c)

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/config"
@@ -34,10 +35,15 @@ var cadvisor struct {
 	SleepDuration time.Duration `default:"10000ms"`
 }
 var _ = config.AddOptions(&cadvisor, "instrumentation.monitoring.cadvisor")
+var serverPrintVersion = utilversion.MustParseSemantic("v1.17.0")
 
 var _ = instrumentation.SIGDescribe("Cadvisor", func() {
 
 	f := framework.NewDefaultFramework("cadvisor")
+
+	ginkgo.BeforeEach(func() {
+		framework.SkipUnlessServerVersionLT(serverPrintVersion, f.ClientSet.Discovery())
+	})
 
 	ginkgo.It("should be healthy on every node.", func() {
 		CheckCadvisorHealthOnAllNodes(f.ClientSet, 5*time.Minute)
