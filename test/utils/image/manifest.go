@@ -228,7 +228,7 @@ func initImageConfigs() map[int]Config {
 	configs[Dnsutils] = Config{e2eRegistry, "dnsutils", "1.1"}
 	configs[DebianBase] = Config{googleContainerRegistry, "debian-base", "0.4.1"}
 	configs[EchoServer] = Config{e2eRegistry, "echoserver", "2.2"}
-	configs[Etcd] = Config{gcRegistry, "etcd", "3.3.15"}
+	configs[Etcd] = Config{gcRegistry, "etcd", "3.3.17"}
 	configs[GBFrontend] = Config{sampleRegistry, "gb-frontend", "v6"}
 	configs[GlusterDynamicProvisioner] = Config{dockerGluster, "glusterdynamic-provisioner", "v1.0"}
 	configs[Httpd] = Config{dockerLibraryRegistry, "httpd", "2.4.38-alpine"}
