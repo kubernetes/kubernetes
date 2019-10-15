@@ -101,7 +101,7 @@ func NewCmdRolloutUndo(f cmdutil.Factory, streams genericclioptions.IOStreams) *
 	return cmd
 }
 
-// Complete completes al the required options
+// Complete completes all the required options
 func (o *UndoOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.Resources = args
 	o.DryRun = cmdutil.GetDryRunFlag(cmd)
