@@ -95,10 +95,6 @@ func (h *hostExecutor) IssueCommandWithResult(cmd string, node *v1.Node) (string
 		h.nodeExecPods[node.Name] = pod
 	}
 	args := []string{
-		"exec",
-		fmt.Sprintf("--namespace=%v", pod.Namespace),
-		pod.Name,
-		"--",
 		"nsenter",
 		"--mount=/rootfs/proc/1/ns/mnt",
 		"--",
@@ -106,7 +102,13 @@ func (h *hostExecutor) IssueCommandWithResult(cmd string, node *v1.Node) (string
 		"-c",
 		cmd,
 	}
-	return framework.RunKubectl(args...)
+	containerName := pod.Spec.Containers[0].Name
+	stdout, stderr, err := h.Framework.ExecCommandInContainerWithFullOutput(pod.Name, containerName, args...)
+	// Originally, we use RunKubectl() which discards stderr. For backward
+	// compatibility, we does not return and only log it here. We can add it
+	// when necessary.
+	framework.Logf("Exec stderr: %q", stderr)
+	return stdout, err
 }
 
 // IssueCommand works like IssueCommandWithResult, but discards result.
