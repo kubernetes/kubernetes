@@ -1,8 +1,7 @@
-package bolt
+package bbolt
 
 import (
 	"fmt"
-	"os"
 	"syscall"
 	"time"
 	"unsafe"
@@ -11,7 +10,7 @@ import (
 )
 
 // flock acquires an advisory lock on a file descriptor.
-func flock(db *DB, mode os.FileMode, exclusive bool, timeout time.Duration) error {
+func flock(db *DB, exclusive bool, timeout time.Duration) error {
 	var t time.Time
 	if timeout != 0 {
 		t = time.Now()
