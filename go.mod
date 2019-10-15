@@ -54,6 +54,7 @@ require (
 	github.com/evanphx/json-patch v4.2.0+incompatible
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/go-bindata/go-bindata v3.1.1+incompatible
+	github.com/go-openapi/analysis v0.19.2
 	github.com/go-openapi/loads v0.19.2
 	github.com/go-openapi/spec v0.19.2
 	github.com/go-openapi/strfmt v0.19.0
