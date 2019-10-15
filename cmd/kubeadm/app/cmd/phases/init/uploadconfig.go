@@ -28,6 +28,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
+	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	kubeletphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubelet"
 	patchnodephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/patchnode"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/uploadconfig"
@@ -122,6 +123,12 @@ func runUploadKubeletConfig(c workflow.RunData) error {
 	klog.V(1).Infoln("[upload-config] Uploading the kubelet component config to a ConfigMap")
 	if err = kubeletphase.CreateConfigMap(cfg.ClusterConfiguration.ComponentConfigs.Kubelet, cfg.KubernetesVersion, client); err != nil {
 		return errors.Wrap(err, "error creating kubelet configuration ConfigMap")
+	}
+
+	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
+	// Adding these RBAC rules ensures that the Node object is created during init before patching the Node object.
+	if err := nodebootstraptokenphase.AutoApproveNodeCertificateRotation(client); err != nil {
+		return err
 	}
 
 	klog.V(1).Infoln("[upload-config] Preserving the CRISocket information for the control-plane node")

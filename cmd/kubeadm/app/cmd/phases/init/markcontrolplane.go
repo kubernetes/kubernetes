@@ -21,6 +21,7 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/phases/workflow"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
+	nodebootstraptokenphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/bootstraptoken/node"
 	markcontrolplanephase "k8s.io/kubernetes/cmd/kubeadm/app/phases/markcontrolplane"
 )
 
@@ -57,6 +58,12 @@ func runMarkControlPlane(c workflow.RunData) error {
 
 	client, err := data.Client()
 	if err != nil {
+		return err
+	}
+
+	// Create/update RBAC rules that makes the nodes to rotate certificates and get their CSRs approved automatically
+	// Adding these RBAC rules ensures that the Node object is created during init before patching the Node object.
+	if err := nodebootstraptokenphase.AutoApproveNodeCertificateRotation(client); err != nil {
 		return err
 	}
 
