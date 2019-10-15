@@ -192,7 +192,7 @@ github.com/containernetworking/cni/pkg/version
 # github.com/coredns/corefile-migration v1.0.2 => github.com/coredns/corefile-migration v1.0.2
 github.com/coredns/corefile-migration/migration
 github.com/coredns/corefile-migration/migration/corefile
-# github.com/coreos/bbolt v1.3.1-coreos.6 => github.com/coreos/bbolt v1.3.1-coreos.6
+# github.com/coreos/bbolt v1.3.3 => github.com/coreos/bbolt v1.3.3
 github.com/coreos/bbolt
 # github.com/coreos/etcd v3.3.17+incompatible => github.com/coreos/etcd v3.3.17+incompatible
 github.com/coreos/etcd/alarm

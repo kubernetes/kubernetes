@@ -2,4 +2,4 @@
 *.test
 *.swp
 /bin/
-cmd/bolt/bolt
+cover.out
