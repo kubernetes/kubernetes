@@ -27,7 +27,7 @@ rules:
   - apiGroups: [""]
     resources: ["services", "replicationcontrollers", "persistentvolumes", "persistentvolumeclaims"]
     verbs: ["get", "list", "watch"]
-  - apiGroups: ["apps", "extensions"]
+  - apiGroups: ["apps"]
     resources: ["daemonsets", "replicasets"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["apps"]
