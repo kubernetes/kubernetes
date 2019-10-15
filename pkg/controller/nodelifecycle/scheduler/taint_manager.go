@@ -75,7 +75,7 @@ type GetPodFunc func(name, namespace string) (*v1.Pod, error)
 type GetNodeFunc func(name string) (*v1.Node, error)
 
 // GetPodsByNodeNameFunc returns the list of pods assigned to the specified node.
-type GetPodsByNodeNameFunc func(nodeName string) ([]v1.Pod, error)
+type GetPodsByNodeNameFunc func(nodeName string) ([]*v1.Pod, error)
 
 // NoExecuteTaintManager listens to Taint/Toleration changes and is responsible for removing Pods
 // from Nodes tainted with NoExecute Taints.
@@ -464,8 +464,7 @@ func (tc *NoExecuteTaintManager) handleNodeUpdate(nodeUpdate nodeUpdateItem) {
 	}
 
 	now := time.Now()
-	for i := range pods {
-		pod := &pods[i]
+	for _, pod := range pods {
 		podNamespacedName := types.NamespacedName{Namespace: pod.Namespace, Name: pod.Name}
 		tc.processPodOnNode(podNamespacedName, node.Name, pod.Spec.Tolerations, taints, now)
 	}

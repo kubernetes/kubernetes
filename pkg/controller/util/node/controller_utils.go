@@ -42,7 +42,7 @@ import (
 // DeletePods will delete all pods from master running on given node,
 // and return true if any pods were deleted, or were found pending
 // deletion.
-func DeletePods(kubeClient clientset.Interface, pods []v1.Pod, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore appsv1listers.DaemonSetLister) (bool, error) {
+func DeletePods(kubeClient clientset.Interface, pods []*v1.Pod, recorder record.EventRecorder, nodeName, nodeUID string, daemonStore appsv1listers.DaemonSetLister) (bool, error) {
 	remaining := false
 	var updateErrList []error
 
@@ -51,12 +51,13 @@ func DeletePods(kubeClient clientset.Interface, pods []v1.Pod, recorder record.E
 	}
 
 	for i := range pods {
-		pod := &pods[i]
 		// Defensive check, also needed for tests.
-		if pod.Spec.NodeName != nodeName {
+		if pods[i].Spec.NodeName != nodeName {
 			continue
 		}
 
+		// Pod will be modified, so making copy is requiered.
+		pod := pods[i].DeepCopy()
 		// Set reason and message in the pod object.
 		if _, err := SetPodTerminationReason(kubeClient, pod, nodeName); err != nil {
 			if apierrors.IsConflict(err) {
@@ -111,16 +112,18 @@ func SetPodTerminationReason(kubeClient clientset.Interface, pod *v1.Pod, nodeNa
 
 // MarkPodsNotReady updates ready status of given pods running on
 // given node from master return true if success
-func MarkPodsNotReady(kubeClient clientset.Interface, pods []v1.Pod, nodeName string) error {
+func MarkPodsNotReady(kubeClient clientset.Interface, pods []*v1.Pod, nodeName string) error {
 	klog.V(2).Infof("Update ready status of pods on node [%v]", nodeName)
 
 	errMsg := []string{}
-	for _, pod := range pods {
+	for i := range pods {
 		// Defensive check, also needed for tests.
-		if pod.Spec.NodeName != nodeName {
+		if pods[i].Spec.NodeName != nodeName {
 			continue
 		}
 
+		// Pod will be modified, so making copy is requiered.
+		pod := pods[i].DeepCopy()
 		for _, cond := range pod.Status.Conditions {
 			if cond.Type == v1.PodReady {
 				cond.Status = v1.ConditionFalse
@@ -128,9 +131,9 @@ func MarkPodsNotReady(kubeClient clientset.Interface, pods []v1.Pod, nodeName st
 					break
 				}
 				klog.V(2).Infof("Updating ready status of pod %v to false", pod.Name)
-				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(&pod)
+				_, err := kubeClient.CoreV1().Pods(pod.Namespace).UpdateStatus(pod)
 				if err != nil {
-					klog.Warningf("Failed to update status for pod %q: %v", format.Pod(&pod), err)
+					klog.Warningf("Failed to update status for pod %q: %v", format.Pod(pod), err)
 					errMsg = append(errMsg, fmt.Sprintf("%v", err))
 				}
 				break
