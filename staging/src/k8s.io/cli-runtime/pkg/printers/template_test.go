@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -107,4 +108,121 @@ type badlyMarshaledSecret struct {
 
 func (a badlyMarshaledSecret) MarshalJSON() ([]byte, error) {
 	return []byte(`{"apiVersion":"v1","data":{"username":"--THIS IS NOT BASE64--"},"kind":"Secret"}`), nil
+}
+
+func TestTemplateStrings(t *testing.T) {
+	// This unit tests the "exists" function as well as the template from update.sh
+	table := map[string]struct {
+		pod    v1.Pod
+		expect string
+	}{
+		"nilInfo":   {v1.Pod{}, "false"},
+		"emptyInfo": {v1.Pod{Status: v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{}}}, "false"},
+		"fooExists": {
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "foo",
+						},
+					},
+				},
+			},
+			"false",
+		},
+		"barExists": {
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "bar",
+						},
+					},
+				},
+			},
+			"false",
+		},
+		"bothExist": {
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "foo",
+						},
+						{
+							Name: "bar",
+						},
+					},
+				},
+			},
+			"false",
+		},
+		"barValid": {
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "foo",
+						},
+						{
+							Name: "bar",
+							State: v1.ContainerState{
+								Running: &v1.ContainerStateRunning{
+									StartedAt: metav1.Time{},
+								},
+							},
+						},
+					},
+				},
+			},
+			"false",
+		},
+		"bothValid": {
+			v1.Pod{
+				Status: v1.PodStatus{
+					ContainerStatuses: []v1.ContainerStatus{
+						{
+							Name: "foo",
+							State: v1.ContainerState{
+								Running: &v1.ContainerStateRunning{
+									StartedAt: metav1.Time{},
+								},
+							},
+						},
+						{
+							Name: "bar",
+							State: v1.ContainerState{
+								Running: &v1.ContainerStateRunning{
+									StartedAt: metav1.Time{},
+								},
+							},
+						},
+					},
+				},
+			},
+			"true",
+		},
+	}
+	// The point of this test is to verify that the below template works.
+	tmpl := `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
+	printer, err := NewGoTemplatePrinter([]byte(tmpl))
+	if err != nil {
+		t.Fatalf("tmpl fail: %v", err)
+	}
+
+	for name, item := range table {
+		buffer := &bytes.Buffer{}
+		err = printer.PrintObj(&item.pod, buffer)
+		if err != nil {
+			t.Errorf("%v: unexpected err: %v", name, err)
+			continue
+		}
+		actual := buffer.String()
+		if len(actual) == 0 {
+			actual = "false"
+		}
+		if e := item.expect; e != actual {
+			t.Errorf("%v: expected %v, got %v", name, e, actual)
+		}
+	}
 }
