@@ -27,7 +27,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -67,6 +67,7 @@ readonly CLOUD_KMS_INTEGRATION=true
 {{end}}
 `
 	kubeAPIServerManifestFileName = "kube-apiserver.manifest"
+	kubeAPIServerConfigScriptName = "configure-kubeapiserver.sh"
 	kubeAPIServerStartFuncName    = "start-kube-apiserver"
 )
 
@@ -88,7 +89,7 @@ func newKubeAPIServerManifestTestCase(t *testing.T) *kubeAPIServerManifestTestCa
 }
 
 func (c *kubeAPIServerManifestTestCase) invokeTest(e kubeAPIServerEnv, kubeEnv string) {
-	c.mustInvokeFunc(kubeEnv, e)
+	c.mustInvokeFunc(kubeEnv, kubeAPIServerConfigScriptName, e)
 	c.mustLoadPodFromManifest()
 }
 
@@ -159,7 +160,7 @@ func TestEncryptionProviderConfig(t *testing.T) {
 		EncryptionProviderConfig:     base64.StdEncoding.EncodeToString([]byte("foo")),
 	}
 
-	c.mustInvokeFunc(deployHelperEnv, e)
+	c.mustInvokeFunc(deployHelperEnv, kubeAPIServerConfigScriptName, e)
 
 	if _, err := os.Stat(p); err != nil {
 		c.t.Fatalf("Expected encryption provider config to be written to %s, but stat failed with error: %v", p, err)
