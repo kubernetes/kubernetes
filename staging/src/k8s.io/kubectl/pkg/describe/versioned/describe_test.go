@@ -28,6 +28,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
 	autoscalingv2beta2 "k8s.io/api/autoscaling/v2beta2"
+	coordinationv1 "k8s.io/api/coordination/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -3179,15 +3180,29 @@ Events:              <none>` + "\n"
 }
 
 func TestDescribeNode(t *testing.T) {
-	fake := fake.NewSimpleClientset(&corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "bar",
-			Namespace: "foo",
+	holderIdentity := "holder"
+
+	fake := fake.NewSimpleClientset(
+		&corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bar",
+			},
+			Spec: corev1.NodeSpec{
+				Unschedulable: true,
+			},
 		},
-		Spec: corev1.NodeSpec{
-			Unschedulable: true,
+		&coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bar",
+				Namespace: corev1.NamespaceNodeLease,
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity: &holderIdentity,
+				AcquireTime:    &metav1.MicroTime{Time: time.Now().Add(-time.Hour)},
+				RenewTime:      &metav1.MicroTime{Time: time.Now()},
+			},
 		},
-	})
+	)
 	c := &describeClient{T: t, Namespace: "foo", Interface: fake}
 	d := NodeDescriber{c}
 	out, err := d.Describe("foo", "bar", describe.DescriberSettings{ShowEvents: true})
@@ -3195,13 +3210,12 @@ func TestDescribeNode(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 
-	expectedOut := []string{"Unschedulable", "true"}
+	expectedOut := []string{"Unschedulable", "true", "holder"}
 	for _, expected := range expectedOut {
 		if !strings.Contains(out, expected) {
 			t.Errorf("expected to find %q in output: %q", expected, out)
 		}
 	}
-
 }
 
 func TestDescribeStatefulSet(t *testing.T) {
