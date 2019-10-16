@@ -1,6 +1,7 @@
 apiVersion: v1
 container: "2"
 follow: true
+insecureSkipTLSVerifyBackend: true
 kind: PodLogOptions
 limitBytes: 5323465663502687351
 sinceSeconds: 1002466899136229878

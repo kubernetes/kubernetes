@@ -65,10 +65,11 @@ type KubeletClientConfig struct {
 
 // ConnectionInfo provides the information needed to connect to a kubelet
 type ConnectionInfo struct {
-	Scheme    string
-	Hostname  string
-	Port      string
-	Transport http.RoundTripper
+	Scheme                         string
+	Hostname                       string
+	Port                           string
+	Transport                      http.RoundTripper
+	InsecureSkipTLSVerifyTransport http.RoundTripper
 }
 
 // ConnectionInfoGetter provides ConnectionInfo for the kubelet running on a named node
@@ -76,9 +77,28 @@ type ConnectionInfoGetter interface {
 	GetConnectionInfo(ctx context.Context, nodeName types.NodeName) (*ConnectionInfo, error)
 }
 
-// MakeTransport creates a RoundTripper for HTTP Transport.
+// MakeTransport creates a secure RoundTripper for HTTP Transport.
 func MakeTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
-	tlsConfig, err := transport.TLSConfigFor(config.transportConfig())
+	return makeTransport(config, false)
+}
+
+// MakeInsecureTransport creates an insecure RoundTripper for HTTP Transport.
+func MakeInsecureTransport(config *KubeletClientConfig) (http.RoundTripper, error) {
+	return makeTransport(config, true)
+}
+
+// makeTransport creates a RoundTripper for HTTP Transport.
+func makeTransport(config *KubeletClientConfig, insecureSkipTLSVerify bool) (http.RoundTripper, error) {
+	// do the insecureSkipTLSVerify on the pre-transport *before* we go get a potentially cached connection.
+	// transportConfig always produces a new struct pointer.
+	preTLSConfig := config.transportConfig()
+	if insecureSkipTLSVerify && preTLSConfig != nil {
+		preTLSConfig.TLS.Insecure = true
+		preTLSConfig.TLS.CAData = nil
+		preTLSConfig.TLS.CAFile = ""
+	}
+
+	tlsConfig, err := transport.TLSConfigFor(preTLSConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -148,6 +168,8 @@ type NodeConnectionInfoGetter struct {
 	defaultPort int
 	// transport is the transport to use to send a request to all kubelets
 	transport http.RoundTripper
+	// insecureSkipTLSVerifyTransport is the transport to use if the kube-apiserver wants to skip verifying the TLS certificate of the kubelet
+	insecureSkipTLSVerifyTransport http.RoundTripper
 	// preferredAddressTypes specifies the preferred order to use to find a node address
 	preferredAddressTypes []v1.NodeAddressType
 }
@@ -163,6 +185,10 @@ func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (
 	if err != nil {
 		return nil, err
 	}
+	insecureSkipTLSVerifyTransport, err := MakeInsecureTransport(&config)
+	if err != nil {
+		return nil, err
+	}
 
 	types := []v1.NodeAddressType{}
 	for _, t := range config.PreferredAddressTypes {
@@ -170,10 +196,11 @@ func NewNodeConnectionInfoGetter(nodes NodeGetter, config KubeletClientConfig) (
 	}
 
 	return &NodeConnectionInfoGetter{
-		nodes:       nodes,
-		scheme:      scheme,
-		defaultPort: int(config.Port),
-		transport:   transport,
+		nodes:                          nodes,
+		scheme:                         scheme,
+		defaultPort:                    int(config.Port),
+		transport:                      transport,
+		insecureSkipTLSVerifyTransport: insecureSkipTLSVerifyTransport,
 
 		preferredAddressTypes: types,
 	}, nil
@@ -199,9 +226,10 @@ func (k *NodeConnectionInfoGetter) GetConnectionInfo(ctx context.Context, nodeNa
 	}
 
 	return &ConnectionInfo{
-		Scheme:    k.scheme,
-		Hostname:  host,
-		Port:      strconv.Itoa(port),
-		Transport: k.transport,
+		Scheme:                         k.scheme,
+		Hostname:                       host,
+		Port:                           strconv.Itoa(port),
+		Transport:                      k.transport,
+		InsecureSkipTLSVerifyTransport: k.insecureSkipTLSVerifyTransport,
 	}, nil
 }
