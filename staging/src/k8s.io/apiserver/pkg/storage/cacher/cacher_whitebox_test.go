@@ -1012,3 +1012,104 @@ func TestCachingDeleteEvents(t *testing.T) {
 	verifyEvents(t, fooEventsWatcher, fooEvents)
 	verifyEvents(t, barEventsWatcher, barEvents)
 }
+
+func testCachingObjects(t *testing.T, watchersCount int) {
+	backingStorage := &dummyStorage{}
+	cacher, _, err := newTestCacher(backingStorage, 10)
+	if err != nil {
+		t.Fatalf("Couldn't create cacher: %v", err)
+	}
+	defer cacher.Stop()
+
+	// Wait until cacher is initialized.
+	cacher.ready.wait()
+
+	dispatchedEvents := []*watchCacheEvent{}
+	cacher.watchCache.eventHandler = func(event *watchCacheEvent) {
+		dispatchedEvents = append(dispatchedEvents, event)
+		cacher.processEvent(event)
+	}
+
+	watchers := make([]watch.Interface, 0, watchersCount)
+	for i := 0; i < watchersCount; i++ {
+		w, err := cacher.Watch(context.TODO(), "pods/ns", "1000", storage.Everything)
+		if err != nil {
+			t.Fatalf("Failed to create watch: %v", err)
+		}
+		defer w.Stop()
+		watchers = append(watchers, w)
+	}
+
+	makePod := func(name, rv string) *examplev1.Pod {
+		return &examplev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:            name,
+				Namespace:       "ns",
+				ResourceVersion: rv,
+			},
+		}
+	}
+	pod1 := makePod("pod", "1001")
+	pod2 := makePod("pod", "1002")
+	pod3 := makePod("pod", "1003")
+
+	cacher.watchCache.Add(pod1)
+	cacher.watchCache.Update(pod2)
+	cacher.watchCache.Delete(pod3)
+
+	// At this point, we already have dispatchedEvents fully propagated.
+
+	verifyEvents := func(w watch.Interface) {
+		var event watch.Event
+		for index := range dispatchedEvents {
+			select {
+			case event = <-w.ResultChan():
+			case <-time.After(wait.ForeverTestTimeout):
+				t.Fatalf("timeout watiching for the event")
+			}
+
+			var object runtime.Object
+			if watchersCount >= 3 {
+				if _, ok := event.Object.(runtime.CacheableObject); !ok {
+					t.Fatalf("Object in %s event should support caching: %#v", event.Type, event.Object)
+				}
+				object = event.Object.(runtime.CacheableObject).GetObject()
+			} else {
+				if _, ok := event.Object.(runtime.CacheableObject); ok {
+					t.Fatalf("Object in %s event should not support caching: %#v", event.Type, event.Object)
+				}
+				object = event.Object.DeepCopyObject()
+			}
+
+			if event.Type == watch.Deleted {
+				resourceVersion, err := cacher.versioner.ObjectResourceVersion(cacher.watchCache.cache[index].PrevObject)
+				if err != nil {
+					t.Fatalf("Failed to parse resource version: %v", err)
+				}
+				updateResourceVersionIfNeeded(object, cacher.versioner, resourceVersion)
+			}
+
+			var e runtime.Object
+			switch event.Type {
+			case watch.Added, watch.Modified:
+				e = cacher.watchCache.cache[index].Object
+			case watch.Deleted:
+				e = cacher.watchCache.cache[index].PrevObject
+			default:
+				t.Errorf("unexpected watch event: %#v", event)
+			}
+			if a := object; !reflect.DeepEqual(a, e) {
+				t.Errorf("event object messed up for %s: %#v, expected: %#v", event.Type, a, e)
+			}
+		}
+	}
+
+	for i := range watchers {
+		verifyEvents(watchers[i])
+	}
+}
+
+func TestCachingObjects(t *testing.T) {
+	t.Run("single watcher", func(t *testing.T) { testCachingObjects(t, 1) })
+	t.Run("many watcher", func(t *testing.T) { testCachingObjects(t, 3) })
+}
