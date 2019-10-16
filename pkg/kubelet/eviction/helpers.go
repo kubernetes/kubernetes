@@ -197,21 +197,21 @@ func parseThresholdStatement(signal evictionapi.Signal, val string) (*evictionap
 		if val == "0%" || val == "100%" {
 			return nil, nil
 		}
-		percentage, err := parsePercentage(val)
+		percentageAsDecimal, err := parsePercentageAsDecimal(val)
 		if err != nil {
 			return nil, err
 		}
-		if percentage < 0 {
+		if percentageAsDecimal < 0 {
 			return nil, fmt.Errorf("eviction percentage threshold %v must be >= 0%%: %s", signal, val)
 		}
-		if percentage > 100 {
+		if percentageAsDecimal > 1 {
 			return nil, fmt.Errorf("eviction percentage threshold %v must be <= 100%%: %s", signal, val)
 		}
 		return &evictionapi.Threshold{
 			Signal:   signal,
 			Operator: operator,
 			Value: evictionapi.ThresholdValue{
-				Percentage: percentage,
+				Percentage: percentageAsDecimal,
 			},
 		}, nil
 	}
@@ -231,8 +231,8 @@ func parseThresholdStatement(signal evictionapi.Signal, val string) (*evictionap
 	}, nil
 }
 
-// parsePercentage parses a string representing a percentage value
-func parsePercentage(input string) (float32, error) {
+// parsePercentageAsDecimal parses a string representing a percentage to its decimal value
+func parsePercentageAsDecimal(input string) (float32, error) {
 	value, err := strconv.ParseFloat(strings.TrimRight(input, "%"), 32)
 	if err != nil {
 		return 0, err
@@ -275,15 +275,15 @@ func parseMinimumReclaims(statements map[string]string) (map[evictionapi.Signal]
 			return nil, fmt.Errorf(unsupportedEvictionSignal, signal)
 		}
 		if strings.HasSuffix(val, "%") {
-			percentage, err := parsePercentage(val)
+			percentageAsDecimal, err := parsePercentageAsDecimal(val)
 			if err != nil {
 				return nil, err
 			}
-			if percentage <= 0 {
+			if percentageAsDecimal <= 0 {
 				return nil, fmt.Errorf("eviction percentage minimum reclaim %v must be positive: %s", signal, val)
 			}
 			results[signal] = evictionapi.ThresholdValue{
-				Percentage: percentage,
+				Percentage: percentageAsDecimal,
 			}
 			continue
 		}

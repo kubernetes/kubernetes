@@ -1717,7 +1717,7 @@ func TestHasNodeConditions(t *testing.T) {
 	}
 }
 
-func TestParsePercentage(t *testing.T) {
+func TestParsePercentageAsDecimal(t *testing.T) {
 	testCases := map[string]struct {
 		hasError bool
 		value    float32
@@ -1736,7 +1736,7 @@ func TestParsePercentage(t *testing.T) {
 		},
 	}
 	for input, expected := range testCases {
-		value, err := parsePercentage(input)
+		value, err := parsePercentageAsDecimal(input)
 		if (err != nil) != expected.hasError {
 			t.Errorf("Test case: %s, expected: %v, actual: %v", input, expected.hasError, err != nil)
 		}
