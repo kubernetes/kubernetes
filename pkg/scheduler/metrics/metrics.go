@@ -262,6 +262,16 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		}, []string{"queue", "event"})
 
+	PermitWaitDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "permit_wait_duration_seconds",
+			Help:           "Duration of waiting in RunPermitPlugins.",
+			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"result"})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		SchedulingLatency,
@@ -286,6 +296,7 @@ var (
 		FrameworkExtensionPointDuration,
 		SchedulerQueueIncomingPods,
 		SchedulerGoroutines,
+		PermitWaitDuration,
 	}
 )
 

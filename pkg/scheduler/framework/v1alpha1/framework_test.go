@@ -727,7 +727,48 @@ func TestRecordingMetrics(t *testing.T) {
 
 			tt.action(f)
 
-			collectAndCompare(t, tt.wantExtensionPoint, tt.wantStatus)
+			collectAndCompareFrameworkMetrics(t, tt.wantExtensionPoint, tt.wantStatus)
+		})
+	}
+}
+
+func TestPermitWaitingMetric(t *testing.T) {
+	tests := []struct {
+		name    string
+		inject  injectedResult
+		wantRes string
+	}{
+		{
+			name: "Permit - Success",
+		},
+		{
+			name:    "Permit - Wait Timeout",
+			inject:  injectedResult{PermitStatus: int(Wait)},
+			wantRes: "Unschedulable",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
+			r := make(Registry)
+			r.Register(testPlugin,
+				func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+					return plugin, nil
+				})
+			plugins := &config.Plugins{
+				Permit: &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}},
+			}
+			f, err := NewFramework(r, plugins, emptyArgs)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+			metrics.Register()
+			metrics.PermitWaitDuration.Reset()
+
+			f.RunPermitPlugins(context.TODO(), nil, pod, "")
+
+			collectAndComparePermitWaitDuration(t, tt.wantRes)
 		})
 	}
 }
@@ -775,12 +816,8 @@ func injectNormalizeRes(inj injectedResult, scores NodeScoreList) *Status {
 	return nil
 }
 
-func collectAndCompare(t *testing.T, wantExtensionPoint string, wantStatus Code) {
-	ch := make(chan prometheus.Metric, 1)
-	m := &dto.Metric{}
-	metrics.FrameworkExtensionPointDuration.Collect(ch)
-	got := <-ch
-	got.Write(m)
+func collectAndCompareFrameworkMetrics(t *testing.T, wantExtensionPoint string, wantStatus Code) {
+	m := collectHistogramMetric(metrics.FrameworkExtensionPointDuration)
 
 	if len(m.Label) != 2 {
 		t.Fatalf("Unexpected number of label pairs, got: %v, want: 2", len(m.Label))
@@ -800,5 +837,45 @@ func collectAndCompare(t *testing.T, wantExtensionPoint string, wantStatus Code)
 
 	if *m.Histogram.SampleSum <= 0 {
 		t.Errorf("Expect latency to be greater than 0, got: %v", m.Histogram.SampleSum)
+	}
+}
+
+func collectAndComparePermitWaitDuration(t *testing.T, wantRes string) {
+	m := collectHistogramMetric(metrics.PermitWaitDuration)
+	if wantRes == "" {
+		if m != nil {
+			t.Errorf("PermitWaitDuration shouldn't be recorded but got %+v", m)
+		}
+		return
+	}
+	if wantRes != "" {
+		if len(m.Label) != 1 {
+			t.Fatalf("Unexpected number of label pairs, got: %v, want: 1", len(m.Label))
+		}
+
+		if *m.Label[0].Value != wantRes {
+			t.Errorf("Unexpected result label, got: %q, want %q", *m.Label[0].Value, wantRes)
+		}
+
+		if *m.Histogram.SampleCount != 1 {
+			t.Errorf("Expect 1 sample, got: %v", m.Histogram.SampleCount)
+		}
+
+		if *m.Histogram.SampleSum <= 0 {
+			t.Errorf("Expect latency to be greater than 0, got: %v", m.Histogram.SampleSum)
+		}
+	}
+}
+
+func collectHistogramMetric(metric prometheus.Collector) *dto.Metric {
+	ch := make(chan prometheus.Metric, 1)
+	metric.Collect(ch)
+	select {
+	case got := <-ch:
+		m := &dto.Metric{}
+		got.Write(m)
+		return m
+	default:
+		return nil
 	}
 }

@@ -85,6 +85,10 @@ func newWaitingPod(pod *v1.Pod, pluginsMaxWaitTime map[string]time.Duration) *wa
 	}
 
 	wp.pendingPlugins = make(map[string]*time.Timer, len(pluginsMaxWaitTime))
+	// The time.AfterFunc calls wp.Reject which iterates through pendingPlugins map. Acquire the
+	// lock here so that time.AfterFunc can only execute after newWaitingPod finishes.
+	wp.mu.Lock()
+	defer wp.mu.Unlock()
 	for k, v := range pluginsMaxWaitTime {
 		plugin, waitTime := k, v
 		wp.pendingPlugins[plugin] = time.AfterFunc(waitTime, func() {
