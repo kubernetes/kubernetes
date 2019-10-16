@@ -143,6 +143,12 @@ func validatePorts(endpointPorts []discovery.EndpointPort, fldPath *field.Path) 
 		} else if !supportedPortProtocols.Has(string(*endpointPort.Protocol)) {
 			allErrs = append(allErrs, field.NotSupported(idxPath.Child("protocol"), *endpointPort.Protocol, supportedPortProtocols.List()))
 		}
+
+		if endpointPort.AppProtocol != nil {
+			for _, msg := range validation.IsQualifiedName(*endpointPort.AppProtocol) {
+				allErrs = append(allErrs, field.Invalid(idxPath.Child("appProtocol"), endpointPort.AppProtocol, msg))
+			}
+		}
 	}
 
 	return allErrs
