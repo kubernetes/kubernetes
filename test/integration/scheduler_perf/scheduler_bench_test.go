@@ -33,7 +33,6 @@ import (
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
-	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -361,10 +360,9 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 	if b.N < minPods {
 		b.N = minPods
 	}
-	finalFunc, clientset := mustSetupScheduler()
+	finalFunc, podInformer, clientset := mustSetupScheduler()
 	defer finalFunc()
 
-	podInformer := scheduler.NewPodInformer(clientset, 0)
 	nodePreparer := framework.NewIntegrationTestNodePreparer(
 		clientset,
 		[]testutils.CountToStrategy{{Count: numNodes, Strategy: nodeStrategy}},
@@ -388,6 +386,7 @@ func benchmarkScheduling(numNodes, numExistingPods, minPods int,
 		if len(scheduled) >= numExistingPods {
 			break
 		}
+		klog.Infof("got %d existing pods, required: %d", len(scheduled), numExistingPods)
 		time.Sleep(1 * time.Second)
 	}
 
