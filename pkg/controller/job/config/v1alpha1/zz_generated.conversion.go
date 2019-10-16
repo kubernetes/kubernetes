@@ -46,7 +46,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	if err := s.AddGeneratedConversionFunc((*v1alpha1.JobControllerConfiguration)(nil), (*config.JobControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_JobControllerConfiguration_To_config_JobControllerConfiguration(a.(*v1alpha1.JobControllerConfiguration), b.(*config.JobControllerConfiguration), scope)
+		return ConvertV1alpha1JobControllerConfigurationToConfigJobControllerConfiguration(a.(*v1alpha1.JobControllerConfiguration), b.(*config.JobControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 		return err
 	}
 	if err := s.AddConversionFunc((*v1alpha1.JobControllerConfiguration)(nil), (*config.JobControllerConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1alpha1_JobControllerConfiguration_To_config_JobControllerConfiguration(a.(*v1alpha1.JobControllerConfiguration), b.(*config.JobControllerConfiguration), scope)
+		return ConvertV1alpha1JobControllerConfigurationToConfigJobControllerConfiguration(a.(*v1alpha1.JobControllerConfiguration), b.(*config.JobControllerConfiguration), scope)
 	}); err != nil {
 		return err
 	}
