@@ -226,3 +226,19 @@ func TestTemplateStrings(t *testing.T) {
 		}
 	}
 }
+
+func TestTemplatePanic(t *testing.T) {
+	tmpl := `{{and ((index .currentState.info "foo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
+	printer, err := NewGoTemplatePrinter([]byte(tmpl))
+	if err != nil {
+		t.Fatalf("tmpl fail: %v", err)
+	}
+	buffer := &bytes.Buffer{}
+	err = printer.PrintObj(&v1.Pod{}, buffer)
+	if err == nil {
+		t.Fatalf("expected that template to crash")
+	}
+	if buffer.String() == "" {
+		t.Errorf("no debugging info was printed")
+	}
+}
