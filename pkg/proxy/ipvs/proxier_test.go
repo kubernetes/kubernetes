@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/proxy"
+	"k8s.io/kubernetes/pkg/proxy/healthcheck"
 	netlinktest "k8s.io/kubernetes/pkg/proxy/ipvs/testing"
 	utilproxy "k8s.io/kubernetes/pkg/proxy/util"
 	proxyutiltest "k8s.io/kubernetes/pkg/proxy/util/testing"
@@ -59,18 +60,6 @@ func (f *fakeIPGetter) NodeIPs() ([]net.IP, error) {
 	return f.nodeIPs, nil
 }
 
-type fakeHealthChecker struct {
-	services  map[types.NamespacedName]uint16
-	Endpoints map[types.NamespacedName]int
-}
-
-func newFakeHealthChecker() *fakeHealthChecker {
-	return &fakeHealthChecker{
-		services:  map[types.NamespacedName]uint16{},
-		Endpoints: map[types.NamespacedName]int{},
-	}
-}
-
 // fakePortOpener implements portOpener.
 type fakePortOpener struct {
 	openPorts []*utilproxy.LocalPort
@@ -81,16 +70,6 @@ type fakePortOpener struct {
 func (f *fakePortOpener) OpenLocalPort(lp *utilproxy.LocalPort) (utilproxy.Closeable, error) {
 	f.openPorts = append(f.openPorts, lp)
 	return nil, nil
-}
-
-func (fake *fakeHealthChecker) SyncServices(newServices map[types.NamespacedName]uint16) error {
-	fake.services = newServices
-	return nil
-}
-
-func (fake *fakeHealthChecker) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
-	fake.Endpoints = newEndpoints
-	return nil
 }
 
 // fakeKernelHandler implements KernelHandler.
@@ -151,7 +130,7 @@ func NewFakeProxier(ipt utiliptables.Interface, ipvs utilipvs.Interface, ipset u
 		hostname:              testHostname,
 		portsMap:              make(map[utilproxy.LocalPort]utilproxy.Closeable),
 		portMapper:            &fakePortOpener{[]*utilproxy.LocalPort{}},
-		healthChecker:         newFakeHealthChecker(),
+		serviceHealthServer:   healthcheck.NewFakeServiceHealthServer(),
 		ipvsScheduler:         DefaultScheduler,
 		ipGetter:              &fakeIPGetter{nodeIPs: nodeIPs},
 		iptablesData:          bytes.NewBuffer(nil),

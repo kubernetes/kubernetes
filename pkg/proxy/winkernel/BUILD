@@ -62,6 +62,7 @@ go_test(
     deps = select({
         "@io_bazel_rules_go//go/platform:windows": [
             "//pkg/proxy:go_default_library",
+            "//pkg/proxy/healthcheck:go_default_library",
             "//staging/src/k8s.io/api/core/v1:go_default_library",
             "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
             "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
