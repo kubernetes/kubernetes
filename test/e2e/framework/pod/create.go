@@ -50,11 +50,21 @@ func CreateWaitAndDeletePod(c clientset.Interface, ns string, pvc *v1.Persistent
 		}
 	}()
 
-	err = TestPodSuccessOrFail(c, ns, runPod)
+	err = testPodSuccessOrFail(c, ns, runPod)
 	if err != nil {
 		return fmt.Errorf("pod %q did not exit with Success: %v", runPod.Name, err)
 	}
 	return // note: named return value
+}
+
+// testPodSuccessOrFail tests whether the pod's exit code is zero.
+func testPodSuccessOrFail(c clientset.Interface, ns string, pod *v1.Pod) error {
+	e2elog.Logf("Pod should terminate with exitcode 0 (success)")
+	if err := WaitForPodSuccessInNamespace(c, pod.Name, ns); err != nil {
+		return fmt.Errorf("pod %q failed to reach Success: %v", pod.Name, err)
+	}
+	e2elog.Logf("Pod %v succeeded ", pod.Name)
+	return nil
 }
 
 // CreateUnschedulablePod with given claims based on node selector
