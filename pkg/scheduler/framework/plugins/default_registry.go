@@ -63,7 +63,7 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 		},
 		volumerestrictions.Name: volumerestrictions.New,
 		volumezone.Name:         volumezone.New,
-		nodevolumelimits.Name:   nodevolumelimits.New(args.SchedulerCache),
+		nodevolumelimits.Name:   nodevolumelimits.New,
 		interpodaffinity.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return interpodaffinity.New(args.SchedulerCache, args.SchedulerCache), nil
 		},

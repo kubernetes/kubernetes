@@ -49,21 +49,23 @@ func (pl *NodeVolumeLimits) Filter(ctx context.Context, _ *framework.CycleState,
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
 }
 
-// New returns function that initializes a new plugin and returns it.
-func New(csiNodeInfo predicates.CSINodeInfo) framework.PluginFactory {
-	return func(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
-		informerFactory := handle.SharedInformerFactory()
-		pvInfo := &predicates.CachedPersistentVolumeInfo{
-			PersistentVolumeLister: informerFactory.Core().V1().PersistentVolumes().Lister(),
-		}
-		pvcInfo := &predicates.CachedPersistentVolumeClaimInfo{
-			PersistentVolumeClaimLister: informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-		}
-		classInfo := &predicates.CachedStorageClassInfo{
-			StorageClassLister: informerFactory.Storage().V1().StorageClasses().Lister(),
-		}
-		return &NodeVolumeLimits{
-			predicate: predicates.NewCSIMaxVolumeLimitPredicate(csiNodeInfo, pvInfo, pvcInfo, classInfo),
-		}, nil
+// New initializes a new plugin and returns it.
+func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+	informerFactory := handle.SharedInformerFactory()
+	csiNodeInfo := &predicates.CachedCSINodeInfo{
+		CSINodeLister: informerFactory.Storage().V1beta1().CSINodes().Lister(),
 	}
+	pvInfo := &predicates.CachedPersistentVolumeInfo{
+		PersistentVolumeLister: informerFactory.Core().V1().PersistentVolumes().Lister(),
+	}
+	pvcInfo := &predicates.CachedPersistentVolumeClaimInfo{
+		PersistentVolumeClaimLister: informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+	}
+	classInfo := &predicates.CachedStorageClassInfo{
+		StorageClassLister: informerFactory.Storage().V1().StorageClasses().Lister(),
+	}
+
+	return &NodeVolumeLimits{
+		predicate: predicates.NewCSIMaxVolumeLimitPredicate(csiNodeInfo, pvInfo, pvcInfo, classInfo),
+	}, nil
 }

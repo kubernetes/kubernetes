@@ -26,8 +26,8 @@ import (
 	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storage "k8s.io/api/storage/v1"
+	v1beta1storage "k8s.io/api/storage/v1beta1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -37,6 +37,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
+	v1beta1storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -169,7 +170,19 @@ type NodeInfo interface {
 
 // CSINodeInfo interface represents anything that can get CSINode object from node name.
 type CSINodeInfo interface {
-	GetCSINodeInfo(nodeName string) (*storagev1beta1.CSINode, error)
+	GetCSINodeInfo(nodeName string) (*v1beta1storage.CSINode, error)
+}
+
+var _ CSINodeInfo = &CachedCSINodeInfo{}
+
+// CachedCSINodeInfo implements CSINodeInfoInfo
+type CachedCSINodeInfo struct {
+	v1beta1storagelisters.CSINodeLister
+}
+
+// GetCSINodeInfo returns a persistent volume object by PV ID.
+func (c *CachedCSINodeInfo) GetCSINodeInfo(nodeName string) (*v1beta1storage.CSINode, error) {
+	return c.Get(nodeName)
 }
 
 // PersistentVolumeInfo interface represents anything that can get persistent volume object by PV ID.
@@ -209,7 +222,7 @@ func (c *CachedPersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace
 
 // StorageClassInfo interface represents anything that can get a storage class object by class name.
 type StorageClassInfo interface {
-	GetStorageClassInfo(className string) (*storagev1.StorageClass, error)
+	GetStorageClassInfo(className string) (*storage.StorageClass, error)
 }
 
 var _ StorageClassInfo = &CachedStorageClassInfo{}
@@ -220,7 +233,7 @@ type CachedStorageClassInfo struct {
 }
 
 // GetStorageClassInfo get StorageClass by class name.
-func (c *CachedStorageClassInfo) GetStorageClassInfo(className string) (*storagev1.StorageClass, error) {
+func (c *CachedStorageClassInfo) GetStorageClassInfo(className string) (*storage.StorageClass, error) {
 	return c.Get(className)
 }
 
@@ -313,9 +326,9 @@ type VolumeFilter struct {
 	FilterVolume           func(vol *v1.Volume) (id string, relevant bool)
 	FilterPersistentVolume func(pv *v1.PersistentVolume) (id string, relevant bool)
 	// MatchProvisioner evaluates if the StorageClass provisioner matches the running predicate
-	MatchProvisioner func(sc *storagev1.StorageClass) (relevant bool)
+	MatchProvisioner func(sc *storage.StorageClass) (relevant bool)
 	// IsMigrated returns a boolean specifying whether the plugin is migrated to a CSI driver
-	IsMigrated func(csiNode *storagev1beta1.CSINode) bool
+	IsMigrated func(csiNode *v1beta1storage.CSINode) bool
 }
 
 // NewMaxPDVolumeCountPredicate creates a predicate which evaluates whether a pod can fit based on the
@@ -577,14 +590,14 @@ var EBSVolumeFilter = VolumeFilter{
 		return "", false
 	},
 
-	MatchProvisioner: func(sc *storagev1.StorageClass) (relevant bool) {
+	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
 		if sc.Provisioner == csilibplugins.AWSEBSInTreePluginName {
 			return true
 		}
 		return false
 	},
 
-	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {
+	IsMigrated: func(csiNode *v1beta1storage.CSINode) bool {
 		return isCSIMigrationOn(csiNode, csilibplugins.AWSEBSInTreePluginName)
 	},
 }
@@ -605,14 +618,14 @@ var GCEPDVolumeFilter = VolumeFilter{
 		return "", false
 	},
 
-	MatchProvisioner: func(sc *storagev1.StorageClass) (relevant bool) {
+	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
 		if sc.Provisioner == csilibplugins.GCEPDInTreePluginName {
 			return true
 		}
 		return false
 	},
 
-	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {
+	IsMigrated: func(csiNode *v1beta1storage.CSINode) bool {
 		return isCSIMigrationOn(csiNode, csilibplugins.GCEPDInTreePluginName)
 	},
 }
@@ -633,14 +646,14 @@ var AzureDiskVolumeFilter = VolumeFilter{
 		return "", false
 	},
 
-	MatchProvisioner: func(sc *storagev1.StorageClass) (relevant bool) {
+	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
 		if sc.Provisioner == csilibplugins.AzureDiskInTreePluginName {
 			return true
 		}
 		return false
 	},
 
-	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {
+	IsMigrated: func(csiNode *v1beta1storage.CSINode) bool {
 		return isCSIMigrationOn(csiNode, csilibplugins.AzureDiskInTreePluginName)
 	},
 }
@@ -662,14 +675,14 @@ var CinderVolumeFilter = VolumeFilter{
 		return "", false
 	},
 
-	MatchProvisioner: func(sc *storagev1.StorageClass) (relevant bool) {
+	MatchProvisioner: func(sc *storage.StorageClass) (relevant bool) {
 		if sc.Provisioner == csilibplugins.CinderInTreePluginName {
 			return true
 		}
 		return false
 	},
 
-	IsMigrated: func(csiNode *storagev1beta1.CSINode) bool {
+	IsMigrated: func(csiNode *v1beta1storage.CSINode) bool {
 		return isCSIMigrationOn(csiNode, csilibplugins.CinderInTreePluginName)
 	},
 }
@@ -758,7 +771,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 						if class.VolumeBindingMode == nil {
 							return false, nil, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", scName)
 						}
-						if *class.VolumeBindingMode == storagev1.VolumeBindingWaitForFirstConsumer {
+						if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
 							// Skip unbound volumes
 							continue
 						}
