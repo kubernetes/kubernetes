@@ -28,7 +28,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -192,29 +191,11 @@ func (e *EndpointController) Run(workers int, stopCh <-chan struct{}) {
 	<-stopCh
 }
 
-func (e *EndpointController) getPodServiceMemberships(pod *v1.Pod) (sets.String, error) {
-	set := sets.String{}
-	services, err := e.serviceLister.GetPodServices(pod)
-	if err != nil {
-		// don't log this error because this function makes pointless
-		// errors when no services match.
-		return set, nil
-	}
-	for i := range services {
-		key, err := controller.KeyFunc(services[i])
-		if err != nil {
-			return nil, err
-		}
-		set.Insert(key)
-	}
-	return set, nil
-}
-
 // When a pod is added, figure out what services it will be a member of and
 // enqueue them. obj must have *v1.Pod type.
 func (e *EndpointController) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	services, err := e.getPodServiceMemberships(pod)
+	services, err := endpointutil.GetPodServiceMemberships(e.serviceLister, pod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
 		return
