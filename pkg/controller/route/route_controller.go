@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -56,7 +56,8 @@ var updateNetworkConditionBackoff = wait.Backoff{
 	Jitter:   1.0,
 }
 
-type RouteController struct {
+// Controller allows cloudprovider routing for a cluster
+type Controller struct {
 	routes           cloudprovider.Routes
 	kubeClient       clientset.Interface
 	clusterName      string
@@ -67,7 +68,8 @@ type RouteController struct {
 	recorder         record.EventRecorder
 }
 
-func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDRs []*net.IPNet) *RouteController {
+// New returns a new route controller for providing cloud routing rules
+func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInformer coreinformers.NodeInformer, clusterName string, clusterCIDRs []*net.IPNet) *Controller {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("route_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
@@ -80,7 +82,7 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	eventBroadcaster.StartLogging(klog.Infof)
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: "route_controller"})
 
-	rc := &RouteController{
+	rc := &Controller{
 		routes:           routes,
 		kubeClient:       kubeClient,
 		clusterName:      clusterName,
@@ -94,7 +96,8 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	return rc
 }
 
-func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
+// Run starts the route controller until the provided stop channel is closed
+func (rc *Controller) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
 	defer utilruntime.HandleCrash()
 
 	klog.Info("Starting route controller")
@@ -122,7 +125,7 @@ func (rc *RouteController) Run(stopCh <-chan struct{}, syncPeriod time.Duration)
 	<-stopCh
 }
 
-func (rc *RouteController) reconcileNodeRoutes() error {
+func (rc *Controller) reconcileNodeRoutes() error {
 	routeList, err := rc.routes.ListRoutes(context.TODO(), rc.clusterName)
 	if err != nil {
 		return fmt.Errorf("error listing routes: %v", err)
@@ -134,7 +137,7 @@ func (rc *RouteController) reconcileNodeRoutes() error {
 	return rc.reconcile(nodes, routeList)
 }
 
-func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.Route) error {
+func (rc *Controller) reconcile(nodes []*v1.Node, routes []*cloudprovider.Route) error {
 	var l sync.Mutex
 	// for each node a map of podCIDRs and their created status
 	nodeRoutesStatuses := make(map[types.NodeName]map[string]bool)
@@ -288,7 +291,7 @@ func (rc *RouteController) reconcile(nodes []*v1.Node, routes []*cloudprovider.R
 	return nil
 }
 
-func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreated bool) error {
+func (rc *Controller) updateNetworkingCondition(node *v1.Node, routesCreated bool) error {
 	_, condition := cloudnodeutil.GetNodeCondition(&(node.Status), v1.NodeNetworkUnavailable)
 	if routesCreated && condition != nil && condition.Status == v1.ConditionFalse {
 		klog.V(2).Infof("set node %v with NodeNetworkUnavailable=false was canceled because it is already set", node.Name)
@@ -339,7 +342,7 @@ func (rc *RouteController) updateNetworkingCondition(node *v1.Node, routesCreate
 	return err
 }
 
-func (rc *RouteController) isResponsibleForRoute(route *cloudprovider.Route) bool {
+func (rc *Controller) isResponsibleForRoute(route *cloudprovider.Route) bool {
 	_, cidr, err := net.ParseCIDR(route.DestinationCIDR)
 	if err != nil {
 		klog.Errorf("Ignoring route %s, unparsable CIDR: %v", route.Name, err)
