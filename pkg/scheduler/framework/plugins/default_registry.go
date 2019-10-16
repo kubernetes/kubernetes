@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodepreferavoidpods"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
@@ -63,12 +64,13 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 	classInfo := &predicates.CachedStorageClassInfo{StorageClassLister: args.StorageClassLister}
 
 	return framework.Registry{
-		imagelocality.Name:   imagelocality.New,
-		tainttoleration.Name: tainttoleration.New,
-		noderesources.Name:   noderesources.New,
-		nodename.Name:        nodename.New,
-		nodeports.Name:       nodeports.New,
-		nodeaffinity.Name:    nodeaffinity.New,
+		imagelocality.Name:       imagelocality.New,
+		tainttoleration.Name:     tainttoleration.New,
+		noderesources.Name:       noderesources.New,
+		nodename.Name:            nodename.New,
+		nodeports.Name:           nodeports.New,
+		nodepreferavoidpods.Name: nodepreferavoidpods.New,
+		nodeaffinity.Name:        nodeaffinity.New,
 		volumebinding.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return volumebinding.NewFromVolumeBinder(args.VolumeBinder), nil
 		},
@@ -153,6 +155,12 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPriority(priorities.ImageLocalityPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, imagelocality.Name, &args.Weight)
+			return
+		})
+
+	registry.RegisterPriority(priorities.NodePreferAvoidPodsPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, nodepreferavoidpods.Name, &args.Weight)
 			return
 		})
 

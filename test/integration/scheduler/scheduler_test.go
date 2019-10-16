@@ -141,7 +141,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"InterPodAffinityPriority",
 				"LeastRequestedPriority",
 				"NodeAffinityPriority",
-				"NodePreferAvoidPodsPriority",
 				"SelectorSpreadPriority",
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
@@ -153,6 +152,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 1},
+					{Name: "NodePreferAvoidPods", Weight: 10000},
 					{Name: "TaintToleration", Weight: 1},
 				},
 			},
@@ -212,7 +212,6 @@ kind: Policy
 				"InterPodAffinityPriority",
 				"LeastRequestedPriority",
 				"NodeAffinityPriority",
-				"NodePreferAvoidPodsPriority",
 				"SelectorSpreadPriority",
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
@@ -224,6 +223,7 @@ kind: Policy
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 1},
+					{Name: "NodePreferAvoidPods", Weight: 10000},
 					{Name: "TaintToleration", Weight: 1},
 				},
 			},
