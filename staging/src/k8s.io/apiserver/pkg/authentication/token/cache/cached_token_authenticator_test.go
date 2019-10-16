@@ -18,7 +18,11 @@ package cache
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -124,4 +128,40 @@ func TestCachedTokenAuthenticatorWithAudiences(t *testing.T) {
 	if u, ok, _ := a.AuthenticateToken(authenticator.WithAudiences(context.Background(), []string{"audB"}), "usertoken1"); !ok || u.User.GetName() != "user1-different" {
 		t.Errorf("Expected user1-different")
 	}
+}
+
+var bKey string
+
+// use a realistic token for benchmarking
+const jwtToken = `eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJvcGVuc2hpZnQtc2RuIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6InNkbi10b2tlbi1nNndtYyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50Lm5hbWUiOiJzZG4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiIzYzM5YzNhYS1kM2Q5LTExZTktYTVkMC0wMmI3YjllODg1OWUiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6b3BlbnNoaWZ0LXNkbjpzZG4ifQ.PIs0rsUTekj5AX8yJeLDyW4vQB17YS4IOgO026yjEvsCY7Wv_2TD0lwyZWqyQh639q3jPh2_3LTQq2Cp0cReBP1PYOIGgprNm3C-3OFZRnkls-GH09kvPYE8J_-a1YwjxucOwytzJvEM5QTC9iXfEJNSTBfLge-HMYT1y0AGKs8DWTSC4rtd_2PedK3OYiAyDg_xHA8qNpG9pRNM8vfjV9VsmqJtlbnTVlTngqC0t5vyMaWrmLNRxN0rTbN2W9L3diXRnYqI8BUfgPQb7uhYcPuXGeypaFrN4d3yNN4NbgVxnkgdd2IXQ8elSJuQn6ynrvLgG0JPMmThOHnwvsZDeA`
+
+func BenchmarkKeyFunc(b *testing.B) {
+	randomCacheKey := make([]byte, 32)
+	if _, err := rand.Read(randomCacheKey); err != nil {
+		b.Fatal(err) // rand should never fail
+	}
+	hashPool := &sync.Pool{
+		New: func() interface{} {
+			return hmac.New(sha256.New, randomCacheKey)
+		},
+	}
+
+	// use realistic audiences for benchmarking
+	auds := []string{"7daf30b7-a85c-429b-8b21-e666aecbb235", "c22aa267-bdde-4acb-8505-998be7818400", "44f9b4f3-7125-4333-b04c-1446a16c6113"}
+
+	b.Run("has audiences", func(b *testing.B) {
+		var key string
+		for n := 0; n < b.N; n++ {
+			key = keyFunc(hashPool, auds, jwtToken)
+		}
+		bKey = key
+	})
+
+	b.Run("nil audiences", func(b *testing.B) {
+		var key string
+		for n := 0; n < b.N; n++ {
+			key = keyFunc(hashPool, nil, jwtToken)
+		}
+		bKey = key
+	})
 }
