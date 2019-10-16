@@ -477,11 +477,9 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo
 	numNewVolumes := len(newVolumes)
 	maxAttachLimit := c.maxVolumeFunc(node)
 
-	if utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
-		volumeLimits := nodeInfo.VolumeLimits()
-		if maxAttachLimitFromAllocatable, ok := volumeLimits[c.volumeLimitKey]; ok {
-			maxAttachLimit = int(maxAttachLimitFromAllocatable)
-		}
+	volumeLimits := nodeInfo.VolumeLimits()
+	if maxAttachLimitFromAllocatable, ok := volumeLimits[c.volumeLimitKey]; ok {
+		maxAttachLimit = int(maxAttachLimitFromAllocatable)
 	}
 
 	if numExistingVolumes+numNewVolumes > maxAttachLimit {

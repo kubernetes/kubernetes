@@ -22,14 +22,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/util/rand"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	v1beta1storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/klog"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	"k8s.io/kubernetes/pkg/features"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
@@ -90,10 +88,6 @@ func (c *CSIMaxVolumeLimitChecker) attachableLimitPredicate(
 	pod *v1.Pod, meta Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
 	// If the new pod doesn't have any volume attached to it, the predicate will always be true
 	if len(pod.Spec.Volumes) == 0 {
-		return true, nil, nil
-	}
-
-	if !utilfeature.DefaultFeatureGate.Enabled(features.AttachVolumeLimit) {
 		return true, nil, nil
 	}
 

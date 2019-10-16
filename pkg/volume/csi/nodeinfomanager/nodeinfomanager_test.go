@@ -1011,7 +1011,6 @@ func getClientSet(existingNode *v1.Node, existingCSINode *storage.CSINode) *fake
 
 func test(t *testing.T, addNodeInfo bool, csiNodeInfoEnabled bool, testcases []testcase) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSINodeInfo, csiNodeInfoEnabled)()
-	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.AttachVolumeLimit, true)()
 
 	for _, tc := range testcases {
 		t.Logf("test case: %q", tc.name)
