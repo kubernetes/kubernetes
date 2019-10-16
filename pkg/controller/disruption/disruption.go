@@ -21,7 +21,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1beta1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/extensions/v1beta1"
 	policy "k8s.io/api/policy/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -363,7 +363,19 @@ func (dc *DisruptionController) updateDb(old, cur interface{}) {
 }
 
 func (dc *DisruptionController) removeDb(obj interface{}) {
-	pdb := obj.(*policy.PodDisruptionBudget)
+	pdb, ok := obj.(*policy.PodDisruptionBudget)
+	if !ok {
+		tombstone, ok := obj.(cache.DeletedFinalStateUnknown)
+		if !ok {
+			klog.Errorf("Couldn't get object from tombstone %+v", obj)
+			return
+		}
+		pdb, ok = tombstone.Obj.(*policy.PodDisruptionBudget)
+		if !ok {
+			klog.Errorf("Tombstone contained object that is not a pdb %+v", obj)
+			return
+		}
+	}
 	klog.V(4).Infof("remove DB %q", pdb.Name)
 	dc.enqueuePdb(pdb)
 }
