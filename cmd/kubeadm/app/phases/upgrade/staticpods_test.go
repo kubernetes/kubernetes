@@ -28,7 +28,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/coreos/etcd/pkg/transport"
+	"go.etcd.io/etcd/pkg/transport"
 	"github.com/pkg/errors"
 
 	"k8s.io/client-go/tools/clientcmd"
