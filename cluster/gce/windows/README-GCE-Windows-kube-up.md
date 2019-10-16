@@ -72,7 +72,7 @@ plane only runs on Linux.
 
 ```
 export NUM_NODES=2  # number of Linux nodes
-export NUM_WINDOWS_NODES=2
+export NUM_WINDOWS_NODES=2 # number of Windows nodes
 export KUBE_GCE_ENABLE_IP_ALIASES=true
 export KUBERNETES_NODE_PLATFORM=windows
 export LOGGING_STACKDRIVER_RESOURCE_TYPES=new
