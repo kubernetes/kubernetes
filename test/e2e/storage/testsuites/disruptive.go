@@ -51,6 +51,7 @@ func InitDisruptiveTestSuite() TestSuite {
 		},
 	}
 }
+
 func (s *disruptiveTestSuite) getTestSuiteInfo() TestSuiteInfo {
 	return s.tsInfo
 }
@@ -145,6 +146,12 @@ func (s *disruptiveTestSuite) defineTests(driver TestDriver, pattern testpattern
 			if (pattern.VolMode == v1.PersistentVolumeBlock && t.runTestBlock != nil) ||
 				(pattern.VolMode == v1.PersistentVolumeFilesystem && t.runTestFile != nil) {
 				ginkgo.It(t.testItStmt, func() {
+
+					if pattern.VolMode == v1.PersistentVolumeBlock && driver.GetDriverInfo().InTreePluginName == "kubernetes.io/local-volume" {
+						// TODO: https://github.com/kubernetes/kubernetes/issues/74552
+						framework.Skipf("Local volume volume plugin does not support block volume reconstruction (#74552)")
+					}
+
 					init()
 					defer cleanup()
 
