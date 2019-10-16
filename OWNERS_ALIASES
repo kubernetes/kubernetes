@@ -20,7 +20,6 @@ aliases:
     - jianhuiz
     - lavalamp
     - liggitt
-    - mbohlool
     - mikedanese
     - sttts
     - wojtek-t
@@ -30,16 +29,13 @@ aliases:
     - liggitt
     - mikedanese
   sig-auth-authorizers-reviewers:
-    - david-mcmahon
     - deads2k
     - dims
     - enj
     - erictune
     - jianhuiz
-    - krousey
     - lavalamp
     - liggitt
-    - mbohlool
     - mikedanese
     - mml
     - ncdc
@@ -56,16 +52,13 @@ aliases:
   sig-auth-certificates-reviewers:
     - awly
     - caesarxuchao
-    - david-mcmahon
     - deads2k
     - dims
     - enj
     - errordeveloper
-    - hongchaodeng
     - jianhuiz
     - lavalamp
     - liggitt
-    - mbohlool
     - mikedanese
     - smarterclayton
     - sttts
@@ -81,7 +74,6 @@ aliases:
     - immutableT
     - lavalamp
     - liggitt
-    - sakshamsharma
     - smarterclayton
     - wojtek-t
 
@@ -102,11 +94,9 @@ aliases:
     - tallclair
   sig-auth-policy-reviewers:
     - deads2k
-    - hongchaodeng
     - jianhuiz
     - liggitt
     - mbohlool
-    - pweil-
     - tallclair
     - krmayankk
 
