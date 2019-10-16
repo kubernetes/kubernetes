@@ -705,22 +705,6 @@ func (cache *schedulerCache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	return n.info.Node(), nil
 }
 
-// ListNodes returns the cached list of nodes.
-func (cache *schedulerCache) ListNodes() []*v1.Node {
-	cache.mu.RLock()
-	defer cache.mu.RUnlock()
-
-	nodes := make([]*v1.Node, 0, len(cache.nodes))
-	for _, node := range cache.nodes {
-		// Node info is sometimes not removed immediately. See schedulerCache.RemoveNode.
-		n := node.info.Node()
-		if n != nil {
-			nodes = append(nodes, n)
-		}
-	}
-	return nodes
-}
-
 func (cache *schedulerCache) GetCSINodeInfo(nodeName string) (*storagev1beta1.CSINode, error) {
 	cache.mu.RLock()
 	defer cache.mu.RUnlock()

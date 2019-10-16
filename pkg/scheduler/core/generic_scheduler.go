@@ -321,11 +321,10 @@ func (g *genericScheduler) Preempt(state *framework.CycleState, pod *v1.Pod, sch
 		klog.V(5).Infof("Pod %v/%v is not eligible for more preemption.", pod.Namespace, pod.Name)
 		return nil, nil, nil, nil
 	}
-	allNodes := g.cache.ListNodes()
-	if len(allNodes) == 0 {
+	if len(g.nodeInfoSnapshot.NodeInfoMap) == 0 {
 		return nil, nil, nil, ErrNoNodesAvailable
 	}
-	potentialNodes := nodesWherePreemptionMightHelp(allNodes, fitError)
+	potentialNodes := nodesWherePreemptionMightHelp(g.nodeInfoSnapshot.NodeInfoMap, fitError)
 	if len(potentialNodes) == 0 {
 		klog.V(3).Infof("Preemption will not help schedule pod %v/%v on any node.", pod.Namespace, pod.Name)
 		// In this case, we should clean-up any existing nominated node name of the pod.
@@ -460,7 +459,7 @@ func (g *genericScheduler) findNodesThatFit(state *framework.CycleState, pod *v1
 	filteredNodesStatuses := framework.NodeToStatusMap{}
 
 	if len(g.predicates) == 0 {
-		filtered = g.cache.ListNodes()
+		filtered = g.nodeInfoSnapshot.ListNodes()
 	} else {
 		allNodes := int32(g.cache.NodeTree().NumNodes())
 		numNodesToFind := g.numFeasibleNodesToFind(allNodes)
@@ -1205,21 +1204,21 @@ func (g *genericScheduler) selectVictimsOnNode(
 
 // nodesWherePreemptionMightHelp returns a list of nodes with failed predicates
 // that may be satisfied by removing pods from the node.
-func nodesWherePreemptionMightHelp(nodes []*v1.Node, fitErr *FitError) []*v1.Node {
+func nodesWherePreemptionMightHelp(nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, fitErr *FitError) []*v1.Node {
 	potentialNodes := []*v1.Node{}
-	for _, node := range nodes {
-		if fitErr.FilteredNodesStatuses[node.Name].Code() == framework.UnschedulableAndUnresolvable {
+	for name, node := range nodeNameToInfo {
+		if fitErr.FilteredNodesStatuses[name].Code() == framework.UnschedulableAndUnresolvable {
 			continue
 		}
-		failedPredicates, _ := fitErr.FailedPredicates[node.Name]
+		failedPredicates, _ := fitErr.FailedPredicates[name]
 		// If we assume that scheduler looks at all nodes and populates the failedPredicateMap
 		// (which is the case today), the !found case should never happen, but we'd prefer
 		// to rely less on such assumptions in the code when checking does not impose
 		// significant overhead.
 		// Also, we currently assume all failures returned by extender as resolvable.
 		if predicates.UnresolvablePredicateExists(failedPredicates) == nil {
-			klog.V(3).Infof("Node %v is a potential node for preemption.", node.Name)
-			potentialNodes = append(potentialNodes, node)
+			klog.V(3).Infof("Node %v is a potential node for preemption.", name)
+			potentialNodes = append(potentialNodes, node.Node())
 		}
 	}
 	return potentialNodes

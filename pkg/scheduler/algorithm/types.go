@@ -30,13 +30,6 @@ var NodeFieldSelectorKeys = map[string]func(*v1.Node) string{
 	schedulerapi.NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
 }
 
-// NodeLister interface represents anything that can list nodes for a scheduler.
-type NodeLister interface {
-	// We explicitly return []*v1.Node, instead of v1.NodeList, to avoid
-	// performing expensive copies that are unneeded.
-	ListNodes() []*v1.Node
-}
-
 // PodFilter is a function to filter a pod. If pod passed return true else return false.
 type PodFilter func(*v1.Pod) bool
 

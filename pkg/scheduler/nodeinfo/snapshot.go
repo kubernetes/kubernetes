@@ -16,6 +16,10 @@ limitations under the License.
 
 package nodeinfo
 
+import (
+	v1 "k8s.io/api/core/v1"
+)
+
 // Snapshot is a snapshot of cache NodeInfo. The scheduler takes a
 // snapshot at the beginning of each scheduling cycle and uses it for its
 // operations in that cycle.
@@ -29,4 +33,15 @@ func NewSnapshot() *Snapshot {
 	return &Snapshot{
 		NodeInfoMap: make(map[string]*NodeInfo),
 	}
+}
+
+// ListNodes returns the list of nodes in the snapshot.
+func (s *Snapshot) ListNodes() []*v1.Node {
+	nodes := make([]*v1.Node, 0, len(s.NodeInfoMap))
+	for _, n := range s.NodeInfoMap {
+		if n != nil && n.node != nil {
+			nodes = append(nodes, n.node)
+		}
+	}
+	return nodes
 }

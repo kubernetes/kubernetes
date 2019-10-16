@@ -28,16 +28,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
 
-var _ algorithm.NodeLister = &FakeNodeLister{}
-
-// FakeNodeLister implements NodeLister on a []string for test purposes.
-type FakeNodeLister []*v1.Node
-
-// ListNodes returns nodes as a []*v1.Node.
-func (f FakeNodeLister) ListNodes() []*v1.Node {
-	return f
-}
-
 var _ algorithm.PodLister = &FakePodLister{}
 
 // FakePodLister implements PodLister on an []v1.Pods for test purposes.
