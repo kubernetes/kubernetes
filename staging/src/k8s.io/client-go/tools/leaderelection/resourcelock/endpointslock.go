@@ -68,6 +68,9 @@ func (el *EndpointsLock) Create(ler LeaderElectionRecord) error {
 			Annotations: map[string]string{
 				LeaderElectionRecordAnnotationKey: string(recordBytes),
 			},
+			Labels: map[string]string{
+				LeaderElectionKindLabelKey: LeaderElectionKindLabelValue,
+			},
 		},
 	})
 	return err

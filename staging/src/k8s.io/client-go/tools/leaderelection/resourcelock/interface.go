@@ -27,6 +27,8 @@ import (
 
 const (
 	LeaderElectionRecordAnnotationKey = "control-plane.alpha.kubernetes.io/leader"
+	LeaderElectionKindLabelKey        = "app.kubernetes.io/component"
+	LeaderElectionKindLabelValue      = "leaderelection"
 	EndpointsResourceLock             = "endpoints"
 	ConfigMapsResourceLock            = "configmaps"
 	LeasesResourceLock                = "leases"
