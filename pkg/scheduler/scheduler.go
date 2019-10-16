@@ -454,6 +454,9 @@ func (sched *Scheduler) scheduleOne() {
 		klog.V(3).Infof("Skip schedule deleting pod: %v/%v", pod.Namespace, pod.Name)
 		return
 	}
+	if isAssumed, _ := g.cache.IsAssumedPod(pod); isAssumed {
+		return result, fmt.Errorf("the pod %s/%s is assumed", pod.Namespace, pod.Name)
+	}
 
 	klog.V(3).Infof("Attempting to schedule pod: %v/%v", pod.Namespace, pod.Name)
 
