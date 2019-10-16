@@ -9,6 +9,7 @@ load(
 go_test(
     name = "go_default_test",
     srcs = [
+        "additional_printers_test.go",
         "printers_test.go",
         "sorted_resource_name_list_test.go",
     ],
@@ -19,12 +20,14 @@ go_test(
         "//pkg/apis/apps:go_default_library",
         "//pkg/apis/autoscaling:go_default_library",
         "//pkg/apis/batch:go_default_library",
+        "//pkg/apis/certificates:go_default_library",
         "//pkg/apis/coordination:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/discovery:go_default_library",
         "//pkg/apis/networking:go_default_library",
         "//pkg/apis/node:go_default_library",
         "//pkg/apis/policy:go_default_library",
+        "//pkg/apis/rbac:go_default_library",
         "//pkg/apis/scheduling:go_default_library",
         "//pkg/apis/storage:go_default_library",
         "//pkg/printers:go_default_library",
@@ -41,8 +44,8 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
+        "//vendor/gopkg.in/yaml.v2:go_default_library",
         "//vendor/k8s.io/utils/pointer:go_default_library",
-        "//vendor/sigs.k8s.io/yaml:go_default_library",
     ],
 )
 
