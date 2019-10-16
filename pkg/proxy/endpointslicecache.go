@@ -18,7 +18,10 @@ package proxy
 
 import (
 	"fmt"
+	"reflect"
 	"sort"
+	"strings"
+	"sync"
 
 	"k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1alpha1"
@@ -31,24 +34,41 @@ import (
 
 // EndpointSliceCache is used as a cache of EndpointSlice information.
 type EndpointSliceCache struct {
-	// sliceByServiceMap is the basis of this cache. It contains endpoint slice
-	// info grouped by service name and endpoint slice name. The first key
-	// represents a namespaced service name while the second key represents
+	// lock protects trackerByServiceMap.
+	lock sync.Mutex
+
+	// trackerByServiceMap is the basis of this cache. It contains endpoint
+	// slice trackers grouped by service name and endpoint slice name. The first
+	// key represents a namespaced service name while the second key represents
 	// an endpoint slice name. Since endpoints can move between slices, we
 	// require slice specific caching to prevent endpoints being removed from
 	// the cache when they may have just moved to a different slice.
-	sliceByServiceMap map[types.NamespacedName]map[string]*endpointSliceInfo
-	makeEndpointInfo  makeEndpointFunc
-	hostname          string
-	isIPv6Mode        *bool
-	recorder          record.EventRecorder
+	trackerByServiceMap map[types.NamespacedName]*endpointSliceTracker
+
+	makeEndpointInfo makeEndpointFunc
+	hostname         string
+	isIPv6Mode       *bool
+	recorder         record.EventRecorder
 }
+
+// endpointSliceTracker keeps track of EndpointSlices as they have been applied
+// by a proxier along with any pending EndpointSlices that have been updated
+// in this cache but not yet applied by a proxier.
+type endpointSliceTracker struct {
+	applied endpointSliceInfoByName
+	pending endpointSliceInfoByName
+}
+
+// endpointSliceInfoByName groups endpointSliceInfo by the names of the
+// corresponding EndpointSlices.
+type endpointSliceInfoByName map[string]*endpointSliceInfo
 
 // endpointSliceInfo contains just the attributes kube-proxy cares about.
 // Used for caching. Intentionally small to limit memory util.
 type endpointSliceInfo struct {
 	Ports     []discovery.EndpointPort
 	Endpoints []*endpointInfo
+	Remove    bool
 }
 
 // endpointInfo contains just the attributes kube-proxy cares about.
@@ -69,12 +89,46 @@ func NewEndpointSliceCache(hostname string, isIPv6Mode *bool, recorder record.Ev
 		makeEndpointInfo = standardEndpointInfo
 	}
 	return &EndpointSliceCache{
-		sliceByServiceMap: map[types.NamespacedName]map[string]*endpointSliceInfo{},
-		hostname:          hostname,
-		isIPv6Mode:        isIPv6Mode,
-		makeEndpointInfo:  makeEndpointInfo,
-		recorder:          recorder,
+		trackerByServiceMap: map[types.NamespacedName]*endpointSliceTracker{},
+		hostname:            hostname,
+		isIPv6Mode:          isIPv6Mode,
+		makeEndpointInfo:    makeEndpointInfo,
+		recorder:            recorder,
 	}
+}
+
+// newEndpointSliceTracker initializes an endpointSliceTracker.
+func newEndpointSliceTracker() *endpointSliceTracker {
+	return &endpointSliceTracker{
+		applied: endpointSliceInfoByName{},
+		pending: endpointSliceInfoByName{},
+	}
+}
+
+// newEndpointSliceInfo generates endpointSliceInfo from an EndpointSlice.
+func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *endpointSliceInfo {
+	esInfo := &endpointSliceInfo{
+		Ports:     endpointSlice.Ports,
+		Endpoints: []*endpointInfo{},
+		Remove:    remove,
+	}
+
+	sort.Sort(byPort(esInfo.Ports))
+
+	if !remove {
+		for _, endpoint := range endpointSlice.Endpoints {
+			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready == true {
+				esInfo.Endpoints = append(esInfo.Endpoints, &endpointInfo{
+					Addresses: endpoint.Addresses,
+					Topology:  endpoint.Topology,
+				})
+			}
+		}
+
+		sort.Sort(byAddress(esInfo.Endpoints))
+	}
+
+	return esInfo
 }
 
 // standardEndpointInfo is the default makeEndpointFunc.
@@ -82,56 +136,75 @@ func standardEndpointInfo(ep *BaseEndpointInfo) Endpoint {
 	return ep
 }
 
-// Update a slice in the cache.
-func (cache *EndpointSliceCache) Update(endpointSlice *discovery.EndpointSlice) {
+// updatePending updates a pending slice in the cache.
+func (cache *EndpointSliceCache) updatePending(endpointSlice *discovery.EndpointSlice, remove bool) bool {
 	serviceKey, sliceKey, err := endpointSliceCacheKeys(endpointSlice)
 	if err != nil {
 		klog.Warningf("Error getting endpoint slice cache keys: %v", err)
-		return
+		return false
 	}
 
-	esInfo := &endpointSliceInfo{
-		Ports:     endpointSlice.Ports,
-		Endpoints: []*endpointInfo{},
+	esInfo := newEndpointSliceInfo(endpointSlice, remove)
+
+	cache.lock.Lock()
+	defer cache.lock.Unlock()
+
+	if _, ok := cache.trackerByServiceMap[serviceKey]; !ok {
+		cache.trackerByServiceMap[serviceKey] = newEndpointSliceTracker()
 	}
-	for _, endpoint := range endpointSlice.Endpoints {
-		if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready == true {
-			esInfo.Endpoints = append(esInfo.Endpoints, &endpointInfo{
-				Addresses: endpoint.Addresses,
-				Topology:  endpoint.Topology,
-			})
+
+	changed := cache.esInfoChanged(serviceKey, sliceKey, esInfo)
+
+	if changed {
+		cache.trackerByServiceMap[serviceKey].pending[sliceKey] = esInfo
+	}
+
+	return changed
+}
+
+// checkoutChanges returns a list of all endpointsChanges that are
+// pending and then marks them as applied.
+func (cache *EndpointSliceCache) checkoutChanges() []*endpointsChange {
+	changes := []*endpointsChange{}
+
+	cache.lock.Lock()
+	defer cache.lock.Unlock()
+
+	for serviceNN, esTracker := range cache.trackerByServiceMap {
+		if len(esTracker.pending) == 0 {
+			continue
 		}
+
+		change := &endpointsChange{}
+
+		change.previous = cache.getEndpointsMap(serviceNN, esTracker.applied)
+
+		for name, sliceInfo := range esTracker.pending {
+			if sliceInfo.Remove {
+				delete(esTracker.applied, name)
+			} else {
+				esTracker.applied[name] = sliceInfo
+			}
+
+			delete(esTracker.pending, name)
+		}
+
+		change.current = cache.getEndpointsMap(serviceNN, esTracker.applied)
+		changes = append(changes, change)
 	}
-	if _, exists := cache.sliceByServiceMap[serviceKey]; !exists {
-		cache.sliceByServiceMap[serviceKey] = map[string]*endpointSliceInfo{}
-	}
-	cache.sliceByServiceMap[serviceKey][sliceKey] = esInfo
+
+	return changes
 }
 
-// Delete a slice from the cache.
-func (cache *EndpointSliceCache) Delete(endpointSlice *discovery.EndpointSlice) {
-	serviceKey, sliceKey, err := endpointSliceCacheKeys(endpointSlice)
-	if err != nil {
-		klog.Warningf("Error getting endpoint slice cache keys: %v", err)
-		return
-	}
-	delete(cache.sliceByServiceMap[serviceKey], sliceKey)
-}
-
-// EndpointsMap computes an EndpointsMap for a given service.
-func (cache *EndpointSliceCache) EndpointsMap(serviceNN types.NamespacedName) EndpointsMap {
-	endpointInfoBySP := cache.endpointInfoByServicePort(serviceNN)
+// getEndpointsMap computes an EndpointsMap for a given set of EndpointSlices.
+func (cache *EndpointSliceCache) getEndpointsMap(serviceNN types.NamespacedName, sliceInfoByName endpointSliceInfoByName) EndpointsMap {
+	endpointInfoBySP := cache.endpointInfoByServicePort(serviceNN, sliceInfoByName)
 	return endpointsMapFromEndpointInfo(endpointInfoBySP)
 }
 
 // endpointInfoByServicePort groups endpoint info by service port name and address.
-func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.NamespacedName) spToEndpointMap {
+func (cache *EndpointSliceCache) endpointInfoByServicePort(serviceNN types.NamespacedName, sliceInfoByName endpointSliceInfoByName) spToEndpointMap {
 	endpointInfoBySP := spToEndpointMap{}
-	sliceInfoByName, ok := cache.sliceByServiceMap[serviceNN]
-
-	if !ok {
-		return endpointInfoBySP
-	}
 
 	for _, sliceInfo := range sliceInfoByName {
 		for _, port := range sliceInfo.Ports {
@@ -198,6 +271,36 @@ func (cache *EndpointSliceCache) isLocal(hostname string) bool {
 	return len(cache.hostname) > 0 && hostname == cache.hostname
 }
 
+// esInfoChanged returns true if the esInfo parameter should be set as a new
+// pending value in the cache.
+func (cache *EndpointSliceCache) esInfoChanged(serviceKey types.NamespacedName, sliceKey string, esInfo *endpointSliceInfo) bool {
+	if _, ok := cache.trackerByServiceMap[serviceKey]; ok {
+		appliedInfo, appliedOk := cache.trackerByServiceMap[serviceKey].applied[sliceKey]
+		pendingInfo, pendingOk := cache.trackerByServiceMap[serviceKey].pending[sliceKey]
+
+		// If there's already a pending value, return whether or not this would
+		// change that.
+		if pendingOk {
+			return !reflect.DeepEqual(esInfo, pendingInfo)
+		}
+
+		// If there's already an applied value, return whether or not this would
+		// change that.
+		if appliedOk {
+			return !reflect.DeepEqual(esInfo, appliedInfo)
+		}
+	}
+
+	// If this is marked for removal and does not exist in the cache, no changes
+	// are necessary.
+	if esInfo.Remove {
+		return false
+	}
+
+	// If not in the cache, and not marked for removal, it should be added.
+	return true
+}
+
 // endpointsMapFromEndpointInfo computes an endpointsMap from endpointInfo that
 // has been grouped by service port and IP.
 func endpointsMapFromEndpointInfo(endpointInfoBySP map[ServicePortName]map[string]Endpoint) EndpointsMap {
@@ -242,6 +345,19 @@ func endpointSliceCacheKeys(endpointSlice *discovery.EndpointSlice) (types.Names
 	return types.NamespacedName{Namespace: endpointSlice.Namespace, Name: serviceName}, endpointSlice.Name, err
 }
 
+// byAddress helps sort endpointInfo
+type byAddress []*endpointInfo
+
+func (e byAddress) Len() int {
+	return len(e)
+}
+func (e byAddress) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
+}
+func (e byAddress) Less(i, j int) bool {
+	return strings.Join(e[i].Addresses, ",") < strings.Join(e[j].Addresses, ",")
+}
+
 // byIP helps sort endpoints by IP
 type byIP []Endpoint
 
@@ -253,4 +369,17 @@ func (e byIP) Swap(i, j int) {
 }
 func (e byIP) Less(i, j int) bool {
 	return e[i].String() < e[j].String()
+}
+
+// byPort helps sort EndpointSlice ports by port number
+type byPort []discovery.EndpointPort
+
+func (p byPort) Len() int {
+	return len(p)
+}
+func (p byPort) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
+}
+func (p byPort) Less(i, j int) bool {
+	return *p[i].Port < *p[j].Port
 }
