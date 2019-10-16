@@ -18,10 +18,12 @@ package metrics
 
 import (
 	"bytes"
+	"testing"
+
 	"github.com/blang/semver"
 	"github.com/prometheus/common/expfmt"
+
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
-	"testing"
 )
 
 func TestCounter(t *testing.T) {

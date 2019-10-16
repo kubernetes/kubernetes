@@ -17,10 +17,12 @@ limitations under the License.
 package legacyregistry
 
 import (
+	"net/http"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"k8s.io/component-base/metrics"
-	"net/http"
 )
 
 var (

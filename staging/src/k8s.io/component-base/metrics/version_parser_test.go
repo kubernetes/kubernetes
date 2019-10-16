@@ -17,8 +17,9 @@ limitations under the License.
 package metrics
 
 import (
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"testing"
+
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 func TestVersionParsing(t *testing.T) {

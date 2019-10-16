@@ -17,9 +17,11 @@ limitations under the License.
 package metrics
 
 import (
-	"github.com/blang/semver"
-	apimachineryversion "k8s.io/apimachinery/pkg/version"
 	"testing"
+
+	"github.com/blang/semver"
+
+	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
 
 func TestGauge(t *testing.T) {
