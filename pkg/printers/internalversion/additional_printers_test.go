@@ -263,21 +263,9 @@ func TestPrinters(t *testing.T) {
 	om := func(name string) metav1.ObjectMeta { return metav1.ObjectMeta{Name: name} }
 
 	var (
-		err              error
-		templatePrinter  printers.ResourcePrinter
-		templatePrinter2 printers.ResourcePrinter
-		jsonpathPrinter  printers.ResourcePrinter
+		err             error
+		jsonpathPrinter printers.ResourcePrinter
 	)
-
-	templatePrinter, err = genericprinters.NewGoTemplatePrinter([]byte("{{.name}}"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	templatePrinter2, err = genericprinters.NewGoTemplatePrinter([]byte("{{len .items}}"))
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	jsonpathPrinter, err = genericprinters.NewJSONPathPrinter("{.metadata.name}")
 	if err != nil {
@@ -286,11 +274,9 @@ func TestPrinters(t *testing.T) {
 
 	genericPrinters := map[string]printers.ResourcePrinter{
 		// TODO(juanvallejo): move "generic printer" tests to pkg/kubectl/genericclioptions/printers
-		"json":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}),
-		"yaml":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}),
-		"template":  templatePrinter,
-		"template2": templatePrinter2,
-		"jsonpath":  jsonpathPrinter,
+		"json":     genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}),
+		"yaml":     genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}),
+		"jsonpath": jsonpathPrinter,
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &v1.Pod{ObjectMeta: om("pod")},
@@ -304,8 +290,7 @@ func TestPrinters(t *testing.T) {
 	}
 	// map of printer name to set of objects it should fail on.
 	expectedErrors := map[string]sets.String{
-		"template2": sets.NewString("pod", "emptyPodList", "endpoints"),
-		"jsonpath":  sets.NewString("emptyPodList", "nonEmptyPodList", "endpoints"),
+		"jsonpath": sets.NewString("emptyPodList", "nonEmptyPodList", "endpoints"),
 	}
 
 	for pName, p := range genericPrinters {
