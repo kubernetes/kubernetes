@@ -61,6 +61,7 @@ const (
 	seedContainer2 = 5000
 	seedSandbox2   = 6000
 	seedContainer3 = 7000
+	seedSandbox3   = 8000
 )
 
 const (
@@ -112,12 +113,13 @@ func TestCRIListPodStats(t *testing.T) {
 
 		// Running pod with a terminated container and a running container
 		sandbox3           = makeFakePodSandbox("sandbox3-name", "sandbox3-uid", "sandbox3-ns", false)
-		sandbox3Cgroup     = "/" + cm.GetPodCgroupNameSuffix(types.UID(sandbox2.PodSandboxStatus.Metadata.Uid))
+		sandbox3Cgroup     = "/" + cm.GetPodCgroupNameSuffix(types.UID(sandbox3.PodSandboxStatus.Metadata.Uid))
 		container5         = makeFakeContainer(sandbox3, cName5, 0, true)
 		containerStats5    = makeFakeContainerStats(container5, imageFsMountpoint)
 		containerLogStats5 = makeFakeLogStats(5000)
 		container8         = makeFakeContainer(sandbox3, cName8, 0, false)
 		containerStats8    = makeFakeContainerStats(container8, imageFsMountpoint)
+		containerLogStats8 = makeFakeLogStats(6000)
 
 		// Terminated pod sandbox
 		sandbox4        = makeFakePodSandbox("sandbox1-name", "sandbox1-uid", "sandbox1-ns", true)
@@ -179,7 +181,7 @@ func TestCRIListPodStats(t *testing.T) {
 		container0, container1, container2, container3, container4, container5, container6, container7, container8,
 	})
 	fakeRuntimeService.SetFakeContainerStats([]*runtimeapi.ContainerStats{
-		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6, containerStats7, containerStats8
+		containerStats0, containerStats1, containerStats2, containerStats3, containerStats4, containerStats5, containerStats6, containerStats7, containerStats8,
 	})
 
 	ephemeralVolumes := makeFakeVolumeStats([]string{"ephVolume1, ephVolumes2"})
@@ -195,6 +197,7 @@ func TestCRIListPodStats(t *testing.T) {
 		kuberuntime.BuildContainerLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid"), cName2):               containerLogStats2,
 		kuberuntime.BuildContainerLogsDirectory("sandbox2-ns", "sandbox2-name", types.UID("sandbox2-uid"), cName3):               containerLogStats4,
 		kuberuntime.BuildContainerLogsDirectory("sandbox3-ns", "sandbox3-name", types.UID("sandbox3-uid"), cName5):               containerLogStats5,
+		kuberuntime.BuildContainerLogsDirectory("sandbox3-ns", "sandbox3-name", types.UID("sandbox3-uid"), cName8):               containerLogStats8,
 		filepath.Join(kuberuntime.BuildPodLogsDirectory("sandbox0-ns", "sandbox0-name", types.UID("sandbox0-uid")), podLogName0): podLogStats0,
 		filepath.Join(kuberuntime.BuildPodLogsDirectory("sandbox1-ns", "sandbox1-name", types.UID("sandbox1-uid")), podLogName1): podLogStats1,
 	}
@@ -339,7 +342,7 @@ func TestCRIListPodCPUAndMemoryStats(t *testing.T) {
 
 		// Running pod with a terminated container and a running container
 		sandbox3        = makeFakePodSandbox("sandbox3-name", "sandbox3-uid", "sandbox3-ns", false)
-		sandbox3Cgroup  = "/" + cm.GetPodCgroupNameSuffix(types.UID(sandbox2.PodSandboxStatus.Metadata.Uid))
+		sandbox3Cgroup  = "/" + cm.GetPodCgroupNameSuffix(types.UID(sandbox3.PodSandboxStatus.Metadata.Uid))
 		container5      = makeFakeContainer(sandbox3, cName5, 0, true)
 		containerStats5 = makeFakeContainerStats(container5, imageFsMountpoint)
 		container8      = makeFakeContainer(sandbox3, cName8, 0, false)
