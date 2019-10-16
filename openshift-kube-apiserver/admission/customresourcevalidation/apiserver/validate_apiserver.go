@@ -5,14 +5,15 @@ import (
 	"regexp"
 	"strings"
 
-	configv1 "github.com/openshift/api/config/v1"
-	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
-
 	"k8s.io/apimachinery/pkg/api/validation"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/kubernetes/openshift-kube-apiserver/admission/customresourcevalidation"
+
+	configv1 "github.com/openshift/api/config/v1"
+	configv1client "github.com/openshift/client-go/config/clientset/versioned/typed/config/v1"
+	libgocrypto "github.com/openshift/library-go/pkg/crypto"
 )
 
 func toAPIServerV1(uncastObj runtime.Object) (*configv1.APIServer, field.ErrorList) {
@@ -116,14 +117,22 @@ func (apiserverV1) ValidateStatusUpdate(uncastObj runtime.Object, uncastOldObj r
 }
 
 func validateAPIServerSpecCreate(spec configv1.APIServerSpec) field.ErrorList {
+	errs := field.ErrorList{}
+	specPath := field.NewPath("spec")
 
-	errs := validateAdditionalCORSAllowedOrigins(field.NewPath("spec").Child("additionalCORSAllowedOrigins"), spec.AdditionalCORSAllowedOrigins)
+	errs = append(errs, validateAdditionalCORSAllowedOrigins(specPath.Child("additionalCORSAllowedOrigins"), spec.AdditionalCORSAllowedOrigins)...)
+	errs = append(errs, validateTLSSecurityProfile(specPath.Child("tlsSecurityProfile"), spec.TLSSecurityProfile)...)
+
 	return errs
 }
 
 func validateAPIServerSpecUpdate(newSpec, oldSpec configv1.APIServerSpec) field.ErrorList {
+	errs := field.ErrorList{}
+	specPath := field.NewPath("spec")
 
-	errs := validateAdditionalCORSAllowedOrigins(field.NewPath("spec").Child("additionalCORSAllowedOrigins"), newSpec.AdditionalCORSAllowedOrigins)
+	errs = append(errs, validateAdditionalCORSAllowedOrigins(specPath.Child("additionalCORSAllowedOrigins"), newSpec.AdditionalCORSAllowedOrigins)...)
+	errs = append(errs, validateTLSSecurityProfile(specPath.Child("tlsSecurityProfile"), newSpec.TLSSecurityProfile)...)
+
 	return errs
 }
 
@@ -142,6 +151,85 @@ func validateAdditionalCORSAllowedOrigins(fieldPath *field.Path, cors []string) 
 		if _, err := regexp.Compile(re); err != nil {
 			errs = append(errs, field.Invalid(fieldPath.Index(i), re, fmt.Sprintf("not a valid regular expression: %v", err)))
 		}
+	}
+
+	return errs
+}
+
+func validateTLSSecurityProfile(fieldPath *field.Path, profile *configv1.TLSSecurityProfile) field.ErrorList {
+	errs := field.ErrorList{}
+
+	if profile == nil {
+		return errs
+	}
+
+	errs = append(errs, validateTLSSecurityProfileType(fieldPath, profile)...)
+
+	if profile.Type == configv1.TLSProfileCustomType && profile.Custom != nil {
+		errs = append(errs, validateCipherSuites(fieldPath.Child("custom", "ciphers"), profile.Custom.Ciphers)...)
+		errs = append(errs, validateMinTLSVersion(fieldPath.Child("custom", "minTLSVersion"), profile.Custom.MinTLSVersion)...)
+	}
+
+	return errs
+}
+
+func validateTLSSecurityProfileType(fieldPath *field.Path, profile *configv1.TLSSecurityProfile) field.ErrorList {
+	const typeProfileMismatchFmt = "type set to %s, but the corresponding field is unset"
+	typePath := fieldPath.Child("type")
+
+	errs := field.ErrorList{}
+
+	availableTypes := []string{
+		string(configv1.TLSProfileOldType),
+		string(configv1.TLSProfileIntermediateType),
+		string(configv1.TLSProfileCustomType),
+	}
+
+	switch profile.Type {
+	case "":
+		if profile.Old != nil || profile.Intermediate != nil || profile.Modern != nil || profile.Custom != nil {
+			errs = append(errs, field.Required(typePath, "one of the profiles is set but 'type' field is empty"))
+		}
+	case configv1.TLSProfileOldType:
+		if profile.Old == nil {
+			errs = append(errs, field.Required(fieldPath.Child("old"), fmt.Sprintf(typeProfileMismatchFmt, profile.Type)))
+		}
+	case configv1.TLSProfileIntermediateType:
+		if profile.Intermediate == nil {
+			errs = append(errs, field.Required(fieldPath.Child("intermediate"), fmt.Sprintf(typeProfileMismatchFmt, profile.Type)))
+		}
+	case configv1.TLSProfileModernType:
+		errs = append(errs, field.NotSupported(fieldPath.Child("type"), profile.Type, availableTypes))
+	case configv1.TLSProfileCustomType:
+		if profile.Custom == nil {
+			errs = append(errs, field.Required(fieldPath.Child("custom"), fmt.Sprintf(typeProfileMismatchFmt, profile.Type)))
+		}
+	default:
+		errs = append(errs, field.Invalid(typePath, profile.Type, fmt.Sprintf("unknown type, valid values are: %v", availableTypes)))
+	}
+
+	return errs
+}
+
+func validateCipherSuites(fieldPath *field.Path, suites []string) field.ErrorList {
+	errs := field.ErrorList{}
+
+	if ianaSuites := libgocrypto.OpenSSLToIANACipherSuites(suites); len(ianaSuites) == 0 {
+		errs = append(errs, field.Invalid(fieldPath, suites, "no supported cipher suite found"))
+	}
+
+	return errs
+}
+
+func validateMinTLSVersion(fieldPath *field.Path, version configv1.TLSProtocolVersion) field.ErrorList {
+	errs := field.ErrorList{}
+
+	if version == configv1.VersionTLS13 {
+		return append(errs, field.NotSupported(fieldPath, version, []string{string(configv1.VersionTLS10), string(configv1.VersionTLS11), string(configv1.VersionTLS12)}))
+	}
+
+	if _, err := libgocrypto.TLSVersion(string(version)); err != nil {
+		errs = append(errs, field.Invalid(fieldPath, version, err.Error()))
 	}
 
 	return errs
