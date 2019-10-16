@@ -238,6 +238,16 @@ var (
 			StabilityLevel: metrics.ALPHA,
 		})
 
+	FrameworkExtensionPointDuration = metrics.NewHistogramVec(
+		&metrics.HistogramOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "framework_extension_point_duration_seconds",
+			Help:           "Latency for running all plugins of a specific extension point.",
+			Buckets:        nil,
+			StabilityLevel: metrics.ALPHA,
+		},
+		[]string{"extension_point", "status"})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		SchedulingLatency,
@@ -259,6 +269,7 @@ var (
 		pendingPods,
 		PodSchedulingDuration,
 		PodSchedulingAttempts,
+		FrameworkExtensionPointDuration,
 	}
 )
 

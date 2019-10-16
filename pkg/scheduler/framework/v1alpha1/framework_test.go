@@ -18,11 +18,15 @@ package v1alpha1
 
 import (
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
-	v1 "k8s.io/api/core/v1"
+	dto "github.com/prometheus/client_model/go"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -37,6 +41,7 @@ const (
 	preFilterPluginName               = "prefilter-plugin"
 	preFilterWithExtensionsPluginName = "prefilter-with-extensions-plugin"
 	duplicatePluginName               = "duplicate-plugin"
+	testPlugin                        = "test-plugin"
 )
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
@@ -116,6 +121,51 @@ type PluginNotImplementingScore struct{}
 
 func (pl *PluginNotImplementingScore) Name() string {
 	return pluginNotImplementingScore
+}
+
+// TestPlugin implements all Plugin interfaces.
+type TestPlugin struct {
+	name string
+	inj  injectedResult
+}
+
+func (pl *TestPlugin) Name() string {
+	return pl.name
+}
+
+func (pl *TestPlugin) Score(state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
+	return 0, NewStatus(Code(pl.inj.ScoreStatus), "injected status")
+}
+
+func (pl *TestPlugin) ScoreExtensions() ScoreExtensions {
+	return nil
+}
+
+func (pl *TestPlugin) PreFilter(state *CycleState, p *v1.Pod) *Status {
+	return NewStatus(Code(pl.inj.PreFilterStatus), "injected status")
+}
+func (pl *TestPlugin) PreFilterExtensions() PreFilterExtensions {
+	return nil
+}
+func (pl *TestPlugin) Filter(state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+	return NewStatus(Code(pl.inj.FilterStatus), "injected status")
+}
+func (pl *TestPlugin) PostFilter(state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status {
+	return NewStatus(Code(pl.inj.PostFilterStatus), "injected status")
+}
+func (pl *TestPlugin) Reserve(state *CycleState, p *v1.Pod, nodeName string) *Status {
+	return NewStatus(Code(pl.inj.ReserveStatus), "injected status")
+}
+func (pl *TestPlugin) PreBind(state *CycleState, p *v1.Pod, nodeName string) *Status {
+	return NewStatus(Code(pl.inj.PreBindStatus), "injected status")
+}
+func (pl *TestPlugin) PostBind(state *CycleState, p *v1.Pod, nodeName string)  {}
+func (pl *TestPlugin) Unreserve(state *CycleState, p *v1.Pod, nodeName string) {}
+func (pl *TestPlugin) Permit(state *CycleState, p *v1.Pod, nodeName string) (*Status, time.Duration) {
+	return NewStatus(Code(pl.inj.PermitStatus), "injected status"), time.Duration(0)
+}
+func (pl *TestPlugin) Bind(state *CycleState, p *v1.Pod, nodeName string) *Status {
+	return NewStatus(Code(pl.inj.BindStatus), "injected status")
 }
 
 // TestPreFilterPlugin only implements PreFilterPlugin interface.
@@ -224,12 +274,12 @@ func TestInitFrameworkWithScorePlugins(t *testing.T) {
 	}{
 		{
 			name:    "enabled Score plugin doesn't exist in registry",
-			plugins: buildConfigDefaultWeights("notExist"),
+			plugins: buildScoreConfigDefaultWeights("notExist"),
 			initErr: true,
 		},
 		{
 			name:    "enabled Score plugin doesn't extend the ScorePlugin interface",
-			plugins: buildConfigDefaultWeights(pluginNotImplementingScore),
+			plugins: buildScoreConfigDefaultWeights(pluginNotImplementingScore),
 			initErr: true,
 		},
 		{
@@ -238,15 +288,15 @@ func TestInitFrameworkWithScorePlugins(t *testing.T) {
 		},
 		{
 			name:    "enabled Score plugin list is empty",
-			plugins: buildConfigDefaultWeights(),
+			plugins: buildScoreConfigDefaultWeights(),
 		},
 		{
 			name:    "enabled plugin only implements ScorePlugin interface",
-			plugins: buildConfigDefaultWeights(scorePlugin1),
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1),
 		},
 		{
 			name:    "enabled plugin implements ScoreWithNormalizePlugin interface",
-			plugins: buildConfigDefaultWeights(scoreWithNormalizePlugin1),
+			plugins: buildScoreConfigDefaultWeights(scoreWithNormalizePlugin1),
 		},
 	}
 
@@ -297,12 +347,12 @@ func TestRunScorePlugins(t *testing.T) {
 	}{
 		{
 			name:    "no Score plugins",
-			plugins: buildConfigDefaultWeights(),
+			plugins: buildScoreConfigDefaultWeights(),
 			want:    PluginToNodeScores{},
 		},
 		{
 			name:    "single Score plugin",
-			plugins: buildConfigDefaultWeights(scorePlugin1),
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1),
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scorePlugin1,
@@ -319,7 +369,7 @@ func TestRunScorePlugins(t *testing.T) {
 		{
 			name: "single ScoreWithNormalize plugin",
 			//registry: registry,
-			plugins: buildConfigDefaultWeights(scoreWithNormalizePlugin1),
+			plugins: buildScoreConfigDefaultWeights(scoreWithNormalizePlugin1),
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scoreWithNormalizePlugin1,
@@ -335,7 +385,7 @@ func TestRunScorePlugins(t *testing.T) {
 		},
 		{
 			name:    "2 Score plugins, 2 NormalizeScore plugins",
-			plugins: buildConfigDefaultWeights(scorePlugin1, scoreWithNormalizePlugin1, scoreWithNormalizePlugin2),
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1, scoreWithNormalizePlugin1, scoreWithNormalizePlugin2),
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scorePlugin1,
@@ -371,11 +421,11 @@ func TestRunScorePlugins(t *testing.T) {
 				{
 					Name: scoreWithNormalizePlugin1,
 					Args: runtime.Unknown{
-						Raw: []byte(`{ "scoreErr": true }`),
+						Raw: []byte(`{ "scoreStatus": 1 }`),
 					},
 				},
 			},
-			plugins: buildConfigDefaultWeights(scorePlugin1, scoreWithNormalizePlugin1),
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1, scoreWithNormalizePlugin1),
 			err:     true,
 		},
 		{
@@ -384,16 +434,16 @@ func TestRunScorePlugins(t *testing.T) {
 				{
 					Name: scoreWithNormalizePlugin1,
 					Args: runtime.Unknown{
-						Raw: []byte(`{ "normalizeErr": true }`),
+						Raw: []byte(`{ "normalizeStatus": 1 }`),
 					},
 				},
 			},
-			plugins: buildConfigDefaultWeights(scorePlugin1, scoreWithNormalizePlugin1),
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1, scoreWithNormalizePlugin1),
 			err:     true,
 		},
 		{
 			name:    "Score plugin return score greater than MaxNodeScore",
-			plugins: buildConfigDefaultWeights(scorePlugin1),
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1),
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scorePlugin1,
@@ -406,7 +456,7 @@ func TestRunScorePlugins(t *testing.T) {
 		},
 		{
 			name:    "Score plugin return score less than MinNodeScore",
-			plugins: buildConfigDefaultWeights(scorePlugin1),
+			plugins: buildScoreConfigDefaultWeights(scorePlugin1),
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scorePlugin1,
@@ -419,7 +469,7 @@ func TestRunScorePlugins(t *testing.T) {
 		},
 		{
 			name:    "ScoreWithNormalize plugin return score greater than MaxNodeScore",
-			plugins: buildConfigDefaultWeights(scoreWithNormalizePlugin1),
+			plugins: buildScoreConfigDefaultWeights(scoreWithNormalizePlugin1),
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scoreWithNormalizePlugin1,
@@ -432,7 +482,7 @@ func TestRunScorePlugins(t *testing.T) {
 		},
 		{
 			name:    "ScoreWithNormalize plugin return score less than MinNodeScore",
-			plugins: buildConfigDefaultWeights(scoreWithNormalizePlugin1),
+			plugins: buildScoreConfigDefaultWeights(scoreWithNormalizePlugin1),
 			pluginConfigs: []config.PluginConfig{
 				{
 					Name: scoreWithNormalizePlugin1,
@@ -457,7 +507,7 @@ func TestRunScorePlugins(t *testing.T) {
 
 			if tt.err {
 				if status.IsSuccess() {
-					t.Error("Expected status to be non-success.")
+					t.Errorf("Expected status to be non-success. got: %v", status.Code().String())
 				}
 				return
 			}
@@ -510,11 +560,173 @@ func TestPreFilterPlugins(t *testing.T) {
 
 }
 
-func buildConfigDefaultWeights(ps ...string) *config.Plugins {
-	return buildConfigWithWeights(defaultWeights, ps...)
+func TestRecordingMetrics(t *testing.T) {
+	tests := []struct {
+		name               string
+		action             func(f Framework)
+		inject             injectedResult
+		wantExtensionPoint string
+		wantStatus         Code
+	}{
+		{
+			name:               "PreFilter - Success",
+			action:             func(f Framework) { f.RunPreFilterPlugins(nil, pod) },
+			wantExtensionPoint: "PreFilter",
+			wantStatus:         Success,
+		},
+		{
+			name:               "Filter - Success",
+			action:             func(f Framework) { f.RunFilterPlugins(nil, pod, nil) },
+			wantExtensionPoint: "Filter",
+			wantStatus:         Success,
+		},
+		{
+			name:               "PostFilter - Success",
+			action:             func(f Framework) { f.RunPostFilterPlugins(nil, pod, nil, nil) },
+			wantExtensionPoint: "PostFilter",
+			wantStatus:         Success,
+		},
+		{
+			name:               "Score - Success",
+			action:             func(f Framework) { f.RunScorePlugins(nil, pod, nodes) },
+			wantExtensionPoint: "Score",
+			wantStatus:         Success,
+		},
+		{
+			name:               "Reserve - Success",
+			action:             func(f Framework) { f.RunReservePlugins(nil, pod, "") },
+			wantExtensionPoint: "Reserve",
+			wantStatus:         Success,
+		},
+		{
+			name:               "Unreserve - Success",
+			action:             func(f Framework) { f.RunUnreservePlugins(nil, pod, "") },
+			wantExtensionPoint: "Unreserve",
+			wantStatus:         Success,
+		},
+		{
+			name:               "PreBind - Success",
+			action:             func(f Framework) { f.RunPreBindPlugins(nil, pod, "") },
+			wantExtensionPoint: "PreBind",
+			wantStatus:         Success,
+		},
+		{
+			name:               "Bind - Success",
+			action:             func(f Framework) { f.RunBindPlugins(nil, pod, "") },
+			wantExtensionPoint: "Bind",
+			wantStatus:         Success,
+		},
+		{
+			name:               "PostBind - Success",
+			action:             func(f Framework) { f.RunPostBindPlugins(nil, pod, "") },
+			wantExtensionPoint: "PostBind",
+			wantStatus:         Success,
+		},
+		{
+			name:               "Permit - Success",
+			action:             func(f Framework) { f.RunPermitPlugins(nil, pod, "") },
+			wantExtensionPoint: "Permit",
+			wantStatus:         Success,
+		},
+
+		{
+			name:               "PreFilter - Error",
+			action:             func(f Framework) { f.RunPreFilterPlugins(nil, pod) },
+			inject:             injectedResult{PreFilterStatus: int(Error)},
+			wantExtensionPoint: "PreFilter",
+			wantStatus:         Error,
+		},
+		{
+			name:               "Filter - Error",
+			action:             func(f Framework) { f.RunFilterPlugins(nil, pod, nil) },
+			inject:             injectedResult{FilterStatus: int(Error)},
+			wantExtensionPoint: "Filter",
+			wantStatus:         Error,
+		},
+		{
+			name:               "PostFilter - Error",
+			action:             func(f Framework) { f.RunPostFilterPlugins(nil, pod, nil, nil) },
+			inject:             injectedResult{PostFilterStatus: int(Error)},
+			wantExtensionPoint: "PostFilter",
+			wantStatus:         Error,
+		},
+		{
+			name:               "Score - Error",
+			action:             func(f Framework) { f.RunScorePlugins(nil, pod, nodes) },
+			inject:             injectedResult{ScoreStatus: int(Error)},
+			wantExtensionPoint: "Score",
+			wantStatus:         Error,
+		},
+		{
+			name:               "Reserve - Error",
+			action:             func(f Framework) { f.RunReservePlugins(nil, pod, "") },
+			inject:             injectedResult{ReserveStatus: int(Error)},
+			wantExtensionPoint: "Reserve",
+			wantStatus:         Error,
+		},
+		{
+			name:               "PreBind - Error",
+			action:             func(f Framework) { f.RunPreBindPlugins(nil, pod, "") },
+			inject:             injectedResult{PreBindStatus: int(Error)},
+			wantExtensionPoint: "PreBind",
+			wantStatus:         Error,
+		},
+		{
+			name:               "Bind - Error",
+			action:             func(f Framework) { f.RunBindPlugins(nil, pod, "") },
+			inject:             injectedResult{BindStatus: int(Error)},
+			wantExtensionPoint: "Bind",
+			wantStatus:         Error,
+		},
+		{
+			name:               "Permit - Error",
+			action:             func(f Framework) { f.RunPermitPlugins(nil, pod, "") },
+			inject:             injectedResult{PermitStatus: int(Error)},
+			wantExtensionPoint: "Permit",
+			wantStatus:         Error,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			plugin := &TestPlugin{name: testPlugin, inj: tt.inject}
+			r := make(Registry)
+			r.Register(testPlugin,
+				func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+					return plugin, nil
+				})
+			pluginSet := &config.PluginSet{Enabled: []config.Plugin{{Name: testPlugin, Weight: 1}}}
+			plugins := &config.Plugins{
+				Score:      pluginSet,
+				PreFilter:  pluginSet,
+				Filter:     pluginSet,
+				PostFilter: pluginSet,
+				Reserve:    pluginSet,
+				Permit:     pluginSet,
+				PreBind:    pluginSet,
+				Bind:       pluginSet,
+				PostBind:   pluginSet,
+				Unreserve:  pluginSet,
+			}
+			f, err := NewFramework(r, plugins, emptyArgs)
+			if err != nil {
+				t.Fatalf("Failed to create framework for testing: %v", err)
+			}
+			metrics.Register()
+			metrics.FrameworkExtensionPointDuration.Reset()
+
+			tt.action(f)
+
+			collectAndCompare(t, tt.wantExtensionPoint, tt.wantStatus)
+		})
+	}
 }
 
-func buildConfigWithWeights(weights map[string]int32, ps ...string) *config.Plugins {
+func buildScoreConfigDefaultWeights(ps ...string) *config.Plugins {
+	return buildScoreConfigWithWeights(defaultWeights, ps...)
+}
+
+func buildScoreConfigWithWeights(weights map[string]int32, ps ...string) *config.Plugins {
 	var plugins []config.Plugin
 	for _, p := range ps {
 		plugins = append(plugins, config.Plugin{Name: p, Weight: weights[p]})
@@ -523,25 +735,60 @@ func buildConfigWithWeights(weights map[string]int32, ps ...string) *config.Plug
 }
 
 type injectedResult struct {
-	ScoreRes     int64 `json:"scoreRes,omitempty"`
-	NormalizeRes int64 `json:"normalizeRes,omitempty"`
-	ScoreErr     bool  `json:"scoreErr,omitempty"`
-	NormalizeErr bool  `json:"normalizeErr,omitempty"`
+	ScoreRes         int64 `json:"scoreRes,omitempty"`
+	NormalizeRes     int64 `json:"normalizeRes,omitempty"`
+	ScoreStatus      int   `json:"scoreStatus,omitempty"`
+	NormalizeStatus  int   `json:"normalizeStatus,omitempty"`
+	PreFilterStatus  int   `json:"preFilterStatus,omitempty"`
+	FilterStatus     int   `json:"filterStatus,omitempty"`
+	PostFilterStatus int   `json:"postFilterStatus,omitempty"`
+	ReserveStatus    int   `json:"reserveStatus,omitempty"`
+	PreBindStatus    int   `json:"preBindStatus,omitempty"`
+	BindStatus       int   `json:"bindStatus,omitempty"`
+	PermitStatus     int   `json:"permitStatus,omitempty"`
 }
 
 func setScoreRes(inj injectedResult) (int64, *Status) {
-	if inj.ScoreErr {
-		return 0, NewStatus(Error, "injecting failure.")
+	if Code(inj.ScoreStatus) != Success {
+		return 0, NewStatus(Code(inj.ScoreStatus), "injecting failure.")
 	}
 	return inj.ScoreRes, nil
 }
 
 func injectNormalizeRes(inj injectedResult, scores NodeScoreList) *Status {
-	if inj.NormalizeErr {
-		return NewStatus(Error, "injecting failure.")
+	if Code(inj.NormalizeStatus) != Success {
+		return NewStatus(Code(inj.NormalizeStatus), "injecting failure.")
 	}
 	for i := range scores {
 		scores[i].Score = inj.NormalizeRes
 	}
 	return nil
+}
+
+func collectAndCompare(t *testing.T, wantExtensionPoint string, wantStatus Code) {
+	ch := make(chan prometheus.Metric, 1)
+	m := &dto.Metric{}
+	metrics.FrameworkExtensionPointDuration.Collect(ch)
+	got := <-ch
+	got.Write(m)
+
+	if len(m.Label) != 2 {
+		t.Fatalf("Unexpected number of label pairs, got: %v, want: 2", len(m.Label))
+	}
+
+	if *m.Label[0].Value != wantExtensionPoint {
+		t.Errorf("Unexpected extension point label, got: %q, want %q", *m.Label[0].Value, wantExtensionPoint)
+	}
+
+	if *m.Label[1].Value != wantStatus.String() {
+		t.Errorf("Unexpected status code label, got: %q, want %q", *m.Label[1].Value, wantStatus)
+	}
+
+	if *m.Histogram.SampleCount != 1 {
+		t.Errorf("Expect 1 sample, got: %v", m.Histogram.SampleCount)
+	}
+
+	if *m.Histogram.SampleSum <= 0 {
+		t.Errorf("Expect latency to be greater than 0, got: %v", m.Histogram.SampleSum)
+	}
 }
