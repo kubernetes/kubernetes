@@ -1,4 +1,4 @@
-package bolt
+package bbolt
 
 import (
 	"fmt"
@@ -254,17 +254,36 @@ func (tx *Tx) Rollback() error {
 	if tx.db == nil {
 		return ErrTxClosed
 	}
-	tx.rollback()
+	tx.nonPhysicalRollback()
 	return nil
 }
 
+// nonPhysicalRollback is called when user calls Rollback directly, in this case we do not need to reload the free pages from disk.
+func (tx *Tx) nonPhysicalRollback() {
+	if tx.db == nil {
+		return
+	}
+	if tx.writable {
+		tx.db.freelist.rollback(tx.meta.txid)
+	}
+	tx.close()
+}
+
+// rollback needs to reload the free pages from disk in case some system error happens like fsync error.
 func (tx *Tx) rollback() {
 	if tx.db == nil {
 		return
 	}
 	if tx.writable {
 		tx.db.freelist.rollback(tx.meta.txid)
-		tx.db.freelist.reload(tx.db.page(tx.db.meta().freelist))
+		if !tx.db.hasSyncedFreelist() {
+			// Reconstruct free page list by scanning the DB to get the whole free page list.
+			// Note: scaning the whole db is heavy if your db size is large in NoSyncFreeList mode.
+			tx.db.freelist.noSyncReload(tx.db.freepages())
+		} else {
+			// Read free page list from freelist page.
+			tx.db.freelist.reload(tx.db.page(tx.db.meta().freelist))
+		}
 	}
 	tx.close()
 }
@@ -303,7 +322,9 @@ func (tx *Tx) close() {
 }
 
 // Copy writes the entire database to a writer.
-// This function exists for backwards compatibility. Use WriteTo() instead.
+// This function exists for backwards compatibility.
+//
+// Deprecated; Use WriteTo() instead.
 func (tx *Tx) Copy(w io.Writer) error {
 	_, err := tx.WriteTo(w)
 	return err
@@ -313,7 +334,7 @@ func (tx *Tx) Copy(w io.Writer) error {
 // If err == nil then exactly tx.Size() bytes will be written into the writer.
 func (tx *Tx) WriteTo(w io.Writer) (n int64, err error) {
 	// Attempt to open reader with WriteFlag
-	f, err := os.OpenFile(tx.db.path, os.O_RDONLY|tx.WriteFlag, 0)
+	f, err := tx.db.openFile(tx.db.path, os.O_RDONLY|tx.WriteFlag, 0)
 	if err != nil {
 		return 0, err
 	}
@@ -367,7 +388,7 @@ func (tx *Tx) WriteTo(w io.Writer) (n int64, err error) {
 // A reader transaction is maintained during the copy so it is safe to continue
 // using the database while a copy is in progress.
 func (tx *Tx) CopyFile(path string, mode os.FileMode) error {
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode)
+	f, err := tx.db.openFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, mode)
 	if err != nil {
 		return err
 	}
