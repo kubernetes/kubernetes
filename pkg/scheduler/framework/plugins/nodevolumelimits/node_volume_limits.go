@@ -20,6 +20,7 @@ import (
 	"context"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -48,9 +49,21 @@ func (pl *NodeVolumeLimits) Filter(ctx context.Context, _ *framework.CycleState,
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
 }
 
-// New initializes a new plugin and returns it.
-func New(csiNodeInfo predicates.CSINodeInfo, pvInfo predicates.PersistentVolumeInfo, pvcInfo predicates.PersistentVolumeClaimInfo, classInfo predicates.StorageClassInfo) framework.Plugin {
-	return &NodeVolumeLimits{
-		predicate: predicates.NewCSIMaxVolumeLimitPredicate(csiNodeInfo, pvInfo, pvcInfo, classInfo),
+// New returns function that initializes a new plugin and returns it.
+func New(csiNodeInfo predicates.CSINodeInfo) framework.PluginFactory {
+	return func(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+		informerFactory := handle.SharedInformerFactory()
+		pvInfo := &predicates.CachedPersistentVolumeInfo{
+			PersistentVolumeLister: informerFactory.Core().V1().PersistentVolumes().Lister(),
+		}
+		pvcInfo := &predicates.CachedPersistentVolumeClaimInfo{
+			PersistentVolumeClaimLister: informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+		}
+		classInfo := &predicates.CachedStorageClassInfo{
+			StorageClassLister: informerFactory.Storage().V1().StorageClasses().Lister(),
+		}
+		return &NodeVolumeLimits{
+			predicate: predicates.NewCSIMaxVolumeLimitPredicate(csiNodeInfo, pvInfo, pvcInfo, classInfo),
+		}, nil
 	}
 }

@@ -274,16 +274,8 @@ func New(client clientset.Interface,
 	registry := options.frameworkDefaultRegistry
 	if registry == nil {
 		registry = frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{
-			SchedulerCache:     schedulerCache,
-			ServiceLister:      informerFactory.Core().V1().Services().Lister(),
-			ControllerLister:   informerFactory.Core().V1().ReplicationControllers().Lister(),
-			ReplicaSetLister:   informerFactory.Apps().V1().ReplicaSets().Lister(),
-			StatefulSetLister:  informerFactory.Apps().V1().StatefulSets().Lister(),
-			PDBLister:          informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
-			PVLister:           informerFactory.Core().V1().PersistentVolumes().Lister(),
-			PVCLister:          informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-			StorageClassLister: informerFactory.Storage().V1().StorageClasses().Lister(),
-			VolumeBinder:       volumeBinder,
+			SchedulerCache: schedulerCache,
+			VolumeBinder:   volumeBinder,
 		})
 	}
 	registry.Merge(options.frameworkOutOfTreeRegistry)

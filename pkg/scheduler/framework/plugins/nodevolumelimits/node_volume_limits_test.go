@@ -444,11 +444,10 @@ func TestNodeVolumeLimits(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, false)()
 			}
 
-			p := New(getFakeCSINodeInfo(csiNode),
-				getFakeCSIPVInfo(test.filterName, test.driverNames...),
-				getFakeCSIPVCInfo(test.filterName, "csi-sc", test.driverNames...),
-				getFakeCSIStorageClassInfo("csi-sc", test.driverNames[0]))
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.newPod, node)
+			p := &NodeVolumeLimits{
+				predicate: predicates.NewCSIMaxVolumeLimitPredicate(getFakeCSINodeInfo(csiNode), getFakeCSIPVInfo(test.filterName, test.driverNames...), getFakeCSIPVCInfo(test.filterName, "csi-sc", test.driverNames...), getFakeCSIStorageClassInfo("csi-sc", test.driverNames[0])),
+			}
+			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
