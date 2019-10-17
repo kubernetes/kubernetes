@@ -38,10 +38,18 @@ filegroup(
 
 go_test(
     name = "go_default_test",
-    srcs = ["address_test.go"],
+    srcs = [
+        "address_test.go",
+        "taints_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/apis/core/install:go_default_library",
+        "//pkg/controller/testutil:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/equality:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
 )
