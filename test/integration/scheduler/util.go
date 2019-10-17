@@ -393,7 +393,8 @@ func nodeTainted(cs clientset.Interface, nodeName string, taints []v1.Taint) wai
 			return false, err
 		}
 
-		if len(taints) != len(node.Spec.Taints) {
+		// node.Spec.Taints may have more taints
+		if len(taints) > len(node.Spec.Taints) {
 			return false, nil
 		}
 
