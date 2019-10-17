@@ -301,8 +301,6 @@ type Cacher struct {
 	watchersToStop []*cacheWatcher
 	// Maintain a timeout queue to send the bookmark event before the watcher times out.
 	bookmarkWatchers *watcherBookmarkTimeBuckets
-	// watchBookmark feature-gate
-	watchBookmarkEnabled bool
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -355,11 +353,10 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		// - reflector.ListAndWatch
 		// and there are no guarantees on the order that they will stop.
 		// So we will be simply closing the channel, and synchronizing on the WaitGroup.
-		stopCh:               stopCh,
-		clock:                clock,
-		timer:                time.NewTimer(time.Duration(0)),
-		bookmarkWatchers:     newTimeBucketWatchers(clock),
-		watchBookmarkEnabled: utilfeature.DefaultFeatureGate.Enabled(features.WatchBookmark),
+		stopCh:           stopCh,
+		clock:            clock,
+		timer:            time.NewTimer(time.Duration(0)),
+		bookmarkWatchers: newTimeBucketWatchers(clock),
 	}
 
 	// Ensure that timer is stopped.
@@ -516,8 +513,8 @@ func (c *Cacher) Watch(ctx context.Context, key string, resourceVersion string, 
 		watcher.forget = forgetWatcher(c, c.watcherIdx, triggerValue, triggerSupported)
 		c.watchers.addWatcher(watcher, c.watcherIdx, triggerValue, triggerSupported)
 
-		// Add it to the queue only when server and client support watch bookmarks.
-		if c.watchBookmarkEnabled && watcher.allowWatchBookmarks {
+		// Add it to the queue only when the client support watch bookmarks.
+		if watcher.allowWatchBookmarks {
 			c.bookmarkWatchers.addWatcher(watcher)
 		}
 		c.watcherIdx++
@@ -790,10 +787,6 @@ func (c *Cacher) processEvent(event *watchCacheEvent) {
 func (c *Cacher) dispatchEvents() {
 	// Jitter to help level out any aggregate load.
 	bookmarkTimer := c.clock.NewTimer(wait.Jitter(time.Second, 0.25))
-	// Stop the timer when watchBookmarkFeatureGate is not enabled.
-	if !c.watchBookmarkEnabled && !bookmarkTimer.Stop() {
-		<-bookmarkTimer.C()
-	}
 	defer bookmarkTimer.Stop()
 
 	lastProcessedResourceVersion := uint64(0)
