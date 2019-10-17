@@ -27,7 +27,7 @@ import (
 	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -394,14 +394,53 @@ func GetCoreDNSInfo(client clientset.Interface) (*v1.ConfigMap, string, string, 
 	return coreDNSConfigMap, corefile, currentCoreDNSversion, nil
 }
 
+type objectForUpdateVolumeStrategicMergePatch struct {
+	Spec objectSpecForMergePatch `json:"spec"`
+}
+
+type objectSpecForMergePatch struct {
+	Volumes []objectVolumeForPatch `json:"volumes"`
+}
+
+type objectVolumeForPatch struct {
+	Name      string            `json:"name"`
+	Configmap configmapForPatch `json:"configmap"`
+}
+
+type configmapForPatch struct {
+	Name  string              `json:"name"`
+	Items []map[string]string `json:"items"`
+}
+
 func patchCoreDNSDeployment(client clientset.Interface, coreDNSCorefileName string) error {
 	dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(kubeadmconstants.CoreDNSDeploymentName, metav1.GetOptions{})
 	if err != nil {
 		return err
 	}
-	patch := fmt.Sprintf(`{"spec":{"template":{"spec":{"volumes":[{"name": "config-volume", "configMap":{"name": "coredns", "items":[{"key": "%s", "path": "%s"}]}}]}}}}`, coreDNSCorefileName, coreDNSCorefileName)
+	patch := objectForUpdateVolumeStrategicMergePatch{
+		Spec: objectSpecForMergePatch{
+			Volumes: []objectVolumeForPatch{
+				{
+					Name: "config-volume",
+					Configmap: configmapForPatch{
+						Name: "coredns",
+						Items: []map[string]string{
+							{
+								"key":  coreDNSCorefileName,
+								"path": coreDNSCorefileName,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	patchBytes, err := json.Marshal(&patch)
+	if err != nil {
+		return errors.Wrap(err, "unable to marshal patch")
+	}
 
-	if _, err := client.AppsV1().Deployments(dnsDeployment.ObjectMeta.Namespace).Patch(dnsDeployment.Name, types.StrategicMergePatchType, []byte(patch)); err != nil {
+	if _, err := client.AppsV1().Deployments(dnsDeployment.ObjectMeta.Namespace).Patch(dnsDeployment.Name, types.StrategicMergePatchType, patchBytes); err != nil {
 		return errors.Wrap(err, "unable to patch the CoreDNS deployment")
 	}
 	return nil

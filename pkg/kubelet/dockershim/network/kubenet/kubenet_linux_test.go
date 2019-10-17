@@ -31,7 +31,7 @@ import (
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/dockershim/network"
-	"k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni/testing"
+	mock_cni "k8s.io/kubernetes/pkg/kubelet/dockershim/network/cni/testing"
 	hostporttest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/hostport/testing"
 	nettest "k8s.io/kubernetes/pkg/kubelet/dockershim/network/testing"
 	"k8s.io/kubernetes/pkg/util/bandwidth"
@@ -316,19 +316,34 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 func TestGetRoutesConifg(t *testing.T) {
 	for _, test := range []struct {
 		cidrs  []string
-		routes string
+		routes []map[string]string
 	}{
 		{
-			cidrs:  []string{"10.0.0.1/24"},
-			routes: `{"dst": "0.0.0.0/0"}`,
+			cidrs: []string{"10.0.0.1/24"},
+			routes: []map[string]string{
+				{
+					"dst": "0.0.0.0/0",
+				},
+			},
 		},
 		{
-			cidrs:  []string{"2001:4860:4860::8888/32"},
-			routes: `{"dst": "::/0"}`,
+			cidrs: []string{"2001:4860:4860::8888/32"},
+			routes: []map[string]string{
+				{
+					"dst": "::/0",
+				},
+			},
 		},
 		{
-			cidrs:  []string{"2001:4860:4860::8888/32", "10.0.0.1/24"},
-			routes: `{"dst": "0.0.0.0/0"},{"dst": "::/0"}`,
+			cidrs: []string{"2001:4860:4860::8888/32", "10.0.0.1/24"},
+			routes: []map[string]string{
+				{
+					"dst": "0.0.0.0/0",
+				},
+				{
+					"dst": "::/0",
+				},
+			},
 		},
 	} {
 		var cidrs []*net.IPNet

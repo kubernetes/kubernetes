@@ -20,6 +20,7 @@ package kubenet
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -65,24 +66,26 @@ const (
 
 	zeroCIDRv6 = "::/0"
 	zeroCIDRv4 = "0.0.0.0/0"
-
-	NET_CONFIG_TEMPLATE = `{
-  "cniVersion": "0.1.0",
-  "name": "kubenet",
-  "type": "bridge",
-  "bridge": "%s",
-  "mtu": %d,
-  "addIf": "%s",
-  "isGateway": true,
-  "ipMasq": false,
-  "hairpinMode": %t,
-  "ipam": {
-    "type": "host-local",
-    "ranges": [%s],
-    "routes": [%s]
-  }
-}`
 )
+
+type netConfigTemplate struct {
+	CNIVersion  string   `json:"cniVersion"`
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Bridge      string   `json:"bridge"`
+	MTU         int      `json:"mtu"`
+	AddIf       string   `json:"addIf"`
+	IsGateway   bool     `json:"isGateway"`
+	IPMasq      bool     `json:"ipMasq"`
+	HairpinMode bool     `json:"hairpinMode"`
+	IPAM        ipamInfo `json:"ipam"`
+}
+
+type ipamInfo struct {
+	Type   string                 `json:"type"`
+	Ranges [][1]map[string]string `json:"ranges"`
+	Routes []map[string]string    `json:"routes"`
+}
 
 // CNI plugins required by kubenet in /opt/cni/bin or user-specified directory
 var requiredCNIPlugins = [...]string{"bridge", "host-local", "loopback"}
@@ -277,12 +280,30 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 
 	//setup hairpinMode
 	setHairpin := plugin.hairpinMode == kubeletconfig.HairpinVeth
-
-	json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, plugin.getRangesConfig(), plugin.getRoutesConfig())
-	klog.V(4).Infof("CNI network config set to %v", json)
-	plugin.netConfig, err = libcni.ConfFromBytes([]byte(json))
+	patch := netConfigTemplate{
+		CNIVersion:  "0.1.0",
+		Name:        "kubenet",
+		Type:        "bridge",
+		Bridge:      BridgeName,
+		MTU:         plugin.mtu,
+		AddIf:       network.DefaultInterfaceName,
+		IsGateway:   true,
+		IPMasq:      false,
+		HairpinMode: setHairpin,
+		IPAM: ipamInfo{
+			Type:   "host-local",
+			Ranges: plugin.getRangesConfig(),
+			Routes: plugin.getRoutesConfig(),
+		},
+	}
+	patchBytes, err := json.Marshal(&patch)
 	if err != nil {
-		klog.Warningf("** failed to set up CNI with %v err:%v", json, err)
+		klog.Warningf("** failed to marshal CNI with %v err:%v", patch, err)
+	}
+	klog.V(4).Infof("CNI network config set to %v", patch)
+	plugin.netConfig, err = libcni.ConfFromBytes(patchBytes)
+	if err != nil {
+		klog.Warningf("** failed to set up CNI with %v err:%v", patchBytes, err)
 		// just incase it was set by mistake
 		plugin.netConfig = nil
 		// we bail out by clearing the *entire* list
@@ -827,30 +848,31 @@ func (plugin *kubenetNetworkPlugin) disableContainerDAD(id kubecontainer.Contain
 
 // given a n cidrs assigned to nodes,
 // create bridge configuration that conforms to them
-func (plugin *kubenetNetworkPlugin) getRangesConfig() string {
-	createRange := func(thisNet *net.IPNet) string {
-		template := `
-[{
-"subnet": "%s",
-"gateway": "%s"
-}]`
-		return fmt.Sprintf(template, thisNet.String(), thisNet.IP.String())
+func (plugin *kubenetNetworkPlugin) getRangesConfig() [][1]map[string]string {
+	createRange := func(thisNet *net.IPNet) [1]map[string]string {
+		template := [1]map[string]string{
+			{
+				"subnet":  thisNet.String(),
+				"gateway": thisNet.IP.String(),
+			},
+		}
+		return template
 	}
 
-	ranges := make([]string, len(plugin.podCIDRs))
+	ranges := make([][1]map[string]string, len(plugin.podCIDRs))
 	for idx, thisCIDR := range plugin.podCIDRs {
 		ranges[idx] = createRange(thisCIDR)
 	}
 	//[{range}], [{range}]
 	// each range is a subnet and a gateway
-	return strings.Join(ranges[:], ",")
+	return ranges
 }
 
 // given a n cidrs assigned to nodes,
 // create bridge routes configuration that conforms to them
-func (plugin *kubenetNetworkPlugin) getRoutesConfig() string {
+func (plugin *kubenetNetworkPlugin) getRoutesConfig() []map[string]string {
 	var (
-		routes       []string
+		routes       []map[string]string
 		hasV4, hasV6 bool
 	)
 	for _, thisCIDR := range plugin.podCIDRs {
@@ -861,12 +883,16 @@ func (plugin *kubenetNetworkPlugin) getRoutesConfig() string {
 		}
 	}
 	if hasV4 {
-		routes = append(routes, fmt.Sprintf(`{"dst": "%s"}`, zeroCIDRv4))
+		routes = append(routes, map[string]string{
+			"dst": zeroCIDRv4,
+		})
 	}
 	if hasV6 {
-		routes = append(routes, fmt.Sprintf(`{"dst": "%s"}`, zeroCIDRv6))
+		routes = append(routes, map[string]string{
+			"dst": zeroCIDRv6,
+		})
 	}
-	return strings.Join(routes, ",")
+	return routes
 }
 
 func (plugin *kubenetNetworkPlugin) addPodIP(id kubecontainer.ContainerID, ip string) {

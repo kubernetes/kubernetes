@@ -17,6 +17,7 @@ limitations under the License.
 package healthcheck
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync/atomic"
@@ -24,7 +25,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/tools/record"
@@ -159,5 +160,18 @@ func (h healthzHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 		lastUpdated = currentTime
 
 	}
-	fmt.Fprintf(resp, fmt.Sprintf(`{"lastUpdated": %q,"currentTime": %q}`, lastUpdated, currentTime))
+	timestamp := timestampForHealth{
+		LastUpdated: lastUpdated,
+		CurrentTime: currentTime,
+	}
+	patchBytes, err := json.Marshal(&timestamp)
+	if err != nil {
+		klog.Warningf("Proxier healthz marshal %v with error: %v", timestamp, err)
+	}
+	resp.Write(patchBytes)
+}
+
+type timestampForHealth struct {
+	LastUpdated time.Time `json:"lastUpdated"`
+	CurrentTime time.Time `json:"currentTime"`
 }

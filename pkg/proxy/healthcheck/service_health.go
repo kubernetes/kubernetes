@@ -17,16 +17,15 @@ limitations under the License.
 package healthcheck
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"sync"
 
-	"github.com/lithammer/dedent"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -163,15 +162,23 @@ func (h hcHandler) ServeHTTP(resp http.ResponseWriter, req *http.Request) {
 	} else {
 		resp.WriteHeader(http.StatusOK)
 	}
-	fmt.Fprintf(resp, strings.Trim(dedent.Dedent(fmt.Sprintf(`
-		{
-			"service": {
-				"namespace": %q,
-				"name": %q
-			},
-			"localEndpoints": %d
-		}
-		`, h.name.Namespace, h.name.Name, count)), "\n"))
+	info := serviceInfo{
+		Service: map[string]string{
+			"namespace": h.name.Namespace,
+			"name":      h.name.Name,
+		},
+		LocalEndpoints: count,
+	}
+	patchBytes, err := json.Marshal(&info)
+	if err != nil {
+		klog.Warningf("Service healthz marshal %v with error: %v", info, err)
+	}
+	resp.Write(patchBytes)
+}
+
+type serviceInfo struct {
+	Service        map[string]string `json:"service"`
+	LocalEndpoints int               `json:"localEndpoints"`
 }
 
 func (hcs *server) SyncEndpoints(newEndpoints map[types.NamespacedName]int) error {
