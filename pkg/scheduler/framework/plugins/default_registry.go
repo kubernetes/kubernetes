@@ -105,6 +105,15 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 		PredicateToConfigProducer: make(map[string]ConfigProducer),
 		PriorityToConfigProducer:  make(map[string]ConfigProducer),
 	}
+	registry.RegisterPredicate(predicates.GeneralPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			// GeneralPredicate is a combination of predicates.
+			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.Name, nil)
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodename.Name, nil)
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodeports.Name, nil)
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodeaffinity.Name, nil)
+			return
+		})
 	registry.RegisterPredicate(predicates.PodToleratesNodeTaintsPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, tainttoleration.Name, nil)

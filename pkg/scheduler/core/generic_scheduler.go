@@ -651,7 +651,7 @@ func (g *genericScheduler) podFitsOnNode(
 			if err != nil {
 				return false, []predicates.PredicateFailureReason{}, nil, err
 			}
-		} else if !podsAdded || len(failedPredicates) != 0 {
+		} else if !podsAdded || len(failedPredicates) != 0 || !status.IsSuccess() {
 			break
 		}
 
