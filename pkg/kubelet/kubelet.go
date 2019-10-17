@@ -689,6 +689,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		kubeDeps.ContainerManager.InternalContainerLifecycle(),
 		legacyLogProvider,
 		klet.runtimeClassManager,
+		kubeCfg.RuntimeRunPodSandboxRequestTimeout.Duration,
 	)
 	if err != nil {
 		return nil, err

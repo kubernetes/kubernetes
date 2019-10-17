@@ -213,6 +213,7 @@ var (
 		"RegistryBurst",
 		"RegistryPullQPS",
 		"RuntimeRequestTimeout.Duration",
+		"RuntimeRunPodSandboxRequestTimeout.Duration",
 		"SerializeImagePulls",
 		"StreamingConnectionIdleTimeout.Duration",
 		"SyncFrequency.Duration",

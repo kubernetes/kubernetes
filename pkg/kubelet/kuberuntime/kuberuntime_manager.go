@@ -131,6 +131,9 @@ type kubeGenericRuntimeManager struct {
 
 	// Cache last per-container error message to reduce log spam
 	logReduction *logreduction.LogReduction
+
+	// The timeout for the RunPodSandbox request
+	runPodSandboxTimeout time.Duration
 }
 
 // KubeGenericRuntime is a interface contains interfaces for container runtime and command.
@@ -168,24 +171,26 @@ func NewKubeGenericRuntimeManager(
 	internalLifecycle cm.InternalContainerLifecycle,
 	legacyLogProvider LegacyLogProvider,
 	runtimeClassManager *runtimeclass.Manager,
+	runPodSandboxTimeout time.Duration,
 ) (KubeGenericRuntime, error) {
 	kubeRuntimeManager := &kubeGenericRuntimeManager{
-		recorder:            recorder,
-		cpuCFSQuota:         cpuCFSQuota,
-		cpuCFSQuotaPeriod:   cpuCFSQuotaPeriod,
-		seccompProfileRoot:  seccompProfileRoot,
-		livenessManager:     livenessManager,
-		containerRefManager: containerRefManager,
-		machineInfo:         machineInfo,
-		osInterface:         osInterface,
-		runtimeHelper:       runtimeHelper,
-		runtimeService:      newInstrumentedRuntimeService(runtimeService),
-		imageService:        newInstrumentedImageManagerService(imageService),
-		keyring:             credentialprovider.NewDockerKeyring(),
-		internalLifecycle:   internalLifecycle,
-		legacyLogProvider:   legacyLogProvider,
-		runtimeClassManager: runtimeClassManager,
-		logReduction:        logreduction.NewLogReduction(identicalErrorDelay),
+		recorder:             recorder,
+		cpuCFSQuota:          cpuCFSQuota,
+		cpuCFSQuotaPeriod:    cpuCFSQuotaPeriod,
+		seccompProfileRoot:   seccompProfileRoot,
+		livenessManager:      livenessManager,
+		containerRefManager:  containerRefManager,
+		machineInfo:          machineInfo,
+		osInterface:          osInterface,
+		runtimeHelper:        runtimeHelper,
+		runtimeService:       newInstrumentedRuntimeService(runtimeService),
+		imageService:         newInstrumentedImageManagerService(imageService),
+		keyring:              credentialprovider.NewDockerKeyring(),
+		internalLifecycle:    internalLifecycle,
+		legacyLogProvider:    legacyLogProvider,
+		runtimeClassManager:  runtimeClassManager,
+		logReduction:         logreduction.NewLogReduction(identicalErrorDelay),
+		runPodSandboxTimeout: runPodSandboxTimeout,
 	}
 
 	typedVersion, err := kubeRuntimeManager.runtimeService.Version(kubeRuntimeAPIVersion)

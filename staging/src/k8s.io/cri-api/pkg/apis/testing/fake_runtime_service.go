@@ -172,7 +172,7 @@ func (r *FakeRuntimeService) Status() (*runtimeapi.RuntimeStatus, error) {
 	return r.FakeStatus, nil
 }
 
-func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
+func (r *FakeRuntimeService) RunPodSandbox(config *runtimeapi.PodSandboxConfig, runtimeHandler string, timeout time.Duration) (string, error) {
 	r.Lock()
 	defer r.Unlock()
 

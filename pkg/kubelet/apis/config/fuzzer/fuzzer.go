@@ -46,6 +46,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 			obj.Address = "0.0.0.0"
 			obj.VolumeStatsAggPeriod = metav1.Duration{Duration: time.Minute}
 			obj.RuntimeRequestTimeout = metav1.Duration{Duration: 2 * time.Minute}
+			obj.RuntimeRunPodSandboxRequestTimeout = metav1.Duration{Duration: 4 * time.Minute}
 			obj.CPUCFSQuota = true
 			obj.EventBurst = 10
 			obj.EventRecordQPS = 5

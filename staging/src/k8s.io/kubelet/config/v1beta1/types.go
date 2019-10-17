@@ -445,6 +445,12 @@ type KubeletConfiguration struct {
 	// Default: "2m"
 	// +optional
 	RuntimeRequestTimeout metav1.Duration `json:"runtimeRequestTimeout,omitempty"`
+	// runtimeRunPodSandboxRequestTimeout is the timeout for the RunPodSandbox request.
+	// Dynamic Kubelet Config (beta): If dynamically updating this field, consider that
+	// it may disrupt components that interact with the Kubelet server.
+	// Default: "4m"
+	// +optional
+	RuntimeRunPodSandboxRequestTimeout metav1.Duration `json:"runtimeRunPodSandboxRequestTimeout,omitempty"`
 	// hairpinMode specifies how the Kubelet should configure the container
 	// bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to

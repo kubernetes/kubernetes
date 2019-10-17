@@ -124,6 +124,7 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		}
 	}
 	out.RuntimeRequestTimeout = in.RuntimeRequestTimeout
+	out.RuntimeRunPodSandboxRequestTimeout = in.RuntimeRunPodSandboxRequestTimeout
 	out.CPUCFSQuotaPeriod = in.CPUCFSQuotaPeriod
 	if in.EvictionHard != nil {
 		in, out := &in.EvictionHard, &out.EvictionHard

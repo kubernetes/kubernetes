@@ -218,6 +218,8 @@ type KubeletConfiguration struct {
 	// runtimeRequestTimeout is the timeout for all runtime requests except long running
 	// requests - pull, logs, exec and attach.
 	RuntimeRequestTimeout metav1.Duration
+	// runtimeRunPodSandboxRequestTimeout is the timeout for the RunPodSandbox request
+	RuntimeRunPodSandboxRequestTimeout metav1.Duration
 	// hairpinMode specifies how the Kubelet should configure the container
 	// bridge for hairpin packets.
 	// Setting this flag allows endpoints in a Service to loadbalance back to
