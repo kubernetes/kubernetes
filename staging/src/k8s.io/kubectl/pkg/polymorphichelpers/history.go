@@ -128,6 +128,10 @@ func (h *DeploymentHistoryViewer) ViewHistory(namespace, name string, revision i
 		if len(changeCause) > 0 {
 			historyInfo[v].Annotations[ChangeCauseAnnotation] = changeCause
 		}
+		if revision > 0 && v == revision {
+			// The revision is now in historyInfo
+			break
+		}
 	}
 
 	if len(historyInfo) == 0 {
@@ -186,6 +190,10 @@ func (h *DaemonSetHistoryViewer) ViewHistory(namespace, name string, revision in
 	for _, history := range history {
 		// TODO: for now we assume revisions don't overlap, we may need to handle it
 		historyInfo[history.Revision] = history
+		if revision > 0 && history.Revision == revision {
+			// The revision is now in historyInfo
+			break
+		}
 	}
 	if len(historyInfo) == 0 {
 		return "No rollout history found.", nil
