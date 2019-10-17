@@ -458,7 +458,7 @@ func (g *genericScheduler) findNodesThatFit(state *framework.CycleState, pod *v1
 	failedPredicateMap := FailedPredicateMap{}
 	filteredNodesStatuses := framework.NodeToStatusMap{}
 
-	if len(g.predicates) == 0 {
+	if len(g.predicates) == 0 && !g.framework.HasFilterPlugins() {
 		filtered = g.nodeInfoSnapshot.ListNodes()
 	} else {
 		allNodes := int32(g.cache.NodeTree().NumNodes())

@@ -172,6 +172,10 @@ func (*fakeFramework) QueueSortFunc() framework.LessFunc {
 	}
 }
 
+func (f *fakeFramework) HasFilterPlugins() bool {
+	return true
+}
+
 func (f *fakeFramework) ListPlugins() map[string][]config.Plugin {
 	return nil
 }
