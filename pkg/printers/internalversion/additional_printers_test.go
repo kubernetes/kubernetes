@@ -182,16 +182,12 @@ func TestCustomTypePrinting(t *testing.T) {
 		t.Fatalf("An error occurred generating the table for custom type: %#v", err)
 	}
 
-	printer := printers.NewTablePrinter(printers.PrintOptions{})
-	buffer := &bytes.Buffer{}
-	err = printer.PrintObj(table, buffer)
-	if err != nil {
-		t.Fatalf("An error occurred printing the Table: %#v", err)
+	expectedTable := &metav1.Table{
+		ColumnDefinitions: []metav1.TableColumnDefinition{{Name: "Data"}},
+		Rows:              []metav1.TableRow{{Cells: []interface{}{"test object"}}},
 	}
-
-	expectedOutput := "DATA\ntest object\n"
-	if buffer.String() != expectedOutput {
-		t.Errorf("The data was not printed as expected. Expected:\n%s\nGot:\n%s", expectedOutput, buffer.String())
+	if !reflect.DeepEqual(expectedTable, table) {
+		t.Errorf("Error generating table from custom type. Expected (%#v), got (%#v)", expectedTable, table)
 	}
 }
 
