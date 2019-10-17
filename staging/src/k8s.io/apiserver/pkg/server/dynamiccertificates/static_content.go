@@ -17,6 +17,7 @@ limitations under the License.
 package dynamiccertificates
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 )
@@ -55,4 +56,56 @@ func (c *staticCAContent) Name() string {
 // CurrentCABundleContent provides ca bundle byte content
 func (c *staticCAContent) CurrentCABundleContent() (cabundle []byte) {
 	return c.caBundle
+}
+
+type staticCertKeyContent struct {
+	name string
+	cert []byte
+	key  []byte
+}
+
+// NewStaticCertKeyContentFromFiles returns a CertKeyContentProvider based on a filename
+func NewStaticCertKeyContentFromFiles(certFile, keyFile string) (CertKeyContentProvider, error) {
+	if len(certFile) == 0 {
+		return nil, fmt.Errorf("missing filename for certificate")
+	}
+	if len(keyFile) == 0 {
+		return nil, fmt.Errorf("missing filename for key")
+	}
+
+	certPEMBlock, err := ioutil.ReadFile(certFile)
+	if err != nil {
+		return nil, err
+	}
+	keyPEMBlock, err := ioutil.ReadFile(keyFile)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewStaticCertKeyContent(fmt.Sprintf("cert: %s, key: %s", certFile, keyFile), certPEMBlock, keyPEMBlock)
+}
+
+// NewStaticCertKeyContent returns a CertKeyContentProvider that always returns the same value
+func NewStaticCertKeyContent(name string, cert, key []byte) (CertKeyContentProvider, error) {
+	// Ensure that the key matches the cert and both are valid
+	_, err := tls.X509KeyPair(cert, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return &staticCertKeyContent{
+		name: name,
+		cert: cert,
+		key:  key,
+	}, nil
+}
+
+// Name is just an identifier
+func (c *staticCertKeyContent) Name() string {
+	return c.name
+}
+
+// CurrentCertKeyContent provides cert and key content
+func (c *staticCertKeyContent) CurrentCertKeyContent() ([]byte, []byte) {
+	return c.cert, c.key
 }

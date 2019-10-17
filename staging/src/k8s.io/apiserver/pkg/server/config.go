@@ -233,9 +233,10 @@ type SecureServingInfo struct {
 
 	// Cert is the main server cert which is used if SNI does not match. Cert must be non-nil and is
 	// allowed to be in SNICerts.
-	Cert *tls.Certificate
+	Cert dynamiccertificates.CertKeyContentProvider
 
 	// SNICerts are the TLS certificates by name used for SNI.
+	// todo: use dynamic certificates
 	SNICerts map[string]*tls.Certificate
 
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates

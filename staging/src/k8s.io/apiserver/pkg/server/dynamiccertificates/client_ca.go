@@ -30,10 +30,10 @@ type CAContentProvider interface {
 }
 
 // dynamicCertificateContent holds the content that overrides the baseTLSConfig
-// TODO add the serving certs to this struct
 type dynamicCertificateContent struct {
 	// clientCA holds the content for the clientCA bundle
-	clientCA caBundleContent
+	clientCA    caBundleContent
+	servingCert certKeyContent
 }
 
 // caBundleContent holds the content for the clientCA bundle.  Wrapping the bytes makes the Equals work nicely with the
@@ -48,6 +48,10 @@ func (c *dynamicCertificateContent) Equal(rhs *dynamicCertificateContent) bool {
 	}
 
 	if !c.clientCA.Equal(&rhs.clientCA) {
+		return false
+	}
+
+	if !c.servingCert.Equal(&rhs.servingCert) {
 		return false
 	}
 
