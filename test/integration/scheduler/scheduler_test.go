@@ -132,7 +132,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"GeneralPredicates",
 				"MatchInterPodAffinity",
 				"MaxAzureDiskVolumeCount",
-				"MaxCSIVolumeCountPred",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 			),
@@ -147,6 +146,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"FilterPlugin": {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeVolumeLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 				},
@@ -203,7 +203,6 @@ kind: Policy
 				"GeneralPredicates",
 				"MatchInterPodAffinity",
 				"MaxAzureDiskVolumeCount",
-				"MaxCSIVolumeCountPred",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 			),
@@ -218,6 +217,7 @@ kind: Policy
 				"FilterPlugin": {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeVolumeLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 				},

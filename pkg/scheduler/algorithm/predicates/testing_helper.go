@@ -22,6 +22,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
 
 // FakePersistentVolumeClaimInfo declares a []v1.PersistentVolumeClaim type for testing.
@@ -92,4 +93,20 @@ func (classes FakeStorageClassInfo) GetStorageClassInfo(name string) (*storagev1
 		}
 	}
 	return nil, fmt.Errorf("Unable to find storage class: %s", name)
+}
+
+// GetVolumeLimitKey returns a ResourceName by filter type
+func GetVolumeLimitKey(filterType string) v1.ResourceName {
+	switch filterType {
+	case EBSVolumeFilterType:
+		return v1.ResourceName(volumeutil.EBSVolumeLimitKey)
+	case GCEPDVolumeFilterType:
+		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
+	case AzureDiskVolumeFilterType:
+		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+	case CinderVolumeFilterType:
+		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
+	default:
+		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
+	}
 }
