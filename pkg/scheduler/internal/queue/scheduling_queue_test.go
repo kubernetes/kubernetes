@@ -861,9 +861,10 @@ func TestRecentlyTriedPodsGoBack(t *testing.T) {
 }
 
 // TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod tests
-// that a pod determined as unschedulable multiple times doesn't block any newer pod.
+// that a pod determined as unschedulable multiple times doesn't block any newer pod, even if
+// the newer pod has lower priority.
 // This behavior ensures that an unschedulable pod does not block head of the queue when there
-// are frequent events that move pods to the active queue.
+// are not too frequent events that move pods to the active queue.
 func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	q := NewPriorityQueue(nil, nil)
 
@@ -919,7 +920,7 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 			CreationTimestamp: metav1.Now(),
 		},
 		Spec: v1.PodSpec{
-			Priority: &highPriority,
+			Priority: &lowPriority,
 		},
 		Status: v1.PodStatus{
 			NominatedNodeName: "node1",
@@ -939,11 +940,11 @@ func TestPodFailedSchedulingMultipleTimesDoesNotBlockNewerPod(t *testing.T) {
 	q.AddUnschedulableIfNotPresent(newPodInfoNoTimestamp(&unschedulablePod), q.SchedulingCycle())
 	// Clear its backoff to simulate its backoff expiration
 	q.clearPodBackoff(&unschedulablePod)
-	// Move all unschedulable pods to the active queue.
-	q.MoveAllToActiveOrBackoffQueue("test")
+	// Assume there are not too frequent events that immediately move all
+	// unschedulable pods to the active queue for all the time.
 
 	// At this time, newerPod should be popped
-	// because it is the oldest tried pod.
+	// because other Pods are still in the unschedulable queue.
 	p2, err2 := q.Pop()
 	if err2 != nil {
 		t.Errorf("Error while popping the head of the queue: %v", err2)
@@ -1065,8 +1066,10 @@ func TestHighPriorityFlushUnschedulableQLeftover(t *testing.T) {
 
 	highPodInfo := q.newPodInfo(&highPod)
 	highPodInfo.Timestamp = time.Now().Add(-1 * unschedulableQTimeInterval)
+	highPod.CreationTimestamp = metav1.NewTime(highPodInfo.Timestamp)
 	midPodInfo := q.newPodInfo(&midPod)
 	midPodInfo.Timestamp = time.Now().Add(-1 * unschedulableQTimeInterval)
+	midPod.CreationTimestamp = metav1.NewTime(midPodInfo.Timestamp)
 	addOrUpdateUnschedulablePod(q, highPodInfo)
 	addOrUpdateUnschedulablePod(q, midPodInfo)
 
@@ -1161,10 +1164,12 @@ func TestPodTimestamp(t *testing.T) {
 		Pod:       pod1,
 		Timestamp: timestamp,
 	}
+	pod1.CreationTimestamp = metav1.NewTime(pInfo1.Timestamp)
 	pInfo2 := &framework.PodInfo{
 		Pod:       pod2,
 		Timestamp: timestamp.Add(time.Second),
 	}
+	pod2.CreationTimestamp = metav1.NewTime(pInfo2.Timestamp)
 
 	tests := []struct {
 		name       string
@@ -1249,9 +1254,10 @@ func TestPendingPodsMetric(t *testing.T) {
 		p := &framework.PodInfo{
 			Pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("test-pod-%d", i),
-					Namespace: fmt.Sprintf("ns%d", i),
-					UID:       types.UID(fmt.Sprintf("tp-%d", i)),
+					Name:              fmt.Sprintf("test-pod-%d", i),
+					Namespace:         fmt.Sprintf("ns%d", i),
+					UID:               types.UID(fmt.Sprintf("tp-%d", i)),
+					CreationTimestamp: metav1.NewTime(timestamp),
 				},
 			},
 			Timestamp: timestamp,

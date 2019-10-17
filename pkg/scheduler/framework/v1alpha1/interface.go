@@ -166,7 +166,7 @@ type Plugin interface {
 // the timestamp when it's added to the queue or recording per-pod metrics.
 type PodInfo struct {
 	Pod *v1.Pod
-	// The time pod added to the scheduling queue.
+	// The last time when the pod is tried to schedule.
 	Timestamp time.Time
 	// Number of schedule attempts before successfully scheduled.
 	// It's used to record the # attempts metric.

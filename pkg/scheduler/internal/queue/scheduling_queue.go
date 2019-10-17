@@ -198,13 +198,21 @@ func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
 
 // activeQComp is the function used by the activeQ heap algorithm to sort pods.
 // It sorts pods based on their priority. When priorities are equal, it uses
+// Pod.CreationTimestamp. When Pod.CreationTimestamps are equal, it uses
 // PodInfo.timestamp.
 func activeQComp(podInfo1, podInfo2 interface{}) bool {
 	pInfo1 := podInfo1.(*framework.PodInfo)
 	pInfo2 := podInfo2.(*framework.PodInfo)
 	prio1 := pod.GetPodPriority(pInfo1.Pod)
 	prio2 := pod.GetPodPriority(pInfo2.Pod)
-	return (prio1 > prio2) || (prio1 == prio2 && pInfo1.Timestamp.Before(pInfo2.Timestamp))
+
+	// To make PriorityQueue near FIFO for same priority Pods, i.e. <5% Pods cut
+	// in line, we should use Pod creation time instead of the last queued time by
+	// scheduler to sort Pod for the same priority.
+	creationTime1 := pInfo1.Pod.CreationTimestamp.Time
+	creationTime2 := pInfo2.Pod.CreationTimestamp.Time
+	return (prio1 > prio2) || (prio1 == prio2 && creationTime1.Before(creationTime2)) ||
+		(prio1 == prio2 && creationTime1.Equal(creationTime2) && pInfo1.Timestamp.Before(pInfo2.Timestamp))
 }
 
 // NewPriorityQueue creates a PriorityQueue object.
