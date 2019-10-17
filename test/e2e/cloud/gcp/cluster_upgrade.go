@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package lifecycle
+package gcp
 
 import (
 	"encoding/xml"
@@ -94,7 +94,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 
 			testSuite := &junit.TestSuite{Name: "Master upgrade"}
 			masterUpgradeTest := &junit.TestCase{
-				Name:      "[sig-cluster-lifecycle] master-upgrade",
+				Name:      "[sig-cloud-provider-gcp] master-upgrade",
 				Classname: "upgrade_tests",
 			}
 			testSuite.TestCases = append(testSuite.TestCases, masterUpgradeTest)
@@ -106,7 +106,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.MasterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 
@@ -128,7 +128,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.NodeUpgrade, upgradeFunc)
+			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.NodeUpgrade, upgradeFunc)
 		})
 	})
 
@@ -138,7 +138,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster upgrade"}
-			clusterUpgradeTest := &junit.TestCase{Name: "[sig-cluster-lifecycle] cluster-upgrade", Classname: "upgrade_tests"}
+			clusterUpgradeTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] cluster-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, clusterUpgradeTest)
 			upgradeFunc := func() {
 				start := time.Now()
@@ -149,7 +149,7 @@ var _ = SIGDescribe("Upgrade [Feature:Upgrade]", func() {
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -167,7 +167,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 			framework.ExpectNoError(err)
 
 			testSuite := &junit.TestSuite{Name: "Cluster downgrade"}
-			clusterDowngradeTest := &junit.TestCase{Name: "[sig-cluster-lifecycle] cluster-downgrade", Classname: "upgrade_tests"}
+			clusterDowngradeTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] cluster-downgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, clusterDowngradeTest)
 
 			upgradeFunc := func() {
@@ -180,7 +180,7 @@ var _ = SIGDescribe("Downgrade [Feature:Downgrade]", func() {
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -193,11 +193,8 @@ var _ = SIGDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 	testFrameworks := createUpgradeFrameworks(upgradeTests)
 	ginkgo.Describe("etcd upgrade", func() {
 		ginkgo.It("should maintain a functioning cluster", func() {
-			upgCtx, err := getUpgradeContext(f.ClientSet.Discovery(), "")
-			framework.ExpectNoError(err)
-
 			testSuite := &junit.TestSuite{Name: "Etcd upgrade"}
-			etcdTest := &junit.TestCase{Name: "[sig-cluster-lifecycle] etcd-upgrade", Classname: "upgrade_tests"}
+			etcdTest := &junit.TestCase{Name: "[sig-cloud-provider-gcp] etcd-upgrade", Classname: "upgrade_tests"}
 			testSuite.TestCases = append(testSuite.TestCases, etcdTest)
 
 			upgradeFunc := func() {
@@ -205,7 +202,7 @@ var _ = SIGDescribe("etcd Upgrade [Feature:EtcdUpgrade]", func() {
 				defer finalizeUpgradeTest(start, etcdTest)
 				framework.ExpectNoError(framework.EtcdUpgrade(framework.TestContext.EtcdUpgradeStorage, framework.TestContext.EtcdUpgradeVersion))
 			}
-			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgCtx, upgrades.EtcdUpgrade, upgradeFunc)
+			runUpgradeSuite(f, upgradeTests, testFrameworks, testSuite, upgrades.EtcdUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -231,7 +228,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.MasterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.MasterUpgrade, upgradeFunc)
 		})
 	})
 	ginkgo.Describe("cluster upgrade", func() {
@@ -251,7 +248,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 	ginkgo.Describe("cluster downgrade", func() {
@@ -271,7 +268,7 @@ var _ = SIGDescribe("gpu Upgrade [Feature:GPUUpgrade]", func() {
 				framework.ExpectNoError(framework.MasterUpgrade(target))
 				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, gpuUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -299,7 +296,7 @@ var _ = ginkgo.Describe("[sig-apps] stateful Upgrade [Feature:StatefulUpgrade]",
 				framework.ExpectNoError(framework.NodeUpgrade(f, target, *upgradeImage))
 				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, statefulsetUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, statefulsetUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -334,7 +331,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				framework.ExpectNoError(framework.NodeUpgradeGCEWithKubeProxyDaemonSet(f, target, *upgradeImage, true))
 				framework.ExpectNoError(e2elifecycle.CheckNodesVersions(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, kubeProxyUpgradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, kubeProxyUpgradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 
@@ -362,7 +359,7 @@ var _ = SIGDescribe("kube-proxy migration [Feature:KubeProxyDaemonSetMigration]"
 				framework.ExpectNoError(framework.MasterUpgradeGCEWithKubeProxyDaemonSet(target, false))
 				framework.ExpectNoError(e2elifecycle.CheckMasterVersion(f.ClientSet, target))
 			}
-			runUpgradeSuite(f, kubeProxyDowngradeTests, testFrameworks, testSuite, upgCtx, upgrades.ClusterUpgrade, upgradeFunc)
+			runUpgradeSuite(f, kubeProxyDowngradeTests, testFrameworks, testSuite, upgrades.ClusterUpgrade, upgradeFunc)
 		})
 	})
 })
@@ -442,7 +439,6 @@ func runUpgradeSuite(
 	tests []upgrades.Test,
 	testFrameworks map[string]*framework.Framework,
 	testSuite *junit.TestSuite,
-	upgCtx *upgrades.UpgradeContext,
 	upgradeType upgrades.UpgradeType,
 	upgradeFunc func(),
 ) {
