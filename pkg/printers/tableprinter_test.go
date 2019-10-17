@@ -18,10 +18,12 @@ package printers
 
 import (
 	"bytes"
+	"regexp"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -592,5 +594,131 @@ Added   test1   1/1     podPhase   5         20h
 		if test.expected != out.String() {
 			t.Errorf("Event/Table printing error: expected (%s), got (%s)", test.expected, out.String())
 		}
+	}
+}
+
+func TestPrintUnstructuredObject(t *testing.T) {
+	obj := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Test",
+			"dummy1":     "present",
+			"dummy2":     "present",
+			"metadata": map[string]interface{}{
+				"name":              "MyName",
+				"namespace":         "MyNamespace",
+				"creationTimestamp": "2017-04-01T00:00:00Z",
+				"resourceVersion":   123,
+				"uid":               "00000000-0000-0000-0000-000000000001",
+				"dummy3":            "present",
+				"labels":            map[string]interface{}{"test": "other"},
+			},
+			/*"items": []interface{}{
+				map[string]interface{}{
+					"itemBool": true,
+					"itemInt":  42,
+				},
+			},*/
+			"url":    "http://localhost",
+			"status": "ok",
+		},
+	}
+
+	tests := []struct {
+		expected string
+		options  PrintOptions
+		object   runtime.Object
+	}{
+		{
+			expected: "NAME\\s+AGE\nMyName\\s+\\d+",
+			object:   obj,
+		},
+		{
+			options: PrintOptions{
+				WithNamespace: true,
+			},
+			expected: "NAMESPACE\\s+NAME\\s+AGE\nMyNamespace\\s+MyName\\s+\\d+",
+			object:   obj,
+		},
+		{
+			options: PrintOptions{
+				ShowLabels:    true,
+				WithNamespace: true,
+			},
+			expected: "NAMESPACE\\s+NAME\\s+AGE\\s+LABELS\nMyNamespace\\s+MyName\\s+\\d+\\w+\\s+test\\=other",
+			object:   obj,
+		},
+		{
+			expected: "NAME\\s+AGE\nMyName\\s+\\d+\\w+\nMyName2\\s+\\d+",
+			object: &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"apiVersion": "v1",
+					"kind":       "Test",
+					"dummy1":     "present",
+					"dummy2":     "present",
+					"items": []interface{}{
+						map[string]interface{}{
+							"metadata": map[string]interface{}{
+								"name":              "MyName",
+								"namespace":         "MyNamespace",
+								"creationTimestamp": "2017-04-01T00:00:00Z",
+								"resourceVersion":   123,
+								"uid":               "00000000-0000-0000-0000-000000000001",
+								"dummy3":            "present",
+								"labels":            map[string]interface{}{"test": "other"},
+							},
+						},
+						map[string]interface{}{
+							"metadata": map[string]interface{}{
+								"name":              "MyName2",
+								"namespace":         "MyNamespace",
+								"creationTimestamp": "2017-04-01T00:00:00Z",
+								"resourceVersion":   123,
+								"uid":               "00000000-0000-0000-0000-000000000001",
+								"dummy3":            "present",
+								"labels":            "badlabel",
+							},
+						},
+					},
+					"url":    "http://localhost",
+					"status": "ok",
+				},
+			},
+		},
+	}
+	out := bytes.NewBuffer([]byte{})
+
+	for _, test := range tests {
+		out.Reset()
+		printer := NewTablePrinter(test.options)
+		printer.PrintObj(test.object, out)
+
+		matches, err := regexp.MatchString(test.expected, out.String())
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !matches {
+			t.Errorf("wanted:\n%s\ngot:\n%s", test.expected, out)
+		}
+	}
+}
+
+type TestUnknownType struct{}
+
+func (obj *TestUnknownType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *TestUnknownType) DeepCopyObject() runtime.Object {
+	if obj == nil {
+		return nil
+	}
+	clone := *obj
+	return &clone
+}
+
+func TestUnknownTypePrinting(t *testing.T) {
+	printer := NewTablePrinter(PrintOptions{})
+	buffer := &bytes.Buffer{}
+	err := printer.PrintObj(&TestUnknownType{}, buffer)
+	if err == nil {
+		t.Errorf("An error was expected from printing unknown type")
 	}
 }
