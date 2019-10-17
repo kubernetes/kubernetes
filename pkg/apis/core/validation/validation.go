@@ -3083,8 +3083,33 @@ func validateContainersOnlyForPod(containers []core.Container, fldPath *field.Pa
 	return allErrs
 }
 
+// PodValidationOptions contains the different settings for pod validation
+type PodValidationOptions struct {
+	// Allow pod spec to have more than one huge page resource (with different sizes)
+	AllowMultipleHugePageResources bool
+}
+
+// ValidatePodSingleHugePageResources checks if there are multiple huge
+// pages resources in the pod object.
+func ValidatePodSingleHugePageResources(pod *core.Pod, specPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+	hugePageResources := sets.NewString()
+	for i := range pod.Spec.Containers {
+		resourceSet := toContainerResourcesSet(&pod.Spec.Containers[i])
+		for resourceStr := range resourceSet {
+			if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
+				hugePageResources.Insert(resourceStr)
+			}
+		}
+	}
+	if len(hugePageResources) > 1 {
+		allErrs = append(allErrs, field.Invalid(specPath, hugePageResources.List(), "must use a single hugepage size in a pod spec"))
+	}
+	return allErrs
+}
+
 // ValidatePod tests if required fields in the pod are set.
-func ValidatePod(pod *core.Pod) field.ErrorList {
+func ValidatePod(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMeta(&pod.ObjectMeta, true, ValidatePodName, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotations(pod.ObjectMeta.Annotations, &pod.Spec, fldPath.Child("annotations"))...)
@@ -3111,17 +3136,8 @@ func ValidatePod(pod *core.Pod) field.ErrorList {
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.Containers, specPath.Child("containers"))...)
 	allErrs = append(allErrs, validateContainersOnlyForPod(pod.Spec.InitContainers, specPath.Child("initContainers"))...)
 
-	hugePageResources := sets.NewString()
-	for i := range pod.Spec.Containers {
-		resourceSet := toContainerResourcesSet(&pod.Spec.Containers[i])
-		for resourceStr := range resourceSet {
-			if v1helper.IsHugePageResourceName(v1.ResourceName(resourceStr)) {
-				hugePageResources.Insert(resourceStr)
-			}
-		}
-	}
-	if len(hugePageResources) > 1 {
-		allErrs = append(allErrs, field.Invalid(specPath, hugePageResources, "must use a single hugepage size in a pod spec"))
+	if !opts.AllowMultipleHugePageResources {
+		allErrs = append(allErrs, ValidatePodSingleHugePageResources(pod, specPath)...)
 	}
 
 	podIPsField := field.NewPath("status", "podIPs")
@@ -3679,8 +3695,8 @@ func ValidateContainerUpdates(newContainers, oldContainers []core.Container, fld
 }
 
 // ValidatePodCreate validates a pod in the context of its initial create
-func ValidatePodCreate(pod *core.Pod) field.ErrorList {
-	allErrs := ValidatePod(pod)
+func ValidatePodCreate(pod *core.Pod, opts PodValidationOptions) field.ErrorList {
+	allErrs := ValidatePod(pod, opts)
 
 	fldPath := field.NewPath("spec")
 	// EphemeralContainers can only be set on update using the ephemeralcontainers subresource
@@ -3693,11 +3709,15 @@ func ValidatePodCreate(pod *core.Pod) field.ErrorList {
 
 // ValidatePodUpdate tests to see if the update is legal for an end user to make. newPod is updated with fields
 // that cannot be changed.
-func ValidatePodUpdate(newPod, oldPod *core.Pod) field.ErrorList {
+func ValidatePodUpdate(newPod, oldPod *core.Pod, opts PodValidationOptions) field.ErrorList {
 	fldPath := field.NewPath("metadata")
 	allErrs := ValidateObjectMetaUpdate(&newPod.ObjectMeta, &oldPod.ObjectMeta, fldPath)
 	allErrs = append(allErrs, ValidatePodSpecificAnnotationUpdates(newPod, oldPod, fldPath.Child("annotations"))...)
 	specPath := field.NewPath("spec")
+
+	if !opts.AllowMultipleHugePageResources {
+		allErrs = append(allErrs, ValidatePodSingleHugePageResources(newPod, specPath)...)
+	}
 
 	// validate updateable fields:
 	// 1.  spec.containers[*].image

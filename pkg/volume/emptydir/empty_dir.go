@@ -216,12 +216,12 @@ func (ed *emptyDir) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 		}
 	}
 
-	switch ed.medium {
-	case v1.StorageMediumDefault:
+	switch {
+	case ed.medium == v1.StorageMediumDefault:
 		err = ed.setupDir(dir)
-	case v1.StorageMediumMemory:
+	case ed.medium == v1.StorageMediumMemory:
 		err = ed.setupTmpfs(dir)
-	case v1.StorageMediumHugePages:
+	case v1helper.IsHugePageMedium(ed.medium):
 		err = ed.setupHugepages(dir)
 	default:
 		err = fmt.Errorf("unknown storage medium %q", ed.medium)
@@ -290,11 +290,11 @@ func (ed *emptyDir) setupHugepages(dir string) error {
 	}
 	// If the directory is a mountpoint with medium hugepages, there is no
 	// work to do since we are already in the desired state.
-	if isMnt && medium == v1.StorageMediumHugePages {
+	if isMnt && v1helper.IsHugePageMedium(medium) {
 		return nil
 	}
 
-	pageSizeMountOption, err := getPageSizeMountOptionFromPod(ed.pod)
+	pageSizeMountOption, err := getPageSizeMountOption(ed.medium, ed.pod)
 	if err != nil {
 		return err
 	}
@@ -303,33 +303,52 @@ func (ed *emptyDir) setupHugepages(dir string) error {
 	return ed.mounter.Mount("nodev", dir, "hugetlbfs", []string{pageSizeMountOption})
 }
 
-// getPageSizeMountOptionFromPod retrieves pageSize mount option from Pod's resources
-// and validates pageSize options in all containers of given Pod.
-func getPageSizeMountOptionFromPod(pod *v1.Pod) (string, error) {
+// getPageSizeMountOption retrieves pageSize mount option from Pod's resources
+// and medium and validates pageSize options in all containers of given Pod.
+func getPageSizeMountOption(medium v1.StorageMedium, pod *v1.Pod) (string, error) {
 	pageSizeFound := false
 	pageSize := resource.Quantity{}
-	// In some rare cases init containers can also consume Huge pages.
-	containers := append(pod.Spec.Containers, pod.Spec.InitContainers...)
-	for _, container := range containers {
+
+	var mediumPageSize resource.Quantity
+	if medium != v1.StorageMediumHugePages {
+		// medium is: Hugepages-<size>
+		var err error
+		mediumPageSize, err = v1helper.HugePageSizeFromMedium(medium)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// In some rare cases init containers can also consume Huge pages
+	for _, container := range append(pod.Spec.Containers, pod.Spec.InitContainers...) {
 		// We can take request because limit and requests must match.
 		for requestName := range container.Resources.Requests {
-			if v1helper.IsHugePageResourceName(requestName) {
-				currentPageSize, err := v1helper.HugePageSizeFromResourceName(requestName)
-				if err != nil {
-					return "", err
-				}
-				// PageSize for all volumes in a POD are equal, except for the first one discovered.
+			if !v1helper.IsHugePageResourceName(requestName) {
+				continue
+			}
+			currentPageSize, err := v1helper.HugePageSizeFromResourceName(requestName)
+			if err != nil {
+				return "", err
+			}
+			if medium == v1.StorageMediumHugePages { // medium is: Hugepages, size is not specified
+				// PageSize for all volumes in a POD must be equal if medium is "Hugepages"
 				if pageSizeFound && pageSize.Cmp(currentPageSize) != 0 {
-					return "", fmt.Errorf("multiple pageSizes for huge pages in a single PodSpec")
+					return "", fmt.Errorf("medium: %s can't be used if container requests multiple huge page sizes", medium)
 				}
-				pageSize = currentPageSize
+
 				pageSizeFound = true
+				pageSize = currentPageSize
+			} else { // medium is: Hugepages-<size>
+				if currentPageSize.Cmp(mediumPageSize) == 0 {
+					pageSizeFound = true
+					pageSize = currentPageSize
+				}
 			}
 		}
 	}
 
 	if !pageSizeFound {
-		return "", fmt.Errorf("hugePages storage requested, but there is no resource request for huge pages")
+		return "", fmt.Errorf("medium %s: hugePages storage requested, but there is no resource request for huge pages", medium)
 	}
 
 	return fmt.Sprintf("%s=%s", hugePagesPageSizeMountOption, pageSize.String()), nil

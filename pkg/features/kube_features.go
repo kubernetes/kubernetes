@@ -539,6 +539,14 @@ const (
 	//
 	// Enables a feature to make secrets and configmaps data immutable.
 	ImmutableEphemeralVolumes featuregate.Feature = "ImmutableEphemeralVolumes"
+
+	// owner: @bart0sh
+	// alpha: v1.18
+	//
+	// Enables usage of HugePages-<size> in a volume medium,
+	// e.g. emptyDir:
+	//        medium: HugePages-1Gi
+	HugePageStorageMediumSize featuregate.Feature = "HugePageStorageMediumSize"
 )
 
 func init() {
@@ -624,6 +632,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
 	ServiceTopology:                                {Default: false, PreRelease: featuregate.Alpha},
 	ImmutableEphemeralVolumes:                      {Default: false, PreRelease: featuregate.Alpha},
+	HugePageStorageMediumSize:                      {Default: false, PreRelease: featuregate.Alpha},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:
