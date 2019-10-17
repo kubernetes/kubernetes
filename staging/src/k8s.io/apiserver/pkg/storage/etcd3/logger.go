@@ -18,13 +18,19 @@ package etcd3
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 
 	"go.etcd.io/etcd/clientv3"
+	"google.golang.org/grpc/grpclog"
 	"k8s.io/klog"
 )
 
 func init() {
 	clientv3.SetLogger(klogWrapper{})
+
+	// overwrite gRPC logger, to discard all gRPC info-level logging
+	grpclog.SetLoggerV2(grpclog.NewLoggerV2(ioutil.Discard, os.Stderr, os.Stderr))
 }
 
 type klogWrapper struct{}
