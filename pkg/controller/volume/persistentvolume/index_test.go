@@ -20,7 +20,7 @@ import (
 	"sort"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -1118,19 +1118,19 @@ func TestVolumeModeCheck(t *testing.T) {
 			enableBlock:        true,
 		},
 		"feature disabled - pvc block and pv filesystem": {
-			isExpectedMismatch: false,
+			isExpectedMismatch: true,
 			vol:                createVolumeModeFilesystemTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
 			enableBlock:        false,
 		},
 		"feature disabled - pvc filesystem and pv block": {
-			isExpectedMismatch: false,
+			isExpectedMismatch: true,
 			vol:                createVolumeModeBlockTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
 			enableBlock:        false,
 		},
 		"feature disabled - pvc block and pv block": {
-			isExpectedMismatch: false,
+			isExpectedMismatch: true,
 			vol:                createVolumeModeBlockTestVolume(),
 			pvc:                makeVolumeModePVC("8G", &blockMode, nil),
 			enableBlock:        false,
@@ -1146,10 +1146,7 @@ func TestVolumeModeCheck(t *testing.T) {
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.BlockVolume, scenario.enableBlock)()
-			expectedMismatch, err := pvutil.CheckVolumeModeMismatches(&scenario.pvc.Spec, &scenario.vol.Spec)
-			if err != nil {
-				t.Errorf("Unexpected failure for checkVolumeModeMismatches: %v", err)
-			}
+			expectedMismatch := pvutil.CheckVolumeModeMismatches(&scenario.pvc.Spec, &scenario.vol.Spec)
 			// expected to match but either got an error or no returned pvmatch
 			if expectedMismatch && !scenario.isExpectedMismatch {
 				t.Errorf("Unexpected failure for scenario, expected not to mismatch on modes but did: %s", name)
@@ -1222,7 +1219,7 @@ func TestFilteringVolumeModes(t *testing.T) {
 			enableBlock:     false,
 		},
 		"2-2 feature disabled - pvc mode is block and pv mode is block - fields should be dropped by api and not analyzed with gate disabled": {
-			isExpectedMatch: true,
+			isExpectedMatch: false,
 			vol:             createTestVolOrderedIndex(createVolumeModeBlockTestVolume()),
 			pvc:             makeVolumeModePVC("8G", &blockMode, nil),
 			enableBlock:     false,
