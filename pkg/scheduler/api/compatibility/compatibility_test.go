@@ -168,7 +168,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"NodeAffinityPriority",
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
@@ -186,6 +185,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "NodeAffinity", Weight: 2},
 				},
 			},
 		},
@@ -238,7 +238,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
-				"NodeAffinityPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
@@ -253,6 +252,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "NodeAffinity", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -310,7 +310,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
-				"NodeAffinityPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 			),
@@ -326,6 +325,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
@@ -393,7 +393,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
-				"NodeAffinityPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 			),
@@ -409,6 +408,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
@@ -489,7 +489,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
-				"NodeAffinityPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 			),
@@ -505,6 +504,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
@@ -586,7 +586,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
-				"NodeAffinityPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 			),
@@ -603,6 +602,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
@@ -689,7 +689,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
-				"NodeAffinityPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 			),
@@ -706,6 +705,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
@@ -804,7 +804,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
-				"NodeAffinityPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
@@ -822,6 +821,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
@@ -922,7 +922,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
-				"NodeAffinityPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
@@ -940,6 +939,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
@@ -1040,7 +1040,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
-				"NodeAffinityPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
@@ -1058,6 +1057,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
@@ -1162,7 +1162,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"LeastRequestedPriority",
 				"BalancedResourceAllocation",
 				"SelectorSpreadPriority",
-				"NodeAffinityPriority",
 				"InterPodAffinityPriority",
 				"MostRequestedPriority",
 				"RequestedToCapacityRatioPriority",
@@ -1180,6 +1179,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
@@ -1216,6 +1216,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	}
 	scoreToPriorityMap := map[string]string{
 		"ImageLocality":       "ImageLocalityPriority",
+		"NodeAffinity":        "NodeAffinityPriority",
 		"NodePreferAvoidPods": "NodePreferAvoidPodsPriority",
 		"TaintToleration":     "TaintTolerationPriority",
 	}
