@@ -53,7 +53,6 @@ go_library(
         "//staging/src/k8s.io/kubectl/pkg/util/i18n:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/interrupt:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/openapi:go_default_library",
-        "//staging/src/k8s.io/kubectl/pkg/util/printers:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/templates:go_default_library",
         "//vendor/github.com/liggitt/tabwriter:go_default_library",
         "//vendor/github.com/spf13/cobra:go_default_library",
@@ -96,6 +95,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/diff:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/watch:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/genericclioptions:go_default_library",
+        "//staging/src/k8s.io/cli-runtime/pkg/printers:go_default_library",
         "//staging/src/k8s.io/cli-runtime/pkg/resource:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/rest/fake:go_default_library",
@@ -104,7 +104,6 @@ go_test(
         "//staging/src/k8s.io/kubectl/pkg/scheme:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/openapi:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/util/openapi/testing:go_default_library",
-        "//staging/src/k8s.io/kubectl/pkg/util/printers:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
     ],
 )
