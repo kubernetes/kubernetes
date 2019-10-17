@@ -2,33 +2,33 @@
    "kind":"ReplicationController",
    "apiVersion":"v1",
    "metadata":{
-      "name":"redis-master",
+      "name":"agnhost-master",
       "labels":{
-         "app":"redis",
+         "app":"agnhost",
          "role":"master"
       }
    },
    "spec":{
       "replicas":1,
       "selector":{
-         "app":"redis",
+         "app":"agnhost",
          "role":"master"
       },
       "template":{
          "metadata":{
             "labels":{
-               "app":"redis",
+               "app":"agnhost",
                "role":"master"
             }
          },
          "spec":{
             "containers":[
                {
-                  "name":"redis-master",
-                  "image": "{{.RedisImage}}",
+                  "name":"agnhost-master",
+                  "image": "{{.AgnhostImage}}",
                   "ports":[
                      {
-                        "name":"redis-server",
+                        "name":"agnhost-server",
                         "containerPort":6379
                      }
                   ]

@@ -274,16 +274,16 @@ func testRollingUpdateDeployment(f *framework.Framework) {
 	err = e2epod.VerifyPodsRunning(c, ns, "sample-pod", false, replicas)
 	framework.ExpectNoError(err, "error in waiting for pods to come up: %s", err)
 
-	// Create a deployment to delete webserver pods and instead bring up redis pods.
+	// Create a deployment to delete webserver pods and instead bring up agnhost pods.
 	deploymentName := "test-rolling-update-deployment"
 	framework.Logf("Creating deployment %q", deploymentName)
-	d := e2edeploy.NewDeployment(deploymentName, replicas, deploymentPodLabels, RedisImageName, RedisImage, appsv1.RollingUpdateDeploymentStrategyType)
+	d := e2edeploy.NewDeployment(deploymentName, replicas, deploymentPodLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
 	deploy, err := c.AppsV1().Deployments(ns).Create(d)
 	framework.ExpectNoError(err)
 
 	// Wait for it to be updated to revision 3546343826724305833.
 	framework.Logf("Ensuring deployment %q gets the next revision from the one the adopted replica set %q has", deploy.Name, rs.Name)
-	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3546343826724305833", RedisImage)
+	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "3546343826724305833", AgnhostImage)
 	framework.ExpectNoError(err)
 
 	framework.Logf("Ensuring status for deployment %q is the expected", deploy.Name)
@@ -303,23 +303,23 @@ func testRecreateDeployment(f *framework.Framework) {
 	ns := f.Namespace.Name
 	c := f.ClientSet
 
-	// Create a deployment that brings up redis pods.
+	// Create a deployment that brings up agnhost pods.
 	deploymentName := "test-recreate-deployment"
 	framework.Logf("Creating deployment %q", deploymentName)
-	d := e2edeploy.NewDeployment(deploymentName, int32(1), map[string]string{"name": "sample-pod-3"}, RedisImageName, RedisImage, appsv1.RecreateDeploymentStrategyType)
+	d := e2edeploy.NewDeployment(deploymentName, int32(1), map[string]string{"name": "sample-pod-3"}, AgnhostImageName, AgnhostImage, appsv1.RecreateDeploymentStrategyType)
 	deployment, err := c.AppsV1().Deployments(ns).Create(d)
 	framework.ExpectNoError(err)
 
 	// Wait for it to be updated to revision 1
 	framework.Logf("Waiting deployment %q to be updated to revision 1", deploymentName)
-	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", RedisImage)
+	err = e2edeploy.WaitForDeploymentRevisionAndImage(c, ns, deploymentName, "1", AgnhostImage)
 	framework.ExpectNoError(err)
 
 	framework.Logf("Waiting deployment %q to complete", deploymentName)
 	err = e2edeploy.WaitForDeploymentComplete(c, deployment)
 	framework.ExpectNoError(err)
 
-	// Update deployment to delete redis pods and bring up webserver pods.
+	// Update deployment to delete agnhost pods and bring up webserver pods.
 	framework.Logf("Triggering a new rollout for deployment %q", deploymentName)
 	deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deploymentName, func(update *appsv1.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = WebserverImageName
@@ -352,7 +352,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	err = e2epod.VerifyPodsRunning(c, ns, "cleanup-pod", false, replicas)
 	framework.ExpectNoError(err, "error in waiting for pods to come up: %v", err)
 
-	// Create a deployment to delete webserver pods and instead bring up redis pods.
+	// Create a deployment to delete webserver pods and instead bring up agnhost pods.
 	deploymentName := "test-cleanup-deployment"
 	framework.Logf("Creating deployment %s", deploymentName)
 
@@ -367,7 +367,7 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 	w, err := c.CoreV1().Pods(ns).Watch(options)
 	framework.ExpectNoError(err)
 	go func() {
-		// There should be only one pod being created, which is the pod with the redis image.
+		// There should be only one pod being created, which is the pod with the agnhost image.
 		// The old RS shouldn't create new pod when deployment controller adding pod template hash label to its selector.
 		numPodCreation := 1
 		for {
@@ -384,15 +384,15 @@ func testDeploymentCleanUpPolicy(f *framework.Framework) {
 				if !ok {
 					framework.Failf("Expect event Object to be a pod")
 				}
-				if pod.Spec.Containers[0].Name != RedisImageName {
-					framework.Failf("Expect the created pod to have container name %s, got pod %#v\n", RedisImageName, pod)
+				if pod.Spec.Containers[0].Name != AgnhostImageName {
+					framework.Failf("Expect the created pod to have container name %s, got pod %#v\n", AgnhostImageName, pod)
 				}
 			case <-stopCh:
 				return
 			}
 		}
 	}()
-	d := e2edeploy.NewDeployment(deploymentName, replicas, deploymentPodLabels, RedisImageName, RedisImage, appsv1.RollingUpdateDeploymentStrategyType)
+	d := e2edeploy.NewDeployment(deploymentName, replicas, deploymentPodLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
 	d.Spec.RevisionHistoryLimit = revisionHistoryLimit
 	_, err = c.AppsV1().Deployments(ns).Create(d)
 	framework.ExpectNoError(err)
@@ -462,9 +462,9 @@ func testRolloverDeployment(f *framework.Framework) {
 	framework.ExpectNoError(err)
 	ensureReplicas(newRS, int32(1))
 
-	// The deployment is stuck, update it to rollover the above 2 ReplicaSets and bring up redis pods.
+	// The deployment is stuck, update it to rollover the above 2 ReplicaSets and bring up agnhost pods.
 	framework.Logf("Rollover old replica sets for deployment %q with new image update", deploymentName)
-	updatedDeploymentImageName, updatedDeploymentImage := RedisImageName, RedisImage
+	updatedDeploymentImageName, updatedDeploymentImage := AgnhostImageName, AgnhostImage
 	deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, newDeployment.Name, func(update *appsv1.Deployment) {
 		update.Spec.Template.Spec.Containers[0].Name = updatedDeploymentImageName
 		update.Spec.Template.Spec.Containers[0].Image = updatedDeploymentImage

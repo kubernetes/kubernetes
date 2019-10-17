@@ -79,32 +79,31 @@ import (
 )
 
 const (
-	updateDemoSelector       = "name=update-demo"
-	guestbookStartupTimeout  = 10 * time.Minute
-	guestbookResponseTimeout = 3 * time.Minute
-	simplePodSelector        = "name=httpd"
-	simplePodName            = "httpd"
-	simplePodResourceName    = "pod/httpd"
-	httpdDefaultOutput       = "It works!"
-	simplePodPort            = 80
-	pausePodSelector         = "name=pause"
-	pausePodName             = "pause"
-	busyboxPodSelector       = "app=busybox1"
-	busyboxPodName           = "busybox1"
-	runJobTimeout            = 5 * time.Minute
-	kubeCtlManifestPath      = "test/e2e/testing-manifests/kubectl"
-	redisControllerFilename  = "redis-master-controller.json.in"
-	redisServiceFilename     = "redis-master-service.json"
-	httpdDeployment1Filename = "httpd-deployment1.yaml.in"
-	httpdDeployment2Filename = "httpd-deployment2.yaml.in"
-	httpdDeployment3Filename = "httpd-deployment3.yaml.in"
-	metaPattern              = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
+	updateDemoSelector        = "name=update-demo"
+	guestbookStartupTimeout   = 10 * time.Minute
+	guestbookResponseTimeout  = 3 * time.Minute
+	simplePodSelector         = "name=httpd"
+	simplePodName             = "httpd"
+	simplePodResourceName     = "pod/httpd"
+	httpdDefaultOutput        = "It works!"
+	simplePodPort             = 80
+	pausePodSelector          = "name=pause"
+	pausePodName              = "pause"
+	busyboxPodSelector        = "app=busybox1"
+	busyboxPodName            = "busybox1"
+	runJobTimeout             = 5 * time.Minute
+	kubeCtlManifestPath       = "test/e2e/testing-manifests/kubectl"
+	agnhostControllerFilename = "agnhost-master-controller.json.in"
+	agnhostServiceFilename    = "agnhost-master-service.json"
+	httpdDeployment1Filename  = "httpd-deployment1.yaml.in"
+	httpdDeployment2Filename  = "httpd-deployment2.yaml.in"
+	httpdDeployment3Filename  = "httpd-deployment3.yaml.in"
+	metaPattern               = `"kind":"%s","apiVersion":"%s/%s","metadata":{"name":"%s"}`
 )
 
 var (
 	nautilusImage = imageutils.GetE2EImage(imageutils.Nautilus)
 	kittenImage   = imageutils.GetE2EImage(imageutils.Kitten)
-	redisImage    = imageutils.GetE2EImage(imageutils.Redis)
 	httpdImage    = imageutils.GetE2EImage(imageutils.Httpd)
 	busyboxImage  = imageutils.GetE2EImage(imageutils.BusyBox)
 	agnhostImage  = imageutils.GetE2EImage(imageutils.Agnhost)
@@ -211,7 +210,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 		return f.NewClusterVerification(
 			f.Namespace,
 			framework.PodStateVerification{
-				Selectors:   map[string]string{"app": "redis"},
+				Selectors:   map[string]string{"app": "agnhost"},
 				ValidPhases: []v1.PodPhase{v1.PodRunning /*v1.PodPending*/},
 			})
 	}
@@ -763,10 +762,10 @@ metadata:
 
 	ginkgo.Describe("Kubectl apply", func() {
 		ginkgo.It("should apply a new configuration to an existing RC", func() {
-			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
-			ginkgo.By("creating Redis RC")
+			ginkgo.By("creating Agnhost RC")
 			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
 			ginkgo.By("applying a modified configuration")
 			stdin := modifyReplicationControllerConfiguration(controllerJSON)
@@ -774,23 +773,23 @@ metadata:
 				WithStdinReader(stdin).
 				ExecOrDie()
 			ginkgo.By("checking the result")
-			forEachReplicationController(c, ns, "app", "redis", validateReplicationControllerConfiguration)
+			forEachReplicationController(c, ns, "app", "agnhost", validateReplicationControllerConfiguration)
 		})
 		ginkgo.It("should reuse port when apply to an existing SVC", func() {
-			serviceJSON := readTestFileOrDie(redisServiceFilename)
+			serviceJSON := readTestFileOrDie(agnhostServiceFilename)
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			ginkgo.By("creating Redis SVC")
+			ginkgo.By("creating Agnhost SVC")
 			framework.RunKubectlOrDieInput(string(serviceJSON[:]), "create", "-f", "-", nsFlag)
 
 			ginkgo.By("getting the original port")
-			originalNodePort := framework.RunKubectlOrDie("get", "service", "redis-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
+			originalNodePort := framework.RunKubectlOrDie("get", "service", "agnhost-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
 
 			ginkgo.By("applying the same configuration")
 			framework.RunKubectlOrDieInput(string(serviceJSON[:]), "apply", "-f", "-", nsFlag)
 
 			ginkgo.By("getting the port after applying configuration")
-			currentNodePort := framework.RunKubectlOrDie("get", "service", "redis-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
+			currentNodePort := framework.RunKubectlOrDie("get", "service", "agnhost-master", nsFlag, "-o", "jsonpath={.spec.ports[0].port}")
 
 			ginkgo.By("checking the result")
 			if originalNodePort != currentNodePort {
@@ -999,33 +998,33 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, describe pod or rc
-			Description: Deploy a redis controller and a redis service. Kubectl describe pods SHOULD return the name, namespace, labels, state and other information as expected. Kubectl describe on rc, service, node and namespace SHOULD also return proper information.
+			Description: Deploy an agnhost controller and an agnhost service. Kubectl describe pods SHOULD return the name, namespace, labels, state and other information as expected. Kubectl describe on rc, service, node and namespace SHOULD also return proper information.
 		*/
 		framework.ConformanceIt("should check if kubectl describe prints relevant information for rc and pods ", func() {
-			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
-			serviceJSON := readTestFileOrDie(redisServiceFilename)
+			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
+			serviceJSON := readTestFileOrDie(agnhostServiceFilename)
 
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
 			framework.RunKubectlOrDieInput(string(serviceJSON[:]), "create", "-f", "-", nsFlag)
 
-			ginkgo.By("Waiting for Redis master to start.")
+			ginkgo.By("Waiting for Agnhost master to start.")
 			waitForOrFailWithDebug(1)
 
 			// Pod
 			forEachPod(func(pod v1.Pod) {
 				output := framework.RunKubectlOrDie("describe", "pod", pod.Name, nsFlag)
 				requiredStrings := [][]string{
-					{"Name:", "redis-master-"},
+					{"Name:", "agnhost-master-"},
 					{"Namespace:", ns},
 					{"Node:"},
-					{"Labels:", "app=redis"},
+					{"Labels:", "app=agnhost"},
 					{"role=master"},
 					{"Annotations:"},
 					{"Status:", "Running"},
 					{"IP:"},
-					{"Controlled By:", "ReplicationController/redis-master"},
-					{"Image:", redisImage},
+					{"Controlled By:", "ReplicationController/agnhost-master"},
+					{"Image:", agnhostImage},
 					{"State:", "Running"},
 					{"QoS Class:", "BestEffort"},
 				}
@@ -1034,28 +1033,28 @@ metadata:
 
 			// Rc
 			requiredStrings := [][]string{
-				{"Name:", "redis-master"},
+				{"Name:", "agnhost-master"},
 				{"Namespace:", ns},
-				{"Selector:", "app=redis,role=master"},
-				{"Labels:", "app=redis"},
+				{"Selector:", "app=agnhost,role=master"},
+				{"Labels:", "app=agnhost"},
 				{"role=master"},
 				{"Annotations:"},
 				{"Replicas:", "1 current", "1 desired"},
 				{"Pods Status:", "1 Running", "0 Waiting", "0 Succeeded", "0 Failed"},
 				{"Pod Template:"},
-				{"Image:", redisImage},
+				{"Image:", agnhostImage},
 				{"Events:"}}
-			checkKubectlOutputWithRetry(requiredStrings, "describe", "rc", "redis-master", nsFlag)
+			checkKubectlOutputWithRetry(requiredStrings, "describe", "rc", "agnhost-master", nsFlag)
 
 			// Service
-			output := framework.RunKubectlOrDie("describe", "service", "redis-master", nsFlag)
+			output := framework.RunKubectlOrDie("describe", "service", "agnhost-master", nsFlag)
 			requiredStrings = [][]string{
-				{"Name:", "redis-master"},
+				{"Name:", "agnhost-master"},
 				{"Namespace:", ns},
-				{"Labels:", "app=redis"},
+				{"Labels:", "app=agnhost"},
 				{"role=master"},
 				{"Annotations:"},
-				{"Selector:", "app=redis", "role=master"},
+				{"Selector:", "app=agnhost", "role=master"},
 				{"Type:", "ClusterIP"},
 				{"IP:"},
 				{"Port:", "<unset>", "6379/TCP"},
@@ -1140,25 +1139,25 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, create service, replication controller
-			Description: Create a Pod running redis master listening to port 6379. Using kubectl expose the redis master  replication controllers at port 1234. Validate that the replication controller is listening on port 1234 and the target port is set to 6379, port that redis master is listening. Using kubectl expose the redis master as a service at port 2345. The service MUST be listening on port 2345 and the target port is set to 6379, port that redis master is listening.
+			Description: Create a Pod running agnhost listening to port 6379. Using kubectl expose the agnhost master replication controllers at port 1234. Validate that the replication controller is listening on port 1234 and the target port is set to 6379, port that agnhost master is listening. Using kubectl expose the agnhost master as a service at port 2345. The service MUST be listening on port 2345 and the target port is set to 6379, port that agnhost master is listening.
 		*/
 		framework.ConformanceIt("should create services for rc ", func() {
-			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
 
-			redisPort := 6379
+			agnhostPort := 6379
 
-			ginkgo.By("creating Redis RC")
+			ginkgo.By("creating Agnhost RC")
 
 			framework.Logf("namespace %v", ns)
 			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
 
 			// It may take a while for the pods to get registered in some cases, wait to be sure.
-			ginkgo.By("Waiting for Redis master to start.")
+			ginkgo.By("Waiting for Agnhost master to start.")
 			waitForOrFailWithDebug(1)
 			forEachPod(func(pod v1.Pod) {
-				framework.Logf("wait on redis-master startup in %v ", ns)
-				framework.LookForStringInLog(ns, pod.Name, "redis-master", "Ready to accept connections", framework.PodStartTimeout)
+				framework.Logf("wait on agnhost-master startup in %v ", ns)
+				framework.LookForStringInLog(ns, pod.Name, "agnhost-master", "Paused", framework.PodStartTimeout)
 			})
 			validateService := func(name string, servicePort int, timeout time.Duration) {
 				err := wait.Poll(framework.Poll, timeout, func() (bool, error) {
@@ -1185,7 +1184,7 @@ metadata:
 						framework.Failf("Too many endpoints found")
 					}
 					for _, port := range uidToPort {
-						if port[0] != redisPort {
+						if port[0] != agnhostPort {
 							framework.Failf("Wrong endpoint port: %d", port[0])
 						}
 					}
@@ -1203,18 +1202,18 @@ metadata:
 				if port.Port != int32(servicePort) {
 					framework.Failf("Wrong service port: %d", port.Port)
 				}
-				if port.TargetPort.IntValue() != redisPort {
+				if port.TargetPort.IntValue() != agnhostPort {
 					framework.Failf("Wrong target port: %d", port.TargetPort.IntValue())
 				}
 			}
 
 			ginkgo.By("exposing RC")
-			framework.RunKubectlOrDie("expose", "rc", "redis-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
+			framework.RunKubectlOrDie("expose", "rc", "agnhost-master", "--name=rm2", "--port=1234", fmt.Sprintf("--target-port=%d", agnhostPort), nsFlag)
 			framework.WaitForService(c, ns, "rm2", true, framework.Poll, framework.ServiceStartTimeout)
 			validateService("rm2", 1234, framework.ServiceStartTimeout)
 
 			ginkgo.By("exposing service")
-			framework.RunKubectlOrDie("expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", redisPort), nsFlag)
+			framework.RunKubectlOrDie("expose", "service", "rm2", "--name=rm3", "--port=2345", fmt.Sprintf("--target-port=%d", agnhostPort), nsFlag)
 			framework.WaitForService(c, ns, "rm3", true, framework.Poll, framework.ServiceStartTimeout)
 			validateService("rm3", 2345, framework.ServiceStartTimeout)
 		})
@@ -1384,14 +1383,14 @@ metadata:
 		/*
 			Release : v1.9
 			Testname: Kubectl, patch to annotate
-			Description: Start running a redis master and a replication controller. When the pod is running, using ‘kubectl patch’ command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
+			Description: Start running agnhost and a replication controller. When the pod is running, using ‘kubectl patch’ command add annotations. The annotation MUST be added to running pods and SHOULD be able to read added annotations from each of the Pods running under the replication controller.
 		*/
 		framework.ConformanceIt("should add annotations for pods in rc ", func() {
-			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(redisControllerFilename)))
+			controllerJSON := commonutils.SubstituteImageName(string(readTestFileOrDie(agnhostControllerFilename)))
 			nsFlag := fmt.Sprintf("--namespace=%v", ns)
-			ginkgo.By("creating Redis RC")
+			ginkgo.By("creating Agnhost RC")
 			framework.RunKubectlOrDieInput(controllerJSON, "create", "-f", "-", nsFlag)
-			ginkgo.By("Waiting for Redis master to start.")
+			ginkgo.By("Waiting for Agnhost master to start.")
 			waitForOrFailWithDebug(1)
 			ginkgo.By("patching all pods")
 			forEachPod(func(pod v1.Pod) {
@@ -2269,7 +2268,7 @@ func forEachReplicationController(c clientset.Interface, ns, selectorKey, select
 }
 
 func validateReplicationControllerConfiguration(rc v1.ReplicationController) {
-	if rc.Name == "redis-master" {
+	if rc.Name == "agnhost-master" {
 		if _, ok := rc.Annotations[v1.LastAppliedConfigAnnotation]; !ok {
 			framework.Failf("Annotation not found in modified configuration:\n%v\n", rc)
 		}
