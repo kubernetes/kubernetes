@@ -293,7 +293,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	queue.Delete(testPod)
 
 	// Trigger a move request
-	queue.MoveAllToActiveQueue()
+	queue.MoveAllToActiveOrBackoffQueue("test")
 
 	// Trigger error handling again to put the pod in backoff queue
 	errFunc(testPodInfo, nil)
