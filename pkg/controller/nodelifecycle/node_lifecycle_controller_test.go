@@ -23,7 +23,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	coordv1beta1 "k8s.io/api/coordination/v1beta1"
+	coordv1 "k8s.io/api/coordination/v1"
 	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,7 +34,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
-	coordinformers "k8s.io/client-go/informers/coordination/v1beta1"
+	coordinformers "k8s.io/client-go/informers/coordination/v1"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
@@ -113,20 +113,20 @@ func (nc *nodeLifecycleController) doEviction(fakeNodeHandler *testutil.FakeNode
 	return podEvicted
 }
 
-func createNodeLease(nodeName string, renewTime metav1.MicroTime) *coordv1beta1.Lease {
-	return &coordv1beta1.Lease{
+func createNodeLease(nodeName string, renewTime metav1.MicroTime) *coordv1.Lease {
+	return &coordv1.Lease{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      nodeName,
 			Namespace: v1.NamespaceNodeLease,
 		},
-		Spec: coordv1beta1.LeaseSpec{
+		Spec: coordv1.LeaseSpec{
 			HolderIdentity: pointer.StringPtr(nodeName),
 			RenewTime:      &renewTime,
 		},
 	}
 }
 
-func (nc *nodeLifecycleController) syncLeaseStore(lease *coordv1beta1.Lease) error {
+func (nc *nodeLifecycleController) syncLeaseStore(lease *coordv1.Lease) error {
 	if lease == nil {
 		return nil
 	}
@@ -162,7 +162,7 @@ func newNodeLifecycleControllerFromClient(
 
 	factory := informers.NewSharedInformerFactory(kubeClient, controller.NoResyncPeriodFunc())
 
-	leaseInformer := factory.Coordination().V1beta1().Leases()
+	leaseInformer := factory.Coordination().V1().Leases()
 	nodeInformer := factory.Core().V1().Nodes()
 	daemonSetInformer := factory.Apps().V1().DaemonSets()
 
@@ -1698,10 +1698,10 @@ func TestMonitorNodeHealthUpdateNodeAndPodStatusWithLease(t *testing.T) {
 	testcases := []struct {
 		description             string
 		fakeNodeHandler         *testutil.FakeNodeHandler
-		lease                   *coordv1beta1.Lease
+		lease                   *coordv1.Lease
 		timeToPass              time.Duration
 		newNodeStatus           v1.NodeStatus
-		newLease                *coordv1beta1.Lease
+		newLease                *coordv1.Lease
 		expectedRequestCount    int
 		expectedNodes           []*v1.Node
 		expectedPodStatusUpdate bool
