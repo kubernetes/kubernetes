@@ -31,6 +31,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
+// Constants
 const (
 	Ext4FSType    = "ext4"
 	Ext3FSType    = "ext3"

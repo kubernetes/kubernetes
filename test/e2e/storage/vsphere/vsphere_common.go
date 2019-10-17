@@ -24,6 +24,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+// Constants
 const (
 	SPBMPolicyName            = "VSPHERE_SPBM_POLICY_NAME"
 	StorageClassDatastoreName = "VSPHERE_DATASTORE"
@@ -32,28 +33,33 @@ const (
 	SPBMTagPolicy             = "VSPHERE_SPBM_TAG_POLICY"
 )
 
+// DataStore Constants
 const (
 	VCPClusterDatastore        = "CLUSTER_DATASTORE"
 	SPBMPolicyDataStoreCluster = "VSPHERE_SPBM_POLICY_DS_CLUSTER"
 )
 
+// VCPScale Constants
 const (
 	VCPScaleVolumeCount   = "VCP_SCALE_VOLUME_COUNT"
 	VCPScaleVolumesPerPod = "VCP_SCALE_VOLUME_PER_POD"
 	VCPScaleInstances     = "VCP_SCALE_INSTANCES"
 )
 
+// VCPStress Constants
 const (
 	VCPStressInstances  = "VCP_STRESS_INSTANCES"
 	VCPStressIterations = "VCP_STRESS_ITERATIONS"
 )
 
+// VCPPerf Constants
 const (
 	VCPPerfVolumeCount   = "VCP_PERF_VOLUME_COUNT"
 	VCPPerfVolumesPerPod = "VCP_PERF_VOLUME_PER_POD"
 	VCPPerfIterations    = "VCP_PERF_ITERATIONS"
 )
 
+// VCPZone Constants
 const (
 	VCPZoneVsanDatastore1      = "VCP_ZONE_VSANDATASTORE1"
 	VCPZoneVsanDatastore2      = "VCP_ZONE_VSANDATASTORE2"
@@ -65,12 +71,14 @@ const (
 	VCPZoneD                   = "VCP_ZONE_D"
 )
 
+// GetAndExpectStringEnvVar returns os env value for the given varName
 func GetAndExpectStringEnvVar(varName string) string {
 	varValue := os.Getenv(varName)
 	gomega.Expect(varValue).NotTo(gomega.BeEmpty(), "ENV "+varName+" is not set")
 	return varValue
 }
 
+// GetAndExpectIntEnvVar gets os env value for the given varName and turn it to int.
 func GetAndExpectIntEnvVar(varName string) int {
 	varValue := GetAndExpectStringEnvVar(varName)
 	varIntValue, err := strconv.Atoi(varValue)

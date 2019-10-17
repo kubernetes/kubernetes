@@ -33,9 +33,11 @@ import (
 	neturl "net/url"
 )
 
+// NodeMapper holds method for node info map
 type NodeMapper struct {
 }
 
+// NodeInfo holds common information of node
 type NodeInfo struct {
 	Name              string
 	DataCenterRef     types.ManagedObjectReference
@@ -45,6 +47,7 @@ type NodeInfo struct {
 	Zones             []string
 }
 
+// Constants
 const (
 	DatacenterType             = "Datacenter"
 	ClusterComputeResourceType = "ClusterComputeResource"
@@ -58,13 +61,13 @@ var (
 
 // GenerateNodeMap populates node name to node info map
 func (nm *NodeMapper) GenerateNodeMap(vSphereInstances map[string]*VSphere, nodeList v1.NodeList) error {
-	type VmSearch struct {
+	type VMSearch struct {
 		vs         *VSphere
 		datacenter *object.Datacenter
 	}
 
 	var wg sync.WaitGroup
-	var queueChannel []*VmSearch
+	var queueChannel []*VMSearch
 
 	var datacenters []*object.Datacenter
 	var err error
@@ -99,7 +102,7 @@ func (nm *NodeMapper) GenerateNodeMap(vSphereInstances map[string]*VSphere, node
 
 		for _, dc := range datacenters {
 			framework.Logf("Search candidates vc=%s and datacenter=%s", vs.Config.Hostname, dc.Name())
-			queueChannel = append(queueChannel, &VmSearch{vs: vs, datacenter: dc})
+			queueChannel = append(queueChannel, &VMSearch{vs: vs, datacenter: dc})
 		}
 	}
 
@@ -208,7 +211,7 @@ func retrieveZoneInformationForNode(nodeName string, connection *VSphere, hostSy
 	return zones
 }
 
-// Generate zone to datastore mapping for easily verifying volume placement
+// GenerateZoneToDatastoreMap generates zone to datastore mapping for easily verifying volume placement
 func (nm *NodeMapper) GenerateZoneToDatastoreMap() error {
 	// 1. Create zone to hosts map for each VC
 	var vcToZoneHostsMap = make(map[string](map[string][]string))
@@ -272,7 +275,7 @@ func retrieveCommonDatastoresAmongHosts(hosts []string, hostToDatastoresMap map[
 	return commonDatastores
 }
 
-// Get all the datastores in the specified zone
+// GetDatastoresInZone gets all the datastores in the specified zone
 func (nm *NodeMapper) GetDatastoresInZone(vc string, zone string) []string {
 	return vcToZoneDatastoresMap[vc][zone]
 }

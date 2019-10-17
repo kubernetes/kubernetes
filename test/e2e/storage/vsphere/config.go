@@ -98,7 +98,7 @@ func GetVSphereInstances() (map[string]*VSphere, error) {
 
 func getConfig() (*ConfigFile, error) {
 	if confFileLocation == "" {
-		return nil, fmt.Errorf("Env variable 'VSPHERE_CONF_FILE' is not set.")
+		return nil, errors.New("Env variable 'VSPHERE_CONF_FILE' is not set")
 	}
 	confFile, err := os.Open(confFileLocation)
 	if err != nil {
@@ -115,7 +115,7 @@ func getConfig() (*ConfigFile, error) {
 // readConfig parses vSphere cloud config file into ConfigFile.
 func readConfig(config io.Reader) (ConfigFile, error) {
 	if config == nil {
-		err := fmt.Errorf("no vSphere cloud provider config file given")
+		err := errors.New("no vSphere cloud provider config file given")
 		return ConfigFile{}, err
 	}
 

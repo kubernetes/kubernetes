@@ -48,6 +48,7 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
+// Constants
 const (
 	volumesPerNode = 55
 	storageclass1  = "sc-default"
@@ -552,9 +553,8 @@ func getVirtualDeviceByPath(ctx context.Context, vm *object.VirtualMachine, disk
 				if matchVirtualDiskAndVolPath(backing.FileName, diskPath) {
 					framework.Logf("Found VirtualDisk backing with filename %q for diskPath %q", backing.FileName, diskPath)
 					return device, nil
-				} else {
-					framework.Logf("VirtualDisk backing filename %q does not match with diskPath %q", backing.FileName, diskPath)
 				}
+				framework.Logf("VirtualDisk backing filename %q does not match with diskPath %q", backing.FileName, diskPath)
 			}
 		}
 	}
@@ -754,7 +754,7 @@ func getUUIDFromProviderID(providerID string) string {
 	return strings.TrimPrefix(providerID, ProviderPrefix)
 }
 
-// GetAllReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
+// GetReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
 func GetReadySchedulableNodeInfos() []*NodeInfo {
 	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
 	framework.ExpectNoError(err)

@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
+// Constants
 const (
 	DiskSizeSCName = "disksizesc"
 )

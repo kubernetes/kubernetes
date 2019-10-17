@@ -33,6 +33,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
+// Constants
 const (
 	VolDir                    = "kubevols"
 	DefaultDiskCapacityKB     = 2097152
@@ -41,7 +42,7 @@ const (
 	VirtualMachineType        = "VirtualMachine"
 )
 
-// Represents a vSphere instance where one or more kubernetes nodes are running.
+// VSphere represents a vSphere instance where one or more kubernetes nodes are running.
 type VSphere struct {
 	Config *Config
 	Client *govmomi.Client
@@ -63,7 +64,7 @@ func (vs *VSphere) GetDatacenter(ctx context.Context, datacenterPath string) (*o
 	return finder.Datacenter(ctx, datacenterPath)
 }
 
-// GetDatacenter returns the DataCenter Object for the given datacenterPath
+// GetDatacenterFromObjectReference returns the DataCenter Object for the given datacenterPath
 func (vs *VSphere) GetDatacenterFromObjectReference(ctx context.Context, dc object.Reference) *object.Datacenter {
 	Connect(ctx, vs)
 	return object.NewDatacenter(vs.Client.Client, dc.Reference())
@@ -85,7 +86,7 @@ func (vs *VSphere) GetVMByUUID(ctx context.Context, vmUUID string, dc object.Ref
 	return s.FindByUuid(ctx, datacenter, vmUUID, true, nil)
 }
 
-// Get host object reference of the host on which the specified VM resides
+// GetHostFromVMReference gets host object reference of the host on which the specified VM resides
 func (vs *VSphere) GetHostFromVMReference(ctx context.Context, vm types.ManagedObjectReference) types.ManagedObjectReference {
 	Connect(ctx, vs)
 	var vmMo mo.VirtualMachine
@@ -94,7 +95,7 @@ func (vs *VSphere) GetHostFromVMReference(ctx context.Context, vm types.ManagedO
 	return host
 }
 
-// Get the datastore references of all the datastores mounted on the specified host
+// GetDatastoresMountedOnHost gets the datastore references of all the datastores mounted on the specified host
 func (vs *VSphere) GetDatastoresMountedOnHost(ctx context.Context, host types.ManagedObjectReference) []types.ManagedObjectReference {
 	Connect(ctx, vs)
 	var hostMo mo.HostSystem
@@ -102,7 +103,7 @@ func (vs *VSphere) GetDatastoresMountedOnHost(ctx context.Context, host types.Ma
 	return hostMo.Datastore
 }
 
-// Get the datastore reference of the specified datastore
+// GetDatastoreRefFromName gets the datastore reference of the specified datastore
 func (vs *VSphere) GetDatastoreRefFromName(ctx context.Context, dc object.Reference, datastoreName string) (types.ManagedObjectReference, error) {
 	Connect(ctx, vs)
 	datacenter := object.NewDatacenter(vs.Client.Client, dc.Reference())
