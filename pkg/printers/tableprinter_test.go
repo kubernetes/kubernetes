@@ -702,3 +702,23 @@ func TestPrintUnstructuredObject(t *testing.T) {
 		}
 	}
 }
+
+type TestUnknownType struct{}
+
+func (obj *TestUnknownType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
+func (obj *TestUnknownType) DeepCopyObject() runtime.Object {
+	if obj == nil {
+		return nil
+	}
+	clone := *obj
+	return &clone
+}
+
+func TestUnknownTypePrinting(t *testing.T) {
+	printer := NewTablePrinter(PrintOptions{})
+	buffer := &bytes.Buffer{}
+	err := printer.PrintObj(&TestUnknownType{}, buffer)
+	if err == nil {
+		t.Errorf("An error was expected from printing unknown type")
+	}
+}

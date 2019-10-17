@@ -81,17 +81,6 @@ func (obj *TestPrintType) DeepCopyObject() runtime.Object {
 	return &clone
 }
 
-type TestUnknownType struct{}
-
-func (obj *TestUnknownType) GetObjectKind() schema.ObjectKind { return schema.EmptyObjectKind }
-func (obj *TestUnknownType) DeepCopyObject() runtime.Object {
-	if obj == nil {
-		return nil
-	}
-	clone := *obj
-	return &clone
-}
-
 // TODO(seans3): Move this test to cli-runtime/pkg/printers.
 func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc func(data []byte, v interface{}) error) {
 	buf := bytes.NewBuffer([]byte{})
@@ -214,15 +203,6 @@ func TestPrintHandlerError(t *testing.T) {
 	_, err := generator.GenerateTable(&obj, printers.GenerateOptions{})
 	if err == nil || err.Error() != "ErrorPrintHandler error" {
 		t.Errorf("Did not get the expected error: %#v", err)
-	}
-}
-
-func TestUnknownTypePrinting(t *testing.T) {
-	printer := printers.NewTablePrinter(printers.PrintOptions{})
-	buffer := &bytes.Buffer{}
-	err := printer.PrintObj(&TestUnknownType{}, buffer)
-	if err == nil {
-		t.Errorf("An error was expected from printing unknown type")
 	}
 }
 
