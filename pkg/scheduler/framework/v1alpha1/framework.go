@@ -599,6 +599,11 @@ func (f *framework) GetWaitingPod(uid types.UID) WaitingPod {
 	return f.waitingPods.get(uid)
 }
 
+// HasFilterPlugins returns true if at least one filter plugin is defined.
+func (f *framework) HasFilterPlugins() bool {
+	return len(f.filterPlugins) > 0
+}
+
 // ListPlugins returns a map of extension point name to plugin names configured at each extension
 // point. Returns nil if no plugins where configred.
 func (f *framework) ListPlugins() map[string][]config.Plugin {

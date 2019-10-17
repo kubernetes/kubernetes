@@ -435,6 +435,9 @@ type Framework interface {
 	// code=4("skip") status.
 	RunBindPlugins(state *CycleState, pod *v1.Pod, nodeName string) *Status
 
+	// HasFilterPlugins return true if at least one filter plugin is defined
+	HasFilterPlugins() bool
+
 	// ListPlugins returns a map of extension point name to list of configured Plugins.
 	ListPlugins() map[string][]config.Plugin
 }
