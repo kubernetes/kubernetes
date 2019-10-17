@@ -21,7 +21,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
-	"regexp"
 	"testing"
 
 	yaml "gopkg.in/yaml.v2"
@@ -67,113 +66,6 @@ type TestStruct struct {
 
 func (in *TestStruct) DeepCopyObject() runtime.Object {
 	panic("never called")
-}
-
-// TODO(seans3): Move this test to tableprinter_test.go
-func TestPrintUnstructuredObject(t *testing.T) {
-	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Test",
-			"dummy1":     "present",
-			"dummy2":     "present",
-			"metadata": map[string]interface{}{
-				"name":              "MyName",
-				"namespace":         "MyNamespace",
-				"creationTimestamp": "2017-04-01T00:00:00Z",
-				"resourceVersion":   123,
-				"uid":               "00000000-0000-0000-0000-000000000001",
-				"dummy3":            "present",
-				"labels":            map[string]interface{}{"test": "other"},
-			},
-			/*"items": []interface{}{
-				map[string]interface{}{
-					"itemBool": true,
-					"itemInt":  42,
-				},
-			},*/
-			"url":    "http://localhost",
-			"status": "ok",
-		},
-	}
-
-	tests := []struct {
-		expected string
-		options  printers.PrintOptions
-		object   runtime.Object
-	}{
-		{
-			expected: "NAME\\s+AGE\nMyName\\s+\\d+",
-			object:   obj,
-		},
-		{
-			options: printers.PrintOptions{
-				WithNamespace: true,
-			},
-			expected: "NAMESPACE\\s+NAME\\s+AGE\nMyNamespace\\s+MyName\\s+\\d+",
-			object:   obj,
-		},
-		{
-			options: printers.PrintOptions{
-				ShowLabels:    true,
-				WithNamespace: true,
-			},
-			expected: "NAMESPACE\\s+NAME\\s+AGE\\s+LABELS\nMyNamespace\\s+MyName\\s+\\d+\\w+\\s+test\\=other",
-			object:   obj,
-		},
-		{
-			expected: "NAME\\s+AGE\nMyName\\s+\\d+\\w+\nMyName2\\s+\\d+",
-			object: &unstructured.Unstructured{
-				Object: map[string]interface{}{
-					"apiVersion": "v1",
-					"kind":       "Test",
-					"dummy1":     "present",
-					"dummy2":     "present",
-					"items": []interface{}{
-						map[string]interface{}{
-							"metadata": map[string]interface{}{
-								"name":              "MyName",
-								"namespace":         "MyNamespace",
-								"creationTimestamp": "2017-04-01T00:00:00Z",
-								"resourceVersion":   123,
-								"uid":               "00000000-0000-0000-0000-000000000001",
-								"dummy3":            "present",
-								"labels":            map[string]interface{}{"test": "other"},
-							},
-						},
-						map[string]interface{}{
-							"metadata": map[string]interface{}{
-								"name":              "MyName2",
-								"namespace":         "MyNamespace",
-								"creationTimestamp": "2017-04-01T00:00:00Z",
-								"resourceVersion":   123,
-								"uid":               "00000000-0000-0000-0000-000000000001",
-								"dummy3":            "present",
-								"labels":            "badlabel",
-							},
-						},
-					},
-					"url":    "http://localhost",
-					"status": "ok",
-				},
-			},
-		},
-	}
-	out := bytes.NewBuffer([]byte{})
-
-	for _, test := range tests {
-		out.Reset()
-		printer := printers.NewTablePrinter(test.options)
-		printer.PrintObj(test.object, out)
-
-		matches, err := regexp.MatchString(test.expected, out.String())
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !matches {
-			t.Errorf("wanted:\n%s\ngot:\n%s", test.expected, out)
-		}
-	}
 }
 
 type TestPrintType struct {
