@@ -178,9 +178,9 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// local), plugin skips setting fsGroup if volume is already mounted
 		// and we don't have reliable way to detect volumes are unmounted or
 		// not before starting the second pod.
-		volume.InjectContent(f.ClientSet, config, fsGroup, pattern.FsType, tests)
+		volume.InjectContent(f, f.ClientSet, config, fsGroup, pattern.FsType, tests)
 		if driver.GetDriverInfo().Capabilities[CapPersistence] {
-			volume.TestVolumeClient(f.ClientSet, config, fsGroup, pattern.FsType, tests)
+			volume.TestVolumeClient(f, f.ClientSet, config, fsGroup, pattern.FsType, tests)
 		} else {
 			ginkgo.By("Skipping persistence check for non-persistent volume")
 		}

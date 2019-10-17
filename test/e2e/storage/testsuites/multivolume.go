@@ -365,18 +365,18 @@ func testAccessMultipleVolumes(f *framework.Framework, cs clientset.Interface, n
 		index := i + 1
 		path := fmt.Sprintf("/mnt/volume%d", index)
 		ginkgo.By(fmt.Sprintf("Checking if the volume%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		utils.CheckVolumeModeOfPath(pod, *pvc.Spec.VolumeMode, path)
+		utils.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
 
 		if readSeedBase > 0 {
 			ginkgo.By(fmt.Sprintf("Checking if read from the volume%d works properly", index))
-			utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, readSeedBase+int64(i))
+			utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, readSeedBase+int64(i))
 		}
 
 		ginkgo.By(fmt.Sprintf("Checking if write to the volume%d works properly", index))
-		utils.CheckWriteToPath(pod, *pvc.Spec.VolumeMode, path, byteLen, writeSeedBase+int64(i))
+		utils.CheckWriteToPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, writeSeedBase+int64(i))
 
 		ginkgo.By(fmt.Sprintf("Checking if read from the volume%d works properly", index))
-		utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, writeSeedBase+int64(i))
+		utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, writeSeedBase+int64(i))
 	}
 
 	pod, err = cs.CoreV1().Pods(pod.Namespace).Get(pod.Name, metav1.GetOptions{})
@@ -452,22 +452,22 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 	for i, pod := range pods {
 		index := i + 1
 		ginkgo.By(fmt.Sprintf("Checking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		utils.CheckVolumeModeOfPath(pod, *pvc.Spec.VolumeMode, path)
+		utils.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, path)
 
 		if i != 0 {
 			ginkgo.By(fmt.Sprintf("From pod%d, checking if reading the data that pod%d write works properly", index, index-1))
 			// For 1st pod, no one has written data yet, so pass the read check
-			utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+			utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 		}
 
 		// Update the seed and check if write/read works properly
 		seed = time.Now().UTC().UnixNano()
 
 		ginkgo.By(fmt.Sprintf("Checking if write to the volume in pod%d works properly", index))
-		utils.CheckWriteToPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+		utils.CheckWriteToPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 
 		ginkgo.By(fmt.Sprintf("Checking if read from the volume in pod%d works properly", index))
-		utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+		utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 	}
 
 	// Delete the last pod and remove from slice of pods
@@ -483,7 +483,7 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		index := i + 1
 		// index of pod and index of pvc match, because pods are created above way
 		ginkgo.By(fmt.Sprintf("Rechecking if the volume in pod%d exists as expected volume mode (%s)", index, *pvc.Spec.VolumeMode))
-		utils.CheckVolumeModeOfPath(pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
+		utils.CheckVolumeModeOfPath(f, pod, *pvc.Spec.VolumeMode, "/mnt/volume1")
 
 		if i == 0 {
 			// This time there should be data that last pod wrote, for 1st pod
@@ -491,15 +491,15 @@ func TestConcurrentAccessToSingleVolume(f *framework.Framework, cs clientset.Int
 		} else {
 			ginkgo.By(fmt.Sprintf("From pod%d, rechecking if reading the data that pod%d write works properly", index, index-1))
 		}
-		utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+		utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 
 		// Update the seed and check if write/read works properly
 		seed = time.Now().UTC().UnixNano()
 
 		ginkgo.By(fmt.Sprintf("Rechecking if write to the volume in pod%d works properly", index))
-		utils.CheckWriteToPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+		utils.CheckWriteToPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 
 		ginkgo.By(fmt.Sprintf("Rechecking if read from the volume in pod%d works properly", index))
-		utils.CheckReadFromPath(pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
+		utils.CheckReadFromPath(f, pod, *pvc.Spec.VolumeMode, path, byteLen, seed)
 	}
 }

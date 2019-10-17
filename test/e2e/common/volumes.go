@@ -91,7 +91,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 			}
 
 			// Must match content of test/images/volumes-tester/nfs/index.html
-			volume.TestVolumeClient(c, config, nil, "" /* fsType */, tests)
+			volume.TestVolumeClient(f, c, config, nil, "" /* fsType */, tests)
 		})
 	})
 
@@ -114,7 +114,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 				},
 			}
 			// Must match content of test/images/volume-tester/nfs/index.html
-			volume.TestVolumeClient(c, config, nil, "" /* fsType */, tests)
+			volume.TestVolumeClient(f, c, config, nil, "" /* fsType */, tests)
 		})
 	})
 
@@ -147,7 +147,7 @@ var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 					ExpectedContent: "Hello from GlusterFS!",
 				},
 			}
-			volume.TestVolumeClient(c, config, nil, "" /* fsType */, tests)
+			volume.TestVolumeClient(f, c, config, nil, "" /* fsType */, tests)
 		})
 	})
 })
