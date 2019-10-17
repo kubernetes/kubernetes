@@ -45,7 +45,6 @@ import (
 	"k8s.io/kubectl/pkg/rawhttp"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/interrupt"
-	utilprinters "k8s.io/kubectl/pkg/util/printers"
 	"k8s.io/kubectl/pkg/util/templates"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -523,7 +522,7 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	// output an empty line separating output
 	separatorWriter := &separatorWriterWrapper{Delegate: trackingWriter}
 
-	w := utilprinters.GetNewTabWriter(separatorWriter)
+	w := printers.GetNewTabWriter(separatorWriter)
 	for ix := range objs {
 		var mapping *meta.RESTMapping
 		var info *resource.Info
@@ -670,7 +669,7 @@ func (o *GetOptions) watch(f cmdutil.Factory, cmd *cobra.Command, args []string)
 		}
 	}
 
-	writer := utilprinters.GetNewTabWriter(o.Out)
+	writer := printers.GetNewTabWriter(o.Out)
 
 	// print the current object
 	var objsToPrint []runtime.Object

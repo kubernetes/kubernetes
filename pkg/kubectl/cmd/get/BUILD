@@ -29,7 +29,6 @@ go_library(
     importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/get",
     visibility = ["//visibility:public"],
     deps = [
-        "//pkg/printers:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
