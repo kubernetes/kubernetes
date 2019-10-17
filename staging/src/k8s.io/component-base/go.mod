@@ -31,4 +31,5 @@ replace (
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/client-go => ../client-go
 	k8s.io/component-base => ../component-base
+	sigs.k8s.io/structured-merge-diff => github.com/apelisse/structured-merge-diff v0.0.0-20190817042607-5428329
 )

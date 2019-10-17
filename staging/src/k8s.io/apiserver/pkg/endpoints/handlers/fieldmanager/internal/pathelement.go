@@ -77,7 +77,7 @@ func NewPathElement(s string) (fieldpath.PathElement, error) {
 		if err != nil {
 			return fieldpath.PathElement{}, err
 		}
-		fields := []value.Field{}
+		fields := []fieldpath.KeyValue{}
 		for k, v := range kv {
 			b, err := json.Marshal(v)
 			if err != nil {
@@ -88,13 +88,14 @@ func NewPathElement(s string) (fieldpath.PathElement, error) {
 				return fieldpath.PathElement{}, err
 			}
 
-			fields = append(fields, value.Field{
-				Name:  k,
+			fields = append(fields, fieldpath.KeyValue{
+				Key:   k,
 				Value: val,
 			})
 		}
+		fieldpath.SortKeyValues(fields)
 		return fieldpath.PathElement{
-			Key: &value.Map{Items: fields},
+			Key: &fields,
 		}, nil
 	default:
 		// Ignore unknown key types
@@ -109,8 +110,8 @@ func PathElementString(pe fieldpath.PathElement) (string, error) {
 		return Field + Separator + *pe.FieldName, nil
 	case pe.Key != nil:
 		kv := map[string]json.RawMessage{}
-		for _, k := range pe.Key.Items {
-			b, err := k.Value.ToJSON()
+		for _, k := range *pe.Key {
+			b, err := value.ToJSON(k.Value)
 			if err != nil {
 				return "", err
 			}
@@ -119,7 +120,7 @@ func PathElementString(pe fieldpath.PathElement) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			kv[k.Name] = m
+			kv[k.Key] = m
 		}
 		b, err := json.Marshal(kv)
 		if err != nil {
@@ -127,7 +128,7 @@ func PathElementString(pe fieldpath.PathElement) (string, error) {
 		}
 		return Key + ":" + string(b), nil
 	case pe.Value != nil:
-		b, err := pe.Value.ToJSON()
+		b, err := value.ToJSON(pe.Value)
 		if err != nil {
 			return "", err
 		}

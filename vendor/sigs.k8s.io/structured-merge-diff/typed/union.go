@@ -34,12 +34,12 @@ func normalizeUnions(w *mergingWalker) error {
 		return nil
 	}
 
-	old := &value.Map{}
+	var old value.Map
 	if w.lhs != nil {
-		old = w.lhs.MapValue
+		old = value.ValueMap(*w.lhs)
 	}
 	for _, union := range atom.Map.Unions {
-		if err := newUnion(&union).Normalize(old, w.rhs.MapValue, w.out.MapValue); err != nil {
+		if err := newUnion(&union).Normalize(old, value.ValueMap(*w.rhs), value.ValueMap(*w.out)); err != nil {
 			return err
 		}
 	}
@@ -56,12 +56,12 @@ func normalizeUnionsApply(w *mergingWalker) error {
 		return nil
 	}
 
-	old := &value.Map{}
+	var old value.Map
 	if w.lhs != nil {
-		old = w.lhs.MapValue
+		old = value.ValueMap(*w.lhs)
 	}
 	for _, union := range atom.Map.Unions {
-		if err := newUnion(&union).NormalizeApply(old, w.rhs.MapValue, w.out.MapValue); err != nil {
+		if err := newUnion(&union).NormalizeApply(old, value.ValueMap(*w.rhs), value.ValueMap(*w.out)); err != nil {
 			return err
 		}
 	}
@@ -105,38 +105,38 @@ type discriminator struct {
 	name string
 }
 
-func (d *discriminator) Set(m *value.Map, v discriminated) {
+func (d *discriminator) Set(m value.Map, v discriminated) {
 	if d == nil {
 		return
 	}
-	m.Set(d.name, value.StringValue(string(v)))
+	m.Set(d.name, string(v))
 }
 
-func (d *discriminator) Get(m *value.Map) discriminated {
+func (d *discriminator) Get(m value.Map) discriminated {
 	if d == nil || m == nil {
 		return ""
 	}
-	f, ok := m.Get(d.name)
+	val, ok := m.Get(d.name)
 	if !ok {
 		return ""
 	}
-	if f.Value.StringValue == nil {
+	if !value.IsString(val) {
 		return ""
 	}
-	return discriminated(*f.Value.StringValue)
+	return discriminated(value.ValueString(val))
 }
 
 type fieldsSet map[field]struct{}
 
 // newFieldsSet returns a map of the fields that are part of the union and are set
 // in the given map.
-func newFieldsSet(m *value.Map, fields []field) fieldsSet {
+func newFieldsSet(m value.Map, fields []field) fieldsSet {
 	if m == nil {
 		return nil
 	}
 	set := fieldsSet{}
 	for _, f := range fields {
-		if subField, ok := m.Get(string(f)); ok && !subField.Value.Null {
+		if subField, ok := m.Get(string(f)); ok && subField != nil {
 			set.Add(f)
 		}
 	}
@@ -212,7 +212,7 @@ func newUnion(su *schema.Union) *union {
 
 // clear removes all the fields in map that are part of the union, but
 // the one we decided to keep.
-func (u *union) clear(m *value.Map, f field) {
+func (u *union) clear(m value.Map, f field) {
 	for _, fieldName := range u.f {
 		if field(fieldName) != f {
 			m.Delete(string(fieldName))
@@ -220,7 +220,7 @@ func (u *union) clear(m *value.Map, f field) {
 	}
 }
 
-func (u *union) Normalize(old, new, out *value.Map) error {
+func (u *union) Normalize(old, new, out value.Map) error {
 	os := newFieldsSet(old, u.f)
 	ns := newFieldsSet(new, u.f)
 	diff := ns.Difference(os)
@@ -248,7 +248,7 @@ func (u *union) Normalize(old, new, out *value.Map) error {
 	return nil
 }
 
-func (u *union) NormalizeApply(applied, merged, out *value.Map) error {
+func (u *union) NormalizeApply(applied, merged, out value.Map) error {
 	as := newFieldsSet(applied, u.f)
 	if len(as) > 1 {
 		return fmt.Errorf("more than one field of union applied: %v", as)

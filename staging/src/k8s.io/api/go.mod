@@ -17,4 +17,5 @@ replace (
 	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
+	sigs.k8s.io/structured-merge-diff => github.com/apelisse/structured-merge-diff v0.0.0-20190817042607-5428329
 )

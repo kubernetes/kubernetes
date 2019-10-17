@@ -43,37 +43,36 @@ type objectWalker struct {
 
 func (w *objectWalker) walk() {
 	switch {
-	case w.value.Null:
-	case w.value.FloatValue != nil:
-	case w.value.IntValue != nil:
-	case w.value.StringValue != nil:
-	case w.value.BooleanValue != nil:
+	case value.IsFloat(w.value):
+	case value.IsInt(w.value):
+	case value.IsString(w.value):
+	case value.IsBool(w.value):
 		// All leaf fields handled the same way (after the switch
 		// statement).
 
 	// Descend
-	case w.value.ListValue != nil:
+	case value.IsList(w.value):
 		// If the list were atomic, we'd break here, but we don't have
 		// a schema, so we can't tell.
 
-		for i, child := range w.value.ListValue.Items {
+		for i, child := range value.ValueList(w.value) {
 			w2 := *w
 			w2.path = append(w.path, GuessBestListPathElement(i, child))
 			w2.value = child
 			w2.walk()
 		}
 		return
-	case w.value.MapValue != nil:
+	case value.IsMap(w.value):
 		// If the map/struct were atomic, we'd break here, but we don't
 		// have a schema, so we can't tell.
 
-		for i := range w.value.MapValue.Items {
-			child := w.value.MapValue.Items[i]
+		value.ValueMap(w.value).Iterate(func(key string, value value.Value) bool {
 			w2 := *w
-			w2.path = append(w.path, PathElement{FieldName: &child.Name})
-			w2.value = child.Value
+			w2.path = append(w.path, PathElement{FieldName: &key})
+			w2.value = value
 			w2.walk()
-		}
+			return true
+		})
 		return
 	}
 
@@ -97,27 +96,26 @@ var AssociativeListCandidateFieldNames = []string{
 // whether item has any of the fields listed in
 // AssociativeListCandidateFieldNames which have scalar values.
 func GuessBestListPathElement(index int, item value.Value) PathElement {
-	if item.MapValue == nil {
+	if !value.IsMap(item) {
 		// Non map items could be parts of sets or regular "atomic"
 		// lists. We won't try to guess whether something should be a
 		// set or not.
 		return PathElement{Index: &index}
 	}
-
-	var keys []value.Field
+	var keys []KeyValue
 	for _, name := range AssociativeListCandidateFieldNames {
-		f, ok := item.MapValue.Get(name)
+		f, ok := value.ValueMap(item).Get(name)
 		if !ok {
 			continue
 		}
 		// only accept primitive/scalar types as keys.
-		if f.Value.Null || f.Value.MapValue != nil || f.Value.ListValue != nil {
+		if f == nil || value.IsMap(f) || value.IsList(f) {
 			continue
 		}
-		keys = append(keys, *f)
+		keys = append(keys, KeyValue{Key: name, Value: f})
 	}
 	if len(keys) > 0 {
-		return PathElement{Key: &value.Map{Items: keys}}
+		return PathElement{Key: &keys}
 	}
 	return PathElement{Index: &index}
 }

@@ -18,6 +18,7 @@ package typed
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
@@ -61,8 +62,8 @@ type TypedValue struct {
 }
 
 // AsValue removes the type from the TypedValue and only keeps the value.
-func (tv TypedValue) AsValue() *value.Value {
-	return &tv.value
+func (tv TypedValue) AsValue() value.Value {
+	return tv.value
 }
 
 // Validate returns an error with a list of every spec violation.
@@ -78,15 +79,12 @@ func (tv TypedValue) Validate() error {
 // ToFieldSet creates a set containing every leaf field and item mentioned, or
 // validation errors, if any were encountered.
 func (tv TypedValue) ToFieldSet() (*fieldpath.Set, error) {
-	s := fieldpath.NewSet()
-	w := tv.walker()
+	w := tv.toFieldSetWalker()
 	defer w.finished()
-	w.leafFieldCallback = func(p fieldpath.Path) { s.Insert(p) }
-	w.nodeFieldCallback = func(p fieldpath.Path) { s.Insert(p) }
-	if errs := w.validate(); len(errs) != 0 {
+	if errs := w.toFieldSet(); len(errs) != 0 {
 		return nil, errs
 	}
-	return s, nil
+	return w.set, nil
 }
 
 // Merge returns the result of merging tv and pso ("partially specified
@@ -116,18 +114,16 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 		Modified: fieldpath.NewSet(),
 		Added:    fieldpath.NewSet(),
 	}
-	c.Merged, err = merge(&tv, rhs, func(w *mergingWalker) {
+	_, err = merge(&tv, rhs, func(w *mergingWalker) {
 		if w.lhs == nil {
 			c.Added.Insert(w.path)
 		} else if w.rhs == nil {
 			c.Removed.Insert(w.path)
-		} else if !w.rhs.Equals(*w.lhs) {
+		} else if !value.Equals(*w.rhs, *w.lhs) {
 			// TODO: Equality is not sufficient for this.
 			// Need to implement equality check on the value type.
 			c.Modified.Insert(w.path)
 		}
-
-		ruleKeepRHS(w)
 	}, func(w *mergingWalker) {
 		if w.lhs == nil {
 			c.Added.Insert(w.path)
@@ -144,7 +140,7 @@ func (tv TypedValue) Compare(rhs *TypedValue) (c *Comparison, err error) {
 
 // RemoveItems removes each provided list or map item from the value.
 func (tv TypedValue) RemoveItems(items *fieldpath.Set) *TypedValue {
-	tv.value, _ = value.FromUnstructured(tv.value.ToUnstructured(true))
+	tv.value = value.Copy(tv.value)
 	removeItemsWithSchema(&tv.value, items, tv.schema, tv.typeRef)
 	return &tv
 }
@@ -167,7 +163,7 @@ func (tv TypedValue) NormalizeUnions(new *TypedValue) (*TypedValue, error) {
 			w.out = &v
 		}
 		if err := normalizeUnions(w); err != nil {
-			errs = append(errs, w.error(err)...)
+			errs = append(errs, errorf(err.Error())...)
 		}
 	}
 	out, mergeErrs := merge(&tv, new, func(w *mergingWalker) {}, normalizeFn)
@@ -193,7 +189,7 @@ func (tv TypedValue) NormalizeUnionsApply(new *TypedValue) (*TypedValue, error) 
 			w.out = &v
 		}
 		if err := normalizeUnionsApply(w); err != nil {
-			errs = append(errs, w.error(err)...)
+			errs = append(errs, errorf(err.Error())...)
 		}
 	}
 	out, mergeErrs := merge(&tv, new, func(w *mergingWalker) {}, normalizeFn)
@@ -207,7 +203,7 @@ func (tv TypedValue) NormalizeUnionsApply(new *TypedValue) (*TypedValue, error) 
 }
 
 func (tv TypedValue) Empty() *TypedValue {
-	tv.value = value.Value{Null: true}
+	tv.value = nil
 	return &tv
 }
 
@@ -217,12 +213,10 @@ var mwPool = sync.Pool{
 
 func merge(lhs, rhs *TypedValue, rule, postRule mergeRule) (*TypedValue, error) {
 	if lhs.schema != rhs.schema {
-		return nil, errorFormatter{}.
-			errorf("expected objects with types from the same schema")
+		return nil, errorf("expected objects with types from the same schema")
 	}
 	if !lhs.typeRef.Equals(rhs.typeRef) {
-		return nil, errorFormatter{}.
-			errorf("expected objects of the same type, but got %v and %v", lhs.typeRef, rhs.typeRef)
+		return nil, errorf("expected objects of the same type, but got %v and %v", lhs.typeRef, rhs.typeRef)
 	}
 
 	mw := mwPool.Get().(*mergingWalker)
@@ -255,9 +249,7 @@ func merge(lhs, rhs *TypedValue, rule, postRule mergeRule) (*TypedValue, error) 
 		schema:  lhs.schema,
 		typeRef: lhs.typeRef,
 	}
-	if mw.out == nil {
-		out.value = value.Value{Null: true}
-	} else {
+	if mw.out != nil {
 		out.value = *mw.out
 	}
 	return out, nil
@@ -268,10 +260,6 @@ func merge(lhs, rhs *TypedValue, rule, postRule mergeRule) (*TypedValue, error) 
 // No field will appear in more than one of the three fieldsets. If all of the
 // fieldsets are empty, then the objects must have been equal.
 type Comparison struct {
-	// Merged is the result of merging the two objects, as explained in the
-	// comments on TypedValue.Merge().
-	Merged *TypedValue
-
 	// Removed contains any fields removed by rhs (the right-hand-side
 	// object in the comparison).
 	Removed *fieldpath.Set
@@ -289,15 +277,15 @@ func (c *Comparison) IsSame() bool {
 
 // String returns a human readable version of the comparison.
 func (c *Comparison) String() string {
-	str := fmt.Sprintf("- Merged Object:\n%v\n", c.Merged.AsValue())
+	bld := strings.Builder{}
 	if !c.Modified.Empty() {
-		str += fmt.Sprintf("- Modified Fields:\n%v\n", c.Modified)
+		bld.WriteString(fmt.Sprintf("- Modified Fields:\n%v\n", c.Modified))
 	}
 	if !c.Added.Empty() {
-		str += fmt.Sprintf("- Added Fields:\n%v\n", c.Added)
+		bld.WriteString(fmt.Sprintf("- Added Fields:\n%v\n", c.Added))
 	}
 	if !c.Removed.Empty() {
-		str += fmt.Sprintf("- Removed Fields:\n%v\n", c.Removed)
+		bld.WriteString(fmt.Sprintf("- Removed Fields:\n%v\n", c.Removed))
 	}
-	return str
+	return bld.String()
 }

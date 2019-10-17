@@ -13,6 +13,11 @@ limitations under the License.
 
 package fieldpath
 
+import (
+	"fmt"
+	"strings"
+)
+
 // APIVersion describes the version of an object or of a fieldset.
 type APIVersion string
 
@@ -94,4 +99,15 @@ func (lhs ManagedFields) Difference(rhs ManagedFields) ManagedFields {
 	}
 
 	return diff
+}
+
+func (lhs ManagedFields) String() string {
+	s := strings.Builder{}
+	for k, v := range lhs {
+		fmt.Fprintf(&s, "%s:\n", k)
+		fmt.Fprintf(&s, "- Applied: %v\n", v.Applied())
+		fmt.Fprintf(&s, "- APIVersion: %v\n", v.APIVersion())
+		fmt.Fprintf(&s, "- Set: %v\n", v.Set())
+	}
+	return s.String()
 }

@@ -24,6 +24,58 @@ import (
 	"sigs.k8s.io/structured-merge-diff/value"
 )
 
+type KeyValue struct {
+	Key   string
+	Value value.Value
+}
+
+func SortKeyValues(kv []KeyValue) {
+	if len(kv) < 2 {
+		return
+	}
+	if len(kv) == 2 {
+		if kv[1].Key < kv[0].Key {
+			kv[0], kv[1] = kv[1], kv[0]
+		}
+		return
+	}
+	sort.SliceStable(kv, func(i, j int) bool {
+		return kv[i].Key < kv[j].Key
+	})
+}
+
+func KeyValueLess(lhs, rhs []KeyValue) bool {
+	i := 0
+	for {
+		if i >= len(lhs) && i >= len(rhs) {
+			// Maps are the same length and all items are equal.
+			return false
+		}
+		if i >= len(lhs) {
+			// LHS is shorter.
+			return true
+		}
+		if i >= len(rhs) {
+			// RHS is shorter.
+			return false
+		}
+		if lhs[i].Key != rhs[i].Key {
+			// the map having the field name that sorts lexically less is "less"
+			return lhs[i].Key < rhs[i].Key
+		}
+		if value.Less(lhs[i].Value, rhs[i].Value) {
+			// LHS is less; return
+			return true
+		}
+		if value.Less(rhs[i].Value, lhs[i].Value) {
+			// RHS is less; return
+			return false
+		}
+		// The items are equal; continue.
+		i++
+	}
+}
+
 // PathElement describes how to select a child field given a containing object.
 type PathElement struct {
 	// Exactly one of the following fields should be non-nil.
@@ -34,8 +86,8 @@ type PathElement struct {
 
 	// Key selects the list element which has fields matching those given.
 	// The containing object must be an associative list with map typed
-	// elements.
-	Key *value.Map
+	// elements. Keys are sorted alphabetically.
+	Key *[]KeyValue
 
 	// Value selects the list element with the given value. The containing
 	// object must be an associative list with a primitive typed element
@@ -62,7 +114,7 @@ func (e PathElement) Less(rhs PathElement) bool {
 		if rhs.Key == nil {
 			return true
 		}
-		return e.Key.Less(rhs.Key)
+		return KeyValueLess(*e.Key, *rhs.Key)
 	} else if rhs.Key != nil {
 		return false
 	}
@@ -71,7 +123,7 @@ func (e PathElement) Less(rhs PathElement) bool {
 		if rhs.Value == nil {
 			return true
 		}
-		return e.Value.Less(*rhs.Value)
+		return value.Less(*e.Value, *rhs.Value)
 	} else if rhs.Value != nil {
 		return false
 	}
@@ -101,16 +153,13 @@ func (e PathElement) String() string {
 	case e.FieldName != nil:
 		return "." + *e.FieldName
 	case e.Key != nil:
-		strs := make([]string, len(e.Key.Items))
-		for i, k := range e.Key.Items {
-			strs[i] = fmt.Sprintf("%v=%v", k.Name, k.Value)
+		strs := make([]string, 0, len(*e.Key))
+		for _, kv := range *e.Key {
+			strs = append(strs, fmt.Sprintf("%v=%v", kv.Key, value.ToString(kv.Value)))
 		}
-		// The order must be canonical, since we use the string value
-		// in a set structure.
-		sort.Strings(strs)
 		return "[" + strings.Join(strs, ",") + "]"
 	case e.Value != nil:
-		return fmt.Sprintf("[=%v]", e.Value)
+		return fmt.Sprintf("[=%v]", value.ToString(*e.Value))
 	case e.Index != nil:
 		return fmt.Sprintf("[%v]", *e.Index)
 	default:
@@ -123,17 +172,16 @@ func (e PathElement) String() string {
 // names (type must be string) with values (type must be value.Value). If these
 // conditions are not met, KeyByFields will panic--it's intended for static
 // construction and shouldn't have user-produced values passed to it.
-func KeyByFields(nameValues ...interface{}) []value.Field {
+func KeyByFields(nameValues ...interface{}) []KeyValue {
 	if len(nameValues)%2 != 0 {
 		panic("must have a value for every name")
 	}
-	out := []value.Field{}
+	out := []KeyValue{}
 	for i := 0; i < len(nameValues)-1; i += 2 {
-		out = append(out, value.Field{
-			Name:  nameValues[i].(string),
-			Value: nameValues[i+1].(value.Value),
-		})
+		out = append(out, KeyValue{Key: nameValues[i].(string), Value: nameValues[i+1]})
 	}
+	SortKeyValues(out)
+
 	return out
 }
 
@@ -141,6 +189,12 @@ func KeyByFields(nameValues ...interface{}) []value.Field {
 // TODO: serialize as a list.
 type PathElementSet struct {
 	members sortedPathElements
+}
+
+func MakePathElementSet(size int) PathElementSet {
+	return PathElementSet{
+		members: make(sortedPathElements, 0, size),
+	}
 }
 
 type sortedPathElements []PathElement

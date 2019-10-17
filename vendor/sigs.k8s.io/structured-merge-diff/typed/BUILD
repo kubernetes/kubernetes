@@ -8,6 +8,7 @@ go_library(
         "merge.go",
         "parser.go",
         "remove.go",
+        "tofieldset.go",
         "typed.go",
         "union.go",
         "validate.go",

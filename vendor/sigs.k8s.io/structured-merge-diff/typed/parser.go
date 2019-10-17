@@ -21,7 +21,6 @@ import (
 
 	yaml "gopkg.in/yaml.v2"
 	"sigs.k8s.io/structured-merge-diff/schema"
-	"sigs.k8s.io/structured-merge-diff/value"
 )
 
 // YAMLObject is an object encoded in YAML.
@@ -94,7 +93,8 @@ func (p ParseableType) IsValid() bool {
 // FromYAML parses a yaml string into an object with the current schema
 // and the type "typename" or an error if validation fails.
 func (p ParseableType) FromYAML(object YAMLObject) (*TypedValue, error) {
-	v, err := value.FromYAML([]byte(object))
+	var v interface{}
+	err := yaml.Unmarshal([]byte(object), &v)
 	if err != nil {
 		return nil, err
 	}
@@ -104,11 +104,7 @@ func (p ParseableType) FromYAML(object YAMLObject) (*TypedValue, error) {
 // FromUnstructured converts a go interface to a TypedValue. It will return an
 // error if the resulting object fails schema validation.
 func (p ParseableType) FromUnstructured(in interface{}) (*TypedValue, error) {
-	v, err := value.FromUnstructured(in)
-	if err != nil {
-		return nil, err
-	}
-	return AsTyped(v, p.Schema, p.TypeRef)
+	return AsTyped(in, p.Schema, p.TypeRef)
 }
 
 // DeducedParseableType is a ParseableType that deduces the type from
