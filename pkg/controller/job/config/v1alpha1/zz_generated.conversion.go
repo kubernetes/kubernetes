@@ -90,7 +90,7 @@ func Convert_v1_GroupResource_To_v1alpha1_GroupResource(in *v1.GroupResource, ou
 	return autoConvert_v1_GroupResource_To_v1alpha1_GroupResource(in, out, s)
 }
 
-func autoConvert_v1alpha1_JobControllerConfiguration_To_config_JobControllerConfiguration(in *v1alpha1.JobControllerConfiguration, out *config.JobControllerConfiguration, s conversion.Scope) error {
+func autoConvertV1alpha1JobControllerConfigurationToConfigJobControllerConfiguration(in *v1alpha1.JobControllerConfiguration, out *config.JobControllerConfiguration, s conversion.Scope) error {
 	out.ConcurrentJobSyncs = in.ConcurrentJobSyncs
 	return nil
 }

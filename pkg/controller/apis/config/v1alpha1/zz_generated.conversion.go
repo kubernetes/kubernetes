@@ -323,7 +323,7 @@ func autoConvert_v1alpha1_KubeControllerManagerConfiguration_To_config_KubeContr
 	if err := podautoscalerconfigv1alpha1.Convert_v1alpha1_HPAControllerConfiguration_To_config_HPAControllerConfiguration(&in.HPAController, &out.HPAController, s); err != nil {
 		return err
 	}
-	if err := jobconfigv1alpha1.Convert_v1alpha1_JobControllerConfiguration_To_config_JobControllerConfiguration(&in.JobController, &out.JobController, s); err != nil {
+	if err := jobconfigv1alpha1.ConvertV1alpha1JobControllerConfigurationToConfigJobControllerConfiguration(&in.JobController, &out.JobController, s); err != nil {
 		return err
 	}
 	if err := namespaceconfigv1alpha1.Convert_v1alpha1_NamespaceControllerConfiguration_To_config_NamespaceControllerConfiguration(&in.NamespaceController, &out.NamespaceController, s); err != nil {
