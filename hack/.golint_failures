@@ -218,7 +218,6 @@ pkg/scheduler/apis/config/v1alpha1
 pkg/security/apparmor
 pkg/security/podsecuritypolicy
 pkg/security/podsecuritypolicy/group
-pkg/security/podsecuritypolicy/seccomp
 pkg/security/podsecuritypolicy/selinux
 pkg/security/podsecuritypolicy/user
 pkg/security/podsecuritypolicy/util
