@@ -40,6 +40,9 @@ type Manager struct {
 
 	// certificates contains the certificateRenewHandler controlled by this manager
 	certificates map[string]*CertificateRenewHandler
+
+	// cas contains the CAExpirationHandler related to the certificates that are controlled by this manager
+	cas map[string]*CAExpirationHandler
 }
 
 // CertificateRenewHandler defines required info for renewing a certificate
@@ -54,10 +57,29 @@ type CertificateRenewHandler struct {
 	// FileName defines the name (or the BaseName) of the certificate file
 	FileName string
 
-	// CABaseName define the base name for the CA that should be used for certificate renewal
+	// CAName defines the name for the CA on which this certificate depends
+	CAName string
+
+	// CABaseName defines the base name for the CA that should be used for certificate renewal
 	CABaseName string
 
-	// readwriter define a CertificateReadWriter to be used for certificate renewal
+	// readwriter defines a CertificateReadWriter to be used for certificate renewal
+	readwriter certificateReadWriter
+}
+
+// CAExpirationHandler defines required info for CA expiration check
+type CAExpirationHandler struct {
+	// Name of the CA to be used for UX.
+	// This value can be used to trigger operations on this CA
+	Name string
+
+	// LongName of the CA to be used for UX
+	LongName string
+
+	// FileName defines the name (or the BaseName) of the CA file
+	FileName string
+
+	// readwriter defines a CertificateReadWriter to be used for CA expiration check
 	readwriter certificateReadWriter
 }
 
@@ -67,6 +89,7 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 		cfg:           cfg,
 		kubernetesDir: kubernetesDir,
 		certificates:  map[string]*CertificateRenewHandler{},
+		cas:           map[string]*CAExpirationHandler{},
 	}
 
 	// gets the list of certificates that are expected according to the current cluster configuration
@@ -93,9 +116,18 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 				Name:       cert.Name,
 				LongName:   cert.LongName,
 				FileName:   cert.BaseName,
+				CAName:     ca.Name,
 				CABaseName: ca.BaseName, //Nb. this is a path for etcd certs (they are stored in a subfolder)
 				readwriter: pkiReadWriter,
 			}
+		}
+
+		pkiReadWriter := newPKICertificateReadWriter(rm.cfg.CertificatesDir, ca.BaseName)
+		rm.cas[ca.Name] = &CAExpirationHandler{
+			Name:       ca.Name,
+			LongName:   ca.LongName,
+			FileName:   ca.BaseName,
+			readwriter: pkiReadWriter,
 		}
 	}
 
@@ -139,7 +171,7 @@ func NewManager(cfg *kubeadmapi.ClusterConfiguration, kubernetesDir string) (*Ma
 	return rm, nil
 }
 
-// Certificates return the list of certificates controlled by this Manager
+// Certificates returns the list of certificates controlled by this Manager
 func (rm *Manager) Certificates() []*CertificateRenewHandler {
 	certificates := []*CertificateRenewHandler{}
 	for _, h := range rm.certificates {
@@ -149,6 +181,18 @@ func (rm *Manager) Certificates() []*CertificateRenewHandler {
 	sort.Slice(certificates, func(i, j int) bool { return certificates[i].Name < certificates[j].Name })
 
 	return certificates
+}
+
+// CAs returns the list of CAs related to the certificates that are controlled by this manager
+func (rm *Manager) CAs() []*CAExpirationHandler {
+	cas := []*CAExpirationHandler{}
+	for _, h := range rm.cas {
+		cas = append(cas, h)
+	}
+
+	sort.Slice(cas, func(i, j int) bool { return cas[i].Name < cas[j].Name })
+
+	return cas
 }
 
 // RenewUsingLocalCA executes certificate renewal using local certificate authorities for generating new certs.
@@ -162,7 +206,7 @@ func (rm *Manager) RenewUsingLocalCA(name string) (bool, error) {
 	}
 
 	// checks if the certificate is externally managed (CA certificate provided without the certificate key)
-	externallyManaged, err := rm.IsExternallyManaged(handler)
+	externallyManaged, err := rm.IsExternallyManaged(handler.CABaseName)
 	if err != nil {
 		return false, err
 	}
@@ -271,18 +315,18 @@ func (rm *Manager) CreateRenewCSR(name, outdir string) error {
 	return nil
 }
 
-// GetExpirationInfo returns certificate expiration info.
+// GetCertificateExpirationInfo returns certificate expiration info.
 // For PKI certificates, use the name defined in the certsphase package, while for certificates
 // embedded in the kubeConfig files, use the kubeConfig file name defined in the kubeadm constants package.
 // If you use the CertificateRenewHandler returned by Certificates func, handler.Name already contains the right value.
-func (rm *Manager) GetExpirationInfo(name string) (*ExpirationInfo, error) {
+func (rm *Manager) GetCertificateExpirationInfo(name string) (*ExpirationInfo, error) {
 	handler, ok := rm.certificates[name]
 	if !ok {
 		return nil, errors.Errorf("%s is not a known certificate", name)
 	}
 
 	// checks if the certificate is externally managed (CA certificate provided without the certificate key)
-	externallyManaged, err := rm.IsExternallyManaged(handler)
+	externallyManaged, err := rm.IsExternallyManaged(handler.CABaseName)
 	if err != nil {
 		return nil, err
 	}
@@ -297,25 +341,48 @@ func (rm *Manager) GetExpirationInfo(name string) (*ExpirationInfo, error) {
 	return newExpirationInfo(name, cert, externallyManaged), nil
 }
 
+// GetCAExpirationInfo returns CA expiration info.
+func (rm *Manager) GetCAExpirationInfo(name string) (*ExpirationInfo, error) {
+	handler, ok := rm.cas[name]
+	if !ok {
+		return nil, errors.Errorf("%s is not a known CA", name)
+	}
+
+	// checks if the CA is externally managed (CA certificate provided without the certificate key)
+	externallyManaged, err := rm.IsExternallyManaged(handler.FileName)
+	if err != nil {
+		return nil, err
+	}
+
+	// reads the current CA
+	ca, err := handler.readwriter.Read()
+	if err != nil {
+		return nil, err
+	}
+
+	// returns the CA expiration info
+	return newExpirationInfo(name, ca, externallyManaged), nil
+}
+
 // IsExternallyManaged checks if we are in the external CA case (CA certificate provided without the certificate key)
-func (rm *Manager) IsExternallyManaged(h *CertificateRenewHandler) (bool, error) {
-	switch h.CABaseName {
+func (rm *Manager) IsExternallyManaged(caBaseName string) (bool, error) {
+	switch caBaseName {
 	case kubeadmconstants.CACertAndKeyBaseName:
 		externallyManaged, err := certsphase.UsingExternalCA(rm.cfg)
 		if err != nil {
-			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", h.CABaseName)
+			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", caBaseName)
 		}
 		return externallyManaged, nil
 	case kubeadmconstants.FrontProxyCACertAndKeyBaseName:
 		externallyManaged, err := certsphase.UsingExternalFrontProxyCA(rm.cfg)
 		if err != nil {
-			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", h.CABaseName)
+			return false, errors.Wrapf(err, "Error checking external CA condition for %s certificate authority", caBaseName)
 		}
 		return externallyManaged, nil
 	case kubeadmconstants.EtcdCACertAndKeyBaseName:
 		return false, nil
 	default:
-		return false, errors.Errorf("unknown certificate authority %s", h.CABaseName)
+		return false, errors.Errorf("unknown certificate authority %s", caBaseName)
 	}
 }
 
