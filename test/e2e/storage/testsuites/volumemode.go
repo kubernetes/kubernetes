@@ -19,6 +19,7 @@ package testsuites
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -27,10 +28,10 @@ import (
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	volevents "k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/kubelet/events"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -221,7 +222,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				}.AsSelector().String()
 				msg := "Unable to attach or mount volumes"
 
-				err = common.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+				err = waitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
 					e2elog.Logf("Warning: did not get event about FailedMountVolume")
@@ -258,7 +259,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				}.AsSelector().String()
 				msg := "does not support block volume provisioning"
 
-				err = common.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.ClaimProvisionTimeout)
+				err = waitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.ClaimProvisionTimeout)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
 					e2elog.Logf("Warning: did not get event about provisioing failed")
@@ -308,7 +309,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		} else {
 			msg = "has volumeMode Filesystem, but is specified in volumeDevices"
 		}
-		err = common.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+		err = waitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
 		// Events are unreliable, don't depend on them. They're used only to speed up the test.
 		if err != nil {
 			e2elog.Logf("Warning: did not get event about mismatched volume use")
@@ -425,4 +426,33 @@ func swapVolumeMode(podTemplate *v1.Pod) *v1.Pod {
 		}
 	}
 	return pod
+}
+
+// NOTE(avalluri): The below code is intentionally copied from e2e/common package.
+// Testsuites depending on common package is not desirable as that pulls quite
+// many tests which are not interested by storage suites.
+//
+// waitTimeoutForEvent waits the given timeout duration for an event to occur.
+func waitTimeoutForEvent(c clientset.Interface, namespace, eventSelector, msg string, timeout time.Duration) error {
+	interval := 2 * time.Second
+	return wait.PollImmediate(interval, timeout, eventOccurred(c, namespace, eventSelector, msg))
+}
+
+// NOTE(avalluri): The below code is intentionally copied from e2e/common package.
+// Testsuites depending on common package is not desirable as that pulls quite
+// many tests which are not interested by storage suites.
+func eventOccurred(c clientset.Interface, namespace, eventSelector, msg string) wait.ConditionFunc {
+	options := metav1.ListOptions{FieldSelector: eventSelector}
+	return func() (bool, error) {
+		events, err := c.CoreV1().Events(namespace).List(options)
+		if err != nil {
+			return false, fmt.Errorf("got error while getting events: %v", err)
+		}
+		for _, event := range events.Items {
+			if strings.Contains(event.Message, msg) {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
 }
