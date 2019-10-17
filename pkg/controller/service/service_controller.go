@@ -42,7 +42,6 @@ import (
 	servicehelper "k8s.io/cloud-provider/service/helpers"
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog"
-	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 )
 
 const (
@@ -316,7 +315,7 @@ func (s *ServiceController) syncLoadBalancerIfNeeded(service *v1.Service, key st
 	// which may involve service interruption.  Also, we would like user-friendly events.
 
 	// Save the state so we can avoid a write if it doesn't change
-	previousStatus := v1helper.LoadBalancerStatusDeepCopy(&service.Status.LoadBalancer)
+	previousStatus := service.Status.LoadBalancer.DeepCopy()
 	var newStatus *v1.LoadBalancerStatus
 	var op loadBalancerOperation
 	var err error
@@ -866,7 +865,7 @@ func removeString(slice []string, s string) []string {
 
 // patchStatus patches the service with the given LoadBalancerStatus.
 func (s *ServiceController) patchStatus(service *v1.Service, previousStatus, newStatus *v1.LoadBalancerStatus) error {
-	if v1helper.LoadBalancerStatusEqual(previousStatus, newStatus) {
+	if servicehelper.LoadBalancerStatusEqual(previousStatus, newStatus) {
 		return nil
 	}
 
