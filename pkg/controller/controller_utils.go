@@ -771,6 +771,94 @@ func (s ActivePods) Less(i, j int) bool {
 	return false
 }
 
+// ActivePodsWithRanks is a sortable list of pods and a list of corresponding
+// ranks which will be considered during sorting.  The two lists must have equal
+// length.  After sorting, the pods will be ordered as follows, applying each
+// rule in turn until one matches:
+//
+// 1. If only one of the pods is assigned to a node, the pod that is not
+//    assigned comes before the pod that is.
+// 2. If the pods' phases differ, a pending pod comes before a pod whose phase
+//    is unknown, and a pod whose phase is unknown comes before a running pod.
+// 3. If exactly one of the pods is ready, the pod that is not ready comes
+//    before the ready pod.
+// 4. If the pods' ranks differ, the pod with greater rank comes before the pod
+//    with lower rank.
+// 5. If both pods are ready but have not been ready for the same amount of
+//    time, the pod that has been ready for a shorter amount of time comes
+//    before the pod that has been ready for longer.
+// 6. If one pod has a container that has restarted more than any container in
+//    the other pod, the pod with the container with more restarts comes
+//    before the other pod.
+// 7. If the pods' creation times differ, the pod that was created more recently
+//    comes before the older pod.
+//
+// If none of these rules matches, the second pod comes before the first pod.
+//
+// The intention of this ordering is to put pods that should be preferred for
+// deletion first in the list.
+type ActivePodsWithRanks struct {
+	// Pods is a list of pods.
+	Pods []*v1.Pod
+
+	// Rank is a ranking of pods.  This ranking is used during sorting when
+	// comparing two pods that are both scheduled, in the same phase, and
+	// having the same ready status.
+	Rank []int
+}
+
+func (s ActivePodsWithRanks) Len() int {
+	return len(s.Pods)
+}
+
+func (s ActivePodsWithRanks) Swap(i, j int) {
+	s.Pods[i], s.Pods[j] = s.Pods[j], s.Pods[i]
+	s.Rank[i], s.Rank[j] = s.Rank[j], s.Rank[i]
+}
+
+// Less compares two pods with corresponding ranks and returns true if the first
+// one should be preferred for deletion.
+func (s ActivePodsWithRanks) Less(i, j int) bool {
+	// 1. Unassigned < assigned
+	// If only one of the pods is unassigned, the unassigned one is smaller
+	if s.Pods[i].Spec.NodeName != s.Pods[j].Spec.NodeName && (len(s.Pods[i].Spec.NodeName) == 0 || len(s.Pods[j].Spec.NodeName) == 0) {
+		return len(s.Pods[i].Spec.NodeName) == 0
+	}
+	// 2. PodPending < PodUnknown < PodRunning
+	m := map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 1, v1.PodRunning: 2}
+	if m[s.Pods[i].Status.Phase] != m[s.Pods[j].Status.Phase] {
+		return m[s.Pods[i].Status.Phase] < m[s.Pods[j].Status.Phase]
+	}
+	// 3. Not ready < ready
+	// If only one of the pods is not ready, the not ready one is smaller
+	if podutil.IsPodReady(s.Pods[i]) != podutil.IsPodReady(s.Pods[j]) {
+		return !podutil.IsPodReady(s.Pods[i])
+	}
+	// 4. Doubled up < not doubled up
+	// If one of the two pods is on the same node as one or more additional
+	// ready pods that belong to the same replicaset, whichever pod has more
+	// colocated ready pods is less
+	if s.Rank[i] != s.Rank[j] {
+		return s.Rank[i] > s.Rank[j]
+	}
+	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
+	//       see https://github.com/kubernetes/kubernetes/issues/22065
+	// 5. Been ready for empty time < less time < more time
+	// If both pods are ready, the latest ready one is smaller
+	if podutil.IsPodReady(s.Pods[i]) && podutil.IsPodReady(s.Pods[j]) && !podReadyTime(s.Pods[i]).Equal(podReadyTime(s.Pods[j])) {
+		return afterOrZero(podReadyTime(s.Pods[i]), podReadyTime(s.Pods[j]))
+	}
+	// 6. Pods with containers with higher restart counts < lower restart counts
+	if maxContainerRestarts(s.Pods[i]) != maxContainerRestarts(s.Pods[j]) {
+		return maxContainerRestarts(s.Pods[i]) > maxContainerRestarts(s.Pods[j])
+	}
+	// 7. Empty creation time pods < newer pods < older pods
+	if !s.Pods[i].CreationTimestamp.Equal(&s.Pods[j].CreationTimestamp) {
+		return afterOrZero(&s.Pods[i].CreationTimestamp, &s.Pods[j].CreationTimestamp)
+	}
+	return false
+}
+
 // afterOrZero checks if time t1 is after time t2; if one of them
 // is zero, the zero time is seen as after non-zero time.
 func afterOrZero(t1, t2 *metav1.Time) bool {
