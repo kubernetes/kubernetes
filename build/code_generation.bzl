@@ -41,7 +41,7 @@ def go_pkg(pkg):
         ...
     )
     """
-    return go_prefix + "/" + pkg.replace("staging/src/", "vendor/", maxsplit = 1)
+    return go_prefix + "/" + pkg.replace("staging/src/", "vendor/", 1)
 
 def openapi_deps():
     deps = [
