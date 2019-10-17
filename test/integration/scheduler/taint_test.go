@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -116,13 +116,13 @@ func TestTaintNodeByCondition(t *testing.T) {
 		t.Errorf("Failed to create node controller: %v", err)
 		return
 	}
-	go nc.Run(context.stopCh)
+	go nc.Run(context.ctx.Done())
 
 	// Waiting for all controller sync.
-	externalInformers.Start(context.stopCh)
-	externalInformers.WaitForCacheSync(context.stopCh)
-	informers.Start(context.stopCh)
-	informers.WaitForCacheSync(context.stopCh)
+	externalInformers.Start(context.ctx.Done())
+	externalInformers.WaitForCacheSync(context.ctx.Done())
+	informers.Start(context.ctx.Done())
+	informers.WaitForCacheSync(context.ctx.Done())
 
 	// -------------------------------------------
 	// Test TaintNodeByCondition feature.
@@ -696,13 +696,13 @@ func TestTaintBasedEvictions(t *testing.T) {
 				return
 			}
 
-			go nc.Run(context.stopCh)
+			go nc.Run(context.ctx.Done())
 
 			// Waiting for all controller sync.
-			externalInformers.Start(context.stopCh)
-			externalInformers.WaitForCacheSync(context.stopCh)
-			informers.Start(context.stopCh)
-			informers.WaitForCacheSync(context.stopCh)
+			externalInformers.Start(context.ctx.Done())
+			externalInformers.WaitForCacheSync(context.ctx.Done())
+			informers.Start(context.ctx.Done())
+			informers.WaitForCacheSync(context.ctx.Done())
 
 			nodeRes := v1.ResourceList{
 				v1.ResourceCPU:    resource.MustParse("4000m"),

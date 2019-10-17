@@ -17,6 +17,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -633,11 +634,14 @@ type TestPlugin struct {
 	name string
 }
 
+var _ framework.ScorePlugin = &TestPlugin{}
+var _ framework.FilterPlugin = &TestPlugin{}
+
 func (t *TestPlugin) Name() string {
 	return t.name
 }
 
-func (t *TestPlugin) Score(state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (t *TestPlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
 	return 1, nil
 }
 
@@ -645,7 +649,7 @@ func (t *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (t *TestPlugin) Filter(state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+func (t *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	return nil
 }
 

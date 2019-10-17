@@ -17,19 +17,20 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"context"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -86,11 +87,11 @@ func (pl *TestScoreWithNormalizePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestScoreWithNormalizePlugin) NormalizeScore(state *CycleState, pod *v1.Pod, scores NodeScoreList) *Status {
+func (pl *TestScoreWithNormalizePlugin) NormalizeScore(ctx context.Context, state *CycleState, pod *v1.Pod, scores NodeScoreList) *Status {
 	return injectNormalizeRes(pl.inj, scores)
 }
 
-func (pl *TestScoreWithNormalizePlugin) Score(state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
+func (pl *TestScoreWithNormalizePlugin) Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
 	return setScoreRes(pl.inj)
 }
 
@@ -108,7 +109,7 @@ func (pl *TestScorePlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestScorePlugin) Score(state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
+func (pl *TestScorePlugin) Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
 	return setScoreRes(pl.inj)
 }
 
@@ -133,7 +134,7 @@ func (pl *TestPlugin) Name() string {
 	return pl.name
 }
 
-func (pl *TestPlugin) Score(state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
+func (pl *TestPlugin) Score(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (int64, *Status) {
 	return 0, NewStatus(Code(pl.inj.ScoreStatus), "injected status")
 }
 
@@ -141,30 +142,39 @@ func (pl *TestPlugin) ScoreExtensions() ScoreExtensions {
 	return nil
 }
 
-func (pl *TestPlugin) PreFilter(state *CycleState, p *v1.Pod) *Status {
+func (pl *TestPlugin) PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) *Status {
 	return NewStatus(Code(pl.inj.PreFilterStatus), "injected status")
 }
+
 func (pl *TestPlugin) PreFilterExtensions() PreFilterExtensions {
 	return nil
 }
-func (pl *TestPlugin) Filter(state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
+
+func (pl *TestPlugin) Filter(ctx context.Context, state *CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	return NewStatus(Code(pl.inj.FilterStatus), "injected status")
 }
-func (pl *TestPlugin) PostFilter(state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status {
+
+func (pl *TestPlugin) PostFilter(ctx context.Context, state *CycleState, pod *v1.Pod, nodes []*v1.Node, filteredNodesStatuses NodeToStatusMap) *Status {
 	return NewStatus(Code(pl.inj.PostFilterStatus), "injected status")
 }
-func (pl *TestPlugin) Reserve(state *CycleState, p *v1.Pod, nodeName string) *Status {
+
+func (pl *TestPlugin) Reserve(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status {
 	return NewStatus(Code(pl.inj.ReserveStatus), "injected status")
 }
-func (pl *TestPlugin) PreBind(state *CycleState, p *v1.Pod, nodeName string) *Status {
+
+func (pl *TestPlugin) PreBind(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status {
 	return NewStatus(Code(pl.inj.PreBindStatus), "injected status")
 }
-func (pl *TestPlugin) PostBind(state *CycleState, p *v1.Pod, nodeName string)  {}
-func (pl *TestPlugin) Unreserve(state *CycleState, p *v1.Pod, nodeName string) {}
-func (pl *TestPlugin) Permit(state *CycleState, p *v1.Pod, nodeName string) (*Status, time.Duration) {
+
+func (pl *TestPlugin) PostBind(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) {}
+
+func (pl *TestPlugin) Unreserve(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) {}
+
+func (pl *TestPlugin) Permit(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (*Status, time.Duration) {
 	return NewStatus(Code(pl.inj.PermitStatus), "injected status"), time.Duration(0)
 }
-func (pl *TestPlugin) Bind(state *CycleState, p *v1.Pod, nodeName string) *Status {
+
+func (pl *TestPlugin) Bind(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) *Status {
 	return NewStatus(Code(pl.inj.BindStatus), "injected status")
 }
 
@@ -177,7 +187,7 @@ func (pl *TestPreFilterPlugin) Name() string {
 	return preFilterPluginName
 }
 
-func (pl *TestPreFilterPlugin) PreFilter(state *CycleState, p *v1.Pod) *Status {
+func (pl *TestPreFilterPlugin) PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) *Status {
 	pl.PreFilterCalled++
 	return nil
 }
@@ -197,18 +207,18 @@ func (pl *TestPreFilterWithExtensionsPlugin) Name() string {
 	return preFilterWithExtensionsPluginName
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(state *CycleState, p *v1.Pod) *Status {
+func (pl *TestPreFilterWithExtensionsPlugin) PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) *Status {
 	pl.PreFilterCalled++
 	return nil
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) AddPod(state *CycleState, podToSchedule *v1.Pod,
+func (pl *TestPreFilterWithExtensionsPlugin) AddPod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod,
 	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	pl.AddCalled++
 	return nil
 }
 
-func (pl *TestPreFilterWithExtensionsPlugin) RemovePod(state *CycleState, podToSchedule *v1.Pod,
+func (pl *TestPreFilterWithExtensionsPlugin) RemovePod(ctx context.Context, state *CycleState, podToSchedule *v1.Pod,
 	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *Status {
 	pl.RemoveCalled++
 	return nil
@@ -225,7 +235,7 @@ func (dp *TestDuplicatePlugin) Name() string {
 	return duplicatePluginName
 }
 
-func (dp *TestDuplicatePlugin) PreFilter(state *CycleState, p *v1.Pod) *Status {
+func (dp *TestDuplicatePlugin) PreFilter(ctx context.Context, state *CycleState, p *v1.Pod) *Status {
 	return nil
 }
 
@@ -503,7 +513,7 @@ func TestRunScorePlugins(t *testing.T) {
 				t.Fatalf("Failed to create framework for testing: %v", err)
 			}
 
-			res, status := f.RunScorePlugins(state, pod, nodes)
+			res, status := f.RunScorePlugins(context.Background(), state, pod, nodes)
 
 			if tt.err {
 				if status.IsSuccess() {
@@ -540,9 +550,9 @@ func TestPreFilterPlugins(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to create framework for testing: %v", err)
 		}
-		f.RunPreFilterPlugins(nil, nil)
-		f.RunPreFilterExtensionAddPod(nil, nil, nil, nil)
-		f.RunPreFilterExtensionRemovePod(nil, nil, nil, nil)
+		f.RunPreFilterPlugins(context.Background(), nil, nil)
+		f.RunPreFilterExtensionAddPod(context.Background(), nil, nil, nil, nil)
+		f.RunPreFilterExtensionRemovePod(context.Background(), nil, nil, nil, nil)
 
 		if preFilter1.PreFilterCalled != 1 {
 			t.Errorf("preFilter1 called %v, expected: 1", preFilter1.PreFilterCalled)
@@ -570,117 +580,117 @@ func TestRecordingMetrics(t *testing.T) {
 	}{
 		{
 			name:               "PreFilter - Success",
-			action:             func(f Framework) { f.RunPreFilterPlugins(nil, pod) },
+			action:             func(f Framework) { f.RunPreFilterPlugins(context.Background(), nil, pod) },
 			wantExtensionPoint: "PreFilter",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Filter - Success",
-			action:             func(f Framework) { f.RunFilterPlugins(nil, pod, nil) },
+			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), nil, pod, nil) },
 			wantExtensionPoint: "Filter",
 			wantStatus:         Success,
 		},
 		{
 			name:               "PostFilter - Success",
-			action:             func(f Framework) { f.RunPostFilterPlugins(nil, pod, nil, nil) },
+			action:             func(f Framework) { f.RunPostFilterPlugins(context.Background(), nil, pod, nil, nil) },
 			wantExtensionPoint: "PostFilter",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Score - Success",
-			action:             func(f Framework) { f.RunScorePlugins(nil, pod, nodes) },
+			action:             func(f Framework) { f.RunScorePlugins(context.Background(), nil, pod, nodes) },
 			wantExtensionPoint: "Score",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Reserve - Success",
-			action:             func(f Framework) { f.RunReservePlugins(nil, pod, "") },
+			action:             func(f Framework) { f.RunReservePlugins(context.Background(), nil, pod, "") },
 			wantExtensionPoint: "Reserve",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Unreserve - Success",
-			action:             func(f Framework) { f.RunUnreservePlugins(nil, pod, "") },
+			action:             func(f Framework) { f.RunUnreservePlugins(context.Background(), nil, pod, "") },
 			wantExtensionPoint: "Unreserve",
 			wantStatus:         Success,
 		},
 		{
 			name:               "PreBind - Success",
-			action:             func(f Framework) { f.RunPreBindPlugins(nil, pod, "") },
+			action:             func(f Framework) { f.RunPreBindPlugins(context.Background(), nil, pod, "") },
 			wantExtensionPoint: "PreBind",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Bind - Success",
-			action:             func(f Framework) { f.RunBindPlugins(nil, pod, "") },
+			action:             func(f Framework) { f.RunBindPlugins(context.Background(), nil, pod, "") },
 			wantExtensionPoint: "Bind",
 			wantStatus:         Success,
 		},
 		{
 			name:               "PostBind - Success",
-			action:             func(f Framework) { f.RunPostBindPlugins(nil, pod, "") },
+			action:             func(f Framework) { f.RunPostBindPlugins(context.Background(), nil, pod, "") },
 			wantExtensionPoint: "PostBind",
 			wantStatus:         Success,
 		},
 		{
 			name:               "Permit - Success",
-			action:             func(f Framework) { f.RunPermitPlugins(nil, pod, "") },
+			action:             func(f Framework) { f.RunPermitPlugins(context.Background(), nil, pod, "") },
 			wantExtensionPoint: "Permit",
 			wantStatus:         Success,
 		},
 
 		{
 			name:               "PreFilter - Error",
-			action:             func(f Framework) { f.RunPreFilterPlugins(nil, pod) },
+			action:             func(f Framework) { f.RunPreFilterPlugins(context.Background(), nil, pod) },
 			inject:             injectedResult{PreFilterStatus: int(Error)},
 			wantExtensionPoint: "PreFilter",
 			wantStatus:         Error,
 		},
 		{
 			name:               "Filter - Error",
-			action:             func(f Framework) { f.RunFilterPlugins(nil, pod, nil) },
+			action:             func(f Framework) { f.RunFilterPlugins(context.Background(), nil, pod, nil) },
 			inject:             injectedResult{FilterStatus: int(Error)},
 			wantExtensionPoint: "Filter",
 			wantStatus:         Error,
 		},
 		{
 			name:               "PostFilter - Error",
-			action:             func(f Framework) { f.RunPostFilterPlugins(nil, pod, nil, nil) },
+			action:             func(f Framework) { f.RunPostFilterPlugins(context.Background(), nil, pod, nil, nil) },
 			inject:             injectedResult{PostFilterStatus: int(Error)},
 			wantExtensionPoint: "PostFilter",
 			wantStatus:         Error,
 		},
 		{
 			name:               "Score - Error",
-			action:             func(f Framework) { f.RunScorePlugins(nil, pod, nodes) },
+			action:             func(f Framework) { f.RunScorePlugins(context.Background(), nil, pod, nodes) },
 			inject:             injectedResult{ScoreStatus: int(Error)},
 			wantExtensionPoint: "Score",
 			wantStatus:         Error,
 		},
 		{
 			name:               "Reserve - Error",
-			action:             func(f Framework) { f.RunReservePlugins(nil, pod, "") },
+			action:             func(f Framework) { f.RunReservePlugins(context.Background(), nil, pod, "") },
 			inject:             injectedResult{ReserveStatus: int(Error)},
 			wantExtensionPoint: "Reserve",
 			wantStatus:         Error,
 		},
 		{
 			name:               "PreBind - Error",
-			action:             func(f Framework) { f.RunPreBindPlugins(nil, pod, "") },
+			action:             func(f Framework) { f.RunPreBindPlugins(context.Background(), nil, pod, "") },
 			inject:             injectedResult{PreBindStatus: int(Error)},
 			wantExtensionPoint: "PreBind",
 			wantStatus:         Error,
 		},
 		{
 			name:               "Bind - Error",
-			action:             func(f Framework) { f.RunBindPlugins(nil, pod, "") },
+			action:             func(f Framework) { f.RunBindPlugins(context.Background(), nil, pod, "") },
 			inject:             injectedResult{BindStatus: int(Error)},
 			wantExtensionPoint: "Bind",
 			wantStatus:         Error,
 		},
 		{
 			name:               "Permit - Error",
-			action:             func(f Framework) { f.RunPermitPlugins(nil, pod, "") },
+			action:             func(f Framework) { f.RunPermitPlugins(context.Background(), nil, pod, "") },
 			inject:             injectedResult{PermitStatus: int(Error)},
 			wantExtensionPoint: "Permit",
 			wantStatus:         Error,

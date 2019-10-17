@@ -17,6 +17,7 @@ limitations under the License.
 package volumescheduling
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -50,14 +51,18 @@ type testContext struct {
 	clientSet       *clientset.Clientset
 	informerFactory informers.SharedInformerFactory
 	scheduler       *scheduler.Scheduler
-	stopCh          chan struct{}
+
+	ctx      context.Context
+	cancelFn context.CancelFunc
 }
 
 // initTestMaster initializes a test environment and creates a master with default
 // configuration.
 func initTestMaster(t *testing.T, nsPrefix string, admission admission.Interface) *testContext {
+	ctx, cancelFunc := context.WithCancel(context.Background())
 	context := testContext{
-		stopCh: make(chan struct{}),
+		ctx:      ctx,
+		cancelFn: cancelFunc,
 	}
 
 	// 1. Create master
@@ -114,19 +119,18 @@ func initTestSchedulerWithOptions(
 
 	var err error
 	context.scheduler, err = createSchedulerWithPodInformer(
-		context.clientSet, podInformer, context.informerFactory, recorder, context.stopCh)
+		context.clientSet, podInformer, context.informerFactory, recorder, context.ctx.Done())
 
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler: %v", err)
 	}
 
-	stopCh := make(chan struct{})
-	eventBroadcaster.StartRecordingToSink(stopCh)
+	eventBroadcaster.StartRecordingToSink(context.ctx.Done())
 
 	context.informerFactory.Start(context.scheduler.StopEverything)
 	context.informerFactory.WaitForCacheSync(context.scheduler.StopEverything)
 
-	context.scheduler.Run()
+	go context.scheduler.Run(context.ctx)
 	return context
 }
 
@@ -156,7 +160,7 @@ func createSchedulerWithPodInformer(
 // at the end of a test.
 func cleanupTest(t *testing.T, context *testContext) {
 	// Kill the scheduler.
-	close(context.stopCh)
+	context.cancelFn()
 	// Cleanup nodes.
 	context.clientSet.CoreV1().Nodes().DeleteCollection(nil, metav1.ListOptions{})
 	framework.DeleteTestingNamespace(context.ns, context.httpServer, t)

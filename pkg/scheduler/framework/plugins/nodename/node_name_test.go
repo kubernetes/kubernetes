@@ -17,10 +17,11 @@ limitations under the License.
 package nodename
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -78,7 +79,7 @@ func TestNodeName(t *testing.T) {
 			nodeInfo.SetNode(test.node)
 
 			p, _ := New(nil, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(nil, test.pod, nodeInfo)
+			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.pod, nodeInfo)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}

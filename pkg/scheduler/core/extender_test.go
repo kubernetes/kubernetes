@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -558,7 +559,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)
 			podIgnored := &v1.Pod{}
-			result, err := scheduler.Schedule(framework.NewCycleState(), podIgnored)
+			result, err := scheduler.Schedule(context.Background(), framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)

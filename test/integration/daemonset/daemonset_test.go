@@ -17,6 +17,7 @@ limitations under the License.
 package daemonset
 
 import (
+	"context"
 	"fmt"
 	"net/http/httptest"
 	"testing"
@@ -84,10 +85,10 @@ func setup(t *testing.T) (*httptest.Server, framework.CloseFunc, *daemon.DaemonS
 }
 
 func setupScheduler(
+	ctx context.Context,
 	t *testing.T,
 	cs clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
-	stopCh chan struct{},
 ) (restoreFeatureGates func()) {
 	restoreFeatureGates = func() {}
 	// If ScheduleDaemonSetPods is disabled, do not start scheduler.
@@ -115,15 +116,15 @@ func setupScheduler(
 		schedulerconfig.SchedulerAlgorithmSource{
 			Provider: &defaultProviderName,
 		},
-		stopCh,
+		ctx.Done(),
 	)
 	if err != nil {
 		t.Fatalf("Couldn't create scheduler: %v", err)
 	}
 
-	eventBroadcaster.StartRecordingToSink(stopCh)
+	eventBroadcaster.StartRecordingToSink(ctx.Done())
 
-	go sched.Run()
+	go sched.Run(ctx)
 	return
 }
 
@@ -498,14 +499,14 @@ func TestOneNodeDaemonLaunchesPod(t *testing.T) {
 			nodeClient := clientset.CoreV1().Nodes()
 			podInformer := informers.Core().V1().Pods().Informer()
 
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			// Start Scheduler
-			defer setupScheduler(t, clientset, informers, stopCh)()
+			defer setupScheduler(ctx, t, clientset, informers)()
 
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
+			informers.Start(ctx.Done())
+			go dc.Run(5, ctx.Done())
 
 			ds := newDaemonSet("foo", ns.Name)
 			ds.Spec.UpdateStrategy = *strategy
@@ -539,14 +540,14 @@ func TestSimpleDaemonSetLaunchesPods(t *testing.T) {
 			nodeClient := clientset.CoreV1().Nodes()
 			podInformer := informers.Core().V1().Pods().Informer()
 
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
+			informers.Start(ctx.Done())
+			go dc.Run(5, ctx.Done())
 
 			// Start Scheduler
-			defer setupScheduler(t, clientset, informers, stopCh)()
+			defer setupScheduler(ctx, t, clientset, informers)()
 
 			ds := newDaemonSet("foo", ns.Name)
 			ds.Spec.UpdateStrategy = *strategy
@@ -577,14 +578,14 @@ func TestDaemonSetWithNodeSelectorLaunchesPods(t *testing.T) {
 			nodeClient := clientset.CoreV1().Nodes()
 			podInformer := informers.Core().V1().Pods().Informer()
 
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
+			informers.Start(ctx.Done())
+			go dc.Run(5, ctx.Done())
 
 			// Start Scheduler
-			defer setupScheduler(t, clientset, informers, stopCh)()
+			defer setupScheduler(ctx, t, clientset, informers)()
 
 			ds := newDaemonSet("foo", ns.Name)
 			ds.Spec.UpdateStrategy = *strategy
@@ -647,14 +648,14 @@ func TestNotReadyNodeDaemonDoesLaunchPod(t *testing.T) {
 		nodeClient := clientset.CoreV1().Nodes()
 		podInformer := informers.Core().V1().Pods().Informer()
 
-		stopCh := make(chan struct{})
-		defer close(stopCh)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-		informers.Start(stopCh)
-		go dc.Run(5, stopCh)
+		informers.Start(ctx.Done())
+		go dc.Run(5, ctx.Done())
 
 		// Start Scheduler
-		defer setupScheduler(t, clientset, informers, stopCh)()
+		defer setupScheduler(ctx, t, clientset, informers)()
 
 		ds := newDaemonSet("foo", ns.Name)
 		ds.Spec.UpdateStrategy = *strategy
@@ -735,14 +736,15 @@ func TestInsufficientCapacityNodeWhenScheduleDaemonSetPodsEnabled(t *testing.T) 
 		podClient := clientset.CoreV1().Pods(ns.Name)
 		podInformer := informers.Core().V1().Pods().Informer()
 		nodeClient := clientset.CoreV1().Nodes()
-		stopCh := make(chan struct{})
-		defer close(stopCh)
 
-		informers.Start(stopCh)
-		go dc.Run(5, stopCh)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		informers.Start(ctx.Done())
+		go dc.Run(5, ctx.Done())
 
 		// Start Scheduler
-		defer setupScheduler(t, clientset, informers, stopCh)()
+		defer setupScheduler(ctx, t, clientset, informers)()
 
 		ds := newDaemonSet("foo", ns.Name)
 		ds.Spec.Template.Spec = resourcePodSpec("", "120M", "75m")
@@ -799,13 +801,14 @@ func TestLaunchWithHashCollision(t *testing.T) {
 	podInformer := informers.Core().V1().Pods().Informer()
 	nodeClient := clientset.CoreV1().Nodes()
 
-	stopCh := make(chan struct{})
-	defer close(stopCh)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	informers.Start(stopCh)
-	go dc.Run(1, stopCh)
+	informers.Start(ctx.Done())
+	go dc.Run(5, ctx.Done())
 
-	defer setupScheduler(t, clientset, informers, stopCh)()
+	// Start Scheduler
+	defer setupScheduler(ctx, t, clientset, informers)()
 
 	// Create single node
 	_, err := nodeClient.Create(newNode("single-node", nil))
@@ -909,14 +912,15 @@ func TestTaintedNode(t *testing.T) {
 			podClient := clientset.CoreV1().Pods(ns.Name)
 			podInformer := informers.Core().V1().Pods().Informer()
 			nodeClient := clientset.CoreV1().Nodes()
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			informers.Start(ctx.Done())
+			go dc.Run(5, ctx.Done())
 
 			// Start Scheduler
-			defer setupScheduler(t, clientset, informers, stopCh)()
-			informers.Start(stopCh)
-
-			go dc.Run(5, stopCh)
+			defer setupScheduler(ctx, t, clientset, informers)()
 
 			ds := newDaemonSet("foo", ns.Name)
 			ds.Spec.UpdateStrategy = *strategy
@@ -978,14 +982,14 @@ func TestUnschedulableNodeDaemonDoesLaunchPod(t *testing.T) {
 			nodeClient := clientset.CoreV1().Nodes()
 			podInformer := informers.Core().V1().Pods().Informer()
 
-			stopCh := make(chan struct{})
-			defer close(stopCh)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
-			informers.Start(stopCh)
-			go dc.Run(5, stopCh)
+			informers.Start(ctx.Done())
+			go dc.Run(5, ctx.Done())
 
 			// Start Scheduler
-			defer setupScheduler(t, clientset, informers, stopCh)()
+			defer setupScheduler(ctx, t, clientset, informers)()
 
 			ds := newDaemonSet("foo", ns.Name)
 			ds.Spec.UpdateStrategy = *strategy

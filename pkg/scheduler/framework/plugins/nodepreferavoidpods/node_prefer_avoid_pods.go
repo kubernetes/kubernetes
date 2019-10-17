@@ -17,6 +17,7 @@ limitations under the License.
 package nodepreferavoidpods
 
 import (
+	"context"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -32,7 +33,7 @@ type NodePreferAvoidPods struct {
 	handle framework.FrameworkHandle
 }
 
-var _ = framework.ScorePlugin(&NodePreferAvoidPods{})
+var _ framework.ScorePlugin = &NodePreferAvoidPods{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "NodePreferAvoidPods"
@@ -43,7 +44,7 @@ func (pl *NodePreferAvoidPods) Name() string {
 }
 
 // Score invoked at the score extension point.
-func (pl *NodePreferAvoidPods) Score(state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (pl *NodePreferAvoidPods) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
 	nodeInfo, exist := pl.handle.NodeInfoSnapshot().NodeInfoMap[nodeName]
 	if !exist {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("node %q does not exist in NodeInfoSnapshot", nodeName))

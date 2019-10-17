@@ -17,7 +17,9 @@ limitations under the License.
 package volumerestrictions
 
 import (
-	"k8s.io/api/core/v1"
+	"context"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
@@ -39,7 +41,7 @@ func (pl *VolumeRestrictions) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *VolumeRestrictions) Filter(_ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *VolumeRestrictions) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	// metadata is not needed for NoDiskConflict
 	_, reasons, err := predicates.NoDiskConflict(pod, nil, nodeInfo)
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
