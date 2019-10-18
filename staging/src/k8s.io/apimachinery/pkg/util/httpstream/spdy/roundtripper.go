@@ -175,35 +175,35 @@ func (s *SpdyRoundTripper) dialWithHttpProxy(requestUrl *url.URL, proxyURL *url.
 
 // dialWithSocks5Proxy dials the host specified by url through a socks5 proxy.
 func (s *SpdyRoundTripper) dialWithSocks5Proxy(requestUrl *url.URL, proxyURL *url.URL) (net.Conn, error) {
-  // ensure we use a canonical host with proxyReq
-  targetHost := netutil.CanonicalAddr(requestUrl)
-  proxyDialAddr := netutil.CanonicalAddr(proxyURL)
+	// ensure we use a canonical host with proxyReq
+	targetHost := netutil.CanonicalAddr(requestUrl)
+	proxyDialAddr := netutil.CanonicalAddr(proxyURL)
 
-  var auth *proxy.Auth
-  if proxyURL.User != nil {
-  	pass, _ := proxyURL.User.Password()
-    auth = &proxy.Auth{
-      User: proxyURL.User.Username(),
-      Password: pass,
-    }
-  }
-  proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, auth, proxy.Direct)
+	var auth *proxy.Auth
+	if proxyURL.User != nil {
+		pass, _ := proxyURL.User.Password()
+		auth = &proxy.Auth{
+			User:     proxyURL.User.Username(),
+			Password: pass,
+		}
+	}
+	proxyDialer, err := proxy.SOCKS5("tcp", proxyDialAddr, auth, proxy.Direct)
 
-  if err != nil {
-    return nil, err
-  }
+	if err != nil {
+		return nil, err
+	}
 
-  proxyDialConn, err := proxyDialer.Dial("tcp", targetHost)
+	proxyDialConn, err := proxyDialer.Dial("tcp", targetHost)
 
-  if err != nil {
-    return nil, err
-  }
- 
-  proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
+	if err != nil {
+		return nil, err
+	}
 
-  rwc, _ := proxyClientConn.Hijack()
+	proxyClientConn := httputil.NewProxyClientConn(proxyDialConn, nil)
 
-  return s.tlsConn(requestUrl, rwc, targetHost)
+	rwc, _ := proxyClientConn.Hijack()
+
+	return s.tlsConn(requestUrl, rwc, targetHost)
 }
 
 // tlsConn returns a TLS client side connection using rwc as the underlying transport.
