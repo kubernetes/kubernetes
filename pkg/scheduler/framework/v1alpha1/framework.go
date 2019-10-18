@@ -127,7 +127,7 @@ func WithInformerFactory(informerFactory informers.SharedInformerFactory) Option
 
 var defaultFrameworkOptions = frameworkOptions{}
 
-var _ = Framework(&framework{})
+var _ Framework = &framework{}
 
 // NewFramework initializes plugins given the configuration and the registry.
 func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfig, opts ...Option) (Framework, error) {

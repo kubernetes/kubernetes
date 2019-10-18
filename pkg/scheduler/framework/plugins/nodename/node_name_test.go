@@ -32,14 +32,12 @@ func TestNodeName(t *testing.T) {
 	tests := []struct {
 		pod        *v1.Pod
 		node       *v1.Node
-		fits       bool
 		name       string
 		wantStatus *framework.Status
 	}{
 		{
 			pod:  &v1.Pod{},
 			node: &v1.Node{},
-			fits: true,
 			name: "no host specified",
 		},
 		{
@@ -53,7 +51,6 @@ func TestNodeName(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fits: true,
 			name: "host matches",
 		},
 		{
@@ -67,7 +64,6 @@ func TestNodeName(t *testing.T) {
 					Name: "foo",
 				},
 			},
-			fits:       false,
 			name:       "host doesn't match",
 			wantStatus: framework.NewStatus(framework.UnschedulableAndUnresolvable, predicates.ErrPodNotMatchHostName.GetReason()),
 		},

@@ -39,7 +39,7 @@ func (s sortablePods) Less(i, j int) bool {
 func (s sortablePods) Len() int      { return len(s) }
 func (s sortablePods) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-var _ = sort.Interface(&sortablePods{})
+var _ sort.Interface = &sortablePods{}
 
 // sortableServices allows us to sort services.
 type sortableServices []*v1.Service
@@ -51,7 +51,7 @@ func (s sortableServices) Less(i, j int) bool {
 func (s sortableServices) Len() int      { return len(s) }
 func (s sortableServices) Swap(i, j int) { s[i], s[j] = s[j], s[i] }
 
-var _ = sort.Interface(&sortableServices{})
+var _ sort.Interface = &sortableServices{}
 
 // predicateMetadataEquivalent returns true if the two metadata are equivalent.
 // Note: this function does not compare podRequest.

@@ -116,18 +116,18 @@ const (
 	permitPluginName             = "permit-plugin"
 )
 
-var _ = framework.PreFilterPlugin(&PreFilterPlugin{})
-var _ = framework.ScorePlugin(&ScorePlugin{})
-var _ = framework.FilterPlugin(&FilterPlugin{})
-var _ = framework.ScorePlugin(&ScorePlugin{})
-var _ = framework.ScorePlugin(&ScoreWithNormalizePlugin{})
-var _ = framework.ReservePlugin(&ReservePlugin{})
-var _ = framework.PostFilterPlugin(&PostFilterPlugin{})
-var _ = framework.PreBindPlugin(&PreBindPlugin{})
-var _ = framework.BindPlugin(&BindPlugin{})
-var _ = framework.PostBindPlugin(&PostBindPlugin{})
-var _ = framework.UnreservePlugin(&UnreservePlugin{})
-var _ = framework.PermitPlugin(&PermitPlugin{})
+var _ framework.PreFilterPlugin = &PreFilterPlugin{}
+var _ framework.ScorePlugin = &ScorePlugin{}
+var _ framework.FilterPlugin = &FilterPlugin{}
+var _ framework.ScorePlugin = &ScorePlugin{}
+var _ framework.ScorePlugin = &ScoreWithNormalizePlugin{}
+var _ framework.ReservePlugin = &ReservePlugin{}
+var _ framework.PostFilterPlugin = &PostFilterPlugin{}
+var _ framework.PreBindPlugin = &PreBindPlugin{}
+var _ framework.BindPlugin = &BindPlugin{}
+var _ framework.PostBindPlugin = &PostBindPlugin{}
+var _ framework.UnreservePlugin = &UnreservePlugin{}
+var _ framework.PermitPlugin = &PermitPlugin{}
 
 // newPlugin returns a plugin factory with specified Plugin.
 func newPlugin(plugin framework.Plugin) framework.PluginFactory {

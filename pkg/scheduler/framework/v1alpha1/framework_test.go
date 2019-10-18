@@ -47,8 +47,8 @@ const (
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
 // TestScorePlugin only implements ScorePlugin interface.
-var _ = ScorePlugin(&TestScoreWithNormalizePlugin{})
-var _ = ScorePlugin(&TestScorePlugin{})
+var _ ScorePlugin = &TestScoreWithNormalizePlugin{}
+var _ ScorePlugin = &TestScorePlugin{}
 
 func newScoreWithNormalizePlugin1(injArgs *runtime.Unknown, f FrameworkHandle) (Plugin, error) {
 	var inj injectedResult

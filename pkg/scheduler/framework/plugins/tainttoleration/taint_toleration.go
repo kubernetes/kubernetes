@@ -34,8 +34,8 @@ type TaintToleration struct {
 	handle framework.FrameworkHandle
 }
 
-var _ = framework.FilterPlugin(&TaintToleration{})
-var _ = framework.ScorePlugin(&TaintToleration{})
+var _ framework.FilterPlugin = &TaintToleration{}
+var _ framework.ScorePlugin = &TaintToleration{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "TaintToleration"
