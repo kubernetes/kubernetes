@@ -36,6 +36,9 @@ import (
 )
 
 func TestCompatibility_v1_Scheduler(t *testing.T) {
+	snapshot := scheduler.RegisteredPredicatesAndPrioritiesSnapshot()
+	defer scheduler.ApplyPredicatesAndPriorities(snapshot)
+
 	// Add serialized versions of scheduler config that exercise available options to ensure compatibility between releases
 	schedulerFiles := map[string]struct {
 		JSON             string
@@ -44,6 +47,27 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		wantPlugins      map[string][]kubeschedulerconfig.Plugin
 		wantExtenders    []schedulerapi.ExtenderConfig
 	}{
+		// This is a special test for the "composite" predicate "GeneralPredicate". GeneralPredicate is a combination
+		// of predicates, and here we test that if given, it is mapped to the set of plugins that should be executed.
+		"GeneralPredicate": {
+			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
+		  "predicates": [
+			{"name": "GeneralPredicates"}
+                  ],
+		  "priorities": [
+                  ]
+		}`,
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeResources"},
+					{Name: "NodeName"},
+					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
+				},
+			},
+		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
 		"1.0": {
@@ -209,7 +233,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
 			{"name": "MatchInterPodAffinity"},
-			{"name": "GeneralPredicates"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
 		  ],"priorities": [
@@ -229,7 +252,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -278,7 +300,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
 			{"name": "MatchInterPodAffinity"},
-			{"name": "GeneralPredicates"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
 		  ],"priorities": [
@@ -301,7 +322,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -351,7 +371,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
 			{"name": "MatchInterPodAffinity"},
-			{"name": "GeneralPredicates"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
 		  ],"priorities": [
@@ -384,7 +403,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -446,7 +464,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
 			{"name": "MatchInterPodAffinity"},
-			{"name": "GeneralPredicates"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
 		  ],"priorities": [
@@ -480,7 +497,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -542,7 +558,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
 			{"name": "MatchInterPodAffinity"},
-			{"name": "GeneralPredicates"},
 			{"name": "CheckVolumeBinding"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
@@ -577,7 +592,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -642,7 +656,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
 			{"name": "MatchInterPodAffinity"},
-			{"name": "GeneralPredicates"},
 			{"name": "CheckVolumeBinding"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
@@ -680,7 +693,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -746,7 +758,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
 			{"name": "MatchInterPodAffinity"},
-			{"name": "GeneralPredicates"},
 			{"name": "CheckVolumeBinding"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
@@ -795,7 +806,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -863,7 +873,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MaxAzureDiskVolumeCount"},
 			{"name": "MaxCSIVolumeCountPred"},
 			{"name": "MatchInterPodAffinity"},
-			{"name": "GeneralPredicates"},
 			{"name": "CheckVolumeBinding"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
@@ -912,7 +921,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -980,7 +988,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MaxCSIVolumeCountPred"},
                         {"name": "MaxCinderVolumeCount"},
 			{"name": "MatchInterPodAffinity"},
-			{"name": "GeneralPredicates"},
 			{"name": "CheckVolumeBinding"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
@@ -1030,7 +1037,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxAzureDiskVolumeCount",
 				"MaxCinderVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -1098,7 +1104,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MaxCSIVolumeCountPred"},
                         {"name": "MaxCinderVolumeCount"},
 			{"name": "MatchInterPodAffinity"},
-			{"name": "GeneralPredicates"},
 			{"name": "CheckVolumeBinding"},
 			{"name": "TestServiceAffinity", "argument": {"serviceAffinity" : {"labels" : ["region"]}}},
 			{"name": "TestLabelsPresence",  "argument": {"labelsPresence"  : {"labels" : ["foo"], "presence":true}}}
@@ -1152,7 +1157,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxAzureDiskVolumeCount",
 				"MaxCinderVolumeCount",
 				"MatchInterPodAffinity",
-				"GeneralPredicates",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -1204,6 +1208,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	seenPredicates := sets.NewString()
 	seenPriorities := sets.NewString()
 	mandatoryPredicates := sets.NewString("CheckNodeCondition")
+	generalPredicateFilters := []string{"NodeResources", "NodeName", "NodePorts", "NodeAffinity"}
 	filterToPredicateMap := map[string]string{
 		"TaintToleration":    "PodToleratesNodeTaints",
 		"NodeName":           "HostName",
@@ -1273,6 +1278,9 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				seenPredicates.Insert(filterToPredicateMap[p.Name])
 
 			}
+			if pluginsToStringSet(gotPlugins["FilterPlugin"]).HasAll(generalPredicateFilters...) {
+				seenPredicates.Insert("GeneralPredicates")
+			}
 			for _, p := range gotPlugins["ScorePlugin"] {
 				seenPriorities.Insert(scoreToPriorityMap[p.Name])
 
@@ -1307,4 +1315,12 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	if !seenPriorities.HasAll(registeredPriorities.List()...) {
 		t.Errorf("Registered priorities are missing from compatibility test (add to test stanza for version currently in development): %#v", registeredPriorities.Difference(seenPriorities).List())
 	}
+}
+
+func pluginsToStringSet(plugins []kubeschedulerconfig.Plugin) sets.String {
+	s := sets.NewString()
+	for _, p := range plugins {
+		s.Insert(p.Name)
+	}
+	return s
 }

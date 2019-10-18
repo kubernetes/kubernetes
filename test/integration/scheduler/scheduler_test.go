@@ -129,7 +129,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"CheckNodeDiskPressure",
 				"CheckNodeMemoryPressure",
 				"CheckNodePIDPressure",
-				"GeneralPredicates",
 				"MatchInterPodAffinity",
 				"MaxAzureDiskVolumeCount",
 				"MaxEBSVolumeCount",
@@ -143,6 +142,10 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeResources"},
+					{Name: "NodeName"},
+					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "NodeVolumeLimits"},
@@ -200,7 +203,6 @@ kind: Policy
 				"CheckNodeDiskPressure",
 				"CheckNodeMemoryPressure",
 				"CheckNodePIDPressure",
-				"GeneralPredicates",
 				"MatchInterPodAffinity",
 				"MaxAzureDiskVolumeCount",
 				"MaxEBSVolumeCount",
@@ -214,6 +216,10 @@ kind: Policy
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeResources"},
+					{Name: "NodeName"},
+					{Name: "NodePorts"},
+					{Name: "NodeAffinity"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "NodeVolumeLimits"},
