@@ -103,9 +103,6 @@ func (c *Cache) Snapshot() *internalcache.Snapshot {
 	return &internalcache.Snapshot{}
 }
 
-// NodeTree is a fake method for testing.
-func (c *Cache) NodeTree() *internalcache.NodeTree { return nil }
-
 // GetNodeInfo is a fake method for testing.
 func (c *Cache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	return nil, nil
@@ -119,4 +116,9 @@ func (c *Cache) ListNodes() []*v1.Node {
 // GetCSINodeInfo is a fake method for testing.
 func (c *Cache) GetCSINodeInfo(nodeName string) (*storagev1beta1.CSINode, error) {
 	return nil, nil
+}
+
+// NumNodes is a fake method for testing.
+func (c *Cache) NumNodes() int {
+	return 0
 }
