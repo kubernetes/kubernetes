@@ -32,6 +32,7 @@ import (
 	"os"
 	"net"
 	"time"
+	"strconv"
 	"github.com/elazarl/goproxy"
 	"github.com/armon/go-socks5"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -272,10 +273,19 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					serverStatusCode:       http.StatusSwitchingProtocols,
 					shouldError:            false,
 				},
-				"proxied tcp->tcp via SOCKS5, authorization failure": {
+				"proxied tcp->tcp via SOCKS5 with invalid auth": {
 					serverFunc:             httptest.NewServer,
 					socks5ProxyServerFunc: 	socks5Server,
-					proxyAuth: 							url.UserPassword("proxyuser", "proxypasswd"),
+					proxyAuth:              url.UserPassword("invalid", "auth"),
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            true,
+				},
+				"proxied tcp->tcp via SOCKS5 with auth": {
+					serverFunc:             httptest.NewServer,
+					socks5ProxyServerFunc: 	socks5Server,
+					proxyAuth:              url.UserPassword("proxyuser", "proxypasswd"),
 					serverConnectionHeader: "Upgrade",
 					serverUpgradeHeader:    "SPDY/3.1",
 					serverStatusCode:       http.StatusSwitchingProtocols,
@@ -285,8 +295,6 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			}
 
 			for k, testCase := range testCases {
-				// TODO: remove for real PR
-				// fmt.Println(k)
 				server := testCase.serverFunc(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 					if testCase.shouldError {
 						if e, a := httpstream.HeaderUpgrade, req.Header.Get(httpstream.HeaderConnection); e != a {
@@ -369,7 +377,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 						proxyHandler = socks5Server(nil)
 					}
 					
-					l, err = net.Listen("tcp", "127.0.0.1:8989")
+					l, err = net.Listen("tcp", "127.0.0.1:0")
 					if err != nil {
 					  t.Fatalf("socks5Server: proxy_test: ListenAndServe: %v", err)
 					}
@@ -379,17 +387,15 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					time.Sleep(100 * time.Millisecond)
 
 					// TODO: pass creds from testCase object
-					// TODO: use dynamic TCP ports
 					proxy := &url.URL{
 						Scheme: "socks5",
-						Host: "//127.0.0.1:8989",
+						Host: "//127.0.0.1:" + strconv.Itoa(l.Addr().(*net.TCPAddr).Port),
 						User: url.UserPassword("foo", "bar"),
 					}
 
-					// TODO: use dynamic TCP ports
 					spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
 						proxierCalled = true
-						proxyURL, err := url.Parse("//127.0.0.1:8989")
+						proxyURL, err := url.Parse(proxy.Host)
 						if err != nil {
 							return nil, err
 						}
@@ -467,8 +473,6 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 
 				if l != nil {
 					l.Close()
-					// TODO: remove delay in lieu of dynamic port allocation
-					time.Sleep(3 * time.Second)
 				}
 			}
 		})
