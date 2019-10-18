@@ -27,7 +27,6 @@ import (
 	"testing"
 	"time"
 
-	apps "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,6 +35,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	algorithmpredicates "k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
@@ -974,6 +975,9 @@ func TestZeroRequest(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
 			// This should match the configuration in defaultPriorities() in
 			// pkg/scheduler/algorithmprovider/defaults/defaults.go if you want
 			// to test what's actually in production.
@@ -982,20 +986,23 @@ func TestZeroRequest(t *testing.T) {
 				{Map: priorities.BalancedResourceAllocationMap, Weight: 1},
 			}
 			selectorSpreadPriorityMap, selectorSpreadPriorityReduce := priorities.NewSelectorSpreadPriority(
-				schedulertesting.FakeServiceLister([]*v1.Service{}),
-				schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
-				schedulertesting.FakeReplicaSetLister([]*apps.ReplicaSet{}),
-				schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
+				informerFactory.Core().V1().Services().Lister(),
+				informerFactory.Core().V1().ReplicationControllers().Lister(),
+				informerFactory.Apps().V1().ReplicaSets().Lister(),
+				informerFactory.Apps().V1().StatefulSets().Lister(),
+			)
 			pc := priorities.PriorityConfig{Map: selectorSpreadPriorityMap, Reduce: selectorSpreadPriorityReduce, Weight: 1}
 			priorityConfigs = append(priorityConfigs, pc)
 
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
 
 			metaDataProducer := priorities.NewPriorityMetadataFactory(
-				schedulertesting.FakeServiceLister([]*v1.Service{}),
-				schedulertesting.FakeControllerLister([]*v1.ReplicationController{}),
-				schedulertesting.FakeReplicaSetLister([]*apps.ReplicaSet{}),
-				schedulertesting.FakeStatefulSetLister([]*apps.StatefulSet{}))
+				informerFactory.Core().V1().Services().Lister(),
+				informerFactory.Core().V1().ReplicationControllers().Lister(),
+				informerFactory.Apps().V1().ReplicaSets().Lister(),
+				informerFactory.Apps().V1().StatefulSets().Lister(),
+			)
+
 			metaData := metaDataProducer(test.pod, nodeNameToInfo)
 
 			list, err := PrioritizeNodes(

@@ -17,7 +17,9 @@ go_library(
         "//staging/src/k8s.io/api/policy/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
+        "//staging/src/k8s.io/client-go/listers/apps/v1:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",
+        "//staging/src/k8s.io/client-go/listers/policy/v1beta1:go_default_library",
     ],
 )
 

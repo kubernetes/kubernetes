@@ -24,6 +24,9 @@ import (
 	"sync"
 
 	"k8s.io/apimachinery/pkg/util/sets"
+	appslisters "k8s.io/client-go/listers/apps/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
@@ -37,11 +40,11 @@ import (
 // PluginFactoryArgs are passed to all plugin factory functions.
 type PluginFactoryArgs struct {
 	PodLister                      algorithm.PodLister
-	ServiceLister                  algorithm.ServiceLister
-	ControllerLister               algorithm.ControllerLister
-	ReplicaSetLister               algorithm.ReplicaSetLister
-	StatefulSetLister              algorithm.StatefulSetLister
-	PDBLister                      algorithm.PDBLister
+	ServiceLister                  corelisters.ServiceLister
+	ControllerLister               corelisters.ReplicationControllerLister
+	ReplicaSetLister               appslisters.ReplicaSetLister
+	StatefulSetLister              appslisters.StatefulSetLister
+	PDBLister                      policylisters.PodDisruptionBudgetLister
 	NodeInfo                       predicates.NodeInfo
 	CSINodeInfo                    predicates.CSINodeInfo
 	PVInfo                         predicates.PersistentVolumeInfo

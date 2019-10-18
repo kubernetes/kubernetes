@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/errors"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/client-go/util/workqueue"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
@@ -155,7 +156,7 @@ type genericScheduler struct {
 	nodeInfoSnapshot         *schedulernodeinfo.Snapshot
 	volumeBinder             *volumebinder.VolumeBinder
 	pvcLister                corelisters.PersistentVolumeClaimLister
-	pdbLister                algorithm.PDBLister
+	pdbLister                policylisters.PodDisruptionBudgetLister
 	disablePreemption        bool
 	percentageOfNodesToScore int32
 	enableNonPreempting      bool
@@ -1278,7 +1279,7 @@ func NewGenericScheduler(
 	extenders []algorithm.SchedulerExtender,
 	volumeBinder *volumebinder.VolumeBinder,
 	pvcLister corelisters.PersistentVolumeClaimLister,
-	pdbLister algorithm.PDBLister,
+	pdbLister policylisters.PodDisruptionBudgetLister,
 	alwaysCheckAllPredicates bool,
 	disablePreemption bool,
 	percentageOfNodesToScore int32,

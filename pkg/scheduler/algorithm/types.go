@@ -17,10 +17,12 @@ limitations under the License.
 package algorithm
 
 import (
-	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
-	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	appslisters "k8s.io/client-go/listers/apps/v1"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/kubernetes/pkg/apis/apps"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
@@ -43,35 +45,7 @@ type PodLister interface {
 	FilteredList(podFilter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
 }
 
-// ServiceLister interface represents anything that can produce a list of services; the list is consumed by a scheduler.
-type ServiceLister interface {
-	// Lists all the services
-	List(labels.Selector) ([]*v1.Service, error)
-	// Gets the services for the given pod
-	GetPodServices(*v1.Pod) ([]*v1.Service, error)
-}
-
-// ControllerLister interface represents anything that can produce a list of ReplicationController; the list is consumed by a scheduler.
-type ControllerLister interface {
-	// Lists all the replication controllers
-	List(labels.Selector) ([]*v1.ReplicationController, error)
-	// Gets the replication controller for the given pod
-	GetPodControllers(*v1.Pod) ([]*v1.ReplicationController, error)
-}
-
-// ReplicaSetLister interface represents anything that can produce a list of ReplicaSet; the list is consumed by a scheduler.
-type ReplicaSetLister interface {
-	// Gets the replicasets for the given pod
-	GetPodReplicaSets(*v1.Pod) ([]*apps.ReplicaSet, error)
-}
-
-// PDBLister interface represents anything that can list PodDisruptionBudget objects.
-type PDBLister interface {
-	// List all the PodDisruptionBudgets matching the selector
-	List(labels.Selector) ([]*policyv1beta1.PodDisruptionBudget, error)
-}
-
-var _ ControllerLister = &EmptyControllerLister{}
+var _ corelisters.ReplicationControllerLister = &EmptyControllerLister{}
 
 // EmptyControllerLister implements ControllerLister on []v1.ReplicationController returning empty data
 type EmptyControllerLister struct{}
@@ -86,14 +60,29 @@ func (f EmptyControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1
 	return nil, nil
 }
 
-var _ ReplicaSetLister = &EmptyReplicaSetLister{}
+// ReplicationControllers returns nil
+func (f EmptyControllerLister) ReplicationControllers(namespace string) corelisters.ReplicationControllerNamespaceLister {
+	return nil
+}
+
+var _ appslisters.ReplicaSetLister = &EmptyReplicaSetLister{}
 
 // EmptyReplicaSetLister implements ReplicaSetLister on []extensions.ReplicaSet returning empty data
 type EmptyReplicaSetLister struct{}
 
-// GetPodReplicaSets returns nil
-func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*apps.ReplicaSet, err error) {
+// List returns nil
+func (f EmptyReplicaSetLister) List(labels.Selector) ([]*appsv1.ReplicaSet, error) {
 	return nil, nil
+}
+
+// GetPodReplicaSets returns nil
+func (f EmptyReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*appsv1.ReplicaSet, err error) {
+	return nil, nil
+}
+
+// ReplicaSets returns nil
+func (f EmptyReplicaSetLister) ReplicaSets(namespace string) appslisters.ReplicaSetNamespaceLister {
+	return nil
 }
 
 // StatefulSetLister interface represents anything that can produce a list of StatefulSet; the list is consumed by a scheduler.
@@ -102,12 +91,22 @@ type StatefulSetLister interface {
 	GetPodStatefulSets(*v1.Pod) ([]*apps.StatefulSet, error)
 }
 
-var _ StatefulSetLister = &EmptyStatefulSetLister{}
+var _ appslisters.StatefulSetLister = &EmptyStatefulSetLister{}
 
 // EmptyStatefulSetLister implements StatefulSetLister on []apps.StatefulSet returning empty data.
 type EmptyStatefulSetLister struct{}
 
-// GetPodStatefulSets of EmptyStatefulSetLister returns nil.
-func (f EmptyStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.StatefulSet, err error) {
+// List returns nil
+func (f EmptyStatefulSetLister) List(labels.Selector) ([]*appsv1.StatefulSet, error) {
 	return nil, nil
+}
+
+// GetPodStatefulSets of EmptyStatefulSetLister returns nil.
+func (f EmptyStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*appsv1.StatefulSet, err error) {
+	return nil, nil
+}
+
+// StatefulSets returns nil
+func (f EmptyStatefulSetLister) StatefulSets(namespace string) appslisters.StatefulSetNamespaceLister {
+	return nil
 }

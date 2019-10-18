@@ -19,12 +19,14 @@ package testing
 import (
 	"fmt"
 
-	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	policylisters "k8s.io/client-go/listers/policy/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 )
 
@@ -53,10 +55,15 @@ func (f FakePodLister) FilteredList(podFilter algorithm.PodFilter, s labels.Sele
 	return selected, nil
 }
 
-var _ algorithm.ServiceLister = &FakeServiceLister{}
+var _ corelisters.ServiceLister = &FakeServiceLister{}
 
 // FakeServiceLister implements ServiceLister on []v1.Service for test purposes.
 type FakeServiceLister []*v1.Service
+
+// Services returns nil.
+func (f FakeServiceLister) Services(namespace string) corelisters.ServiceNamespaceLister {
+	return nil
+}
 
 // List returns v1.ServiceList, the list of all services.
 func (f FakeServiceLister) List(labels.Selector) ([]*v1.Service, error) {
@@ -81,7 +88,7 @@ func (f FakeServiceLister) GetPodServices(pod *v1.Pod) (services []*v1.Service, 
 	return
 }
 
-var _ algorithm.ControllerLister = &FakeControllerLister{}
+var _ corelisters.ReplicationControllerLister = &FakeControllerLister{}
 
 // FakeControllerLister implements ControllerLister on []v1.ReplicationController for test purposes.
 type FakeControllerLister []*v1.ReplicationController
@@ -112,13 +119,23 @@ func (f FakeControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.
 	return
 }
 
-var _ algorithm.ReplicaSetLister = &FakeReplicaSetLister{}
+// ReplicationControllers returns nil
+func (f FakeControllerLister) ReplicationControllers(namespace string) corelisters.ReplicationControllerNamespaceLister {
+	return nil
+}
+
+var _ appslisters.ReplicaSetLister = &FakeReplicaSetLister{}
 
 // FakeReplicaSetLister implements ControllerLister on []extensions.ReplicaSet for test purposes.
-type FakeReplicaSetLister []*apps.ReplicaSet
+type FakeReplicaSetLister []*appsv1.ReplicaSet
+
+// List returns replica sets.
+func (f FakeReplicaSetLister) List(labels.Selector) ([]*appsv1.ReplicaSet, error) {
+	return f, nil
+}
 
 // GetPodReplicaSets gets the ReplicaSets that have the selector that match the labels on the given pod
-func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*apps.ReplicaSet, err error) {
+func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*appsv1.ReplicaSet, err error) {
 	var selector labels.Selector
 
 	for _, rs := range f {
@@ -141,13 +158,23 @@ func (f FakeReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*apps.Replic
 	return
 }
 
-var _ algorithm.StatefulSetLister = &FakeStatefulSetLister{}
+// ReplicaSets returns nil
+func (f FakeReplicaSetLister) ReplicaSets(namespace string) appslisters.ReplicaSetNamespaceLister {
+	return nil
+}
 
-// FakeStatefulSetLister implements ControllerLister on []apps.StatefulSet for testing purposes.
-type FakeStatefulSetLister []*apps.StatefulSet
+var _ appslisters.StatefulSetLister = &FakeStatefulSetLister{}
+
+// FakeStatefulSetLister implements ControllerLister on []appsv1.StatefulSet for testing purposes.
+type FakeStatefulSetLister []*appsv1.StatefulSet
+
+// List returns stateful sets.
+func (f FakeStatefulSetLister) List(labels.Selector) ([]*appsv1.StatefulSet, error) {
+	return f, nil
+}
 
 // GetPodStatefulSets gets the StatefulSets that have the selector that match the labels on the given pod.
-func (f FakeStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.StatefulSet, err error) {
+func (f FakeStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*appsv1.StatefulSet, err error) {
 	var selector labels.Selector
 
 	for _, ss := range f {
@@ -166,6 +193,11 @@ func (f FakeStatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*apps.Stat
 		err = fmt.Errorf("Could not find StatefulSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
+}
+
+// StatefulSets returns nil
+func (f FakeStatefulSetLister) StatefulSets(namespace string) appslisters.StatefulSetNamespaceLister {
+	return nil
 }
 
 // FakePersistentVolumeClaimLister implements PersistentVolumeClaimLister on []*v1.PersistentVolumeClaim for test purposes.
@@ -211,4 +243,14 @@ type FakePDBLister []*policy.PodDisruptionBudget
 // List returns a list of PodDisruptionBudgets.
 func (f FakePDBLister) List(labels.Selector) ([]*policy.PodDisruptionBudget, error) {
 	return f, nil
+}
+
+// PodDisruptionBudgets returns nil.
+func (f FakePDBLister) PodDisruptionBudgets(namespace string) policylisters.PodDisruptionBudgetNamespaceLister {
+	return nil
+}
+
+// GetPodPodDisruptionBudgets returns nil.
+func (f FakePDBLister) GetPodPodDisruptionBudgets(pod *v1.Pod) ([]*policy.PodDisruptionBudget, error) {
+	return nil, nil
 }
