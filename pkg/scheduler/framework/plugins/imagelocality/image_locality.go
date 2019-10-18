@@ -29,12 +29,12 @@ import (
 
 var mb int64 = 1024 * 1024
 
-// ImageLocality is a plugin that checks if a pod tolerates a node's taints.
+// ImageLocality is a score plugin that favors nodes that already have requested pod container's images.
 type ImageLocality struct {
 	handle framework.FrameworkHandle
 }
 
-var _ = framework.ScorePlugin(&ImageLocality{})
+var _ framework.ScorePlugin = &ImageLocality{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "ImageLocality"

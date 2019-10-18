@@ -19,7 +19,7 @@ package nodevolumelimits
 import (
 	"context"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -31,7 +31,7 @@ type NodeVolumeLimits struct {
 	predicate predicates.FitPredicate
 }
 
-var _ = framework.FilterPlugin(&NodeVolumeLimits{})
+var _ framework.FilterPlugin = &NodeVolumeLimits{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "NodeVolumeLimits"

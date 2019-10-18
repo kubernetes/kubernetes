@@ -118,7 +118,7 @@ func (fp *tokenFilter) PreFilterExtensions() framework.PreFilterExtensions {
 	return fp
 }
 
-var _ = framework.FilterPlugin(&tokenFilter{})
+var _ framework.FilterPlugin = &tokenFilter{}
 
 // TestPreemption tests a few preemption scenarios.
 func TestPreemption(t *testing.T) {

@@ -31,7 +31,7 @@ import (
 // NodeResources is a plugin that checks if a node has sufficient resources.
 type NodeResources struct{}
 
-var _ = framework.FilterPlugin(&NodeResources{})
+var _ framework.FilterPlugin = &NodeResources{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "NodeResources"

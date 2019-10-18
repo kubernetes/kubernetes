@@ -26,12 +26,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-// VolumeZone is a plugin that checks volume zone
+// VolumeZone is a plugin that checks volume zone.
 type VolumeZone struct {
 	predicate predicates.FitPredicate
 }
 
-var _ = framework.FilterPlugin(&VolumeZone{})
+var _ framework.FilterPlugin = &VolumeZone{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "VolumeZone"

@@ -29,7 +29,7 @@ import (
 // and implements only one hook for prebind.
 type StatelessPreBindExample struct{}
 
-var _ = framework.PreBindPlugin(StatelessPreBindExample{})
+var _ framework.PreBindPlugin = StatelessPreBindExample{}
 
 // Name is the name of the plugin used in Registry and configurations.
 const Name = "stateless-prebind-plugin-example"

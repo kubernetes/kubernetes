@@ -187,7 +187,7 @@ var defaultPriorityQueueOptions = priorityQueueOptions{
 }
 
 // Making sure that PriorityQueue implements SchedulingQueue.
-var _ = SchedulingQueue(&PriorityQueue{})
+var _ SchedulingQueue = &PriorityQueue{}
 
 // newPodInfoNoTimestamp builds a PodInfo object without timestamp.
 func newPodInfoNoTimestamp(pod *v1.Pod) *framework.PodInfo {
