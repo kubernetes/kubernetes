@@ -153,25 +153,30 @@ func (proxier *metaProxier) OnEndpointsSynced() {
 // OnEndpointSliceAdd is called whenever creation of a new endpoint slice object
 // is observed.
 func (proxier *metaProxier) OnEndpointSliceAdd(endpointSlice *discovery.EndpointSlice) {
-	// noop
+	proxier.ipv4Proxier.OnEndpointSliceAdd(endpointSlice)
+	proxier.ipv6Proxier.OnEndpointSliceAdd(endpointSlice)
 }
 
 // OnEndpointSliceUpdate is called whenever modification of an existing endpoint
 // slice object is observed.
-func (proxier *metaProxier) OnEndpointSliceUpdate(_, endpointSlice *discovery.EndpointSlice) {
-	//noop
+func (proxier *metaProxier) OnEndpointSliceUpdate(old, endpointSlice *discovery.EndpointSlice) {
+
+	proxier.ipv4Proxier.OnEndpointSliceUpdate(old, endpointSlice)
+	proxier.ipv6Proxier.OnEndpointSliceUpdate(old, endpointSlice)
 }
 
 // OnEndpointSliceDelete is called whenever deletion of an existing endpoint slice
 // object is observed.
 func (proxier *metaProxier) OnEndpointSliceDelete(endpointSlice *discovery.EndpointSlice) {
-	//noop
+	proxier.ipv4Proxier.OnEndpointSliceDelete(endpointSlice)
+	proxier.ipv6Proxier.OnEndpointSliceDelete(endpointSlice)
 }
 
 // OnEndpointSlicesSynced is called once all the initial event handlers were
 // called and the state is fully propagated to local cache.
 func (proxier *metaProxier) OnEndpointSlicesSynced() {
-	//noop
+	proxier.ipv4Proxier.OnEndpointSlicesSynced()
+	proxier.ipv6Proxier.OnEndpointSlicesSynced()
 }
 
 // endpointsIPFamily that returns IPFamily of endpoints or error if

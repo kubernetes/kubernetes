@@ -252,6 +252,9 @@ type Proxier struct {
 	// Inject for test purpose.
 	networkInterfacer     utilproxy.NetworkInterfacer
 	gracefuldeleteManager *GracefulTerminationManager
+	// isIPv6: set to true when the proxier is operating on IPv6
+	// family
+	isIPv6 bool
 }
 
 // IPGetter helps get node network interface IP
@@ -405,7 +408,7 @@ func NewProxier(ipt utiliptables.Interface,
 
 	isIPv6 := utilnet.IsIPv6(nodeIP)
 
-	klog.V(2).Infof("nodeIP: %v, isIPv6: %v", nodeIP, isIPv6)
+	klog.V(2).Infof("nodeIP: %v, isIPv6: %v this proxier will operate on IPv6", nodeIP, isIPv6)
 
 	if len(clusterCIDR) == 0 {
 		klog.Warningf("clusterCIDR not specified, unable to distinguish between internal and external traffic")
@@ -456,6 +459,7 @@ func NewProxier(ipt utiliptables.Interface,
 		nodePortAddresses:     nodePortAddresses,
 		networkInterfacer:     utilproxy.RealNetwork{},
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
+		isIPv6:                isIPv6,
 	}
 	// initialize ipsetList with all sets we needed
 	proxier.ipsetList = make(map[string]*IPSet)
@@ -922,6 +926,12 @@ func (proxier *Proxier) syncProxyRules() {
 	// We assume that if this was called, we really want to sync them,
 	// even if nothing changed in the meantime. In other words, callers are
 	// responsible for detecting no-op changes and not calling this function.
+
+	// (khenidak) the previous assumption is valid only for single stack
+	// for dual stack, we have no way for endpointslice (or general endpoint processing)
+	// to know if this endpoint is being processed for an IPv6 or IPv4 proxier
+	// TODO: Find a way where the endpoints/slice can be loaded with knowledge
+	// of proxy/ipfamily and perform the filtering there.
 	serviceUpdateResult := proxy.UpdateServiceMap(proxier.serviceMap, proxier.serviceChanges)
 	endpointUpdateResult := proxier.endpointsMap.Update(proxier.endpointsChanges)
 
@@ -929,6 +939,13 @@ func (proxier *Proxier) syncProxyRules() {
 	// merge stale services gathered from updateEndpointsMap
 	for _, svcPortName := range endpointUpdateResult.StaleServiceNames {
 		if svcInfo, ok := proxier.serviceMap[svcPortName]; ok && svcInfo != nil && svcInfo.Protocol() == v1.ProtocolUDP {
+			// ignore stale services that does not match ipfamily of the proxier
+			isIpv6Svc := utilnet.IsIPv6(svcInfo.ClusterIP())
+			if proxier.isIPv6 != isIpv6Svc {
+				klog.V(10).Infof("ipvs proxier (ipv6:%v) is ignoring  a stale service:%v (ipv6:%v) because it is not of same ipfamily", proxier.isIPv6, svcPortName, isIpv6Svc)
+				continue
+			}
+
 			klog.V(2).Infof("Stale udp service %v -> %s", svcPortName, svcInfo.ClusterIP().String())
 			staleServices.Insert(svcInfo.ClusterIP().String())
 			for _, extIP := range svcInfo.ExternalIPStrings() {
@@ -1023,6 +1040,14 @@ func (proxier *Proxier) syncProxyRules() {
 			klog.Errorf("Failed to cast serviceInfo %q", svcName.String())
 			continue
 		}
+
+		// ignore services that does not match proxier ipfamily
+		isIpv6Svc := utilnet.IsIPv6(svcInfo.ClusterIP())
+		if proxier.isIPv6 != isIpv6Svc {
+			klog.V(10).Infof("ipvs proxier (ipv6:%v) is ignoring service:%v (ipv6:%v) because it is not of same ipfamily", proxier.isIPv6, svcName.String(), isIpv6Svc)
+			continue
+		}
+
 		protocol := strings.ToLower(string(svcInfo.Protocol()))
 		// Precompute svcNameString; with many services the many calls
 		// to ServicePortName.String() show up in CPU profiles.

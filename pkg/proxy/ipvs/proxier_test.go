@@ -950,6 +950,8 @@ func TestNodePort(t *testing.T) {
 }
 
 func TestClusterIP(t *testing.T) {
+	// the fake proxy is always created with
+	// isIPv6 == false
 	tests := []struct {
 		name         string
 		services     []*v1.Service
@@ -957,7 +959,58 @@ func TestClusterIP(t *testing.T) {
 		expectedIPVS *ipvstest.FakeIPVS
 	}{
 		{
-			name: "2 services with Cluster IP, each with endpoints",
+			name: "2 services with Cluster IP ipv6. both should be ignored",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.ClusterIP = "1002:ab8::2:0"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+				makeTestService("ns2", "svc2", func(svc *v1.Service) {
+					svc.Spec.ClusterIP = "1002:ab8::2:1"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p8080",
+						Port:     int32(8080),
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "svc1", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "1009:ab8::5:5",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name:     "p80",
+							Port:     int32(80),
+							Protocol: v1.ProtocolTCP,
+						}},
+					}}
+				}),
+				makeTestEndpoints("ns2", "svc2", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "1009:ab8::5:6",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name:     "p8080",
+							Port:     int32(8080),
+							Protocol: v1.ProtocolTCP,
+						}},
+					}}
+				}),
+			},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services:     map[ipvstest.ServiceKey]*utilipvs.VirtualServer{},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{},
+			},
+		},
+		{
+			name: "2 services with Cluster IP mixed family, each with endpoints. IPv6 should be ignored",
 			services: []*v1.Service{
 				makeTestService("ns1", "svc1", func(svc *v1.Service) {
 					svc.Spec.ClusterIP = "10.20.30.41"
@@ -1014,12 +1067,86 @@ func TestClusterIP(t *testing.T) {
 						Port:      uint16(80),
 						Scheduler: "rr",
 					},
+				},
+				Destinations: map[ipvstest.ServiceKey][]*utilipvs.RealServer{
 					{
-						IP:       "1002:ab8::2:1",
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						{
+							Address: net.ParseIP("10.180.0.1"),
+							Port:    uint16(80),
+							Weight:  1,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "2 services with Cluster IP ipv4, each with endpoints",
+			services: []*v1.Service{
+				makeTestService("ns1", "svc1", func(svc *v1.Service) {
+					svc.Spec.ClusterIP = "10.20.30.41"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p80",
+						Port:     int32(80),
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+				makeTestService("ns2", "svc2", func(svc *v1.Service) {
+					svc.Spec.ClusterIP = "10.20.30.42"
+					svc.Spec.Ports = []v1.ServicePort{{
+						Name:     "p8080",
+						Port:     int32(8080),
+						Protocol: v1.ProtocolTCP,
+					}}
+				}),
+			},
+			endpoints: []*v1.Endpoints{
+				makeTestEndpoints("ns1", "svc1", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "10.180.0.1",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name:     "p80",
+							Port:     int32(80),
+							Protocol: v1.ProtocolTCP,
+						}},
+					}}
+				}),
+				makeTestEndpoints("ns2", "svc2", func(ept *v1.Endpoints) {
+					ept.Subsets = []v1.EndpointSubset{{
+						Addresses: []v1.EndpointAddress{{
+							IP: "10.180.1.1",
+						}},
+						Ports: []v1.EndpointPort{{
+							Name:     "p8080",
+							Port:     int32(8080),
+							Protocol: v1.ProtocolTCP,
+						}},
+					}}
+				}),
+			},
+			expectedIPVS: &ipvstest.FakeIPVS{
+				Services: map[ipvstest.ServiceKey]*utilipvs.VirtualServer{
+					{
+						IP:       "10.20.30.41",
+						Port:     80,
+						Protocol: "TCP",
+					}: {
+						Address:   net.ParseIP("10.20.30.41"),
+						Protocol:  "TCP",
+						Port:      uint16(80),
+						Scheduler: "rr",
+					},
+					{
+						IP:       "10.20.30.42",
 						Port:     8080,
 						Protocol: "TCP",
 					}: {
-						Address:   net.ParseIP("1002:ab8::2:1"),
+						Address:   net.ParseIP("10.20.30.42"),
 						Protocol:  "TCP",
 						Port:      uint16(8080),
 						Scheduler: "rr",
@@ -1038,12 +1165,12 @@ func TestClusterIP(t *testing.T) {
 						},
 					},
 					{
-						IP:       "1002:ab8::2:1",
+						IP:       "10.20.30.42",
 						Port:     8080,
 						Protocol: "TCP",
 					}: {
 						{
-							Address: net.ParseIP("1009:ab8::5:6"),
+							Address: net.ParseIP("10.180.1.1"),
 							Port:    uint16(8080),
 							Weight:  1,
 						},
