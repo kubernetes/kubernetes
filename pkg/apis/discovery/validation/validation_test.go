@@ -46,7 +46,22 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(1),
+					Addresses: generateIPAddresses(1),
+					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
+		},
+		"good-fqdns": {
+			expectedErrors: 0,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: addressTypePtr(discovery.AddressTypeFQDN),
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"foo.example.com", "example.com", "example.com.", "hyphens-are-good.example.com"},
 					Hostname:  utilpointer.StringPtr("valid-123"),
 				}},
 			},
@@ -67,7 +82,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolSCTP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(1),
+					Addresses: generateIPAddresses(1),
 					Hostname:  utilpointer.StringPtr("valid-123"),
 				}},
 			},
@@ -85,7 +100,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(1),
+					Addresses: generateIPAddresses(1),
 				}},
 			},
 		},
@@ -125,7 +140,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(maxAddresses),
+					Addresses: generateIPAddresses(maxAddresses),
 				}},
 			},
 		},
@@ -139,7 +154,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(1),
+					Addresses: generateIPAddresses(1),
 					Topology:  generateTopology(maxTopologyLabels),
 				}},
 			},
@@ -223,7 +238,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(0),
+					Addresses: generateIPAddresses(0),
 				}},
 			},
 		},
@@ -237,7 +252,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(maxAddresses + 1),
+					Addresses: generateIPAddresses(maxAddresses + 1),
 				}},
 			},
 		},
@@ -251,7 +266,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(1),
+					Addresses: generateIPAddresses(1),
 				}},
 			},
 		},
@@ -265,7 +280,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(1),
+					Addresses: generateIPAddresses(1),
 					Topology:  map[string]string{"--INVALID": "example"},
 				}},
 			},
@@ -280,7 +295,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(1),
+					Addresses: generateIPAddresses(1),
 					Topology:  generateTopology(maxTopologyLabels + 1),
 				}},
 			},
@@ -295,7 +310,7 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(1),
+					Addresses: generateIPAddresses(1),
 					Hostname:  utilpointer.StringPtr("--INVALID"),
 				}},
 			},
@@ -313,14 +328,46 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
-					Addresses: generateAddresses(1),
+					Addresses: generateIPAddresses(1),
+					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
+		},
+		"bad-ip": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: addressTypePtr(discovery.AddressTypeIP),
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"123.456.789.012"},
+					Hostname:  utilpointer.StringPtr("valid-123"),
+				}},
+			},
+		},
+		"bad-fqdns": {
+			expectedErrors: 4,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: addressTypePtr(discovery.AddressTypeFQDN),
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: []string{"foo.*", "FOO.example.com", "underscores_are_bad.example.com", "*.example.com"},
 					Hostname:  utilpointer.StringPtr("valid-123"),
 				}},
 			},
 		},
 		"empty-everything": {
 			expectedErrors: 3,
-			endpointSlice:  &discovery.EndpointSlice{},
+			endpointSlice: &discovery.EndpointSlice{
+				AddressType: addressTypePtr(""),
+			},
 		},
 	}
 
@@ -422,7 +469,7 @@ func generateEndpoints(n int) []discovery.Endpoint {
 	return endpoints
 }
 
-func generateAddresses(n int) []string {
+func generateIPAddresses(n int) []string {
 	addresses := []string{}
 	for i := 0; i < n; i++ {
 		addresses = append(addresses, fmt.Sprintf("10.1.2.%d", i%255))

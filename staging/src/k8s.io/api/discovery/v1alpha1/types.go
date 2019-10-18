@@ -33,7 +33,11 @@ type EndpointSlice struct {
 	// +optional
 	metav1.ObjectMeta `json:"metadata,omitempty" protobuf:"bytes,1,opt,name=metadata"`
 	// addressType specifies the type of address carried by this EndpointSlice.
-	// All addresses in this slice must be the same type.
+	// All addresses in this slice must be the same type. The following address
+	// types are currently supported:
+	// * IP:   Represents an IP Address. This can include both IPv4 and IPv6
+	//         addresses.
+	// * FQDN: Represents a Fully Qualified Domain Name.
 	// Default is IP
 	// +optional
 	AddressType *AddressType `json:"addressType" protobuf:"bytes,4,rep,name=addressType"`
@@ -55,17 +59,21 @@ type EndpointSlice struct {
 type AddressType string
 
 const (
-	// AddressTypeIP represents an IP Address.
+	// AddressTypeIP represents an IP Address. Inclusive of IPv4 and IPv6
+	// addresses.
 	AddressTypeIP = AddressType("IP")
+	// AddressTypeFQDN represents a Fully Qualified Domain Name.
+	AddressTypeFQDN = AddressType("FQDN")
 )
 
 // Endpoint represents a single logical "backend" implementing a service.
 type Endpoint struct {
 	// addresses of this endpoint. The contents of this field are interpreted
 	// according to the corresponding EndpointSlice addressType field. This
-	// allows for cases like dual-stack (IPv4 and IPv6) networking. Consumers
-	// (e.g. kube-proxy) must handle different types of addresses in the context
-	// of their own capabilities. This must contain at least one address but no
+	// allows for cases like dual-stack networking where both IPv4 and IPv6
+	// addresses would be included with the IP addressType. Consumers (e.g.
+	// kube-proxy) must handle different types of addresses in the context of
+	// their own capabilities. This must contain at least one address but no
 	// more than 100.
 	// +listType=set
 	Addresses []string `json:"addresses" protobuf:"bytes,1,rep,name=addresses"`
