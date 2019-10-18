@@ -28,9 +28,12 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
-
+	"log"
+	"os"
+	"net"
+	"time"
 	"github.com/elazarl/goproxy"
-
+	"github.com/armon/go-socks5"
 	"k8s.io/apimachinery/pkg/util/httpstream"
 )
 
@@ -69,9 +72,30 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				return ts
 			}
 
+			socks5Server := func(creds *socks5.StaticCredentials) *socks5.Server {
+			  var conf *socks5.Config
+			  if creds != nil {
+			    cator := socks5.UserPassAuthenticator{Credentials: creds}
+			    conf = &socks5.Config{
+			      AuthMethods:  []socks5.Authenticator{cator},
+			      Logger:       log.New(os.Stdout, "", log.LstdFlags),
+			    }
+			  } else {
+			    conf = &socks5.Config{}
+			  }
+
+			  ts, err := socks5.New(conf)
+			  if err != nil {
+			    t.Errorf("socks5Server: proxy_test: %v", err)
+			  }
+			  return ts
+			}
+
+
 			testCases := map[string]struct {
 				serverFunc             func(http.Handler) *httptest.Server
 				proxyServerFunc        func(http.Handler) *httptest.Server
+				socks5ProxyServerFunc	 func(creds *socks5.StaticCredentials) *socks5.Server
 				proxyAuth              *url.Userinfo
 				clientTLS              *tls.Config
 				serverConnectionHeader string
@@ -240,9 +264,29 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					serverStatusCode:       http.StatusSwitchingProtocols,
 					shouldError:            false,
 				},
+				"proxied tcp->tcp via SOCKS5": {
+					serverFunc:             httptest.NewServer,
+					socks5ProxyServerFunc: 	socks5Server,
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            false,
+				},
+				"proxied tcp->tcp via SOCKS5, authorization failure": {
+					serverFunc:             httptest.NewServer,
+					socks5ProxyServerFunc: 	socks5Server,
+					proxyAuth: 							url.UserPassword("proxyuser", "proxypasswd"),
+					serverConnectionHeader: "Upgrade",
+					serverUpgradeHeader:    "SPDY/3.1",
+					serverStatusCode:       http.StatusSwitchingProtocols,
+					shouldError:            true,
+				},
+
 			}
 
 			for k, testCase := range testCases {
+				// TODO: remove for real PR
+				// fmt.Println(k)
 				server := testCase.serverFunc(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 					if testCase.shouldError {
 						if e, a := httpstream.HeaderUpgrade, req.Header.Get(httpstream.HeaderConnection); e != a {
@@ -313,6 +357,47 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					}
 					defer proxy.Close()
 				}
+				var l net.Listener
+				if testCase.socks5ProxyServerFunc != nil {
+					var proxyHandler *socks5.Server
+					if testCase.proxyAuth != nil {
+						// TODO: pass creds from testCase object
+						proxyHandler = socks5Server(&socks5.StaticCredentials{
+						  "foo": "bar",
+						})
+					} else {
+						proxyHandler = socks5Server(nil)
+					}
+					
+					l, err = net.Listen("tcp", "127.0.0.1:8989")
+					if err != nil {
+					  t.Fatalf("socks5Server: proxy_test: ListenAndServe: %v", err)
+					}
+					defer l.Close()
+
+					go proxyHandler.Serve(l)
+					time.Sleep(100 * time.Millisecond)
+
+					// TODO: pass creds from testCase object
+					// TODO: use dynamic TCP ports
+					proxy := &url.URL{
+						Scheme: "socks5",
+						Host: "//127.0.0.1:8989",
+						User: url.UserPassword("foo", "bar"),
+					}
+
+					// TODO: use dynamic TCP ports
+					spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
+						proxierCalled = true
+						proxyURL, err := url.Parse("//127.0.0.1:8989")
+						if err != nil {
+							return nil, err
+						}
+						proxyURL.User = testCase.proxyAuth
+						proxyURL.Scheme = proxy.Scheme
+						return proxyURL, nil
+					}
+				}
 
 				client := &http.Client{Transport: spdyTransport}
 
@@ -378,6 +463,12 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				}
 				if proxyCalledWithAuthHeader != expectedProxyAuth {
 					t.Fatalf("%s: Expected to see a call to the proxy with credentials %q, got %q", k, testCase.proxyAuth, proxyCalledWithAuthHeader)
+				}
+
+				if l != nil {
+					l.Close()
+					// TODO: remove delay in lieu of dynamic port allocation
+					time.Sleep(3 * time.Second)
 				}
 			}
 		})
