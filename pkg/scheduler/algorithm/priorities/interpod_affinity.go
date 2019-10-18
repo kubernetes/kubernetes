@@ -21,7 +21,6 @@ import (
 	"sync/atomic"
 
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -114,11 +113,8 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	processPod := func(existingPod *v1.Pod) error {
 		existingPodNode, err := ipa.info.GetNodeInfo(existingPod.Spec.NodeName)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				klog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
-				return nil
-			}
-			return err
+			klog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
+			return nil
 		}
 		existingPodAffinity := existingPod.Spec.Affinity
 		existingHasAffinityConstraints := existingPodAffinity != nil && existingPodAffinity.PodAffinity != nil

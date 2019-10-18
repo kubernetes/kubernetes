@@ -28,7 +28,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	v1beta1storage "k8s.io/api/storage/v1beta1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1400,12 +1399,8 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairsOfPods(pod *v1.
 	for _, existingPod := range existingPods {
 		existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
 		if err != nil {
-			if apierrors.IsNotFound(err) {
-				klog.Errorf("Pod %s has NodeName %q but node is not found",
-					podName(existingPod), existingPod.Spec.NodeName)
-				continue
-			}
-			return nil, err
+			klog.Errorf("Pod %s has NodeName %q but node is not found", podName(existingPod), existingPod.Spec.NodeName)
+			continue
 		}
 		existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, existingPodNode)
 		if err != nil {
