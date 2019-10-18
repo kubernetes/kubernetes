@@ -823,6 +823,37 @@ func (c *Cacher) dispatchEvents() {
 	}
 }
 
+func setCachingObjects(event *watchCacheEvent, versioner storage.Versioner) {
+	switch event.Type {
+	case watch.Added, watch.Modified:
+		if object, err := newCachingObject(event.Object); err == nil {
+			event.Object = object
+		} else {
+			klog.Errorf("couldn't create cachingObject from: %#v", event.Object)
+		}
+		// Don't wrap PrevObject for update event (for create events it is nil).
+		// We only encode those to deliver DELETE watch events, so if
+		// event.Object is not nil it can be used only for watchers for which
+		// selector was satisfied for its previous version and is no longer
+		// satisfied for the current version.
+		// This is rare enough that it doesn't justify making deep-copy of the
+		// object (done by newCachingObject) every time.
+	case watch.Deleted:
+		// Don't wrap Object for delete events - these are not to deliver any
+		// events. Only wrap PrevObject.
+		if object, err := newCachingObject(event.PrevObject); err == nil {
+			// Update resource version of the underlying object.
+			// event.PrevObject is used to deliver DELETE watch events and
+			// for them, we set resourceVersion to <current> instead of
+			// the resourceVersion of the last modification of the object.
+			updateResourceVersionIfNeeded(object.object, versioner, event.ResourceVersion)
+			event.PrevObject = object
+		} else {
+			klog.Errorf("couldn't create cachingObject from: %#v", event.Object)
+		}
+	}
+}
+
 func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 	c.startDispatching(event)
 	defer c.finishDispatching()
@@ -836,6 +867,23 @@ func (c *Cacher) dispatchEvent(event *watchCacheEvent) {
 			watcher.nonblockingAdd(event)
 		}
 	} else {
+		// Set up caching of object serializations only for dispatching this event.
+		//
+		// Storing serializations in memory would result in increased memory usage,
+		// but it would help for caching encodings for watches started from old
+		// versions. However, we still don't have a convincing data that the gain
+		// from it justifies increased memory usage, so for now we drop the cached
+		// serializations after dispatching this event.
+		//
+		// Given the deep-copies that are done to create cachingObjects,
+		// we try to cache serializations only if there are at least 3 watchers.
+		if len(c.watchersBuffer) >= 3 {
+			// Make a shallow copy to allow overwriting Object and PrevObject.
+			wcEvent := *event
+			setCachingObjects(&wcEvent, c.versioner)
+			event = &wcEvent
+		}
+
 		c.blockedWatchers = c.blockedWatchers[:0]
 		for _, watcher := range c.watchersBuffer {
 			if !watcher.nonblockingAdd(event) {
