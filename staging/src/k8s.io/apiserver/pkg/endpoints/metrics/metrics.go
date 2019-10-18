@@ -96,8 +96,8 @@ var (
 			Help: "Response latency distribution in seconds for each verb, dry run value, group, version, resource, subresource, scope and component.",
 			// This metric is used for verifying api call latencies SLO,
 			// as well as tracking regressions in this aspects.
-			// Thus we customize buckets significantly, to empower both usecases.
-			Buckets:        []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 4.0, 10, 20, 40, 60},
+			// Thus we like to have good resolution between 0.1s and 1s.
+			Buckets:        []float64{0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0, 4.0, 10, 20, 40, 60},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"verb", "dry_run", "group", "version", "resource", "subresource", "scope", "component"},
