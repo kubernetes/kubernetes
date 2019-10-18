@@ -71,7 +71,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		framework.ExpectNoError(err)
 		framework.Logf("Got cluster ID: %v", clusterID)
 
-		jig := e2eservice.NewTestJig(cs, serviceName)
+		jig := e2eservice.NewTestJig(cs, ns, serviceName)
 		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
 		framework.ExpectNoError(err)
 
@@ -82,15 +82,17 @@ var _ = SIGDescribe("Firewall rule", func() {
 		nodesSet := sets.NewString(nodesNames...)
 
 		ginkgo.By("Creating a LoadBalancer type service with ExternalTrafficPolicy=Global")
-		svc := jig.CreateLoadBalancerService(ns, serviceName, e2eservice.LoadBalancerCreateTimeoutDefault, func(svc *v1.Service) {
+		svc, err := jig.CreateLoadBalancerService(e2eservice.LoadBalancerCreateTimeoutDefault, func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: firewallTestHTTPPort}}
 			svc.Spec.LoadBalancerSourceRanges = firewallTestSourceRanges
 		})
+		framework.ExpectNoError(err)
 		defer func() {
-			jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+			_, err = jig.UpdateService(func(svc *v1.Service) {
 				svc.Spec.Type = v1.ServiceTypeNodePort
 				svc.Spec.LoadBalancerSourceRanges = nil
 			})
+			framework.ExpectNoError(err)
 			err = cs.CoreV1().Services(svc.Namespace).Delete(svc.Name, nil)
 			framework.ExpectNoError(err)
 			ginkgo.By("Waiting for the local traffic health check firewall rule to be deleted")
@@ -116,9 +118,10 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		// OnlyLocal service is needed to examine which exact nodes the requests are being forwarded to by the Load Balancer on GCE
 		ginkgo.By("Updating LoadBalancer service to ExternalTrafficPolicy=Local")
-		svc = jig.UpdateServiceOrFail(svc.Namespace, svc.Name, func(svc *v1.Service) {
+		svc, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 		})
+		framework.ExpectNoError(err)
 
 		ginkgo.By("Waiting for the nodes health check firewall rule to be deleted")
 		_, err = gce.WaitForFirewallRule(gceCloud, nodesHCFw.Name, false, e2eservice.LoadBalancerCleanupTimeout)
