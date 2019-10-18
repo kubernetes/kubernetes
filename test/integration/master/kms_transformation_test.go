@@ -23,8 +23,8 @@ import (
 	"context"
 	"crypto/aes"
 	"encoding/binary"
-	"fmt"
 
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/storage/value"
 	aestransformer "k8s.io/apiserver/pkg/storage/value/encrypt/aes"
+	mock "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/testing"
 	kmsapi "k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -41,6 +42,7 @@ import (
 
 const (
 	dekKeySizeLen = 2
+	kmsAPIVersion = "v1beta1"
 )
 
 type envelope struct {
@@ -112,14 +114,16 @@ resources:
 `
 
 	providerName := "kms-provider"
-	pluginMock, err := newBase64Plugin("@kms-provider.sock")
+	pluginMock, err := mock.NewBase64Plugin("@kms-provider.sock")
 	if err != nil {
 		t.Fatalf("failed to create mock of KMS Plugin: %v", err)
 	}
 
-	go pluginMock.grpcServer.Serve(pluginMock.listener)
-	defer pluginMock.cleanUp()
-	kmsPluginMustBeUp(t, pluginMock)
+	go pluginMock.Start()
+	if err := mock.WaitForBase64PluginToBeUp(pluginMock); err != nil {
+		t.Fatalf("Failed start plugin, err: %v", err)
+	}
+	defer pluginMock.CleanUp()
 
 	test, err := newTransformTest(t, encryptionConfig)
 	if err != nil {
@@ -133,10 +137,7 @@ resources:
 	}
 
 	// Since Data Encryption Key (DEK) is randomly generated (per encryption operation), we need to ask KMS Mock for it.
-	plainTextDEK := pluginMock.lastEncryptRequest.Plain
-	if err != nil {
-		t.Fatalf("failed to get DEK from KMS: %v", err)
-	}
+	plainTextDEK := pluginMock.LastEncryptRequest()
 
 	secretETCDPath := test.getETCDPath()
 	rawEnvelope, err := test.getRawSecretFromETCD()
@@ -197,23 +198,30 @@ resources:
        endpoint: unix:///@kms-provider-2.sock
 `
 
-	pluginMock1, err := newBase64Plugin("@kms-provider-1.sock")
+	pluginMock1, err := mock.NewBase64Plugin("@kms-provider-1.sock")
 	if err != nil {
 		t.Fatalf("failed to create mock of KMS Plugin #1: %v", err)
 	}
 
-	go pluginMock1.grpcServer.Serve(pluginMock1.listener)
-	defer pluginMock1.cleanUp()
-	kmsPluginMustBeUp(t, pluginMock1)
-
-	pluginMock2, err := newBase64Plugin("@kms-provider-2.sock")
-	if err != nil {
-		t.Fatalf("failed to create mock of KMS Plugin #2: %v", err)
+	if err := pluginMock1.Start(); err != nil {
+		t.Fatalf("Failed to start kms-plugin, err: %v", err)
+	}
+	defer pluginMock1.CleanUp()
+	if err := mock.WaitForBase64PluginToBeUp(pluginMock1); err != nil {
+		t.Fatalf("Failed to start plugin #1, err: %v", err)
 	}
 
-	go pluginMock2.grpcServer.Serve(pluginMock2.listener)
-	defer pluginMock2.cleanUp()
-	kmsPluginMustBeUp(t, pluginMock2)
+	pluginMock2, err := mock.NewBase64Plugin("@kms-provider-2.sock")
+	if err != nil {
+		t.Fatalf("Failed to create mock of KMS Plugin #2: err: %v", err)
+	}
+	if err := pluginMock2.Start(); err != nil {
+		t.Fatalf("Failed to start kms-plugin, err: %v", err)
+	}
+	defer pluginMock2.CleanUp()
+	if err := mock.WaitForBase64PluginToBeUp(pluginMock2); err != nil {
+		t.Fatalf("Failed to start KMS Plugin #2: err: %v", err)
+	}
 
 	test, err := newTransformTest(t, encryptionConfig)
 	if err != nil {
@@ -231,30 +239,17 @@ resources:
 
 	// Stage 2 - kms-plugin for provider-1 is down. Therefore, expect the health check for provider-1
 	// to fail, but provider-2 should still be OK
-	pluginMock1.enterFailedState()
+	pluginMock1.EnterFailedState()
 	mustBeUnHealthy(t, "kms-provider-0", test.kubeAPIServer.ClientConfig)
 	mustBeHealthy(t, "kms-provider-1", test.kubeAPIServer.ClientConfig)
-	pluginMock1.exitFailedState()
+	pluginMock1.ExitFailedState()
 
 	// Stage 3 - kms-plugin for provider-1 is now up. Therefore, expect the health check for provider-1
 	// to succeed now, but provider-2 is now down.
 	// Need to sleep since health check chases responses for 3 seconds.
-	pluginMock2.enterFailedState()
+	pluginMock2.EnterFailedState()
 	mustBeHealthy(t, "kms-provider-0", test.kubeAPIServer.ClientConfig)
 	mustBeUnHealthy(t, "kms-provider-1", test.kubeAPIServer.ClientConfig)
-}
-
-func kmsPluginMustBeUp(t *testing.T, plugin *base64Plugin) {
-	t.Helper()
-	var gRPCErr error
-	pollErr := wait.PollImmediate(1*time.Second, wait.ForeverTestTimeout, func() (bool, error) {
-		_, gRPCErr = plugin.Encrypt(context.Background(), &kmsapi.EncryptRequest{Plain: []byte("foo")})
-		return gRPCErr == nil, nil
-	})
-
-	if pollErr == wait.ErrWaitTimeout {
-		t.Fatalf("failed to start kms-plugin, error: %v", gRPCErr)
-	}
 }
 
 func mustBeHealthy(t *testing.T, checkName string, clientConfig *rest.Config) {

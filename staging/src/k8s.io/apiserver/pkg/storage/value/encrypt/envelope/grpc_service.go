@@ -68,6 +68,8 @@ func NewGRPCService(endpoint string, callTimeout time.Duration) (Service, error)
 			c, err := net.DialUnix(unixProtocol, nil, &net.UnixAddr{Name: addr})
 			if err != nil {
 				klog.Errorf("failed to create connection to unix socket: %s, error: %v", addr, err)
+			} else {
+				klog.V(4).Infof("Successfully dialed Unix socket %v", addr)
 			}
 			return c, err
 		}))
