@@ -20,9 +20,6 @@ import (
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	corelisters "k8s.io/client-go/listers/core/v1"
-	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -45,26 +42,14 @@ import (
 
 // RegistryArgs arguments needed to create default plugin factories.
 type RegistryArgs struct {
-	SchedulerCache     internalcache.Cache
-	ServiceLister      algorithm.ServiceLister
-	ControllerLister   algorithm.ControllerLister
-	ReplicaSetLister   algorithm.ReplicaSetLister
-	StatefulSetLister  algorithm.StatefulSetLister
-	PDBLister          algorithm.PDBLister
-	PVLister           corelisters.PersistentVolumeLister
-	PVCLister          corelisters.PersistentVolumeClaimLister
-	StorageClassLister storagelistersv1.StorageClassLister
-	VolumeBinder       *volumebinder.VolumeBinder
+	SchedulerCache internalcache.Cache
+	VolumeBinder   *volumebinder.VolumeBinder
 }
 
 // NewDefaultRegistry builds a default registry with all the default plugins.
 // This is the registry that Kubernetes default scheduler uses. A scheduler that
 // runs custom plugins, can pass a different Registry when initializing the scheduler.
 func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
-	pvInfo := &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: args.PVLister}
-	pvcInfo := &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: args.PVCLister}
-	classInfo := &predicates.CachedStorageClassInfo{StorageClassLister: args.StorageClassLister}
-
 	return framework.Registry{
 		imagelocality.Name:       imagelocality.New,
 		tainttoleration.Name:     tainttoleration.New,
@@ -77,12 +62,8 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 			return volumebinding.NewFromVolumeBinder(args.VolumeBinder), nil
 		},
 		volumerestrictions.Name: volumerestrictions.New,
-		volumezone.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
-			return volumezone.New(pvInfo, pvcInfo, classInfo), nil
-		},
-		nodevolumelimits.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
-			return nodevolumelimits.New(args.SchedulerCache, pvInfo, pvcInfo, classInfo), nil
-		},
+		volumezone.Name:         volumezone.New,
+		nodevolumelimits.Name:   nodevolumelimits.New(args.SchedulerCache),
 		interpodaffinity.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return interpodaffinity.New(args.SchedulerCache, args.SchedulerCache), nil
 		},

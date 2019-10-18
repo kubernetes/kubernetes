@@ -154,8 +154,10 @@ func TestSingleZone(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
-			p := New(pvInfo, pvcInfo, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.Pod, node)
+			p := &VolumeZone{
+				predicate: predicates.NewVolumeZonePredicate(pvInfo, pvcInfo, nil),
+			}
+			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -237,8 +239,10 @@ func TestMultiZone(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
-			p := New(pvInfo, pvcInfo, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.Pod, node)
+			p := &VolumeZone{
+				predicate: predicates.NewVolumeZonePredicate(pvInfo, pvcInfo, nil),
+			}
+			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -340,8 +344,10 @@ func TestWithBinding(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
-			p := New(pvInfo, pvcInfo, classInfo)
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), nil, test.Pod, node)
+			p := &VolumeZone{
+				predicate: predicates.NewVolumeZonePredicate(pvInfo, pvcInfo, classInfo),
+			}
+			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
