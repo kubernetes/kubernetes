@@ -129,7 +129,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"CheckNodeDiskPressure",
 				"CheckNodeMemoryPressure",
 				"CheckNodePIDPressure",
-				"MatchInterPodAffinity",
 				"MaxAzureDiskVolumeCount",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
@@ -151,6 +150,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "NodeVolumeLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 1},
@@ -203,7 +203,6 @@ kind: Policy
 				"CheckNodeDiskPressure",
 				"CheckNodeMemoryPressure",
 				"CheckNodePIDPressure",
-				"MatchInterPodAffinity",
 				"MaxAzureDiskVolumeCount",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
@@ -225,6 +224,7 @@ kind: Policy
 					{Name: "NodeVolumeLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 1},

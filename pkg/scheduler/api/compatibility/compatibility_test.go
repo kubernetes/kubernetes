@@ -251,7 +251,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -271,6 +270,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -321,7 +321,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -342,6 +341,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -402,7 +402,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -423,6 +422,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -496,7 +496,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -517,6 +516,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -591,7 +591,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -613,6 +612,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -692,7 +692,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -714,6 +713,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -805,7 +805,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -828,6 +827,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "TaintToleration"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -920,7 +920,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
-				"MatchInterPodAffinity",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -944,6 +943,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeVolumeLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -1036,7 +1036,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MaxCinderVolumeCount",
-				"MatchInterPodAffinity",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -1060,6 +1059,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeVolumeLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -1156,7 +1156,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 				"MaxAzureDiskVolumeCount",
 				"MaxCinderVolumeCount",
-				"MatchInterPodAffinity",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -1180,6 +1179,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeVolumeLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
+					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "ImageLocality", Weight: 2},
@@ -1219,6 +1219,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		"VolumeRestrictions": "NoDiskConflict",
 		"VolumeZone":         "NoVolumeZoneConflict",
 		"NodeVolumeLimits":   "MaxCSIVolumeCountPred",
+		"InterPodAffinity":   "MatchInterPodAffinity",
 	}
 	scoreToPriorityMap := map[string]string{
 		"ImageLocality":       "ImageLocalityPriority",
