@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -1509,7 +1510,7 @@ func (f *fakeVolumeHost) CSIDriversSynced() cache.InformerSynced {
 	return nil
 }
 
-func (f *fakeVolumeHost) CSINodeLister() storagelisters.CSINodeLister {
+func (f *fakeVolumeHost) CSINodeLister() storagelistersv1.CSINodeLister {
 	// not needed for testing
 	return nil
 }
