@@ -1063,7 +1063,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 
 	addLimitToNode := func() {
 		for _, driver := range driverNames {
-			node.Status.Allocatable[getVolumeLimitKey(driver)] = *resource.NewQuantity(limit, resource.DecimalSI)
+			node.Status.Allocatable[GetVolumeLimitKey(driver)] = *resource.NewQuantity(limit, resource.DecimalSI)
 		}
 	}
 
@@ -1110,19 +1110,4 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 
 	nodeInfo.SetNode(node)
 	return nodeInfo, csiNode
-}
-
-func getVolumeLimitKey(filterType string) v1.ResourceName {
-	switch filterType {
-	case EBSVolumeFilterType:
-		return v1.ResourceName(volumeutil.EBSVolumeLimitKey)
-	case GCEPDVolumeFilterType:
-		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
-	case AzureDiskVolumeFilterType:
-		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
-	case CinderVolumeFilterType:
-		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
-	default:
-		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
-	}
 }

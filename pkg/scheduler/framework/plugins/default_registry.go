@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodepreferavoidpods"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
@@ -77,6 +78,9 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 		volumerestrictions.Name: volumerestrictions.New,
 		volumezone.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return volumezone.New(pvInfo, pvcInfo, classInfo), nil
+		},
+		nodevolumelimits.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+			return nodevolumelimits.New(args.SchedulerCache, pvInfo, pvcInfo, classInfo), nil
 		},
 	}
 }
@@ -143,6 +147,11 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPredicate(predicates.NoVolumeZoneConflictPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, volumezone.Name, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.MaxCSIVolumeCountPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.Name, nil)
 			return
 		})
 
