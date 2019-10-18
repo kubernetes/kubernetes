@@ -187,15 +187,14 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	}
 	trace.Step("Running prefilter plugins done")
 
-	numNodes := g.cache.NodeTree().NumNodes()
-	if numNodes == 0 {
-		return result, ErrNoNodesAvailable
-	}
-
 	if err := g.snapshot(); err != nil {
 		return result, err
 	}
 	trace.Step("Snapshoting scheduler cache and node infos done")
+
+	if len(g.nodeInfoSnapshot.NodeInfoList) == 0 {
+		return result, ErrNoNodesAvailable
+	}
 
 	startPredicateEvalTime := time.Now()
 	filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(ctx, state, pod)
@@ -213,7 +212,7 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	if len(filteredNodes) == 0 {
 		return result, &FitError{
 			Pod:                   pod,
-			NumAllNodes:           numNodes,
+			NumAllNodes:           len(g.nodeInfoSnapshot.NodeInfoList),
 			FailedPredicates:      failedPredicateMap,
 			FilteredNodesStatuses: filteredNodesStatuses,
 		}
@@ -460,13 +459,13 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 	if len(g.predicates) == 0 && !g.framework.HasFilterPlugins() {
 		filtered = g.nodeInfoSnapshot.ListNodes()
 	} else {
-		allNodes := int32(g.cache.NodeTree().NumNodes())
+		allNodes := int32(len(g.nodeInfoSnapshot.NodeInfoList))
 		numNodesToFind := g.numFeasibleNodesToFind(allNodes)
 
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
 		filtered = make([]*v1.Node, numNodesToFind)
-		errs := errors.MessageCountMap{}
+		errCh := util.NewErrorChannel()
 		var (
 			predicateResultLock sync.Mutex
 			filteredLen         int32
@@ -479,20 +478,17 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 		state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
 		checkNode := func(i int) {
-			nodeName := g.cache.NodeTree().Next()
-
+			nodeInfo := g.nodeInfoSnapshot.NodeInfoList[i]
 			fits, failedPredicates, status, err := g.podFitsOnNode(
 				ctx,
 				state,
 				pod,
 				meta,
-				g.nodeInfoSnapshot.NodeInfoMap[nodeName],
+				nodeInfo,
 				g.alwaysCheckAllPredicates,
 			)
 			if err != nil {
-				predicateResultLock.Lock()
-				errs[err.Error()]++
-				predicateResultLock.Unlock()
+				errCh.SendErrorWithCancel(err, cancel)
 				return
 			}
 			if fits {
@@ -501,15 +497,15 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 					cancel()
 					atomic.AddInt32(&filteredLen, -1)
 				} else {
-					filtered[length-1] = g.nodeInfoSnapshot.NodeInfoMap[nodeName].Node()
+					filtered[length-1] = nodeInfo.Node()
 				}
 			} else {
 				predicateResultLock.Lock()
 				if !status.IsSuccess() {
-					filteredNodesStatuses[nodeName] = status
+					filteredNodesStatuses[nodeInfo.Node().Name] = status
 				}
 				if len(failedPredicates) != 0 {
-					failedPredicateMap[nodeName] = failedPredicates
+					failedPredicateMap[nodeInfo.Node().Name] = failedPredicates
 				}
 				predicateResultLock.Unlock()
 			}
@@ -520,8 +516,8 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 		workqueue.ParallelizeUntil(ctx, 16, int(allNodes), checkNode)
 
 		filtered = filtered[:filteredLen]
-		if len(errs) > 0 {
-			return []*v1.Node{}, FailedPredicateMap{}, framework.NodeToStatusMap{}, errors.CreateAggregateFromMessageCountMap(errs)
+		if err := errCh.ReceiveError(); err != nil {
+			return []*v1.Node{}, FailedPredicateMap{}, framework.NodeToStatusMap{}, err
 		}
 	}
 

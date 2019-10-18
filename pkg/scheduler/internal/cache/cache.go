@@ -74,7 +74,7 @@ type schedulerCache struct {
 	// headNode points to the most recently updated NodeInfo in "nodes". It is the
 	// head of the linked list.
 	headNode *nodeInfoListItem
-	nodeTree *NodeTree
+	nodeTree *nodeTree
 	// A map from image name to its imageState.
 	imageStates map[string]*imageState
 }
@@ -236,6 +236,17 @@ func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *schedulernodei
 			if _, ok := cache.nodes[name]; !ok {
 				delete(nodeSnapshot.NodeInfoMap, name)
 			}
+		}
+	}
+
+	// Take a snapshot of the nodes order in the tree
+	nodeSnapshot.NodeInfoList = make([]*schedulernodeinfo.NodeInfo, 0, cache.nodeTree.numNodes)
+	for i := 0; i < cache.nodeTree.numNodes; i++ {
+		nodeName := cache.nodeTree.next()
+		if n := nodeSnapshot.NodeInfoMap[nodeName]; n != nil {
+			nodeSnapshot.NodeInfoList = append(nodeSnapshot.NodeInfoList, n)
+		} else {
+			klog.Errorf("node %q exist in nodeTree but not in NodeInfoMap, this should not happen.", nodeName)
 		}
 	}
 	return nil
@@ -516,7 +527,7 @@ func (cache *schedulerCache) AddNode(node *v1.Node) error {
 	}
 	cache.moveNodeInfoToHead(node.Name)
 
-	cache.nodeTree.AddNode(node)
+	cache.nodeTree.addNode(node)
 	cache.addNodeImageStates(node, n.info)
 	return n.info.SetNode(node)
 }
@@ -534,7 +545,7 @@ func (cache *schedulerCache) UpdateNode(oldNode, newNode *v1.Node) error {
 	}
 	cache.moveNodeInfoToHead(newNode.Name)
 
-	cache.nodeTree.UpdateNode(oldNode, newNode)
+	cache.nodeTree.updateNode(oldNode, newNode)
 	cache.addNodeImageStates(newNode, n.info)
 	return n.info.SetNode(newNode)
 }
@@ -560,7 +571,7 @@ func (cache *schedulerCache) RemoveNode(node *v1.Node) error {
 		cache.moveNodeInfoToHead(node.Name)
 	}
 
-	if err := cache.nodeTree.RemoveNode(node); err != nil {
+	if err := cache.nodeTree.removeNode(node); err != nil {
 		return err
 	}
 	cache.removeNodeImageStates(node)
@@ -686,10 +697,6 @@ func (cache *schedulerCache) expirePod(key string, ps *podState) error {
 	delete(cache.assumedPods, key)
 	delete(cache.podStates, key)
 	return nil
-}
-
-func (cache *schedulerCache) NodeTree() *NodeTree {
-	return cache.nodeTree
 }
 
 // GetNodeInfo returns cached data for the node name.
