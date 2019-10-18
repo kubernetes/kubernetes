@@ -73,6 +73,9 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 		obj.MetricsBindAddress = net.JoinHostPort("0.0.0.0", strconv.Itoa(ports.InsecureSchedulerPort))
 	}
 
+	if len(obj.LeaderElection.ResourceLock) == 0 {
+		obj.LeaderElection.ResourceLock = "endpointsleases"
+	}
 	if len(obj.LeaderElection.LockObjectNamespace) == 0 && len(obj.LeaderElection.ResourceNamespace) == 0 {
 		obj.LeaderElection.LockObjectNamespace = kubeschedulerconfigv1alpha1.SchedulerDefaultLockObjectNamespace
 	}
