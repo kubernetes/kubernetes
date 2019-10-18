@@ -1061,10 +1061,6 @@ func (n FakeNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	return &node, nil
 }
 
-func PredicateMetadata(p *v1.Pod, nodeInfo map[string]*schedulernodeinfo.NodeInfo) algorithmpredicates.PredicateMetadata {
-	return algorithmpredicates.GetPredicateMetadata(p, nodeInfo)
-}
-
 var smallContainers = []v1.Container{
 	{
 		Resources: v1.ResourceRequirements{
@@ -1384,14 +1380,12 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				cache.AddNode(&v1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: map[string]string{"hostname": name}}})
 			}
 
-			predMetaProducer := algorithmpredicates.EmptyPredicateMetadataProducer
-
 			filterPlugin.failedNodeReturnCodeMap = filterFailedNodeReturnCodeMap
 			scheduler := NewGenericScheduler(
 				nil,
 				internalqueue.NewSchedulingQueue(nil, nil),
 				test.predicates,
-				predMetaProducer,
+				algorithmpredicates.GetPredicateMetadata,
 				nil,
 				priorities.EmptyPriorityMetadataProducer,
 				filterFramework,
@@ -1429,7 +1423,8 @@ func TestSelectNodesForPreemption(t *testing.T) {
 			newnode.ObjectMeta.Labels = map[string]string{"hostname": "newnode"}
 			nodes = append(nodes, newnode)
 			state := framework.NewCycleState()
-			nodeToPods, err := g.selectNodesForPreemption(context.Background(), state, test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)
+			g.nodeInfoSnapshot.NodeInfoMap = nodeNameToInfo
+			nodeToPods, err := g.selectNodesForPreemption(context.Background(), state, test.pod, nodes, nil)
 			if err != nil {
 				t.Error(err)
 			}
@@ -1643,9 +1638,12 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			g := &genericScheduler{
-				framework: emptyFramework,
+				framework:             emptyFramework,
+				predicates:            test.predicates,
+				predicateMetaProducer: algorithmpredicates.GetPredicateMetadata,
 			}
 			assignDefaultStartTime(test.pods)
+			g.nodeInfoSnapshot = g.framework.NodeInfoSnapshot()
 
 			nodes := []*v1.Node{}
 			for _, n := range test.nodes {
@@ -1653,7 +1651,8 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 			}
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, nodes)
 			state := framework.NewCycleState()
-			candidateNodes, _ := g.selectNodesForPreemption(context.Background(), state, test.pod, nodeNameToInfo, nodes, test.predicates, PredicateMetadata, nil, nil)
+			g.nodeInfoSnapshot.NodeInfoMap = nodeNameToInfo
+			candidateNodes, _ := g.selectNodesForPreemption(context.Background(), state, test.pod, nodes, nil)
 			node := pickOneNodeForPreemption(candidateNodes)
 			found := false
 			for _, nodeName := range test.expected {
