@@ -21,19 +21,19 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"github.com/armon/go-socks5"
+	"github.com/elazarl/goproxy"
 	"io"
+	"k8s.io/apimachinery/pkg/util/httpstream"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
-	"net"
 	"time"
-	"strconv"
-	"github.com/elazarl/goproxy"
-	"github.com/armon/go-socks5"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 )
 
 // be sure to unset environment variable https_proxy (if exported) before testing, otherwise the testing will fail unexpectedly.
@@ -72,28 +72,27 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 			}
 
 			socks5Server := func(creds *socks5.StaticCredentials) *socks5.Server {
-			  var conf *socks5.Config
-			  if creds != nil {
-			    cator := socks5.UserPassAuthenticator{Credentials: creds}
-			    conf = &socks5.Config{
-			      AuthMethods:  []socks5.Authenticator{cator},
-			    }
-			  } else {
-			    conf = &socks5.Config{}
-			  }
+				var conf *socks5.Config
+				if creds != nil {
+					cator := socks5.UserPassAuthenticator{Credentials: creds}
+					conf = &socks5.Config{
+						AuthMethods: []socks5.Authenticator{cator},
+					}
+				} else {
+					conf = &socks5.Config{}
+				}
 
-			  ts, err := socks5.New(conf)
-			  if err != nil {
-			    t.Errorf("socks5Server: proxy_test: %v", err)
-			  }
-			  return ts
+				ts, err := socks5.New(conf)
+				if err != nil {
+					t.Errorf("socks5Server: proxy_test: %v", err)
+				}
+				return ts
 			}
-
 
 			testCases := map[string]struct {
 				serverFunc             func(http.Handler) *httptest.Server
 				proxyServerFunc        func(http.Handler) *httptest.Server
-				socks5ProxyServerFunc	 func(creds *socks5.StaticCredentials) *socks5.Server
+				socks5ProxyServerFunc  func(creds *socks5.StaticCredentials) *socks5.Server
 				proxyAuth              *url.Userinfo
 				clientTLS              *tls.Config
 				serverConnectionHeader string
@@ -264,7 +263,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				},
 				"proxied tcp->tcp via SOCKS5": {
 					serverFunc:             httptest.NewServer,
-					socks5ProxyServerFunc: 	socks5Server,
+					socks5ProxyServerFunc:  socks5Server,
 					serverConnectionHeader: "Upgrade",
 					serverUpgradeHeader:    "SPDY/3.1",
 					serverStatusCode:       http.StatusSwitchingProtocols,
@@ -272,7 +271,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				},
 				"proxied tcp->tcp via SOCKS5 with invalid auth": {
 					serverFunc:             httptest.NewServer,
-					socks5ProxyServerFunc: 	socks5Server,
+					socks5ProxyServerFunc:  socks5Server,
 					proxyAuth:              url.UserPassword("invalid", "auth"),
 					serverConnectionHeader: "Upgrade",
 					serverUpgradeHeader:    "SPDY/3.1",
@@ -281,7 +280,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 				},
 				"proxied tcp->tcp via SOCKS5 with auth": {
 					serverFunc:             httptest.NewServer,
-					socks5ProxyServerFunc: 	socks5Server,
+					socks5ProxyServerFunc:  socks5Server,
 					proxyAuth:              url.UserPassword("proxyuser", "proxypasswd"),
 					serverConnectionHeader: "Upgrade",
 					serverUpgradeHeader:    "SPDY/3.1",
@@ -367,7 +366,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					var proxyHandler *socks5.Server
 					if testCase.proxyAuth != nil {
 						proxyHandler = socks5Server(&socks5.StaticCredentials{
-						 "proxyuser": "proxypasswd",
+							"proxyuser": "proxypasswd",
 						})
 						proxyCalledWithAuth = true
 					} else {
@@ -377,7 +376,7 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 
 					l, err = net.Listen("tcp", "127.0.0.1:0")
 					if err != nil {
-					  t.Fatalf("socks5Server: proxy_test: Listen: %v", err)
+						t.Fatalf("socks5Server: proxy_test: Listen: %v", err)
 					}
 					defer l.Close()
 
@@ -386,9 +385,9 @@ func TestRoundTripAndNewConnection(t *testing.T) {
 					time.Sleep(100 * time.Millisecond)
 
 					proxy := &url.URL{
-					  Scheme: "socks5",
-					  Host: proxyCalledWithHost,
-					  User: testCase.proxyAuth,
+						Scheme: "socks5",
+						Host:   proxyCalledWithHost,
+						User:   testCase.proxyAuth,
 					}
 
 					spdyTransport.proxier = func(proxierReq *http.Request) (*url.URL, error) {
