@@ -194,6 +194,7 @@ filename | sha512 hash
 
 ### Other notable changes
 
+* Fixes an issue in the AWS cloudprovider, where ELBs fail to register instances ([#82954](https://github.com/kubernetes/kubernetes/pull/82954), [@M00nF1sh](https://github.com/M00nF1sh))
 * Fixes a goroutine leak in kube-apiserver when a request times out. ([#83333](https://github.com/kubernetes/kubernetes/pull/83333), [@lavalamp](https://github.com/lavalamp))
 * Fix aggressive VM calls for Azure VMSS ([#83102](https://github.com/kubernetes/kubernetes/pull/83102), [@feiskyer](https://github.com/feiskyer))
 * Fixes a flaw (CVE-2019-11253) in json/yaml decoding where large or malformed documents could consume excessive server resources. Request bodies for normal API requests (create/delete/update/patch operations of regular resources) are now limited to 3MB. ([#83261](https://github.com/kubernetes/kubernetes/pull/83261), [@liggitt](https://github.com/liggitt))
