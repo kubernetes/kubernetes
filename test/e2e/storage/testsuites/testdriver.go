@@ -166,8 +166,6 @@ type DriverInfo struct {
 	InTreePluginName string
 	FeatureTag       string // FeatureTag for the driver
 
-	// Max file size to be tested for this driver
-	MaxFileSize int64
 	// The range of size supported by this driver
 	SupportedSizeRange volume.SizeRange
 	// Map of string for supported fs type

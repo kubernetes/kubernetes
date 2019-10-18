@@ -75,9 +75,8 @@ type hostpathCSIDriver struct {
 func initHostPathCSIDriver(name string, capabilities map[testsuites.Capability]bool, volumeAttributes []map[string]string, manifests ...string) testsuites.TestDriver {
 	return &hostpathCSIDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        name,
-			FeatureTag:  "",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:       name,
+			FeatureTag: "",
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -250,9 +249,8 @@ func InitMockCSIDriver(driverOpts CSIMockDriverOpts) testsuites.TestDriver {
 
 	return &mockCSIDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        "csi-mock",
-			FeatureTag:  "",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:       "csi-mock",
+			FeatureTag: "",
 			SupportedFsType: sets.NewString(
 				"", // Default fsType
 			),
@@ -373,9 +371,8 @@ var _ testsuites.DynamicPVTestDriver = &gcePDCSIDriver{}
 func InitGcePDCSIDriver() testsuites.TestDriver {
 	return &gcePDCSIDriver{
 		driverInfo: testsuites.DriverInfo{
-			Name:        GCEPDCSIDriverName,
-			FeatureTag:  "[Serial]",
-			MaxFileSize: testpatterns.FileSizeMedium,
+			Name:       GCEPDCSIDriverName,
+			FeatureTag: "[Serial]",
 			SupportedSizeRange: volume.SizeRange{
 				Min: "5Gi",
 			},

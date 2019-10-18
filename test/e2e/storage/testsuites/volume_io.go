@@ -32,6 +32,7 @@ import (
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -142,7 +143,39 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		defer cleanup()
 
 		cs := f.ClientSet
-		fileSizes := createFileSizes(dInfo.MaxFileSize)
+
+		//calculate driver and test suite supported max size
+		var driverSizeRange, testSuiteSizeRange volume.SizeRange
+
+		//driver don't have limitation on max size, use default max size
+		if len(dInfo.SupportedSizeRange.Max) == 0 {
+			driverSizeRange.Max = maxValidSize
+		} else {
+			driverSizeRange.Max = dInfo.SupportedSizeRange.Max
+		}
+
+		//test suite don't have limitation on max size, use default max size
+		if len(t.tsInfo.supportedSizeRange.Max) == 0 {
+			testSuiteSizeRange.Max = maxValidSize
+		} else {
+			testSuiteSizeRange.Max = t.tsInfo.supportedSizeRange.Max
+		}
+
+		//parse size format
+		var driverQuantity, testQuantity resource.Quantity
+
+		driverQuantity, err := resource.ParseQuantity(driverSizeRange.Max)
+		if err != nil {
+			framework.ExpectNoError(err)
+		}
+
+		testQuantity, err = resource.ParseQuantity(testSuiteSizeRange.Max)
+		if err != nil {
+			framework.ExpectNoError(err)
+		}
+		maxFileSize := math.Min(float64(driverQuantity.Value()), float64(testQuantity.Value()))
+
+		fileSizes := createFileSizes(int64(maxFileSize))
 		testFile := fmt.Sprintf("%s_io_test_%s", dInfo.Name, f.Namespace.Name)
 		var fsGroup *int64
 		if !framework.NodeOSDistroIs("windows") && dInfo.Capabilities[CapFsGroup] {
@@ -152,7 +185,7 @@ func (t *volumeIOTestSuite) defineTests(driver TestDriver, pattern testpatterns.
 		podSec := v1.PodSecurityContext{
 			FSGroup: fsGroup,
 		}
-		err := testVolumeIO(f, cs, convertTestConfig(l.config), *l.resource.volSource, &podSec, testFile, fileSizes)
+		err = testVolumeIO(f, cs, convertTestConfig(l.config), *l.resource.volSource, &podSec, testFile, fileSizes)
 		framework.ExpectNoError(err)
 	})
 }
