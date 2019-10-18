@@ -1310,7 +1310,7 @@ var _ = SIGDescribe("Services", func() {
 		err = t.DeleteService(serviceName)
 		framework.ExpectNoError(err, "failed to delete service: %s in namespace: %s", serviceName, ns)
 
-		hostExec := e2epod.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
+		hostExec := launchHostExecPod(f.ClientSet, f.Namespace.Name, "hostexec")
 		cmd := fmt.Sprintf(`! ss -ant46 'sport = :%d' | tail -n +2 | grep LISTEN`, nodePort)
 		var stdout string
 		if pollErr := wait.PollImmediate(framework.Poll, e2eservice.KubeProxyLagTimeout, func() (bool, error) {
@@ -1610,7 +1610,7 @@ var _ = SIGDescribe("Services", func() {
 		//  a pod to test the service.
 		ginkgo.By("hitting the internal load balancer from pod")
 		framework.Logf("creating pod with host network")
-		hostExec := e2epod.LaunchHostExecPod(f.ClientSet, f.Namespace.Name, "ilb-host-exec")
+		hostExec := launchHostExecPod(f.ClientSet, f.Namespace.Name, "ilb-host-exec")
 
 		framework.Logf("Waiting up to %v for service %q's internal LB to respond to requests", createTimeout, serviceName)
 		tcpIngressIP := e2eservice.GetIngressPoint(lbIngress)
@@ -2544,4 +2544,15 @@ func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas 
 	deployment, err := cs.AppsV1().Deployments(ns).Create(pauseDeployment)
 	framework.ExpectNoError(err, "Error in creating deployment for pause pod")
 	return deployment
+}
+
+// launchHostExecPod launches a hostexec pod in the given namespace and waits
+// until it's Running
+func launchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
+	hostExecPod := e2epod.NewExecPodSpec(ns, name, true)
+	pod, err := client.CoreV1().Pods(ns).Create(hostExecPod)
+	framework.ExpectNoError(err)
+	err = e2epod.WaitForPodRunningInNamespace(client, pod)
+	framework.ExpectNoError(err)
+	return pod
 }

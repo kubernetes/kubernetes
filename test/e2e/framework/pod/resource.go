@@ -442,17 +442,6 @@ func NewExecPodSpec(ns, name string, hostNetwork bool) *v1.Pod {
 	return pod
 }
 
-// LaunchHostExecPod launches a hostexec pod in the given namespace and waits
-// until it's Running
-func LaunchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
-	hostExecPod := NewExecPodSpec(ns, name, true)
-	pod, err := client.CoreV1().Pods(ns).Create(hostExecPod)
-	expectNoError(err)
-	err = WaitForPodRunningInNamespace(client, pod)
-	expectNoError(err)
-	return pod
-}
-
 // newExecPodSpec returns the pod spec of exec pod
 func newExecPodSpec(ns, generateName string) *v1.Pod {
 	immediate := int64(0)
