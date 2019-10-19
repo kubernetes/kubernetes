@@ -49,9 +49,8 @@ func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleS
 	if !exist {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("node %q does not exist in NodeInfoSnapshot", nodeName))
 	}
-	meta := migration.PriorityMetadata(state)
-
-	s, err := priorities.BalancedResourceAllocationMap(pod, meta, nodeInfo)
+	// BalancedResourceAllocationMap does not use priority metadata, hence we pass nil here
+	s, err := priorities.BalancedResourceAllocationMap(pod, nil, nodeInfo)
 	return s.Score, migration.ErrorToFrameworkStatus(err)
 }
 

@@ -3,7 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
-        "balance_allocated.go",
+        "balanced_allocation.go",
         "least_allocated.go",
         "most_allocated.go",
         "node_resources.go",
@@ -41,7 +41,7 @@ filegroup(
 go_test(
     name = "go_default_test",
     srcs = [
-        "balance_allocated_test.go",
+        "balanced_allocation_test.go",
         "least_allocated_test.go",
         "most_allocated_test.go",
         "node_resources_test.go",

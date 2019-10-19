@@ -48,9 +48,8 @@ func (la *LeastAllocated) Score(ctx context.Context, state *framework.CycleState
 	if !exist {
 		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("node %q does not exist in NodeInfoSnapshot", nodeName))
 	}
-	meta := migration.PriorityMetadata(state)
-
-	s, err := priorities.LeastRequestedPriorityMap(pod, meta, nodeInfo)
+	// LeastRequestedPriorityMap does not use priority metadata, hence we pass nil here
+	s, err := priorities.LeastRequestedPriorityMap(pod, nil, nodeInfo)
 	return s.Score, migration.ErrorToFrameworkStatus(err)
 }
 
