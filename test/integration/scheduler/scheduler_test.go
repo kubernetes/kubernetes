@@ -110,7 +110,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				]
 			}`,
 			expectedPredicates: sets.NewString(
-				"CheckNodeUnschedulable", // mandatory predicate
 				"PredicateOne",
 				"PredicateTwo",
 			),
@@ -120,6 +119,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
 				},
 			},
@@ -130,7 +130,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"apiVersion" : "v1"
 			}`,
 			expectedPredicates: sets.NewString(
-				"CheckNodeUnschedulable", // mandatory predicate
 				"MaxAzureDiskVolumeCount",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
@@ -143,6 +142,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeResources"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
@@ -169,12 +169,11 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"predicates" : [],
 				"priorities" : []
 			}`,
-			expectedPredicates: sets.NewString(
-				"CheckNodeUnschedulable", // mandatory predicate
-			),
+			expectedPredicates:   sets.NewString(),
 			expectedPrioritizers: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
 				},
 			},
@@ -192,7 +191,6 @@ priorities:
   weight: 5
 `,
 			expectedPredicates: sets.NewString(
-				"CheckNodeUnschedulable", // mandatory predicate
 				"PredicateOne",
 				"PredicateTwo",
 			),
@@ -202,6 +200,7 @@ priorities:
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
 				},
 			},
@@ -211,7 +210,6 @@ priorities:
 kind: Policy
 `,
 			expectedPredicates: sets.NewString(
-				"CheckNodeUnschedulable", // mandatory predicate
 				"MaxAzureDiskVolumeCount",
 				"MaxEBSVolumeCount",
 				"MaxGCEPDVolumeCount",
@@ -224,6 +222,7 @@ kind: Policy
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeResources"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
@@ -249,12 +248,11 @@ kind: Policy
 predicates: []
 priorities: []
 `,
-			expectedPredicates: sets.NewString(
-				"CheckNodeUnschedulable", // mandatory predicate
-			),
+			expectedPredicates:   sets.NewString(),
 			expectedPrioritizers: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
 				},
 			},

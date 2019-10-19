@@ -61,6 +61,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		}`,
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeResources"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
@@ -102,6 +103,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeAffinity"},
 					{Name: "NodeResources"},
 					{Name: "VolumeRestrictions"},
@@ -147,6 +149,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -203,6 +206,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -267,6 +271,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -338,6 +343,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -419,6 +425,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -513,6 +520,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -608,6 +616,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -709,6 +718,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -823,6 +833,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -938,6 +949,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -1054,6 +1066,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -1174,6 +1187,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -1211,9 +1225,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	registeredPriorities := sets.NewString(scheduler.ListRegisteredPriorityFunctions()...)
 	seenPredicates := sets.NewString()
 	seenPriorities := sets.NewString()
-	mandatoryPredicates := sets.NewString("CheckNodeUnschedulable")
+	mandatoryPredicates := sets.NewString()
 	generalPredicateFilters := []string{"NodeResources", "NodeName", "NodePorts", "NodeAffinity"}
 	filterToPredicateMap := map[string]string{
+		"NodeUnschedulable":  "CheckNodeUnschedulable",
 		"TaintToleration":    "PodToleratesNodeTaints",
 		"NodeName":           "HostName",
 		"NodePorts":          "PodFitsHostPorts",
