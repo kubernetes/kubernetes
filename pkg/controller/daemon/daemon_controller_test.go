@@ -26,7 +26,7 @@ import (
 	"time"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -1804,8 +1804,6 @@ func TestTaintPressureNodeDaemonLaunchesPod(t *testing.T) {
 			}
 			manager.nodeStore.Add(node)
 
-			// Enabling critical pod and taint nodes by condition feature gate should create critical pod
-			defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintNodesByCondition, true)()
 			manager.dsStore.Add(ds)
 			syncAndValidateDaemonSets(t, manager, ds, podControl, 1, 0, 0)
 		}

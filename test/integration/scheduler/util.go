@@ -212,6 +212,7 @@ func initTestSchedulerWithOptions(
 	context.informerFactory.WaitForCacheSync(context.scheduler.StopEverything)
 
 	go context.scheduler.Run(context.ctx)
+
 	return context
 }
 

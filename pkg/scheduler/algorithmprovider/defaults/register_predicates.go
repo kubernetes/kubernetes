@@ -113,10 +113,13 @@ func init() {
 	scheduler.RegisterFitPredicate(predicates.CheckNodePIDPressurePred, predicates.CheckNodePIDPressurePredicate)
 
 	// Fit is determined by node conditions: not ready, network unavailable or out of disk.
-	scheduler.RegisterMandatoryFitPredicate(predicates.CheckNodeConditionPred, predicates.CheckNodeConditionPredicate)
+	scheduler.RegisterFitPredicate(predicates.CheckNodeConditionPred, predicates.CheckNodeConditionPredicate)
 
 	// Fit is determined based on whether a pod can tolerate all of the node's taints
-	scheduler.RegisterFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
+	scheduler.RegisterMandatoryFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
+
+	// Fit is determined based on whether a pod can tolerate unschedulable of node
+	scheduler.RegisterMandatoryFitPredicate(predicates.CheckNodeUnschedulablePred, predicates.CheckNodeUnschedulablePredicate)
 
 	// Fit is determined by volume topology requirements.
 	scheduler.RegisterFitPredicateFactory(

@@ -65,6 +65,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
+					{Name: "TaintToleration"},
 				},
 			},
 		},
@@ -104,6 +105,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeAffinity"},
 					{Name: "NodeResources"},
 					{Name: "VolumeRestrictions"},
+					{Name: "TaintToleration"},
 				},
 			},
 		},
@@ -150,6 +152,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeAffinity"},
 					{Name: "NodeResources"},
 					{Name: "VolumeRestrictions"},
+					{Name: "TaintToleration"},
 				},
 			},
 		},
@@ -205,6 +208,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeAffinity"},
 					{Name: "NodeResources"},
 					{Name: "VolumeRestrictions"},
+					{Name: "TaintToleration"},
 					{Name: "VolumeZone"},
 				},
 				"ScorePlugin": {
@@ -1207,7 +1211,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	registeredPriorities := sets.NewString(scheduler.ListRegisteredPriorityFunctions()...)
 	seenPredicates := sets.NewString()
 	seenPriorities := sets.NewString()
-	mandatoryPredicates := sets.NewString("CheckNodeCondition")
+	mandatoryPredicates := sets.NewString("CheckNodeUnschedulable")
 	generalPredicateFilters := []string{"NodeResources", "NodeName", "NodePorts", "NodeAffinity"}
 	filterToPredicateMap := map[string]string{
 		"TaintToleration":    "PodToleratesNodeTaints",

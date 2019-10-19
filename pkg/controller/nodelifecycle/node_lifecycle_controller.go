@@ -296,10 +296,6 @@ type Controller struct {
 	// taints instead of evicting Pods itself.
 	useTaintBasedEvictions bool
 
-	// if set to true, NodeController will taint Nodes based on its condition for 'NetworkUnavailable',
-	// 'MemoryPressure', 'PIDPressure' and 'DiskPressure'.
-	taintNodeByCondition bool
-
 	nodeUpdateQueue workqueue.Interface
 }
 
@@ -320,7 +316,7 @@ func NewNodeLifecycleController(
 	unhealthyZoneThreshold float32,
 	runTaintManager bool,
 	useTaintBasedEvictions bool,
-	taintNodeByCondition bool) (*Controller, error) {
+) (*Controller, error) {
 
 	if kubeClient == nil {
 		klog.Fatalf("kubeClient is nil when starting Controller")
@@ -359,7 +355,6 @@ func NewNodeLifecycleController(
 		unhealthyZoneThreshold:      unhealthyZoneThreshold,
 		runTaintManager:             runTaintManager,
 		useTaintBasedEvictions:      useTaintBasedEvictions && runTaintManager,
-		taintNodeByCondition:        taintNodeByCondition,
 		nodeUpdateQueue:             workqueue.NewNamed("node_lifecycle_controller"),
 	}
 	if useTaintBasedEvictions {
@@ -469,10 +464,6 @@ func NewNodeLifecycleController(
 		}),
 	})
 
-	if nc.taintNodeByCondition {
-		klog.Infof("Controller will taint node by condition.")
-	}
-
 	nc.leaseLister = leaseInformer.Lister()
 	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
 		nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
@@ -547,11 +538,9 @@ func (nc *Controller) doNodeProcessingPassWorker() {
 			return
 		}
 		nodeName := obj.(string)
-		if nc.taintNodeByCondition {
-			if err := nc.doNoScheduleTaintingPass(nodeName); err != nil {
-				klog.Errorf("Failed to taint NoSchedule on node <%s>, requeue it: %v", nodeName, err)
-				// TODO(k82cn): Add nodeName back to the queue
-			}
+		if err := nc.doNoScheduleTaintingPass(nodeName); err != nil {
+			klog.Errorf("Failed to taint NoSchedule on node <%s>, requeue it: %v", nodeName, err)
+			// TODO(k82cn): Add nodeName back to the queue
 		}
 		// TODO: re-evaluate whether there are any labels that need to be
 		// reconcile in 1.19. Remove this function if it's no longer necessary.

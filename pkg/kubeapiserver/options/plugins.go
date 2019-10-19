@@ -142,11 +142,8 @@ func DefaultOffAdmissionPlugins() sets.String {
 		resourcequota.PluginName,                //ResourceQuota
 		storageobjectinuseprotection.PluginName, //StorageObjectInUseProtection
 		podpriority.PluginName,                  //PodPriority
+		nodetaint.PluginName,                    //TaintNodesByCondition
 	)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
-		defaultOnPlugins.Insert(nodetaint.PluginName) //TaintNodesByCondition
-	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
 		defaultOnPlugins.Insert(runtimeclass.PluginName) //RuntimeClass
