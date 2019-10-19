@@ -245,7 +245,8 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 		"--file", manifestsFile,
 		"--name", name,
 		"--namespace", namespace,
-		"--certs-dir", certsDir)
+		"--certs-dir", certsDir,
+		"--tolerate-master")
 
 	output, err := cmd.CombinedOutput()
 	if err == nil {
