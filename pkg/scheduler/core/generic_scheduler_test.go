@@ -642,6 +642,9 @@ func TestGenericScheduler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
 			filterPlugin.failedNodeReturnCodeMap = test.filterFailedNodeReturnCodeMap
 
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
@@ -671,7 +674,7 @@ func TestGenericScheduler(t *testing.T) {
 				[]algorithm.SchedulerExtender{},
 				nil,
 				pvcLister,
-				schedulertesting.FakePDBLister{},
+				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				test.alwaysCheckAllPredicates,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
@@ -1377,6 +1380,9 @@ func TestSelectNodesForPreemption(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
 			filterFailedNodeReturnCodeMap := map[string]framework.Code{}
 			cache := internalcache.New(time.Duration(0), wait.NeverStop)
 			for _, pod := range test.pods {
@@ -1399,7 +1405,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				[]algorithm.SchedulerExtender{},
 				nil,
 				nil,
-				schedulertesting.FakePDBLister{},
+				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
@@ -2085,6 +2091,9 @@ func TestPreempt(t *testing.T) {
 	labelKeys := []string{"hostname", "zone", "region"}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
 			t.Logf("===== Running test %v", t.Name())
 			stop := make(chan struct{})
 			cache := internalcache.New(time.Duration(0), stop)
@@ -2137,8 +2146,8 @@ func TestPreempt(t *testing.T) {
 				emptyFramework,
 				extenders,
 				nil,
-				schedulertesting.FakePersistentVolumeClaimLister{},
-				schedulertesting.FakePDBLister{},
+				informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
