@@ -150,10 +150,14 @@ func NewStatus(code Code, msg string) *Status {
 type WaitingPod interface {
 	// GetPod returns a reference to the waiting pod.
 	GetPod() *v1.Pod
-	// Allow the waiting pod to be scheduled. Returns true if the allow signal was
-	// successfully delivered, false otherwise.
-	Allow() bool
-	// Reject declares the waiting pod unschedulable. Returns true if the allow signal
+	// GetPendingPlugins returns a list of pending permit plugin's name.
+	GetPendingPlugins() []string
+	// Allow declares the waiting pod is allowed to be scheduled by plugin pluginName.
+	// If this is the last remaining plugin to allow, then a success signal is delivered
+	// to unblock the pod.
+	// Returns true if the allow signal was successfully dealt with, false otherwise.
+	Allow(pluginName string) bool
+	// Reject declares the waiting pod unschedulable. Returns true if the reject signal
 	// was successfully delivered, false otherwise.
 	Reject(msg string) bool
 }
