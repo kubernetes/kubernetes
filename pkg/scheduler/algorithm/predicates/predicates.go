@@ -1050,7 +1050,7 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *v1.Pod, meta PredicateMet
 // ServiceAffinity defines a struct used for creating service affinity predicates.
 type ServiceAffinity struct {
 	podLister     algorithm.PodLister
-	serviceLister algorithm.ServiceLister
+	serviceLister corelisters.ServiceLister
 	nodeInfo      NodeInfo
 	labels        []string
 }
@@ -1082,7 +1082,7 @@ func (s *ServiceAffinity) serviceAffinityMetadataProducer(pm *predicateMetadata)
 }
 
 // NewServiceAffinityPredicate creates a ServiceAffinity.
-func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister algorithm.ServiceLister, nodeInfo NodeInfo, labels []string) (FitPredicate, predicateMetadataProducer) {
+func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister corelisters.ServiceLister, nodeInfo NodeInfo, labels []string) (FitPredicate, predicateMetadataProducer) {
 	affinity := &ServiceAffinity{
 		podLister:     podLister,
 		serviceLister: serviceLister,
