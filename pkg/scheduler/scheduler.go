@@ -19,11 +19,8 @@ package scheduler
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"time"
-
-	"k8s.io/klog"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,6 +30,7 @@ import (
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/events"
+	"k8s.io/klog"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
@@ -44,13 +42,15 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
+	utilio "k8s.io/utils/io"
 )
 
 const (
 	// BindTimeoutSeconds defines the default bind timeout
 	BindTimeoutSeconds = 100
 	// SchedulerError is the reason recorded for events when an error occurs during scheduling a pod.
-	SchedulerError = "SchedulerError"
+	SchedulerError  = "SchedulerError"
+	maxConfigLength = 10 * 1 << 20 // 10MB
 )
 
 // podConditionUpdater updates the condition of a pod based on the passed
@@ -355,12 +355,12 @@ func New(client clientset.Interface,
 
 // initPolicyFromFile initialize policy from file
 func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
-	// Use a policy serialized in a file.
-	_, err := os.Stat(policyFile)
+	file, err := os.Open(policyFile)
 	if err != nil {
-		return fmt.Errorf("missing policy config file %s", policyFile)
+		return fmt.Errorf("couldn't open policy config file %s: %v", policyFile, err)
 	}
-	data, err := ioutil.ReadFile(policyFile)
+	defer file.Close()
+	data, err := utilio.ReadAtMost(file, maxConfigLength)
 	if err != nil {
 		return fmt.Errorf("couldn't read policy config: %v", err)
 	}
