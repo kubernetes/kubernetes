@@ -135,9 +135,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"MaxGCEPDVolumeCount",
 			),
 			expectedPrioritizers: sets.NewString(
-				"BalancedResourceAllocation",
 				"InterPodAffinityPriority",
-				"LeastRequestedPriority",
 				"SelectorSpreadPriority",
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
@@ -155,7 +153,9 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
+					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
+					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeAffinity", Weight: 1},
 					{Name: "NodePreferAvoidPods", Weight: 10000},
 					{Name: "TaintToleration", Weight: 1},
@@ -215,9 +215,7 @@ kind: Policy
 				"MaxGCEPDVolumeCount",
 			),
 			expectedPrioritizers: sets.NewString(
-				"BalancedResourceAllocation",
 				"InterPodAffinityPriority",
-				"LeastRequestedPriority",
 				"SelectorSpreadPriority",
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
@@ -235,7 +233,9 @@ kind: Policy
 					{Name: "InterPodAffinity"},
 				},
 				"ScorePlugin": {
+					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
+					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeAffinity", Weight: 1},
 					{Name: "NodePreferAvoidPods", Weight: 10000},
 					{Name: "TaintToleration", Weight: 1},
@@ -486,25 +486,23 @@ func TestUnschedulableNodes(t *testing.T) {
 }
 
 func TestMultiScheduler(t *testing.T) {
-	/*
-		This integration tests the multi-scheduler feature in the following way:
-		1. create a default scheduler
-		2. create a node
-		3. create 3 pods: testPodNoAnnotation, testPodWithAnnotationFitsDefault and testPodWithAnnotationFitsFoo
-			- note: the first two should be picked and scheduled by default scheduler while the last one should be
-			        picked by scheduler of name "foo-scheduler" which does not exist yet.
-		4. **check point-1**:
-			- testPodNoAnnotation, testPodWithAnnotationFitsDefault should be scheduled
-			- testPodWithAnnotationFitsFoo should NOT be scheduled
-		5. create a scheduler with name "foo-scheduler"
-		6. **check point-2**:
-			- testPodWithAnnotationFitsFoo should be scheduled
-		7. stop default scheduler
-		8. create 2 pods: testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2
-			- note: these two pods belong to default scheduler which no longer exists
-		9. **check point-3**:
-			- testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 should NOT be scheduled
-	*/
+	// This integration tests the multi-scheduler feature in the following way:
+	// 1. create a default scheduler
+	// 2. create a node
+	// 3. create 3 pods: testPodNoAnnotation, testPodWithAnnotationFitsDefault and testPodWithAnnotationFitsFoo
+	//	  - note: the first two should be picked and scheduled by default scheduler while the last one should be
+	//	          picked by scheduler of name "foo-scheduler" which does not exist yet.
+	// 4. **check point-1**:
+	//	   - testPodNoAnnotation, testPodWithAnnotationFitsDefault should be scheduled
+	//	   - testPodWithAnnotationFitsFoo should NOT be scheduled
+	// 5. create a scheduler with name "foo-scheduler"
+	// 6. **check point-2**:
+	//     - testPodWithAnnotationFitsFoo should be scheduled
+	// 7. stop default scheduler
+	// 8. create 2 pods: testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2
+	//    - note: these two pods belong to default scheduler which no longer exists
+	// 9. **check point-3**:
+	//     - testPodNoAnnotation2 and testPodWithAnnotationFitsDefault2 should NOT be scheduled
 
 	// 1. create and start default-scheduler
 	context := initTest(t, "multi-scheduler")
