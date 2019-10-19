@@ -115,6 +115,18 @@ type Extensions struct {
 	//      used to identify them. Order is preserved upon merge. The map tag
 	//      must only be used on a list with elements of type object.
 	XListType *string
+
+	// x-kubernetes-map-type annotates an object to further describe its topology.
+	// This extension must only be used when type is object and may have 2 possible values:
+	//
+	// 1) `granular`:
+	//      These maps are actual maps (key-value pairs) and each fields are independent
+	//      from each other (they can each be manipulated by separate actors). This is
+	//      the default behaviour for all maps.
+	// 2) `atomic`: the list is treated as a single entity, like a scalar.
+	//      Atomic maps will be entirely replaced when updated.
+	// +optional
+	XMapType *string
 }
 
 // +k8s:deepcopy-gen=true
