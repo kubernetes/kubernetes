@@ -6805,6 +6805,74 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			wantError: false,
 		},
+		{
+			name: "invalid type with map type extension (granular)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:     "array",
+					XMapType: strPtr("granular"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "unset type with map type extension (granular)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					XMapType: strPtr("granular"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "invalid type with map type extension (atomic)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:     "array",
+					XMapType: strPtr("atomic"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "unset type with map type extension (atomic)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					XMapType: strPtr("atomic"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "invalid map type",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:     "object",
+					XMapType: strPtr("badMapType"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "allowed type with map type extension (granular)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:     "object",
+					XMapType: strPtr("granular"),
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "allowed type with map type extension (atomic)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:     "object",
+					XMapType: strPtr("atomic"),
+				},
+			},
+			wantError: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -789,6 +789,18 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-preserve-unknown-fields"), *schema.XPreserveUnknownFields, "must be true or undefined"))
 	}
 
+	if schema.XMapType != nil && schema.Type != "object" {
+		if len(schema.Type) == 0 {
+			allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must be object if x-kubernetes-map-type is set"))
+		} else {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), schema.Type, "must be object if x-kubernetes-map-type is set"))
+		}
+	}
+
+	if schema.XMapType != nil && *schema.XMapType != "atomic" && *schema.XMapType != "granular" {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("x-kubernetes-map-type"), *schema.XMapType, []string{"atomic", "granular"}))
+	}
+
 	if schema.XListType != nil && schema.Type != "array" {
 		if len(schema.Type) == 0 {
 			allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must be array if x-kubernetes-list-type is set"))
