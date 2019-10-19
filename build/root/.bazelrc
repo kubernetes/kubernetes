@@ -10,6 +10,7 @@ build --verbose_failures
 test --test_output=errors
 
 # Include git version info
+build --stamp
 build --workspace_status_command hack/print-workspace-status.sh
 
 # Make /tmp hermetic
