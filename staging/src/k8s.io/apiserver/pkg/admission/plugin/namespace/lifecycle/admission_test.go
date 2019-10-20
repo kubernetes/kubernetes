@@ -19,14 +19,17 @@ package lifecycle
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/clock"
+	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/admission"
@@ -191,6 +194,14 @@ func TestAdmissionNamespaceTerminating(t *testing.T) {
 	err = handler.Admit(context.TODO(), admission.NewAttributesRecord(&pod, nil, v1.SchemeGroupVersion.WithKind("Pod").GroupKind().WithVersion("version"), pod.Namespace, pod.Name, v1.Resource("pods").WithVersion("version"), "", admission.Create, &metav1.CreateOptions{}, false, nil), nil)
 	if err == nil {
 		t.Errorf("Expected error rejecting creates in a namespace when it is terminating")
+	}
+	expectedCause := metav1.StatusCause{
+		Type:    v1.NamespaceTerminatingCause,
+		Message: fmt.Sprintf("namespace %s is being terminated", namespace),
+		Field:   "metadata.namespace",
+	}
+	if cause, ok := errors.StatusCause(err, v1.NamespaceTerminatingCause); !ok || !reflect.DeepEqual(expectedCause, cause) {
+		t.Errorf("Expected status cause indicating the namespace is terminating: %t %s", ok, diff.ObjectReflectDiff(expectedCause, cause))
 	}
 
 	// verify update operations in the namespace can proceed
