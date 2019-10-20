@@ -213,7 +213,10 @@ func (c *ServiceAccountsController) syncNamespace(key string) error {
 		sa.Namespace = ns.Name
 
 		if _, err := c.client.CoreV1().ServiceAccounts(ns.Name).Create(&sa); err != nil && !apierrs.IsAlreadyExists(err) {
-			createFailures = append(createFailures, err)
+			// we can safely ignore terminating namespace errors
+			if !apierrs.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+				createFailures = append(createFailures, err)
+			}
 		}
 	}
 
