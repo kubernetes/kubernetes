@@ -68,9 +68,13 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 		volumebinding.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return volumebinding.NewFromVolumeBinder(args.VolumeBinder), nil
 		},
-		volumerestrictions.Name: volumerestrictions.New,
-		volumezone.Name:         volumezone.New,
-		nodevolumelimits.Name:   nodevolumelimits.New,
+		volumerestrictions.Name:        volumerestrictions.New,
+		volumezone.Name:                volumezone.New,
+		nodevolumelimits.CSIName:       nodevolumelimits.NewCSI,
+		nodevolumelimits.EBSName:       nodevolumelimits.NewEBS,
+		nodevolumelimits.GCEPDName:     nodevolumelimits.NewGCEPD,
+		nodevolumelimits.AzureDiskName: nodevolumelimits.NewAzureDisk,
+		nodevolumelimits.CinderName:    nodevolumelimits.NewCinder,
 		interpodaffinity.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return interpodaffinity.New(args.SchedulerCache, args.SchedulerCache), nil
 		},
@@ -158,7 +162,27 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 		})
 	registry.RegisterPredicate(predicates.MaxCSIVolumeCountPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
-			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.Name, nil)
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.CSIName, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.MaxEBSVolumeCountPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.EBSName, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.MaxGCEPDVolumeCountPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.GCEPDName, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.MaxAzureDiskVolumeCountPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.AzureDiskName, nil)
+			return
+		})
+	registry.RegisterPredicate(predicates.MaxCinderVolumeCountPred,
+		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodevolumelimits.CinderName, nil)
 			return
 		})
 	registry.RegisterPredicate(predicates.MatchInterPodAffinityPred,

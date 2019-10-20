@@ -129,11 +129,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"kind" : "Policy",
 				"apiVersion" : "v1"
 			}`,
-			expectedPredicates: sets.NewString(
-				"MaxAzureDiskVolumeCount",
-				"MaxEBSVolumeCount",
-				"MaxGCEPDVolumeCount",
-			),
 			expectedPrioritizers: sets.NewString(
 				"InterPodAffinityPriority",
 				"SelectorSpreadPriority",
@@ -147,7 +142,10 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "NodeAffinity"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "EBSLimits"},
+					{Name: "GCEPDLimits"},
 					{Name: "NodeVolumeLimits"},
+					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
@@ -209,11 +207,6 @@ priorities:
 			policy: `apiVersion: v1
 kind: Policy
 `,
-			expectedPredicates: sets.NewString(
-				"MaxAzureDiskVolumeCount",
-				"MaxEBSVolumeCount",
-				"MaxGCEPDVolumeCount",
-			),
 			expectedPrioritizers: sets.NewString(
 				"InterPodAffinityPriority",
 				"SelectorSpreadPriority",
@@ -227,7 +220,10 @@ kind: Policy
 					{Name: "NodeAffinity"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "EBSLimits"},
+					{Name: "GCEPDLimits"},
 					{Name: "NodeVolumeLimits"},
+					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},

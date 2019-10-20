@@ -2,7 +2,13 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "go_default_library",
-    srcs = ["node_volume_limits.go"],
+    srcs = [
+        "azure.go",
+        "cinder.go",
+        "csi.go",
+        "ebs.go",
+        "gce.go",
+    ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits",
     visibility = ["//visibility:public"],
     deps = [
@@ -17,7 +23,13 @@ go_library(
 
 go_test(
     name = "go_default_test",
-    srcs = ["node_volume_limits_test.go"],
+    srcs = [
+        "azure_test.go",
+        "cinder_test.go",
+        "csi_test.go",
+        "ebs_test.go",
+        "gce_test.go",
+    ],
     embed = [":go_default_library"],
     deps = [
         "//pkg/features:go_default_library",

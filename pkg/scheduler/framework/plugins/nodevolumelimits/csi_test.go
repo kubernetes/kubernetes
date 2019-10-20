@@ -47,7 +47,7 @@ const (
 	hostpathInTreePluginName = "kubernetes.io/hostpath"
 )
 
-func TestNodeVolumeLimits(t *testing.T) {
+func TestCSILimits(t *testing.T) {
 	runningPod := &v1.Pod{
 		Spec: v1.PodSpec{
 			Volumes: []v1.Volume{
@@ -444,7 +444,7 @@ func TestNodeVolumeLimits(t *testing.T) {
 				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, false)()
 			}
 
-			p := &NodeVolumeLimits{
+			p := &CSILimits{
 				predicate: predicates.NewCSIMaxVolumeLimitPredicate(getFakeCSINodeInfo(csiNode), getFakeCSIPVInfo(test.filterName, test.driverNames...), getFakeCSIPVCInfo(test.filterName, "csi-sc", test.driverNames...), getFakeCSIStorageClassInfo("csi-sc", test.driverNames[0])),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)

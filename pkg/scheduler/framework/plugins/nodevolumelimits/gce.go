@@ -27,30 +27,30 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-// NodeVolumeLimits is a plugin that checks node volume limits
-type NodeVolumeLimits struct {
+// GCEPDLimits is a plugin that checks node volume limits.
+type GCEPDLimits struct {
 	predicate predicates.FitPredicate
 }
 
-var _ framework.FilterPlugin = &NodeVolumeLimits{}
+var _ framework.FilterPlugin = &GCEPDLimits{}
 
-// Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "NodeVolumeLimits"
+// GCEPDName is the name of the plugin used in the plugin registry and configurations.
+const GCEPDName = "GCEPDLimits"
 
 // Name returns name of the plugin. It is used in logs, etc.
-func (pl *NodeVolumeLimits) Name() string {
-	return Name
+func (pl *GCEPDLimits) Name() string {
+	return GCEPDName
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodeVolumeLimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (pl *GCEPDLimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	// metadata is not needed
 	_, reasons, err := pl.predicate(pod, nil, nodeInfo)
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
 }
 
-// New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
+// NewGCEPD returns function that initializes a new plugin and returns it.
+func NewGCEPD(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
 	csiNodeInfo := &predicates.CachedCSINodeInfo{
 		CSINodeLister: informerFactory.Storage().V1beta1().CSINodes().Lister(),
@@ -65,7 +65,7 @@ func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin
 		StorageClassLister: informerFactory.Storage().V1().StorageClasses().Lister(),
 	}
 
-	return &NodeVolumeLimits{
-		predicate: predicates.NewCSIMaxVolumeLimitPredicate(csiNodeInfo, pvInfo, pvcInfo, classInfo),
+	return &GCEPDLimits{
+		predicate: predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, csiNodeInfo, classInfo, pvInfo, pvcInfo),
 	}, nil
 }
