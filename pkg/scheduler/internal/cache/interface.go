@@ -18,7 +18,6 @@ package cache
 
 import (
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -102,20 +101,8 @@ type Cache interface {
 	// on this node.
 	UpdateNodeInfoSnapshot(nodeSnapshot *schedulernodeinfo.Snapshot) error
 
-	// AddCSINode adds overall CSI-related information about node.
-	AddCSINode(csiNode *storagev1beta1.CSINode) error
-
-	// UpdateCSINode updates overall CSI-related information about node.
-	UpdateCSINode(oldCSINode, newCSINode *storagev1beta1.CSINode) error
-
-	// RemoveCSINode removes overall CSI-related information about node.
-	RemoveCSINode(csiNode *storagev1beta1.CSINode) error
-
 	// GetNodeInfo returns the node object with node string.
 	GetNodeInfo(nodeName string) (*v1.Node, error)
-
-	// GetCSINodeInfo returns the csinode object with the given name.
-	GetCSINodeInfo(nodeName string) (*storagev1beta1.CSINode, error)
 
 	// Snapshot takes a snapshot on current cache
 	Snapshot() *Snapshot
