@@ -53,15 +53,18 @@ type RegistryArgs struct {
 // runs custom plugins, can pass a different Registry when initializing the scheduler.
 func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 	return framework.Registry{
-		imagelocality.Name:       imagelocality.New,
-		tainttoleration.Name:     tainttoleration.New,
-		noderesources.Name:       noderesources.New,
-		nodename.Name:            nodename.New,
-		nodeports.Name:           nodeports.New,
-		nodepreferavoidpods.Name: nodepreferavoidpods.New,
-		nodeaffinity.Name:        nodeaffinity.New,
-		podtopologyspread.Name:   podtopologyspread.New,
-		nodeunschedulable.Name:   nodeunschedulable.New,
+		imagelocality.Name:                   imagelocality.New,
+		tainttoleration.Name:                 tainttoleration.New,
+		noderesources.Name:                   noderesources.New,
+		nodename.Name:                        nodename.New,
+		nodeports.Name:                       nodeports.New,
+		nodepreferavoidpods.Name:             nodepreferavoidpods.New,
+		nodeaffinity.Name:                    nodeaffinity.New,
+		podtopologyspread.Name:               podtopologyspread.New,
+		nodeunschedulable.Name:               nodeunschedulable.New,
+		noderesources.BalancedAllocationName: noderesources.NewBalancedAllocation,
+		noderesources.MostAllocatedName:      noderesources.NewMostAllocated,
+		noderesources.LeastAllocatedName:     noderesources.NewLeastAllocated,
 		volumebinding.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
 			return volumebinding.NewFromVolumeBinder(args.VolumeBinder), nil
 		},
@@ -187,6 +190,24 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPriority(priorities.NodePreferAvoidPodsPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, nodepreferavoidpods.Name, &args.Weight)
+			return
+		})
+
+	registry.RegisterPriority(priorities.MostRequestedPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, noderesources.MostAllocatedName, &args.Weight)
+			return
+		})
+
+	registry.RegisterPriority(priorities.BalancedResourceAllocation,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, noderesources.BalancedAllocationName, &args.Weight)
+			return
+		})
+
+	registry.RegisterPriority(priorities.LeastRequestedPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, noderesources.LeastAllocatedName, &args.Weight)
 			return
 		})
 
