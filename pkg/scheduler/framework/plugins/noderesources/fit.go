@@ -28,21 +28,21 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-// NodeResources is a plugin that checks if a node has sufficient resources.
-type NodeResources struct{}
+// Fit is a plugin that checks if a node has sufficient resources.
+type Fit struct{}
 
-var _ framework.FilterPlugin = &NodeResources{}
+var _ framework.FilterPlugin = &Fit{}
 
-// Name is the name of the plugin used in the plugin registry and configurations.
-const Name = "NodeResources"
+// FitName is the name of the plugin used in the plugin registry and configurations.
+const FitName = "NodeResourcesFit"
 
 // Name returns name of the plugin. It is used in logs, etc.
-func (pl *NodeResources) Name() string {
-	return Name
+func (f *Fit) Name() string {
+	return FitName
 }
 
 // Filter invoked at the filter extension point.
-func (pl *NodeResources) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
+func (f *Fit) Filter(ctx context.Context, cycleState *framework.CycleState, pod *v1.Pod, nodeInfo *nodeinfo.NodeInfo) *framework.Status {
 	meta, ok := migration.PredicateMetadata(cycleState).(predicates.PredicateMetadata)
 	if !ok {
 		return migration.ErrorToFrameworkStatus(fmt.Errorf("%+v convert to predicates.PredicateMetadata error", cycleState))
@@ -51,7 +51,7 @@ func (pl *NodeResources) Filter(ctx context.Context, cycleState *framework.Cycle
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
 }
 
-// New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
-	return &NodeResources{}, nil
+// NewFit initializes a new plugin and returns it.
+func NewFit(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+	return &Fit{}, nil
 }

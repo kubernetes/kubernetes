@@ -4,9 +4,9 @@ go_library(
     name = "go_default_library",
     srcs = [
         "balanced_allocation.go",
+        "fit.go",
         "least_allocated.go",
         "most_allocated.go",
-        "node_resources.go",
         "test_util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/noderesources",
@@ -42,9 +42,9 @@ go_test(
     name = "go_default_test",
     srcs = [
         "balanced_allocation_test.go",
+        "fit_test.go",
         "least_allocated_test.go",
         "most_allocated_test.go",
-        "node_resources_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
