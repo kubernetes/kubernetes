@@ -237,9 +237,13 @@ func TestFakeTimer(t *testing.T) {
 	select {
 	case <-oneSec.C():
 		t.Errorf("unexpected channel read")
-	case <-twoSec.C():
-		t.Errorf("unexpected channel read")
 	default:
+	}
+	select {
+	case <-twoSec.C():
+		// Expected!
+	default:
+		t.Errorf("unexpected channel non-read")
 	}
 	select {
 	case <-treSec.C():

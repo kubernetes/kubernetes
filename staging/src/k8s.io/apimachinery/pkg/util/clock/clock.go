@@ -346,12 +346,15 @@ func (f *fakeTimer) Reset(d time.Duration) bool {
 	defer f.fakeClock.lock.Unlock()
 	waiters := f.fakeClock.waiters
 	seekChan := f.waiter.destChan
+	newTargetTime := f.fakeClock.time.Add(d)
+	f.waiter.targetTime = newTargetTime
 	for i := range waiters {
 		if waiters[i].destChan == seekChan {
-			waiters[i].targetTime = f.fakeClock.time.Add(d)
+			waiters[i].targetTime = newTargetTime
 			return true
 		}
 	}
+	f.fakeClock.waiters = append(f.fakeClock.waiters, f.waiter)
 	return false
 }
 
