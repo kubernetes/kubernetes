@@ -1120,6 +1120,8 @@ func createAndInitKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// TODO: block until all sources have delivered at least one update to the channel, or break the sync loop
 	// up into "per source" synchronizations
 
+	os.Clearenv()
+
 	k, err = kubelet.NewMainKubelet(kubeCfg,
 		kubeDeps,
 		crOptions,
