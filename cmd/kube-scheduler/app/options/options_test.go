@@ -472,16 +472,76 @@ pluginConfig:
 			options: &Options{
 				ConfigFile: unknownFieldConfig,
 			},
-			expectedError: "found unknown field: foo",
-			checkErrFn:    runtime.IsStrictDecodingError,
+			// TODO (obitech): Remove this comment and add a new test for v1alpha2, when it's available, as this should fail then.
+			// expectedError: "found unknown field: foo",
+			// checkErrFn:    runtime.IsStrictDecodingError,
+			expectedUsername: "config",
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				SchedulerName:                  "default-scheduler",
+				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HardPodAffinitySymmetricWeight: 1,
+				HealthzBindAddress:             "0.0.0.0:10251",
+				MetricsBindAddress:             "0.0.0.0:10251",
+				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+						LeaderElect:       true,
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpointsleases",
+						ResourceNamespace: "kube-system",
+						ResourceName:      "kube-scheduler",
+					},
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  configKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: &defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     &defaultPodMaxBackoffSeconds,
+				Plugins:                  nil,
+			},
 		},
 		{
 			name: "duplicate fields",
 			options: &Options{
 				ConfigFile: duplicateFieldConfig,
 			},
-			expectedError: `key "leaderElect" already set`,
-			checkErrFn:    runtime.IsStrictDecodingError,
+			// TODO (obitech): Remove this comment and add a new test for v1alpha2, when it's available, as this should fail then.
+			// expectedError: `key "leaderElect" already set`,
+			// checkErrFn:    runtime.IsStrictDecodingError,
+			expectedUsername: "config",
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				SchedulerName:                  "default-scheduler",
+				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HardPodAffinitySymmetricWeight: 1,
+				HealthzBindAddress:             "0.0.0.0:10251",
+				MetricsBindAddress:             "0.0.0.0:10251",
+				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+						LeaderElect:       false,
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpointsleases",
+						ResourceNamespace: "kube-system",
+						ResourceName:      "kube-scheduler",
+					},
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  configKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: &defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     &defaultPodMaxBackoffSeconds,
+				Plugins:                  nil,
+			},
 		},
 	}
 
@@ -523,7 +583,7 @@ pluginConfig:
 				return
 			}
 			if username != tc.expectedUsername {
-				t.Errorf("expected server call with user %s, got %s", tc.expectedUsername, username)
+				t.Errorf("expected server call with user %q, got %q", tc.expectedUsername, username)
 			}
 		})
 	}
