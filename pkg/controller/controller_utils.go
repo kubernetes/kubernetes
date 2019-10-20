@@ -577,7 +577,10 @@ func (r RealPodControl) createPods(nodeName, namespace string, template *v1.PodT
 	}
 	newPod, err := r.KubeClient.CoreV1().Pods(namespace).Create(pod)
 	if err != nil {
-		r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
+		// only send an event if the namespace isn't terminating
+		if !apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+			r.Recorder.Eventf(object, v1.EventTypeWarning, FailedCreatePodReason, "Error creating: %v", err)
+		}
 		return err
 	}
 	accessor, err := meta.Accessor(object)
