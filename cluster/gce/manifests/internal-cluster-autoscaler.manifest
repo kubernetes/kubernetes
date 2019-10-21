@@ -17,7 +17,7 @@
         "containers": [
             {
                 "name": "cluster-autoscaler",
-                "image": "gcr.io/gke-master-images/cluster-autoscaler:cluster-autoscaler-v2019.10.15-1.16-gke.0",
+                "image": "gcr.io/gke-master-images/cluster-autoscaler:cluster-autoscaler-v2019.10.21-1.16-gke.0",
                 "livenessProbe": {
                     "httpGet": {
                         "path": "/health-check",
@@ -27,10 +27,12 @@
                     "periodSeconds": 60
                 },
                 "command": [
-                    "./run.sh",
+                    "/cluster-autoscaler",
                     "--kubernetes=https://127.0.0.1:443",
                     "--v=4",
-                    "--logtostderr=true",
+                    "--logtostderr=false",
+                    "--log-file=/var/log/cluster-autoscaler.log",
+                    "--log-file-max-size=0",
                     "--write-status-configmap=true",
                     "--balance-similar-node-groups=true",
                     "--kubeconfig=/etc/srv/kubernetes/cluster-autoscaler/kubeconfig",
