@@ -103,18 +103,6 @@ func init() {
 	// (e.g. kubelet and all schedulers)
 	scheduler.RegisterFitPredicate(predicates.GeneralPred, predicates.GeneralPredicates)
 
-	// Fit is determined by node memory pressure condition.
-	scheduler.RegisterFitPredicate(predicates.CheckNodeMemoryPressurePred, predicates.CheckNodeMemoryPressurePredicate)
-
-	// Fit is determined by node disk pressure condition.
-	scheduler.RegisterFitPredicate(predicates.CheckNodeDiskPressurePred, predicates.CheckNodeDiskPressurePredicate)
-
-	// Fit is determined by node pid pressure condition.
-	scheduler.RegisterFitPredicate(predicates.CheckNodePIDPressurePred, predicates.CheckNodePIDPressurePredicate)
-
-	// Fit is determined by node conditions: not ready, network unavailable or out of disk.
-	scheduler.RegisterFitPredicate(predicates.CheckNodeConditionPred, predicates.CheckNodeConditionPredicate)
-
 	// Fit is determined based on whether a pod can tolerate all of the node's taints
 	scheduler.RegisterMandatoryFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
 

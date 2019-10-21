@@ -351,7 +351,6 @@ func GetPredicateMetadata(pod *v1.Pod, nodeNameToInfoMap map[string]*schedulerno
 
 	predicateMetadata := &predicateMetadata{
 		pod:                      pod,
-		podBestEffort:            isPodBestEffort(pod),
 		evenPodsSpreadMetadata:   evenPodsSpreadMetadata,
 		podAffinityMetadata:      podAffinityMetadata,
 		podFitsResourcesMetadata: getPodFitsResourcesMetedata(pod),

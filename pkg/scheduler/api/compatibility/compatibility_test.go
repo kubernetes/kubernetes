@@ -240,7 +240,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "NoDiskConflict"},
 			{"name": "NoVolumeZoneConflict"},
 			{"name": "PodToleratesNodeTaints"},
-			{"name": "CheckNodeMemoryPressure"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
@@ -259,7 +258,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			wantPredicates: sets.NewString(
-				"CheckNodeMemoryPressure",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -307,8 +305,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "NoDiskConflict"},
 			{"name": "NoVolumeZoneConflict"},
 			{"name": "PodToleratesNodeTaints"},
-			{"name": "CheckNodeMemoryPressure"},
-			{"name": "CheckNodeDiskPressure"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
@@ -329,8 +325,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  ]
 		}`,
 			wantPredicates: sets.NewString(
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -379,8 +373,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "NoDiskConflict"},
 			{"name": "NoVolumeZoneConflict"},
 			{"name": "PodToleratesNodeTaints"},
-			{"name": "CheckNodeMemoryPressure"},
-			{"name": "CheckNodeDiskPressure"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
@@ -411,8 +403,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -472,9 +462,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "NoDiskConflict"},
 			{"name": "NoVolumeZoneConflict"},
 			{"name": "PodToleratesNodeTaints"},
-			{"name": "CheckNodeMemoryPressure"},
-			{"name": "CheckNodeDiskPressure"},
-			{"name": "CheckNodeCondition"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
@@ -505,9 +492,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
-				"CheckNodeCondition",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -567,9 +551,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "NoDiskConflict"},
 			{"name": "NoVolumeZoneConflict"},
 			{"name": "PodToleratesNodeTaints"},
-			{"name": "CheckNodeMemoryPressure"},
-			{"name": "CheckNodeDiskPressure"},
-			{"name": "CheckNodeCondition"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
@@ -601,9 +582,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
-				"CheckNodeCondition",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -665,10 +643,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "NoDiskConflict"},
 			{"name": "NoVolumeZoneConflict"},
 			{"name": "PodToleratesNodeTaints"},
-			{"name": "CheckNodeMemoryPressure"},
-			{"name": "CheckNodeDiskPressure"},
-			{"name": "CheckNodePIDPressure"},
-			{"name": "CheckNodeCondition"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
@@ -702,10 +676,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
-				"CheckNodePIDPressure",
-				"CheckNodeCondition",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -768,10 +738,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "NoDiskConflict"},
 			{"name": "NoVolumeZoneConflict"},
 			{"name": "PodToleratesNodeTaints"},
-			{"name": "CheckNodeMemoryPressure"},
-			{"name": "CheckNodeDiskPressure"},
-			{"name": "CheckNodePIDPressure"},
-			{"name": "CheckNodeCondition"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
@@ -816,10 +782,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
-				"CheckNodePIDPressure",
-				"CheckNodeCondition",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -883,10 +845,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "NoDiskConflict"},
 			{"name": "NoVolumeZoneConflict"},
 			{"name": "PodToleratesNodeTaints"},
-			{"name": "CheckNodeMemoryPressure"},
-			{"name": "CheckNodeDiskPressure"},
-			{"name": "CheckNodePIDPressure"},
-			{"name": "CheckNodeCondition"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
@@ -932,10 +890,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
-				"CheckNodePIDPressure",
-				"CheckNodeCondition",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -998,10 +952,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "NoDiskConflict"},
 			{"name": "NoVolumeZoneConflict"},
 			{"name": "PodToleratesNodeTaints"},
-			{"name": "CheckNodeMemoryPressure"},
-			{"name": "CheckNodeDiskPressure"},
-			{"name": "CheckNodePIDPressure"},
-			{"name": "CheckNodeCondition"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
@@ -1048,10 +998,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
-				"CheckNodePIDPressure",
-				"CheckNodeCondition",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),
@@ -1115,10 +1061,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "NoDiskConflict"},
 			{"name": "NoVolumeZoneConflict"},
 			{"name": "PodToleratesNodeTaints"},
-			{"name": "CheckNodeMemoryPressure"},
-			{"name": "CheckNodeDiskPressure"},
-			{"name": "CheckNodePIDPressure"},
-			{"name": "CheckNodeCondition"},
 			{"name": "MaxEBSVolumeCount"},
 			{"name": "MaxGCEPDVolumeCount"},
 			{"name": "MaxAzureDiskVolumeCount"},
@@ -1169,10 +1111,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		  }]
 		}`,
 			wantPredicates: sets.NewString(
-				"CheckNodeMemoryPressure",
-				"CheckNodeDiskPressure",
-				"CheckNodePIDPressure",
-				"CheckNodeCondition",
 				"TestServiceAffinity",
 				"TestLabelsPresence",
 			),

@@ -40,7 +40,6 @@ import (
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
-	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
@@ -56,8 +55,6 @@ const (
 	MatchInterPodAffinityPred = "MatchInterPodAffinity"
 	// CheckVolumeBindingPred defines the name of predicate CheckVolumeBinding.
 	CheckVolumeBindingPred = "CheckVolumeBinding"
-	// CheckNodeConditionPred defines the name of predicate CheckNodeCondition.
-	CheckNodeConditionPred = "CheckNodeCondition"
 	// GeneralPred defines the name of predicate GeneralPredicates.
 	GeneralPred = "GeneralPredicates"
 	// HostNamePred defines the name of predicate HostName.
@@ -100,12 +97,6 @@ const (
 	MaxCSIVolumeCountPred = "MaxCSIVolumeCountPred"
 	// NoVolumeZoneConflictPred defines the name of predicate NoVolumeZoneConflict.
 	NoVolumeZoneConflictPred = "NoVolumeZoneConflict"
-	// CheckNodeMemoryPressurePred defines the name of predicate CheckNodeMemoryPressure.
-	CheckNodeMemoryPressurePred = "CheckNodeMemoryPressure"
-	// CheckNodeDiskPressurePred defines the name of predicate CheckNodeDiskPressure.
-	CheckNodeDiskPressurePred = "CheckNodeDiskPressure"
-	// CheckNodePIDPressurePred defines the name of predicate CheckNodePIDPressure.
-	CheckNodePIDPressurePred = "CheckNodePIDPressure"
 	// EvenPodsSpreadPred defines the name of predicate EvenPodsSpread.
 	EvenPodsSpreadPred = "EvenPodsSpread"
 
@@ -144,13 +135,13 @@ const (
 // The order is based on the restrictiveness & complexity of predicates.
 // Design doc: https://github.com/kubernetes/community/blob/master/contributors/design-proposals/scheduling/predicates-ordering.md
 var (
-	predicatesOrdering = []string{CheckNodeConditionPred, CheckNodeUnschedulablePred,
+	predicatesOrdering = []string{CheckNodeUnschedulablePred,
 		GeneralPred, HostNamePred, PodFitsHostPortsPred,
 		MatchNodeSelectorPred, PodFitsResourcesPred, NoDiskConflictPred,
 		PodToleratesNodeTaintsPred, PodToleratesNodeNoExecuteTaintsPred, CheckNodeLabelPresencePred,
 		CheckServiceAffinityPred, MaxEBSVolumeCountPred, MaxGCEPDVolumeCountPred, MaxCSIVolumeCountPred,
 		MaxAzureDiskVolumeCountPred, MaxCinderVolumeCountPred, CheckVolumeBindingPred, NoVolumeZoneConflictPred,
-		CheckNodeMemoryPressurePred, CheckNodePIDPressurePred, CheckNodeDiskPressurePred, EvenPodsSpreadPred, MatchInterPodAffinityPred}
+		EvenPodsSpreadPred, MatchInterPodAffinityPred}
 )
 
 // Ordering returns the ordering of predicates.
@@ -1637,80 +1628,6 @@ func podToleratesNodeTaints(pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo, f
 		return true, nil, nil
 	}
 	return false, []PredicateFailureReason{ErrTaintsTolerationsNotMatch}, nil
-}
-
-// isPodBestEffort checks if pod is scheduled with best-effort QoS.
-func isPodBestEffort(pod *v1.Pod) bool {
-	return v1qos.GetPodQOS(pod) == v1.PodQOSBestEffort
-}
-
-// CheckNodeMemoryPressurePredicate checks if a pod can be scheduled on a node
-// reporting memory pressure condition.
-func CheckNodeMemoryPressurePredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	var podBestEffort bool
-	if predicateMeta, ok := meta.(*predicateMetadata); ok {
-		podBestEffort = predicateMeta.podBestEffort
-	} else {
-		// We couldn't parse metadata - fallback to computing it.
-		podBestEffort = isPodBestEffort(pod)
-	}
-	// pod is not BestEffort pod
-	if !podBestEffort {
-		return true, nil, nil
-	}
-
-	// check if node is under memory pressure
-	if nodeInfo.MemoryPressureCondition() == v1.ConditionTrue {
-		return false, []PredicateFailureReason{ErrNodeUnderMemoryPressure}, nil
-	}
-	return true, nil, nil
-}
-
-// CheckNodeDiskPressurePredicate checks if a pod can be scheduled on a node
-// reporting disk pressure condition.
-func CheckNodeDiskPressurePredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	// check if node is under disk pressure
-	if nodeInfo.DiskPressureCondition() == v1.ConditionTrue {
-		return false, []PredicateFailureReason{ErrNodeUnderDiskPressure}, nil
-	}
-	return true, nil, nil
-}
-
-// CheckNodePIDPressurePredicate checks if a pod can be scheduled on a node
-// reporting pid pressure condition.
-func CheckNodePIDPressurePredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	// check if node is under pid pressure
-	if nodeInfo.PIDPressureCondition() == v1.ConditionTrue {
-		return false, []PredicateFailureReason{ErrNodeUnderPIDPressure}, nil
-	}
-	return true, nil, nil
-}
-
-// CheckNodeConditionPredicate checks if a pod can be scheduled on a node reporting
-// network unavailable and not ready condition. Only node conditions are accounted in this predicate.
-func CheckNodeConditionPredicate(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error) {
-	reasons := []PredicateFailureReason{}
-	if nodeInfo == nil || nodeInfo.Node() == nil {
-		return false, []PredicateFailureReason{ErrNodeUnknownCondition}, nil
-	}
-
-	node := nodeInfo.Node()
-	for _, cond := range node.Status.Conditions {
-		// We consider the node for scheduling only when its:
-		// - NodeReady condition status is ConditionTrue,
-		// - NodeNetworkUnavailable condition status is ConditionFalse.
-		if cond.Type == v1.NodeReady && cond.Status != v1.ConditionTrue {
-			reasons = append(reasons, ErrNodeNotReady)
-		} else if cond.Type == v1.NodeNetworkUnavailable && cond.Status != v1.ConditionFalse {
-			reasons = append(reasons, ErrNodeNetworkUnavailable)
-		}
-	}
-
-	if node.Spec.Unschedulable {
-		reasons = append(reasons, ErrNodeUnschedulable)
-	}
-
-	return len(reasons) == 0, reasons, nil
 }
 
 // VolumeBindingChecker contains information to check a volume binding.
