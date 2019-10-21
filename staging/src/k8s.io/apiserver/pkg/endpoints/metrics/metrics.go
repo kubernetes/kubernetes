@@ -189,10 +189,10 @@ var (
 		[]string{"requestKind"},
 	)
 
-	requestErrorsTotal = compbasemetrics.NewCounterVec(
+	requestTerminationsTotal = compbasemetrics.NewCounterVec(
 		&compbasemetrics.CounterOpts{
-			Name:           "apiserver_request_errors_total",
-			Help:           "Number of requests which have resulted in an apiserver response error.",
+			Name:           "apiserver_request_terminations_total",
+			Help:           "Number of requests which apiserver terminated in self-defense.",
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "code"},
@@ -213,7 +213,7 @@ var (
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
-		requestErrorsTotal,
+		requestTerminationsTotal,
 	}
 )
 
@@ -247,9 +247,11 @@ func UpdateInflightRequestMetrics(nonmutating, mutating int) {
 	currentInflightRequests.WithLabelValues(MutatingKind).Set(float64(mutating))
 }
 
-// RecordRequestError records the occurrence of a request error during apiserver handling (e.g. timeouts,
-// maxinflight throttling, proxyHandler errors).
-func RecordRequestError(req *http.Request, requestInfo *request.RequestInfo, component string, code int) {
+// RecordRequestTermination records that the request was terminated early as part of a resource
+// preservation or apiserver self-defense mechanism (e.g. timeouts, maxinflight throttling,
+// proxyHandler errors). RecordRequestTermination should only be called zero or one times
+// per request.
+func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInfo, component string, code int) {
 	if requestInfo == nil {
 		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
 	}
@@ -261,9 +263,9 @@ func RecordRequestError(req *http.Request, requestInfo *request.RequestInfo, com
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
 	if requestInfo.IsResourceRequest {
-		requestErrorsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
+		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
-		requestErrorsTotal.WithLabelValues(cleanVerb(verb, req), "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
+		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
 	}
 }
 
