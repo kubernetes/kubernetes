@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"reflect"
 	"sort"
@@ -107,7 +108,7 @@ func TestDeletePods(t *testing.T) {
 		t.Run(test.description, func(t *testing.T) {
 			_, pods := createPods(false)
 			ctx := context.TODO()
-			pendingPods, err := waitForDelete(ctx, pods, test.interval, test.timeout, false, test.getPodFn, nil)
+			pendingPods, err := waitForDelete(ctx, pods, test.interval, test.timeout, false, test.getPodFn, nil, time.Duration(math.MaxInt64))
 
 			if test.expectError {
 				if err == nil {

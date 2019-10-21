@@ -210,7 +210,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 				select {
 				case <-ctx.Done():
 					// return here or we'll leak a goroutine.
-					returnCh <- fmt.Errorf("error when evicting pod %q: global timeout", pod.Name)
+					returnCh <- fmt.Errorf("error when evicting pod %q: global timeout reached: %v", pod.Name, globalTimeout)
 					return
 				default:
 				}
@@ -228,7 +228,7 @@ func (d *Helper) evictPods(pods []corev1.Pod, policyGroupVersion string, getPodF
 					return
 				}
 			}
-			_, err := waitForDelete(ctx, []corev1.Pod{pod}, 1*time.Second, time.Duration(math.MaxInt64), true, getPodFn, d.OnPodDeletedOrEvicted)
+			_, err := waitForDelete(ctx, []corev1.Pod{pod}, 1*time.Second, time.Duration(math.MaxInt64), true, getPodFn, d.OnPodDeletedOrEvicted, globalTimeout)
 			if err == nil {
 				returnCh <- nil
 			} else {
@@ -270,11 +270,11 @@ func (d *Helper) deletePods(pods []corev1.Pod, getPodFn func(namespace, name str
 		}
 	}
 	ctx := context.TODO()
-	_, err := waitForDelete(ctx, pods, 1*time.Second, globalTimeout, false, getPodFn, d.OnPodDeletedOrEvicted)
+	_, err := waitForDelete(ctx, pods, 1*time.Second, globalTimeout, false, getPodFn, d.OnPodDeletedOrEvicted, globalTimeout)
 	return err
 }
 
-func waitForDelete(ctx context.Context, pods []corev1.Pod, interval, timeout time.Duration, usingEviction bool, getPodFn func(string, string) (*corev1.Pod, error), onDoneFn func(pod *corev1.Pod, usingEviction bool)) ([]corev1.Pod, error) {
+func waitForDelete(ctx context.Context, pods []corev1.Pod, interval, timeout time.Duration, usingEviction bool, getPodFn func(string, string) (*corev1.Pod, error), onDoneFn func(pod *corev1.Pod, usingEviction bool), globalTimeout time.Duration) ([]corev1.Pod, error) {
 	err := wait.PollImmediate(interval, timeout, func() (bool, error) {
 		pendingPods := []corev1.Pod{}
 		for i, pod := range pods {
@@ -294,7 +294,7 @@ func waitForDelete(ctx context.Context, pods []corev1.Pod, interval, timeout tim
 		if len(pendingPods) > 0 {
 			select {
 			case <-ctx.Done():
-				return false, fmt.Errorf("global timeout")
+				return false, fmt.Errorf("global timeout reached: %v", globalTimeout)
 			default:
 				return false, nil
 			}
