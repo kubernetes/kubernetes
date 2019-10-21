@@ -29,7 +29,9 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 // NodeScoreList declares a list of nodes and their scores.
@@ -451,14 +453,8 @@ type Framework interface {
 // passed to the plugin factories at the time of plugin initialization. Plugins
 // must store and use this handle to call framework functions.
 type FrameworkHandle interface {
-	// NodeInfoSnapshot return the latest NodeInfo snapshot. The snapshot
-	// is taken at the beginning of a scheduling cycle and remains unchanged until
-	// a pod finishes "Reserve" point. There is no guarantee that the information
-	// remains unchanged in the binding phase of scheduling, so plugins in the binding
-	// cycle(permit/pre-bind/bind/post-bind/un-reserve plugin) should not use it,
-	// otherwise a concurrent read/write error might occur, they should use scheduler
-	// cache instead.
-	NodeInfoSnapshot() *schedulernodeinfo.Snapshot
+	// NodeInfoSnapshot return the latest NodeInfo snapshot.
+	NodeInfoSnapshot() *nodeinfosnapshot.Snapshot
 
 	// IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.
 	IterateOverWaitingPods(callback func(WaitingPod))
@@ -469,5 +465,15 @@ type FrameworkHandle interface {
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface
 
+	// SharedInformerfactory returns the shared informer factory used by the framework.
 	SharedInformerFactory() informers.SharedInformerFactory
+
+	// SharedLister returns scheduler shared lister. It lists objects from the
+	// NodeInfo snapshot. The snapshot is taken at the beginning of a scheduling
+	// cycle and remains unchanged until a pod finishes "Reserve" point.
+	// IMPORTANT: there is no guarantee that the information remains unchanged in the binding phase of
+	// scheduling, so plugins in the binding cycle(permit/pre-bind/bind/post-bind/un-reserve plugin)
+	// should not use it, otherwise a concurrent read/write error might occur, they should use shared informer.
+	// TODO: consider adding a lister for the scheduler cache.
+	SnapshotSharedLister() *listers.SharedLister
 }

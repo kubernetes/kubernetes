@@ -24,7 +24,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,6 +34,8 @@ import (
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -1852,12 +1854,13 @@ func TestServiceAffinity(t *testing.T) {
 	for _, test := range tests {
 		testIt := func(skipPrecompute bool) {
 			t.Run(fmt.Sprintf("%v/skipPrecompute/%v", test.name, skipPrecompute), func(t *testing.T) {
-				nodes := []v1.Node{node1, node2, node3, node4, node5}
+				nodes := []*v1.Node{&node1, &node2, &node3, &node4, &node5}
 				nodeInfo := schedulernodeinfo.NewNodeInfo()
 				nodeInfo.SetNode(test.node)
 				nodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{test.node.Name: nodeInfo}
 				// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
-				predicate, precompute := NewServiceAffinityPredicate(st.FakePodLister(test.pods), st.FakeServiceLister(test.services), FakeNodeListInfo(nodes), test.labels)
+				l := schedulerlisters.NewSharedLister(fakelisters.PodLister(test.pods), fakelisters.NewNodeInfoLister(nodes))
+				predicate, precompute := NewServiceAffinityPredicate(l, fakelisters.ServiceLister(test.services), test.labels)
 				// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
 				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", func(pm *predicateMetadata) {
 					if !skipPrecompute {
@@ -2930,8 +2933,8 @@ func TestInterPodAffinity(t *testing.T) {
 			}
 
 			fit := PodAffinityChecker{
-				info:      FakeNodeInfo(*node),
-				podLister: st.FakePodLister(test.pods),
+				nodeInfoLister: fakelisters.NewNodeInfoLister([]*v1.Node{node}),
+				podLister:      fakelisters.PodLister(test.pods),
 			}
 			nodeInfo := schedulernodeinfo.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(test.node)
@@ -2968,7 +2971,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 	tests := []struct {
 		pod                               *v1.Pod
 		pods                              []*v1.Pod
-		nodes                             []v1.Node
+		nodes                             []*v1.Node
 		nodesExpectAffinityFailureReasons [][]PredicateFailureReason
 		fits                              map[string]bool
 		name                              string
@@ -3000,7 +3003,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			pods: []*v1.Pod{
 				{Spec: v1.PodSpec{NodeName: "machine1"}, ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: podLabelA}},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine2", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelRgIndia}},
@@ -3055,7 +3058,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
 				{Spec: v1.PodSpec{NodeName: "nodeB"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "def"}}},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "h1"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "h2"}}},
 			},
@@ -3108,7 +3111,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				},
 			},
 			pods: []*v1.Pod{{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Name: "p1", Labels: map[string]string{"foo": "bar"}}}},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"zone": "az1", "hostname": "h1"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"zone": "az2", "hostname": "h2"}}},
 			},
@@ -3146,7 +3149,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			pods: []*v1.Pod{
 				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "hostname": "nodeB"}}},
 			},
@@ -3195,7 +3198,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			pods: []*v1.Pod{
 				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "abc", "service": "securityscan"}}},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
@@ -3235,7 +3238,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 			pods: []*v1.Pod{
 				{Spec: v1.PodSpec{NodeName: "nodeA"}, ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"foo": "abc"}}},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
@@ -3298,7 +3301,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
@@ -3379,7 +3382,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: labelRgChina}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: labelRgChinaAzAz1}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: labelRgIndia}},
@@ -3424,7 +3427,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
 			},
@@ -3465,7 +3468,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
 			},
@@ -3528,7 +3531,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
@@ -3589,7 +3592,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
@@ -3642,7 +3645,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
@@ -3696,7 +3699,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
@@ -3748,7 +3751,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
@@ -3803,7 +3806,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
@@ -3889,7 +3892,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeC", Labels: map[string]string{"region": "r1", "zone": "z3", "hostname": "nodeC"}}},
@@ -3946,7 +3949,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeB"}}},
 			},
@@ -4007,7 +4010,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 					},
 				},
 			},
-			nodes: []v1.Node{
+			nodes: []*v1.Node{
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeA", Labels: map[string]string{"region": "r1", "zone": "z1", "hostname": "nodeA"}}},
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
@@ -4027,7 +4030,6 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeListInfo := FakeNodeListInfo(test.nodes)
 			nodeInfoMap := make(map[string]*schedulernodeinfo.NodeInfo)
 			for i, node := range test.nodes {
 				var podsOnNode []*v1.Pod
@@ -4038,14 +4040,14 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				}
 
 				nodeInfo := schedulernodeinfo.NewNodeInfo(podsOnNode...)
-				nodeInfo.SetNode(&test.nodes[i])
+				nodeInfo.SetNode(test.nodes[i])
 				nodeInfoMap[node.Name] = nodeInfo
 			}
 
 			for indexNode, node := range test.nodes {
 				testFit := PodAffinityChecker{
-					info:      nodeListInfo,
-					podLister: st.FakePodLister(test.pods),
+					nodeInfoLister: fakelisters.NewNodeInfoLister(test.nodes),
+					podLister:      fakelisters.PodLister(test.pods),
 				}
 
 				var meta PredicateMetadata
@@ -4060,7 +4062,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				affinity := test.pod.Spec.Affinity
 				if affinity != nil && affinity.NodeAffinity != nil {
 					nodeInfo := schedulernodeinfo.NewNodeInfo()
-					nodeInfo.SetNode(&node)
+					nodeInfo.SetNode(node)
 					nodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{node.Name: nodeInfo}
 					fits2, reasons, err := PodMatchNodeSelector(test.pod, GetPredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
 					if err != nil {
@@ -4592,7 +4594,7 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 }
 
 func TestVolumeZonePredicate(t *testing.T) {
-	pvInfo := FakePersistentVolumeInfo{
+	pvInfo := fakelisters.PersistentVolumeInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
@@ -4604,7 +4606,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 		},
 	}
 
-	pvcInfo := FakePersistentVolumeClaimInfo{
+	pvcInfo := fakelisters.PersistentVolumeClaimInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -4721,7 +4723,7 @@ func TestVolumeZonePredicate(t *testing.T) {
 }
 
 func TestVolumeZonePredicateMultiZone(t *testing.T) {
-	pvInfo := FakePersistentVolumeInfo{
+	pvInfo := fakelisters.PersistentVolumeInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
@@ -4733,7 +4735,7 @@ func TestVolumeZonePredicateMultiZone(t *testing.T) {
 		},
 	}
 
-	pvcInfo := FakePersistentVolumeClaimInfo{
+	pvcInfo := fakelisters.PersistentVolumeClaimInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -4823,7 +4825,7 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 		classImmediate = "Class_Immediate"
 	)
 
-	classInfo := FakeStorageClassInfo{
+	classInfo := fakelisters.StorageClassInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: classImmediate},
 		},
@@ -4833,13 +4835,13 @@ func TestVolumeZonePredicateWithVolumeBinding(t *testing.T) {
 		},
 	}
 
-	pvInfo := FakePersistentVolumeInfo{
+	pvInfo := fakelisters.PersistentVolumeInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 	}
 
-	pvcInfo := FakePersistentVolumeClaimInfo{
+	pvcInfo := fakelisters.PersistentVolumeClaimInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},

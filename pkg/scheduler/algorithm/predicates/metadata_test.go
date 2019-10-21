@@ -25,6 +25,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
@@ -350,16 +352,13 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			allPodLister := st.FakePodLister(append(test.existingPods, test.addedPod))
+			allPodLister := fakelisters.PodLister(append(test.existingPods, test.addedPod))
+
 			// getMeta creates predicate meta data given the list of pods.
-			getMeta := func(lister st.FakePodLister) (*predicateMetadata, map[string]*schedulernodeinfo.NodeInfo) {
-				nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(lister, test.nodes)
-				// nodeList is a list of non-pointer nodes to feed to FakeNodeListInfo.
-				nodeList := []v1.Node{}
-				for _, n := range test.nodes {
-					nodeList = append(nodeList, *n)
-				}
-				_, precompute := NewServiceAffinityPredicate(lister, st.FakeServiceLister(test.services), FakeNodeListInfo(nodeList), nil)
+			getMeta := func(podLister fakelisters.PodLister) (*predicateMetadata, map[string]*schedulernodeinfo.NodeInfo) {
+				nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(podLister, test.nodes)
+				l := schedulerlisters.NewSharedLister(podLister, fakelisters.NewNodeInfoLister(test.nodes))
+				_, precompute := NewServiceAffinityPredicate(l, fakelisters.ServiceLister(test.services), nil)
 				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", precompute)
 				meta := GetPredicateMetadata(test.pendingPod, nodeInfoMap)
 				return meta.(*predicateMetadata), nodeInfoMap
@@ -369,7 +368,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 			// are given to the metadata producer.
 			allPodsMeta, _ := getMeta(allPodLister)
 			// existingPodsMeta1 is meta data produced for test.existingPods (without test.addedPod).
-			existingPodsMeta1, nodeInfoMap := getMeta(st.FakePodLister(test.existingPods))
+			existingPodsMeta1, nodeInfoMap := getMeta(fakelisters.PodLister(test.existingPods))
 			// Add test.addedPod to existingPodsMeta1 and make sure meta is equal to allPodsMeta
 			nodeInfo := nodeInfoMap[test.addedPod.Spec.NodeName]
 			if err := existingPodsMeta1.AddPod(test.addedPod, nodeInfo.Node()); err != nil {
@@ -380,7 +379,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 			}
 			// Remove the added pod and from existingPodsMeta1 an make sure it is equal
 			// to meta generated for existing pods.
-			existingPodsMeta2, _ := getMeta(st.FakePodLister(test.existingPods))
+			existingPodsMeta2, _ := getMeta(fakelisters.PodLister(test.existingPods))
 			if err := existingPodsMeta1.RemovePod(test.addedPod, nil); err != nil {
 				t.Errorf("error removing pod from meta: %v", err)
 			}

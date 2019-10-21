@@ -20,8 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -54,8 +54,8 @@ func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.Cy
 }
 
 // New initializes a new plugin and returns it.
-func New(nodeInfo predicates.NodeInfo, podLister algorithm.PodLister) framework.Plugin {
+func New(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
 	return &InterPodAffinity{
-		predicate: predicates.NewPodAffinityPredicate(nodeInfo, podLister),
-	}
+		predicate: predicates.NewPodAffinityPredicate(h.SnapshotSharedLister()),
+	}, nil
 }

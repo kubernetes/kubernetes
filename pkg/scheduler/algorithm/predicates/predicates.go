@@ -46,6 +46,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -162,11 +163,6 @@ func Ordering() []string {
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
 type FitPredicate func(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error)
-
-// NodeInfo interface represents anything that can get node object from node name.
-type NodeInfo interface {
-	GetNodeInfo(nodeName string) (*v1.Node, error)
-}
 
 // CSINodeInfo interface represents anything that can get CSINode object from node name.
 type CSINodeInfo interface {
@@ -1062,10 +1058,10 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *v1.Pod, meta PredicateMet
 
 // ServiceAffinity defines a struct used for creating service affinity predicates.
 type ServiceAffinity struct {
-	podLister     algorithm.PodLister
-	serviceLister corelisters.ServiceLister
-	nodeInfo      NodeInfo
-	labels        []string
+	nodeInfoLister schedulerlisters.NodeInfoLister
+	podLister      schedulerlisters.PodLister
+	serviceLister  corelisters.ServiceLister
+	labels         []string
 }
 
 // serviceAffinityMetadataProducer should be run once by the scheduler before looping through the Predicate.  It is a helper function that
@@ -1095,12 +1091,12 @@ func (s *ServiceAffinity) serviceAffinityMetadataProducer(pm *predicateMetadata)
 }
 
 // NewServiceAffinityPredicate creates a ServiceAffinity.
-func NewServiceAffinityPredicate(podLister algorithm.PodLister, serviceLister corelisters.ServiceLister, nodeInfo NodeInfo, labels []string) (FitPredicate, predicateMetadataProducer) {
+func NewServiceAffinityPredicate(sharedLister *schedulerlisters.SharedLister, serviceLister corelisters.ServiceLister, labels []string) (FitPredicate, predicateMetadataProducer) {
 	affinity := &ServiceAffinity{
-		podLister:     podLister,
-		serviceLister: serviceLister,
-		nodeInfo:      nodeInfo,
-		labels:        labels,
+		nodeInfoLister: sharedLister.NodeInfos(),
+		podLister:      sharedLister.Pods(),
+		serviceLister:  serviceLister,
+		labels:         labels,
 	}
 	return affinity.checkServiceAffinity, affinity.serviceAffinityMetadataProducer
 }
@@ -1155,11 +1151,11 @@ func (s *ServiceAffinity) checkServiceAffinity(pod *v1.Pod, meta PredicateMetada
 	if len(s.labels) > len(affinityLabels) {
 		if len(services) > 0 {
 			if len(filteredPods) > 0 {
-				nodeWithAffinityLabels, err := s.nodeInfo.GetNodeInfo(filteredPods[0].Spec.NodeName)
+				nodeWithAffinityLabels, err := s.nodeInfoLister.Get(filteredPods[0].Spec.NodeName)
 				if err != nil {
 					return false, nil, err
 				}
-				AddUnsetLabelsToMap(affinityLabels, s.labels, labels.Set(nodeWithAffinityLabels.Labels))
+				AddUnsetLabelsToMap(affinityLabels, s.labels, labels.Set(nodeWithAffinityLabels.Node().Labels))
 			}
 		}
 	}
@@ -1263,15 +1259,15 @@ func EssentialPredicates(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedule
 
 // PodAffinityChecker contains information to check pod affinity.
 type PodAffinityChecker struct {
-	info      NodeInfo
-	podLister algorithm.PodLister
+	nodeInfoLister schedulerlisters.NodeInfoLister
+	podLister      schedulerlisters.PodLister
 }
 
 // NewPodAffinityPredicate creates a PodAffinityChecker.
-func NewPodAffinityPredicate(info NodeInfo, podLister algorithm.PodLister) FitPredicate {
+func NewPodAffinityPredicate(sharedLister *schedulerlisters.SharedLister) FitPredicate {
 	checker := &PodAffinityChecker{
-		info:      info,
-		podLister: podLister,
+		nodeInfoLister: sharedLister.NodeInfos(),
+		podLister:      sharedLister.Pods(),
 	}
 	return checker.InterPodAffinityMatches
 }
@@ -1325,7 +1321,7 @@ func (c *PodAffinityChecker) podMatchesPodAffinityTerms(pod, targetPod *v1.Pod, 
 		return false, false, nil
 	}
 	// Namespace and selector of the terms have matched. Now we check topology of the terms.
-	targetPodNode, err := c.info.GetNodeInfo(targetPod.Spec.NodeName)
+	targetPodNodeInfo, err := c.nodeInfoLister.Get(targetPod.Spec.NodeName)
 	if err != nil {
 		return false, false, err
 	}
@@ -1333,7 +1329,7 @@ func (c *PodAffinityChecker) podMatchesPodAffinityTerms(pod, targetPod *v1.Pod, 
 		if len(term.TopologyKey) == 0 {
 			return false, false, fmt.Errorf("empty topologyKey is not allowed except for PreferredDuringScheduling pod anti-affinity")
 		}
-		if !priorityutil.NodesHaveSameTopologyKey(nodeInfo.Node(), targetPodNode, term.TopologyKey) {
+		if !priorityutil.NodesHaveSameTopologyKey(nodeInfo.Node(), targetPodNodeInfo.Node(), term.TopologyKey) {
 			return false, true, nil
 		}
 	}
@@ -1398,7 +1394,7 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairsOfPods(pod *v1.
 	topologyMaps := newTopologyPairsMaps()
 
 	for _, existingPod := range existingPods {
-		existingPodNode, err := c.info.GetNodeInfo(existingPod.Spec.NodeName)
+		existingPodNodeInfo, err := c.nodeInfoLister.Get(existingPod.Spec.NodeName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				klog.Errorf("Pod %s has NodeName %q but node is not found",
@@ -1407,7 +1403,7 @@ func (c *PodAffinityChecker) getMatchingAntiAffinityTopologyPairsOfPods(pod *v1.
 			}
 			return nil, err
 		}
-		existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, existingPodNode)
+		existingPodTopologyMaps, err := getMatchingAntiAffinityTopologyPairsOfPod(pod, existingPod, existingPodNodeInfo.Node())
 		if err != nil {
 			return nil, err
 		}

@@ -31,8 +31,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -57,7 +59,7 @@ const (
 // plugins.
 type framework struct {
 	registry              Registry
-	nodeInfoSnapshot      *schedulernodeinfo.Snapshot
+	nodeInfoSnapshot      *nodeinfosnapshot.Snapshot
 	waitingPods           *waitingPodsMap
 	pluginNameToWeightMap map[string]int
 	queueSortPlugins      []QueueSortPlugin
@@ -104,8 +106,9 @@ func (f *framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint
 }
 
 type frameworkOptions struct {
-	clientSet       clientset.Interface
-	informerFactory informers.SharedInformerFactory
+	clientSet        clientset.Interface
+	informerFactory  informers.SharedInformerFactory
+	nodeInfoSnapshot *nodeinfosnapshot.Snapshot
 }
 
 // Option for the framework.
@@ -125,7 +128,16 @@ func WithInformerFactory(informerFactory informers.SharedInformerFactory) Option
 	}
 }
 
-var defaultFrameworkOptions = frameworkOptions{}
+// WithNodeInfoSnapshot sets the NodeInfo Snapshot.
+func WithNodeInfoSnapshot(nodeInfoSnapshot *nodeinfosnapshot.Snapshot) Option {
+	return func(o *frameworkOptions) {
+		o.nodeInfoSnapshot = nodeInfoSnapshot
+	}
+}
+
+var defaultFrameworkOptions = frameworkOptions{
+	nodeInfoSnapshot: nodeinfosnapshot.NewSnapshot(),
+}
 
 var _ Framework = &framework{}
 
@@ -138,7 +150,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 
 	f := &framework{
 		registry:              r,
-		nodeInfoSnapshot:      schedulernodeinfo.NewSnapshot(),
+		nodeInfoSnapshot:      options.nodeInfoSnapshot,
 		pluginNameToWeightMap: make(map[string]int),
 		waitingPods:           newWaitingPodsMap(),
 		clientSet:             options.clientSet,
@@ -594,7 +606,7 @@ func (f *framework) RunPermitPlugins(
 // is taken at the beginning of a scheduling cycle and remains unchanged until a
 // pod finishes "Reserve". There is no guarantee that the information remains
 // unchanged after "Reserve".
-func (f *framework) NodeInfoSnapshot() *schedulernodeinfo.Snapshot {
+func (f *framework) NodeInfoSnapshot() *nodeinfosnapshot.Snapshot {
 	return f.nodeInfoSnapshot
 }
 
@@ -649,6 +661,11 @@ func (f *framework) ClientSet() clientset.Interface {
 // SharedInformerFactory returns a shared informer factory.
 func (f *framework) SharedInformerFactory() informers.SharedInformerFactory {
 	return f.informerFactory
+}
+
+// SnapshotSharedLister returns the snapshot's scheduler lister.
+func (f *framework) SnapshotSharedLister() *listers.SharedLister {
+	return f.nodeInfoSnapshot.SharedLister
 }
 
 func (f *framework) pluginsNeeded(plugins *config.Plugins) map[string]config.Plugin {

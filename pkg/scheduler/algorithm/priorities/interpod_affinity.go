@@ -24,9 +24,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 
@@ -35,16 +35,16 @@ import (
 
 // InterPodAffinity contains information to calculate inter pod affinity.
 type InterPodAffinity struct {
-	info                  predicates.NodeInfo
+	nodeInfoLister        schedulerlisters.NodeInfoLister
 	hardPodAffinityWeight int32
 }
 
 // NewInterPodAffinityPriority creates an InterPodAffinity.
 func NewInterPodAffinityPriority(
-	info predicates.NodeInfo,
+	nodeInfoLister schedulerlisters.NodeInfoLister,
 	hardPodAffinityWeight int32) PriorityFunction {
 	interPodAffinity := &InterPodAffinity{
-		info:                  info,
+		nodeInfoLister:        nodeInfoLister,
 		hardPodAffinityWeight: hardPodAffinityWeight,
 	}
 	return interPodAffinity.CalculateInterPodAffinityPriority
@@ -112,7 +112,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	var maxCount, minCount int64
 
 	processPod := func(existingPod *v1.Pod) error {
-		existingPodNode, err := ipa.info.GetNodeInfo(existingPod.Spec.NodeName)
+		existingPodNodeInfo, err := ipa.nodeInfoLister.Get(existingPod.Spec.NodeName)
 		if err != nil {
 			if apierrors.IsNotFound(err) {
 				klog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
@@ -123,6 +123,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 		existingPodAffinity := existingPod.Spec.Affinity
 		existingHasAffinityConstraints := existingPodAffinity != nil && existingPodAffinity.PodAffinity != nil
 		existingHasAntiAffinityConstraints := existingPodAffinity != nil && existingPodAffinity.PodAntiAffinity != nil
+		existingPodNode := existingPodNodeInfo.Node()
 
 		if hasAffinityConstraints {
 			// For every soft pod affinity term of <pod>, if <existingPod> matches the term,

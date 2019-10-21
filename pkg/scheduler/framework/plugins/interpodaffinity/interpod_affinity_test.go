@@ -21,13 +21,14 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 var (
@@ -35,6 +36,20 @@ var (
 	unschedulable                = framework.NewStatus(framework.Unschedulable, predicates.ErrPodAffinityNotMatch.GetReason())
 	unschedulableAndUnresolvable = framework.NewStatus(framework.UnschedulableAndUnresolvable, predicates.ErrPodAffinityRulesNotMatch.GetReason())
 )
+
+func makeInterPodAffinity(pods []*v1.Pod, nodes []*v1.Node) *InterPodAffinity {
+	nodeInfoList := make([]*schedulernodeinfo.NodeInfo, len(nodes))
+	for _, node := range nodes {
+		nodeInfo := schedulernodeinfo.NewNodeInfo()
+		nodeInfo.SetNode(node)
+		nodeInfoList = append(nodeInfoList, nodeInfo)
+	}
+
+	l := schedulerlisters.NewSharedLister(fakelisters.PodLister(pods), fakelisters.NodeInfoLister(nodeInfoList))
+	return &InterPodAffinity{
+		predicate: predicates.NewPodAffinityPredicate(l),
+	}
+}
 
 func createPodWithAffinityTerms(namespace, nodeName string, labels map[string]string, affinity, antiAffinity []v1.PodAffinityTerm) *v1.Pod {
 	return &v1.Pod{
@@ -739,8 +754,8 @@ func TestSingleNode(t *testing.T) {
 			state := framework.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
-			p := New(predicates.FakeNodeInfo(*node), st.FakePodLister(test.pods))
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, nodeInfoMap[node.Name])
+			p := makeInterPodAffinity(test.pods, []*v1.Node{node})
+			gotStatus := p.Filter(context.Background(), state, test.pod, nodeInfoMap[node.Name])
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -1432,19 +1447,14 @@ func TestMultipleNodes(t *testing.T) {
 
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeList := make([]v1.Node, len(test.nodes))
-			for _, node := range test.nodes {
-				nodeList = append(nodeList, *node)
-			}
-			nodeListInfo := predicates.FakeNodeListInfo(nodeList)
 			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
 			for indexNode, node := range test.nodes {
 				meta := predicates.GetPredicateMetadata(test.pod, nodeInfoMap)
 				state := framework.NewCycleState()
 				state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
-				p := New(nodeListInfo, st.FakePodLister(test.pods))
-				gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, nodeInfoMap[node.Name])
+				p := makeInterPodAffinity(test.pods, test.nodes)
+				gotStatus := p.Filter(context.Background(), state, test.pod, nodeInfoMap[node.Name])
 				if !reflect.DeepEqual(gotStatus, test.wantStatuses[indexNode]) {
 					t.Errorf("index: %d status does not match: %v, want: %v", indexTest, gotStatus, test.wantStatuses[indexNode])
 				}

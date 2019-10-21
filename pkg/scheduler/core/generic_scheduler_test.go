@@ -47,8 +47,9 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 var (
@@ -657,7 +658,7 @@ func TestGenericScheduler(t *testing.T) {
 			pvcs := []*v1.PersistentVolumeClaim{}
 			pvcs = append(pvcs, test.pvcs...)
 
-			pvcLister := schedulertesting.FakePersistentVolumeClaimLister(pvcs)
+			pvcLister := fakelisters.PersistentVolumeClaimLister(pvcs)
 
 			predMetaProducer := algorithmpredicates.EmptyPredicateMetadataProducer
 			if test.buildPredMeta {
@@ -1427,7 +1428,8 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				nodes = append(nodes, node)
 			}
 			if test.addAffinityPredicate {
-				test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(FakeNodeInfo(*nodes[0]), schedulertesting.FakePodLister(test.pods))
+				l := schedulerlisters.NewSharedLister(fakelisters.PodLister(test.pods), fakelisters.NewNodeInfoLister([]*v1.Node{nodes[0]}))
+				test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(l)
 			}
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, nodes)
 			// newnode simulate a case that a new node is added to the cluster, but nodeNameToInfo

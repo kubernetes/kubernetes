@@ -27,11 +27,11 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	policylisters "k8s.io/client-go/listers/policy/v1beta1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 
 	"k8s.io/klog"
@@ -39,13 +39,12 @@ import (
 
 // PluginFactoryArgs are passed to all plugin factory functions.
 type PluginFactoryArgs struct {
-	PodLister                      algorithm.PodLister
+	SchedulerSharedLister          *schedulerlisters.SharedLister
 	ServiceLister                  corelisters.ServiceLister
 	ControllerLister               corelisters.ReplicationControllerLister
 	ReplicaSetLister               appslisters.ReplicaSetLister
 	StatefulSetLister              appslisters.StatefulSetLister
 	PDBLister                      policylisters.PodDisruptionBudgetLister
-	NodeInfo                       predicates.NodeInfo
 	CSINodeInfo                    predicates.CSINodeInfo
 	PVInfo                         predicates.PersistentVolumeInfo
 	PVCInfo                        predicates.PersistentVolumeClaimInfo
@@ -268,9 +267,8 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 		if policy.Argument.ServiceAffinity != nil {
 			predicateFactory = func(args PluginFactoryArgs) predicates.FitPredicate {
 				predicate, precomputationFunction := predicates.NewServiceAffinityPredicate(
-					args.PodLister,
+					args.SchedulerSharedLister,
 					args.ServiceLister,
-					args.NodeInfo,
 					policy.Argument.ServiceAffinity.Labels,
 				)
 
@@ -371,7 +369,7 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 			pcf = &PriorityConfigFactory{
 				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 					return priorities.NewServiceAntiAffinityPriority(
-						args.PodLister,
+						args.SchedulerSharedLister.Pods(),
 						args.ServiceLister,
 						policy.Argument.ServiceAntiAffinity.Label,
 					)

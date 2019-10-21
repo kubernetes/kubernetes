@@ -57,6 +57,7 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	cachedebugger "k8s.io/kubernetes/pkg/scheduler/internal/cache/debugger"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
@@ -181,6 +182,7 @@ type Configurator struct {
 	plugins                      *config.Plugins
 	pluginConfig                 []config.PluginConfig
 	pluginConfigProducerRegistry *plugins.ConfigProducerRegistry
+	nodeInfoSnapshot             *nodeinfosnapshot.Snapshot
 }
 
 // ConfigFactoryArgs is a set arguments passed to NewConfigFactory.
@@ -260,6 +262,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 		plugins:                        args.Plugins,
 		pluginConfig:                   args.PluginConfig,
 		pluginConfigProducerRegistry:   args.PluginConfigProducerRegistry,
+		nodeInfoSnapshot:               nodeinfosnapshot.NewSnapshot(),
 	}
 	c.scheduledPodsHasSynced = args.PodInformer.Informer().HasSynced
 
@@ -409,6 +412,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		pluginConfig,
 		framework.WithClientSet(c.client),
 		framework.WithInformerFactory(c.informerFactory),
+		framework.WithNodeInfoSnapshot(c.nodeInfoSnapshot),
 	)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
@@ -587,14 +591,12 @@ func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[strin
 
 func (c *Configurator) getAlgorithmArgs() (*PluginFactoryArgs, *plugins.ConfigProducerArgs) {
 	return &PluginFactoryArgs{
-		PodLister:                      c.schedulerCache,
+		SchedulerSharedLister:          c.nodeInfoSnapshot.SharedLister,
 		ServiceLister:                  c.serviceLister,
 		ControllerLister:               c.controllerLister,
 		ReplicaSetLister:               c.replicaSetLister,
 		StatefulSetLister:              c.statefulSetLister,
 		PDBLister:                      c.pdbLister,
-		NodeInfo:                       c.schedulerCache,
-		CSINodeInfo:                    &predicates.CachedCSINodeInfo{CSINodeLister: c.csiNodeLister},
 		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: c.pVLister},
 		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: c.pVCLister},
 		StorageClassInfo:               &predicates.CachedStorageClassInfo{StorageClassLister: c.storageClassLister},
