@@ -800,9 +800,10 @@ func TestGetPodPriority(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		if GetPodPriority(test.pod) != test.expectedPriority {
-			t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
-		}
-
+		t.Run(test.name, func(t *testing.T) {
+			if GetPodPriority(test.pod) != test.expectedPriority {
+				t.Errorf("expected pod priority: %v, got %v", test.expectedPriority, GetPodPriority(test.pod))
+			}
+		})
 	}
 }

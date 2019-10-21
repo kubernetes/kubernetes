@@ -26,18 +26,21 @@ import (
 
 func TestCopyAndReplace(t *testing.T) {
 	testCases := []struct {
+		name        string
 		set         sets.String
 		replaceWhat string
 		replaceWith string
 		expected    sets.String
 	}{
 		{
+			name:        "replace existing item",
 			set:         sets.String{"A": sets.Empty{}, "B": sets.Empty{}},
 			replaceWhat: "A",
 			replaceWith: "C",
 			expected:    sets.String{"B": sets.Empty{}, "C": sets.Empty{}},
 		},
 		{
+			name:        "replace nonexistent item",
 			set:         sets.String{"A": sets.Empty{}, "B": sets.Empty{}},
 			replaceWhat: "D",
 			replaceWith: "C",
@@ -45,10 +48,12 @@ func TestCopyAndReplace(t *testing.T) {
 		},
 	}
 	for _, testCase := range testCases {
-		result := copyAndReplace(testCase.set, testCase.replaceWhat, testCase.replaceWith)
-		if !result.Equal(testCase.expected) {
-			t.Errorf("expected %v got %v", testCase.expected, result)
-		}
+		t.Run(testCase.name, func(t *testing.T) {
+			result := copyAndReplace(testCase.set, testCase.replaceWhat, testCase.replaceWith)
+			if !result.Equal(testCase.expected) {
+				t.Errorf("expected %v got %v", testCase.expected, result)
+			}
+		})
 	}
 }
 

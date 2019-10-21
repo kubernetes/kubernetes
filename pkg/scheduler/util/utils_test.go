@@ -135,11 +135,13 @@ func TestGetContainerPorts(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		result := GetContainerPorts(test.pod1, test.pod2)
-		if !reflect.DeepEqual(test.expected, result) {
-			t.Errorf("Got different result than expected.\nDifference detected on:\n%s", diff.ObjectGoPrintSideBySide(test.expected, result))
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case%v", i), func(t *testing.T) {
+			result := GetContainerPorts(test.pod1, test.pod2)
+			if !reflect.DeepEqual(test.expected, result) {
+				t.Errorf("Got different result than expected.\nDifference detected on:\n%s", diff.ObjectGoPrintSideBySide(test.expected, result))
+			}
+		})
 	}
 }
 

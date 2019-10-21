@@ -33,14 +33,17 @@ import (
 
 func TestNewResource(t *testing.T) {
 	tests := []struct {
+		name         string
 		resourceList v1.ResourceList
 		expected     *Resource
 	}{
 		{
+			name:         "empty resource set",
 			resourceList: map[v1.ResourceName]resource.Quantity{},
 			expected:     &Resource{},
 		},
 		{
+			name: "has resources set",
 			resourceList: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:                      *resource.NewScaledQuantity(4, -3),
 				v1.ResourceMemory:                   *resource.NewQuantity(2000, resource.BinarySI),
@@ -60,19 +63,23 @@ func TestNewResource(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		r := NewResource(test.resourceList)
-		if !reflect.DeepEqual(test.expected, r) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, r)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			r := NewResource(test.resourceList)
+			if !reflect.DeepEqual(test.expected, r) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, r)
+			}
+		})
 	}
 }
 
 func TestResourceList(t *testing.T) {
 	tests := []struct {
+		name     string
 		resource *Resource
 		expected v1.ResourceList
 	}{
 		{
+			name:     "empty resource list",
 			resource: &Resource{},
 			expected: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:              *resource.NewScaledQuantity(0, -3),
@@ -82,6 +89,7 @@ func TestResourceList(t *testing.T) {
 			},
 		},
 		{
+			name: "has resource list set",
 			resource: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
@@ -106,23 +114,28 @@ func TestResourceList(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		rl := test.resource.ResourceList()
-		if !reflect.DeepEqual(test.expected, rl) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, rl)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			rl := test.resource.ResourceList()
+			if !reflect.DeepEqual(test.expected, rl) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, rl)
+			}
+		})
 	}
 }
 
 func TestResourceClone(t *testing.T) {
 	tests := []struct {
+		name     string
 		resource *Resource
 		expected *Resource
 	}{
 		{
+			name:     "no resource to clone",
 			resource: &Resource{},
 			expected: &Resource{},
 		},
 		{
+			name: "has resource to clone",
 			resource: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
@@ -141,23 +154,27 @@ func TestResourceClone(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		r := test.resource.Clone()
-		// Modify the field to check if the result is a clone of the origin one.
-		test.resource.MilliCPU += 1000
-		if !reflect.DeepEqual(test.expected, r) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, r)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			r := test.resource.Clone()
+			// Modify the field to check if the result is a clone of the origin one.
+			test.resource.MilliCPU += 1000
+			if !reflect.DeepEqual(test.expected, r) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, r)
+			}
+		})
 	}
 }
 
 func TestResourceAddScalar(t *testing.T) {
 	tests := []struct {
+		name           string
 		resource       *Resource
 		scalarName     v1.ResourceName
 		scalarQuantity int64
 		expected       *Resource
 	}{
 		{
+			name:           "add scalar value to empty set",
 			resource:       &Resource{},
 			scalarName:     "scalar1",
 			scalarQuantity: 100,
@@ -166,6 +183,7 @@ func TestResourceAddScalar(t *testing.T) {
 			},
 		},
 		{
+			name: "add scalar value to existing set",
 			resource: &Resource{
 				MilliCPU:         4,
 				Memory:           2000,
@@ -186,20 +204,24 @@ func TestResourceAddScalar(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test.resource.AddScalar(test.scalarName, test.scalarQuantity)
-		if !reflect.DeepEqual(test.expected, test.resource) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			test.resource.AddScalar(test.scalarName, test.scalarQuantity)
+			if !reflect.DeepEqual(test.expected, test.resource) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
+			}
+		})
 	}
 }
 
 func TestSetMaxResource(t *testing.T) {
 	tests := []struct {
+		name         string
 		resource     *Resource
 		resourceList v1.ResourceList
 		expected     *Resource
 	}{
 		{
+			name:     "set max for empty resource",
 			resource: &Resource{},
 			resourceList: map[v1.ResourceName]resource.Quantity{
 				v1.ResourceCPU:              *resource.NewScaledQuantity(4, -3),
@@ -213,6 +235,7 @@ func TestSetMaxResource(t *testing.T) {
 			},
 		},
 		{
+			name: "set max for non-empty resource",
 			resource: &Resource{
 				MilliCPU:         4,
 				Memory:           4000,
@@ -236,10 +259,12 @@ func TestSetMaxResource(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test.resource.SetMaxResource(test.resourceList)
-		if !reflect.DeepEqual(test.expected, test.resource) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			test.resource.SetMaxResource(test.resourceList)
+			if !reflect.DeepEqual(test.expected, test.resource) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, test.resource)
+			}
+		})
 	}
 }
 
@@ -531,14 +556,16 @@ func TestNodeInfoClone(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		ni := test.nodeInfo.Clone()
-		// Modify the field to check if the result is a clone of the origin one.
-		test.nodeInfo.generation += 10
-		test.nodeInfo.usedPorts.Remove("127.0.0.1", "TCP", 80)
-		if !reflect.DeepEqual(test.expected, ni) {
-			t.Errorf("expected: %#v, got: %#v", test.expected, ni)
-		}
+	for i, test := range tests {
+		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+			ni := test.nodeInfo.Clone()
+			// Modify the field to check if the result is a clone of the origin one.
+			test.nodeInfo.generation += 10
+			test.nodeInfo.usedPorts.Remove("127.0.0.1", "TCP", 80)
+			if !reflect.DeepEqual(test.expected, ni) {
+				t.Errorf("expected: %#v, got: %#v", test.expected, ni)
+			}
+		})
 	}
 }
 
@@ -941,29 +968,32 @@ func TestNodeInfoRemovePod(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		ni := fakeNodeInfo(pods...)
+		name := fmt.Sprintf("node: %s, pod: %s", test.pod.Spec.NodeName, test.pod.GetName())
+		t.Run(name, func(t *testing.T) {
+			ni := fakeNodeInfo(pods...)
 
-		gen := ni.generation
-		err := ni.RemovePod(test.pod)
-		if err != nil {
-			if test.errExpected {
-				expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.Node().Name)
-				if expectedErrorMsg == err {
-					t.Errorf("expected error: %v, got: %v", expectedErrorMsg, err)
+			gen := ni.generation
+			err := ni.RemovePod(test.pod)
+			if err != nil {
+				if test.errExpected {
+					expectedErrorMsg := fmt.Errorf("no corresponding pod %s in pods of node %s", test.pod.Name, ni.Node().Name)
+					if expectedErrorMsg == err {
+						t.Errorf("expected error: %v, got: %v", expectedErrorMsg, err)
+					}
+				} else {
+					t.Errorf("expected no error, got: %v", err)
 				}
 			} else {
-				t.Errorf("expected no error, got: %v", err)
+				if ni.generation <= gen {
+					t.Errorf("generation is not incremented. Prev: %v, current: %v", gen, ni.generation)
+				}
 			}
-		} else {
-			if ni.generation <= gen {
-				t.Errorf("generation is not incremented. Prev: %v, current: %v", gen, ni.generation)
-			}
-		}
 
-		test.expectedNodeInfo.generation = ni.generation
-		if !reflect.DeepEqual(test.expectedNodeInfo, ni) {
-			t.Errorf("expected: %#v, got: %#v", test.expectedNodeInfo, ni)
-		}
+			test.expectedNodeInfo.generation = ni.generation
+			if !reflect.DeepEqual(test.expectedNodeInfo, ni) {
+				t.Errorf("expected: %#v, got: %#v", test.expectedNodeInfo, ni)
+			}
+		})
 	}
 }
 
