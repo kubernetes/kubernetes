@@ -326,6 +326,11 @@ type Cacher struct {
 	watchersToStop []*cacheWatcher
 	// Maintain a timeout queue to send the bookmark event before the watcher times out.
 	bookmarkWatchers *watcherBookmarkTimeBuckets
+
+	// Metrics
+	eventsCounterMetric          metrics.CounterMetric
+	eventsSentLatencyMetric      metrics.ObserverMetric
+	incommingChannelLengthMetric metrics.GaugeMetric
 }
 
 // NewCacherFromConfig creates a new Cacher responsible for servicing WATCH and LIST requests from
@@ -383,6 +388,12 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 		timer:            time.NewTimer(time.Duration(0)),
 		bookmarkWatchers: newTimeBucketWatchers(clock),
 	}
+
+	// Cache metrics
+	metricLabelValue := cacher.objectType.String()
+	cacher.eventsCounterMetric = cacherEventsCounter.WithLabelValues(metricLabelValue)
+	cacher.eventsSentLatencyMetric = cacherEventsSentLatency.WithLabelValues(metricLabelValue)
+	cacher.incommingChannelLengthMetric = cacherWatcherChannelLength.WithLabelValues(metricLabelValue, "incoming")
 
 	// Ensure that timer is stopped.
 	if !cacher.timer.Stop() {
@@ -806,7 +817,7 @@ func (c *Cacher) processEvent(event *watchCacheEvent) {
 		// Monitor if this gets backed up, and how much.
 		klog.V(1).Infof("cacher (%v): %v objects queued in incoming channel.", c.objectType.String(), curLen)
 	}
-	cacherWatcherChannelLength.WithLabelValues(c.objectType.String(), "incoming").Set(float64(len(c.incoming)))
+	c.incommingChannelLengthMetric.Set(float64(len(c.incoming)))
 	c.incoming <- *event
 }
 
@@ -816,7 +827,6 @@ func (c *Cacher) dispatchEvents() {
 	defer bookmarkTimer.Stop()
 
 	lastProcessedResourceVersion := uint64(0)
-	metricLabelValue := c.objectType.String()
 	for {
 		select {
 		case event, ok := <-c.incoming:
@@ -824,9 +834,9 @@ func (c *Cacher) dispatchEvents() {
 				return
 			}
 			now := c.clock.Now()
-			cacherEventsCounter.WithLabelValues(metricLabelValue).Inc()
+			c.eventsCounterMetric.Inc()
 			c.dispatchEvent(&event)
-			cacherEventsSentLatency.WithLabelValues(metricLabelValue).Observe(float64(c.clock.Since(now)/time.Microsecond) / 1000.0)
+			c.eventsSentLatencyMetric.Observe(float64(c.clock.Since(now)/time.Microsecond) / 1000.0)
 
 			lastProcessedResourceVersion = event.ResourceVersion
 		case <-bookmarkTimer.C():

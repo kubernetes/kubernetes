@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3/metrics"
 	"k8s.io/apiserver/pkg/storage/value"
+	compbasemetrics "k8s.io/component-base/metrics"
 
 	"github.com/coreos/etcd/clientv3"
 	"k8s.io/klog"
@@ -86,6 +87,10 @@ type watchChan struct {
 	incomingEventChan chan *event
 	resultChan        chan watch.Event
 	errChan           chan error
+
+	// Metrics
+	eventsCounterMetric     compbasemetrics.CounterMetric
+	eventsSentLatencyMetric compbasemetrics.ObserverMetric
 }
 
 func newWatcher(client *clientv3.Client, codec runtime.Codec, versioner storage.Versioner, transformer value.Transformer) *watcher {
@@ -123,6 +128,10 @@ func (w *watcher) createWatchChan(ctx context.Context, key string, rev int64, re
 		incomingEventChan: make(chan *event, incomingBufSize),
 		resultChan:        make(chan watch.Event, outgoingBufSize),
 		errChan:           make(chan error, 1),
+
+		// Metrics
+		eventsCounterMetric:     metrics.NewEtcdWatcherEventCountMetric(key),
+		eventsSentLatencyMetric: metrics.NewEtcdWatcherEventLatencyMetric(key),
 	}
 	if pred.Empty() {
 		// The filter doesn't filter out any object.
@@ -217,10 +226,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 			wc.sendError(err)
 			return
 		}
-		metrics.RecordEtcdWatcherChannelLength(wc.key, "incomingEventChan", len(wc.incomingEventChan))
-		metrics.RecordEtcdWatcherChannelLength(wc.key, "resultChan", len(wc.resultChan))
-		metrics.RecordEtcdWatcherChannelLength(wc.key, "errChan", len(wc.errChan))
-		metrics.RecordEtcdWatcherEventCount(wc.key, len(wres.Events))
+		wc.eventsCounterMetric.Add(float64(len(wres.Events)))
 
 		now := time.Now()
 		for _, e := range wres.Events {
@@ -232,7 +238,7 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 			}
 			wc.sendEvent(parsedEvent)
 		}
-		metrics.RecordEtcdWatcherEventLatency(wc.key, time.Since(now))
+		wc.eventsSentLatencyMetric.Observe(float64(time.Since(now)/time.Microsecond) / 1000)
 	}
 	// When we come to this point, it's only possible that client side ends the watch.
 	// e.g. cancel the context, close the client.
