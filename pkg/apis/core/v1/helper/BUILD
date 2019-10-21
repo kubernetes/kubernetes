@@ -32,7 +32,6 @@ go_library(
         "//staging/src/k8s.io/apimachinery/pkg/labels:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/selection:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/validation:go_default_library",
-        "//vendor/github.com/docker/go-units:go_default_library",
     ],
 )
 

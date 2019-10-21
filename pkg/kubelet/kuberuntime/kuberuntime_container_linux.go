@@ -23,7 +23,6 @@ import (
 
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -81,32 +80,43 @@ func (m *kubeGenericRuntimeManager) generateLinuxContainerConfig(container *v1.C
 		lc.Resources.CpuPeriod = cpuPeriod
 	}
 
-	pageSizes := sets.NewString()
-	for resourceObj, amountObj := range container.Resources.Limits {
-		if v1helper.IsHugePageResourceName(resourceObj) {
-			pageSize, err := v1helper.HugePageSizeFromResourceName(resourceObj)
-			if err != nil {
-				continue
-			}
-			sizeString := v1helper.HugePageUnitSizeFromByteSize(pageSize.Value())
-			lc.Resources.HugepageLimits = append(lc.Resources.HugepageLimits, &runtimeapi.HugepageLimit{
-				PageSize: sizeString,
-				Limit:    uint64(amountObj.Value()),
-			})
-			pageSizes.Insert(sizeString)
-		}
-	}
+	lc.Resources.HugepageLimits = GetHugepageLimitsFromResources(container.Resources)
 
-	// for each page size omitted, limit to 0
+	return lc
+}
+
+// GetHugepageLimitsFromResources returns limits of each hugepages from resources.
+func GetHugepageLimitsFromResources(resources v1.ResourceRequirements) []*runtimeapi.HugepageLimit {
+	var hugepageLimits []*runtimeapi.HugepageLimit
+
+	// For each page size, limit to 0.
 	for _, pageSize := range cgroupfs.HugePageSizes {
-		if pageSizes.Has(pageSize) {
-			continue
-		}
-		lc.Resources.HugepageLimits = append(lc.Resources.HugepageLimits, &runtimeapi.HugepageLimit{
+		hugepageLimits = append(hugepageLimits, &runtimeapi.HugepageLimit{
 			PageSize: pageSize,
 			Limit:    uint64(0),
 		})
 	}
 
-	return lc
+	requiredHugepageLimits := map[string]uint64{}
+	for resourceObj, amountObj := range resources.Limits {
+		if !v1helper.IsHugePageResourceName(resourceObj) {
+			continue
+		}
+
+		pageSize, err := v1helper.HugePageSizeFromResourceName(resourceObj)
+		if err != nil {
+			continue
+		}
+
+		sizeString := v1helper.HugePageUnitSizeFromByteSize(pageSize.Value())
+		requiredHugepageLimits[sizeString] = uint64(amountObj.Value())
+	}
+
+	for _, hugepageLimit := range hugepageLimits {
+		if limit, exists := requiredHugepageLimits[hugepageLimit.PageSize]; exists {
+			hugepageLimit.Limit = limit
+		}
+	}
+
+	return hugepageLimits
 }

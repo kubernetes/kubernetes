@@ -19,12 +19,16 @@ limitations under the License.
 package kuberuntime
 
 import (
+	"reflect"
 	"testing"
 
+	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 func makeExpectedConfig(m *kubeGenericRuntimeManager, pod *v1.Pod, containerIndex int) *runtimeapi.ContainerConfig {
@@ -134,4 +138,92 @@ func TestGenerateContainerConfig(t *testing.T) {
 
 	_, _, err = m.generateContainerConfig(&podWithContainerSecurityContext.Spec.Containers[0], podWithContainerSecurityContext, 0, "", podWithContainerSecurityContext.Spec.Containers[0].Image)
 	assert.Error(t, err, "RunAsNonRoot should fail for non-numeric username")
+}
+
+func TestGetHugepageLimitsFromResources(t *testing.T) {
+	var baseHugepage []*runtimeapi.HugepageLimit
+
+	// For each page size, limit to 0.
+	for _, pageSize := range cgroupfs.HugePageSizes {
+		baseHugepage = append(baseHugepage, &runtimeapi.HugepageLimit{
+			PageSize: pageSize,
+			Limit:    uint64(0),
+		})
+	}
+
+	tests := []struct {
+		resources v1.ResourceRequirements
+		expected  []*runtimeapi.HugepageLimit
+	}{
+		{
+			resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					"hugepages-2Mi": resource.MustParse("2Mi"),
+				},
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "2MB",
+					Limit:    2097152,
+				},
+			},
+		},
+		{
+			resources: v1.ResourceRequirements{
+				Limits: v1.ResourceList{
+					v1.ResourceName(v1.ResourceCPU): resource.MustParse("0"),
+					"hugepages-2Mi":                 resource.MustParse("2Mi"),
+					"hugepages-1Gi":                 resource.MustParse("2Gi"),
+				},
+			},
+			expected: []*runtimeapi.HugepageLimit{
+				{
+					PageSize: "2MB",
+					Limit:    2097152,
+				},
+				{
+					PageSize: "1GB",
+					Limit:    2147483648,
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		// Validate if machine supports hugepage size that used in test case.
+		machineHugepageSupport := true
+		for _, hugepageLimit := range test.expected {
+			hugepageSupport := false
+			for _, pageSize := range cgroupfs.HugePageSizes {
+				if pageSize == hugepageLimit.PageSize {
+					hugepageSupport = true
+					break
+				}
+			}
+
+			if !hugepageSupport {
+				machineHugepageSupport = false
+				break
+			}
+		}
+
+		// Case of machine can't support hugepage size
+		if !machineHugepageSupport {
+			continue
+		}
+
+		expectedHugepages := baseHugepage
+		for _, hugepage := range test.expected {
+			for _, expectedHugepage := range expectedHugepages {
+				if expectedHugepage.PageSize == hugepage.PageSize {
+					expectedHugepage.Limit = hugepage.Limit
+				}
+			}
+		}
+
+		results := GetHugepageLimitsFromResources(test.resources)
+		if !reflect.DeepEqual(expectedHugepages, results) {
+			t.Errorf("test failed. Expected %v but got %v", expectedHugepages, results)
+		}
+	}
 }
