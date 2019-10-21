@@ -55,13 +55,13 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 	return framework.Registry{
 		imagelocality.Name:                   imagelocality.New,
 		tainttoleration.Name:                 tainttoleration.New,
-		noderesources.Name:                   noderesources.New,
 		nodename.Name:                        nodename.New,
 		nodeports.Name:                       nodeports.New,
 		nodepreferavoidpods.Name:             nodepreferavoidpods.New,
 		nodeaffinity.Name:                    nodeaffinity.New,
 		podtopologyspread.Name:               podtopologyspread.New,
 		nodeunschedulable.Name:               nodeunschedulable.New,
+		noderesources.FitName:                noderesources.NewFit,
 		noderesources.BalancedAllocationName: noderesources.NewBalancedAllocation,
 		noderesources.MostAllocatedName:      noderesources.NewMostAllocated,
 		noderesources.LeastAllocatedName:     noderesources.NewLeastAllocated,
@@ -105,7 +105,7 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 	registry.RegisterPredicate(predicates.GeneralPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			// GeneralPredicate is a combination of predicates.
-			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.Name, nil)
+			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodename.Name, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeports.Name, nil)
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodeaffinity.Name, nil)
@@ -118,7 +118,7 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 		})
 	registry.RegisterPredicate(predicates.PodFitsResourcesPred,
 		func(_ ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
-			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.Name, nil)
+			plugins.Filter = appendToPluginSet(plugins.Filter, noderesources.FitName, nil)
 			return
 		})
 	registry.RegisterPredicate(predicates.HostNamePred,

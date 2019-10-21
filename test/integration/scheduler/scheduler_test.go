@@ -141,7 +141,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
-					{Name: "NodeResources"},
+					{Name: "NodeResourcesFit"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
@@ -221,7 +221,7 @@ kind: Policy
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
-					{Name: "NodeResources"},
+					{Name: "NodeResourcesFit"},
 					{Name: "NodeName"},
 					{Name: "NodePorts"},
 					{Name: "NodeAffinity"},
