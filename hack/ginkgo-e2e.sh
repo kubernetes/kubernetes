@@ -74,7 +74,11 @@ else
     prepare-e2e
 
     detect-master >/dev/null
-    KUBE_MASTER_URL="${KUBE_MASTER_URL:-https://${KUBE_MASTER_IP:-}}"
+
+    KUBE_MASTER_URL="${KUBE_MASTER_URL:-}"
+    if [[ -z "${KUBE_MASTER_URL:-}" && -n "${KUBE_MASTER_IP:-}" ]]; then
+      KUBE_MASTER_URL="https://${KUBE_MASTER_IP}"
+    fi
 
     auth_config=(
       "--kubeconfig=${KUBECONFIG:-$DEFAULT_KUBECONFIG}"
