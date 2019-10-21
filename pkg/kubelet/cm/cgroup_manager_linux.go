@@ -24,12 +24,12 @@ import (
 	"strings"
 	"time"
 
-	units "github.com/docker/go-units"
 	libcontainercgroups "github.com/opencontainers/runc/libcontainer/cgroups"
 	cgroupfs "github.com/opencontainers/runc/libcontainer/cgroups/fs"
 	cgroupsystemd "github.com/opencontainers/runc/libcontainer/cgroups/systemd"
 	libcontainerconfigs "github.com/opencontainers/runc/libcontainer/configs"
 	"k8s.io/klog"
+	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -385,7 +385,7 @@ func (m *cgroupManagerImpl) toResources(resourceConfig *ResourceConfig) *libcont
 	// for each page size enumerated, set that value
 	pageSizes := sets.NewString()
 	for pageSize, limit := range resourceConfig.HugePageLimit {
-		sizeString := units.CustomSize("%g%s", float64(pageSize), 1024.0, libcontainercgroups.HugePageSizeUnitList)
+		sizeString := v1helper.HugePageUnitSizeFromByteSize(pageSize)
 		resources.HugetlbLimit = append(resources.HugetlbLimit, &libcontainerconfigs.HugepageLimit{
 			Pagesize: sizeString,
 			Limit:    uint64(limit),
