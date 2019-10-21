@@ -98,7 +98,7 @@ func proxyError(w http.ResponseWriter, req *http.Request, error string, code int
 		return
 	}
 	// TODO: record long-running request differently? The long-running check func does not necessarily match the one of the aggregated apiserver
-	endpointmetrics.RecordRequestError(req, info, aggregatorComponent, code)
+	endpointmetrics.RecordRequestTermination(req, info, aggregatorComponent, code)
 }
 
 func (r *proxyHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
