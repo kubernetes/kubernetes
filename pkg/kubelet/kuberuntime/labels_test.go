@@ -197,6 +197,7 @@ func TestPodLabels(t *testing.T) {
 		},
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{},
+			NodeName:   "test_node",
 		},
 	}
 	expected := &labeledPodSandboxInfo{
@@ -204,6 +205,7 @@ func TestPodLabels(t *testing.T) {
 		PodName:      pod.Name,
 		PodNamespace: pod.Namespace,
 		PodUID:       pod.UID,
+		NodeName:     pod.Spec.NodeName,
 	}
 
 	// Test whether we can get right information from label

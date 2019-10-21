@@ -21,6 +21,7 @@ const (
 	KubernetesPodNamespaceLabel  = "io.kubernetes.pod.namespace"
 	KubernetesPodUIDLabel        = "io.kubernetes.pod.uid"
 	KubernetesContainerNameLabel = "io.kubernetes.container.name"
+	KubernetesNodeNameLabel      = "io.kubernetes.node.name"
 )
 
 func GetContainerName(labels map[string]string) string {
@@ -37,4 +38,8 @@ func GetPodUID(labels map[string]string) string {
 
 func GetPodNamespace(labels map[string]string) string {
 	return labels[KubernetesPodNamespaceLabel]
+}
+
+func GetNodeName(labels map[string]string) string {
+	return labels[KubernetesNodeNameLabel]
 }

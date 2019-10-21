@@ -47,6 +47,7 @@ type labeledPodSandboxInfo struct {
 	PodName      string
 	PodNamespace string
 	PodUID       kubetypes.UID
+	NodeName     string
 }
 
 type annotatedPodSandboxInfo struct {
@@ -84,6 +85,7 @@ func newPodLabels(pod *v1.Pod) map[string]string {
 	labels[types.KubernetesPodNameLabel] = pod.Name
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
+	labels[types.KubernetesNodeNameLabel] = pod.Spec.NodeName
 
 	return labels
 }
@@ -100,6 +102,7 @@ func newContainerLabels(container *v1.Container, pod *v1.Pod) map[string]string 
 	labels[types.KubernetesPodNamespaceLabel] = pod.Namespace
 	labels[types.KubernetesPodUIDLabel] = string(pod.UID)
 	labels[types.KubernetesContainerNameLabel] = container.Name
+	labels[types.KubernetesNodeNameLabel] = pod.Spec.NodeName
 
 	return labels
 }
@@ -154,11 +157,12 @@ func getPodSandboxInfoFromLabels(labels map[string]string) *labeledPodSandboxInf
 		PodName:      getStringValueFromLabel(labels, types.KubernetesPodNameLabel),
 		PodNamespace: getStringValueFromLabel(labels, types.KubernetesPodNamespaceLabel),
 		PodUID:       kubetypes.UID(getStringValueFromLabel(labels, types.KubernetesPodUIDLabel)),
+		NodeName:     getStringValueFromLabel(labels, types.KubernetesNodeNameLabel),
 	}
 
 	// Remain only labels from v1.Pod
 	for k, v := range labels {
-		if k != types.KubernetesPodNameLabel && k != types.KubernetesPodNamespaceLabel && k != types.KubernetesPodUIDLabel {
+		if k != types.KubernetesPodNameLabel && k != types.KubernetesPodNamespaceLabel && k != types.KubernetesPodUIDLabel && k != types.KubernetesNodeNameLabel {
 			podSandboxInfo.Labels[k] = v
 		}
 	}

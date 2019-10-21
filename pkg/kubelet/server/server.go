@@ -895,7 +895,7 @@ func containerPrometheusLabelsFunc(s stats.Provider) metrics.ContainerLabelsFunc
 	return func(c *cadvisorapi.ContainerInfo) map[string]string {
 		// Prometheus requires that all metrics in the same family have the same labels,
 		// so we arrange to supply blank strings for missing labels
-		var name, image, podName, namespace, containerName string
+		var name, image, podName, namespace, containerName, nodeName string
 		if len(c.Aliases) > 0 {
 			name = c.Aliases[0]
 		}
@@ -908,6 +908,9 @@ func containerPrometheusLabelsFunc(s stats.Provider) metrics.ContainerLabelsFunc
 		}
 		if v, ok := c.Spec.Labels[kubelettypes.KubernetesContainerNameLabel]; ok {
 			containerName = v
+		}
+		if v, ok := c.Spec.Labels[kubelettypes.KubernetesNodeNameLabel]; ok {
+			nodeName = v
 		}
 		// Associate pod cgroup with pod so we have an accurate accounting of sandbox
 		if podName == "" && namespace == "" {
@@ -923,6 +926,7 @@ func containerPrometheusLabelsFunc(s stats.Provider) metrics.ContainerLabelsFunc
 			"pod":              podName,
 			"namespace":        namespace,
 			"container":        containerName,
+			"node":             nodeName,
 		}
 		return set
 	}
