@@ -139,6 +139,10 @@ func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugi
 	}
 }
 
+func noSuchNetNS(err error) bool {
+	return strings.Contains(err.Error(), "no such file or directory") && strings.Contains(err.Error(), "failed to Statfs")
+}
+
 func (plugin *kubenetNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	plugin.host = host
 	plugin.hairpinMode = hairpinMode
@@ -712,7 +716,7 @@ func (plugin *kubenetNetworkPlugin) delContainerFromNetwork(config *libcni.Netwo
 	err = plugin.cniConfig.DelNetwork(cniTimeoutCtx, config, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
-	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
+	if err != nil && !noSuchNetNS(err) {
 		return fmt.Errorf("error removing container from network: %v", err)
 	}
 	return nil

@@ -215,6 +215,10 @@ func getDefaultCNINetwork(confDir string, binDirs []string) (*cniNetwork, error)
 	return nil, fmt.Errorf("no valid networks found in %s", confDir)
 }
 
+func noSuchNetNS(err error) bool {
+	return strings.Contains(err.Error(), "no such file or directory") && strings.Contains(err.Error(), "failed to Statfs")
+}
+
 func (plugin *cniNetworkPlugin) Init(host network.Host, hairpinMode kubeletconfig.HairpinMode, nonMasqueradeCIDR string, mtu int) error {
 	err := plugin.platformInit()
 	if err != nil {
@@ -381,7 +385,7 @@ func (plugin *cniNetworkPlugin) deleteFromNetwork(ctx context.Context, network *
 	err = cniNet.DelNetworkList(ctx, netConf, rt)
 	// The pod may not get deleted successfully at the first time.
 	// Ignore "no such file or directory" error in case the network has already been deleted in previous attempts.
-	if err != nil && !strings.Contains(err.Error(), "no such file or directory") {
+	if err != nil && !noSuchNetNS(err) {
 		klog.Errorf("Error deleting %s from network %s/%s: %v", pdesc, netConf.Plugins[0].Network.Type, netConf.Name, err)
 		return err
 	}
