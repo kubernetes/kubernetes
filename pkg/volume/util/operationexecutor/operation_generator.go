@@ -1757,6 +1757,7 @@ func (og *operationGenerator) nodeExpandVolume(volumeToMount VolumeToMount, rsOp
 			}
 			simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.NodeExpandVolume succeeded", "")
 			og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
+			og.recorder.Eventf(pvc, v1.EventTypeNormal, kevents.FileSystemResizeSuccess, simpleMsg)
 			klog.Infof(detailedMsg)
 			// File system resize succeeded, now update the PVC's Capacity to match the PV's
 			err = util.MarkFSResizeFinished(pvc, pvSpecCap, og.kubeClient)
