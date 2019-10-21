@@ -371,15 +371,8 @@ var _ = SIGDescribe("kubelet", func() {
 				NodeSelector: nodeLabels,
 			})
 			framework.ExpectNoError(err, "failed creating a ReplicationController")
-			if resourceMonitor != nil {
-				resourceMonitor.LogLatest()
-			}
-
 			ginkgo.By("Deleting the RC")
 			framework.DeleteRCAndWaitForGC(f.ClientSet, f.Namespace.Name, rcName)
-			if resourceMonitor != nil {
-				resourceMonitor.LogCPUSummary()
-			}
 		})
 	})
 
