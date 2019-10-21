@@ -12,6 +12,7 @@ discovery:
   timeout: 5m0s
   tlsBootstrapToken: abcdef.0123456789abcdef
 kind: JoinConfiguration
+metadata: {}
 nodeRegistration:
   criSocket: /var/run/dockershim.sock
   name: control-plane-1

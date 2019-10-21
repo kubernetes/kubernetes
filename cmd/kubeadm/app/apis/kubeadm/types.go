@@ -61,6 +61,7 @@ type InitConfiguration struct {
 // ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster
 type ClusterConfiguration struct {
 	metav1.TypeMeta
+	ObjectMeta
 
 	// ComponentConfigs holds internal ComponentConfig struct types known to kubeadm, should long-term only exist in the internal kubeadm API
 	// +k8s:conversion-gen=false
@@ -118,9 +119,6 @@ type ClusterConfiguration struct {
 
 	// FeatureGates enabled by the user.
 	FeatureGates map[string]bool
-
-	// The cluster name
-	ClusterName string
 }
 
 // ControlPlaneComponent holds settings common to control plane component of the cluster
@@ -421,4 +419,12 @@ type HostPathMount struct {
 	ReadOnly bool
 	// PathType is the type of the HostPath.
 	PathType v1.HostPathType
+}
+
+// ObjectMeta is a cut down version on metav1.ObjectMeta with the bare minimum that is sensible in
+// kubeadm terms and satisfies the requirements of Kustomize.
+// The original metav1.ObjectMeta proved too large and some unneeded fields broke a bunch of tests (like the fuzzer).
+type ObjectMeta struct {
+	// Name is an unique name to identify the object with. In the terms of kubeadm, this is the cluster name.
+	Name string
 }

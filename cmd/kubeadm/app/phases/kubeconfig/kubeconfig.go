@@ -98,7 +98,7 @@ func createKubeConfigFiles(outDir string, cfg *kubeadmapi.InitConfiguration, kub
 		}
 
 		// builds the KubeConfig object
-		config, err := buildKubeConfigFromSpec(spec, cfg.ClusterName)
+		config, err := buildKubeConfigFromSpec(spec, cfg.Name)
 		if err != nil {
 			return err
 		}
@@ -296,7 +296,7 @@ func WriteKubeConfigWithClientCert(out io.Writer, cfg *kubeadmapi.InitConfigurat
 		},
 	}
 
-	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
+	return writeKubeConfigFromSpec(out, spec, cfg.Name)
 }
 
 // WriteKubeConfigWithToken writes a kubeconfig file - with a token as client authentication info - to the given writer.
@@ -322,7 +322,7 @@ func WriteKubeConfigWithToken(out io.Writer, cfg *kubeadmapi.InitConfiguration, 
 		},
 	}
 
-	return writeKubeConfigFromSpec(out, spec, cfg.ClusterName)
+	return writeKubeConfigFromSpec(out, spec, cfg.Name)
 }
 
 // writeKubeConfigFromSpec creates a kubeconfig object from a kubeConfigSpec and writes it to the given writer.

@@ -31,8 +31,15 @@ func Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 		return err
 	}
 
+	// Ignore InitConfiguration.ObjectMeta as it has no meaning and no representation in kubeadm.InitConfiguration
+
 	// Keep the fuzzer test happy by setting out.ClusterConfiguration to defaults
 	clusterCfg := &ClusterConfiguration{}
 	SetDefaults_ClusterConfiguration(clusterCfg)
 	return Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(clusterCfg, &out.ClusterConfiguration, s)
+}
+
+// Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration is required to ignore the local ObjectMeta (missing from the internal type)
+func Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
+	return autoConvert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s)
 }

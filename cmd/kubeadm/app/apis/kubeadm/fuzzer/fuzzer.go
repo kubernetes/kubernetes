@@ -37,6 +37,7 @@ func Funcs(codecs runtimeserializer.CodecFactory) []interface{} {
 		fuzzNetworking,
 		fuzzJoinConfiguration,
 		fuzzJoinControlPlane,
+		fuzzObjectMeta,
 	}
 }
 
@@ -50,6 +51,9 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 	// More specifically:
 	// internal with manually applied defaults -> external object : loosing ClusterConfiguration) -> internal object with automatically applied defaults
 	obj.ClusterConfiguration = kubeadm.ClusterConfiguration{
+		ObjectMeta: kubeadm.ObjectMeta{
+			Name: v1beta3.DefaultClusterName,
+		},
 		APIServer: kubeadm.APIServer{
 			TimeoutForControlPlane: &metav1.Duration{
 				Duration: constants.DefaultControlPlaneTimeout,
@@ -59,7 +63,6 @@ func fuzzInitConfiguration(obj *kubeadm.InitConfiguration, c fuzz.Continue) {
 			Type: kubeadm.CoreDNS,
 		},
 		CertificatesDir: v1beta3.DefaultCertificatesDir,
-		ClusterName:     v1beta3.DefaultClusterName,
 		Etcd: kubeadm.Etcd{
 			Local: &kubeadm.LocalEtcd{
 				DataDir: v1beta3.DefaultEtcdDataDir,
@@ -101,7 +104,6 @@ func fuzzClusterConfiguration(obj *kubeadm.ClusterConfiguration, c fuzz.Continue
 	// Pinning values for fields that get defaults if fuzz value is empty string or nil (thus making the round trip test fail)
 	obj.CertificatesDir = "foo"
 	obj.CIImageRepository = "" //This fields doesn't exists in public API >> using default to get the roundtrip test pass
-	obj.ClusterName = "bar"
 	obj.ImageRepository = "baz"
 	obj.KubernetesVersion = "qux"
 	obj.APIServer.TimeoutForControlPlane = &metav1.Duration{
@@ -153,4 +155,11 @@ func fuzzJoinControlPlane(obj *kubeadm.JoinControlPlane, c fuzz.Continue) {
 
 	// Pin values for fields that are not present in v1beta1
 	obj.CertificateKey = ""
+}
+
+func fuzzObjectMeta(obj *kubeadm.ObjectMeta, c fuzz.Continue) {
+	c.FuzzNoCustom(obj)
+
+	// Pin values for fields that are not present in v1beta1 & v1beta2
+	obj.Name = v1beta3.DefaultClusterName
 }

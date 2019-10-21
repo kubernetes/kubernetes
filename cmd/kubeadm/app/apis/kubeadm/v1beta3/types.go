@@ -28,6 +28,10 @@ import (
 type InitConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// Optional: Ignored in InitConfiguration
+	// +optional
+	ObjectMeta `json:"metadata,omitempty"`
+
 	// `kubeadm init`-only information. These fields are solely used the first time `kubeadm init` runs.
 	// After that, the information in the fields IS NOT uploaded to the `kubeadm-config` ConfigMap
 	// that is used by `kubeadm upgrade` for instance. These fields must be omitempty.
@@ -61,6 +65,10 @@ type InitConfiguration struct {
 // ClusterConfiguration contains cluster-wide configuration for a kubeadm cluster
 type ClusterConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// Optional: Gets automatically defaulted if not initialized
+	// +optional
+	ObjectMeta `json:"metadata,omitempty"`
 
 	// Etcd holds configuration for etcd.
 	Etcd Etcd `json:"etcd,omitempty"`
@@ -122,11 +130,6 @@ type ClusterConfiguration struct {
 	// Optional: No features will be enabled or disabled if unspecified. See kubeadm documentation for more information.
 	// +optional
 	FeatureGates map[string]bool `json:"featureGates,omitempty"`
-
-	// The cluster name
-	// Optional: Defaulted to "kubernetes"
-	// +optional
-	ClusterName string `json:"clusterName,omitempty"`
 }
 
 // ControlPlaneComponent holds settings common to control plane component of the cluster
@@ -366,6 +369,10 @@ type ExternalEtcd struct {
 type JoinConfiguration struct {
 	metav1.TypeMeta `json:",inline"`
 
+	// Optional: Ingored in JoinConfiguration
+	// +optional
+	ObjectMeta `json:"metadata,omitempty"`
+
 	// NodeRegistration holds fields that relate to registering the new control-plane node to the cluster
 	NodeRegistration NodeRegistrationOptions `json:"nodeRegistration,omitempty"`
 
@@ -476,4 +483,14 @@ type HostPathMount struct {
 	// Optional: Defaulted to ""
 	// +optional
 	PathType v1.HostPathType `json:"pathType,omitempty"`
+}
+
+// ObjectMeta is a cut down version on metav1.ObjectMeta with the bare minimum that is sensible in
+// kubeadm terms and satisfies the requirements of Kustomize.
+// The original metav1.ObjectMeta proved too large and some unneeded fields broke a bunch of tests (like the fuzzer).
+type ObjectMeta struct {
+	// Name is an unique name to identify the object with. In the terms of kubeadm, this is the cluster name.
+	// Optional: Defaulted to "kubernetes" only when ObjectMeta is embedded in ClusterConfiguration.
+	// +optional
+	Name string `json:"name,omitempty"`
 }

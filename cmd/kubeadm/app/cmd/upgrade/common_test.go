@@ -187,6 +187,7 @@ func TestPrintConfiguration(t *testing.T) {
 	    dataDir: /some/path
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
+	metadata: {}
 	networking: {}
 	scheduler: {}
 `),
@@ -222,6 +223,7 @@ func TestPrintConfiguration(t *testing.T) {
 	    keyFile: ""
 	kind: ClusterConfiguration
 	kubernetesVersion: v1.7.1
+	metadata: {}
 	networking:
 	  serviceSubnet: 10.96.0.1/12
 	scheduler: {}

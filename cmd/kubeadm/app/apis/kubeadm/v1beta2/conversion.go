@@ -36,3 +36,21 @@ func Convert_v1beta2_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConf
 	SetDefaults_ClusterConfiguration(clusterCfg)
 	return Convert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(clusterCfg, &out.ClusterConfiguration, s)
 }
+
+func Convert_kubeadm_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in *kubeadm.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_ClusterConfiguration_To_v1beta2_ClusterConfiguration(in, out, s); err != nil {
+		return err
+	}
+
+	out.ClusterName = in.Name
+	return nil
+}
+
+func Convert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1beta2_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s); err != nil {
+		return err
+	}
+
+	out.Name = in.ClusterName
+	return nil
+}

@@ -93,8 +93,9 @@ func SetDefaults_ClusterConfiguration(obj *ClusterConfiguration) {
 		obj.ImageRepository = DefaultImageRepository
 	}
 
-	if obj.ClusterName == "" {
-		obj.ClusterName = DefaultClusterName
+	// In kubeadm's terms, ObjectMeta.Name is the cluster name
+	if obj.Name == "" {
+		obj.Name = DefaultClusterName
 	}
 
 	SetDefaults_DNS(obj)

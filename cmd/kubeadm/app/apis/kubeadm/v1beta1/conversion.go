@@ -57,3 +57,21 @@ func Convert_kubeadm_NodeRegistrationOptions_To_v1beta1_NodeRegistrationOptions(
 
 	return nil
 }
+
+func Convert_kubeadm_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in *kubeadm.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
+	if err := autoConvert_kubeadm_ClusterConfiguration_To_v1beta1_ClusterConfiguration(in, out, s); err != nil {
+		return err
+	}
+
+	out.ClusterName = in.Name
+	return nil
+}
+
+func Convert_v1beta1_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
+	if err := autoConvert_v1beta1_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in, out, s); err != nil {
+		return err
+	}
+
+	out.Name = in.ClusterName
+	return nil
+}

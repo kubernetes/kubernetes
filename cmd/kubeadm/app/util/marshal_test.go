@@ -114,6 +114,9 @@ func TestMarshalUnmarshalToYamlForCodecs(t *testing.T) {
 			Kind:       constants.InitConfigurationKind,
 			APIVersion: kubeadmapiv1.SchemeGroupVersion.String(),
 		},
+		ObjectMeta: kubeadmapiv1.ObjectMeta{
+			Name: kubeadmapiv1.DefaultClusterName,
+		},
 		NodeRegistration: kubeadmapiv1.NodeRegistrationOptions{
 			Name:      "testNode",
 			CRISocket: "/var/run/cri.sock",

@@ -187,11 +187,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*JoinConfiguration)(nil), (*kubeadm.JoinConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(a.(*JoinConfiguration), b.(*kubeadm.JoinConfiguration), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*kubeadm.JoinConfiguration)(nil), (*JoinConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(a.(*kubeadm.JoinConfiguration), b.(*JoinConfiguration), scope)
 	}); err != nil {
@@ -237,6 +232,16 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddGeneratedConversionFunc((*ObjectMeta)(nil), (*kubeadm.ObjectMeta)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta3_ObjectMeta_To_kubeadm_ObjectMeta(a.(*ObjectMeta), b.(*kubeadm.ObjectMeta), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*kubeadm.ObjectMeta)(nil), (*ObjectMeta)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_kubeadm_ObjectMeta_To_v1beta3_ObjectMeta(a.(*kubeadm.ObjectMeta), b.(*ObjectMeta), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*kubeadm.InitConfiguration)(nil), (*InitConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration(a.(*kubeadm.InitConfiguration), b.(*InitConfiguration), scope)
 	}); err != nil {
@@ -244,6 +249,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddConversionFunc((*InitConfiguration)(nil), (*kubeadm.InitConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(a.(*InitConfiguration), b.(*kubeadm.InitConfiguration), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddConversionFunc((*JoinConfiguration)(nil), (*kubeadm.JoinConfiguration)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(a.(*JoinConfiguration), b.(*kubeadm.JoinConfiguration), scope)
 	}); err != nil {
 		return err
 	}
@@ -379,6 +389,9 @@ func Convert_kubeadm_BootstrapTokenString_To_v1beta3_BootstrapTokenString(in *ku
 }
 
 func autoConvert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *ClusterConfiguration, out *kubeadm.ClusterConfiguration, s conversion.Scope) error {
+	if err := Convert_v1beta3_ObjectMeta_To_kubeadm_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
 	if err := Convert_v1beta3_Etcd_To_kubeadm_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
 		return err
 	}
@@ -403,7 +416,6 @@ func autoConvert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in
 	out.ImageRepository = in.ImageRepository
 	out.UseHyperKubeImage = in.UseHyperKubeImage
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
-	out.ClusterName = in.ClusterName
 	return nil
 }
 
@@ -413,6 +425,9 @@ func Convert_v1beta3_ClusterConfiguration_To_kubeadm_ClusterConfiguration(in *Cl
 }
 
 func autoConvert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration(in *kubeadm.ClusterConfiguration, out *ClusterConfiguration, s conversion.Scope) error {
+	if err := Convert_kubeadm_ObjectMeta_To_v1beta3_ObjectMeta(&in.ObjectMeta, &out.ObjectMeta, s); err != nil {
+		return err
+	}
 	// INFO: in.ComponentConfigs opted out of conversion generation
 	if err := Convert_kubeadm_Etcd_To_v1beta3_Etcd(&in.Etcd, &out.Etcd, s); err != nil {
 		return err
@@ -439,7 +454,6 @@ func autoConvert_kubeadm_ClusterConfiguration_To_v1beta3_ClusterConfiguration(in
 	// INFO: in.CIImageRepository opted out of conversion generation
 	out.UseHyperKubeImage = in.UseHyperKubeImage
 	out.FeatureGates = *(*map[string]bool)(unsafe.Pointer(&in.FeatureGates))
-	out.ClusterName = in.ClusterName
 	return nil
 }
 
@@ -661,6 +675,7 @@ func Convert_kubeadm_ImageMeta_To_v1beta3_ImageMeta(in *kubeadm.ImageMeta, out *
 }
 
 func autoConvert_v1beta3_InitConfiguration_To_kubeadm_InitConfiguration(in *InitConfiguration, out *kubeadm.InitConfiguration, s conversion.Scope) error {
+	// WARNING: in.ObjectMeta requires manual conversion: does not exist in peer-type
 	out.BootstrapTokens = *(*[]kubeadm.BootstrapToken)(unsafe.Pointer(&in.BootstrapTokens))
 	if err := Convert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
@@ -686,6 +701,7 @@ func autoConvert_kubeadm_InitConfiguration_To_v1beta3_InitConfiguration(in *kube
 }
 
 func autoConvert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
+	// WARNING: in.ObjectMeta requires manual conversion: does not exist in peer-type
 	if err := Convert_v1beta3_NodeRegistrationOptions_To_kubeadm_NodeRegistrationOptions(&in.NodeRegistration, &out.NodeRegistration, s); err != nil {
 		return err
 	}
@@ -695,11 +711,6 @@ func autoConvert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *Join
 	}
 	out.ControlPlane = (*kubeadm.JoinControlPlane)(unsafe.Pointer(in.ControlPlane))
 	return nil
-}
-
-// Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration is an autogenerated conversion function.
-func Convert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in *JoinConfiguration, out *kubeadm.JoinConfiguration, s conversion.Scope) error {
-	return autoConvert_v1beta3_JoinConfiguration_To_kubeadm_JoinConfiguration(in, out, s)
 }
 
 func autoConvert_kubeadm_JoinConfiguration_To_v1beta3_JoinConfiguration(in *kubeadm.JoinConfiguration, out *JoinConfiguration, s conversion.Scope) error {
@@ -827,4 +838,24 @@ func autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOpti
 // Convert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions is an autogenerated conversion function.
 func Convert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(in *kubeadm.NodeRegistrationOptions, out *NodeRegistrationOptions, s conversion.Scope) error {
 	return autoConvert_kubeadm_NodeRegistrationOptions_To_v1beta3_NodeRegistrationOptions(in, out, s)
+}
+
+func autoConvert_v1beta3_ObjectMeta_To_kubeadm_ObjectMeta(in *ObjectMeta, out *kubeadm.ObjectMeta, s conversion.Scope) error {
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_v1beta3_ObjectMeta_To_kubeadm_ObjectMeta is an autogenerated conversion function.
+func Convert_v1beta3_ObjectMeta_To_kubeadm_ObjectMeta(in *ObjectMeta, out *kubeadm.ObjectMeta, s conversion.Scope) error {
+	return autoConvert_v1beta3_ObjectMeta_To_kubeadm_ObjectMeta(in, out, s)
+}
+
+func autoConvert_kubeadm_ObjectMeta_To_v1beta3_ObjectMeta(in *kubeadm.ObjectMeta, out *ObjectMeta, s conversion.Scope) error {
+	out.Name = in.Name
+	return nil
+}
+
+// Convert_kubeadm_ObjectMeta_To_v1beta3_ObjectMeta is an autogenerated conversion function.
+func Convert_kubeadm_ObjectMeta_To_v1beta3_ObjectMeta(in *kubeadm.ObjectMeta, out *ObjectMeta, s conversion.Scope) error {
+	return autoConvert_kubeadm_ObjectMeta_To_v1beta3_ObjectMeta(in, out, s)
 }
