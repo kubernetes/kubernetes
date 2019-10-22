@@ -6873,6 +6873,124 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			wantError: false,
 		},
+		{
+			name: "XImmutability if set can only be immutable, readOnly or removeOnly",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:          "object",
+					XImmutability: strPtr("bad"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "XImmutability if set can only be immutable, readOnly or removeOnly (positive)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:          "object",
+					XImmutability: strPtr("immutable"),
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "XKeyImmutability if set can only be immutable, readOnly or removeOnly",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:             "object",
+					XKeyImmutability: strPtr("bad"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "XKeyImmutability if set can only be immutable, readOnly or removeOnly (positive)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:             "object",
+					XKeyImmutability: strPtr("immutable"),
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "XImmutability is mutually exclusive with XKeyImmutability",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:             "object",
+					XImmutability:    strPtr("immutable"),
+					XKeyImmutability: strPtr("immutable"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "XKeyImmutability is forbidden for object with properties",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:             "object",
+					XKeyImmutability: strPtr("immutable"),
+					Properties: map[string]apiextensions.JSONSchemaProps{
+						"key": {
+							Type: "string",
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "x-kubernetes-mutability: addOnly | removeOnly forbidden for type object with additionalProperties (maps) (addOnly)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:          "object",
+					XImmutability: strPtr("addOnly"),
+					AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+						Allows: true,
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "string",
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "x-kubernetes-mutability: addOnly | removeOnly forbidden for type object with additionalProperties (maps) (removeOnly)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:          "object",
+					XImmutability: strPtr("removeOnly"),
+					AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+						Allows: true,
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "string",
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "x-kubernetes-mutability: addOnly | removeOnly forbidden for arrays (addOnly)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:          "array",
+					XImmutability: strPtr("addOnly"),
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "x-kubernetes-mutability: addOnly | removeOnly forbidden for arrays (removeOnly)",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:          "array",
+					XImmutability: strPtr("removeOnly"),
+				},
+			},
+			wantError: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

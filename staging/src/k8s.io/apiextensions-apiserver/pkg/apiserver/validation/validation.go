@@ -252,8 +252,15 @@ func ConvertJSONSchemaPropsWithPostProcess(in *apiextensions.JSONSchemaProps, ou
 	if in.XListType != nil {
 		out.VendorExtensible.AddExtension("x-kubernetes-list-type", *in.XListType)
 	}
+
 	if in.XMapType != nil {
 		out.VendorExtensible.AddExtension("x-kubernetes-map-type", *in.XMapType)
+	}
+	if in.XImmutability != nil {
+		out.VendorExtensible.AddExtension("x-kubernetes-immutability", *in.XImmutability)
+	}
+	if in.XKeyImmutability != nil {
+		out.VendorExtensible.AddExtension("x-kubernetes-key-immutability", *in.XKeyImmutability)
 	}
 	return nil
 }

@@ -785,6 +785,32 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		}
 	}
 
+	if schema.XImmutability != nil && *schema.XImmutability != "immutable" && *schema.XImmutability != "addOnly" && *schema.XImmutability != "removeOnly" {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("x-kubernetes-immutability"), *schema.XImmutability, []string{"immutable", "addOnly", "removeOnly"}))
+	}
+
+	if schema.XKeyImmutability != nil && *schema.XKeyImmutability != "immutable" && *schema.XKeyImmutability != "addOnly" && *schema.XKeyImmutability != "removeOnly" {
+		allErrs = append(allErrs, field.NotSupported(fldPath.Child("x-kubernetes-key-immutability"), *schema.XKeyImmutability, []string{"immutable", "addOnly", "removeOnly"}))
+	}
+
+	if schema.XImmutability != nil && schema.XKeyImmutability != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-immutability"), *schema.XImmutability, "is mutually exclusive with x-kubernetes-key-immutability"))
+	}
+
+	if schema.XKeyImmutability != nil && schema.Type == "object" && schema.Properties != nil {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-key-immutability"), *schema.XKeyImmutability, "is forbidden for object with properties"))
+	}
+
+	if schema.XImmutability != nil && (*schema.XImmutability == "addOnly" || *schema.XImmutability == "removeOnly") &&
+		schema.AdditionalProperties != nil && schema.Type == "object" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-mutability"), schema.Type, "x-kubernetes-mutability: addOnly | removeOnly forbidden for type object with additionalProperties (maps)"))
+	}
+
+	if schema.XImmutability != nil && (*schema.XImmutability == "addOnly" || *schema.XImmutability == "removeOnly") &&
+		schema.Type == "array" {
+		allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-mutability"), schema.Type, "x-kubernetes-mutability: addOnly | removeOnly forbidden for arrays"))
+	}
+
 	if schema.XPreserveUnknownFields != nil && *schema.XPreserveUnknownFields == false {
 		allErrs = append(allErrs, field.Invalid(fldPath.Child("x-kubernetes-preserve-unknown-fields"), *schema.XPreserveUnknownFields, "must be true or undefined"))
 	}
@@ -943,6 +969,13 @@ func (v *specStandardValidatorV3) validate(schema *apiextensions.JSONSchemaProps
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-embedded-resource"), "must not be used inside of resource meta"))
 	}
 
+	if v.isInsideResourceMeta && schema.XImmutability != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-immutable"), "must not be used inside of resource meta"))
+	}
+
+	if v.isInsideResourceMeta && schema.XKeyImmutability != nil {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-immutable-keys"), "must not be used inside of resource meta"))
+	}
 	return allErrs
 }
 
@@ -1157,7 +1190,7 @@ func schemaHasKubernetesExtensions(s *apiextensions.JSONSchemaProps) bool {
 		return false
 	}
 
-	if s.XEmbeddedResource || s.XPreserveUnknownFields != nil || s.XIntOrString || len(s.XListMapKeys) > 0 || s.XListType != nil {
+	if s.XEmbeddedResource || s.XPreserveUnknownFields != nil || s.XImmutability != nil || s.XKeyImmutability != nil || s.XIntOrString || len(s.XListMapKeys) > 0 || s.XListType != nil {
 		return true
 	}
 
