@@ -95,7 +95,8 @@ var UpdateLabelBackoff = wait.Backoff{
 }
 
 var (
-	KeyFunc = cache.DeletionHandlingMetaNamespaceKeyFunc
+	KeyFunc           = cache.DeletionHandlingMetaNamespaceKeyFunc
+	podPhaseToOrdinal = map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 1, v1.PodRunning: 2}
 )
 
 type ResyncPeriodFunc func() time.Duration
@@ -706,9 +707,8 @@ func (s ByLogging) Less(i, j int) bool {
 		return len(s[i].Spec.NodeName) > 0
 	}
 	// 2. PodRunning < PodUnknown < PodPending
-	m := map[v1.PodPhase]int{v1.PodRunning: 0, v1.PodUnknown: 1, v1.PodPending: 2}
-	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
-		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
+	if s[i].Status.Phase != s[j].Status.Phase {
+		return podPhaseToOrdinal[s[i].Status.Phase] > podPhaseToOrdinal[s[j].Status.Phase]
 	}
 	// 3. ready < not ready
 	if podutil.IsPodReady(s[i]) != podutil.IsPodReady(s[j]) {
@@ -717,8 +717,12 @@ func (s ByLogging) Less(i, j int) bool {
 	// TODO: take availability into account when we push minReadySeconds information from deployment into pods,
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
 	// 4. Been ready for more time < less time < empty time
-	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
-		return afterOrZero(podReadyTime(s[j]), podReadyTime(s[i]))
+	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) {
+		readyTime1 := podReadyTime(s[i])
+		readyTime2 := podReadyTime(s[j])
+		if !readyTime1.Equal(readyTime2) {
+			return afterOrZero(readyTime2, readyTime1)
+		}
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
 	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
@@ -744,9 +748,8 @@ func (s ActivePods) Less(i, j int) bool {
 		return len(s[i].Spec.NodeName) == 0
 	}
 	// 2. PodPending < PodUnknown < PodRunning
-	m := map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 1, v1.PodRunning: 2}
-	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
-		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
+	if podPhaseToOrdinal[s[i].Status.Phase] != podPhaseToOrdinal[s[j].Status.Phase] {
+		return podPhaseToOrdinal[s[i].Status.Phase] < podPhaseToOrdinal[s[j].Status.Phase]
 	}
 	// 3. Not ready < ready
 	// If only one of the pods is not ready, the not ready one is smaller
@@ -757,8 +760,12 @@ func (s ActivePods) Less(i, j int) bool {
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
 	// 4. Been ready for empty time < less time < more time
 	// If both pods are ready, the latest ready one is smaller
-	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) && !podReadyTime(s[i]).Equal(podReadyTime(s[j])) {
-		return afterOrZero(podReadyTime(s[i]), podReadyTime(s[j]))
+	if podutil.IsPodReady(s[i]) && podutil.IsPodReady(s[j]) {
+		readyTime1 := podReadyTime(s[i])
+		readyTime2 := podReadyTime(s[j])
+		if !readyTime1.Equal(readyTime2) {
+			return afterOrZero(readyTime1, readyTime2)
+		}
 	}
 	// 5. Pods with containers with higher restart counts < lower restart counts
 	if maxContainerRestarts(s[i]) != maxContainerRestarts(s[j]) {
@@ -825,9 +832,8 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 		return len(s.Pods[i].Spec.NodeName) == 0
 	}
 	// 2. PodPending < PodUnknown < PodRunning
-	m := map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 1, v1.PodRunning: 2}
-	if m[s.Pods[i].Status.Phase] != m[s.Pods[j].Status.Phase] {
-		return m[s.Pods[i].Status.Phase] < m[s.Pods[j].Status.Phase]
+	if podPhaseToOrdinal[s.Pods[i].Status.Phase] != podPhaseToOrdinal[s.Pods[j].Status.Phase] {
+		return podPhaseToOrdinal[s.Pods[i].Status.Phase] < podPhaseToOrdinal[s.Pods[j].Status.Phase]
 	}
 	// 3. Not ready < ready
 	// If only one of the pods is not ready, the not ready one is smaller
@@ -845,8 +851,12 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 	//       see https://github.com/kubernetes/kubernetes/issues/22065
 	// 5. Been ready for empty time < less time < more time
 	// If both pods are ready, the latest ready one is smaller
-	if podutil.IsPodReady(s.Pods[i]) && podutil.IsPodReady(s.Pods[j]) && !podReadyTime(s.Pods[i]).Equal(podReadyTime(s.Pods[j])) {
-		return afterOrZero(podReadyTime(s.Pods[i]), podReadyTime(s.Pods[j]))
+	if podutil.IsPodReady(s.Pods[i]) && podutil.IsPodReady(s.Pods[j]) {
+		readyTime1 := podReadyTime(s.Pods[i])
+		readyTime2 := podReadyTime(s.Pods[j])
+		if !readyTime1.Equal(readyTime2) {
+			return afterOrZero(readyTime1, readyTime2)
+		}
 	}
 	// 6. Pods with containers with higher restart counts < lower restart counts
 	if maxContainerRestarts(s.Pods[i]) != maxContainerRestarts(s.Pods[j]) {
