@@ -43,6 +43,7 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/kubelet/cm/cpumanager/containermap:go_default_library",
         "//pkg/kubelet/cm/cpumanager/state:go_default_library",
         "//pkg/kubelet/cm/cpumanager/topology:go_default_library",
         "//pkg/kubelet/cm/cpuset:go_default_library",

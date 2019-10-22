@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
+	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/containermap"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/state"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
@@ -246,6 +247,7 @@ func TestCPUManagerAdd(t *testing.T) {
 			containerRuntime: mockRuntimeService{
 				err: testCase.updateErr,
 			},
+			containerMap:      containermap.NewContainerMap(),
 			activePods:        func() []*v1.Pod { return nil },
 			podStatusProvider: mockPodStatusProvider{},
 		}
@@ -260,6 +262,237 @@ func TestCPUManagerAdd(t *testing.T) {
 		if !testCase.expCPUSet.Equals(mgr.state.GetDefaultCPUSet()) {
 			t.Errorf("CPU Manager AddContainer() error (%v). expected cpuset: %v but got: %v",
 				testCase.description, testCase.expCPUSet, mgr.state.GetDefaultCPUSet())
+		}
+	}
+}
+
+func TestCPUManagerAddWithInitContainers(t *testing.T) {
+	testCases := []struct {
+		description      string
+		topo             *topology.CPUTopology
+		numReservedCPUs  int
+		initContainerIDs []string
+		containerIDs     []string
+		stAssignments    state.ContainerCPUAssignments
+		stDefaultCPUSet  cpuset.CPUSet
+		pod              *v1.Pod
+		expInitCSets     []cpuset.CPUSet
+		expCSets         []cpuset.CPUSet
+	}{
+		{
+			description:      "No Guaranteed Init CPUs",
+			topo:             topoSingleSocketHT,
+			numReservedCPUs:  0,
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			initContainerIDs: []string{"initFakeID"},
+			containerIDs:     []string{"appFakeID"},
+			pod: makeMultiContainerPod(
+				[]struct{ request, limit string }{{"100m", "100m"}},
+				[]struct{ request, limit string }{{"4000m", "4000m"}}),
+			expInitCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet()},
+			expCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4, 1, 5)},
+		},
+		{
+			description:      "Equal Number of Guaranteed CPUs",
+			topo:             topoSingleSocketHT,
+			numReservedCPUs:  0,
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			initContainerIDs: []string{"initFakeID"},
+			containerIDs:     []string{"appFakeID"},
+			pod: makeMultiContainerPod(
+				[]struct{ request, limit string }{{"4000m", "4000m"}},
+				[]struct{ request, limit string }{{"4000m", "4000m"}}),
+			expInitCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4, 1, 5)},
+			expCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4, 1, 5)},
+		},
+		{
+			description:      "More Init Container Guaranteed CPUs",
+			topo:             topoSingleSocketHT,
+			numReservedCPUs:  0,
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			initContainerIDs: []string{"initFakeID"},
+			containerIDs:     []string{"appFakeID"},
+			pod: makeMultiContainerPod(
+				[]struct{ request, limit string }{{"6000m", "6000m"}},
+				[]struct{ request, limit string }{{"4000m", "4000m"}}),
+			expInitCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4, 1, 5, 2, 6)},
+			expCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4, 1, 5)},
+		},
+		{
+			description:      "Less Init Container Guaranteed CPUs",
+			topo:             topoSingleSocketHT,
+			numReservedCPUs:  0,
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			initContainerIDs: []string{"initFakeID"},
+			containerIDs:     []string{"appFakeID"},
+			pod: makeMultiContainerPod(
+				[]struct{ request, limit string }{{"2000m", "2000m"}},
+				[]struct{ request, limit string }{{"4000m", "4000m"}}),
+			expInitCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4)},
+			expCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4, 1, 5)},
+		},
+		{
+			description:      "Multi Init Container Equal CPUs",
+			topo:             topoSingleSocketHT,
+			numReservedCPUs:  0,
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			initContainerIDs: []string{"initFakeID-1", "initFakeID-2"},
+			containerIDs:     []string{"appFakeID"},
+			pod: makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"},
+					{"2000m", "2000m"}},
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"}}),
+			expInitCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4),
+				cpuset.NewCPUSet(0, 4)},
+			expCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4)},
+		},
+		{
+			description:      "Multi Init Container Less CPUs",
+			topo:             topoSingleSocketHT,
+			numReservedCPUs:  0,
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			initContainerIDs: []string{"initFakeID-1", "initFakeID-2"},
+			containerIDs:     []string{"appFakeID"},
+			pod: makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"4000m", "4000m"},
+					{"4000m", "4000m"}},
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"}}),
+			expInitCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4, 1, 5),
+				cpuset.NewCPUSet(0, 4, 1, 5)},
+			expCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4)},
+		},
+		{
+			description:      "Multi Init Container More CPUs",
+			topo:             topoSingleSocketHT,
+			numReservedCPUs:  0,
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			initContainerIDs: []string{"initFakeID-1", "initFakeID-2"},
+			containerIDs:     []string{"appFakeID"},
+			pod: makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"},
+					{"2000m", "2000m"}},
+				[]struct{ request, limit string }{
+					{"4000m", "4000m"}}),
+			expInitCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4),
+				cpuset.NewCPUSet(0, 4)},
+			expCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4, 1, 5)},
+		},
+		{
+			description:      "Multi Init Container Increasing CPUs",
+			topo:             topoSingleSocketHT,
+			numReservedCPUs:  0,
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			initContainerIDs: []string{"initFakeID-1", "initFakeID-2"},
+			containerIDs:     []string{"appFakeID"},
+			pod: makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"},
+					{"4000m", "4000m"}},
+				[]struct{ request, limit string }{
+					{"6000m", "6000m"}}),
+			expInitCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4),
+				cpuset.NewCPUSet(0, 4, 1, 5)},
+			expCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4, 1, 5, 2, 6)},
+		},
+		{
+			description:      "Multi Init, Multi App Container Split CPUs",
+			topo:             topoSingleSocketHT,
+			numReservedCPUs:  0,
+			stAssignments:    state.ContainerCPUAssignments{},
+			stDefaultCPUSet:  cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7),
+			initContainerIDs: []string{"initFakeID-1", "initFakeID-2"},
+			containerIDs:     []string{"appFakeID-1", "appFakeID-2"},
+			pod: makeMultiContainerPod(
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"},
+					{"4000m", "4000m"}},
+				[]struct{ request, limit string }{
+					{"2000m", "2000m"},
+					{"2000m", "2000m"}}),
+			expInitCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4),
+				cpuset.NewCPUSet(0, 4, 1, 5)},
+			expCSets: []cpuset.CPUSet{
+				cpuset.NewCPUSet(0, 4),
+				cpuset.NewCPUSet(1, 5)},
+		},
+	}
+
+	for _, testCase := range testCases {
+		policy := NewStaticPolicy(testCase.topo, testCase.numReservedCPUs, cpuset.NewCPUSet(), topologymanager.NewFakeManager())
+
+		state := &mockState{
+			assignments:   testCase.stAssignments,
+			defaultCPUSet: testCase.stDefaultCPUSet,
+		}
+
+		mgr := &manager{
+			policy:            policy,
+			state:             state,
+			containerRuntime:  mockRuntimeService{},
+			containerMap:      containermap.NewContainerMap(),
+			activePods:        func() []*v1.Pod { return nil },
+			podStatusProvider: mockPodStatusProvider{},
+		}
+
+		containers := append(
+			testCase.pod.Spec.InitContainers,
+			testCase.pod.Spec.Containers...)
+
+		containerIDs := append(
+			testCase.initContainerIDs,
+			testCase.containerIDs...)
+
+		expCSets := append(
+			testCase.expInitCSets,
+			testCase.expCSets...)
+
+		for i := range containers {
+			err := mgr.AddContainer(testCase.pod, &containers[i], containerIDs[i])
+			if err != nil {
+				t.Errorf("StaticPolicy AddContainer() error (%v). unexpected error for container id: %v: %v",
+					testCase.description, containerIDs[i], err)
+			}
+
+			cset, found := state.assignments[containerIDs[i]]
+			if !expCSets[i].IsEmpty() && !found {
+				t.Errorf("StaticPolicy AddContainer() error (%v). expected container id %v to be present in assignments %v",
+					testCase.description, containerIDs[i], state.assignments)
+			}
+
+			if found && !cset.Equals(expCSets[i]) {
+				t.Errorf("StaticPolicy AddContainer() error (%v). expected cpuset %v for container %v but got %v",
+					testCase.description, expCSets[i], containerIDs[i], cset)
+			}
 		}
 	}
 }
@@ -386,6 +619,7 @@ func TestCPUManagerRemove(t *testing.T) {
 			defaultCPUSet: cpuset.NewCPUSet(),
 		},
 		containerRuntime:  mockRuntimeService{},
+		containerMap:      containermap.NewContainerMap(),
 		activePods:        func() []*v1.Pod { return nil },
 		podStatusProvider: mockPodStatusProvider{},
 	}
@@ -401,6 +635,7 @@ func TestCPUManagerRemove(t *testing.T) {
 		},
 		state:             state.NewMemoryState(),
 		containerRuntime:  mockRuntimeService{},
+		containerMap:      containermap.NewContainerMap(),
 		activePods:        func() []*v1.Pod { return nil },
 		podStatusProvider: mockPodStatusProvider{},
 	}
@@ -630,6 +865,7 @@ func TestReconcileState(t *testing.T) {
 			containerRuntime: mockRuntimeService{
 				err: testCase.updateErr,
 			},
+			containerMap: containermap.NewContainerMap(),
 			activePods: func() []*v1.Pod {
 				return testCase.activePods
 			},
@@ -724,6 +960,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 			containerRuntime: mockRuntimeService{
 				err: testCase.updateErr,
 			},
+			containerMap:      containermap.NewContainerMap(),
 			activePods:        func() []*v1.Pod { return nil },
 			podStatusProvider: mockPodStatusProvider{},
 		}
