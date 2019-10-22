@@ -274,16 +274,40 @@ type reconciledContainer struct {
 	containerID   string
 }
 
-func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {
+func (m *manager) removeStaleState(activePods []*v1.Pod) {
 	if !m.sourcesReady.AllReady() {
 		return
 	}
+
+	m.Lock()
+	defer m.Unlock()
+
+	activeContainers := make(map[string]*v1.Pod)
+	for _, pod := range activePods {
+		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
+			containerID, err := m.containerMap.Get(pod, &container)
+			if err == nil {
+				activeContainers[containerID] = pod
+			}
+		}
+	}
+	for containerID := range m.state.GetCPUAssignments() {
+		if pod, ok := activeContainers[containerID]; !ok {
+			err := m.policyRemoveContainer(containerID)
+			if err != nil {
+				klog.Errorf("[cpumanager] removeStaleState: failed to remove container (pod: %s, container id: %s, error: %v)", pod.Name, containerID, err)
+			}
+		}
+	}
+}
+
+func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
 
-	activeContainers := make(map[string]*v1.Pod)
-
-	for _, pod := range m.activePods() {
+	activePods := m.activePods()
+	m.removeStaleState(activePods)
+	for _, pod := range activePods {
 		allContainers := pod.Spec.InitContainers
 		allContainers = append(allContainers, pod.Spec.Containers...)
 		status, ok := m.podStatusProvider.GetPodStatus(pod.UID)
@@ -321,8 +345,6 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				}
 			}
 
-			activeContainers[containerID] = pod
-
 			cset := m.state.GetCPUSetOrDefault(containerID)
 			if cset.IsEmpty() {
 				// NOTE: This should not happen outside of tests.
@@ -339,16 +361,6 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				continue
 			}
 			success = append(success, reconciledContainer{pod.Name, container.Name, containerID})
-		}
-	}
-
-	for containerID := range m.state.GetCPUAssignments() {
-		if pod, ok := activeContainers[containerID]; !ok {
-			err := m.RemoveContainer(containerID)
-			if err != nil {
-				klog.Errorf("[cpumanager] reconcileState: failed to remove container (pod: %s, container id: %s, error: %v)", pod.Name, containerID, err)
-				failure = append(failure, reconciledContainer{pod.Name, "", containerID})
-			}
 		}
 	}
 	return success, failure
