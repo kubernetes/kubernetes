@@ -203,7 +203,7 @@ const (
 	CertificateKeySize = 32
 
 	// LabelNodeRoleMaster specifies that a node is a control-plane
-	// This is a duplicate definition of the constant in pkg/controller/service/service_controller.go
+	// This is a duplicate definition of the constant in pkg/controller/service/controller.go
 	LabelNodeRoleMaster = "node-role.kubernetes.io/master"
 
 	// AnnotationKubeadmCRISocket specifies the annotation kubeadm uses to preserve the crisocket information given to kubeadm at
