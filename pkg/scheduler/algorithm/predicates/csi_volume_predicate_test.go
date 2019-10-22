@@ -30,6 +30,7 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 )
 
 const (
@@ -471,8 +472,8 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 	}
 }
 
-func getFakeCSIPVInfo(volumeName string, driverNames ...string) FakePersistentVolumeInfo {
-	pvInfos := FakePersistentVolumeInfo{}
+func getFakeCSIPVInfo(volumeName string, driverNames ...string) fakelisters.PersistentVolumeInfo {
+	pvInfos := fakelisters.PersistentVolumeInfo{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			volumeHandle := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -516,8 +517,8 @@ func getFakeCSIPVInfo(volumeName string, driverNames ...string) FakePersistentVo
 	return pvInfos
 }
 
-func getFakeCSIPVCInfo(volumeName, scName string, driverNames ...string) FakePersistentVolumeClaimInfo {
-	pvcInfos := FakePersistentVolumeClaimInfo{}
+func getFakeCSIPVCInfo(volumeName, scName string, driverNames ...string) fakelisters.PersistentVolumeClaimInfo {
+	pvcInfos := fakelisters.PersistentVolumeClaimInfo{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			v := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -559,8 +560,8 @@ func enableMigrationOnNode(csiNode *storagev1beta1.CSINode, pluginName string) {
 	csiNode.Annotations = nodeInfoAnnotations
 }
 
-func getFakeCSIStorageClassInfo(scName, provisionerName string) FakeStorageClassInfo {
-	return FakeStorageClassInfo{
+func getFakeCSIStorageClassInfo(scName, provisionerName string) fakelisters.StorageClassInfo {
+	return fakelisters.StorageClassInfo{
 		{
 			ObjectMeta:  metav1.ObjectMeta{Name: scName},
 			Provisioner: provisionerName,
@@ -568,9 +569,9 @@ func getFakeCSIStorageClassInfo(scName, provisionerName string) FakeStorageClass
 	}
 }
 
-func getFakeCSINodeInfo(csiNode *storagev1beta1.CSINode) FakeCSINodeInfo {
+func getFakeCSINodeInfo(csiNode *storagev1beta1.CSINode) fakelisters.CSINodeInfo {
 	if csiNode != nil {
-		return FakeCSINodeInfo(*csiNode)
+		return fakelisters.CSINodeInfo(*csiNode)
 	}
-	return FakeCSINodeInfo{}
+	return fakelisters.CSINodeInfo{}
 }

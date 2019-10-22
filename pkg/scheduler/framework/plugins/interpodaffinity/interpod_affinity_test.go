@@ -26,8 +26,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 var (
@@ -739,7 +739,7 @@ func TestSingleNode(t *testing.T) {
 			state := framework.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
-			p := New(predicates.FakeNodeInfo(*node), st.FakePodLister(test.pods))
+			p := New(fakelisters.NodeLister([]*v1.Node{node}), fakelisters.PodLister(test.pods))
 			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, nodeInfoMap[node.Name])
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
@@ -1432,18 +1432,14 @@ func TestMultipleNodes(t *testing.T) {
 
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeList := make([]v1.Node, len(test.nodes))
-			for _, node := range test.nodes {
-				nodeList = append(nodeList, *node)
-			}
-			nodeListInfo := predicates.FakeNodeListInfo(nodeList)
+			nodeListInfo := fakelisters.NodeLister(test.nodes)
 			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
 			for indexNode, node := range test.nodes {
 				meta := predicates.GetPredicateMetadata(test.pod, nodeInfoMap)
 				state := framework.NewCycleState()
 				state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
-				p := New(nodeListInfo, st.FakePodLister(test.pods))
+				p := New(nodeListInfo, fakelisters.PodLister(test.pods))
 				gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, nodeInfoMap[node.Name])
 				if !reflect.DeepEqual(gotStatus, test.wantStatuses[indexNode]) {
 					t.Errorf("index: %d status does not match: %v, want: %v", indexTest, gotStatus, test.wantStatuses[indexNode])

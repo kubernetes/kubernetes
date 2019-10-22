@@ -32,19 +32,6 @@ var NodeFieldSelectorKeys = map[string]func(*v1.Node) string{
 	schedulerapi.NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
 }
 
-// PodFilter is a function to filter a pod. If pod passed return true else return false.
-type PodFilter func(*v1.Pod) bool
-
-// PodLister interface represents anything that can list pods for a scheduler.
-type PodLister interface {
-	// We explicitly return []*v1.Pod, instead of v1.PodList, to avoid
-	// performing expensive copies that are unneeded.
-	List(labels.Selector) ([]*v1.Pod, error)
-	// This is similar to "List()", but the returned slice does not
-	// contain pods that don't pass `podFilter`.
-	FilteredList(podFilter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
-}
-
 var _ corelisters.ReplicationControllerLister = &EmptyControllerLister{}
 
 // EmptyControllerLister implements ControllerLister on []v1.ReplicationController returning empty data

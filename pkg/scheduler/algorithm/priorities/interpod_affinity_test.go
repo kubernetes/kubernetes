@@ -17,27 +17,16 @@ limitations under the License.
 package priorities
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
-
-type FakeNodeListInfo []*v1.Node
-
-func (nodes FakeNodeListInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
-	for _, node := range nodes {
-		if node.Name == nodeName {
-			return node, nil
-		}
-	}
-	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
-}
 
 func TestInterPodAffinityPriority(t *testing.T) {
 	labelRgChina := map[string]string{
@@ -528,7 +517,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
 			interPodAffinity := InterPodAffinity{
-				info:                  FakeNodeListInfo(test.nodes),
+				nodeLister:            fakelisters.NodeLister(test.nodes),
 				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			}
 			list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
@@ -616,7 +605,7 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
 			ipa := InterPodAffinity{
-				info:                  FakeNodeListInfo(test.nodes),
+				nodeLister:            fakelisters.NodeLister(test.nodes),
 				hardPodAffinityWeight: test.hardPodAffinityWeight,
 			}
 			list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
@@ -673,7 +662,7 @@ func BenchmarkInterPodAffinityPriority(b *testing.B) {
 			existingPods, allNodes := tt.prepFunc(tt.existingPodsNum, tt.allNodesNum)
 			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(existingPods, allNodes)
 			interPodAffinity := InterPodAffinity{
-				info:                  FakeNodeListInfo(allNodes),
+				nodeLister:            fakelisters.NodeLister(allNodes),
 				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			}
 			b.ResetTimer()

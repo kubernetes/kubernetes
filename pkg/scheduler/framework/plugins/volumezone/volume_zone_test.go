@@ -26,6 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -48,7 +49,7 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 }
 
 func TestSingleZone(t *testing.T) {
-	pvInfo := predicates.FakePersistentVolumeInfo{
+	pvInfo := fakelisters.PersistentVolumeInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
@@ -60,7 +61,7 @@ func TestSingleZone(t *testing.T) {
 		},
 	}
 
-	pvcInfo := predicates.FakePersistentVolumeClaimInfo{
+	pvcInfo := fakelisters.PersistentVolumeClaimInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -166,7 +167,7 @@ func TestSingleZone(t *testing.T) {
 }
 
 func TestMultiZone(t *testing.T) {
-	pvInfo := predicates.FakePersistentVolumeInfo{
+	pvInfo := fakelisters.PersistentVolumeInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
@@ -178,7 +179,7 @@ func TestMultiZone(t *testing.T) {
 		},
 	}
 
-	pvcInfo := predicates.FakePersistentVolumeClaimInfo{
+	pvcInfo := fakelisters.PersistentVolumeClaimInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -259,7 +260,7 @@ func TestWithBinding(t *testing.T) {
 		classImmediate = "Class_Immediate"
 	)
 
-	classInfo := predicates.FakeStorageClassInfo{
+	classInfo := fakelisters.StorageClassInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: classImmediate},
 		},
@@ -269,13 +270,13 @@ func TestWithBinding(t *testing.T) {
 		},
 	}
 
-	pvInfo := predicates.FakePersistentVolumeInfo{
+	pvInfo := fakelisters.PersistentVolumeInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 	}
 
-	pvcInfo := predicates.FakePersistentVolumeClaimInfo{
+	pvcInfo := fakelisters.PersistentVolumeClaimInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
