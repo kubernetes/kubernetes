@@ -190,6 +190,8 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 	masterConfig.ExtraConfig.VersionedInformers = informers.NewSharedInformerFactory(clientset, masterConfig.GenericConfig.LoopbackClientConfig.Timeout)
 	m, err = masterConfig.Complete().New(genericapiserver.NewEmptyDelegate())
 	if err != nil {
+		// We log the error first so that even if closeFn crashes, the error is shown
+		klog.Errorf("error in bringing up the master: %v", err)
 		closeFn()
 		klog.Fatalf("error in bringing up the master: %v", err)
 	}
