@@ -582,11 +582,24 @@ func (handle *LinuxKernelHandler) GetModules() ([]string, error) {
 
 	var bmods []string
 
-	// Find out loaded kernel modules. If this is a full static kernel it will thrown an error
+	// Find out loaded kernel modules. If this is a full static kernel it will try to verify if the module is compiled using /boot/config-KERNELVERSION
 	modulesFile, err := os.Open("/proc/modules")
+	if err == os.ErrNotExist {
+		klog.Warningf("Failed to read file /proc/modules with error %v. Assuming this is a kernel without loadable modules support enabled", err)
+		kernelConfigFile := fmt.Sprintf("/boot/config-%s", kernelVersionStr)
+		kConfig, err := ioutil.ReadFile(kernelConfigFile)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to read Kernel Config file %s with error %v", kernelConfigFile, err)
+		}
+		for _, module := range ipvsModules {
+			if match, _ := regexp.Match("CONFIG_"+strings.ToUpper(module)+"=y", kConfig); match {
+				bmods = append(bmods, module)
+			}
+		}
+		return bmods, nil
+	}
 	if err != nil {
-		klog.Warningf("Failed to read file /proc/modules with error %v. Kube-proxy requires loadable modules support enabled in the kernel", err)
-		return nil, err
+		return nil, fmt.Errorf("Failed to read file /proc/modules with error %v", err)
 	}
 
 	mods, err := getFirstColumn(modulesFile)
