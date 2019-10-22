@@ -21,10 +21,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
-	"github.com/armon/go-socks5"
-	"github.com/elazarl/goproxy"
 	"io"
-	"k8s.io/apimachinery/pkg/util/httpstream"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -34,6 +31,11 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/armon/go-socks5"
+	"github.com/elazarl/goproxy"
+
+	"k8s.io/apimachinery/pkg/util/httpstream"
 )
 
 // be sure to unset environment variable https_proxy (if exported) before testing, otherwise the testing will fail unexpectedly.
