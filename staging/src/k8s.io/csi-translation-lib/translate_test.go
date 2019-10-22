@@ -20,7 +20,9 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/csi-translation-lib/plugins"
 )
 
 func TestTranslationStability(t *testing.T) {
@@ -75,6 +77,117 @@ func TestTranslationStability(t *testing.T) {
 			t.Errorf("Volumes after translation and back not equal:\n\nOriginal Volume: %#v\n\nRound-trip Volume: %#v", test.pv, newPV)
 		}
 	}
+}
+
+func TestZoneTranslation(t *testing.T) {
+	testCases := []struct {
+		name        string
+		pv          *v1.PersistentVolume
+		topologyKey string
+	}{
+		{
+			name: "GCE PD PV Source",
+			pv: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomain: "us-east-1",
+						v1.LabelZoneRegion:        "us-east-1a",
+					},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+							PDName:    "test-disk",
+							FSType:    "ext4",
+							Partition: 0,
+							ReadOnly:  false,
+						},
+					},
+				},
+			},
+			topologyKey: plugins.GCEPDTopologyKey,
+		},
+		{
+			name: "AWS EBS PV Source",
+			pv: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomain: "us-east-1",
+						v1.LabelZoneRegion:        "us-east-1a",
+					},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+							VolumeID:  "vol01",
+							FSType:    "ext3",
+							Partition: 1,
+							ReadOnly:  true,
+						},
+					},
+				},
+			},
+			topologyKey: plugins.AWSEBSTopologyKey,
+		},
+		{
+			name: "Cinder PV Source",
+			pv: &v1.PersistentVolume{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.LabelZoneFailureDomain: "us-east-1",
+						v1.LabelZoneRegion:        "us-east-1a",
+					},
+				},
+				Spec: v1.PersistentVolumeSpec{
+					PersistentVolumeSource: v1.PersistentVolumeSource{
+						Cinder: &v1.CinderPersistentVolumeSource{
+							VolumeID: "vol1",
+							FSType:   "ext4",
+							ReadOnly: false,
+						},
+					},
+				},
+			},
+			topologyKey: plugins.CinderTopologyKey,
+		},
+	}
+	for _, test := range testCases {
+		ctl := New()
+		t.Logf("Testing %v", test.name)
+
+		zone := test.pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
+
+		// Translate to CSI PV and check translated node affinity
+		newCSIPV, err := ctl.TranslateInTreePVToCSI(test.pv)
+		if err != nil {
+			t.Errorf("Error when translating to CSI: %v", err)
+		}
+
+		if !isNodeAffinitySet(newCSIPV, test.topologyKey, zone) {
+			t.Errorf("Volume after translation lacks topology: %#v", newCSIPV)
+		}
+
+		// Translate back to in-tree and make sure node affinity is still set
+		newInTreePV, err := ctl.TranslateCSIPVToInTree(newCSIPV)
+		if err != nil {
+			t.Errorf("Error when translating to in-tree: %v", err)
+		}
+
+		if !isNodeAffinitySet(newInTreePV, test.topologyKey, zone) {
+			t.Errorf("Volume after translation lacks topology: %#v", newInTreePV)
+		}
+	}
+}
+
+func isNodeAffinitySet(pv *v1.PersistentVolume, topologyKey, zone string) bool {
+	for i := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
+		for _, r := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions {
+			if r.Key == topologyKey && r.Values[0] == zone {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func TestPluginNameMappings(t *testing.T) {
