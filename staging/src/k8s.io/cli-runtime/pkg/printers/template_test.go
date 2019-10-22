@@ -243,6 +243,34 @@ func TestTemplatePanic(t *testing.T) {
 	}
 }
 
+func TestTemplateSuccess(t *testing.T) {
+
+	templatePrinter, err := NewGoTemplatePrinter([]byte("{{.name}}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Template printer should succeed on these resources.
+	om := func(name string) metav1.ObjectMeta { return metav1.ObjectMeta{Name: name} }
+	objects := []runtime.Object{
+		&v1.Pod{ObjectMeta: om("pod")},
+		&v1.PodList{},
+		&v1.PodList{Items: []v1.Pod{{}}},
+		&v1.Endpoints{
+			Subsets: []v1.EndpointSubset{{
+				Addresses: []v1.EndpointAddress{{IP: "127.0.0.1"}, {IP: "localhost"}},
+				Ports:     []v1.EndpointPort{{Port: 8080}},
+			}}},
+	}
+
+	for _, obj := range objects {
+		b := &bytes.Buffer{}
+		if err := templatePrinter.PrintObj(obj, b); err != nil {
+			t.Errorf("Unexpected template error: %v", err)
+		}
+	}
+}
+
 func TestTemplateErrors(t *testing.T) {
 
 	templatePrinter, err := NewGoTemplatePrinter([]byte("{{len .items}}"))
