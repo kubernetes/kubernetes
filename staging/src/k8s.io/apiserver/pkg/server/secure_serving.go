@@ -76,8 +76,19 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		if notifier, ok := s.ClientCA.(dynamiccertificates.Notifier); ok {
 			notifier.AddListener(dynamicCertificateController)
 		}
+		if notifier, ok := s.Cert.(dynamiccertificates.Notifier); ok {
+			notifier.AddListener(dynamicCertificateController)
+		}
 		// start controllers if possible
 		if controller, ok := s.ClientCA.(dynamiccertificates.ControllerRunner); ok {
+			// runonce to be sure that we have a value.
+			if err := controller.RunOnce(); err != nil {
+				return nil, err
+			}
+
+			go controller.Run(1, stopCh)
+		}
+		if controller, ok := s.Cert.(dynamiccertificates.ControllerRunner); ok {
 			// runonce to be sure that we have a value.
 			if err := controller.RunOnce(); err != nil {
 				return nil, err

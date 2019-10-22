@@ -5,7 +5,8 @@ go_library(
     srcs = [
         "cert_key.go",
         "client_ca.go",
-        "dynamicfile_content.go",
+        "dynamic_cafile_content.go",
+        "dynamic_serving_content.go",
         "named_certificates.go",
         "static_content.go",
         "tlsconfig.go",

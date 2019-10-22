@@ -226,7 +226,7 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	// load main cert
 	if len(serverCertFile) != 0 || len(serverKeyFile) != 0 {
 		var err error
-		c.Cert, err = dynamiccertificates.NewStaticCertKeyContentFromFiles(serverCertFile, serverKeyFile)
+		c.Cert, err = dynamiccertificates.NewDynamicServingContentFromFiles("serving-cert", serverCertFile, serverKeyFile)
 		if err != nil {
 			return err
 		}
