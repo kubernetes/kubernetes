@@ -69,12 +69,10 @@ func (deploymentStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+func (s deploymentStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	s.ResetFields(obj, nil)
 	deployment := obj.(*apps.Deployment)
-	deployment.Status = apps.DeploymentStatus{}
 	deployment.Generation = 1
-
-	pod.DropDisabledTemplateFields(&deployment.Spec.Template, nil)
 }
 
 // Validate validates a new deployment.
@@ -95,19 +93,29 @@ func (deploymentStrategy) AllowCreateOnUpdate() bool {
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+func (s deploymentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	s.ResetFields(obj, old)
 	newDeployment := obj.(*apps.Deployment)
 	oldDeployment := old.(*apps.Deployment)
-	newDeployment.Status = oldDeployment.Status
-
-	pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
-
 	// Spec updates bump the generation so that we can distinguish between
 	// scaling events and template changes, annotation updates bump the generation
 	// because annotations are copied from deployments to their replica sets.
 	if !apiequality.Semantic.DeepEqual(newDeployment.Spec, oldDeployment.Spec) ||
 		!apiequality.Semantic.DeepEqual(newDeployment.Annotations, oldDeployment.Annotations) {
 		newDeployment.Generation = oldDeployment.Generation + 1
+	}
+}
+
+// ResetFields that are not allowed to be set by end users
+func (deploymentStrategy) ResetFields(new, old runtime.Object) {
+	newDeployment := new.(*apps.Deployment)
+	if old != nil {
+		oldDeployment := old.(*apps.Deployment)
+		newDeployment.Status = oldDeployment.Status
+		pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, &oldDeployment.Spec.Template)
+	} else {
+		newDeployment.Status = apps.DeploymentStatus{}
+		pod.DropDisabledTemplateFields(&newDeployment.Spec.Template, nil)
 	}
 }
 

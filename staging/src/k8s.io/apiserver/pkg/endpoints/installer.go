@@ -555,6 +555,7 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 			a.group.UnsafeConvertor,
 			a.group.Defaulter,
 			a.group.Creater,
+			a.group.Resetter,
 			fqKindToRegister,
 			reqScope.HubGroupVersion,
 		)

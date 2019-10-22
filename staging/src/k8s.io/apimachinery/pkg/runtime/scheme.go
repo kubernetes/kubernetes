@@ -69,6 +69,11 @@ type Scheme struct {
 	// the provided object must be a pointer.
 	defaulterFuncs map[reflect.Type]func(interface{})
 
+	// resetterFuncs is an array of interfaces to be called with an object to reset fields that should
+	// not be changed by the user
+	// the provided object must be a pointer.
+	resetterFuncs map[reflect.Type]func(interface{}, interface{})
+
 	// converter stores all registered conversion functions. It also has
 	// default converting behavior.
 	converter *conversion.Converter
@@ -97,6 +102,7 @@ func NewScheme() *Scheme {
 		unversionedKinds:          map[string]reflect.Type{},
 		fieldLabelConversionFuncs: map[schema.GroupVersionKind]FieldLabelConversionFunc{},
 		defaulterFuncs:            map[reflect.Type]func(interface{}){},
+		resetterFuncs:             map[reflect.Type]func(interface{}){},
 		versionPriority:           map[string][]string{},
 		schemeName:                naming.GetNameFromCallsite(internalPackages...),
 	}
@@ -389,6 +395,23 @@ func (s *Scheme) AddTypeDefaultingFunc(srcType Object, fn func(interface{})) {
 func (s *Scheme) Default(src Object) {
 	if fn, ok := s.defaulterFuncs[reflect.TypeOf(src)]; ok {
 		fn(src)
+	}
+}
+
+// AddTypeResettingFunc registers a function that is passed a pointer to an
+// object and can reset fields on the object that are not to be changed by a user.
+// These functions will be invoked when ResetFields() is called.
+// The function will never be called unless the provided object matches srcType.
+// If this function is invoked twice with the same srcType,
+// the fn passed to the later call will be used instead.
+func (s *Scheme) AddTypeResettingFunc(srcType Object, fn func(interface{}, interface{})) {
+	s.resetterFuncs[reflect.TypeOf(srcType)] = fn
+}
+
+// ResetFields resets selected fields on the provided new object with fields from the
+func (s *Scheme) ResetFields(new, old Object) {
+	if fn, ok := s.resetterFuncs[reflect.TypeOf(new)]; ok {
+		fn(new, old)
 	}
 }
 

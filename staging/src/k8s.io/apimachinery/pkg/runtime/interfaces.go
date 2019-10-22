@@ -255,6 +255,13 @@ type ObjectCreater interface {
 	New(kind schema.GroupVersionKind) (out Object, err error)
 }
 
+// ObjectResetter contains methods for resetting fields on an object that should not be changed
+type ObjectResetter interface {
+	// ResetFields takes an Object (must be a pointer) and resets any fields that are not allowed to be changed by a user
+	// If old is not nil, fields in the new object will be reset based on old.
+	ResetFields(new, old Object)
+}
+
 // EquivalentResourceMapper provides information about resources that address the same underlying data as a specified resource
 type EquivalentResourceMapper interface {
 	// EquivalentResourcesFor returns a list of resources that address the same underlying data as resource.
