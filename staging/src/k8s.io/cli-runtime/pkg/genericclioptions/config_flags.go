@@ -52,6 +52,7 @@ const (
 	flagPassword         = "password"
 	flagTimeout          = "request-timeout"
 	flagHTTPCacheDir     = "cache-dir"
+	flagClientCacheTTL   = "cache-ttl"
 )
 
 var defaultCacheDir = filepath.Join(homedir.HomeDir(), ".kube", "http-cache")
@@ -94,6 +95,7 @@ type ConfigFlags struct {
 	Username         *string
 	Password         *string
 	Timeout          *string
+	ClientCacheTTL   *string
 
 	clientConfig clientcmd.ClientConfig
 	lock         sync.Mutex
@@ -232,7 +234,15 @@ func (f *ConfigFlags) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, e
 	}
 
 	discoveryCacheDir := computeDiscoverCacheDir(filepath.Join(homedir.HomeDir(), ".kube", "cache", "discovery"), config.Host)
-	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, time.Duration(10*time.Minute))
+	ttl := time.Duration(10 * time.Minute)
+	if f.ClientCacheTTL != nil {
+		cacheTTL, err := time.ParseDuration(*f.ClientCacheTTL)
+		if err != nil {
+			return nil, err
+		}
+		ttl = cacheTTL
+	}
+	return diskcached.NewCachedDiscoveryClientForConfig(config, discoveryCacheDir, httpCacheDir, ttl)
 }
 
 // ToRESTMapper returns a mapper.
@@ -303,7 +313,9 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 	if f.Timeout != nil {
 		flags.StringVar(f.Timeout, flagTimeout, *f.Timeout, "The length of time to wait before giving up on a single server request. Non-zero values should contain a corresponding time unit (e.g. 1s, 2m, 3h). A value of zero means don't timeout requests.")
 	}
-
+	if f.ClientCacheTTL != nil {
+		flags.StringVar(f.ClientCacheTTL, flagClientCacheTTL, *f.ClientCacheTTL, "The TTL for client-go discovery cache. Default value is 10 minutes")
+	}
 }
 
 // WithDeprecatedPasswordFlag enables the username and password config flags
