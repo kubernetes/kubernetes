@@ -68,7 +68,7 @@ func (az *Cloud) NodeAddresses(ctx context.Context, name types.NodeName) ([]v1.N
 	}
 
 	if az.UseInstanceMetadata {
-		metadata, err := az.metadata.GetMetadata()
+		metadata, err := az.metadata.GetMetadata(allowUnsafeRead)
 		if err != nil {
 			return nil, err
 		}
@@ -224,7 +224,7 @@ func (az *Cloud) InstanceID(ctx context.Context, name types.NodeName) (string, e
 	}
 
 	if az.UseInstanceMetadata {
-		metadata, err := az.metadata.GetMetadata()
+		metadata, err := az.metadata.GetMetadata(allowUnsafeRead)
 		if err != nil {
 			return "", err
 		}
@@ -301,7 +301,7 @@ func (az *Cloud) InstanceType(ctx context.Context, name types.NodeName) (string,
 	}
 
 	if az.UseInstanceMetadata {
-		metadata, err := az.metadata.GetMetadata()
+		metadata, err := az.metadata.GetMetadata(allowUnsafeRead)
 		if err != nil {
 			return "", err
 		}
