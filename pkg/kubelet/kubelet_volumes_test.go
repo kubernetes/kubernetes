@@ -25,10 +25,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	core "k8s.io/client-go/testing"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetest "k8s.io/kubernetes/pkg/volume/testing"
 	"k8s.io/kubernetes/pkg/volume/util"
+	"os"
+	"path"
+	"path/filepath"
 )
 
 func TestListVolumesForPod(t *testing.T) {
@@ -196,9 +200,25 @@ func TestPodVolumesExist(t *testing.T) {
 	}
 
 	for _, pod := range pods {
-		podVolumesExist := kubelet.podVolumesExist(pod.UID)
+		podVolumesExist := kubelet.podMountedVolumesExistInCacheOrDisk(pod.UID)
 		assert.True(t, podVolumesExist, "pod %q", pod.UID)
 	}
+}
+
+func TestPodVolumePathsExist(t *testing.T) {
+	testKubelet := newTestKubelet(t, false /* controllerAttachDetachEnabled */)
+	defer testKubelet.Cleanup()
+	kubelet := testKubelet.kubelet
+	pod := podWithUIDNameNs(uuid.NewUUID(), "pod1", "ns")
+
+	// To pass volumeManager GetMountedVolumesForPod control create pod volume data directory directly
+	podVolumeDir := kubelet.getPodVolumeDir(pod.UID, "volumePlugin1", "volume1")
+	podDataDir := filepath.Join(podVolumeDir, "data1")
+	os.MkdirAll(path.Dir(podDataDir), 0755)
+	defer os.RemoveAll(path.Dir(kubelet.getPodDir(pod.UID)))
+
+	podVolumePathsExist := kubelet.podVolumePathsExistInCacheOrDisk(pod.UID)
+	assert.True(t, podVolumePathsExist, "pod %q", pod.UID)
 }
 
 func TestVolumeAttachAndMountControllerDisabled(t *testing.T) {
