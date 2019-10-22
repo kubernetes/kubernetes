@@ -36,7 +36,7 @@ func FuzzDuration(b []byte) int {
 	if err := yaml.Unmarshal(b, &unmarshalResult); err != nil {
 		return 0
 	}
-	marshalResult, err := yaml.Marshal(&unmarshalResult)
+	marshalResult, err := sigyaml.Marshal(&unmarshalResult)
 	if err != nil {
 		panic(err)
 	}
@@ -55,7 +55,7 @@ func FuzzMicroTime(b []byte) int {
 	if err := yaml.Unmarshal(b, &unmarshalResult); err != nil {
 		return 0
 	}
-	marshalResult, err := yaml.Marshal(&unmarshalResult)
+	marshalResult, err := sigyaml.Marshal(&unmarshalResult)
 	if err != nil {
 		panic(err)
 	}
@@ -85,7 +85,7 @@ func FuzzTime(b []byte) int {
 	var unmarshalResult struct {
 		T metav1.Time `json:"t"`
 	}
-	if err := yaml.Unmarshal(b, &unmarshalResult); err != nil {
+	if err := sigyaml.Unmarshal(b, &unmarshalResult); err != nil {
 		return 0
 	}
 	marshalResult, err := yaml.Marshal(&unmarshalResult)
