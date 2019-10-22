@@ -86,8 +86,8 @@ func newETCD3HealthCheck(c storagebackend.Config) (func() error, error) {
 		client := clientValue.Load().(*clientv3.Client)
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		// See https://github.com/etcd-io/etcd/blob/master/etcdctl/ctlv3/command/ep_command.go#L118
-		_, err := client.Get(ctx, path.Join(c.Prefix, "health"))
+		// See https://github.com/etcd-io/etcd/blob/c57f8b3af865d1b531b979889c602ba14377420e/etcdctl/ctlv3/command/ep_command.go#L118
+		_, err := client.Get(ctx, path.Join("/", c.Prefix, "health"))
 		if err == nil {
 			return nil
 		}
