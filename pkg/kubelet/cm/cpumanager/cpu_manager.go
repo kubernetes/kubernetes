@@ -96,6 +96,10 @@ type manager struct {
 	// and the containerID of their containers
 	podStatusProvider status.PodStatusProvider
 
+	// containerMap provides a mapping from (pod, container) -> containerID
+	// for all containers a pod
+	containerMap containerMap
+
 	topology *topology.CPUTopology
 
 	nodeAllocatableReservation v1.ResourceList
@@ -162,6 +166,7 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		policy:                     policy,
 		reconcilePeriod:            reconcilePeriod,
 		state:                      stateImpl,
+		containerMap:               newContainerMap(),
 		topology:                   topo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
 	}
@@ -186,7 +191,22 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 
 func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) error {
 	m.Lock()
-	err := m.policy.AddContainer(m.state, p, c, containerID)
+	// Proactively remove CPUs from init containers that have already run.
+	// They are guaranteed to have run to completion before any other
+	// container is run.
+	for _, initContainer := range p.Spec.InitContainers {
+		if c.Name != initContainer.Name {
+			initContainerID, err := m.containerMap.Get(p, &initContainer)
+			if err != nil {
+				continue
+			}
+			err = m.policyRemoveContainer(initContainerID)
+			if err != nil {
+				klog.Warningf("[cpumanager] unable to remove init container (container id: %s, error: %v)", initContainerID, err)
+			}
+		}
+	}
+	err := m.policyAddContainer(p, c, containerID)
 	if err != nil {
 		klog.Errorf("[cpumanager] AddContainer error: %v", err)
 		m.Unlock()
@@ -200,7 +220,7 @@ func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 		if err != nil {
 			klog.Errorf("[cpumanager] AddContainer error: %v", err)
 			m.Lock()
-			err := m.policy.RemoveContainer(m.state, containerID)
+			err := m.policyRemoveContainer(containerID)
 			if err != nil {
 				klog.Errorf("[cpumanager] AddContainer rollback state error: %v", err)
 			}
@@ -216,12 +236,28 @@ func (m *manager) RemoveContainer(containerID string) error {
 	m.Lock()
 	defer m.Unlock()
 
-	err := m.policy.RemoveContainer(m.state, containerID)
+	err := m.policyRemoveContainer(containerID)
 	if err != nil {
 		klog.Errorf("[cpumanager] RemoveContainer error: %v", err)
 		return err
 	}
 	return nil
+}
+
+func (m *manager) policyAddContainer(p *v1.Pod, c *v1.Container, containerID string) error {
+	err := m.policy.AddContainer(m.state, p, c, containerID)
+	if err == nil {
+		m.containerMap.Add(p, c, containerID)
+	}
+	return err
+}
+
+func (m *manager) policyRemoveContainer(containerID string) error {
+	err := m.policy.RemoveContainer(m.state, containerID)
+	if err == nil {
+		m.containerMap.Remove(containerID)
+	}
+	return err
 }
 
 func (m *manager) State() state.Reader {

@@ -75,10 +75,6 @@ type staticPolicy struct {
 	topology *topology.CPUTopology
 	// set of CPUs that is not available for exclusive assignment
 	reserved cpuset.CPUSet
-	// containerMap provides a mapping from
-	// (pod, container) -> containerID
-	// for all containers a pod
-	containerMap containerMap
 	// topology manager reference to get container Topology affinity
 	affinity topologymanager.Store
 }
@@ -105,10 +101,9 @@ func NewStaticPolicy(topology *topology.CPUTopology, numReservedCPUs int, affini
 	klog.Infof("[cpumanager] reserved %d CPUs (\"%s\") not available for exclusive assignment", reserved.Size(), reserved)
 
 	return &staticPolicy{
-		topology:     topology,
-		reserved:     reserved,
-		containerMap: newContainerMap(),
-		affinity:     affinity,
+		topology: topology,
+		reserved: reserved,
+		affinity: affinity,
 	}
 }
 
@@ -183,14 +178,6 @@ func (p *staticPolicy) assignableCPUs(s state.State) cpuset.CPUSet {
 }
 
 func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) (rerr error) {
-	// So long as this function does not return an error,
-	// add (pod, container, containerID) to the containerMap.
-	defer func() {
-		if rerr == nil {
-			p.containerMap.Add(pod, container, containerID)
-		}
-	}()
-
 	if numCPUs := p.guaranteedCPUs(pod, container); numCPUs != 0 {
 		klog.Infof("[cpumanager] static policy: AddContainer (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 		// container belongs in an exclusively allocated pool
@@ -198,22 +185,6 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 		if _, ok := s.GetCPUSet(containerID); ok {
 			klog.Infof("[cpumanager] static policy: container already present in state, skipping (container: %s, container id: %s)", container.Name, containerID)
 			return nil
-		}
-
-		// Proactively remove CPUs from init containers that have already run.
-		// They are guaranteed to have run to completion before any other
-		// container is run.
-		for _, initContainer := range pod.Spec.InitContainers {
-			if container.Name != initContainer.Name {
-				initContainerID, err := p.containerMap.Get(pod, &initContainer)
-				if err != nil {
-					continue
-				}
-				err = p.RemoveContainer(s, initContainerID)
-				if err != nil {
-					klog.Warningf("[cpumanager] unable to remove init container (container id: %s, error: %v)", initContainerID, err)
-				}
-			}
 		}
 
 		// Call Topology Manager to get the aligned socket affinity across all hint providers.
@@ -233,14 +204,6 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 }
 
 func (p *staticPolicy) RemoveContainer(s state.State, containerID string) (rerr error) {
-	// So long as this function does not return an error,
-	// remove containerID from the containerMap.
-	defer func() {
-		if rerr == nil {
-			p.containerMap.Remove(containerID)
-		}
-	}()
-
 	klog.Infof("[cpumanager] static policy: RemoveContainer (container id: %s)", containerID)
 	if toRelease, ok := s.GetCPUSet(containerID); ok {
 		s.Delete(containerID)
