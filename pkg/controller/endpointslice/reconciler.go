@@ -90,7 +90,8 @@ func (r *reconciler) reconcile(service *corev1.Service, pods []*corev1.Pod, exis
 			if err != nil {
 				return err
 			}
-			endpoint := podToEndpoint(pod, node, service.Spec.PublishNotReadyAddresses)
+
+			endpoint := podToEndpoint(pod, node, service)
 			desiredEndpointsByPortMap[epHash].Insert(&endpoint)
 			numDesiredEndpoints++
 		}
