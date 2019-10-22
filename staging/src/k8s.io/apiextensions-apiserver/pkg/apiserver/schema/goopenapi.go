@@ -87,6 +87,12 @@ func (x *Extensions) toGoOpenAPI(ret *spec.Schema) {
 	if x.XMapType != nil {
 		ret.VendorExtensible.AddExtension("x-kubernetes-map-type", *x.XMapType)
 	}
+	if x.XImmutability != nil {
+		ret.VendorExtensible.AddExtension("x-kubernetes-immutability", *x.XImmutability)
+	}
+	if x.XKeyImmutability != nil {
+		ret.VendorExtensible.AddExtension("x-kubernetes-key-immutability", *x.XKeyImmutability)
+	}
 }
 
 func (v *ValueValidation) toGoOpenAPI(ret *spec.Schema) {

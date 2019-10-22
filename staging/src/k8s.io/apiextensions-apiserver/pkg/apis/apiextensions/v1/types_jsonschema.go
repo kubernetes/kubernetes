@@ -129,6 +129,18 @@ type JSONSchemaProps struct {
 	//      Atomic maps will be entirely replaced when updated.
 	// +optional
 	XMapType *string `json:"x-kubernetes-map-type,omitempty" protobuf:"bytes,43,opt,name=xKubernetesMapType"`
+
+	// x-kubernetes-immutability
+	// 1) `immutable`:
+	// 2) `addOnly`:
+	// 3) `removeOnly`:
+	XImmutability *string `json:"x-kubernetes-immutability,omitempty" protobuf:"bytes,44,opt,name=xKubernetesImmutability"`
+
+	// x-kubernetes-key-immutability
+	// 1) `immutable`:
+	// 2) `addOnly`:
+	// 3) `removeOnly`:
+	XKeyImmutability *string `json:"x-kubernetes-key-immutability,omitempty" protobuf:"bytes,45,opt,name=xKubernetesKeyImmutability"`
 }
 
 // JSON represents any valid JSON value.

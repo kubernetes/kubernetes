@@ -127,6 +127,18 @@ type Extensions struct {
 	//      Atomic maps will be entirely replaced when updated.
 	// +optional
 	XMapType *string
+
+	// x-kubernetes-immutability
+	// 1) `immutable`:
+	// 2) `addOnly`:
+	// 3) `removeOnly`:
+	XImmutability *string
+
+	// x-kubernetes-key-immutability
+	// 1) `immutable`:
+	// 2) `addOnly`:
+	// 3) `removeOnly`:
+	XKeyImmutability *string
 }
 
 // +k8s:deepcopy-gen=true

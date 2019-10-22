@@ -266,5 +266,27 @@ func (in *JSONSchemaProps) DeepCopy() *JSONSchemaProps {
 		**out = **in
 	}
 
+	if in.XListType != nil {
+		in, out := &in.XListType, &out.XListType
+		if *in == nil {
+			*out = nil
+		} else {
+			*out = new(string)
+			**out = **in
+		}
+	}
+
+	if in.XImmutability != nil {
+		in, out := &in.XImmutability, &out.XImmutability
+		*out = new(string)
+		**out = **in
+	}
+
+	if in.XKeyImmutability != nil {
+		in, out := &in.XKeyImmutability, &out.XKeyImmutability
+		*out = new(string)
+		**out = **in
+	}
+
 	return out
 }

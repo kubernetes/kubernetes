@@ -247,6 +247,8 @@ func newExtensions(s *apiextensions.JSONSchemaProps) (*Extensions, error) {
 		XListMapKeys:      s.XListMapKeys,
 		XListType:         s.XListType,
 		XMapType:          s.XMapType,
+		XImmutability:     s.XKeyImmutability,
+		XKeyImmutability:  s.XKeyImmutability,
 	}
 
 	if s.XPreserveUnknownFields != nil {
