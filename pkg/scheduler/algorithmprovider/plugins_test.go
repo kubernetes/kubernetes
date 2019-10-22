@@ -78,10 +78,6 @@ func TestApplyFeatureGates(t *testing.T) {
 				t.Fatalf("Error retrieving provider: %v", err)
 			}
 
-			if p.FitPredicateKeys.Has("CheckNodeCondition") {
-				t.Fatalf("Unexpected predicate: 'CheckNodeCondition'")
-			}
-
 			if !p.FitPredicateKeys.Has("PodToleratesNodeTaints") {
 				t.Fatalf("Failed to find predicate: 'PodToleratesNodeTaints'")
 			}
@@ -99,10 +95,6 @@ func TestApplyFeatureGates(t *testing.T) {
 
 			if !p.FitPredicateKeys.Has("PodToleratesNodeTaints") {
 				t.Fatalf("Failed to find predicate: 'PodToleratesNodeTaints'")
-			}
-
-			if p.FitPredicateKeys.Has("CheckNodeCondition") {
-				t.Fatalf("Unexpected predicate: 'CheckNodeCondition'")
 			}
 		})
 	}
