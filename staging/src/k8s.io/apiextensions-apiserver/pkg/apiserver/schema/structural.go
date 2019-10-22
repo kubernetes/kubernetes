@@ -20,6 +20,24 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const (
+	XListTypeMap            = "map"
+	XListTypeAtomic         = "atomic"
+	XListTypeSet            = "set"
+	XMapTypeGranular        = "granular"
+	XMapTypeAtomic          = "atomic"
+	XImmutabilityImmutable  = "immutable"
+	XImmutabilityAddOnly    = "addOnly"
+	XImmutabilityRemoveOnly = "removeOnly"
+
+	GenericTypeInteger = "integer"
+	GenericTypeNumber  = "number"
+	GenericTypeString  = "string"
+	GenericTypeBool    = "boolean"
+	GenericTypeObject  = "object"
+	GenericTypeArray   = "array"
+)
+
 // +k8s:deepcopy-gen=true
 
 // Structural represents a structural schema.

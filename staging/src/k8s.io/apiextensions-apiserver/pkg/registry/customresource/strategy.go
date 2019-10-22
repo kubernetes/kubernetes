@@ -21,6 +21,11 @@ import (
 
 	"github.com/go-openapi/validate"
 
+	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
+	schemaimmutable "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/immutable"
+	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
+	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,11 +38,6 @@ import (
 	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
-
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	schemaobjectmeta "k8s.io/apiextensions-apiserver/pkg/apiserver/schema/objectmeta"
-	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 )
 
 // customResourceStrategy implements behavior for CustomResources.
@@ -169,6 +169,10 @@ func (a customResourceStrategy) ValidateUpdate(ctx context.Context, obj, old run
 	if u, ok := obj.(*unstructured.Unstructured); ok {
 		v := obj.GetObjectKind().GroupVersionKind().Version
 		errs = append(errs, schemaobjectmeta.Validate(nil, u.Object, a.schemas[v], false)...)
+
+		if o, ok := old.(*unstructured.Unstructured); ok {
+			errs = append(errs, schemaimmutable.Immutable(o.Object, u.Object, a.schemas[v], nil)...)
+		}
 	}
 
 	return errs
