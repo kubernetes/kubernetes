@@ -33,7 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
 	"k8s.io/kubernetes/pkg/kubelet/config"
-	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
 
@@ -295,9 +294,9 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				break
 			}
 
-			containerID, err := findContainerIDByName(&status, container.Name)
+			containerID, err := m.containerMap.Get(pod, &container)
 			if err != nil {
-				klog.Warningf("[cpumanager] reconcileState: skipping container; ID not found in status (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)
+				klog.Warningf("[cpumanager] reconcileState: skipping container; ID not found in containerMap (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
 				continue
 			}
@@ -353,22 +352,6 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 		}
 	}
 	return success, failure
-}
-
-func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {
-	allStatuses := status.InitContainerStatuses
-	allStatuses = append(allStatuses, status.ContainerStatuses...)
-	for _, container := range allStatuses {
-		if container.Name == name && container.ContainerID != "" {
-			cid := &kubecontainer.ContainerID{}
-			err := cid.ParseString(container.ContainerID)
-			if err != nil {
-				return "", err
-			}
-			return cid.ID, nil
-		}
-	}
-	return "", fmt.Errorf("unable to find ID for container with name %v in pod status (it may not be running)", name)
 }
 
 func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) error {

@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 )
 
 type mockState struct {
@@ -850,6 +851,28 @@ func TestReconcileState(t *testing.T) {
 	}
 
 	for _, testCase := range testCases {
+		containerMap := newContainerMap()
+		for _, pod := range testCase.activePods {
+			for _, container := range pod.Spec.InitContainers {
+				for _, status := range testCase.pspPS.InitContainerStatuses {
+					if container.Name == status.Name {
+						cid := &kubecontainer.ContainerID{}
+						cid.ParseString(status.ContainerID)
+						containerMap.Add(pod, &container, cid.ID)
+					}
+				}
+			}
+			for _, container := range pod.Spec.Containers {
+				for _, status := range testCase.pspPS.ContainerStatuses {
+					if container.Name == status.Name {
+						cid := &kubecontainer.ContainerID{}
+						cid.ParseString(status.ContainerID)
+						containerMap.Add(pod, &container, cid.ID)
+					}
+				}
+			}
+		}
+
 		mgr := &manager{
 			policy: &mockPolicy{
 				err: nil,
@@ -861,7 +884,7 @@ func TestReconcileState(t *testing.T) {
 			containerRuntime: mockRuntimeService{
 				err: testCase.updateErr,
 			},
-			containerMap: newContainerMap(),
+			containerMap: containerMap,
 			activePods: func() []*v1.Pod {
 				return testCase.activePods
 			},
