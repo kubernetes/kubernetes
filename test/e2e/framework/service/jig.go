@@ -381,7 +381,8 @@ func (j *TestJig) WaitForAvailableEndpoint(timeout time.Duration) error {
 }
 
 // sanityCheckService performs sanity checks on the given service; in particular, ensuring
-// that creating/updating a service allocates IPs, ports, etc, as needed.
+// that creating/updating a service allocates IPs, ports, etc, as needed. It does not
+// check for ingress assignment as that happens asynchronously after the Service is created.
 func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) (*v1.Service, error) {
 	if svcType == "" {
 		svcType = v1.ServiceTypeClusterIP
@@ -418,19 +419,10 @@ func (j *TestJig) sanityCheckService(svc *v1.Service, svcType v1.ServiceType) (*
 			}
 		}
 	}
-	expectIngress := false
-	if svcType == v1.ServiceTypeLoadBalancer {
-		expectIngress = true
-	}
-	hasIngress := len(svc.Status.LoadBalancer.Ingress) != 0
-	if hasIngress != expectIngress {
-		return nil, fmt.Errorf("unexpected number of Status.LoadBalancer.Ingress (%d) for service", len(svc.Status.LoadBalancer.Ingress))
-	}
-	if hasIngress {
-		for i, ing := range svc.Status.LoadBalancer.Ingress {
-			if ing.IP == "" && ing.Hostname == "" {
-				return nil, fmt.Errorf("unexpected Status.LoadBalancer.Ingress[%d] for service: %#v", i, ing)
-			}
+
+	if svcType != v1.ServiceTypeLoadBalancer {
+		if len(svc.Status.LoadBalancer.Ingress) != 0 {
+			return nil, fmt.Errorf("unexpected Status.LoadBalancer.Ingress on non-LoadBalancer service")
 		}
 	}
 
@@ -507,6 +499,13 @@ func (j *TestJig) WaitForLoadBalancer(timeout time.Duration) (*v1.Service, error
 	if err != nil {
 		return nil, err
 	}
+
+	for i, ing := range service.Status.LoadBalancer.Ingress {
+		if ing.IP == "" && ing.Hostname == "" {
+			return nil, fmt.Errorf("unexpected Status.LoadBalancer.Ingress[%d] for service: %#v", i, ing)
+		}
+	}
+
 	return j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
 }
 
