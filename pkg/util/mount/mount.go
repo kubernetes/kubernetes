@@ -48,7 +48,7 @@ type Interface interface {
 	// most notably linux bind mounts and symbolic link.
 	IsLikelyNotMountPoint(file string) (bool, error)
 	// GetMountRefs finds all mount references to the path, returns a
-	// list of paths. Path could be a mountpoint path, device or a normal
+	// list of paths. Path could be a mountpoint or a normal
 	// directory (for bind mount).
 	GetMountRefs(pathname string) ([]string, error)
 }

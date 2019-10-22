@@ -238,7 +238,7 @@ func (mounter *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 }
 
 // GetMountRefs finds all mount references to pathname, returns a
-// list of paths. Path could be a mountpoint path, device or a normal
+// list of paths. Path could be a mountpoint or a normal
 // directory (for bind mount).
 func (mounter *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	pathExists, pathErr := PathExists(pathname)
@@ -441,7 +441,8 @@ func parseProcMounts(content []byte) ([]MountPoint, error) {
 
 // SearchMountPoints finds all mount references to the source, returns a list of
 // mountpoints.
-// This function assumes source cannot be device.
+// The source can be a mount point or a normal directory (bind mount). We
+// didn't support device because there is no use case by now.
 // Some filesystems may share a source name, e.g. tmpfs. And for bind mounting,
 // it's possible to mount a non-root path of a filesystem, so we need to use
 // root path and major:minor to represent mount source uniquely.
