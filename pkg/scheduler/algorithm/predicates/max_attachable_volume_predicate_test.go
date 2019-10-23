@@ -31,10 +31,26 @@ import (
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	utilpointer "k8s.io/utils/pointer"
 )
+
+func getVolumeLimitKey(filterType string) v1.ResourceName {
+	switch filterType {
+	case EBSVolumeFilterType:
+		return v1.ResourceName(volumeutil.EBSVolumeLimitKey)
+	case GCEPDVolumeFilterType:
+		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
+	case AzureDiskVolumeFilterType:
+		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+	case CinderVolumeFilterType:
+		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
+	default:
+		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
+	}
+}
 
 func onePVCPod(filterName string) *v1.Pod {
 	return &v1.Pod{
@@ -877,7 +893,7 @@ func TestVolumeCountConflicts(t *testing.T) {
 	}
 }
 
-func getFakeStorageClassInfo(sc string) FakeStorageClassInfo {
+func getFakeStorageClassInfo(sc string) fakelisters.StorageClassInfo {
 	var provisioner string
 	switch sc {
 	case EBSVolumeFilterType:
@@ -889,9 +905,9 @@ func getFakeStorageClassInfo(sc string) FakeStorageClassInfo {
 	case CinderVolumeFilterType:
 		provisioner = csilibplugins.CinderInTreePluginName
 	default:
-		return FakeStorageClassInfo{}
+		return fakelisters.StorageClassInfo{}
 	}
-	return FakeStorageClassInfo{
+	return fakelisters.StorageClassInfo{
 		{
 			ObjectMeta:  metav1.ObjectMeta{Name: sc},
 			Provisioner: provisioner,
@@ -903,8 +919,8 @@ func getFakeStorageClassInfo(sc string) FakeStorageClassInfo {
 	}
 }
 
-func getFakePVInfo(filterName string) FakePersistentVolumeInfo {
-	return FakePersistentVolumeInfo{
+func getFakePVInfo(filterName string) fakelisters.PersistentVolumeInfo {
+	return fakelisters.PersistentVolumeInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeSpec{
@@ -922,8 +938,8 @@ func getFakePVInfo(filterName string) FakePersistentVolumeInfo {
 	}
 }
 
-func getFakePVCInfo(filterName string) FakePersistentVolumeClaimInfo {
-	return FakePersistentVolumeClaimInfo{
+func getFakePVCInfo(filterName string) fakelisters.PersistentVolumeClaimInfo {
+	return fakelisters.PersistentVolumeClaimInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeClaimSpec{
@@ -1063,7 +1079,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 
 	addLimitToNode := func() {
 		for _, driver := range driverNames {
-			node.Status.Allocatable[GetVolumeLimitKey(driver)] = *resource.NewQuantity(limit, resource.DecimalSI)
+			node.Status.Allocatable[getVolumeLimitKey(driver)] = *resource.NewQuantity(limit, resource.DecimalSI)
 		}
 	}
 

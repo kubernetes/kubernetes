@@ -736,8 +736,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		} else {
 			// Calculating nodeResourceString can be heavy. Avoid it if klog verbosity is below 2.
 			if klog.V(2) {
-				node, _ := sched.Cache().GetNodeInfo(scheduleResult.SuggestedHost)
-				klog.Infof("pod %v/%v is bound successfully on node %q, %d nodes evaluated, %d nodes were found feasible. Bound node resource: %q.", assumedPod.Namespace, assumedPod.Name, scheduleResult.SuggestedHost, scheduleResult.EvaluatedNodes, scheduleResult.FeasibleNodes, nodeResourceString(node))
+				klog.Infof("pod %v/%v is bound successfully on node %q, %d nodes evaluated, %d nodes were found feasible.", assumedPod.Namespace, assumedPod.Name, scheduleResult.SuggestedHost, scheduleResult.EvaluatedNodes, scheduleResult.FeasibleNodes)
 			}
 
 			metrics.PodScheduleSuccesses.Inc()
@@ -787,16 +786,4 @@ func (p *podPreemptorImpl) removeNominatedNodeName(pod *v1.Pod) error {
 		return nil
 	}
 	return p.setNominatedNodeName(pod, "")
-}
-
-// nodeResourceString returns a string representation of node resources.
-func nodeResourceString(n *v1.Node) string {
-	if n == nil {
-		return "N/A"
-	}
-	return fmt.Sprintf("Capacity: %s; Allocatable: %s.", resourceString(&n.Status.Capacity), resourceString(&n.Status.Allocatable))
-}
-
-func resourceString(r *v1.ResourceList) string {
-	return fmt.Sprintf("CPU<%s>|Memory<%s>|Pods<%s>|StorageEphemeral<%s>", r.Cpu().String(), r.Memory().String(), r.Pods().String(), r.StorageEphemeral().String())
 }

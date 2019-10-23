@@ -23,9 +23,9 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 
@@ -34,16 +34,14 @@ import (
 
 // InterPodAffinity contains information to calculate inter pod affinity.
 type InterPodAffinity struct {
-	info                  predicates.NodeInfo
+	nodeLister            schedulerlisters.NodeLister
 	hardPodAffinityWeight int32
 }
 
 // NewInterPodAffinityPriority creates an InterPodAffinity.
-func NewInterPodAffinityPriority(
-	info predicates.NodeInfo,
-	hardPodAffinityWeight int32) PriorityFunction {
+func NewInterPodAffinityPriority(nodeLister schedulerlisters.NodeLister, hardPodAffinityWeight int32) PriorityFunction {
 	interPodAffinity := &InterPodAffinity{
-		info:                  info,
+		nodeLister:            nodeLister,
 		hardPodAffinityWeight: hardPodAffinityWeight,
 	}
 	return interPodAffinity.CalculateInterPodAffinityPriority
@@ -111,7 +109,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	var maxCount, minCount int64
 
 	processPod := func(existingPod *v1.Pod) error {
-		existingPodNode, err := ipa.info.GetNodeInfo(existingPod.Spec.NodeName)
+		existingPodNode, err := ipa.nodeLister.GetNodeInfo(existingPod.Spec.NodeName)
 		if err != nil {
 			klog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
 			return nil

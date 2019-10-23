@@ -92,7 +92,7 @@ func init() {
 	scheduler.RegisterFitPredicateFactory(
 		predicates.MatchInterPodAffinityPred,
 		func(args scheduler.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister)
+			return predicates.NewPodAffinityPredicate(args.NodeLister, args.PodLister)
 		},
 	)
 

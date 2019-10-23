@@ -18,14 +18,15 @@ package nodevolumelimits
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
 
-	"fmt"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/api/storage/v1beta1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -33,10 +34,10 @@ import (
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-
-	"k8s.io/apimachinery/pkg/api/resource"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -46,6 +47,22 @@ const (
 
 	hostpathInTreePluginName = "kubernetes.io/hostpath"
 )
+
+// getVolumeLimitKey returns a ResourceName by filter type
+func getVolumeLimitKey(filterType string) v1.ResourceName {
+	switch filterType {
+	case predicates.EBSVolumeFilterType:
+		return v1.ResourceName(volumeutil.EBSVolumeLimitKey)
+	case predicates.GCEPDVolumeFilterType:
+		return v1.ResourceName(volumeutil.GCEVolumeLimitKey)
+	case predicates.AzureDiskVolumeFilterType:
+		return v1.ResourceName(volumeutil.AzureVolumeLimitKey)
+	case predicates.CinderVolumeFilterType:
+		return v1.ResourceName(volumeutil.CinderVolumeLimitKey)
+	default:
+		return v1.ResourceName(volumeutil.GetCSIAttachLimitKey(filterType))
+	}
+}
 
 func TestCSILimits(t *testing.T) {
 	runningPod := &v1.Pod{
@@ -455,8 +472,8 @@ func TestCSILimits(t *testing.T) {
 	}
 }
 
-func getFakeCSIPVInfo(volumeName string, driverNames ...string) predicates.FakePersistentVolumeInfo {
-	pvInfos := predicates.FakePersistentVolumeInfo{}
+func getFakeCSIPVInfo(volumeName string, driverNames ...string) fakelisters.PersistentVolumeInfo {
+	pvInfos := fakelisters.PersistentVolumeInfo{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			volumeHandle := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -500,8 +517,8 @@ func getFakeCSIPVInfo(volumeName string, driverNames ...string) predicates.FakeP
 	return pvInfos
 }
 
-func getFakeCSIPVCInfo(volumeName, scName string, driverNames ...string) predicates.FakePersistentVolumeClaimInfo {
-	pvcInfos := predicates.FakePersistentVolumeClaimInfo{}
+func getFakeCSIPVCInfo(volumeName, scName string, driverNames ...string) fakelisters.PersistentVolumeClaimInfo {
+	pvcInfos := fakelisters.PersistentVolumeClaimInfo{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			v := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -543,8 +560,8 @@ func enableMigrationOnNode(csiNode *storagev1beta1.CSINode, pluginName string) {
 	csiNode.Annotations = nodeInfoAnnotations
 }
 
-func getFakeCSIStorageClassInfo(scName, provisionerName string) predicates.FakeStorageClassInfo {
-	return predicates.FakeStorageClassInfo{
+func getFakeCSIStorageClassInfo(scName, provisionerName string) fakelisters.StorageClassInfo {
+	return fakelisters.StorageClassInfo{
 		{
 			ObjectMeta:  metav1.ObjectMeta{Name: scName},
 			Provisioner: provisionerName,
@@ -552,11 +569,11 @@ func getFakeCSIStorageClassInfo(scName, provisionerName string) predicates.FakeS
 	}
 }
 
-func getFakeCSINodeInfo(csiNode *storagev1beta1.CSINode) predicates.FakeCSINodeInfo {
+func getFakeCSINodeInfo(csiNode *storagev1beta1.CSINode) fakelisters.CSINodeInfo {
 	if csiNode != nil {
-		return predicates.FakeCSINodeInfo(*csiNode)
+		return fakelisters.CSINodeInfo(*csiNode)
 	}
-	return predicates.FakeCSINodeInfo{}
+	return fakelisters.CSINodeInfo{}
 }
 
 func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*schedulernodeinfo.NodeInfo, *v1beta1.CSINode) {
@@ -571,7 +588,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 
 	addLimitToNode := func() {
 		for _, driver := range driverNames {
-			node.Status.Allocatable[predicates.GetVolumeLimitKey(driver)] = *resource.NewQuantity(limit, resource.DecimalSI)
+			node.Status.Allocatable[getVolumeLimitKey(driver)] = *resource.NewQuantity(limit, resource.DecimalSI)
 		}
 	}
 

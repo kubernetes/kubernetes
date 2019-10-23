@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -484,8 +485,8 @@ func TestEBSLimits(t *testing.T) {
 	}
 }
 
-func getFakePVCInfo(filterName string) predicates.FakePersistentVolumeClaimInfo {
-	return predicates.FakePersistentVolumeClaimInfo{
+func getFakePVCInfo(filterName string) fakelisters.PersistentVolumeClaimInfo {
+	return fakelisters.PersistentVolumeClaimInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeClaimSpec{
@@ -545,8 +546,8 @@ func getFakePVCInfo(filterName string) predicates.FakePersistentVolumeClaimInfo 
 	}
 }
 
-func getFakePVInfo(filterName string) predicates.FakePersistentVolumeInfo {
-	return predicates.FakePersistentVolumeInfo{
+func getFakePVInfo(filterName string) fakelisters.PersistentVolumeInfo {
+	return fakelisters.PersistentVolumeInfo{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeSpec{

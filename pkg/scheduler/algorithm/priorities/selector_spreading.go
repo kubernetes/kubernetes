@@ -23,8 +23,8 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 
@@ -155,13 +155,13 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 
 // ServiceAntiAffinity contains information to calculate service anti-affinity priority.
 type ServiceAntiAffinity struct {
-	podLister     algorithm.PodLister
+	podLister     schedulerlisters.PodLister
 	serviceLister corelisters.ServiceLister
 	label         string
 }
 
 // NewServiceAntiAffinityPriority creates a ServiceAntiAffinity.
-func NewServiceAntiAffinityPriority(podLister algorithm.PodLister, serviceLister corelisters.ServiceLister, label string) (PriorityMapFunction, PriorityReduceFunction) {
+func NewServiceAntiAffinityPriority(podLister schedulerlisters.PodLister, serviceLister corelisters.ServiceLister, label string) (PriorityMapFunction, PriorityReduceFunction) {
 	antiAffinity := &ServiceAntiAffinity{
 		podLister:     podLister,
 		serviceLister: serviceLister,

@@ -593,7 +593,7 @@ func (c *Configurator) getAlgorithmArgs() (*PluginFactoryArgs, *plugins.ConfigPr
 		ReplicaSetLister:               c.replicaSetLister,
 		StatefulSetLister:              c.statefulSetLister,
 		PDBLister:                      c.pdbLister,
-		NodeInfo:                       c.schedulerCache,
+		NodeLister:                     c.schedulerCache,
 		CSINodeInfo:                    &predicates.CachedCSINodeInfo{CSINodeLister: c.csiNodeLister},
 		PVInfo:                         &predicates.CachedPersistentVolumeInfo{PersistentVolumeLister: c.pVLister},
 		PVCInfo:                        &predicates.CachedPersistentVolumeClaimInfo{PersistentVolumeClaimLister: c.pVCLister},
