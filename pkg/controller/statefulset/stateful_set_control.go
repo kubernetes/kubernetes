@@ -74,12 +74,11 @@ type defaultStatefulSetControl struct {
 // understand the consistency implications of having unpredictable numbers of pods available.
 func (ssc *defaultStatefulSetControl) UpdateStatefulSet(set *apps.StatefulSet, pods []*v1.Pod) error {
 
-	// list all revisions and sort them
+	// list all revisions
 	revisions, err := ssc.ListRevisions(set)
 	if err != nil {
 		return err
 	}
-	history.SortControllerRevisions(revisions)
 
 	// get the current, and update revisions
 	currentRevision, updateRevision, collisionCount, err := ssc.getStatefulSetRevisions(set, revisions)
