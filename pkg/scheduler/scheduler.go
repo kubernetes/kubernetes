@@ -675,6 +675,9 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	}
 	// bind the pod to its host asynchronously (we can do this b/c of the assumption step above).
 	go func() {
+		metrics.SchedulerGoroutines.WithLabelValues("binding").Inc()
+		defer metrics.SchedulerGoroutines.WithLabelValues("binding").Dec()
+
 		// Bind volumes first before Pod
 		if !allBound {
 			err := sched.bindVolumes(assumedPod)
