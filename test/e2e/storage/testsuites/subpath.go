@@ -157,24 +157,24 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 	}
 
 	cleanup := func() {
-		if l.pod != nil {
-			ginkgo.By("Deleting pod")
-			err := e2epod.DeletePodWithWait(f.ClientSet, l.pod)
-			framework.ExpectNoError(err, "while deleting pod")
-			l.pod = nil
-		}
+		// if l.pod != nil {
+		// ginkgo.By("Deleting pod")
+		// err := e2epod.DeletePodWithWait(f.ClientSet, l.pod)
+		// framework.ExpectNoError(err, "while deleting pod")
+		// l.pod = nil
+		// }
 
-		if l.resource != nil {
-			l.resource.cleanupResource()
-			l.resource = nil
-		}
+		// if l.resource != nil {
+		// l.resource.cleanupResource()
+		// l.resource = nil
+		// }
 
-		if l.driverCleanup != nil {
-			l.driverCleanup()
-			l.driverCleanup = nil
-		}
+		// if l.driverCleanup != nil {
+		// l.driverCleanup()
+		// l.driverCleanup = nil
+		// }
 
-		validateMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName, l.intreeOps, l.migratedOps)
+		// validateMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	ginkgo.It("should support non-existent path", func() {
@@ -902,7 +902,7 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "while getting pod")
 
-	utils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true)
+	utils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true, true)
 }
 
 func formatVolume(f *framework.Framework, pod *v1.Pod) {

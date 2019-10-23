@@ -20,7 +20,9 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -34,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -234,9 +237,48 @@ func TestKubeletRestartsAndRestoresMap(c clientset.Interface, f *framework.Frame
 	framework.Logf("Volume map detected on pod %s and written data %s is readable post-restart.", clientPod.Name, path)
 }
 
+// findGlobalVolumeMountPaths finds all global volume mount paths for given pod from the host mount information.
+// This function assumes:
+// 1) pod volume mount paths exists in /var/lib/kubelet/pods/<pod-uid>/volumes/
+// 2) global volume mount paths exists in /var/lib/kubelet/plugins/
+func findGlobalVolumeMountPaths(mountInfo string, podUID string) ([]string, error) {
+	tmpfile, err := ioutil.TempFile("", "mountinfo")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(tmpfile.Name()) // clean up
+	err = ioutil.WriteFile(tmpfile.Name(), []byte(mountInfo), 0644)
+	if err != nil {
+		return nil, err
+	}
+	podVolumeMountBase := fmt.Sprintf("/var/lib/kubelet/pods/%s/volumes/", podUID)
+	globalVolumeMountBase := "/var/lib/kubelet/plugins"
+	mis, err := mount.ParseMountInfo(tmpfile.Name())
+	if err != nil {
+		return nil, err
+	}
+	globalVolumeMountPaths := []string{}
+	for _, mi := range mis {
+		if mount.PathWithinBase(mi.MountPoint, podVolumeMountBase) {
+			refs, err := mount.SearchMountPoints(mi.MountPoint, tmpfile.Name())
+			if err != nil {
+				return nil, err
+			}
+			for _, ref := range refs {
+				if mount.PathWithinBase(ref, globalVolumeMountBase) {
+					globalVolumeMountPaths = append(globalVolumeMountPaths, ref)
+				}
+			}
+		}
+	}
+	return globalVolumeMountPaths, nil
+}
+
 // TestVolumeUnmountsFromDeletedPodWithForceOption tests that a volume unmounts if the client pod was deleted while the kubelet was down.
 // forceDelete is true indicating whether the pod is forcefully deleted.
-func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool) {
+// checkSubpath is true indicating whether the subpath should be checked.
+// checkGlobalMount is true indicating whether the global mount should be checked.
+func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool, checkGlobalMount bool) {
 	nodeIP, err := framework.GetHostAddress(c, clientPod)
 	framework.ExpectNoError(err)
 	nodeIP = nodeIP + ":22"
@@ -253,6 +295,24 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 		e2essh.LogResult(result)
 		framework.ExpectNoError(err, "Encountered SSH error.")
 		gomega.Expect(result.Code).To(gomega.BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
+	}
+
+	var globalVolumeMountPaths []string
+	if checkGlobalMount {
+		// Find global mount path and verify it will be unmounted later.
+		// We don't verify it must exist because:
+		// 1) not all volume types have global mount path, e.g. local filesystem volume with directory source
+		// 2) volume types which failed to mount global mount path will fail in other test
+		ginkgo.By("Find the volume global mount paths")
+		result, err = e2essh.SSH("cat /proc/self/mountinfo", nodeIP, framework.TestContext.Provider)
+		framework.ExpectNoError(err, "Encountered SSH error.")
+		globalVolumeMountPaths, err = findGlobalVolumeMountPaths(result.Stdout, string(clientPod.UID))
+		framework.ExpectNoError(err, fmt.Sprintf("Failed to get global volume mount paths: %v", err))
+		if len(globalVolumeMountPaths) > 0 {
+			framework.Logf("Volume global mount paths found at %v", globalVolumeMountPaths)
+		} else {
+			framework.Logf("No volume global mount paths found")
+		}
 	}
 
 	// This command is to make sure kubelet is started after test finishes no matter it fails or not.
@@ -298,16 +358,28 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 		gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty (i.e. no subpath mount found).")
 		framework.Logf("Subpath volume unmounted on node %s", clientPod.Spec.NodeName)
 	}
+
+	if checkGlobalMount && len(globalVolumeMountPaths) > 0 {
+		globalMountPathCmd := fmt.Sprintf("ls %s | grep '.'", strings.Join(globalVolumeMountPaths, " "))
+		if isSudoPresent(nodeIP, framework.TestContext.Provider) {
+			globalMountPathCmd = fmt.Sprintf("sudo sh -c \"%s\"", globalMountPathCmd)
+		}
+		ginkgo.By("Expecting the volume global mount path not to be found.")
+		result, err = e2essh.SSH(globalMountPathCmd, nodeIP, framework.TestContext.Provider)
+		e2essh.LogResult(result)
+		framework.ExpectNoError(err, "Encountered SSH error.")
+		gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty.")
+	}
 }
 
 // TestVolumeUnmountsFromDeletedPod tests that a volume unmounts if the client pod was deleted while the kubelet was down.
 func TestVolumeUnmountsFromDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod) {
-	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, false, false)
+	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, false, false, false)
 }
 
 // TestVolumeUnmountsFromForceDeletedPod tests that a volume unmounts if the client pod was forcefully deleted while the kubelet was down.
 func TestVolumeUnmountsFromForceDeletedPod(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod) {
-	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, true, false)
+	TestVolumeUnmountsFromDeletedPodWithForceOption(c, f, clientPod, true, false, false)
 }
 
 // TestVolumeUnmapsFromDeletedPodWithForceOption tests that a volume unmaps if the client pod was deleted while the kubelet was down.
