@@ -28,7 +28,14 @@ type CertKeyContentProvider interface {
 	CurrentCertKeyContent() ([]byte, []byte)
 }
 
-// caBundleContent holds the content for the cert and key
+// SNICertKeyContentProvider provides a certificate and matching private key as well as optional explicit names
+type SNICertKeyContentProvider interface {
+	CertKeyContentProvider
+	// SNINames provides names used for SNI. May return nil.
+	SNINames() []string
+}
+
+// certKeyContent holds the content for the cert and key
 type certKeyContent struct {
 	cert []byte
 	key  []byte
@@ -40,4 +47,28 @@ func (c *certKeyContent) Equal(rhs *certKeyContent) bool {
 	}
 
 	return bytes.Equal(c.key, rhs.key) && bytes.Equal(c.cert, rhs.cert)
+}
+
+// sniCertKeyContent holds the content for the cert and key as well as any explicit names
+type sniCertKeyContent struct {
+	certKeyContent
+	sniNames []string
+}
+
+func (c *sniCertKeyContent) Equal(rhs *sniCertKeyContent) bool {
+	if c == nil || rhs == nil {
+		return c == rhs
+	}
+
+	if len(c.sniNames) != len(rhs.sniNames) {
+		return false
+	}
+
+	for i := range c.sniNames {
+		if c.sniNames[i] != rhs.sniNames[i] {
+			return false
+		}
+	}
+
+	return c.certKeyContent.Equal(&rhs.certKeyContent)
 }

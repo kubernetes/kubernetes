@@ -19,18 +19,15 @@ package server
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"golang.org/x/net/http2"
 	"k8s.io/klog"
 
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 )
 
@@ -41,7 +38,6 @@ const (
 // tlsConfig produces the tls.Config to serve with.
 func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
-		NameToCertificate: s.SNICerts,
 		// Can't use SSLv3 because of POODLE and BEAST
 		// Can't use TLSv1.0 because of POODLE and BEAST using CBC cipher
 		// Can't use TLSv1.1 because of RC4 cipher usage
@@ -62,28 +58,18 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 		tlsConfig.CipherSuites = s.CipherSuites
 	}
 
-	// if s.Cert is not nil, this logic is contained within the dynamic serving controller
-	if s.Cert == nil {
-		// append all named certs. Otherwise, the go tls stack will think no SNI processing
-		// is necessary because there is only one cert anyway.
-		// Moreover, if ServerCert.CertFile/ServerCert.KeyFile are not set, the first SNI
-		// cert will become the default cert. That's what we expect anyway.
-		for _, c := range s.SNICerts {
-			tlsConfig.Certificates = append(tlsConfig.Certificates, *c)
-		}
-	}
-
 	if s.ClientCA != nil {
 		// Populate PeerCertificates in requests, but don't reject connections without certificates
 		// This allows certificates to be validated by authenticators, while still allowing other auth types
 		tlsConfig.ClientAuth = tls.RequestClientCert
 	}
 
-	if s.ClientCA != nil || s.Cert != nil {
+	if s.ClientCA != nil || s.Cert != nil || len(s.SNICerts) > 0 {
 		dynamicCertificateController := dynamiccertificates.NewDynamicServingCertificateController(
 			*tlsConfig,
 			s.ClientCA,
 			s.Cert,
+			s.SNICerts,
 			nil, // TODO see how to plumb an event recorder down in here. For now this results in simply klog messages.
 		)
 		// runonce to be sure that we have a value.
@@ -197,57 +183,6 @@ func RunServer(
 	}()
 
 	return stoppedCh, nil
-}
-
-type NamedTLSCert struct {
-	TLSCert tls.Certificate
-
-	// Names is a list of domain patterns: fully qualified domain names, possibly prefixed with
-	// wildcard segments.
-	Names []string
-}
-
-// GetNamedCertificateMap returns a map of *tls.Certificate by name. It's
-// suitable for use in tls.Config#NamedCertificates. Returns an error if any of the certs
-// cannot be loaded. Returns nil if len(certs) == 0
-func GetNamedCertificateMap(certs []NamedTLSCert) (map[string]*tls.Certificate, error) {
-	// register certs with implicit names first, reverse order such that earlier trump over the later
-	byName := map[string]*tls.Certificate{}
-	for i := len(certs) - 1; i >= 0; i-- {
-		if len(certs[i].Names) > 0 {
-			continue
-		}
-		cert := &certs[i].TLSCert
-
-		// read names from certificate common names and DNS names
-		if len(cert.Certificate) == 0 {
-			return nil, fmt.Errorf("empty SNI certificate, skipping")
-		}
-		x509Cert, err := x509.ParseCertificate(cert.Certificate[0])
-		if err != nil {
-			return nil, fmt.Errorf("parse error for SNI certificate: %v", err)
-		}
-		cn := x509Cert.Subject.CommonName
-		if cn == "*" || len(validation.IsDNS1123Subdomain(strings.TrimPrefix(cn, "*."))) == 0 {
-			byName[cn] = cert
-		}
-		for _, san := range x509Cert.DNSNames {
-			byName[san] = cert
-		}
-		// intentionally all IPs in the cert are ignored as SNI forbids passing IPs
-		// to select a cert. Before go 1.6 the tls happily passed IPs as SNI values.
-	}
-
-	// register certs with explicit names last, overwriting every of the implicit ones,
-	// again in reverse order.
-	for i := len(certs) - 1; i >= 0; i-- {
-		namedCert := &certs[i]
-		for _, name := range namedCert.Names {
-			byName[name] = &certs[i].TLSCert
-		}
-	}
-
-	return byName, nil
 }
 
 // tcpKeepAliveListener sets TCP keep-alive timeouts on accepted

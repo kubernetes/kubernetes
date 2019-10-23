@@ -17,7 +17,6 @@ limitations under the License.
 package options
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net"
 	"path"
@@ -250,21 +249,15 @@ func (s *SecureServingOptions) ApplyTo(config **server.SecureServingInfo) error 
 	}
 
 	// load SNI certs
-	namedTLSCerts := make([]server.NamedTLSCert, 0, len(s.SNICertKeys))
+	namedTLSCerts := make([]dynamiccertificates.SNICertKeyContentProvider, 0, len(s.SNICertKeys))
 	for _, nck := range s.SNICertKeys {
-		tlsCert, err := tls.LoadX509KeyPair(nck.CertFile, nck.KeyFile)
-		namedTLSCerts = append(namedTLSCerts, server.NamedTLSCert{
-			TLSCert: tlsCert,
-			Names:   nck.Names,
-		})
+		tlsCert, err := dynamiccertificates.NewStaticSNICertKeyContentFromFiles(nck.CertFile, nck.KeyFile, nck.Names...)
+		namedTLSCerts = append(namedTLSCerts, tlsCert)
 		if err != nil {
 			return fmt.Errorf("failed to load SNI cert and key: %v", err)
 		}
 	}
-	c.SNICerts, err = server.GetNamedCertificateMap(namedTLSCerts)
-	if err != nil {
-		return err
-	}
+	c.SNICerts = namedTLSCerts
 
 	return nil
 }

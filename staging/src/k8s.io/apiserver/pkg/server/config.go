@@ -17,7 +17,6 @@ limitations under the License.
 package server
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net"
 	"net/http"
@@ -235,9 +234,8 @@ type SecureServingInfo struct {
 	// allowed to be in SNICerts.
 	Cert dynamiccertificates.CertKeyContentProvider
 
-	// SNICerts are the TLS certificates by name used for SNI.
-	// todo: use dynamic certificates
-	SNICerts map[string]*tls.Certificate
+	// SNICerts are the TLS certificates used for SNI.
+	SNICerts []dynamiccertificates.SNICertKeyContentProvider
 
 	// ClientCA is the certificate bundle for all the signers that you'll recognize for incoming client certificates
 	ClientCA dynamiccertificates.CAContentProvider
