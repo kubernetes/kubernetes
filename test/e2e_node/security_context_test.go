@@ -22,8 +22,9 @@ import (
 	"os/exec"
 	"strings"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/features"
@@ -109,6 +110,86 @@ var _ = framework.KubeDescribe("Security Context", func() {
 			pid2 := f.ExecCommandInContainer("shared-pid-ns-test-pod", "test-container-2", "/bin/pidof", "top")
 			if pid1 != pid2 {
 				framework.Failf("PIDs are not the same in different containers: test-container-1=%v, test-container-2=%v", pid1, pid2)
+			}
+		})
+	})
+
+	ginkgo.Context("when creating a pod in the host PID namespace", func() {
+		makeHostPidPod := func(podName, image string, command []string, hostPID bool) *v1.Pod {
+			return &v1.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: podName,
+				},
+				Spec: v1.PodSpec{
+					RestartPolicy: v1.RestartPolicyNever,
+					HostPID:       hostPID,
+					Containers: []v1.Container{
+						{
+							Image:   image,
+							Name:    podName,
+							Command: command,
+						},
+					},
+				},
+			}
+		}
+		createAndWaitHostPidPod := func(podName string, hostPID bool) {
+			podClient.Create(makeHostPidPod(podName,
+				busyboxImage,
+				[]string{"sh", "-c", "pidof nginx || true"},
+				hostPID,
+			))
+
+			podClient.WaitForSuccess(podName, framework.PodStartTimeout)
+		}
+
+		nginxPid := ""
+		ginkgo.BeforeEach(func() {
+			nginxPodName := "nginx-hostpid-" + string(uuid.NewUUID())
+			podClient.CreateSync(makeHostPidPod(nginxPodName,
+				imageutils.GetE2EImage(imageutils.Nginx),
+				nil,
+				true,
+			))
+
+			output := f.ExecShellInContainer(nginxPodName, nginxPodName,
+				"cat /var/run/nginx.pid")
+			nginxPid = strings.TrimSpace(output)
+		})
+
+		ginkgo.It("should show its pid in the host PID namespace [NodeFeature:HostAccess]", func() {
+			busyboxPodName := "busybox-hostpid-" + string(uuid.NewUUID())
+			createAndWaitHostPidPod(busyboxPodName, true)
+			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			if err != nil {
+				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+			}
+
+			pids := strings.TrimSpace(logs)
+			framework.Logf("Got nginx's pid %q from pod %q", pids, busyboxPodName)
+			if pids == "" {
+				framework.Failf("nginx's pid should be seen by hostpid containers")
+			}
+
+			pidSets := sets.NewString(strings.Split(pids, " ")...)
+			if !pidSets.Has(nginxPid) {
+				framework.Failf("nginx's pid should be seen by hostpid containers")
+			}
+		})
+
+		ginkgo.It("should not show its pid in the non-hostpid containers [NodeFeature:HostAccess]", func() {
+			busyboxPodName := "busybox-non-hostpid-" + string(uuid.NewUUID())
+			createAndWaitHostPidPod(busyboxPodName, false)
+			logs, err := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, busyboxPodName, busyboxPodName)
+			if err != nil {
+				framework.Failf("GetPodLogs for pod %q failed: %v", busyboxPodName, err)
+			}
+
+			pids := strings.TrimSpace(logs)
+			framework.Logf("Got nginx's pid %q from pod %q", pids, busyboxPodName)
+			pidSets := sets.NewString(strings.Split(pids, " ")...)
+			if pidSets.Has(nginxPid) {
+				framework.Failf("nginx's pid should not be seen by non-hostpid containers")
 			}
 		})
 	})
