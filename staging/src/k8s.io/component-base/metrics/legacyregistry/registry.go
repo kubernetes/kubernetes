@@ -43,7 +43,7 @@ func init() {
 // Deprecated: Please note the issues described in the doc comment of
 // InstrumentHandler. You might want to consider using promhttp.Handler instead.
 func Handler() http.Handler {
-	return prometheus.InstrumentHandler("prometheus", promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{}))
+	return promhttp.InstrumentMetricHandler(prometheus.DefaultRegisterer, promhttp.HandlerFor(defaultRegistry, promhttp.HandlerOpts{}))
 }
 
 // Register registers a collectable metric but uses the global registry

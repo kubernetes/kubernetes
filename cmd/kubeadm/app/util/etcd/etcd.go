@@ -26,9 +26,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"go.etcd.io/etcd/clientv3"
 	"go.etcd.io/etcd/pkg/transport"
-	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
