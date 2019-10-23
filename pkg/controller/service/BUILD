@@ -3,9 +3,9 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "controller.go",
         "doc.go",
         "patch.go",
-        "service_controller.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/controller/service",
     visibility = ["//visibility:public"],
@@ -36,8 +36,8 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "controller_test.go",
         "patch_test.go",
-        "service_controller_test.go",
     ],
     embed = [":go_default_library"],
     deps = [

@@ -67,7 +67,7 @@ func defaultExternalService() *v1.Service {
 
 func alwaysReady() bool { return true }
 
-func newController() (*ServiceController, *fakecloud.Cloud, *fake.Clientset) {
+func newController() (*Controller, *fakecloud.Cloud, *fake.Clientset) {
 	cloud := &fakecloud.Cloud{}
 	cloud.Region = region
 
@@ -677,7 +677,7 @@ func TestProcessServiceCreateOrUpdateK8sError(t *testing.T) {
 
 func TestSyncService(t *testing.T) {
 
-	var controller *ServiceController
+	var controller *Controller
 
 	testCases := []struct {
 		testName   string
@@ -756,19 +756,19 @@ func TestSyncService(t *testing.T) {
 
 func TestProcessServiceDeletion(t *testing.T) {
 
-	var controller *ServiceController
+	var controller *Controller
 	var cloud *fakecloud.Cloud
 	// Add a global svcKey name
 	svcKey := "external-balancer"
 
 	testCases := []struct {
 		testName   string
-		updateFn   func(*ServiceController) // Update function used to manipulate srv and controller values
+		updateFn   func(*Controller)        // Update function used to manipulate srv and controller values
 		expectedFn func(svcErr error) error // Function to check if the returned value is expected
 	}{
 		{
 			testName: "If a non-existent service is deleted",
-			updateFn: func(controller *ServiceController) {
+			updateFn: func(controller *Controller) {
 				// Does not do anything
 			},
 			expectedFn: func(svcErr error) error {
@@ -777,7 +777,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 		},
 		{
 			testName: "If cloudprovided failed to delete the service",
-			updateFn: func(controller *ServiceController) {
+			updateFn: func(controller *Controller) {
 
 				svc := controller.cache.getOrCreate(svcKey)
 				svc.state = defaultExternalService()
@@ -797,7 +797,7 @@ func TestProcessServiceDeletion(t *testing.T) {
 		},
 		{
 			testName: "If delete was successful",
-			updateFn: func(controller *ServiceController) {
+			updateFn: func(controller *Controller) {
 
 				testSvc := defaultExternalService()
 				controller.enqueueService(testSvc)
@@ -1221,7 +1221,7 @@ func TestAddFinalizer(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			c := fake.NewSimpleClientset()
-			s := &ServiceController{
+			s := &Controller{
 				kubeClient: c,
 			}
 			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(tc.svc); err != nil {
@@ -1275,7 +1275,7 @@ func TestRemoveFinalizer(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			c := fake.NewSimpleClientset()
-			s := &ServiceController{
+			s := &Controller{
 				kubeClient: c,
 			}
 			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(tc.svc); err != nil {
@@ -1375,7 +1375,7 @@ func TestPatchStatus(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
 			c := fake.NewSimpleClientset()
-			s := &ServiceController{
+			s := &Controller{
 				kubeClient: c,
 			}
 			if _, err := s.kubeClient.CoreV1().Services(tc.svc.Namespace).Create(tc.svc); err != nil {
