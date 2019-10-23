@@ -160,7 +160,7 @@ func (f Field) AddTo(enc ObjectEncoder) {
 	case NamespaceType:
 		enc.OpenNamespace(f.Key)
 	case StringerType:
-		enc.AddString(f.Key, f.Interface.(fmt.Stringer).String())
+		err = encodeStringer(f.Key, f.Interface, enc)
 	case ErrorType:
 		encodeError(f.Key, f.Interface.(error), enc)
 	case SkipType:
@@ -198,4 +198,15 @@ func addFields(enc ObjectEncoder, fields []Field) {
 	for i := range fields {
 		fields[i].AddTo(enc)
 	}
+}
+
+func encodeStringer(key string, stringer interface{}, enc ObjectEncoder) (err error) {
+	defer func() {
+		if v := recover(); v != nil {
+			err = fmt.Errorf("PANIC=%v", v)
+		}
+	}()
+
+	enc.AddString(key, stringer.(fmt.Stringer).String())
+	return
 }

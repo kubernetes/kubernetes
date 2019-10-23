@@ -29,8 +29,8 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/component-base/metrics/legacyregistry"
 	"go.etcd.io/etcd/clientv3"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
