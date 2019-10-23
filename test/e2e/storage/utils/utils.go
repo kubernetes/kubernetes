@@ -64,44 +64,44 @@ const (
 )
 
 // PodExec runs f.ExecCommandInContainerWithFullOutput to execute a shell cmd in target pod
-func PodExec(f *framework.Framework, pod *v1.Pod, bashExec string) (string, error) {
-	stdout, _, err := f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", bashExec)
+func PodExec(f *framework.Framework, pod *v1.Pod, shExec string) (string, error) {
+	stdout, _, err := f.ExecCommandInContainerWithFullOutput(pod.Name, pod.Spec.Containers[0].Name, "/bin/sh", "-c", shExec)
 	return stdout, err
 }
 
-// VerifyExecInPodSucceed verifies bash cmd in target pod succeed
-func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, bashExec string) {
-	_, err := PodExec(f, pod, bashExec)
+// VerifyExecInPodSucceed verifies shell cmd in target pod succeed
+func VerifyExecInPodSucceed(f *framework.Framework, pod *v1.Pod, shExec string) {
+	_, err := PodExec(f, pod, shExec)
 	if err != nil {
 		if err, ok := err.(uexec.CodeExitError); ok {
 			exitCode := err.ExitStatus()
 			framework.ExpectNoError(err,
 				"%q should succeed, but failed with exit code %d and error message %q",
-				bashExec, exitCode, err)
+				shExec, exitCode, err)
 		} else {
 			framework.ExpectNoError(err,
 				"%q should succeed, but failed with error message %q",
-				bashExec, err)
+				shExec, err)
 		}
 	}
 }
 
-// VerifyExecInPodFail verifies bash cmd in target pod fail with certain exit code
-func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, bashExec string, exitCode int) {
-	_, err := PodExec(f, pod, bashExec)
+// VerifyExecInPodFail verifies shell cmd in target pod fail with certain exit code
+func VerifyExecInPodFail(f *framework.Framework, pod *v1.Pod, shExec string, exitCode int) {
+	_, err := PodExec(f, pod, shExec)
 	if err != nil {
 		if err, ok := err.(clientexec.ExitError); ok {
 			actualExitCode := err.ExitStatus()
 			framework.ExpectEqual(actualExitCode, exitCode,
 				"%q should fail with exit code %d, but failed with exit code %d and error message %q",
-				bashExec, exitCode, actualExitCode, err)
+				shExec, exitCode, actualExitCode, err)
 		} else {
 			framework.ExpectNoError(err,
 				"%q should fail with exit code %d, but failed with error message %q",
-				bashExec, exitCode, err)
+				shExec, exitCode, err)
 		}
 	}
-	framework.ExpectError(err, "%q should fail with exit code %d, but exit without error", bashExec, exitCode)
+	framework.ExpectError(err, "%q should fail with exit code %d, but exit without error", shExec, exitCode)
 }
 
 func isSudoPresent(nodeIP string, provider string) bool {
