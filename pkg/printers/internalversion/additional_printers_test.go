@@ -202,22 +202,6 @@ func TestPrintHandlerError(t *testing.T) {
 	}
 }
 
-func TestTemplatePanic(t *testing.T) {
-	tmpl := `{{and ((index .currentState.info "foo").state.running.startedAt) .currentState.info.net.state.running.startedAt}}`
-	printer, err := genericprinters.NewGoTemplatePrinter([]byte(tmpl))
-	if err != nil {
-		t.Fatalf("tmpl fail: %v", err)
-	}
-	buffer := &bytes.Buffer{}
-	err = printer.PrintObj(&v1.Pod{}, buffer)
-	if err == nil {
-		t.Fatalf("expected that template to crash")
-	}
-	if buffer.String() == "" {
-		t.Errorf("no debugging info was printed")
-	}
-}
-
 func TestNamePrinter(t *testing.T) {
 	tests := map[string]struct {
 		obj    runtime.Object
@@ -275,143 +259,13 @@ func TestNamePrinter(t *testing.T) {
 }
 
 // TODO(seans3): Move this test to cli-runtime/pkg/printers.
-func TestTemplateStrings(t *testing.T) {
-	// This unit tests the "exists" function as well as the template from update.sh
-	table := map[string]struct {
-		pod    v1.Pod
-		expect string
-	}{
-		"nilInfo":   {v1.Pod{}, "false"},
-		"emptyInfo": {v1.Pod{Status: v1.PodStatus{ContainerStatuses: []v1.ContainerStatus{}}}, "false"},
-		"fooExists": {
-			v1.Pod{
-				Status: v1.PodStatus{
-					ContainerStatuses: []v1.ContainerStatus{
-						{
-							Name: "foo",
-						},
-					},
-				},
-			},
-			"false",
-		},
-		"barExists": {
-			v1.Pod{
-				Status: v1.PodStatus{
-					ContainerStatuses: []v1.ContainerStatus{
-						{
-							Name: "bar",
-						},
-					},
-				},
-			},
-			"false",
-		},
-		"bothExist": {
-			v1.Pod{
-				Status: v1.PodStatus{
-					ContainerStatuses: []v1.ContainerStatus{
-						{
-							Name: "foo",
-						},
-						{
-							Name: "bar",
-						},
-					},
-				},
-			},
-			"false",
-		},
-		"barValid": {
-			v1.Pod{
-				Status: v1.PodStatus{
-					ContainerStatuses: []v1.ContainerStatus{
-						{
-							Name: "foo",
-						},
-						{
-							Name: "bar",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{
-									StartedAt: metav1.Time{},
-								},
-							},
-						},
-					},
-				},
-			},
-			"false",
-		},
-		"bothValid": {
-			v1.Pod{
-				Status: v1.PodStatus{
-					ContainerStatuses: []v1.ContainerStatus{
-						{
-							Name: "foo",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{
-									StartedAt: metav1.Time{},
-								},
-							},
-						},
-						{
-							Name: "bar",
-							State: v1.ContainerState{
-								Running: &v1.ContainerStateRunning{
-									StartedAt: metav1.Time{},
-								},
-							},
-						},
-					},
-				},
-			},
-			"true",
-		},
-	}
-	// The point of this test is to verify that the below template works.
-	tmpl := `{{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "foo") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`
-	printer, err := genericprinters.NewGoTemplatePrinter([]byte(tmpl))
-	if err != nil {
-		t.Fatalf("tmpl fail: %v", err)
-	}
-
-	for name, item := range table {
-		buffer := &bytes.Buffer{}
-		err = printer.PrintObj(&item.pod, buffer)
-		if err != nil {
-			t.Errorf("%v: unexpected err: %v", name, err)
-			continue
-		}
-		actual := buffer.String()
-		if len(actual) == 0 {
-			actual = "false"
-		}
-		if e := item.expect; e != actual {
-			t.Errorf("%v: expected %v, got %v", name, e, actual)
-		}
-	}
-}
-
-// TODO(seans3): Move this test to cli-runtime/pkg/printers.
 func TestPrinters(t *testing.T) {
 	om := func(name string) metav1.ObjectMeta { return metav1.ObjectMeta{Name: name} }
 
 	var (
-		err              error
-		templatePrinter  printers.ResourcePrinter
-		templatePrinter2 printers.ResourcePrinter
-		jsonpathPrinter  printers.ResourcePrinter
+		err             error
+		jsonpathPrinter printers.ResourcePrinter
 	)
-
-	templatePrinter, err = genericprinters.NewGoTemplatePrinter([]byte("{{.name}}"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	templatePrinter2, err = genericprinters.NewGoTemplatePrinter([]byte("{{len .items}}"))
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	jsonpathPrinter, err = genericprinters.NewJSONPathPrinter("{.metadata.name}")
 	if err != nil {
@@ -420,11 +274,9 @@ func TestPrinters(t *testing.T) {
 
 	genericPrinters := map[string]printers.ResourcePrinter{
 		// TODO(juanvallejo): move "generic printer" tests to pkg/kubectl/genericclioptions/printers
-		"json":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}),
-		"yaml":      genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}),
-		"template":  templatePrinter,
-		"template2": templatePrinter2,
-		"jsonpath":  jsonpathPrinter,
+		"json":     genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}),
+		"yaml":     genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}),
+		"jsonpath": jsonpathPrinter,
 	}
 	objects := map[string]runtime.Object{
 		"pod":             &v1.Pod{ObjectMeta: om("pod")},
@@ -438,8 +290,7 @@ func TestPrinters(t *testing.T) {
 	}
 	// map of printer name to set of objects it should fail on.
 	expectedErrors := map[string]sets.String{
-		"template2": sets.NewString("pod", "emptyPodList", "endpoints"),
-		"jsonpath":  sets.NewString("emptyPodList", "nonEmptyPodList", "endpoints"),
+		"jsonpath": sets.NewString("emptyPodList", "nonEmptyPodList", "endpoints"),
 	}
 
 	for pName, p := range genericPrinters {
