@@ -46,13 +46,14 @@ func (t *ServiceUpgradeTest) Setup(f *framework.Framework) {
 	jig := e2eservice.NewTestJig(f.ClientSet, f.Namespace.Name, serviceName)
 
 	ns := f.Namespace
+	cs := f.ClientSet
 
 	ginkgo.By("creating a TCP service " + serviceName + " with type=LoadBalancer in namespace " + ns.Name)
 	tcpService, err := jig.CreateTCPService(func(s *v1.Service) {
 		s.Spec.Type = v1.ServiceTypeLoadBalancer
 	})
 	framework.ExpectNoError(err)
-	tcpService, err = jig.WaitForLoadBalancer(e2eservice.LoadBalancerCreateTimeoutDefault)
+	tcpService, err = jig.WaitForLoadBalancer(e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
 	framework.ExpectNoError(err)
 
 	// Get info to hit it with

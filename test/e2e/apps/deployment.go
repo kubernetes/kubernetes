@@ -901,7 +901,7 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 	framework.Logf("Creating a service %s with type=LoadBalancer and externalTrafficPolicy=Local in namespace %s", name, ns)
 	jig := e2eservice.NewTestJig(c, ns, name)
 	jig.Labels = podLabels
-	service, err := jig.CreateLoadBalancerService(e2eservice.LoadBalancerCreateTimeoutDefault, func(svc *v1.Service) {
+	service, err := jig.CreateLoadBalancerService(e2eservice.GetServiceLoadBalancerCreationTimeout(c), func(svc *v1.Service) {
 		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 	})
 	framework.ExpectNoError(err)
