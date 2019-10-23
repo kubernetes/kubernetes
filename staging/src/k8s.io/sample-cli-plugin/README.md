@@ -55,7 +55,7 @@ $ hack/create-plugin-archive.sh
 # generate a ready-to-use krew manifest from the template
 $ hack/generate-krew-manifest.sh
 # install the plugin via krew
-$ kubectl krew install --manifest out/sample-plugin.yaml --archive out/archive.tar.gz
+$ kubectl krew install --manifest _output/sample-plugin.yaml --archive _output/archive.tar.gz
 ```
 
 ##### Cleanup

@@ -19,7 +19,7 @@ set -euo pipefail
 
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-out_dirname="out"
+out_dirname="_output"
 mkdir -p "$out_dirname"
 
 for os in darwin linux windows; do

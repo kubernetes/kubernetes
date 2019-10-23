@@ -1,7 +1,7 @@
 apiVersion: krew.googlecontainertools.github.com/v1alpha2
 kind: Plugin
 metadata:
-  name: sample-plugin
+  name: ns
 spec:
   version: "v0.0.1"
   platforms:

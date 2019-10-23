@@ -19,7 +19,7 @@ set -euo pipefail
 
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-out_dirname="out"
+out_dirname="_output"
 archive="$out_dirname/archive.tar.gz"
 mkdir -p "$out_dirname"
 
@@ -41,7 +41,7 @@ ARCHIVE_SHASUM=$(sha256sum "$archive" | sed 's/ .*//') envsubst '$ARCHIVE_SHASUM
 echo 'You can now do a test installation of the sample plugin via Krew.'
 echo 'If you do not have Krew installed yet, go to https://krew.dev/#installation'
 echo ''
-echo '$ kubectl krew install --manifest out/sample-plugin.yaml --archive out/archive.tar.gz'
+echo '$ kubectl krew install --manifest _output/sample-plugin.yaml --archive _output/archive.tar.gz'
 echo ''
 echo 'To clean up, run'
 echo '$ kubectl krew remove sample-plugin'
