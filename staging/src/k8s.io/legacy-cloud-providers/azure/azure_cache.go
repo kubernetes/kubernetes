@@ -30,14 +30,14 @@ import (
 type cacheReadType int
 
 const (
-	// cachedData returns data from cache if cache entry not expired
+	// cacheReadTypeDefault returns data from cache if cache entry not expired
 	// if cache entry expired, then it will refetch the data using getter
 	// save the entry in cache and then return
-	cachedData cacheReadType = iota
-	// allowUnsafeRead returns data from cache even if the cache entry is
+	cacheReadTypeDefault cacheReadType = iota
+	// cacheReadTypeUnsafe returns data from cache even if the cache entry is
 	// active/expired. If entry doesn't exist in cache, then data is fetched
 	// using getter, saved in cache and returned
-	allowUnsafeRead
+	cacheReadTypeUnsafe
 )
 
 // getFunc defines a getter function for timedCache.
@@ -90,15 +90,15 @@ func (t *timedCache) getInternal(key string) (*cacheEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	// lock here to ensure if entry doesn't exist, we add a new entry
-	// avoiding overwrites
-	t.lock.Lock()
-	defer t.lock.Unlock()
-
 	// if entry exists, return the entry
 	if exists {
 		return entry.(*cacheEntry), nil
 	}
+
+	// lock here to ensure if entry doesn't exist, we add a new entry
+	// avoiding overwrites
+	t.lock.Lock()
+	defer t.lock.Unlock()
 
 	// Still not found, add new entry with nil data.
 	// Note the data will be filled later by getter.
@@ -122,12 +122,12 @@ func (t *timedCache) Get(key string, crt cacheReadType) (interface{}, error) {
 
 	// entry exists
 	if entry.data != nil {
-		// allow dirty, so return data even if expired
-		if crt == allowUnsafeRead {
+		// allow unsafe read, so return data even if expired
+		if crt == cacheReadTypeUnsafe {
 			return entry.data, nil
 		}
 		// if cached data is not expired, return cached data
-		if time.Since(entry.createdOn) < t.ttl && crt == cachedData {
+		if time.Since(entry.createdOn) < t.ttl {
 			return entry.data, nil
 		}
 	}

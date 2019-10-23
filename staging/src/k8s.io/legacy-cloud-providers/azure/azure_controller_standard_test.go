@@ -107,7 +107,7 @@ func TestGetDataDisks(t *testing.T) {
 			nodeName:          "vm2",
 			expectedDataDisks: nil,
 			expectedError:     true,
-			crt:               cachedData,
+			crt:               cacheReadTypeDefault,
 		},
 		{
 			desc:     "correct list of data disks shall be returned if everything is good",
@@ -119,7 +119,7 @@ func TestGetDataDisks(t *testing.T) {
 				},
 			},
 			expectedError: false,
-			crt:           cachedData,
+			crt:           cacheReadTypeDefault,
 		},
 		{
 			desc:     "correct list of data disks shall be returned if everything is good",
@@ -131,7 +131,7 @@ func TestGetDataDisks(t *testing.T) {
 				},
 			},
 			expectedError: false,
-			crt:           allowUnsafeRead,
+			crt:           cacheReadTypeUnsafe,
 		},
 	}
 	for i, test := range testCases {
@@ -143,7 +143,7 @@ func TestGetDataDisks(t *testing.T) {
 		assert.Equal(t, test.expectedDataDisks, dataDisks, "TestCase[%d]: %s", i, test.desc)
 		assert.Equal(t, test.expectedError, err != nil, "TestCase[%d]: %s", i, test.desc)
 
-		if test.crt == allowUnsafeRead {
+		if test.crt == cacheReadTypeUnsafe {
 			time.Sleep(fakeCacheTTL)
 			dataDisks, err := vmSet.GetDataDisks(test.nodeName, test.crt)
 			assert.Equal(t, test.expectedDataDisks, dataDisks, "TestCase[%d]: %s", i, test.desc)

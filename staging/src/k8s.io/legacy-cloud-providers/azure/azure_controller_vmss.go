@@ -32,7 +32,7 @@ import (
 // the vhd must exist, can be identified by diskName, diskURI, and lun.
 func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
 	vmName := mapNodeNameToVMName(nodeName)
-	ssName, instanceID, vm, err := ss.getVmssVM(vmName, cachedData)
+	ssName, instanceID, vm, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
 	if err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 // the vhd can be identified by diskName or diskURI
 func (ss *scaleSet) DetachDisk(diskName, diskURI string, nodeName types.NodeName) (*http.Response, error) {
 	vmName := mapNodeNameToVMName(nodeName)
-	ssName, instanceID, vm, err := ss.getVmssVM(vmName, cachedData)
+	ssName, instanceID, vm, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
 	if err != nil {
 		return nil, err
 	}
