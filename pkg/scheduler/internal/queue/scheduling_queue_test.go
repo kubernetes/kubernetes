@@ -37,6 +37,7 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -181,7 +182,7 @@ func (f *fakeFramework) ListPlugins() map[string][]config.Plugin {
 	return nil
 }
 
-func (*fakeFramework) NodeInfoSnapshot() *schedulernodeinfo.Snapshot {
+func (*fakeFramework) NodeInfoSnapshot() *nodeinfosnapshot.Snapshot {
 	return nil
 }
 

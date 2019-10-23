@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "host_ports.go",
         "node_info.go",
-        "snapshot.go",
         "util.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/nodeinfo",
@@ -51,7 +50,10 @@ filegroup(
 
 filegroup(
     name = "all-srcs",
-    srcs = [":package-srcs"],
+    srcs = [
+        ":package-srcs",
+        "//pkg/scheduler/nodeinfo/snapshot:all-srcs",
+    ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )

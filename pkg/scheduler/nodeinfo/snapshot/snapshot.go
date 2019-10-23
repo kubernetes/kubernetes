@@ -18,22 +18,23 @@ package nodeinfo
 
 import (
 	v1 "k8s.io/api/core/v1"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // Snapshot is a snapshot of cache NodeInfo and NodeTree order. The scheduler takes a
 // snapshot at the beginning of each scheduling cycle and uses it for its operations in that cycle.
 type Snapshot struct {
 	// NodeInfoMap a map of node name to a snapshot of its NodeInfo.
-	NodeInfoMap map[string]*NodeInfo
+	NodeInfoMap map[string]*schedulernodeinfo.NodeInfo
 	// NodeInfoList is the list of nodes as ordered in the cache's nodeTree.
-	NodeInfoList []*NodeInfo
+	NodeInfoList []*schedulernodeinfo.NodeInfo
 	Generation   int64
 }
 
 // NewSnapshot initializes a Snapshot struct and returns it.
 func NewSnapshot() *Snapshot {
 	return &Snapshot{
-		NodeInfoMap: make(map[string]*NodeInfo),
+		NodeInfoMap: make(map[string]*schedulernodeinfo.NodeInfo),
 	}
 }
 
@@ -41,8 +42,8 @@ func NewSnapshot() *Snapshot {
 func (s *Snapshot) ListNodes() []*v1.Node {
 	nodes := make([]*v1.Node, 0, len(s.NodeInfoMap))
 	for _, n := range s.NodeInfoList {
-		if n != nil && n.node != nil {
-			nodes = append(nodes, n.node)
+		if n.Node() != nil {
+			nodes = append(nodes, n.Node())
 		}
 	}
 	return nodes

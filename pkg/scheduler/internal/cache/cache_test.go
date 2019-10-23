@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func deepEqualWithoutGeneration(t *testing.T, testcase int, actual *nodeInfoListItem, expected *schedulernodeinfo.NodeInfo) {
@@ -1076,7 +1077,7 @@ func TestNodeOperators(t *testing.T) {
 		}
 
 		// Case 2: dump cached nodes successfully.
-		cachedNodes := schedulernodeinfo.NewSnapshot()
+		cachedNodes := nodeinfosnapshot.NewSnapshot()
 		cache.UpdateNodeInfoSnapshot(cachedNodes)
 		newNode, found := cachedNodes.NodeInfoMap[node.Name]
 		if !found || len(cachedNodes.NodeInfoMap) != 1 {
@@ -1179,7 +1180,7 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	}
 
 	var cache *schedulerCache
-	var snapshot *schedulernodeinfo.Snapshot
+	var snapshot *nodeinfosnapshot.Snapshot
 	type operation = func()
 
 	addNode := func(i int) operation {
@@ -1332,7 +1333,7 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cache = newSchedulerCache(time.Second, time.Second, nil)
-			snapshot = schedulernodeinfo.NewSnapshot()
+			snapshot = nodeinfosnapshot.NewSnapshot()
 
 			for _, op := range test.operations {
 				op()
@@ -1363,7 +1364,7 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	}
 }
 
-func compareCacheWithNodeInfoSnapshot(cache *schedulerCache, snapshot *schedulernodeinfo.Snapshot) error {
+func compareCacheWithNodeInfoSnapshot(cache *schedulerCache, snapshot *nodeinfosnapshot.Snapshot) error {
 	if len(snapshot.NodeInfoMap) != len(cache.nodes) {
 		return fmt.Errorf("unexpected number of nodes in the snapshot. Expected: %v, got: %v", len(cache.nodes), len(snapshot.NodeInfoMap))
 	}
@@ -1381,7 +1382,7 @@ func BenchmarkUpdate1kNodes30kPods(b *testing.B) {
 	cache := setupCacheOf1kNodes30kPods(b)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		cachedNodes := schedulernodeinfo.NewSnapshot()
+		cachedNodes := nodeinfosnapshot.NewSnapshot()
 		cache.UpdateNodeInfoSnapshot(cachedNodes)
 	}
 }
