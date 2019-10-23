@@ -528,7 +528,7 @@ func runVolumeTesterPod(client clientset.Interface, config TestConfig, podSuffix
 	return clientPod, nil
 }
 
-func testVolumeContent(f *framework.Framework, client clientset.Interface, pod *v1.Pod, fsGroup *int64, fsType string, tests []Test) {
+func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsType string, tests []Test) {
 	ginkgo.By("Checking that text file contents are perfect.")
 	for i, test := range tests {
 		if test.Mode == v1.PersistentVolumeBlock {
@@ -581,7 +581,7 @@ func TestVolumeClient(f *framework.Framework, client clientset.Interface, config
 
 	}
 	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, clientPod))
-	testVolumeContent(f, client, clientPod, fsGroup, fsType, tests)
+	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
 }
 
 // InjectContent inserts index.html with given content into given volume. It does so by
@@ -621,7 +621,7 @@ func InjectContent(f *framework.Framework, client clientset.Interface, config Te
 
 	// Check that the data have been really written in this pod.
 	// This tests non-persistent volume types
-	testVolumeContent(f, client, injectorPod, fsGroup, fsType, tests)
+	testVolumeContent(f, injectorPod, fsGroup, fsType, tests)
 }
 
 // CreateGCEVolume creates PersistentVolumeSource for GCEVolume.
