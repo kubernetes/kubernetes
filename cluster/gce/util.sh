@@ -950,9 +950,6 @@ function print-common-kubelet-config {
   declare quoted_dns_server_ip
   declare quoted_dns_domain
   quoted_dns_server_ip=$(yaml-quote "${DNS_SERVER_IP}")
-  if [[ "${ENABLE_NODELOCAL_DNS:-}" == "true" ]]; then
-    quoted_dns_server_ip=$(yaml-quote "${LOCAL_DNS_IP}")
-  fi
   quoted_dns_domain=$(yaml-quote "${DNS_DOMAIN}")
   cat <<EOF
 kind: KubeletConfiguration
