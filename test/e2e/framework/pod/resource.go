@@ -488,32 +488,6 @@ func CreateExecPodOrFail(client clientset.Interface, ns, generateName string, tw
 	return execPod
 }
 
-// CreatePodOrFail creates a pod with the specified containerPorts.
-func CreatePodOrFail(c clientset.Interface, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
-	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:   name,
-			Labels: labels,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:  "pause",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
-					Args:  []string{"pause"},
-					Ports: containerPorts,
-					// Add a dummy environment variable to work around a docker issue.
-					// https://github.com/docker/docker/issues/14203
-					Env: []v1.EnvVar{{Name: "FOO", Value: " "}},
-				},
-			},
-		},
-	}
-	_, err := c.CoreV1().Pods(ns).Create(pod)
-	expectNoError(err, "failed to create pod %s in namespace %s", name, ns)
-}
-
 // CheckPodsRunningReady returns whether all pods whose names are listed in
 // podNames in namespace ns are running and ready, using c and waiting at most
 // timeout.

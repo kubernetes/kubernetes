@@ -148,12 +148,12 @@ var _ = SIGDescribe("Services", func() {
 		name1 := "pod1"
 		name2 := "pod2"
 
-		e2epod.CreatePodOrFail(cs, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
+		createPodOrFail(cs, ns, name1, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name1] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		e2epod.CreatePodOrFail(cs, ns, name2, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
+		createPodOrFail(cs, ns, name2, jig.Labels, []v1.ContainerPort{{ContainerPort: 80}})
 		names[name2] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{name1: {80}, name2: {80}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
@@ -234,12 +234,12 @@ var _ = SIGDescribe("Services", func() {
 		podname1 := "pod1"
 		podname2 := "pod2"
 
-		e2epod.CreatePodOrFail(cs, ns, podname1, jig.Labels, containerPorts1)
+		createPodOrFail(cs, ns, podname1, jig.Labels, containerPorts1)
 		names[podname1] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
 
-		e2epod.CreatePodOrFail(cs, ns, podname2, jig.Labels, containerPorts2)
+		createPodOrFail(cs, ns, podname2, jig.Labels, containerPorts2)
 		names[podname2] = true
 		err = e2eendpoints.ValidateEndpointsPorts(cs, ns, serviceName, e2eendpoints.PortsByPodName{podname1: {port1}, podname2: {port2}})
 		framework.ExpectNoError(err, "failed to validate endpoints for service %s in namespace: %s", serviceName, ns)
@@ -2560,6 +2560,32 @@ func createPausePodDeployment(cs clientset.Interface, name, ns string, replicas 
 	deployment, err := cs.AppsV1().Deployments(ns).Create(pauseDeployment)
 	framework.ExpectNoError(err, "Error in creating deployment for pause pod")
 	return deployment
+}
+
+// createPodOrFail creates a pod with the specified containerPorts.
+func createPodOrFail(c clientset.Interface, ns, name string, labels map[string]string, containerPorts []v1.ContainerPort) {
+	ginkgo.By(fmt.Sprintf("Creating pod %s in namespace %s", name, ns))
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:   name,
+			Labels: labels,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "pause",
+					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Args:  []string{"pause"},
+					Ports: containerPorts,
+					// Add a dummy environment variable to work around a docker issue.
+					// https://github.com/docker/docker/issues/14203
+					Env: []v1.EnvVar{{Name: "FOO", Value: " "}},
+				},
+			},
+		},
+	}
+	_, err := c.CoreV1().Pods(ns).Create(pod)
+	framework.ExpectNoError(err, "failed to create pod %s in namespace %s", name, ns)
 }
 
 // launchHostExecPod launches a hostexec pod in the given namespace and waits
