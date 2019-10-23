@@ -10,12 +10,3 @@
 ./cluster/gce/util.sh
 ./cluster/log-dump/log-dump.sh
 ./cluster/pre-existing/util.sh
-./test/cmd/apply.sh
-./test/cmd/apps.sh
-./test/cmd/core.sh
-./test/cmd/crd.sh
-./test/cmd/create.sh
-./test/cmd/generic-resources.sh
-./test/cmd/save-config.sh
-./test/images/pets/redis-installer/on-start.sh
-./test/images/pets/zookeeper-installer/on-start.sh
