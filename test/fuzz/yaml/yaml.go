@@ -27,40 +27,42 @@ import (
 	sigyaml "sigs.k8s.io/yaml"
 )
 
-// FuzzDuration is a fuzz target for unmarshaling Duration defined in "k8s.io/apimachinery/pkg/apis/meta/v1".
-// This target also checks that the unmarshaled result can be marshaled back to the input.
-func FuzzDuration(b []byte) int {
-	var unmarshalResult struct {
+// FuzzDuration is a fuzz target for strict-unmarshaling Duration defined in
+// "k8s.io/apimachinery/pkg/apis/meta/v1". This target also checks that the
+// unmarshaled result can be marshaled back to the input.
+func FuzzDurationStrict(b []byte) int {
+	var durationHolder struct {
 		D metav1.Duration `json:"d"`
 	}
-	if err := yaml.Unmarshal(b, &unmarshalResult); err != nil {
+	if err := sigyaml.UnmarshalStrict(b, &durationHolder); err != nil {
 		return 0
 	}
-	marshalResult, err := sigyaml.Marshal(&unmarshalResult)
+	result, err := sigyaml.Marshal(&durationHolder)
 	if err != nil {
 		panic(err)
 	}
-	if !bytes.Equal(marshalResult, b) {
-		panic("marshalResult != input")
+	if !bytes.Equal(result, b) {
+		panic("result != input")
 	}
 	return 1
 }
 
-// FuzzMicroTime is a fuzz target for unmarshaling MicroTime defined in "k8s.io/apimachinery/pkg/apis/meta/v1".
-// This target also checks that the unmarshaled result can be marshaled back to the input.
-func FuzzMicroTime(b []byte) int {
-	var unmarshalResult struct {
+// FuzzMicroTime is a fuzz target for strict-unmarshaling MicroTime defined in
+// "k8s.io/apimachinery/pkg/apis/meta/v1". This target also checks that the
+// unmarshaled result can be marshaled back to the input.
+func FuzzMicroTimeStrict(b []byte) int {
+	var microTimeHolder struct {
 		T metav1.MicroTime `json:"t"`
 	}
-	if err := yaml.Unmarshal(b, &unmarshalResult); err != nil {
+	if err := sigyaml.UnmarshalStrict(b, &microTimeHolder); err != nil {
 		return 0
 	}
-	marshalResult, err := sigyaml.Marshal(&unmarshalResult)
+	result, err := sigyaml.Marshal(&microTimeHolder)
 	if err != nil {
 		panic(err)
 	}
-	if !bytes.Equal(marshalResult, b) {
-		panic("marshalResult != input")
+	if !bytes.Equal(result, b) {
+		panic("result != input")
 	}
 	return 1
 }
@@ -79,21 +81,22 @@ func FuzzSigYaml(b []byte) int {
 	return out
 }
 
-// FuzzTime is a fuzz target for unmarshaling Time defined in "k8s.io/apimachinery/pkg/apis/meta/v1".
-// This target also checks that the unmarshaled result can be marshaled back to the input.
+// FuzzTime is a fuzz target for strict-unmarshaling Time defined in
+// "k8s.io/apimachinery/pkg/apis/meta/v1". This target also checks that the
+// unmarshaled result can be marshaled back to the input.
 func FuzzTime(b []byte) int {
-	var unmarshalResult struct {
+	var timeHolder struct {
 		T metav1.Time `json:"t"`
 	}
-	if err := sigyaml.Unmarshal(b, &unmarshalResult); err != nil {
+	if err := sigyaml.UnmarshalStrict(b, &timeHolder); err != nil {
 		return 0
 	}
-	marshalResult, err := yaml.Marshal(&unmarshalResult)
+	result, err := sigyaml.Marshal(&timeHolder)
 	if err != nil {
 		panic(err)
 	}
-	if !bytes.Equal(marshalResult, b) {
-		panic("marshalResult != input")
+	if !bytes.Equal(result, b) {
+		panic("result != input")
 	}
 	return 1
 }
