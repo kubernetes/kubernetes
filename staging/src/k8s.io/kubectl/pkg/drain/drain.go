@@ -298,7 +298,6 @@ func waitForDelete(ctx context.Context, pods []corev1.Pod, interval, timeout tim
 			default:
 				return false, nil
 			}
-			return false, nil
 		}
 		return true, nil
 	})
