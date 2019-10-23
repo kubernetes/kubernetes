@@ -850,7 +850,7 @@ func SelectorFromSet(ls Set) Selector {
 	if ls == nil || len(ls) == 0 {
 		return internalSelector{}
 	}
-	var requirements internalSelector
+	requirements := make([]Requirement, 0, len(ls))
 	for label, value := range ls {
 		r, err := NewRequirement(label, selection.Equals, []string{value})
 		if err == nil {
@@ -862,7 +862,7 @@ func SelectorFromSet(ls Set) Selector {
 	}
 	// sort to have deterministic string representation
 	sort.Sort(ByKey(requirements))
-	return requirements
+	return internalSelector(requirements)
 }
 
 // SelectorFromValidatedSet returns a Selector which will match exactly the given Set.
@@ -872,13 +872,13 @@ func SelectorFromValidatedSet(ls Set) Selector {
 	if ls == nil || len(ls) == 0 {
 		return internalSelector{}
 	}
-	var requirements internalSelector
+	requirements := make([]Requirement, 0, len(ls))
 	for label, value := range ls {
 		requirements = append(requirements, Requirement{key: label, operator: selection.Equals, strValues: []string{value}})
 	}
 	// sort to have deterministic string representation
 	sort.Sort(ByKey(requirements))
-	return requirements
+	return internalSelector(requirements)
 }
 
 // ParseToRequirements takes a string representing a selector and returns a list of

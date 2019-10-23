@@ -617,3 +617,16 @@ func TestSafeSort(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkSelectorFromValidatedSet(b *testing.B) {
+	set := map[string]string{
+		"foo": "foo",
+		"bar": "bar",
+	}
+
+	for i := 0; i < b.N; i++ {
+		if SelectorFromValidatedSet(set).Empty() {
+			b.Errorf("Unexpected selector")
+		}
+	}
+}
