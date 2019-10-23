@@ -72,6 +72,20 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 			s.SNICerts,
 			nil, // TODO see how to plumb an event recorder down in here. For now this results in simply klog messages.
 		)
+		// register if possible
+		if notifier, ok := s.ClientCA.(dynamiccertificates.Notifier); ok {
+			notifier.AddListener(dynamicCertificateController)
+		}
+		// start controllers if possible
+		if controller, ok := s.ClientCA.(dynamiccertificates.ControllerRunner); ok {
+			// runonce to be sure that we have a value.
+			if err := controller.RunOnce(); err != nil {
+				return nil, err
+			}
+
+			go controller.Run(1, stopCh)
+		}
+
 		// runonce to be sure that we have a value.
 		if err := dynamicCertificateController.RunOnce(); err != nil {
 			return nil, err

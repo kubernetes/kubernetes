@@ -60,6 +60,8 @@ type DynamicServingCertificateController struct {
 	eventRecorder events.EventRecorder
 }
 
+var _ Listener = &DynamicServingCertificateController{}
+
 // NewDynamicServingCertificateController returns a controller that can be used to keep a TLSConfig up to date.
 func NewDynamicServingCertificateController(
 	baseTLSConfig tls.Config,

@@ -345,21 +345,19 @@ func DefaultOpenAPIConfig(getDefinitions openapicommon.GetOpenAPIDefinitions, de
 	}
 }
 
-func (c *AuthenticationInfo) ApplyClientCert(clientCAFile string, servingInfo *SecureServingInfo) error {
-	if servingInfo != nil {
-		if len(clientCAFile) > 0 {
-			clientCAProvider, err := dynamiccertificates.NewStaticCAContentFromFile(clientCAFile)
-			if err != nil {
-				return fmt.Errorf("unable to load client CA file: %v", err)
-			}
-			if servingInfo.ClientCA == nil {
-				servingInfo.ClientCA = clientCAProvider
-			} else {
-				servingInfo.ClientCA = dynamiccertificates.NewUnionCAContentProvider(servingInfo.ClientCA, clientCAProvider)
-			}
-		}
+func (c *AuthenticationInfo) ApplyClientCert(clientCA dynamiccertificates.CAContentProvider, servingInfo *SecureServingInfo) error {
+	if servingInfo == nil {
+		return nil
+	}
+	if clientCA == nil {
+		return nil
+	}
+	if servingInfo.ClientCA == nil {
+		servingInfo.ClientCA = clientCA
+		return nil
 	}
 
+	servingInfo.ClientCA = dynamiccertificates.NewUnionCAContentProvider(servingInfo.ClientCA, clientCA)
 	return nil
 }
 

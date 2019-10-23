@@ -18,14 +18,17 @@ package dynamiccertificates
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 )
 
 type staticCAContent struct {
 	name     string
-	caBundle []byte
+	caBundle *caBundleAndVerifier
 }
+
+var _ CAContentProvider = &staticCAContent{}
 
 // NewStaticCAContentFromFile returns a CAContentProvider based on a filename
 func NewStaticCAContentFromFile(filename string) (CAContentProvider, error) {
@@ -37,15 +40,20 @@ func NewStaticCAContentFromFile(filename string) (CAContentProvider, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewStaticCAContent(filename, caBundle), nil
+	return NewStaticCAContent(filename, caBundle)
 }
 
 // NewStaticCAContent returns a CAContentProvider that always returns the same value
-func NewStaticCAContent(name string, caBundle []byte) CAContentProvider {
+func NewStaticCAContent(name string, caBundle []byte) (CAContentProvider, error) {
+	caBundleAndVerifier, err := newCABundleAndVerifier(name, caBundle)
+	if err != nil {
+		return nil, err
+	}
+
 	return &staticCAContent{
 		name:     name,
-		caBundle: caBundle,
-	}
+		caBundle: caBundleAndVerifier,
+	}, nil
 }
 
 // Name is just an identifier
@@ -55,7 +63,11 @@ func (c *staticCAContent) Name() string {
 
 // CurrentCABundleContent provides ca bundle byte content
 func (c *staticCAContent) CurrentCABundleContent() (cabundle []byte) {
-	return c.caBundle
+	return c.caBundle.caBundle
+}
+
+func (c *staticCAContent) VerifyOptions() x509.VerifyOptions {
+	return c.caBundle.verifyOptions
 }
 
 type staticCertKeyContent struct {
