@@ -121,20 +121,15 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 		}
 	}
 
-	vmset, err := c.getNodeVMSet(nodeName, allowUnsafeRead)
+	vmset, err := c.getNodeVMSet(nodeName, cacheReadTypeUnsafe)
 	if err != nil {
 		return err
 	}
 
 	instanceid, err := c.cloud.InstanceID(context.TODO(), nodeName)
 	if err != nil {
-<<<<<<< HEAD:pkg/cloudprovider/providers/azure/azure_controller_common.go
 		klog.Warningf("failed to get azure instance id (%v)", err)
 		return fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
-=======
-		klog.Warningf("failed to get azure instance id (%v) for node %s", err, nodeName)
-		return -1, fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
->>>>>>> add allowunsafe read:staging/src/k8s.io/legacy-cloud-providers/azure/azure_controller_common.go
 	}
 
 	diskOpMutex.LockKey(instanceid)
@@ -164,7 +159,7 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 		return fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
 	}
 
-	vmset, err := c.getNodeVMSet(nodeName, allowUnsafeRead)
+	vmset, err := c.getNodeVMSet(nodeName, cacheReadTypeUnsafe)
 	if err != nil {
 		return err
 	}
@@ -212,7 +207,7 @@ func (c *controllerCommon) getNodeDataDisks(nodeName types.NodeName, crt cacheRe
 func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error) {
 	// getNodeDataDisks need to fetch the cached data/fresh data if cache expired here
 	// to ensure we get LUN based on latest entry.
-	disks, err := c.getNodeDataDisks(nodeName, cachedData)
+	disks, err := c.getNodeDataDisks(nodeName, cacheReadTypeDefault)
 	if err != nil {
 		klog.Errorf("error of getting data disks for node %q: %v", nodeName, err)
 		return -1, err
@@ -232,7 +227,7 @@ func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.N
 
 // GetNextDiskLun searches all vhd attachment on the host and find unused lun. Return -1 if all luns are used.
 func (c *controllerCommon) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
-	disks, err := c.getNodeDataDisks(nodeName, cachedData)
+	disks, err := c.getNodeDataDisks(nodeName, cacheReadTypeDefault)
 	if err != nil {
 		klog.Errorf("error of getting data disks for node %q: %v", nodeName, err)
 		return -1, err
@@ -263,7 +258,7 @@ func (c *controllerCommon) DisksAreAttached(diskNames []string, nodeName types.N
 	// for every reconcile call. The cache is invalidated after Attach/Detach
 	// disk. So the new entry will be fetched and cached the first time reconcile
 	// loop runs after the Attach/Disk OP which will reflect the latest model.
-	disks, err := c.getNodeDataDisks(nodeName, allowUnsafeRead)
+	disks, err := c.getNodeDataDisks(nodeName, cacheReadTypeUnsafe)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// if host doesn't exist, no need to detach
