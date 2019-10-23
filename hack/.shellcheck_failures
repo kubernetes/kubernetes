@@ -1,3 +1,4 @@
+./build/common.sh
 ./build/lib/release.sh
 ./cluster/common.sh
 ./cluster/gce/config-default.sh
@@ -6,7 +7,19 @@
 ./cluster/gce/gci/configure.sh
 ./cluster/gce/gci/health-monitor.sh
 ./cluster/gce/gci/master-helper.sh
+./cluster/gce/gci/mounter/stage-upload.sh
 ./cluster/gce/upgrade.sh
 ./cluster/gce/util.sh
 ./cluster/log-dump/log-dump.sh
 ./cluster/pre-existing/util.sh
+./hack/lib/golang.sh
+./hack/lib/test.sh
+./test/cmd/apply.sh
+./test/cmd/apps.sh
+./test/cmd/core.sh
+./test/cmd/crd.sh
+./test/cmd/create.sh
+./test/cmd/generic-resources.sh
+./test/cmd/save-config.sh
+./test/images/pets/redis-installer/on-start.sh
+./test/images/pets/zookeeper-installer/on-start.sh
