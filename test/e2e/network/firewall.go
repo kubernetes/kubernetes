@@ -82,7 +82,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		nodesSet := sets.NewString(nodesNames...)
 
 		ginkgo.By("Creating a LoadBalancer type service with ExternalTrafficPolicy=Global")
-		svc, err := jig.CreateLoadBalancerService(e2eservice.LoadBalancerCreateTimeoutDefault, func(svc *v1.Service) {
+		svc, err := jig.CreateLoadBalancerService(e2eservice.GetServiceLoadBalancerCreationTimeout(cs), func(svc *v1.Service) {
 			svc.Spec.Ports = []v1.ServicePort{{Protocol: v1.ProtocolTCP, Port: firewallTestHTTPPort}}
 			svc.Spec.LoadBalancerSourceRanges = firewallTestSourceRanges
 		})
@@ -129,7 +129,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		ginkgo.By("Waiting for the correct local traffic health check firewall rule to be created")
 		localHCFw := gce.ConstructHealthCheckFirewallForLBService(clusterID, svc, cloudConfig.NodeTag, false)
-		fw, err = gce.WaitForFirewallRule(gceCloud, localHCFw.Name, true, e2eservice.LoadBalancerCreateTimeoutDefault)
+		fw, err = gce.WaitForFirewallRule(gceCloud, localHCFw.Name, true, e2eservice.GetServiceLoadBalancerCreationTimeout(cs))
 		framework.ExpectNoError(err)
 		err = gce.VerifyFirewallRule(fw, localHCFw, cloudConfig.Network, false)
 		framework.ExpectNoError(err)
@@ -160,7 +160,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		// Send requests from outside of the cluster because internal traffic is whitelisted
 		ginkgo.By("Accessing the external service ip from outside, all non-master nodes should be reached")
-		err = framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerCreateTimeoutDefault, nodesSet)
+		err = framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet)
 		framework.ExpectNoError(err)
 
 		// Check if there are overlapping tags on the firewall that extend beyond just the vms in our cluster
@@ -181,12 +181,12 @@ var _ = SIGDescribe("Firewall rule", func() {
 			nodesSet.Insert(nodesNames[0])
 			gce.SetInstanceTags(cloudConfig, nodesNames[0], zone, removedTags)
 			// Make sure traffic is recovered before exit
-			err = framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerCreateTimeoutDefault, nodesSet)
+			err = framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet)
 			framework.ExpectNoError(err)
 		}()
 
 		ginkgo.By("Accessing serivce through the external ip and examine got no response from the node without tags")
-		err = framework.TestHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerCreateTimeoutDefault, nodesSet, 15)
+		err = framework.TestHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet, 15)
 		framework.ExpectNoError(err)
 	})
 
