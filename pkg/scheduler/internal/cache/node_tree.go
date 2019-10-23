@@ -18,21 +18,22 @@ package cache
 
 import (
 	"fmt"
+	"sync"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/klog"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
+
+	"k8s.io/klog"
 )
 
-// nodeTree is a tree-like data structure that holds node names in each zone. Zone names are
+// NodeTree is a tree-like data structure that holds node names in each zone. Zone names are
 // keys to "NodeTree.tree" and values of "NodeTree.tree" are arrays of node names.
-// NodeTree is NOT thread-safe, any concurrent updates/reads from it must be synchronized by the caller.
-// It is used only by schedulerCache, and should stay as such.
-type nodeTree struct {
+type NodeTree struct {
 	tree      map[string]*nodeArray // a map from zone (region-zone) to an array of nodes in the zone.
 	zones     []string              // a list of all the zones in the tree (keys)
 	zoneIndex int
 	numNodes  int
+	mu        sync.RWMutex
 }
 
 // nodeArray is a struct that has nodes that are in a zone.
@@ -57,8 +58,8 @@ func (na *nodeArray) next() (nodeName string, exhausted bool) {
 }
 
 // newNodeTree creates a NodeTree from nodes.
-func newNodeTree(nodes []*v1.Node) *nodeTree {
-	nt := &nodeTree{
+func newNodeTree(nodes []*v1.Node) *NodeTree {
+	nt := &NodeTree{
 		tree: make(map[string]*nodeArray),
 	}
 	for _, n := range nodes {
@@ -67,9 +68,15 @@ func newNodeTree(nodes []*v1.Node) *nodeTree {
 	return nt
 }
 
-// addNode adds a node and its corresponding zone to the tree. If the zone already exists, the node
+// AddNode adds a node and its corresponding zone to the tree. If the zone already exists, the node
 // is added to the array of nodes in that zone.
-func (nt *nodeTree) addNode(n *v1.Node) {
+func (nt *NodeTree) AddNode(n *v1.Node) {
+	nt.mu.Lock()
+	defer nt.mu.Unlock()
+	nt.addNode(n)
+}
+
+func (nt *NodeTree) addNode(n *v1.Node) {
 	zone := utilnode.GetZoneKey(n)
 	if na, ok := nt.tree[zone]; ok {
 		for _, nodeName := range na.nodes {
@@ -87,8 +94,14 @@ func (nt *nodeTree) addNode(n *v1.Node) {
 	nt.numNodes++
 }
 
-// removeNode removes a node from the NodeTree.
-func (nt *nodeTree) removeNode(n *v1.Node) error {
+// RemoveNode removes a node from the NodeTree.
+func (nt *NodeTree) RemoveNode(n *v1.Node) error {
+	nt.mu.Lock()
+	defer nt.mu.Unlock()
+	return nt.removeNode(n)
+}
+
+func (nt *NodeTree) removeNode(n *v1.Node) error {
 	zone := utilnode.GetZoneKey(n)
 	if na, ok := nt.tree[zone]; ok {
 		for i, nodeName := range na.nodes {
@@ -109,7 +122,7 @@ func (nt *nodeTree) removeNode(n *v1.Node) error {
 
 // removeZone removes a zone from tree.
 // This function must be called while writer locks are hold.
-func (nt *nodeTree) removeZone(zone string) {
+func (nt *NodeTree) removeZone(zone string) {
 	delete(nt.tree, zone)
 	for i, z := range nt.zones {
 		if z == zone {
@@ -119,8 +132,8 @@ func (nt *nodeTree) removeZone(zone string) {
 	}
 }
 
-// updateNode updates a node in the NodeTree.
-func (nt *nodeTree) updateNode(old, new *v1.Node) {
+// UpdateNode updates a node in the NodeTree.
+func (nt *NodeTree) UpdateNode(old, new *v1.Node) {
 	var oldZone string
 	if old != nil {
 		oldZone = utilnode.GetZoneKey(old)
@@ -131,20 +144,24 @@ func (nt *nodeTree) updateNode(old, new *v1.Node) {
 	if oldZone == newZone {
 		return
 	}
+	nt.mu.Lock()
+	defer nt.mu.Unlock()
 	nt.removeNode(old) // No error checking. We ignore whether the old node exists or not.
 	nt.addNode(new)
 }
 
-func (nt *nodeTree) resetExhausted() {
+func (nt *NodeTree) resetExhausted() {
 	for _, na := range nt.tree {
 		na.lastIndex = 0
 	}
 	nt.zoneIndex = 0
 }
 
-// next returns the name of the next node. NodeTree iterates over zones and in each zone iterates
+// Next returns the name of the next node. NodeTree iterates over zones and in each zone iterates
 // over nodes in a round robin fashion.
-func (nt *nodeTree) next() string {
+func (nt *NodeTree) Next() string {
+	nt.mu.Lock()
+	defer nt.mu.Unlock()
 	if len(nt.zones) == 0 {
 		return ""
 	}
@@ -167,4 +184,11 @@ func (nt *nodeTree) next() string {
 			return nodeName
 		}
 	}
+}
+
+// NumNodes returns the number of nodes.
+func (nt *NodeTree) NumNodes() int {
+	nt.mu.RLock()
+	defer nt.mu.RUnlock()
+	return nt.numNodes
 }

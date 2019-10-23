@@ -93,6 +93,9 @@ func (c *Cache) Snapshot() *internalcache.Snapshot {
 	return &internalcache.Snapshot{}
 }
 
+// NodeTree is a fake method for testing.
+func (c *Cache) NodeTree() *internalcache.NodeTree { return nil }
+
 // GetNodeInfo is a fake method for testing.
 func (c *Cache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	return nil, nil

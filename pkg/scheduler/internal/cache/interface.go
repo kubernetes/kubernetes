@@ -106,6 +106,9 @@ type Cache interface {
 
 	// Snapshot takes a snapshot on current cache
 	Snapshot() *Snapshot
+
+	// NodeTree returns a node tree structure
+	NodeTree() *NodeTree
 }
 
 // Snapshot is a snapshot of cache state
