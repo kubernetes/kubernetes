@@ -96,7 +96,7 @@ var UpdateLabelBackoff = wait.Backoff{
 
 var (
 	KeyFunc           = cache.DeletionHandlingMetaNamespaceKeyFunc
-	podPhaseToOrdinal = map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 1, v1.PodRunning: 2}
+	podPhaseToOrdinal = map[v1.PodPhase]int{v1.PodPending: 0, v1.PodUnknown: 1, v1.PodRunning: 2, v1.PodFailed: 3, v1.PodSucceeded: 4}
 )
 
 type ResyncPeriodFunc func() time.Duration
@@ -748,7 +748,7 @@ func (s ActivePods) Less(i, j int) bool {
 		return len(s[i].Spec.NodeName) == 0
 	}
 	// 2. PodPending < PodUnknown < PodRunning
-	if podPhaseToOrdinal[s[i].Status.Phase] != podPhaseToOrdinal[s[j].Status.Phase] {
+	if s[i].Status.Phase != s[j].Status.Phase {
 		return podPhaseToOrdinal[s[i].Status.Phase] < podPhaseToOrdinal[s[j].Status.Phase]
 	}
 	// 3. Not ready < ready
@@ -832,7 +832,7 @@ func (s ActivePodsWithRanks) Less(i, j int) bool {
 		return len(s.Pods[i].Spec.NodeName) == 0
 	}
 	// 2. PodPending < PodUnknown < PodRunning
-	if podPhaseToOrdinal[s.Pods[i].Status.Phase] != podPhaseToOrdinal[s.Pods[j].Status.Phase] {
+	if s.Pods[i].Status.Phase != s.Pods[j].Status.Phase {
 		return podPhaseToOrdinal[s.Pods[i].Status.Phase] < podPhaseToOrdinal[s.Pods[j].Status.Phase]
 	}
 	// 3. Not ready < ready

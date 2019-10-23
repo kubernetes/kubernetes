@@ -95,8 +95,8 @@ func (s ByLogging) Less(i, j int) bool {
 		return len(s[i].Spec.NodeName) > 0
 	}
 	// 2. PodRunning < PodUnknown < PodPending
-	m := map[corev1.PodPhase]int{corev1.PodRunning: 0, corev1.PodUnknown: 1, corev1.PodPending: 2}
-	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
+	m := map[corev1.PodPhase]int{corev1.PodRunning: 0, corev1.PodUnknown: 1, corev1.PodPending: 2, corev1.PodFailed: 3, corev1.PodSucceeded: 4}
+	if s[i].Status.Phase != s[j].Status.Phase {
 		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
 	}
 	// 3. ready < not ready
@@ -133,8 +133,8 @@ func (s ActivePods) Less(i, j int) bool {
 		return len(s[i].Spec.NodeName) == 0
 	}
 	// 2. PodPending < PodUnknown < PodRunning
-	m := map[corev1.PodPhase]int{corev1.PodPending: 0, corev1.PodUnknown: 1, corev1.PodRunning: 2}
-	if m[s[i].Status.Phase] != m[s[j].Status.Phase] {
+	m := map[corev1.PodPhase]int{corev1.PodPending: 0, corev1.PodUnknown: 1, corev1.PodRunning: 2, corev1.PodFailed: 3, corev1.PodSucceeded: 4}
+	if s[i].Status.Phase != s[j].Status.Phase {
 		return m[s[i].Status.Phase] < m[s[j].Status.Phase]
 	}
 	// 3. Not ready < ready
