@@ -238,8 +238,7 @@ func (r *REST) Delete(ctx context.Context, name string, deleteValidation rest.Va
 
 	// prior to final deletion, we must ensure that finalizers is empty
 	if len(namespace.Spec.Finalizers) != 0 {
-		err = apierrors.NewConflict(api.Resource("namespaces"), namespace.Name, fmt.Errorf("The system is ensuring all content is removed from this namespace.  Upon completion, this namespace will automatically be purged by the system."))
-		return nil, false, err
+		return namespace, false, nil
 	}
 	return r.store.Delete(ctx, name, deleteValidation, options)
 }
