@@ -72,6 +72,12 @@ const (
 	// TestTimeout is used for most polling/waiting activities
 	TestTimeout = 60 * time.Second
 
+	// AffinityTimeout is the maximum time that CheckAffinity is allowed to take; this
+	// needs to be more than long enough for AffinityConfirmCount HTTP requests to
+	// complete in a busy CI cluster, but shouldn't be too long since we will end up
+	// waiting the entire time in the tests where affinity is not expected.
+	AffinityTimeout = 2 * time.Minute
+
 	// AffinityConfirmCount is the number of needed continuous requests to confirm that
 	// affinity is enabled.
 	AffinityConfirmCount = 15
