@@ -32,6 +32,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -650,13 +651,12 @@ func CheckWriteToPath(pod *v1.Pod, volMode v1.PersistentVolumeMode, path string,
 }
 
 // findMountPoints returns all mount points on given node under specified directory.
-func findMountPoints(nodeIP string, dir string) []string {
-	result, err := e2essh.SSH(fmt.Sprintf(`find %s -type d -exec mountpoint {} \; | grep 'is a mountpoint$'`, dir), nodeIP, framework.TestContext.Provider)
-	e2essh.LogResult(result)
-	framework.ExpectNoError(err, "Encountered SSH error.")
+func findMountPoints(hostExec HostExec, node *v1.Node, dir string) []string {
+	result, err := hostExec.IssueCommandWithResult(fmt.Sprintf(`find %s -type d -exec mountpoint {} \; | grep 'is a mountpoint$' || true`, dir), node)
+	framework.ExpectNoError(err, "Encountered HostExec error.")
 	var mountPoints []string
 	if err != nil {
-		for _, line := range strings.Split(result.Stdout, "\n") {
+		for _, line := range strings.Split(result, "\n") {
 			if line == "" {
 				continue
 			}
@@ -667,9 +667,6 @@ func findMountPoints(nodeIP string, dir string) []string {
 }
 
 // FindVolumeGlobalMountPoints returns all volume global mount points on the node of given pod.
-func FindVolumeGlobalMountPoints(c clientset.Interface, pod *v1.Pod) []string {
-	nodeIP, err := framework.GetHostAddress(c, pod)
-	framework.ExpectNoError(err)
-	nodeIP = nodeIP + ":22"
-	return findMountPoints(nodeIP, "/var/lib/kubelet/plugins")
+func FindVolumeGlobalMountPoints(hostExec HostExec, node *v1.Node) sets.String {
+	return sets.NewString(findMountPoints(hostExec, node, "/var/lib/kubelet/plugins")...)
 }
