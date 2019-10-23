@@ -330,13 +330,17 @@ func (o *DrainCmdOptions) deleteOrEvictPodsSimple(nodeInfo *resource.Info) error
 
 	if err := o.drainer.DeleteOrEvictPods(list.Pods()); err != nil {
 		pendingList, newErrs := o.drainer.GetPodsForDeletion(nodeInfo.Name)
-
-		fmt.Fprintf(o.ErrOut, "There are pending pods in node %q when an error occurred: %v\n", nodeInfo.Name, err)
-		for _, pendingPod := range pendingList.Pods() {
-			fmt.Fprintf(o.ErrOut, "%s/%s\n", "pod", pendingPod.Name)
+		if pendingList != nil {
+			pods := pendingList.Pods()
+			if len(pods) != 0 {
+				fmt.Fprintf(o.ErrOut, "There are pending pods in node %q when an error occurred: %v\n", nodeInfo.Name, err)
+				for _, pendingPod := range pods {
+					fmt.Fprintf(o.ErrOut, "%s/%s\n", "pod", pendingPod.Name)
+				}
+			}
 		}
 		if newErrs != nil {
-			fmt.Fprintf(o.ErrOut, "following errors also occurred:\n%s", utilerrors.NewAggregate(newErrs))
+			fmt.Fprintf(o.ErrOut, "Following errors occurred while getting the list of pods to delete:\n%s", utilerrors.NewAggregate(newErrs))
 		}
 		return err
 	}
