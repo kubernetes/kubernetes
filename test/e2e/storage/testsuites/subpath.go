@@ -36,6 +36,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/gomega"
 )
 
 var (
@@ -157,24 +158,24 @@ func (s *subPathTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 	}
 
 	cleanup := func() {
-		// if l.pod != nil {
-		// ginkgo.By("Deleting pod")
-		// err := e2epod.DeletePodWithWait(f.ClientSet, l.pod)
-		// framework.ExpectNoError(err, "while deleting pod")
-		// l.pod = nil
-		// }
+		if l.pod != nil {
+			ginkgo.By("Deleting pod")
+			err := e2epod.DeletePodWithWait(f.ClientSet, l.pod)
+			framework.ExpectNoError(err, "while deleting pod")
+			l.pod = nil
+		}
 
-		// if l.resource != nil {
-		// l.resource.cleanupResource()
-		// l.resource = nil
-		// }
+		if l.resource != nil {
+			l.resource.cleanupResource()
+			l.resource = nil
+		}
 
-		// if l.driverCleanup != nil {
-		// l.driverCleanup()
-		// l.driverCleanup = nil
-		// }
+		if l.driverCleanup != nil {
+			l.driverCleanup()
+			l.driverCleanup = nil
+		}
 
-		// validateMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName, l.intreeOps, l.migratedOps)
+		validateMigrationVolumeOpCounts(f.ClientSet, driver.GetDriverInfo().InTreePluginName, l.intreeOps, l.migratedOps)
 	}
 
 	ginkgo.It("should support non-existent path", func() {
@@ -880,6 +881,10 @@ func testPodContainerRestart(f *framework.Framework, pod *v1.Pod) {
 func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete bool) {
 	// This is mostly copied from TestVolumeUnmountsFromDeletedPodWithForceOption()
 
+	// Disruptive test run serially, we can cache all voluem global mount
+	// points and verify after the test that we do not leak any global mount point.
+	mountPoints := utils.FindVolumeGlobalMountPoints(f.ClientSet, pod)
+
 	// Change to busybox
 	pod.Spec.Containers[0].Image = volume.GetTestImage(imageutils.GetE2EImage(imageutils.BusyBox))
 	pod.Spec.Containers[0].Command = volume.GenerateScriptCmd("sleep 100000")
@@ -902,7 +907,10 @@ func testSubpathReconstruction(f *framework.Framework, pod *v1.Pod, forceDelete 
 	pod, err = f.ClientSet.CoreV1().Pods(f.Namespace.Name).Get(pod.Name, metav1.GetOptions{})
 	framework.ExpectNoError(err, "while getting pod")
 
-	utils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true, true)
+	utils.TestVolumeUnmountsFromDeletedPodWithForceOption(f.ClientSet, f, pod, forceDelete, true)
+
+	mountPointsAfter := utils.FindVolumeGlobalMountPoints(f.ClientSet, pod)
+	gomega.Expect(mountPointsAfter).To(gomega.ConsistOf(mountPoints), "Global mount points leaked. Before: %v, After: %v.", mountPoints, mountPointsAfter)
 }
 
 func formatVolume(f *framework.Framework, pod *v1.Pod) {
