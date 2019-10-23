@@ -55,9 +55,9 @@ run_kubectl_apply_tests() {
   [[ "$(kubectl apply -f hack/testdata/retainKeys/deployment/deployment-after.yaml "${kube_flags[@]:?}")" ]]
   # Post-Condition: deployment "test-deployment-retainkeys" has updated fields
   grep -q Recreate <<< "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}")"
-  ! grep -q RollingUpdate <<< "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}")"
+  ! grep -q RollingUpdate <<< "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}")" || exit 1
   grep -q hostPath <<< "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}")"
-  ! grep -q emptyDir <<< "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}")"
+  ! grep -q emptyDir <<< "$(kubectl get deployments test-deployment-retainkeys -o yaml "${kube_flags[@]:?}")" || exit 1
   # Clean up
   kubectl delete deployments test-deployment-retainkeys "${kube_flags[@]:?}"
 
@@ -119,7 +119,7 @@ __EOF__
   # Dry-run create the CR
   kubectl "${kube_flags[@]:?}" apply --server-dry-run -f hack/testdata/CRD/resource.yaml "${kube_flags[@]:?}"
   # Make sure that the CR doesn't exist
-  ! kubectl "${kube_flags[@]:?}" get resource/myobj
+  ! kubectl "${kube_flags[@]:?}" get resource/myobj || exit 1
 
   # clean-up
   kubectl "${kube_flags[@]:?}" delete customresourcedefinition resources.mygroup.example.com
@@ -317,7 +317,7 @@ __EOF__
   # Dry-run create the CR
   kubectl "${kube_flags[@]:?}" apply --server-side --server-dry-run -f hack/testdata/CRD/resource.yaml "${kube_flags[@]:?}"
   # Make sure that the CR doesn't exist
-  ! kubectl "${kube_flags[@]:?}" get resource/myobj
+  ! kubectl "${kube_flags[@]:?}" get resource/myobj || exit 1
 
   # clean-up
   kubectl "${kube_flags[@]:?}" delete customresourcedefinition resources.mygroup.example.com
