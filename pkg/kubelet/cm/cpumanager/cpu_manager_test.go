@@ -775,7 +775,7 @@ func TestReconcileState(t *testing.T) {
 			stDefaultCPUSet:              cpuset.NewCPUSet(),
 			updateErr:                    nil,
 			expectSucceededContainerName: "",
-			expectFailedContainerName:    "fakeContainerName",
+			expectFailedContainerName:    "",
 		},
 		{
 			description: "cpu manager reconclie - container id not found",

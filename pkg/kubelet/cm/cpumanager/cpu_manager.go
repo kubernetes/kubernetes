@@ -353,19 +353,19 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 
 	m.removeStaleState()
 	for _, pod := range m.activePods() {
+		pstatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
+		if !ok {
+			klog.Warningf("[cpumanager] reconcileState: skipping pod; status not found (pod: %s)", pod.Name)
+			failure = append(failure, reconciledContainer{pod.Name, "", ""})
+			continue
+		}
+
 		allContainers := pod.Spec.InitContainers
 		allContainers = append(allContainers, pod.Spec.Containers...)
-		status, ok := m.podStatusProvider.GetPodStatus(pod.UID)
 		for _, container := range allContainers {
-			if !ok {
-				klog.Warningf("[cpumanager] reconcileState: skipping pod; status not found (pod: %s)", pod.Name)
-				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
-				break
-			}
-
-			containerID, err := findContainerIDByName(&status, container.Name)
+			containerID, err := findContainerIDByName(&pstatus, container.Name)
 			if err != nil {
-				klog.Warningf("[cpumanager] reconcileState: skipping container; ID not found in status (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)
+				klog.Warningf("[cpumanager] reconcileState: skipping container; ID not found in pod status (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)
 				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
 				continue
 			}
@@ -375,7 +375,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			// - kubelet has just been restarted - and there is no previous state file
 			// - container has been removed from state by RemoveContainer call (DeletionTimestamp is set)
 			if _, ok := m.state.GetCPUSet(string(pod.UID), container.Name); !ok {
-				if status.Phase == v1.PodRunning && pod.DeletionTimestamp == nil {
+				if pstatus.Phase == v1.PodRunning && pod.DeletionTimestamp == nil {
 					klog.V(4).Infof("[cpumanager] reconcileState: container is not present in state - trying to add (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 					err := m.AddContainer(pod, &container, containerID)
 					if err != nil {
