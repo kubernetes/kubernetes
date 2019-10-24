@@ -41,13 +41,13 @@ import (
 
 // PluginFactoryArgs are passed to all plugin factory functions.
 type PluginFactoryArgs struct {
+	NodeInfoLister                 schedulerlisters.NodeInfoLister
 	PodLister                      schedulerlisters.PodLister
 	ServiceLister                  corelisters.ServiceLister
 	ControllerLister               corelisters.ReplicationControllerLister
 	ReplicaSetLister               appslisters.ReplicaSetLister
 	StatefulSetLister              appslisters.StatefulSetLister
 	PDBLister                      policylisters.PodDisruptionBudgetLister
-	NodeLister                     schedulerlisters.NodeLister
 	CSINodeLister                  v1beta1storagelisters.CSINodeLister
 	PVLister                       corelisters.PersistentVolumeLister
 	PVCLister                      corelisters.PersistentVolumeClaimLister
@@ -270,7 +270,7 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 		if policy.Argument.ServiceAffinity != nil {
 			predicateFactory = func(args PluginFactoryArgs) predicates.FitPredicate {
 				predicate, precomputationFunction := predicates.NewServiceAffinityPredicate(
-					args.NodeLister,
+					args.NodeInfoLister,
 					args.PodLister,
 					args.ServiceLister,
 					policy.Argument.ServiceAffinity.Labels,

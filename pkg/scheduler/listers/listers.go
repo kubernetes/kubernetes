@@ -19,6 +19,7 @@ package listers
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // PodFilter is a function to filter a pod. If pod passed return true else return false.
@@ -33,8 +34,16 @@ type PodLister interface {
 	FilteredList(podFilter PodFilter, selector labels.Selector) ([]*v1.Pod, error)
 }
 
-// NodeLister interface represents anything that can list/get node object from node name.
-type NodeLister interface {
-	// TODO(ahg-g): rename to Get and add a List interface.
-	GetNodeInfo(nodeName string) (*v1.Node, error)
+// NodeInfoLister interface represents anything that can list/get NodeInfo objects from node name.
+type NodeInfoLister interface {
+	// Returns the list of NodeInfos.
+	List() ([]*schedulernodeinfo.NodeInfo, error)
+	// Returns the NodeInfo of the given node name.
+	Get(nodeName string) (*schedulernodeinfo.NodeInfo, error)
+}
+
+// SharedLister groups scheduler-specific listers.
+type SharedLister interface {
+	Pods() PodLister
+	NodeInfos() NodeInfoLister
 }

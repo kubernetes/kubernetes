@@ -102,9 +102,6 @@ type Cache interface {
 	// on this node.
 	UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapshot.Snapshot) error
 
-	// GetNodeInfo returns the node object with node string.
-	GetNodeInfo(nodeName string) (*v1.Node, error)
-
 	// Snapshot takes a snapshot on current cache
 	Snapshot() *Snapshot
 }

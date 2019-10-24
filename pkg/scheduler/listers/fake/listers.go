@@ -30,6 +30,7 @@ import (
 	storagelisters "k8s.io/client-go/listers/storage/v1"
 	v1beta1storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 var _ schedulerlisters.PodLister = &PodLister{}
@@ -115,7 +116,7 @@ func (f ControllerLister) GetPodControllers(pod *v1.Pod) (controllers []*v1.Repl
 		}
 	}
 	if len(controllers) == 0 {
-		err = fmt.Errorf("Could not find Replication Controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find Replication Controller for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 
 	return
@@ -154,7 +155,7 @@ func (f ReplicaSetLister) GetPodReplicaSets(pod *v1.Pod) (rss []*appsv1.ReplicaS
 		}
 	}
 	if len(rss) == 0 {
-		err = fmt.Errorf("Could not find ReplicaSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find ReplicaSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 
 	return
@@ -192,7 +193,7 @@ func (f StatefulSetLister) GetPodStatefulSets(pod *v1.Pod) (sss []*appsv1.Statef
 		}
 	}
 	if len(sss) == 0 {
-		err = fmt.Errorf("Could not find StatefulSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
+		err = fmt.Errorf("could not find StatefulSet for pod %s in namespace %s with labels: %v", pod.Name, pod.Namespace, pod.Labels)
 	}
 	return
 }
@@ -243,17 +244,34 @@ func (pvcs PersistentVolumeClaimLister) PersistentVolumeClaims(namespace string)
 	}
 }
 
-// NodeLister declares a *v1.Node type for testing.
-type NodeLister []*v1.Node
+// NodeInfoLister declares a schedulernodeinfo.NodeInfo type for testing.
+type NodeInfoLister []*schedulernodeinfo.NodeInfo
 
-// GetNodeInfo returns a fake node object in the fake nodes.
-func (nodes NodeLister) GetNodeInfo(nodeName string) (*v1.Node, error) {
+// Get returns a fake node object in the fake nodes.
+func (nodes NodeInfoLister) Get(nodeName string) (*schedulernodeinfo.NodeInfo, error) {
 	for _, node := range nodes {
-		if node != nil && node.Name == nodeName {
+		if node != nil && node.Node().Name == nodeName {
 			return node, nil
 		}
 	}
-	return nil, fmt.Errorf("Unable to find node: %s", nodeName)
+	return nil, fmt.Errorf("unable to find node: %s", nodeName)
+}
+
+// List lists all nodes.
+func (nodes NodeInfoLister) List() ([]*schedulernodeinfo.NodeInfo, error) {
+	return nodes, nil
+}
+
+// NewNodeInfoLister create a new fake NodeInfoLister from a slice of v1.Nodes.
+func NewNodeInfoLister(nodes []*v1.Node) schedulerlisters.NodeInfoLister {
+	nodeInfoList := make([]*schedulernodeinfo.NodeInfo, len(nodes))
+	for _, node := range nodes {
+		nodeInfo := schedulernodeinfo.NewNodeInfo()
+		nodeInfo.SetNode(node)
+		nodeInfoList = append(nodeInfoList, nodeInfo)
+	}
+
+	return NodeInfoLister(nodeInfoList)
 }
 
 var _ v1beta1storagelisters.CSINodeLister = CSINodeLister{}

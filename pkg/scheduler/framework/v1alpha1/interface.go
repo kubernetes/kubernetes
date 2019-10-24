@@ -29,6 +29,7 @@ import (
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
@@ -452,6 +453,15 @@ type Framework interface {
 // passed to the plugin factories at the time of plugin initialization. Plugins
 // must store and use this handle to call framework functions.
 type FrameworkHandle interface {
+	// SnapshotSharedLister returns listers from the latest NodeInfo Snapshot. The snapshot
+	// is taken at the beginning of a scheduling cycle and remains unchanged until
+	// a pod finishes "Reserve" point. There is no guarantee that the information
+	// remains unchanged in the binding phase of scheduling, so plugins in the binding
+	// cycle(permit/pre-bind/bind/post-bind/un-reserve plugin) should not use it,
+	// otherwise a concurrent read/write error might occur, they should use scheduler
+	// cache instead.
+	SnapshotSharedLister() schedulerlisters.SharedLister
+
 	// NodeInfoSnapshot return the latest NodeInfo snapshot. The snapshot
 	// is taken at the beginning of a scheduling cycle and remains unchanged until
 	// a pod finishes "Reserve" point. There is no guarantee that the information

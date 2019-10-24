@@ -24,7 +24,6 @@ go_library(
         "//pkg/scheduler/framework/plugins/volumerestrictions:go_default_library",
         "//pkg/scheduler/framework/plugins/volumezone:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
-        "//pkg/scheduler/internal/cache:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
     ],

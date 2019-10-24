@@ -355,7 +355,7 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 			// getMeta creates predicate meta data given the list of pods.
 			getMeta := func(lister fakelisters.PodLister) (*predicateMetadata, map[string]*schedulernodeinfo.NodeInfo) {
 				nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(lister, test.nodes)
-				_, precompute := NewServiceAffinityPredicate(fakelisters.NodeLister(test.nodes), lister, fakelisters.ServiceLister(test.services), nil)
+				_, precompute := NewServiceAffinityPredicate(fakelisters.NewNodeInfoLister(test.nodes), lister, fakelisters.ServiceLister(test.services), nil)
 				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", precompute)
 				meta := GetPredicateMetadata(test.pendingPod, nodeInfoMap)
 				return meta.(*predicateMetadata), nodeInfoMap

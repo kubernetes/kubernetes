@@ -17,7 +17,11 @@ limitations under the License.
 package nodeinfo
 
 import (
+	"fmt"
+
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -31,11 +35,38 @@ type Snapshot struct {
 	Generation   int64
 }
 
-// NewSnapshot initializes a Snapshot struct and returns it.
-func NewSnapshot() *Snapshot {
+var _ schedulerlisters.SharedLister = &Snapshot{}
+
+// NewEmptySnapshot initializes a Snapshot struct and returns it.
+func NewEmptySnapshot() *Snapshot {
 	return &Snapshot{
 		NodeInfoMap: make(map[string]*schedulernodeinfo.NodeInfo),
 	}
+}
+
+// NewSnapshot initializes a Snapshot struct and returns it.
+func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
+	nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(pods, nodes)
+	nodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodes))
+	for _, v := range nodeInfoMap {
+		nodeInfoList = append(nodeInfoList, v)
+	}
+
+	s := NewEmptySnapshot()
+	s.NodeInfoMap = nodeInfoMap
+	s.NodeInfoList = nodeInfoList
+
+	return s
+}
+
+// Pods returns a PodLister
+func (s *Snapshot) Pods() schedulerlisters.PodLister {
+	return &podLister{snapshot: s}
+}
+
+// NodeInfos returns a NodeInfoLister.
+func (s *Snapshot) NodeInfos() schedulerlisters.NodeInfoLister {
+	return &nodeInfoLister{snapshot: s}
 }
 
 // ListNodes returns the list of nodes in the snapshot.
@@ -47,4 +78,51 @@ func (s *Snapshot) ListNodes() []*v1.Node {
 		}
 	}
 	return nodes
+}
+
+type podLister struct {
+	snapshot *Snapshot
+}
+
+// List returns the list of pods in the snapshot.
+func (p *podLister) List(selector labels.Selector) ([]*v1.Pod, error) {
+	alwaysTrue := func(p *v1.Pod) bool { return true }
+	return p.FilteredList(alwaysTrue, selector)
+}
+
+// FilteredList returns a filtered list of pods in the snapshot.
+func (p *podLister) FilteredList(podFilter schedulerlisters.PodFilter, selector labels.Selector) ([]*v1.Pod, error) {
+	// podFilter is expected to return true for most or all of the pods. We
+	// can avoid expensive array growth without wasting too much memory by
+	// pre-allocating capacity.
+	maxSize := 0
+	for _, n := range p.snapshot.NodeInfoMap {
+		maxSize += len(n.Pods())
+	}
+	pods := make([]*v1.Pod, 0, maxSize)
+	for _, n := range p.snapshot.NodeInfoMap {
+		for _, pod := range n.Pods() {
+			if podFilter(pod) && selector.Matches(labels.Set(pod.Labels)) {
+				pods = append(pods, pod)
+			}
+		}
+	}
+	return pods, nil
+}
+
+type nodeInfoLister struct {
+	snapshot *Snapshot
+}
+
+// List returns the list of nodes in the snapshot.
+func (n *nodeInfoLister) List() ([]*schedulernodeinfo.NodeInfo, error) {
+	return n.snapshot.NodeInfoList, nil
+}
+
+// Returns the NodeInfo of the given node name.
+func (n *nodeInfoLister) Get(nodeName string) (*schedulernodeinfo.NodeInfo, error) {
+	if v, ok := n.snapshot.NodeInfoMap[nodeName]; ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("nodeinfo not found for node name %q", nodeName)
 }

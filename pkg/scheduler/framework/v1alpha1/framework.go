@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -105,8 +106,9 @@ func (f *framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint
 }
 
 type frameworkOptions struct {
-	clientSet       clientset.Interface
-	informerFactory informers.SharedInformerFactory
+	clientSet        clientset.Interface
+	informerFactory  informers.SharedInformerFactory
+	nodeInfoSnapshot *nodeinfosnapshot.Snapshot
 }
 
 // Option for the framework.
@@ -126,7 +128,16 @@ func WithInformerFactory(informerFactory informers.SharedInformerFactory) Option
 	}
 }
 
-var defaultFrameworkOptions = frameworkOptions{}
+// WithNodeInfoSnapshot sets the NodeInfo Snapshot.
+func WithNodeInfoSnapshot(nodeInfoSnapshot *nodeinfosnapshot.Snapshot) Option {
+	return func(o *frameworkOptions) {
+		o.nodeInfoSnapshot = nodeInfoSnapshot
+	}
+}
+
+var defaultFrameworkOptions = frameworkOptions{
+	nodeInfoSnapshot: nodeinfosnapshot.NewEmptySnapshot(),
+}
 
 var _ Framework = &framework{}
 
@@ -139,7 +150,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 
 	f := &framework{
 		registry:              r,
-		nodeInfoSnapshot:      nodeinfosnapshot.NewSnapshot(),
+		nodeInfoSnapshot:      options.nodeInfoSnapshot,
 		pluginNameToWeightMap: make(map[string]int),
 		waitingPods:           newWaitingPodsMap(),
 		clientSet:             options.clientSet,
@@ -591,6 +602,14 @@ func (f *framework) RunPermitPlugins(
 	}
 
 	return nil
+}
+
+// SnapshotSharedLister returns the scheduler's SharedLister of the latest NodeInfo
+// snapshot. The snapshot is taken at the beginning of a scheduling cycle and remains
+// unchanged until a pod finishes "Reserve". There is no guarantee that the information
+// remains unchanged after "Reserve".
+func (f *framework) SnapshotSharedLister() schedulerlisters.SharedLister {
+	return f.nodeInfoSnapshot
 }
 
 // NodeInfoSnapshot returns the latest NodeInfo snapshot. The snapshot

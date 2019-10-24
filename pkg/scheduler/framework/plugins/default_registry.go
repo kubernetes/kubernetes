@@ -38,14 +38,12 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumezone"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
 )
 
 // RegistryArgs arguments needed to create default plugin factories.
 type RegistryArgs struct {
-	SchedulerCache internalcache.Cache
-	VolumeBinder   *volumebinder.VolumeBinder
+	VolumeBinder *volumebinder.VolumeBinder
 }
 
 // NewDefaultRegistry builds a default registry with all the default plugins.
@@ -75,9 +73,7 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 		nodevolumelimits.GCEPDName:     nodevolumelimits.NewGCEPD,
 		nodevolumelimits.AzureDiskName: nodevolumelimits.NewAzureDisk,
 		nodevolumelimits.CinderName:    nodevolumelimits.NewCinder,
-		interpodaffinity.Name: func(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
-			return interpodaffinity.New(args.SchedulerCache, args.SchedulerCache), nil
-		},
+		interpodaffinity.Name:          interpodaffinity.New,
 	}
 }
 

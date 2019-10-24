@@ -26,8 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 var (
@@ -733,14 +732,15 @@ func TestSingleNode(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := test.node
-			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, []*v1.Node{node})
-			meta := predicates.GetPredicateMetadata(test.pod, nodeInfoMap)
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, []*v1.Node{test.node})
+			meta := predicates.GetPredicateMetadata(test.pod, snapshot.NodeInfoMap)
 			state := framework.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
-			p := New(fakelisters.NodeLister([]*v1.Node{node}), fakelisters.PodLister(test.pods))
-			gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, nodeInfoMap[node.Name])
+			p := &InterPodAffinity{
+				predicate: predicates.NewPodAffinityPredicate(snapshot.NodeInfos(), snapshot.Pods()),
+			}
+			gotStatus := p.Filter(context.Background(), state, test.pod, snapshot.NodeInfoMap[test.node.Name])
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -1432,15 +1432,16 @@ func TestMultipleNodes(t *testing.T) {
 
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeListInfo := fakelisters.NodeLister(test.nodes)
-			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
 			for indexNode, node := range test.nodes {
-				meta := predicates.GetPredicateMetadata(test.pod, nodeInfoMap)
+				meta := predicates.GetPredicateMetadata(test.pod, snapshot.NodeInfoMap)
 				state := framework.NewCycleState()
 				state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
-				p := New(nodeListInfo, fakelisters.PodLister(test.pods))
-				gotStatus := p.(framework.FilterPlugin).Filter(context.Background(), state, test.pod, nodeInfoMap[node.Name])
+				p := &InterPodAffinity{
+					predicate: predicates.NewPodAffinityPredicate(snapshot.NodeInfos(), snapshot.Pods()),
+				}
+				gotStatus := p.Filter(context.Background(), state, test.pod, snapshot.NodeInfoMap[node.Name])
 				if !reflect.DeepEqual(gotStatus, test.wantStatuses[indexNode]) {
 					t.Errorf("index: %d status does not match: %v, want: %v", indexTest, gotStatus, test.wantStatuses[indexNode])
 				}
