@@ -429,16 +429,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 			},
 		},
 		{
-			// a role for the csi external attacher
-			ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-attacher"},
-			Rules: []rbacv1.PolicyRule{
-				rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(storageGroup).Resources("volumeattachments").RuleOrDie(),
-				rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
-			},
-		},
-		{
 			// a role making the csrapprover controller approve a node client CSR
 			ObjectMeta: metav1.ObjectMeta{Name: "system:certificates.k8s.io:certificatesigningrequests:nodeclient"},
 			Rules: []rbacv1.PolicyRule{
@@ -508,22 +498,6 @@ func ClusterRoles() []rbacv1.ClusterRole {
 		// a role to use for the kube-scheduler
 		ObjectMeta: metav1.ObjectMeta{Name: "system:kube-scheduler"},
 		Rules:      kubeSchedulerRules,
-	})
-
-	externalProvisionerRules := []rbacv1.PolicyRule{
-		rbacv1helpers.NewRule("create", "delete", "get", "list", "watch").Groups(legacyGroup).Resources("persistentvolumes").RuleOrDie(),
-		rbacv1helpers.NewRule("get", "list", "watch", "update", "patch").Groups(legacyGroup).Resources("persistentvolumeclaims").RuleOrDie(),
-		rbacv1helpers.NewRule("list", "watch").Groups(storageGroup).Resources("storageclasses").RuleOrDie(),
-		rbacv1helpers.NewRule("get", "list", "watch", "create", "update", "patch").Groups(legacyGroup).Resources("events").RuleOrDie(),
-		rbacv1helpers.NewRule("get", "list", "watch").Groups(legacyGroup).Resources("nodes").RuleOrDie(),
-	}
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		externalProvisionerRules = append(externalProvisionerRules, rbacv1helpers.NewRule("get", "watch", "list").Groups("storage.k8s.io").Resources("csinodes").RuleOrDie())
-	}
-	roles = append(roles, rbacv1.ClusterRole{
-		// a role for the csi external provisioner
-		ObjectMeta: metav1.ObjectMeta{Name: "system:csi-external-provisioner"},
-		Rules:      externalProvisionerRules,
 	})
 
 	addClusterRoleLabel(roles)
