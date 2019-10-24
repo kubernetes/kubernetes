@@ -96,7 +96,7 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	return rc
 }
 
-// Run starts the route controller until the provided stop channel is closed
+// Run starts the controller reconciling routes against node changes every five minutes
 func (rc *Controller) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
 	defer utilruntime.HandleCrash()
 
