@@ -101,7 +101,7 @@ func newWorker(
 	case startup:
 		w.spec = container.StartupProbe
 		w.resultsManager = m.startupManager
-		w.initialValue = results.Failure
+		w.initialValue = results.Unknown
 	}
 
 	basicMetricLabels := metrics.Labels{
