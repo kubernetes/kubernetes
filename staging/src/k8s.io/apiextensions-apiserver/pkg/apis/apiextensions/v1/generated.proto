@@ -204,7 +204,7 @@ message CustomResourceDefinitionSpec {
   optional CustomResourceDefinitionNames names = 3;
 
   // scope indicates whether the defined custom resource is cluster- or namespace-scoped.
-  // Allowed values are `Cluster` and `Namespaced`. Default is `Namespaced`.
+  // Allowed values are `Cluster` and `Namespaced`.
   optional string scope = 4;
 
   // versions is the list of all API versions of the defined custom resource.
