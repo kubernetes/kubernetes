@@ -308,6 +308,9 @@ type KubeletConfiguration struct {
 	// These sysctls are namespaced but not allowed by default.  For example: "kernel.msg*,net.ipv4.route.min_pmtu"
 	// +optional
 	AllowedUnsafeSysctls []string
+	// Whether iptables CONNMARK should be used instead of MARK for marking and matching packets for source NAT. By
+	// default, iptables MARK is used.
+	UseConnMark bool
 
 	/* the following fields are meant for Node Allocatable */
 

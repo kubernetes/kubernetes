@@ -541,6 +541,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		experimentalHostUserNamespaceDefaulting: utilfeature.DefaultFeatureGate.Enabled(features.ExperimentalHostUserNamespaceDefaultingGate),
 		keepTerminatedPodVolumes:                keepTerminatedPodVolumes,
 		nodeStatusMaxImages:                     nodeStatusMaxImages,
+		useConnMark:                             kubeCfg.UseConnMark,
 	}
 
 	if klet.cloud != nil {
@@ -1221,6 +1222,10 @@ type Kubelet struct {
 
 	// Handles RuntimeClass objects for the Kubelet.
 	runtimeClassManager *runtimeclass.Manager
+
+	// When set iptables CONNMARK will be used in place of iptables MARK for marking and matching
+	// of service VIP traffic.
+	useConnMark bool
 }
 
 // setupDataDirs creates:

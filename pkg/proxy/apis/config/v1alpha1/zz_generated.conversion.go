@@ -196,6 +196,7 @@ func autoConvert_v1alpha1_KubeProxyIPTablesConfiguration_To_config_KubeProxyIPTa
 	out.MasqueradeAll = in.MasqueradeAll
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
+	out.UseConnMark = in.UseConnMark
 	return nil
 }
 
@@ -209,6 +210,7 @@ func autoConvert_config_KubeProxyIPTablesConfiguration_To_v1alpha1_KubeProxyIPTa
 	out.MasqueradeAll = in.MasqueradeAll
 	out.SyncPeriod = in.SyncPeriod
 	out.MinSyncPeriod = in.MinSyncPeriod
+	out.UseConnMark = in.UseConnMark
 	return nil
 }
 

@@ -201,6 +201,7 @@ type Proxier struct {
 	nodeIP         net.IP
 	portMapper     utilproxy.PortOpener
 	recorder       record.EventRecorder
+	useConnMark    bool
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       healthcheck.ProxierHealthUpdater
@@ -261,6 +262,7 @@ func NewProxier(ipt utiliptables.Interface,
 	recorder record.EventRecorder,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	nodePortAddresses []string,
+	useConnMark bool,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if val, _ := sysctl.GetSysctl(sysctlRouteLocalnet); val != 1 {
@@ -318,6 +320,7 @@ func NewProxier(ipt utiliptables.Interface,
 		natRules:                 bytes.NewBuffer(nil),
 		nodePortAddresses:        nodePortAddresses,
 		networkInterfacer:        utilproxy.RealNetwork{},
+		useConnMark:              useConnMark,
 	}
 	burstSyncs := 2
 	klog.V(3).Infof("minSyncPeriod: %v, syncPeriod: %v, burstSyncs: %d", minSyncPeriod, syncPeriod, burstSyncs)
@@ -678,6 +681,20 @@ func (proxier *Proxier) appendServiceCommentLocked(args []string, svcName string
 	args = append(args, "-m", "comment", "--comment", svcName)
 }
 
+func (proxier *Proxier) iptablesMarkTarget() string {
+	if proxier.useConnMark {
+		return "CONNMARK"
+	}
+	return "MARK"
+}
+
+func (proxier *Proxier) iptablesMarkModule() string {
+	if proxier.useConnMark {
+		return "connmark"
+	}
+	return "mark"
+}
+
 // This is where all of the iptables-save/restore calls happen.
 // The only other iptables rules are those that are setup in iptablesInit()
 // This assumes proxier.mu is NOT held
@@ -803,7 +820,7 @@ func (proxier *Proxier) syncProxyRules() {
 	masqRule := []string{
 		"-A", string(kubePostroutingChain),
 		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
-		"-m", "mark", "--mark", proxier.masqueradeMark,
+		"-m", proxier.iptablesMarkModule(), "--mark", proxier.masqueradeMark,
 		"-j", "MASQUERADE",
 	}
 	if proxier.iptables.HasRandomFully() {
@@ -817,9 +834,10 @@ func (proxier *Proxier) syncProxyRules() {
 	// Install the kubernetes-specific masquerade mark rule. We use a whole chain for
 	// this so that it is easier to flush and change, for example if the mark
 	// value should ever change.
+
 	writeLine(proxier.natRules, []string{
 		"-A", string(KubeMarkMasqChain),
-		"-j", "MARK", "--set-xmark", proxier.masqueradeMark,
+		"-j", proxier.iptablesMarkTarget(), "--set-xmark", proxier.masqueradeMark,
 	}...)
 
 	// Accumulate NAT chains to keep.
@@ -1392,7 +1410,7 @@ func (proxier *Proxier) syncProxyRules() {
 	writeLine(proxier.filterRules,
 		"-A", string(kubeForwardChain),
 		"-m", "comment", "--comment", `"kubernetes forwarding rules"`,
-		"-m", "mark", "--mark", proxier.masqueradeMark,
+		"-m", proxier.iptablesMarkModule(), "--mark", proxier.masqueradeMark,
 		"-j", "ACCEPT",
 	)
 

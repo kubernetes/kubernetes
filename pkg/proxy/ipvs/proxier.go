@@ -227,6 +227,7 @@ type Proxier struct {
 	nodeIP         net.IP
 	portMapper     utilproxy.PortOpener
 	recorder       record.EventRecorder
+	useConnMark    bool
 
 	serviceHealthServer healthcheck.ServiceHealthServer
 	healthzServer       healthcheck.ProxierHealthUpdater
@@ -333,6 +334,7 @@ func NewProxier(ipt utiliptables.Interface,
 	healthzServer healthcheck.ProxierHealthUpdater,
 	scheduler string,
 	nodePortAddresses []string,
+	useConnMark bool,
 ) (*Proxier, error) {
 	// Set the route_localnet sysctl we need for
 	if val, _ := sysctl.GetSysctl(sysctlRouteLocalnet); val != 1 {
@@ -456,6 +458,7 @@ func NewProxier(ipt utiliptables.Interface,
 		nodePortAddresses:     nodePortAddresses,
 		networkInterfacer:     utilproxy.RealNetwork{},
 		gracefuldeleteManager: NewGracefulTerminationManager(ipvs),
+		useConnMark:           useConnMark,
 	}
 	// initialize ipsetList with all sets we needed
 	proxier.ipsetList = make(map[string]*IPSet)
@@ -489,6 +492,7 @@ func NewDualStackProxier(
 	healthzServer healthcheck.ProxierHealthUpdater,
 	scheduler string,
 	nodePortAddresses []string,
+	useConnMark bool,
 ) (proxy.Provider, error) {
 
 	safeIpset := newSafeIpset(ipset)
@@ -497,7 +501,7 @@ func NewDualStackProxier(
 	ipv4Proxier, err := NewProxier(ipt[0], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(false, excludeCIDRs), strictARP,
 		masqueradeAll, masqueradeBit, clusterCIDR[0], hostname, nodeIP[0],
-		recorder, healthzServer, scheduler, nodePortAddresses)
+		recorder, healthzServer, scheduler, nodePortAddresses, useConnMark)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv4 proxier: %v", err)
 	}
@@ -505,7 +509,7 @@ func NewDualStackProxier(
 	ipv6Proxier, err := NewProxier(ipt[1], ipvs, safeIpset, sysctl,
 		exec, syncPeriod, minSyncPeriod, filterCIDRs(true, excludeCIDRs), strictARP,
 		masqueradeAll, masqueradeBit, clusterCIDR[1], hostname, nodeIP[1],
-		nil, nil, scheduler, nodePortAddresses)
+		nil, nil, scheduler, nodePortAddresses, useConnMark)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create ipv6 proxier: %v", err)
 	}
@@ -898,6 +902,19 @@ func (proxier *Proxier) OnEndpointSlicesSynced() {
 
 // EntryInvalidErr indicates if an ipset entry is invalid or not
 const EntryInvalidErr = "error adding entry %s to ipset %s"
+
+func (proxier *Proxier) iptablesMarkTarget() string {
+	if proxier.useConnMark {
+		return "CONNMARK"
+	}
+	return "MARK"
+}
+func (proxier *Proxier) iptablesMarkModule() string {
+	if proxier.useConnMark {
+		return "connmark"
+	}
+	return "mark"
+}
 
 // This is where all of the ipvs calls happen.
 // assumes proxier.mu is held
@@ -1626,7 +1643,7 @@ func (proxier *Proxier) writeIptablesRules() {
 	writeLine(proxier.filterRules,
 		"-A", string(KubeForwardChain),
 		"-m", "comment", "--comment", `"kubernetes forwarding rules"`,
-		"-m", "mark", "--mark", proxier.masqueradeMark,
+		"-m", proxier.iptablesMarkModule(), "--mark", proxier.masqueradeMark,
 		"-j", "ACCEPT",
 	)
 
@@ -1719,7 +1736,7 @@ func (proxier *Proxier) createAndLinkeKubeChain() {
 	masqRule := []string{
 		"-A", string(kubePostroutingChain),
 		"-m", "comment", "--comment", `"kubernetes service traffic requiring SNAT"`,
-		"-m", "mark", "--mark", proxier.masqueradeMark,
+		"-m", proxier.iptablesMarkModule(), "--mark", proxier.masqueradeMark,
 		"-j", "MASQUERADE",
 	}
 	if proxier.iptables.HasRandomFully() {
@@ -1735,7 +1752,7 @@ func (proxier *Proxier) createAndLinkeKubeChain() {
 	// value should ever change.
 	writeLine(proxier.natRules, []string{
 		"-A", string(KubeMarkMasqChain),
-		"-j", "MARK", "--set-xmark", proxier.masqueradeMark,
+		"-j", proxier.iptablesMarkTarget(), "--set-xmark", proxier.masqueradeMark,
 	}...)
 }
 

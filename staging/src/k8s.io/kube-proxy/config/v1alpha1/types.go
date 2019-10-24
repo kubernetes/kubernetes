@@ -35,6 +35,9 @@ type KubeProxyIPTablesConfiguration struct {
 	// minSyncPeriod is the minimum period that iptables rules are refreshed (e.g. '5s', '1m',
 	// '2h22m').
 	MinSyncPeriod metav1.Duration `json:"minSyncPeriod"`
+	// useConnMark is a toggle for using iptables CONNMARK to mark and match service VIP traffic instead
+	// of iptables MARK.
+	UseConnMark bool `json:"useConnMark"`
 }
 
 // KubeProxyIPVSConfiguration contains ipvs-related configuration

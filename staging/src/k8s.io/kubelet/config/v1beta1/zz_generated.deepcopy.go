@@ -285,6 +285,11 @@ func (in *KubeletConfiguration) DeepCopyInto(out *KubeletConfiguration) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.UseConnMark != nil {
+		in, out := &in.UseConnMark, &out.UseConnMark
+		*out = new(bool)
+		**out = **in
+	}
 	return
 }
 

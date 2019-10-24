@@ -743,6 +743,12 @@ type KubeletConfiguration struct {
 	// Default: []
 	// +optional
 	AllowedUnsafeSysctls []string `json:"allowedUnsafeSysctls,omitempty"`
+	// Whether or not to use iptables CONNMARK to mark traffic to service VIPs instead of iptables MARK.
+	// Default: false
+	// +optional
+	UseConnMark *bool `json:"useConnMark,omitempty"`
+
+
 }
 
 type KubeletAuthorizationMode string

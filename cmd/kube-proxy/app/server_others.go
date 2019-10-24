@@ -163,6 +163,7 @@ func newProxyServer(
 			recorder,
 			healthzServer,
 			config.NodePortAddresses,
+			config.IPTables.UseConnMark,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("unable to create proxier: %v", err)
@@ -202,6 +203,7 @@ func newProxyServer(
 				healthzServer,
 				config.IPVS.Scheduler,
 				config.NodePortAddresses,
+				config.IPTables.UseConnMark,
 			)
 		} else {
 			proxier, err = ipvs.NewProxier(
@@ -223,6 +225,7 @@ func newProxyServer(
 				healthzServer,
 				config.IPVS.Scheduler,
 				config.NodePortAddresses,
+				config.IPTables.UseConnMark,
 			)
 		}
 		if err != nil {

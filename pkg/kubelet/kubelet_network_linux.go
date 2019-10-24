@@ -34,6 +34,19 @@ func (kl *Kubelet) initNetworkUtil() {
 		kl.syncNetworkUtil, 1*time.Minute, wait.NeverStop)
 }
 
+func (kl *Kubelet) iptablesMarkTarget() string {
+	if kl.useConnMark {
+		return "CONNMARK"
+	}
+	return "MARK"
+}
+func (kl *Kubelet) iptablesMarkModule() string {
+	if kl.useConnMark {
+		return "connmark"
+	}
+	return "mark"
+}
+
 // syncNetworkUtil ensures the network utility are present on host.
 // Network util includes:
 // 1. 	In nat table, KUBE-MARK-DROP rule to mark connections for dropping
@@ -96,7 +109,7 @@ func (kl *Kubelet) syncNetworkUtil() {
 		klog.Errorf("Failed to ensure that %s chain %s exists: %v", utiliptables.TableNAT, KubePostroutingChain, err)
 		return
 	}
-	if _, err := kl.iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubeMarkMasqChain, "-j", "MARK", "--set-xmark", masqueradeMark); err != nil {
+	if _, err := kl.iptClient.EnsureRule(utiliptables.Append, utiliptables.TableNAT, KubeMarkMasqChain, "-j", kl.iptablesMarkTarget(), "--set-xmark", masqueradeMark); err != nil {
 		klog.Errorf("Failed to ensure marking rule for %v: %v", KubeMarkMasqChain, err)
 		return
 	}
@@ -110,7 +123,7 @@ func (kl *Kubelet) syncNetworkUtil() {
 	// modes of kube-proxy
 	masqRule := []string{
 		"-m", "comment", "--comment", "kubernetes service traffic requiring SNAT",
-		"-m", "mark", "--mark", masqueradeMark,
+		"-m", kl.iptablesMarkModule(), "--mark", masqueradeMark,
 		"-j", "MASQUERADE",
 	}
 	if kl.iptClient.HasRandomFully() {
