@@ -571,11 +571,13 @@ func (f *framework) RunPermitPlugins(
 	// We now wait for the minimum duration if at least one plugin asked to
 	// wait (and no plugin rejected the pod)
 	if statusCode == Wait {
+		startTime := time.Now()
 		w := newWaitingPod(pod, pluginsWaitTime)
 		f.waitingPods.add(w)
 		defer f.waitingPods.remove(pod.UID)
 		klog.V(4).Infof("waiting for pod %q at permit", pod.Name)
 		s := <-w.s
+		metrics.PermitWaitDuration.WithLabelValues(s.Code().String()).Observe(metrics.SinceInSeconds(startTime))
 		if !s.IsSuccess() {
 			if s.IsUnschedulable() {
 				msg := fmt.Sprintf("pod %q rejected while waiting at permit: %v", pod.Name, s.Message())
