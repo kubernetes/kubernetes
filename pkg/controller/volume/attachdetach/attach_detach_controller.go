@@ -131,6 +131,7 @@ func NewAttachDetachController(
 		utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
 		adc.csiNodeLister = csiNodeInformer.Lister()
 		adc.csiNodeSynced = csiNodeInformer.Informer().HasSynced
+		disableReconciliationSync = true
 	}
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
