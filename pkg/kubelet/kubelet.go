@@ -584,6 +584,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	imageBackOff := flowcontrol.NewBackOff(backOffPeriod, MaxContainerBackOff)
 
 	klet.livenessManager = proberesults.NewManager()
+	klet.startupManager = proberesults.NewManager()
 
 	klet.podCache = kubecontainer.NewCache()
 	var checkpointManager checkpointmanager.CheckpointManager
@@ -672,6 +673,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	runtime, err := kuberuntime.NewKubeGenericRuntimeManager(
 		kubecontainer.FilterEventRecorder(kubeDeps.Recorder),
 		klet.livenessManager,
+		klet.startupManager,
 		seccompProfileRoot,
 		containerRefManager,
 		machineInfo,
@@ -778,6 +780,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	klet.probeManager = prober.NewManager(
 		klet.statusManager,
 		klet.livenessManager,
+		klet.startupManager,
 		klet.runner,
 		containerRefManager,
 		kubeDeps.Recorder)
@@ -977,6 +980,7 @@ type Kubelet struct {
 	probeManager prober.Manager
 	// Manages container health check results.
 	livenessManager proberesults.Manager
+	startupManager  proberesults.Manager
 
 	// How long to keep idle streaming command execution/port forwarding
 	// connections open before terminating them

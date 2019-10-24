@@ -79,10 +79,12 @@ func TestDoProbe(t *testing.T) {
 				podStatus:      &pendingStatus,
 				expectContinue: true,
 				expectSet:      true,
+				expectedResult: results.Failure,
 			},
 			{ // Container terminated
-				podStatus: &terminatedStatus,
-				expectSet: true,
+				podStatus:      &terminatedStatus,
+				expectSet:      true,
+				expectedResult: results.Failure,
 			},
 			{ // Probe successful.
 				podStatus:      &runningStatus,
@@ -134,8 +136,15 @@ func TestInitialDelay(t *testing.T) {
 		m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(probeType != startup))
 
 		expectContinue(t, w, w.doProbe(), "during initial delay")
-		// Default value depends on probe, true for liveness, otherwise false.
-		expectResult(t, w, results.Result(probeType == liveness), "during initial delay")
+		// Default value depends on probe, Success for liveness, Failure for readiness, Unknown for startup
+		switch probeType {
+		case liveness:
+			expectResult(t, w, results.Success, "during initial delay")
+		case readiness:
+			expectResult(t, w, results.Failure, "during initial delay")
+		case startup:
+			expectResult(t, w, results.Unknown, "during initial delay")
+		}
 
 		// 100 seconds later...
 		laterStatus := getTestRunningStatusWithStarted(probeType != startup)
@@ -397,17 +406,17 @@ func TestResultRunOnStartupCheckFailure(t *testing.T) {
 	// Below FailureThreshold leaves probe state unchanged
 	// which is failed for startup at first.
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
-	msg := "probe failure, result failure"
+	msg := "probe failure, result unknown"
 	expectContinue(t, w, w.doProbe(), msg)
-	expectResult(t, w, results.Failure, msg)
+	expectResult(t, w, results.Unknown, msg)
 	if w.resultRun != 1 {
 		t.Errorf("Prober resultRun should be 1")
 	}
 
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
-	msg = "2nd probe failure, result failure"
+	msg = "2nd probe failure, result unknown"
 	expectContinue(t, w, w.doProbe(), msg)
-	expectResult(t, w, results.Failure, msg)
+	expectResult(t, w, results.Unknown, msg)
 	if w.resultRun != 2 {
 		t.Errorf("Prober resultRun should be 2")
 	}
@@ -446,11 +455,11 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	m := newTestManager()
 	w := newTestWorker(m, startup, v1.Probe{SuccessThreshold: 1, FailureThreshold: 2})
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
-	// startupProbe fails
+	// startupProbe fails < FailureThreshold, stays unknown
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
-	msg := "Not started, probe failure, result failure"
+	msg := "Not started, probe failure, result unknown"
 	expectContinue(t, w, w.doProbe(), msg)
-	expectResult(t, w, results.Failure, msg)
+	expectResult(t, w, results.Unknown, msg)
 	// startupProbe succeeds
 	m.prober.exec = fakeExecProber{probe.Success, nil}
 	msg = "Started, probe success, result success"

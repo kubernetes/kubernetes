@@ -100,6 +100,7 @@ type kubeGenericRuntimeManager struct {
 
 	// Health check results.
 	livenessManager proberesults.Manager
+	startupManager  proberesults.Manager
 
 	// If true, enforce container cpu limits with CFS quota support
 	cpuCFSQuota bool
@@ -150,6 +151,7 @@ type LegacyLogProvider interface {
 func NewKubeGenericRuntimeManager(
 	recorder record.EventRecorder,
 	livenessManager proberesults.Manager,
+	startupManager proberesults.Manager,
 	seccompProfileRoot string,
 	containerRefManager *kubecontainer.RefManager,
 	machineInfo *cadvisorapi.MachineInfo,
@@ -175,6 +177,7 @@ func NewKubeGenericRuntimeManager(
 		cpuCFSQuotaPeriod:   cpuCFSQuotaPeriod,
 		seccompProfileRoot:  seccompProfileRoot,
 		livenessManager:     livenessManager,
+		startupManager:      startupManager,
 		containerRefManager: containerRefManager,
 		machineInfo:         machineInfo,
 		osInterface:         osInterface,
@@ -590,6 +593,9 @@ func (m *kubeGenericRuntimeManager) computePodActions(pod *v1.Pod, podStatus *ku
 		} else if liveness, found := m.livenessManager.Get(containerStatus.ID); found && liveness == proberesults.Failure {
 			// If the container failed the liveness probe, we should kill it.
 			message = fmt.Sprintf("Container %s failed liveness probe", container.Name)
+		} else if startup, found := m.startupManager.Get(containerStatus.ID); found && startup == proberesults.Failure {
+			// If the container failed the startup probe, we should kill it.
+			message = fmt.Sprintf("Container %s failed startup probe", container.Name)
 		} else {
 			// Keep the container.
 			keepCount++
