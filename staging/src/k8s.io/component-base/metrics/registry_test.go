@@ -210,9 +210,8 @@ func TestShowHiddenMetric(t *testing.T) {
 	registry.MustRegister(alphaHiddenCounter)
 
 	ms, err := registry.Gather()
-	if len(ms) != expectedMetricCount {
-		t.Errorf("Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
-	}
+	assert.Equalf(t, expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
+
 	showHidden.Store(true)
 	defer showHidden.Store(false)
 	registry.MustRegister(NewCounter(
@@ -228,11 +227,7 @@ func TestShowHiddenMetric(t *testing.T) {
 	expectedMetricCount = 1
 
 	ms, err = registry.Gather()
-	if len(ms) != expectedMetricCount {
-		t.Errorf("Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
-	}
-	if err != nil {
-		t.Fatalf("Gather failed %v", err)
-	}
+	assert.Equalf(t, expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), expectedMetricCount)
+	assert.Nil(t, err, "Gather failed %v", err)
 
 }
