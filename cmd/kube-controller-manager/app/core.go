@@ -33,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	cacheddiscovery "k8s.io/client-go/discovery/cached/memory"
+	storagev1beta1informer "k8s.io/client-go/informers/storage/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/metadata"
 	restclient "k8s.io/client-go/rest"
@@ -278,6 +279,17 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 		return nil, true, fmt.Errorf("duration time must be greater than one second as set via command line option reconcile-sync-loop-period")
 	}
 
+	var (
+		csiNodeInformer   storagev1beta1informer.CSINodeInformer
+		csiDriverInformer storagev1beta1informer.CSIDriverInformer
+	)
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
+		csiNodeInformer = ctx.InformerFactory.Storage().V1beta1().CSINodes()
+	}
+	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
+		csiDriverInformer = ctx.InformerFactory.Storage().V1beta1().CSIDrivers()
+	}
+
 	attachDetachController, attachDetachControllerErr :=
 		attachdetach.NewAttachDetachController(
 			ctx.ClientBuilder.ClientOrDie("attachdetach-controller"),
@@ -285,8 +297,8 @@ func startAttachDetachController(ctx ControllerContext) (http.Handler, bool, err
 			ctx.InformerFactory.Core().V1().Nodes(),
 			ctx.InformerFactory.Core().V1().PersistentVolumeClaims(),
 			ctx.InformerFactory.Core().V1().PersistentVolumes(),
-			ctx.InformerFactory.Storage().V1beta1().CSINodes(),
-			ctx.InformerFactory.Storage().V1beta1().CSIDrivers(),
+			csiNodeInformer,
+			csiDriverInformer,
 			ctx.Cloud,
 			ProbeAttachableVolumePlugins(),
 			GetDynamicPluginProber(ctx.ComponentConfig.PersistentVolumeBinderController.VolumeConfiguration),

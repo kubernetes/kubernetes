@@ -52,12 +52,11 @@ func (pl *GCEPDLimits) Filter(ctx context.Context, _ *framework.CycleState, pod 
 // NewGCEPD returns function that initializes a new plugin and returns it.
 func NewGCEPD(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	csiNodeLister := informerFactory.Storage().V1beta1().CSINodes().Lister()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
 	return &GCEPDLimits{
-		predicate: predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, csiNodeLister, scLister, pvLister, pvcLister),
+		predicate: predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, getCSINodeListerIfEnabled(informerFactory), scLister, pvLister, pvcLister),
 	}, nil
 }

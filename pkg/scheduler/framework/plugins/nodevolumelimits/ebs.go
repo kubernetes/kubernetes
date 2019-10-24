@@ -52,12 +52,11 @@ func (pl *EBSLimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 // NewEBS returns function that initializes a new plugin and returns it.
 func NewEBS(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	csiNodeLister := informerFactory.Storage().V1beta1().CSINodes().Lister()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
 	return &EBSLimits{
-		predicate: predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, csiNodeLister, scLister, pvLister, pvcLister),
+		predicate: predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, getCSINodeListerIfEnabled(informerFactory), scLister, pvLister, pvcLister),
 	}, nil
 }
