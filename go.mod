@@ -261,7 +261,7 @@ replace (
 	github.com/go-logr/logr => github.com/go-logr/logr v0.1.0
 	github.com/go-openapi/analysis => github.com/go-openapi/analysis v0.19.2
 	github.com/go-openapi/errors => github.com/go-openapi/errors v0.19.2
-	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.2
+	github.com/go-openapi/jsonpointer => github.com/go-openapi/jsonpointer v0.19.3
 	github.com/go-openapi/jsonreference => github.com/go-openapi/jsonreference v0.19.2
 	github.com/go-openapi/loads => github.com/go-openapi/loads v0.19.2
 	github.com/go-openapi/runtime => github.com/go-openapi/runtime v0.19.0
