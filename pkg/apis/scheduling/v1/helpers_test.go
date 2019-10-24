@@ -1,5 +1,5 @@
 /*
-Copyright 2018 The Kubernetes Authors.
+Copyright 2019 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,18 +14,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package scheduling
+package v1
 
 import (
 	"testing"
 
+	v1 "k8s.io/api/scheduling/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
 func TestIsKnownSystemPriorityClass(t *testing.T) {
 	tests := []struct {
 		name     string
-		pc       *PriorityClass
+		pc       *v1.PriorityClass
 		expected bool
 	}{
 		{
@@ -35,11 +37,11 @@ func TestIsKnownSystemPriorityClass(t *testing.T) {
 		},
 		{
 			name: "non-system priority class",
-			pc: &PriorityClass{
+			pc: &v1.PriorityClass{
 				ObjectMeta: metav1.ObjectMeta{
-					Name: SystemNodeCritical,
+					Name: scheduling.SystemNodeCritical,
 				},
-				Value:       SystemCriticalPriority, // This is the value of system cluster critical
+				Value:       scheduling.SystemCriticalPriority, // This is the value of system cluster critical
 				Description: "Used for system critical pods that must not be moved from their current node.",
 			},
 			expected: false,
@@ -47,7 +49,7 @@ func TestIsKnownSystemPriorityClass(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if is, err := IsKnownSystemPriorityClass(test.pc); test.expected != is {
+		if is, err := IsKnownSystemPriorityClass(test.pc.Name, test.pc.Value, test.pc.GlobalDefault); test.expected != is {
 			t.Errorf("Test [%v]: Expected %v, but got %v. Error: %v", test.name, test.expected, is, err)
 		}
 	}
