@@ -171,6 +171,11 @@ func runApply(flags *applyFlags, userVersion string) error {
 		return errors.Wrap(err, "[upgrade/postupgrade] FATAL post-upgrade error")
 	}
 
+	klog.V(1).Infoln("[upgrade/addons] upgrading addons")
+	if err := upgrade.PerformAddonUpgradeTasks(client, cfg, flags.dryRun); err != nil {
+		return errors.Wrap(err, "[upgrade/addons] FATAL addons-upgrade error")
+	}
+
 	if flags.dryRun {
 		fmt.Println("[dryrun] Finished dryrunning successfully!")
 		return nil
