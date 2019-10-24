@@ -86,10 +86,6 @@ type Config struct {
 	// stale while they sit in a channel.
 	NextPod func() *framework.PodInfo
 
-	// WaitForCacheSync waits for scheduler cache to populate.
-	// It returns true if it was successful, false if the controller should shutdown.
-	WaitForCacheSync func() bool
-
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
 	Error func(*framework.PodInfo, error)
@@ -146,8 +142,6 @@ type Configurator struct {
 
 	// Close this to stop all reflectors
 	StopEverything <-chan struct{}
-
-	scheduledPodsHasSynced cache.InformerSynced
 
 	schedulerCache internalcache.Cache
 
@@ -261,7 +255,6 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 		pluginConfig:                   args.PluginConfig,
 		pluginConfigProducerRegistry:   args.PluginConfigProducerRegistry,
 	}
-	c.scheduledPodsHasSynced = args.PodInformer.Informer().HasSynced
 
 	return c
 }
@@ -454,13 +447,10 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 	)
 
 	return &Config{
-		SchedulerCache: c.schedulerCache,
-		Algorithm:      algo,
-		GetBinder:      getBinderFunc(c.client, extenders),
-		Framework:      framework,
-		WaitForCacheSync: func() bool {
-			return cache.WaitForCacheSync(c.StopEverything, c.scheduledPodsHasSynced)
-		},
+		SchedulerCache:  c.schedulerCache,
+		Algorithm:       algo,
+		GetBinder:       getBinderFunc(c.client, extenders),
+		Framework:       framework,
 		NextPod:         internalqueue.MakeNextPodFunc(podQueue),
 		Error:           MakeDefaultErrorFunc(c.client, podQueue, c.schedulerCache),
 		StopEverything:  c.StopEverything,

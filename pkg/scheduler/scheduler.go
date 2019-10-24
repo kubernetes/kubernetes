@@ -32,6 +32,7 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -95,10 +96,6 @@ type Scheduler struct {
 	// stale while they sit in a channel.
 	NextPod func() *framework.PodInfo
 
-	// WaitForCacheSync waits for scheduler cache to populate.
-	// It returns true if it was successful, false if the controller should shutdown.
-	WaitForCacheSync func() bool
-
 	// Error is called if there is an error. It is passed the pod in
 	// question, and the error
 	Error func(*framework.PodInfo, error)
@@ -117,6 +114,8 @@ type Scheduler struct {
 
 	// SchedulingQueue holds pods to be scheduled
 	SchedulingQueue internalqueue.SchedulingQueue
+
+	scheduledPodsHasSynced func() bool
 }
 
 // Cache returns the cache in scheduler for test to check the data in scheduler.
@@ -348,6 +347,7 @@ func New(client clientset.Interface,
 	sched := NewFromConfig(config)
 	sched.podConditionUpdater = &podConditionUpdaterImpl{client}
 	sched.podPreemptor = &podPreemptorImpl{client}
+	sched.scheduledPodsHasSynced = podInformer.Informer().HasSynced
 
 	AddAllEventHandlers(sched, options.schedulerName, informerFactory, podInformer)
 	return sched, nil
@@ -398,7 +398,6 @@ func NewFromConfig(config *Config) *Scheduler {
 		GetBinder:         config.GetBinder,
 		Framework:         config.Framework,
 		NextPod:           config.NextPod,
-		WaitForCacheSync:  config.WaitForCacheSync,
 		Error:             config.Error,
 		Recorder:          config.Recorder,
 		StopEverything:    config.StopEverything,
@@ -410,7 +409,7 @@ func NewFromConfig(config *Config) *Scheduler {
 
 // Run begins watching and scheduling. It waits for cache to be synced, then starts scheduling and blocked until the context is done.
 func (sched *Scheduler) Run(ctx context.Context) {
-	if !sched.WaitForCacheSync() {
+	if !cache.WaitForCacheSync(ctx.Done(), sched.scheduledPodsHasSynced) {
 		return
 	}
 
