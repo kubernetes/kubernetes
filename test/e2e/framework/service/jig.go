@@ -526,7 +526,7 @@ func (j *TestJig) WaitForLoadBalancerDestroy(ip string, port int, timeout time.D
 	if err != nil {
 		return nil, err
 	}
-	return j.sanityCheckService(service, v1.ServiceTypeLoadBalancer)
+	return j.sanityCheckService(service, service.Spec.Type)
 }
 
 func (j *TestJig) waitForCondition(timeout time.Duration, message string, conditionFn func(*v1.Service) bool) (*v1.Service, error) {
