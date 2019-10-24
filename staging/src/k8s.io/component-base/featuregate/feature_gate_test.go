@@ -39,6 +39,7 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
@@ -47,6 +48,7 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "fooBarBaz=true",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
@@ -56,6 +58,16 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "AllAlpha=false",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "AllBeta=false",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
@@ -64,39 +76,90 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "AllAlpha=true",
 			expect: map[Feature]bool{
 				allAlphaGate:  true,
+				allBetaGate:   false,
 				testAlphaGate: true,
 				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "AllBeta=true",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   true,
+				testAlphaGate: false,
+				testBetaGate:  true,
 			},
 		},
 		{
 			arg: "AllAlpha=banana",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
 			parseError: "invalid value of AllAlpha",
 		},
 		{
+			arg: "AllBeta=banana",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+			parseError: "invalid value of AllBeta",
+		},
+		{
 			arg: "AllAlpha=false,TestAlpha=true",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: true,
 				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "AllBeta=false,TestBeta=true",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  true,
 			},
 		},
 		{
 			arg: "TestAlpha=true,AllAlpha=false",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: true,
 				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "TestBeta=true,AllBeta=false",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  true,
 			},
 		},
 		{
 			arg: "AllAlpha=true,TestAlpha=false",
 			expect: map[Feature]bool{
 				allAlphaGate:  true,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "AllBeta=true,TestBeta=false",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   true,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
@@ -105,6 +168,16 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "TestAlpha=false,AllAlpha=true",
 			expect: map[Feature]bool{
 				allAlphaGate:  true,
+				allBetaGate:   false,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "TestBeta=false,AllBeta=true",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   true,
 				testAlphaGate: false,
 				testBetaGate:  false,
 			},
@@ -113,8 +186,63 @@ func TestFeatureGateFlag(t *testing.T) {
 			arg: "TestBeta=true,AllAlpha=false",
 			expect: map[Feature]bool{
 				allAlphaGate:  false,
+				allBetaGate:   false,
 				testAlphaGate: false,
 				testBetaGate:  true,
+			},
+		},
+		{
+			arg: "TestAlpha=true,AllBeta=false",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: true,
+				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "AllAlpha=true,AllBeta=true",
+			expect: map[Feature]bool{
+				allAlphaGate:  true,
+				allBetaGate:   true,
+				testAlphaGate: true,
+				testBetaGate:  true,
+			},
+		},
+		{
+			arg: "AllAlpha=true,AllBeta=true,TestAlpha=false,TestBeta=false",
+			expect: map[Feature]bool{
+				allAlphaGate:  true,
+				allBetaGate:   true,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "AllAlpha=false,AllBeta=false,TestAlpha=true,TestBeta=true",
+			expect: map[Feature]bool{
+				allAlphaGate:  false,
+				allBetaGate:   false,
+				testAlphaGate: true,
+				testBetaGate:  true,
+			},
+		},
+		{
+			arg: "TestAlpha=false,TestBeta=false,AllAlpha=true,AllBeta=true",
+			expect: map[Feature]bool{
+				allAlphaGate:  true,
+				allBetaGate:   true,
+				testAlphaGate: false,
+				testBetaGate:  false,
+			},
+		},
+		{
+			arg: "AllAlpha=true,AllBeta=true,TestAlpha=false,TestBeta=false",
+			expect: map[Feature]bool{
+				allAlphaGate:  true,
+				allBetaGate:   true,
+				testAlphaGate: false,
+				testBetaGate:  false,
 			},
 		},
 	}
