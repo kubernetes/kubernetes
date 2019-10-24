@@ -157,12 +157,12 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 }
 
 // Run executes the scheduler based on the given configuration. It only returns on error or when context is done.
-func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, registryOptions ...Option) error {
+func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTreeRegistryOptions ...Option) error {
 	// To help debugging, immediately log version
 	klog.V(1).Infof("Starting Kubernetes Scheduler version %+v", version.Get())
 
 	outOfTreeRegistry := make(framework.Registry)
-	for _, option := range registryOptions {
+	for _, option := range outOfTreeRegistryOptions {
 		if err := option(outOfTreeRegistry); err != nil {
 			return err
 		}

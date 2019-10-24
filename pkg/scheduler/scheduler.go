@@ -128,14 +128,16 @@ func (sched *Scheduler) Cache() internalcache.Cache {
 }
 
 type schedulerOptions struct {
-	schedulerName                   string
-	hardPodAffinitySymmetricWeight  int32
-	disablePreemption               bool
-	percentageOfNodesToScore        int32
-	bindTimeoutSeconds              int64
-	podInitialBackoffSeconds        int64
-	podMaxBackoffSeconds            int64
-	frameworkDefaultRegistry        framework.Registry
+	schedulerName                  string
+	hardPodAffinitySymmetricWeight int32
+	disablePreemption              bool
+	percentageOfNodesToScore       int32
+	bindTimeoutSeconds             int64
+	podInitialBackoffSeconds       int64
+	podMaxBackoffSeconds           int64
+	// Default registry contains all in-tree plugins
+	frameworkDefaultRegistry framework.Registry
+	// This registry contains out of tree plugins to be merged with default registry.
 	frameworkOutOfTreeRegistry      framework.Registry
 	frameworkConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry
 	frameworkPlugins                *kubeschedulerconfig.Plugins
@@ -180,7 +182,7 @@ func WithBindTimeoutSeconds(bindTimeoutSeconds int64) Option {
 	}
 }
 
-// WithFrameworkDefaultRegistry sets the framework's default registry.
+// WithFrameworkDefaultRegistry sets the framework's default registry. This is only used in integration tests.
 func WithFrameworkDefaultRegistry(registry framework.Registry) Option {
 	return func(o *schedulerOptions) {
 		o.frameworkDefaultRegistry = registry
