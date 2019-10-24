@@ -52,16 +52,10 @@ func (pl *VolumeZone) Filter(ctx context.Context, _ *framework.CycleState, pod *
 // New initializes a new plugin and returns it.
 func New(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	pvInfo := &predicates.CachedPersistentVolumeInfo{
-		PersistentVolumeLister: informerFactory.Core().V1().PersistentVolumes().Lister(),
-	}
-	pvcInfo := &predicates.CachedPersistentVolumeClaimInfo{
-		PersistentVolumeClaimLister: informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-	}
-	classInfo := &predicates.CachedStorageClassInfo{
-		StorageClassLister: informerFactory.Storage().V1().StorageClasses().Lister(),
-	}
+	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
+	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 	return &VolumeZone{
-		predicate: predicates.NewVolumeZonePredicate(pvInfo, pvcInfo, classInfo),
+		predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, scLister),
 	}, nil
 }

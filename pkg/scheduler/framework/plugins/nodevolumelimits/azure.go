@@ -52,20 +52,12 @@ func (pl *AzureDiskLimits) Filter(ctx context.Context, _ *framework.CycleState, 
 // NewAzureDisk returns function that initializes a new plugin and returns it.
 func NewAzureDisk(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	csiNodeInfo := &predicates.CachedCSINodeInfo{
-		CSINodeLister: informerFactory.Storage().V1beta1().CSINodes().Lister(),
-	}
-	pvInfo := &predicates.CachedPersistentVolumeInfo{
-		PersistentVolumeLister: informerFactory.Core().V1().PersistentVolumes().Lister(),
-	}
-	pvcInfo := &predicates.CachedPersistentVolumeClaimInfo{
-		PersistentVolumeClaimLister: informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-	}
-	classInfo := &predicates.CachedStorageClassInfo{
-		StorageClassLister: informerFactory.Storage().V1().StorageClasses().Lister(),
-	}
+	csiNodeLister := informerFactory.Storage().V1beta1().CSINodes().Lister()
+	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
+	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
 	return &AzureDiskLimits{
-		predicate: predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, csiNodeInfo, classInfo, pvInfo, pvcInfo),
+		predicate: predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, csiNodeLister, scLister, pvLister, pvcLister),
 	}, nil
 }

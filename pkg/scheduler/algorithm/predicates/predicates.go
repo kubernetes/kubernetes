@@ -160,75 +160,6 @@ type NodeInfo interface {
 // The failure information is given by the error.
 type FitPredicate func(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error)
 
-// CSINodeInfo interface represents anything that can get CSINode object from node name.
-type CSINodeInfo interface {
-	GetCSINodeInfo(nodeName string) (*v1beta1storage.CSINode, error)
-}
-
-var _ CSINodeInfo = &CachedCSINodeInfo{}
-
-// CachedCSINodeInfo implements CSINodeInfoInfo
-type CachedCSINodeInfo struct {
-	v1beta1storagelisters.CSINodeLister
-}
-
-// GetCSINodeInfo returns a persistent volume object by PV ID.
-func (c *CachedCSINodeInfo) GetCSINodeInfo(nodeName string) (*v1beta1storage.CSINode, error) {
-	return c.Get(nodeName)
-}
-
-// PersistentVolumeInfo interface represents anything that can get persistent volume object by PV ID.
-type PersistentVolumeInfo interface {
-	GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error)
-}
-
-var _ PersistentVolumeInfo = &CachedPersistentVolumeInfo{}
-
-// CachedPersistentVolumeInfo implements PersistentVolumeInfo
-type CachedPersistentVolumeInfo struct {
-	corelisters.PersistentVolumeLister
-}
-
-// GetPersistentVolumeInfo returns a persistent volume object by PV ID.
-func (c *CachedPersistentVolumeInfo) GetPersistentVolumeInfo(pvID string) (*v1.PersistentVolume, error) {
-	return c.Get(pvID)
-}
-
-// PersistentVolumeClaimInfo interface represents anything that can get a PVC object in
-// specified namespace with specified name.
-type PersistentVolumeClaimInfo interface {
-	GetPersistentVolumeClaimInfo(namespace string, name string) (*v1.PersistentVolumeClaim, error)
-}
-
-var _ PersistentVolumeClaimInfo = &CachedPersistentVolumeClaimInfo{}
-
-// CachedPersistentVolumeClaimInfo implements PersistentVolumeClaimInfo
-type CachedPersistentVolumeClaimInfo struct {
-	corelisters.PersistentVolumeClaimLister
-}
-
-// GetPersistentVolumeClaimInfo fetches the claim in specified namespace with specified name.
-func (c *CachedPersistentVolumeClaimInfo) GetPersistentVolumeClaimInfo(namespace string, name string) (*v1.PersistentVolumeClaim, error) {
-	return c.PersistentVolumeClaims(namespace).Get(name)
-}
-
-// StorageClassInfo interface represents anything that can get a storage class object by class name.
-type StorageClassInfo interface {
-	GetStorageClassInfo(className string) (*storage.StorageClass, error)
-}
-
-var _ StorageClassInfo = &CachedStorageClassInfo{}
-
-// CachedStorageClassInfo implements StorageClassInfo
-type CachedStorageClassInfo struct {
-	storagelisters.StorageClassLister
-}
-
-// GetStorageClassInfo get StorageClass by class name.
-func (c *CachedStorageClassInfo) GetStorageClassInfo(className string) (*storage.StorageClass, error) {
-	return c.Get(className)
-}
-
 func isVolumeConflict(volume v1.Volume, pod *v1.Pod) bool {
 	// fast path if there is no conflict checking targets.
 	if volume.GCEPersistentDisk == nil && volume.AWSElasticBlockStore == nil && volume.RBD == nil && volume.ISCSI == nil {
@@ -301,10 +232,10 @@ type MaxPDVolumeCountChecker struct {
 	filter         VolumeFilter
 	volumeLimitKey v1.ResourceName
 	maxVolumeFunc  func(node *v1.Node) int
-	csiNodeInfo    CSINodeInfo
-	pvInfo         PersistentVolumeInfo
-	pvcInfo        PersistentVolumeClaimInfo
-	scInfo         StorageClassInfo
+	csiNodeLister  v1beta1storagelisters.CSINodeLister
+	pvLister       corelisters.PersistentVolumeLister
+	pvcLister      corelisters.PersistentVolumeClaimLister
+	scLister       storagelisters.StorageClassLister
 
 	// The string below is generated randomly during the struct's initialization.
 	// It is used to prefix volumeID generated inside the predicate() method to
@@ -333,8 +264,8 @@ type VolumeFilter struct {
 // The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
 // types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
 // the maximum.
-func NewMaxPDVolumeCountPredicate(filterName string, csiNodeInfo CSINodeInfo, scInfo StorageClassInfo,
-	pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo) FitPredicate {
+func NewMaxPDVolumeCountPredicate(filterName string, csiNodeLister v1beta1storagelisters.CSINodeLister, scLister storagelisters.StorageClassLister,
+	pvLister corelisters.PersistentVolumeLister, pvcLister corelisters.PersistentVolumeClaimLister) FitPredicate {
 	var filter VolumeFilter
 	var volumeLimitKey v1.ResourceName
 
@@ -362,10 +293,10 @@ func NewMaxPDVolumeCountPredicate(filterName string, csiNodeInfo CSINodeInfo, sc
 		filter:               filter,
 		volumeLimitKey:       volumeLimitKey,
 		maxVolumeFunc:        getMaxVolumeFunc(filterName),
-		csiNodeInfo:          csiNodeInfo,
-		pvInfo:               pvInfo,
-		pvcInfo:              pvcInfo,
-		scInfo:               scInfo,
+		csiNodeLister:        csiNodeLister,
+		pvLister:             pvLister,
+		pvcLister:            pvcLister,
+		scLister:             scLister,
 		randomVolumeIDPrefix: rand.String(32),
 	}
 
@@ -438,7 +369,7 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 			// to avoid conflicts with existing volume IDs.
 			pvID := fmt.Sprintf("%s-%s/%s", c.randomVolumeIDPrefix, namespace, pvcName)
 
-			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
+			pvc, err := c.pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
 			if err != nil || pvc == nil {
 				// If the PVC is invalid, we don't count the volume because
 				// there's no guarantee that it belongs to the running predicate.
@@ -459,7 +390,7 @@ func (c *MaxPDVolumeCountChecker) filterVolumes(volumes []v1.Volume, namespace s
 				continue
 			}
 
-			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
+			pv, err := c.pvLister.Get(pvName)
 			if err != nil || pv == nil {
 				// If the PV is invalid and PVC belongs to the running predicate,
 				// log the error and count the PV towards the PV limit.
@@ -485,7 +416,7 @@ func (c *MaxPDVolumeCountChecker) matchProvisioner(pvc *v1.PersistentVolumeClaim
 		return false
 	}
 
-	storageClass, err := c.scInfo.GetStorageClassInfo(*pvc.Spec.StorageClassName)
+	storageClass, err := c.scLister.Get(*pvc.Spec.StorageClassName)
 	if err != nil || storageClass == nil {
 		return false
 	}
@@ -515,7 +446,7 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta PredicateMetadata,
 		return false, nil, fmt.Errorf("node not found")
 	}
 
-	csiNode, err := c.csiNodeInfo.GetCSINodeInfo(node.Name)
+	csiNode, err := c.csiNodeLister.Get(node.Name)
 	if err != nil {
 		// we don't fail here because the CSINode object is only necessary
 		// for determining whether the migration is enabled or not
@@ -681,9 +612,9 @@ var CinderVolumeFilter = VolumeFilter{
 
 // VolumeZoneChecker contains information to check the volume zone for a predicate.
 type VolumeZoneChecker struct {
-	pvInfo    PersistentVolumeInfo
-	pvcInfo   PersistentVolumeClaimInfo
-	classInfo StorageClassInfo
+	pvLister  corelisters.PersistentVolumeLister
+	pvcLister corelisters.PersistentVolumeClaimLister
+	scLister  storagelisters.StorageClassLister
 }
 
 // NewVolumeZonePredicate evaluates if a pod can fit due to the volumes it requests, given
@@ -700,11 +631,11 @@ type VolumeZoneChecker struct {
 // determining the zone of a volume during scheduling, and that is likely to
 // require calling out to the cloud provider.  It seems that we are moving away
 // from inline volume declarations anyway.
-func NewVolumeZonePredicate(pvInfo PersistentVolumeInfo, pvcInfo PersistentVolumeClaimInfo, classInfo StorageClassInfo) FitPredicate {
+func NewVolumeZonePredicate(pvLister corelisters.PersistentVolumeLister, pvcLister corelisters.PersistentVolumeClaimLister, scLister storagelisters.StorageClassLister) FitPredicate {
 	c := &VolumeZoneChecker{
-		pvInfo:    pvInfo,
-		pvcInfo:   pvcInfo,
-		classInfo: classInfo,
+		pvLister:  pvLister,
+		pvcLister: pvcLister,
+		scLister:  scLister,
 	}
 	return c.predicate
 }
@@ -745,7 +676,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 			if pvcName == "" {
 				return false, nil, fmt.Errorf("PersistentVolumeClaim had no name")
 			}
-			pvc, err := c.pvcInfo.GetPersistentVolumeClaimInfo(namespace, pvcName)
+			pvc, err := c.pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
 			if err != nil {
 				return false, nil, err
 			}
@@ -758,7 +689,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 			if pvName == "" {
 				scName := v1helper.GetPersistentVolumeClaimClass(pvc)
 				if len(scName) > 0 {
-					class, _ := c.classInfo.GetStorageClassInfo(scName)
+					class, _ := c.scLister.Get(scName)
 					if class != nil {
 						if class.VolumeBindingMode == nil {
 							return false, nil, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", scName)
@@ -772,7 +703,7 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 				return false, nil, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
 			}
 
-			pv, err := c.pvInfo.GetPersistentVolumeInfo(pvName)
+			pv, err := c.pvLister.Get(pvName)
 			if err != nil {
 				return false, nil, err
 			}
