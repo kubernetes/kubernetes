@@ -1833,6 +1833,13 @@ func (kl *Kubelet) syncLoop(updates <-chan kubetypes.PodUpdate, handler SyncHand
 		factor = 2
 	)
 	duration := base
+	// Responsible for checking limits in resolv.conf
+	// The limits do not have anything to do with individual pods
+	// Since this is called in syncLoop, we don't need to call it anywhere else
+	if kl.dnsConfigurer != nil && kl.dnsConfigurer.ResolverConfig != "" {
+		kl.dnsConfigurer.CheckLimitsForResolvConf()
+	}
+
 	for {
 		if err := kl.runtimeState.runtimeErrors(); err != nil {
 			klog.Errorf("skipping pod synchronization - %v", err)
@@ -2039,11 +2046,6 @@ func (kl *Kubelet) handleMirrorPod(mirrorPod *v1.Pod, start time.Time) {
 func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 	start := kl.clock.Now()
 	sort.Sort(sliceutils.PodsByCreationTime(pods))
-	// Responsible for checking limits in resolv.conf
-	// The limits do not have anything to do with individual pods
-	if kl.dnsConfigurer != nil && kl.dnsConfigurer.ResolverConfig != "" {
-		kl.dnsConfigurer.CheckLimitsForResolvConf()
-	}
 	for _, pod := range pods {
 		existingPods := kl.podManager.GetPods()
 		// Always add the pod to the pod manager. Kubelet relies on the pod
@@ -2081,10 +2083,6 @@ func (kl *Kubelet) HandlePodAdditions(pods []*v1.Pod) {
 // being updated from a config source.
 func (kl *Kubelet) HandlePodUpdates(pods []*v1.Pod) {
 	start := kl.clock.Now()
-	// Responsible for checking limits in resolv.conf
-	if kl.dnsConfigurer != nil && kl.dnsConfigurer.ResolverConfig != "" {
-		kl.dnsConfigurer.CheckLimitsForResolvConf()
-	}
 	for _, pod := range pods {
 		kl.podManager.UpdatePod(pod)
 		if kubetypes.IsMirrorPod(pod) {
