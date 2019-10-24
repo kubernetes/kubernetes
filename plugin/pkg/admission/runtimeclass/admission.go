@@ -67,6 +67,9 @@ var _ genericadmissioninitailizer.WantsExternalKubeInformerFactory = &RuntimeCla
 
 // SetExternalKubeInformerFactory implements the WantsExternalKubeInformerFactory interface.
 func (r *RuntimeClass) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+		return
+	}
 	runtimeClassInformer := f.Node().V1beta1().RuntimeClasses()
 	r.SetReadyFunc(runtimeClassInformer.Informer().HasSynced)
 	r.runtimeClassLister = runtimeClassInformer.Lister()
@@ -74,6 +77,9 @@ func (r *RuntimeClass) SetExternalKubeInformerFactory(f informers.SharedInformer
 
 // ValidateInitialization implements the WantsExternalKubeInformerFactory interface.
 func (r *RuntimeClass) ValidateInitialization() error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+		return nil
+	}
 	if r.runtimeClassLister == nil {
 		return fmt.Errorf("missing RuntimeClass lister")
 	}
@@ -110,6 +116,10 @@ func (r *RuntimeClass) Admit(ctx context.Context, attributes admission.Attribute
 
 // Validate makes sure that pod adhere's to RuntimeClass's definition
 func (r *RuntimeClass) Validate(ctx context.Context, attributes admission.Attributes, o admission.ObjectInterfaces) error {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
+		return nil
+	}
+
 	// Ignore all calls to subresources or resources other than pods.
 	if shouldIgnore(attributes) {
 		return nil
