@@ -34,7 +34,6 @@ import (
 
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	v1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -106,7 +105,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 	"k8s.io/kubernetes/pkg/kubelet/util/sliceutils"
 	"k8s.io/kubernetes/pkg/kubelet/volumemanager"
-	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/security/apparmor"
 	sysctlwhitelist "k8s.io/kubernetes/pkg/security/podsecuritypolicy/sysctl"
 	utilipt "k8s.io/kubernetes/pkg/util/iptables"
@@ -458,7 +456,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		r := cache.NewReflector(nodeLW, &v1.Node{}, nodeIndexer, 0)
 		go r.Run(wait.NeverStop)
 	}
-	nodeInfo := &CachedNodeInfo{NodeLister: corelisters.NewNodeLister(nodeIndexer)}
+	nodeLister := corelisters.NewNodeLister(nodeIndexer)
 
 	// TODO: get the real node object of ourself,
 	// and use the real node name and UID.
@@ -506,7 +504,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		registerSchedulable:                     registerSchedulable,
 		dnsConfigurer:                           dns.NewConfigurer(kubeDeps.Recorder, nodeRef, parsedNodeIP, clusterDNS, kubeCfg.ClusterDomain, kubeCfg.ResolverConfig),
 		serviceLister:                           serviceLister,
-		nodeInfo:                                nodeInfo,
+		nodeLister:                              nodeLister,
 		masterServiceNamespace:                  masterServiceNamespace,
 		streamingConnectionIdleTimeout:          kubeCfg.StreamingConnectionIdleTimeout.Duration,
 		recorder:                                kubeDeps.Recorder,
@@ -959,8 +957,8 @@ type Kubelet struct {
 	masterServiceNamespace string
 	// serviceLister knows how to list services
 	serviceLister serviceLister
-	// nodeInfo knows how to get information about the node for this kubelet.
-	nodeInfo predicates.NodeInfo
+	// nodeLister knows how to list nodes
+	nodeLister corelisters.NodeLister
 
 	// a list of node labels to register
 	nodeLabels map[string]string
@@ -2305,24 +2303,4 @@ func getStreamingConfig(kubeCfg *kubeletconfiginternal.KubeletConfiguration, kub
 		}
 	}
 	return config
-}
-
-// CachedNodeInfo implements NodeInfo
-type CachedNodeInfo struct {
-	corelisters.NodeLister
-}
-
-// GetNodeInfo returns cached data for the node name.
-func (c *CachedNodeInfo) GetNodeInfo(nodeName string) (*v1.Node, error) {
-	node, err := c.Get(nodeName)
-
-	if apierrors.IsNotFound(err) {
-		return nil, err
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving node '%v' from cache: %v", nodeName, err)
-	}
-
-	return node, nil
 }
