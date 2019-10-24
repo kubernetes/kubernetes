@@ -1740,6 +1740,7 @@ func (og *operationGenerator) nodeExpandVolume(volumeToMount VolumeToMount, rsOp
 				simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MountVolume.NodeExpandVolume failed", "requested read-only file system")
 				klog.Warningf(detailedMsg)
 				og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeWarning, kevents.FileSystemResizeFailed, simpleMsg)
+				og.recorder.Eventf(pvc, v1.EventTypeWarning, kevents.FileSystemResizeFailed, simpleMsg)
 				return true, nil
 			}
 			rsOpts.VolumeSpec = volumeToMount.VolumeSpec
