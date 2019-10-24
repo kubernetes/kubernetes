@@ -46,7 +46,7 @@ type CustomResourceDefinitionSpec struct {
 	// names specify the resource and kind names for the custom resource.
 	Names CustomResourceDefinitionNames `json:"names" protobuf:"bytes,3,opt,name=names"`
 	// scope indicates whether the defined custom resource is cluster- or namespace-scoped.
-	// Allowed values are `Cluster` and `Namespaced`. Default is `Namespaced`.
+	// Allowed values are `Cluster` and `Namespaced`.
 	Scope ResourceScope `json:"scope" protobuf:"bytes,4,opt,name=scope,casttype=ResourceScope"`
 	// versions is the list of all API versions of the defined custom resource.
 	// Version names are used to compute the order in which served versions are listed in API discovery.
