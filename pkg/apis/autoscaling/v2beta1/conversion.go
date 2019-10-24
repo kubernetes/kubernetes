@@ -21,41 +21,9 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/conversion"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/apis/autoscaling"
 	core "k8s.io/kubernetes/pkg/apis/core"
 )
-
-func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add non-generated conversion functions
-	err := scheme.AddConversionFuncs(
-		Convert_autoscaling_ExternalMetricSource_To_v2beta1_ExternalMetricSource,
-		Convert_v2beta1_ExternalMetricSource_To_autoscaling_ExternalMetricSource,
-		Convert_autoscaling_ObjectMetricSource_To_v2beta1_ObjectMetricSource,
-		Convert_v2beta1_ObjectMetricSource_To_autoscaling_ObjectMetricSource,
-		Convert_autoscaling_PodsMetricSource_To_v2beta1_PodsMetricSource,
-		Convert_v2beta1_PodsMetricSource_To_autoscaling_PodsMetricSource,
-		Convert_autoscaling_ExternalMetricStatus_To_v2beta1_ExternalMetricStatus,
-		Convert_v2beta1_ExternalMetricStatus_To_autoscaling_ExternalMetricStatus,
-		Convert_autoscaling_ObjectMetricStatus_To_v2beta1_ObjectMetricStatus,
-		Convert_v2beta1_ObjectMetricStatus_To_autoscaling_ObjectMetricStatus,
-		Convert_autoscaling_PodsMetricStatus_To_v2beta1_PodsMetricStatus,
-		Convert_v2beta1_PodsMetricStatus_To_autoscaling_PodsMetricStatus,
-		Convert_autoscaling_ResourceMetricSource_To_v2beta1_ResourceMetricSource,
-		Convert_v2beta1_ResourceMetricSource_To_autoscaling_ResourceMetricSource,
-		Convert_autoscaling_MetricTarget_To_v2beta1_CrossVersionObjectReference,
-		Convert_v2beta1_CrossVersionObjectReference_To_autoscaling_MetricTarget,
-		Convert_autoscaling_ResourceMetricStatus_To_v2beta1_ResourceMetricStatus,
-		Convert_v2beta1_ResourceMetricStatus_To_autoscaling_ResourceMetricStatus,
-		Convert_autoscaling_HorizontalPodAutoscaler_To_v2beta1_HorizontalPodAutoscaler,
-		Convert_v2beta1_HorizontalPodAutoscaler_To_autoscaling_HorizontalPodAutoscaler,
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
 
 func Convert_autoscaling_MetricTarget_To_v2beta1_CrossVersionObjectReference(in *autoscaling.MetricTarget, out *autoscalingv2beta1.CrossVersionObjectReference, s conversion.Scope) error {
 	return nil
