@@ -29,12 +29,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
+	policyv1beta1informers "k8s.io/client-go/informers/policy/v1beta1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
+	kubefeatures "k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -279,6 +282,11 @@ func New(client clientset.Interface,
 	}
 	registry.Merge(options.frameworkOutOfTreeRegistry)
 
+	var pdbInformer policyv1beta1informers.PodDisruptionBudgetInformer
+	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
+		pdbInformer = informerFactory.Policy().V1beta1().PodDisruptionBudgets()
+	}
+
 	// Set up the configurator which can create schedulers from configs.
 	configurator := NewConfigFactory(&ConfigFactoryArgs{
 		Client:                         client,
@@ -291,7 +299,7 @@ func New(client clientset.Interface,
 		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
 		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
 		ServiceInformer:                informerFactory.Core().V1().Services(),
-		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
+		PdbInformer:                    pdbInformer,
 		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
 		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
 		VolumeBinder:                   volumeBinder,

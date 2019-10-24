@@ -226,6 +226,11 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 		csiNodeLister = args.CSINodeInformer.Lister()
 	}
 
+	var pdbLister policylisters.PodDisruptionBudgetLister
+	if args.PdbInformer != nil {
+		pdbLister = args.PdbInformer.Lister()
+	}
+
 	c := &Configurator{
 		client:                         args.Client,
 		informerFactory:                args.InformerFactory,
@@ -235,7 +240,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 		controllerLister:               args.ReplicationControllerInformer.Lister(),
 		replicaSetLister:               args.ReplicaSetInformer.Lister(),
 		statefulSetLister:              args.StatefulSetInformer.Lister(),
-		pdbLister:                      args.PdbInformer.Lister(),
+		pdbLister:                      pdbLister,
 		nodeLister:                     args.NodeInformer.Lister(),
 		podLister:                      args.PodInformer.Lister(),
 		storageClassLister:             storageClassLister,

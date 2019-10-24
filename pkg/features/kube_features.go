@@ -492,6 +492,13 @@ const (
 	//
 	// Enables the users to skip TLS verification of kubelets on pod logs requests
 	AllowInsecureBackendProxy featuregate.Feature = "AllowInsecureBackendProxy"
+
+	// owner: @mortent
+	// alpha: v1.3
+	// beta:  v1.5
+	//
+	// Enable all logic related to the PodDisruptionBudget API object in policy
+	PodDisruptionBudget featuregate.Feature = "PodDisruptionBudget"
 )
 
 func init() {
@@ -572,6 +579,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EvenPodsSpread:                                 {Default: false, PreRelease: featuregate.Alpha},
 	StartupProbe:                                   {Default: false, PreRelease: featuregate.Alpha},
 	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
+	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

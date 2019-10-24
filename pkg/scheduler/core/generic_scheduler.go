@@ -332,9 +332,15 @@ func (g *genericScheduler) Preempt(ctx context.Context, state *framework.CycleSt
 		// In this case, we should clean-up any existing nominated node name of the pod.
 		return nil, nil, []*v1.Pod{pod}, nil
 	}
-	pdbs, err := g.pdbLister.List(labels.Everything())
-	if err != nil {
-		return nil, nil, nil, err
+	var (
+		pdbs []*policy.PodDisruptionBudget
+		err  error
+	)
+	if g.pdbLister != nil {
+		pdbs, err = g.pdbLister.List(labels.Everything())
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 	nodeToVictims, err := g.selectNodesForPreemption(ctx, state, pod, potentialNodes, pdbs)
 	if err != nil {
