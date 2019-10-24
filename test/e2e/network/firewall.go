@@ -18,10 +18,12 @@ package network
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/master/ports"
@@ -160,7 +162,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 
 		// Send requests from outside of the cluster because internal traffic is whitelisted
 		ginkgo.By("Accessing the external service ip from outside, all non-master nodes should be reached")
-		err = framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet)
+		err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet)
 		framework.ExpectNoError(err)
 
 		// Check if there are overlapping tags on the firewall that extend beyond just the vms in our cluster
@@ -181,12 +183,12 @@ var _ = SIGDescribe("Firewall rule", func() {
 			nodesSet.Insert(nodesNames[0])
 			gce.SetInstanceTags(cloudConfig, nodesNames[0], zone, removedTags)
 			// Make sure traffic is recovered before exit
-			err = framework.TestHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet)
+			err = testHitNodesFromOutside(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet)
 			framework.ExpectNoError(err)
 		}()
 
 		ginkgo.By("Accessing serivce through the external ip and examine got no response from the node without tags")
-		err = framework.TestHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet, 15)
+		err = testHitNodesFromOutsideWithCount(svcExternalIP, firewallTestHTTPPort, e2eservice.LoadBalancerPropagationTimeoutDefault, nodesSet, 15)
 		framework.ExpectNoError(err)
 	})
 
@@ -227,4 +229,47 @@ func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) {
 	if result.Code != 0 {
 		framework.Failf("Was unexpectedly able to reach %s:%d", ip, port)
 	}
+}
+
+// testHitNodesFromOutside checkes HTTP connectivity from outside.
+func testHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String) error {
+	return testHitNodesFromOutsideWithCount(externalIP, httpPort, timeout, expectedHosts, 1)
+}
+
+// testHitNodesFromOutsideWithCount checkes HTTP connectivity from outside with count.
+func testHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String,
+	countToSucceed int) error {
+	framework.Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)
+	hittedHosts := sets.NewString()
+	count := 0
+	condition := func() (bool, error) {
+		result := framework.PokeHTTP(externalIP, int(httpPort), "/hostname", &framework.HTTPPokeParams{Timeout: 1 * time.Second})
+		if result.Status != framework.HTTPSuccess {
+			return false, nil
+		}
+
+		hittedHost := strings.TrimSpace(string(result.Body))
+		if !expectedHosts.Has(hittedHost) {
+			framework.Logf("Error hitting unexpected host: %v, reset counter: %v", hittedHost, count)
+			count = 0
+			return false, nil
+		}
+		if !hittedHosts.Has(hittedHost) {
+			hittedHosts.Insert(hittedHost)
+			framework.Logf("Missing %+v, got %+v", expectedHosts.Difference(hittedHosts), hittedHosts)
+		}
+		if hittedHosts.Equal(expectedHosts) {
+			count++
+			if count >= countToSucceed {
+				return true, nil
+			}
+		}
+		return false, nil
+	}
+
+	if err := wait.Poll(time.Second, timeout, condition); err != nil {
+		return fmt.Errorf("error waiting for expectedHosts: %v, hittedHosts: %v, count: %v, expected count: %v",
+			expectedHosts, hittedHosts, count, countToSucceed)
+	}
+	return nil
 }

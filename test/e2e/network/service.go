@@ -1535,8 +1535,8 @@ var _ = SIGDescribe("Services", func() {
 		svcIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 		// Wait longer as this is our first request after creation.  We can't check using a separate method,
 		// because the LB should only be reachable from the "accept" pod
-		framework.CheckReachabilityFromPod(true, loadBalancerLagTimeout, namespace, acceptPod.Name, svcIP)
-		framework.CheckReachabilityFromPod(false, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
+		checkReachabilityFromPod(true, loadBalancerLagTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(false, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
 
 		// Make sure dropPod is running. There are certain chances that the pod might be teminated due to unexpected reasons.		dropPod, err = cs.CoreV1().Pods(namespace).Get(dropPod.Name, metav1.GetOptions{})
 		dropPod, err = cs.CoreV1().Pods(namespace).Get(dropPod.Name, metav1.GetOptions{})
@@ -1550,16 +1550,16 @@ var _ = SIGDescribe("Services", func() {
 			svc.Spec.LoadBalancerSourceRanges = []string{dropPod.Status.PodIP + "/32"}
 		})
 		framework.ExpectNoError(err)
-		framework.CheckReachabilityFromPod(false, normalReachabilityTimeout, namespace, acceptPod.Name, svcIP)
-		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
+		checkReachabilityFromPod(false, normalReachabilityTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
 
 		ginkgo.By("Delete LoadBalancerSourceRange field and check reachability")
 		_, err = jig.UpdateService(func(svc *v1.Service) {
 			svc.Spec.LoadBalancerSourceRanges = nil
 		})
 		framework.ExpectNoError(err)
-		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, acceptPod.Name, svcIP)
-		framework.CheckReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
+		checkReachabilityFromPod(true, normalReachabilityTimeout, namespace, acceptPod.Name, svcIP)
+		checkReachabilityFromPod(true, normalReachabilityTimeout, namespace, dropPod.Name, svcIP)
 	})
 
 	// TODO: Get rid of [DisabledForLargeClusters] tag when issue #56138 is fixed.
@@ -2571,4 +2571,23 @@ func launchHostExecPod(client clientset.Interface, ns, name string) *v1.Pod {
 	err = e2epod.WaitForPodRunningInNamespace(client, pod)
 	framework.ExpectNoError(err)
 	return pod
+}
+
+// checkReachabilityFromPod checks reachability from the specified pod.
+func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
+	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
+	err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
+		_, err := framework.RunHostCmd(namespace, pod, cmd)
+		if expectToBeReachable && err != nil {
+			framework.Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
+			return false, nil
+		}
+
+		if !expectToBeReachable && err == nil {
+			framework.Logf("Expect target NOT to be reachable. But it is reachable. Retry until timeout")
+			return false, nil
+		}
+		return true, nil
+	})
+	framework.ExpectNoError(err)
 }
