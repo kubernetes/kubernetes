@@ -370,25 +370,38 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				continue
 			}
 
-			// Check whether container is present in state, there may be 3 reasons why it's not present:
-			// - policy does not want to track the container
-			// - kubelet has just been restarted - and there is no previous state file
-			// - container has been removed from state by RemoveContainer call (DeletionTimestamp is set)
-			if _, ok := m.state.GetCPUSet(string(pod.UID), container.Name); !ok {
-				if pstatus.Phase == v1.PodRunning && pod.DeletionTimestamp == nil {
-					klog.V(4).Infof("[cpumanager] reconcileState: container is not present in state - trying to add (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
-					err := m.AddContainer(pod, &container, containerID)
-					if err != nil {
-						klog.Errorf("[cpumanager] reconcileState: failed to add container (pod: %s, container: %s, container id: %s, error: %v)", pod.Name, container.Name, containerID, err)
-						failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
-						continue
-					}
-				} else {
-					// if DeletionTimestamp is set, pod has already been removed from state
-					// skip the pod/container since it's not running and will be deleted soon
-					continue
-				}
+			cstatus, err := findContainerStatusByName(&pstatus, container.Name)
+			if err != nil {
+				klog.Warningf("[cpumanager] reconcileState: skipping container; container status not found in pod status (pod: %s, container: %s, error: %v)", pod.Name, container.Name, err)
+				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
+				continue
 			}
+
+			if cstatus.State.Waiting != nil ||
+				(cstatus.State.Waiting == nil && cstatus.State.Running == nil && cstatus.State.Terminated == nil) {
+				klog.Warningf("[cpumanager] reconcileState: skipping container; container still in the waiting state (pod: %s, container: %s)", pod.Name, container.Name)
+				failure = append(failure, reconciledContainer{pod.Name, container.Name, ""})
+				continue
+			}
+
+			if cstatus.State.Terminated != nil {
+				// Since the container is terminated, we know it is safe to
+				// remove it without any reconciliation. Removing the container
+				// will also remove it from the `containerMap` so that this
+				// container will be skipped next time around the loop.
+				_, _, err := m.containerMap.GetContainerRef(containerID)
+				if err == nil {
+					klog.Warningf("[cpumanager] reconcileState: skipping container; already terminated (pod: %s, container id: %s)", pod.Name, containerID)
+					err := m.RemoveContainer(containerID)
+					if err != nil {
+						klog.Errorf("[cpumanager] reconcileState: failed to remove container (pod: %s, container id: %s, error: %v)", pod.Name, containerID, err)
+						failure = append(failure, reconciledContainer{pod.Name, container.Name, containerID})
+					}
+				}
+				continue
+			}
+
+			m.containerMap.Add(string(pod.UID), container.Name, containerID)
 
 			cset := m.state.GetCPUSetOrDefault(string(pod.UID), container.Name)
 			if cset.IsEmpty() {
@@ -425,6 +438,15 @@ func findContainerIDByName(status *v1.PodStatus, name string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("unable to find ID for container with name %v in pod status (it may not be running)", name)
+}
+
+func findContainerStatusByName(status *v1.PodStatus, name string) (*v1.ContainerStatus, error) {
+	for _, status := range append(status.InitContainerStatuses, status.ContainerStatuses...) {
+		if status.Name == name {
+			return &status, nil
+		}
+	}
+	return nil, fmt.Errorf("unable to find status for container with name %v in pod status (it may not be running)", name)
 }
 
 func (m *manager) updateContainerCPUSet(containerID string, cpus cpuset.CPUSet) error {
