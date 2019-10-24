@@ -4217,8 +4217,9 @@ type NodeSpec struct {
 	// ID of the node assigned by the cloud provider in the format: <ProviderName>://<ProviderSpecificNodeID>
 	// +optional
 	ProviderID string `json:"providerID,omitempty" protobuf:"bytes,3,opt,name=providerID"`
-	// Unschedulable controls node schedulability of new pods. By default, node is schedulable.
-	// More info: https://kubernetes.io/docs/concepts/nodes/node/#manual-node-administration
+	// Deprecated. Unschedulable controls node schedulability of new pods. By default, node is schedulable.
+	// Remove field after 1.21.
+	// see: https://issues.k8s.io/69010
 	// +optional
 	Unschedulable bool `json:"unschedulable,omitempty" protobuf:"varint,4,opt,name=unschedulable"`
 	// If specified, the node's taints.

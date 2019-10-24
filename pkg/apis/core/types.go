@@ -3683,7 +3683,9 @@ type NodeSpec struct {
 	// +optional
 	ProviderID string
 
-	// Unschedulable controls node schedulability of new pods. By default node is schedulable.
+	// Deprecated. Unschedulable controls node schedulability of new pods. By default, node is schedulable.
+	// Remove field after 1.21.
+	// see: https://issues.k8s.io/69010
 	// +optional
 	Unschedulable bool
 
