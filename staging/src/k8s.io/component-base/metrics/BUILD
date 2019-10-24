@@ -81,3 +81,29 @@ filegroup(
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
 )
+
+# Packages allowed to import github.com/prometheus
+package_group(
+    name = "prometheus_import_allow_list",
+    packages = [
+        "//cluster/images/etcd-version-monitor",
+        "//pkg/controller/endpointslice",
+        "//pkg/controller/volume/attachdetach/metrics",
+        "//pkg/controller/volume/persistentvolume/metrics",
+        "//pkg/kubelet/metrics/collectors",
+        "//pkg/kubelet/pleg",
+        "//pkg/kubelet/pluginmanager/metrics",
+        "//pkg/kubelet/server",
+        "//pkg/kubelet/server/stats",
+        "//pkg/kubelet/volumemanager/metrics",
+        "//pkg/master",
+        "//pkg/scheduler/framework/v1alpha1",
+        "//pkg/volume/util/operationexecutor",
+        "//staging/src/k8s.io/apiserver/pkg/admission/metrics",
+        "//staging/src/k8s.io/component-base/metrics/...",
+        "//test/e2e",
+        "//test/e2e/storage",
+        "//test/e2e_node",
+        "//vendor/...",
+    ],
+)

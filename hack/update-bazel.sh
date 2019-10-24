@@ -91,6 +91,13 @@ if [[ $ret != 0 && $ret != 3 ]]; then
   exit 1
 fi
 
+# restrict ./vendor/github.com/prometheus/* targets visibility
+# see comment above re: buildozer exit codes
+buildozer -quiet 'set visibility //staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list' '//vendor/github.com/prometheus/...:go_default_library' && ret=$? || ret=$?
+if [[ $ret != 0 && $ret != 3 ]]; then
+  exit 1
+fi
+
 # we need to set this because gazelle doesn't support pkg-config, which would set this link option
 # see comment above re: buildozer exit codes
 buildozer -quiet 'set clinkopts select({"@io_bazel_rules_go//go/platform:linux":["-lseccomp",],"//conditions:default":[],})' //vendor/github.com/seccomp/libseccomp-golang:go_default_library && ret=$? || ret=$?

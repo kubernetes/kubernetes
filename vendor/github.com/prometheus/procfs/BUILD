@@ -23,7 +23,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/prometheus/procfs",
     importpath = "github.com/prometheus/procfs",
-    visibility = ["//visibility:public"],
+    visibility = ["//staging/src/k8s.io/component-base/metrics:prometheus_import_allow_list"],
     deps = ["//vendor/github.com/prometheus/procfs/internal/fs:go_default_library"],
 )
 
