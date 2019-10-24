@@ -717,7 +717,7 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 				return nil
 			}}
 		},
-		WaitForCacheSync: func() bool {
+		scheduledPodsHasSynced: func() bool {
 			return true
 		},
 		NextPod: func() *framework.PodInfo {
