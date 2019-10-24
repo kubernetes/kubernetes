@@ -52,20 +52,11 @@ func (pl *CinderLimits) Filter(ctx context.Context, _ *framework.CycleState, pod
 // NewCinder returns function that initializes a new plugin and returns it.
 func NewCinder(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	csiNodeInfo := &predicates.CachedCSINodeInfo{
-		CSINodeLister: informerFactory.Storage().V1beta1().CSINodes().Lister(),
-	}
-	pvInfo := &predicates.CachedPersistentVolumeInfo{
-		PersistentVolumeLister: informerFactory.Core().V1().PersistentVolumes().Lister(),
-	}
-	pvcInfo := &predicates.CachedPersistentVolumeClaimInfo{
-		PersistentVolumeClaimLister: informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
-	}
-	classInfo := &predicates.CachedStorageClassInfo{
-		StorageClassLister: informerFactory.Storage().V1().StorageClasses().Lister(),
-	}
-
+	csiNodeLister := informerFactory.Storage().V1beta1().CSINodes().Lister()
+	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
+	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
+	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 	return &CinderLimits{
-		predicate: predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, csiNodeInfo, classInfo, pvInfo, pvcInfo),
+		predicate: predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, csiNodeLister, scLister, pvLister, pvcLister),
 	}, nil
 }
