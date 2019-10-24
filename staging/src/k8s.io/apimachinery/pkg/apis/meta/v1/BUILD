@@ -54,6 +54,7 @@ go_library(
         "types.go",
         "types_swagger_doc_generated.go",
         "watch.go",
+        "zz_generated.conversion.go",
         "zz_generated.deepcopy.go",
         "zz_generated.defaults.go",
     ],

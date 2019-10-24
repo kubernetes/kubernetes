@@ -322,6 +322,7 @@ type OwnerReference struct {
 	BlockOwnerDeletion *bool `json:"blockOwnerDeletion,omitempty" protobuf:"varint,7,opt,name=blockOwnerDeletion"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ListOptions is the query options to a standard REST list call.
@@ -401,6 +402,7 @@ type ListOptions struct {
 	Continue string `json:"continue,omitempty" protobuf:"bytes,8,opt,name=continue"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ExportOptions is the query options to the standard REST get call.
@@ -415,6 +417,7 @@ type ExportOptions struct {
 	Exact bool `json:"exact" protobuf:"varint,2,opt,name=exact"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // GetOptions is the standard query options to the standard REST get call.
@@ -497,6 +500,7 @@ type DeleteOptions struct {
 	DryRun []string `json:"dryRun,omitempty" protobuf:"bytes,5,rep,name=dryRun"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // CreateOptions may be provided when creating an API object.
@@ -520,6 +524,7 @@ type CreateOptions struct {
 	FieldManager string `json:"fieldManager,omitempty" protobuf:"bytes,3,name=fieldManager"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PatchOptions may be provided when patching an API object.
@@ -552,6 +557,7 @@ type PatchOptions struct {
 	FieldManager string `json:"fieldManager,omitempty" protobuf:"bytes,3,name=fieldManager"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // UpdateOptions may be provided when updating an API object.
@@ -1264,6 +1270,7 @@ const (
 )
 
 // TableOptions are used when a Table is requested by the caller.
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type TableOptions struct {
 	TypeMeta `json:",inline"`

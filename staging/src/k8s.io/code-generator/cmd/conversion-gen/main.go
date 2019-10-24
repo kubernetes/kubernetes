@@ -100,6 +100,15 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
+	// k8s.io/apimachinery/pkg/runtime contains a number of manual conversions,
+	// that we need to generate conversions.
+	// Packages being dependencies of explicitly requested packages are only
+	// partially scanned - only types explicitly used are being traversed.
+	// Not used functions or types are omitted.
+	// Adding this explicitly to InputDirs ensures that the package is fully
+	// scanned and all functions are parsed and processed.
+	genericArgs.InputDirs = append(genericArgs.InputDirs, "k8s.io/apimachinery/pkg/runtime")
+
 	if err := generatorargs.Validate(genericArgs); err != nil {
 		klog.Fatalf("Error: %v", err)
 	}
