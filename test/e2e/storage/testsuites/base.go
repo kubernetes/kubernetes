@@ -36,6 +36,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/testutil"
 	csitrans "k8s.io/csi-translation-lib"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -533,7 +534,7 @@ func StartPodLogs(f *framework.Framework) func() {
 	return cancel
 }
 
-func getVolumeOpsFromMetricsForPlugin(ms metrics.Metrics, pluginName string) opCounts {
+func getVolumeOpsFromMetricsForPlugin(ms testutil.Metrics, pluginName string) opCounts {
 	totOps := opCounts{}
 
 	for method, samples := range ms {
@@ -577,7 +578,7 @@ func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
 
 	controllerMetrics, err := metricsGrabber.GrabFromControllerManager()
 	framework.ExpectNoError(err, "Error getting c-m metrics : %v", err)
-	totOps := getVolumeOpsFromMetricsForPlugin(metrics.Metrics(controllerMetrics), pluginName)
+	totOps := getVolumeOpsFromMetricsForPlugin(testutil.Metrics(controllerMetrics), pluginName)
 
 	framework.Logf("Node name not specified for getVolumeOpCounts, falling back to listing nodes from API Server")
 	nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
@@ -589,7 +590,7 @@ func getVolumeOpCounts(c clientset.Interface, pluginName string) opCounts {
 		for _, node := range nodes.Items {
 			nodeMetrics, err := metricsGrabber.GrabFromKubelet(node.GetName())
 			framework.ExpectNoError(err, "Error getting Kubelet %v metrics: %v", node.GetName(), err)
-			totOps = addOpCounts(totOps, getVolumeOpsFromMetricsForPlugin(metrics.Metrics(nodeMetrics), pluginName))
+			totOps = addOpCounts(totOps, getVolumeOpsFromMetricsForPlugin(testutil.Metrics(nodeMetrics), pluginName))
 		}
 	} else {
 		framework.Logf("Skipping operation metrics gathering from nodes in getVolumeOpCounts, greater than %v nodes", nodeLimit)

@@ -28,6 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/testutil"
 	"k8s.io/kubernetes/pkg/master/ports"
 	schedulermetric "k8s.io/kubernetes/pkg/scheduler/metrics"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
@@ -35,8 +36,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/system"
 
 	"github.com/onsi/gomega"
-
-	"github.com/prometheus/common/model"
 )
 
 const (
@@ -63,7 +62,7 @@ const (
 	bigClusterNodeCountThreshold                   = 500
 )
 
-var schedulingLatencyMetricName = model.LabelValue(schedulermetric.SchedulerSubsystem + "_" + schedulermetric.SchedulingLatencyName)
+var schedulingLatencyMetricName = schedulermetric.SchedulerSubsystem + "_" + schedulermetric.SchedulingLatencyName
 
 func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 	var a APIResponsiveness
@@ -73,7 +72,7 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 		return nil, err
 	}
 
-	samples, err := extractMetricSamples(body)
+	samples, err := testutil.ExtractMetricSamples(body)
 	if err != nil {
 		return nil, err
 	}
@@ -86,8 +85,8 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 		// Example line:
 		// apiserver_request_latencies_summary{resource="namespaces",verb="LIST",quantile="0.99"} 908
 		// apiserver_request_total{resource="pods",verb="LIST",client="kubectl",code="200",contentType="json"} 233
-		if sample.Metric[model.MetricNameLabel] != "apiserver_request_latencies_summary" &&
-			sample.Metric[model.MetricNameLabel] != "apiserver_request_total" {
+		if sample.Metric[testutil.MetricNameLabel] != "apiserver_request_latencies_summary" &&
+			sample.Metric[testutil.MetricNameLabel] != "apiserver_request_total" {
 			continue
 		}
 
@@ -99,10 +98,10 @@ func readLatencyMetrics(c clientset.Interface) (*APIResponsiveness, error) {
 			continue
 		}
 
-		switch sample.Metric[model.MetricNameLabel] {
+		switch sample.Metric[testutil.MetricNameLabel] {
 		case "apiserver_request_latencies_summary":
 			latency := sample.Value
-			quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
+			quantile, err := strconv.ParseFloat(string(sample.Metric[testutil.QuantileLabel]), 64)
 			if err != nil {
 				return nil, err
 			}
@@ -261,13 +260,13 @@ func getSchedulingLatency(c clientset.Interface, provider, cloudMasterName, mast
 		return nil, err
 	}
 
-	samples, err := extractMetricSamples(data)
+	samples, err := testutil.ExtractMetricSamples(data)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, sample := range samples {
-		if sample.Metric[model.MetricNameLabel] != schedulingLatencyMetricName {
+		if string(sample.Metric[testutil.MetricNameLabel]) != schedulingLatencyMetricName {
 			continue
 		}
 
@@ -286,7 +285,7 @@ func getSchedulingLatency(c clientset.Interface, provider, cloudMasterName, mast
 			continue
 		}
 
-		quantile, err := strconv.ParseFloat(string(sample.Metric[model.QuantileLabel]), 64)
+		quantile, err := strconv.ParseFloat(string(sample.Metric[testutil.QuantileLabel]), 64)
 		if err != nil {
 			return nil, err
 		}

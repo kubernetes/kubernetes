@@ -42,6 +42,7 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage/names:go_default_library",
         "//staging/src/k8s.io/client-go/dynamic:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
+        "//staging/src/k8s.io/component-base/metrics/testutil:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib:go_default_library",
         "//staging/src/k8s.io/csi-translation-lib/plugins:go_default_library",
         "//test/e2e/framework:go_default_library",

@@ -29,6 +29,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/testutil"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/framework/metrics"
@@ -274,7 +275,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		metricKey := "volume_operation_total_seconds_count"
 		dimensions := []string{"operation_name", "plugin_name"}
-		valid := hasValidMetrics(metrics.Metrics(controllerMetrics), metricKey, dimensions...)
+		valid := hasValidMetrics(testutil.Metrics(controllerMetrics), metricKey, dimensions...)
 		gomega.Expect(valid).To(gomega.BeTrue(), "Invalid metric in P/V Controller metrics: %q", metricKey)
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
@@ -304,7 +305,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// Metrics should have dimensions plugin_name and state available
 		totalVolumesKey := "volume_manager_total_volumes"
 		dimensions := []string{"state", "plugin_name"}
-		valid := hasValidMetrics(metrics.Metrics(kubeMetrics), totalVolumesKey, dimensions...)
+		valid := hasValidMetrics(testutil.Metrics(kubeMetrics), totalVolumesKey, dimensions...)
 		gomega.Expect(valid).To(gomega.BeTrue(), "Invalid metric in Volume Manager metrics: %q", totalVolumesKey)
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
@@ -353,8 +354,8 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		// Total number of volumes in both ActualStateofWorld and DesiredStateOfWorld
 		// states should be higher or equal than it used to be
-		oldStates := getStatesMetrics(totalVolumesKey, metrics.Metrics(controllerMetrics))
-		updatedStates := getStatesMetrics(totalVolumesKey, metrics.Metrics(updatedControllerMetrics))
+		oldStates := getStatesMetrics(totalVolumesKey, testutil.Metrics(controllerMetrics))
+		updatedStates := getStatesMetrics(totalVolumesKey, testutil.Metrics(updatedControllerMetrics))
 		for _, stateName := range states {
 			if _, ok := oldStates[stateName]; !ok {
 				continue
@@ -716,7 +717,7 @@ func calculateRelativeValues(originValues, updatedValues map[string]int64) map[s
 	return relativeValues
 }
 
-func hasValidMetrics(metrics metrics.Metrics, metricKey string, dimensions ...string) bool {
+func hasValidMetrics(metrics testutil.Metrics, metricKey string, dimensions ...string) bool {
 	var errCount int
 	framework.Logf("Looking for sample in metric %q", metricKey)
 	samples, ok := metrics[metricKey]
@@ -736,7 +737,7 @@ func hasValidMetrics(metrics metrics.Metrics, metricKey string, dimensions ...st
 	return errCount == 0
 }
 
-func getStatesMetrics(metricKey string, givenMetrics metrics.Metrics) map[string]map[string]int64 {
+func getStatesMetrics(metricKey string, givenMetrics testutil.Metrics) map[string]map[string]int64 {
 	states := make(map[string]map[string]int64)
 	for _, sample := range givenMetrics[metricKey] {
 		framework.Logf("Found sample %q", sample.String())
@@ -759,10 +760,10 @@ func waitForADControllerStatesMetrics(metricsGrabber *metrics.Grabber, metricNam
 			framework.Skipf("Could not get controller-manager metrics - skipping")
 			return false, err
 		}
-		if !hasValidMetrics(metrics.Metrics(updatedMetrics), metricName, dimensions...) {
+		if !hasValidMetrics(testutil.Metrics(updatedMetrics), metricName, dimensions...) {
 			return false, fmt.Errorf("could not get valid metrics for %q", metricName)
 		}
-		states := getStatesMetrics(metricName, metrics.Metrics(updatedMetrics))
+		states := getStatesMetrics(metricName, testutil.Metrics(updatedMetrics))
 		for _, name := range stateNames {
 			if _, ok := states[name]; !ok {
 				return false, fmt.Errorf("could not get state %q from A/D Controller metrics", name)
