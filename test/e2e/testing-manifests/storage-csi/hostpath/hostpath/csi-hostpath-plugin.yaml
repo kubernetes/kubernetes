@@ -34,7 +34,6 @@ spec:
       labels:
         app: csi-hostpathplugin
     spec:
-      hostNetwork: true
       containers:
         - name: node-driver-registrar
           image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
