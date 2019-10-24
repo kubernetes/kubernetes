@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"github.com/blang/semver"
+	"github.com/stretchr/testify/assert"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
 )
@@ -84,16 +85,11 @@ func TestGauge(t *testing.T) {
 			registry.MustRegister(c)
 
 			ms, err := registry.Gather()
-			if len(ms) != test.expectedMetricCount {
-				t.Errorf("Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			}
-			if err != nil {
-				t.Fatalf("Gather failed %v", err)
-			}
+			assert.Equalf(t, test.expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
+			assert.Nil(t, err, "Gather failed %v", err)
+
 			for _, metric := range ms {
-				if metric.GetHelp() != test.expectedHelp {
-					t.Errorf("Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
-				}
+				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
 			}
 
 			// let's increment the counter and verify that the metric still works
@@ -101,14 +97,11 @@ func TestGauge(t *testing.T) {
 			c.Set(101)
 			expected := 101
 			ms, err = registry.Gather()
-			if err != nil {
-				t.Fatalf("Gather failed %v", err)
-			}
+			assert.Nil(t, err, "Gather failed %v", err)
+
 			for _, mf := range ms {
 				for _, m := range mf.GetMetric() {
-					if int(m.GetGauge().GetValue()) != expected {
-						t.Errorf("Got %v, wanted %v as the count", m.GetGauge().GetValue(), expected)
-					}
+					assert.Equalf(t, expected, int(m.GetGauge().GetValue()), "Got %v, wanted %v as the count", m.GetGauge().GetValue(), expected)
 					t.Logf("%v\n", m.GetGauge().GetValue())
 				}
 			}
@@ -180,30 +173,20 @@ func TestGaugeVec(t *testing.T) {
 			registry.MustRegister(c)
 			c.WithLabelValues("1", "2").Set(1.0)
 			ms, err := registry.Gather()
-
-			if len(ms) != test.expectedMetricCount {
-				t.Errorf("Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
-			}
-			if err != nil {
-				t.Fatalf("Gather failed %v", err)
-			}
+			assert.Equalf(t, test.expectedMetricCount, len(ms), "Got %v metrics, Want: %v metrics", len(ms), test.expectedMetricCount)
+			assert.Nil(t, err, "Gather failed %v", err)
 			for _, metric := range ms {
-				if metric.GetHelp() != test.expectedHelp {
-					t.Errorf("Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
-				}
+				assert.Equalf(t, test.expectedHelp, metric.GetHelp(), "Got %s as help message, want %s", metric.GetHelp(), test.expectedHelp)
 			}
 
 			// let's increment the counter and verify that the metric still works
 			c.WithLabelValues("1", "3").Set(1.0)
 			c.WithLabelValues("2", "3").Set(1.0)
 			ms, err = registry.Gather()
-			if err != nil {
-				t.Fatalf("Gather failed %v", err)
-			}
+			assert.Nil(t, err, "Gather failed %v", err)
+
 			for _, mf := range ms {
-				if len(mf.GetMetric()) != 3 {
-					t.Errorf("Got %v metrics, wanted 2 as the count", len(mf.GetMetric()))
-				}
+				assert.Equalf(t, 3, len(mf.GetMetric()), "Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))
 			}
 		})
 	}
