@@ -27,8 +27,8 @@ import (
 	sigyaml "sigs.k8s.io/yaml"
 )
 
-// FuzzDuration is a fuzz target for strict-unmarshaling Duration defined in
-// "k8s.io/apimachinery/pkg/apis/meta/v1". This target also checks that the
+// FuzzDurationStrict is a fuzz target for strict-unmarshaling Duration defined
+// in "k8s.io/apimachinery/pkg/apis/meta/v1". This target also checks that the
 // unmarshaled result can be marshaled back to the input.
 func FuzzDurationStrict(b []byte) int {
 	var durationHolder struct {
@@ -47,9 +47,9 @@ func FuzzDurationStrict(b []byte) int {
 	return 1
 }
 
-// FuzzMicroTime is a fuzz target for strict-unmarshaling MicroTime defined in
-// "k8s.io/apimachinery/pkg/apis/meta/v1". This target also checks that the
-// unmarshaled result can be marshaled back to the input.
+// FuzzMicroTimeStrict is a fuzz target for strict-unmarshaling MicroTime
+// defined in "k8s.io/apimachinery/pkg/apis/meta/v1". This target also checks
+// that the unmarshaled result can be marshaled back to the input.
 func FuzzMicroTimeStrict(b []byte) int {
 	var microTimeHolder struct {
 		T metav1.MicroTime `json:"t"`
