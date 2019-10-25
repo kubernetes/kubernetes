@@ -1974,7 +1974,6 @@ func TestUpdateNode(t *testing.T) {
 
 // DaemonSets should be resynced when non-daemon pods was deleted.
 func TestDeleteNoDaemonPod(t *testing.T) {
-
 	var enqueued bool
 
 	cases := []struct {
@@ -2130,12 +2129,6 @@ func TestDeleteNoDaemonPod(t *testing.T) {
 				syncAndValidateDaemonSets(t, manager, c.ds, podControl, 1, 0, 0)
 			default:
 				t.Fatalf("unexpected UpdateStrategy %+v", strategy)
-			}
-
-			manager.enqueueDaemonSetRateLimited = func(ds *apps.DaemonSet) {
-				if ds.Name == "ds" {
-					enqueued = true
-				}
 			}
 
 			enqueued = false
