@@ -35,9 +35,6 @@ const (
 	kubeMetricImportPath = `"k8s.io/component-base/metrics"`
 	// Should equal to final directory name of kubeMetricImportPath
 	kubeMetricsDefaultImportName = "metrics"
-	prometheusImportPath         = `"github.com/prometheus/client_golang/prometheus"`
-	// Should equal to final directory name of kubeMetricImportPath
-	prometheusDefaultImportName = "prometheus"
 )
 
 func main() {
@@ -121,13 +118,10 @@ func searchFileForStableMetrics(filename string, src interface{}) ([]metric, []e
 	if metricsImportName == "" {
 		return []metric{}, []error{}
 	}
-	prometheusImportName, err := getLocalNameOfImportedPackage(tree, prometheusImportPath, prometheusDefaultImportName)
-	if err != nil {
-		return []metric{}, addFileInformationToErrors([]error{err}, fileset)
-	}
+	variables := globalVariableDeclarations(tree)
 
 	stableMetricsFunctionCalls, errors := findStableMetricDeclaration(tree, metricsImportName)
-	metrics, es := decodeMetricCalls(stableMetricsFunctionCalls, metricsImportName, prometheusImportName)
+	metrics, es := decodeMetricCalls(stableMetricsFunctionCalls, metricsImportName, variables)
 	errors = append(errors, es...)
 	return metrics, addFileInformationToErrors(errors, fileset)
 }
@@ -156,4 +150,22 @@ func addFileInformationToErrors(es []error, fileset *token.FileSet) []error {
 		}
 	}
 	return es
+}
+
+func globalVariableDeclarations(tree *ast.File) map[string]ast.Expr {
+	consts := make(map[string]ast.Expr)
+	for _, d := range tree.Decls {
+		if gd, ok := d.(*ast.GenDecl); ok && (gd.Tok == token.CONST || gd.Tok == token.VAR) {
+			for _, spec := range gd.Specs {
+				if vspec, ok := spec.(*ast.ValueSpec); ok {
+					for _, name := range vspec.Names {
+						for _, value := range vspec.Values {
+							consts[name.Name] = value
+						}
+					}
+				}
+			}
+		}
+	}
+	return consts
 }
