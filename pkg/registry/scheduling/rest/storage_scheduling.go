@@ -39,8 +39,6 @@ import (
 	schedulingapiv1alpha1 "k8s.io/kubernetes/pkg/apis/scheduling/v1alpha1"
 	schedulingapiv1beta1 "k8s.io/kubernetes/pkg/apis/scheduling/v1beta1"
 	priorityclassstore "k8s.io/kubernetes/pkg/registry/scheduling/priorityclass/storage"
-
-	"k8s.io/klog"
 )
 
 const (
