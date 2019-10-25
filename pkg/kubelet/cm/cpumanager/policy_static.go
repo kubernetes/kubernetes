@@ -127,13 +127,14 @@ func (p *staticPolicy) validateState(s state.State) error {
 	tmpAssignments := s.GetCPUAssignments()
 	tmpDefaultCPUset := s.GetDefaultCPUSet()
 
+	allCPUs := p.topology.CPUDetails.CPUs()
+
 	// Default cpuset cannot be empty when assignments exist
 	if tmpDefaultCPUset.IsEmpty() {
 		if len(tmpAssignments) != 0 {
 			return fmt.Errorf("default cpuset cannot be empty")
 		}
 		// state is empty initialize
-		allCPUs := p.topology.CPUDetails.CPUs()
 		s.SetDefaultCPUSet(allCPUs)
 		return nil
 	}
@@ -169,9 +170,23 @@ func (p *staticPolicy) validateState(s state.State) error {
 		tmpCPUSets = append(tmpCPUSets, cset)
 	}
 	totalKnownCPUs = totalKnownCPUs.UnionAll(tmpCPUSets)
-	if !totalKnownCPUs.Equals(p.topology.CPUDetails.CPUs()) {
+
+	// If more CPUs are available, we should add them into defaultCPUSet.
+	// This can be due to for example onlining a CPU when kubelet is not running.
+	if totalKnownCPUs.IsSubsetOf(allCPUs) {
+		defaultCPUSet := allCPUs
+		for _, cset := range tmpCPUSets {
+			defaultCPUSet = defaultCPUSet.Difference(cset)
+		}
+		defaultCPUSet = defaultCPUSet.Union(tmpDefaultCPUset)
+
+		s.SetDefaultCPUSet(defaultCPUSet)
+		return nil
+	}
+
+	if !totalKnownCPUs.Equals(allCPUs) {
 		return fmt.Errorf("current set of available CPUs \"%s\" doesn't match with CPUs in state \"%s\"",
-			p.topology.CPUDetails.CPUs().String(), totalKnownCPUs.String())
+			allCPUs.String(), totalKnownCPUs.String())
 	}
 
 	return nil

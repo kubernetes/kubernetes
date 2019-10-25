@@ -120,7 +120,7 @@ func TestStaticPolicyStart(t *testing.T) {
 				"1": cpuset.NewCPUSet(3, 4),
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(5, 6, 7, 8, 9, 10),
-			expPanic:        true,
+			expCSet:         cpuset.NewCPUSet(5, 6, 7, 8, 9, 10, 11),
 		},
 	}
 	for _, testCase := range testCases {
@@ -141,13 +141,6 @@ func TestStaticPolicyStart(t *testing.T) {
 			}
 			policy.Start(st)
 
-			if !testCase.stDefaultCPUSet.IsEmpty() {
-				for cpuid := 1; cpuid < policy.topology.NumCPUs; cpuid++ {
-					if !st.defaultCPUSet.Contains(cpuid) {
-						t.Errorf("StaticPolicy Start() error. expected cpuid %d to be present in defaultCPUSet", cpuid)
-					}
-				}
-			}
 			if !st.GetDefaultCPUSet().Equals(testCase.expCSet) {
 				t.Errorf("State CPUSet is different than expected. Have %q wants: %q", st.GetDefaultCPUSet(),
 					testCase.expCSet)
