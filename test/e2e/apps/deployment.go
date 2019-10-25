@@ -888,7 +888,7 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 	// inter-pod affinity for pods of different rollouts and anti-affinity
 	// for pods of the same rollout, so it will need to be updated when
 	// performing a rollout.
-	setAffinity(d)
+	setAffinities(d, false)
 	d.Spec.Strategy.RollingUpdate = &appsv1.RollingUpdateDeployment{
 		MaxSurge:       intOrStrP(1),
 		MaxUnavailable: intOrStrP(0),
@@ -943,7 +943,7 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 		framework.Logf("Updating label deployment %q pod spec (iteration #%d)", name, i)
 		deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, d.Name, func(update *appsv1.Deployment) {
 			update.Spec.Template.Labels["iteration"] = fmt.Sprintf("%d", i)
-			setAffinity(update)
+			setAffinities(update, true)
 		})
 		framework.ExpectNoError(err)
 
@@ -963,32 +963,14 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 	}
 }
 
-func setAffinity(d *appsv1.Deployment) {
-	d.Spec.Template.Spec.Affinity = &v1.Affinity{
-		PodAffinity: &v1.PodAffinity{
-			PreferredDuringSchedulingIgnoredDuringExecution: []v1.WeightedPodAffinityTerm{
-				{
-					Weight: int32(100),
-					PodAffinityTerm: v1.PodAffinityTerm{
-						TopologyKey: "kubernetes.io/hostname",
-						LabelSelector: &metav1.LabelSelector{
-							MatchExpressions: []metav1.LabelSelectorRequirement{
-								{
-									Key:      "name",
-									Operator: metav1.LabelSelectorOpIn,
-									Values:   []string{d.Spec.Template.Labels["name"]},
-								},
-								{
-									Key:      "iteration",
-									Operator: metav1.LabelSelectorOpNotIn,
-									Values:   []string{d.Spec.Template.Labels["iteration"]},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
+// setAffinities set PodAntiAffinity across pods from the same generation
+// of Deployment and if, explicitly requested, also affinity with pods
+// from other generations.
+// It is required to make those "Required" so that in large clusters where
+// scheduler may not score all nodes if a lot of them are feasible, the
+// test will also have a chance to pass.
+func setAffinities(d *appsv1.Deployment, setAffinity bool) {
+	affinity := &v1.Affinity{
 		PodAntiAffinity: &v1.PodAntiAffinity{
 			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
 				{
@@ -1011,4 +993,28 @@ func setAffinity(d *appsv1.Deployment) {
 			},
 		},
 	}
+	if setAffinity {
+		affinity.PodAffinity = &v1.PodAffinity{
+			RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+				{
+					TopologyKey: "kubernetes.io/hostname",
+					LabelSelector: &metav1.LabelSelector{
+						MatchExpressions: []metav1.LabelSelectorRequirement{
+							{
+								Key:      "name",
+								Operator: metav1.LabelSelectorOpIn,
+								Values:   []string{d.Spec.Template.Labels["name"]},
+							},
+							{
+								Key:      "iteration",
+								Operator: metav1.LabelSelectorOpNotIn,
+								Values:   []string{d.Spec.Template.Labels["iteration"]},
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+	d.Spec.Template.Spec.Affinity = affinity
 }
