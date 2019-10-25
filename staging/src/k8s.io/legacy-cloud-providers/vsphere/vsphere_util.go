@@ -72,7 +72,7 @@ func GetVSphere() (*VSphere, error) {
 func getVSphereConfig() (*VSphereConfig, error) {
 	confFileLocation := os.Getenv(vSphereConfFileEnvVar)
 	if confFileLocation == "" {
-		return nil, fmt.Errorf("Env variable 'VSPHERE_CONF_FILE' is not set.")
+		return nil, fmt.Errorf("Env variable 'VSPHERE_CONF_FILE' is not set. ")
 	}
 	confFile, err := os.Open(confFileLocation)
 	if err != nil {
@@ -92,33 +92,33 @@ func getVSphereConfig() (*VSphereConfig, error) {
 }
 
 // Returns the accessible datastores for the given node VM.
-func getAccessibleDatastores(ctx context.Context, nodeVmDetail *NodeDetails, nodeManager *NodeManager) ([]*vclib.DatastoreInfo, error) {
-	accessibleDatastores, err := nodeVmDetail.vm.GetAllAccessibleDatastores(ctx)
+func getAccessibleDatastores(ctx context.Context, nodeVMDetail *NodeDetails, nodeManager *NodeManager) ([]*vclib.DatastoreInfo, error) {
+	accessibleDatastores, err := nodeVMDetail.vm.GetAllAccessibleDatastores(ctx)
 	if err != nil {
 		// Check if the node VM is not found which indicates that the node info in the node manager is stale.
 		// If so, rediscover the node and retry.
 		if vclib.IsManagedObjectNotFoundError(err) {
-			klog.V(4).Infof("error %q ManagedObjectNotFound for node %q. Rediscovering...", err, nodeVmDetail.NodeName)
-			err = nodeManager.RediscoverNode(convertToK8sType(nodeVmDetail.NodeName))
+			klog.V(4).Infof("error %q ManagedObjectNotFound for node %q. Rediscovering...", err, nodeVMDetail.NodeName)
+			err = nodeManager.RediscoverNode(convertToK8sType(nodeVMDetail.NodeName))
 			if err == nil {
-				klog.V(4).Infof("Discovered node %s successfully", nodeVmDetail.NodeName)
-				nodeInfo, err := nodeManager.GetNodeInfo(convertToK8sType(nodeVmDetail.NodeName))
+				klog.V(4).Infof("Discovered node %s successfully", nodeVMDetail.NodeName)
+				nodeInfo, err := nodeManager.GetNodeInfo(convertToK8sType(nodeVMDetail.NodeName))
 				if err != nil {
-					klog.V(4).Infof("error %q getting node info for node %+v", err, nodeVmDetail)
+					klog.V(4).Infof("error %q getting node info for node %+v", err, nodeVMDetail)
 					return nil, err
 				}
 
 				accessibleDatastores, err = nodeInfo.vm.GetAllAccessibleDatastores(ctx)
 				if err != nil {
-					klog.V(4).Infof("error %q getting accessible datastores for node %+v", err, nodeVmDetail)
+					klog.V(4).Infof("error %q getting accessible datastores for node %+v", err, nodeVMDetail)
 					return nil, err
 				}
 			} else {
-				klog.V(4).Infof("error %q rediscovering node %+v", err, nodeVmDetail)
+				klog.V(4).Infof("error %q rediscovering node %+v", err, nodeVMDetail)
 				return nil, err
 			}
 		} else {
-			klog.V(4).Infof("error %q getting accessible datastores for node %+v", err, nodeVmDetail)
+			klog.V(4).Infof("error %q getting accessible datastores for node %+v", err, nodeVMDetail)
 			return nil, err
 		}
 	}
@@ -127,24 +127,24 @@ func getAccessibleDatastores(ctx context.Context, nodeVmDetail *NodeDetails, nod
 
 // Get all datastores accessible for the virtual machine object.
 func getSharedDatastoresInK8SCluster(ctx context.Context, nodeManager *NodeManager) ([]*vclib.DatastoreInfo, error) {
-	nodeVmDetails, err := nodeManager.GetNodeDetails()
+	nodeVMDetails, err := nodeManager.GetNodeDetails()
 	if err != nil {
-		klog.Errorf("Error while obtaining Kubernetes node nodeVmDetail details. error : %+v", err)
+		klog.Errorf("Error while obtaining Kubernetes node nodeVMDetail details. error : %+v", err)
 		return nil, err
 	}
 
-	if len(nodeVmDetails) == 0 {
-		msg := fmt.Sprintf("Kubernetes node nodeVmDetail details is empty. nodeVmDetails : %+v", nodeVmDetails)
+	if len(nodeVMDetails) == 0 {
+		msg := fmt.Sprintf("Kubernetes node nodeVMDetail details is empty. nodeVMDetails : %+v", nodeVMDetails)
 		klog.Error(msg)
 		return nil, fmt.Errorf(msg)
 	}
 	var sharedDatastores []*vclib.DatastoreInfo
-	for _, nodeVmDetail := range nodeVmDetails {
-		klog.V(9).Infof("Getting accessible datastores for node %s", nodeVmDetail.NodeName)
-		accessibleDatastores, err := getAccessibleDatastores(ctx, &nodeVmDetail, nodeManager)
+	for _, nodeVMDetail := range nodeVMDetails {
+		klog.V(9).Infof("Getting accessible datastores for node %s", nodeVMDetail.NodeName)
+		accessibleDatastores, err := getAccessibleDatastores(ctx, &nodeVMDetail, nodeManager)
 		if err != nil {
 			if err == vclib.ErrNoVMFound {
-				klog.V(9).Infof("Got NoVMFound error for node %s", nodeVmDetail.NodeName)
+				klog.V(9).Infof("Got NoVMFound error for node %s", nodeVMDetail.NodeName)
 				continue
 			}
 			return nil, err
@@ -155,7 +155,7 @@ func getSharedDatastoresInK8SCluster(ctx context.Context, nodeManager *NodeManag
 		} else {
 			sharedDatastores = intersect(sharedDatastores, accessibleDatastores)
 			if len(sharedDatastores) == 0 {
-				return nil, fmt.Errorf("No shared datastores found in the Kubernetes cluster for nodeVmDetails: %+v", nodeVmDetails)
+				return nil, fmt.Errorf("No shared datastores found in the Kubernetes cluster for nodeVMDetails: %+v", nodeVMDetails)
 			}
 		}
 	}
