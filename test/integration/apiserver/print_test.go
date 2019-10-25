@@ -31,6 +31,7 @@ import (
 	auditregv1alpha1 "k8s.io/api/auditregistration/v1alpha1"
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
+	discoveryv1beta1 "k8s.io/api/discovery/v1beta1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
 	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
@@ -150,6 +151,7 @@ func TestServerSidePrint(t *testing.T) {
 			auditregv1alpha1.SchemeGroupVersion,
 			batchv2alpha1.SchemeGroupVersion,
 			discoveryv1alpha1.SchemeGroupVersion,
+			discoveryv1beta1.SchemeGroupVersion,
 			rbacv1alpha1.SchemeGroupVersion,
 			settingsv1alpha1.SchemeGroupVersion,
 			schedulerapi.SchemeGroupVersion,

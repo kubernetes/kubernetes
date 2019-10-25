@@ -360,7 +360,6 @@ func KnownControllers() []string {
 // ControllersDisabledByDefault is the set of controllers which is disabled by default
 var ControllersDisabledByDefault = sets.NewString(
 	"bootstrapsigner",
-	"endpointslice",
 	"tokencleaner",
 )
 

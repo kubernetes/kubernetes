@@ -677,7 +677,7 @@ func (s *ProxyServer) Run() error {
 	go serviceConfig.Run(wait.NeverStop)
 
 	if utilfeature.DefaultFeatureGate.Enabled(features.EndpointSlice) {
-		endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1alpha1().EndpointSlices(), s.ConfigSyncPeriod)
+		endpointSliceConfig := config.NewEndpointSliceConfig(informerFactory.Discovery().V1beta1().EndpointSlices(), s.ConfigSyncPeriod)
 		endpointSliceConfig.RegisterEventHandler(s.Proxier)
 		go endpointSliceConfig.Run(wait.NeverStop)
 	} else {

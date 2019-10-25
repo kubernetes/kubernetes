@@ -18,12 +18,12 @@ package reconcilers
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1alpha1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1alpha1"
+	discoveryclient "k8s.io/client-go/kubernetes/typed/discovery/v1beta1"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -123,7 +123,7 @@ func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.Endpoint
 	endpointSlice.Name = endpoints.Name
 	endpointSlice.Labels = map[string]string{discovery.LabelServiceName: endpoints.Name}
 
-	// TODO: Add support for IPv6 addresses here (and in the rest of
+	// TODO: Add support for dual stack here (and in the rest of
 	// EndpointsAdapter).
 	endpointSlice.AddressType = discovery.AddressTypeIPv4
 
@@ -136,6 +136,11 @@ func endpointSliceFromEndpoints(endpoints *corev1.Endpoints) *discovery.Endpoint
 				Protocol: &subset.Ports[i].Protocol,
 			})
 		}
+
+		if allAddressesIPv6(append(subset.Addresses, subset.NotReadyAddresses...)) {
+			endpointSlice.AddressType = discovery.AddressTypeIPv6
+		}
+
 		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.Addresses, endpointSlice.AddressType, true)...)
 		endpointSlice.Endpoints = append(endpointSlice.Endpoints, getEndpointsFromAddresses(subset.NotReadyAddresses, endpointSlice.AddressType, false)...)
 	}
@@ -171,4 +176,19 @@ func endpointFromAddress(address corev1.EndpointAddress, ready bool) discovery.E
 		TargetRef:  address.TargetRef,
 		Topology:   topology,
 	}
+}
+
+// allAddressesIPv6 returns true if all provided addresses are IPv6.
+func allAddressesIPv6(addresses []corev1.EndpointAddress) bool {
+	if len(addresses) == 0 {
+		return false
+	}
+
+	for _, address := range addresses {
+		if !utilnet.IsIPv6String(address.IP) {
+			return false
+		}
+	}
+
+	return true
 }
