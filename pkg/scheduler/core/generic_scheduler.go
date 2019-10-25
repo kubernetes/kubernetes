@@ -445,9 +445,9 @@ func (g *genericScheduler) numFeasibleNodesToFind(numAllNodes int32) (numNodes i
 	adaptivePercentage := g.percentageOfNodesToScore
 	if adaptivePercentage <= 0 {
 		adaptivePercentage = schedulerapi.DefaultPercentageOfNodesToScore - numAllNodes/125
-		if adaptivePercentage < minFeasibleNodesPercentageToFind {
-			adaptivePercentage = minFeasibleNodesPercentageToFind
-		}
+	}	
+	if adaptivePercentage < minFeasibleNodesPercentageToFind {
+		adaptivePercentage = minFeasibleNodesPercentageToFind
 	}
 
 	numNodes = numAllNodes * adaptivePercentage / 100
