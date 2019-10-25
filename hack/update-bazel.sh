@@ -28,7 +28,7 @@ PATH="${GOBIN}:${PATH}"
 pushd "${KUBE_ROOT}/vendor"
   go install ./github.com/bazelbuild/bazel-gazelle/cmd/gazelle
   go install ./github.com/bazelbuild/buildtools/buildozer
-  go install ./k8s.io/repo-infra/kazel
+  go install ./k8s.io/repo-infra/cmd/kazel
 popd
 
 # Find all of the staging repos.
