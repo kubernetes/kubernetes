@@ -72,7 +72,6 @@ func (d *DataDirectory) Initialize(target *EtcdVersionPair) error {
 		if err != nil {
 			return fmt.Errorf("failed to write version.txt to '%s': %v", d.path, err)
 		}
-		return nil
 	}
 	return nil
 }
