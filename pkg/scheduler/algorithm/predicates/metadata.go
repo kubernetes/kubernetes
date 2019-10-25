@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -42,7 +43,7 @@ type PredicateMetadata interface {
 }
 
 // PredicateMetadataProducer is a function that computes predicate metadata for a given pod.
-type PredicateMetadataProducer func(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata
+type PredicateMetadataProducer func(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) PredicateMetadata
 
 // AntiAffinityTerm's topology key value used in predicate metadata
 type topologyPair struct {
@@ -314,7 +315,7 @@ func RegisterPredicateMetadataProducer(predicateName string, precomp predicateMe
 }
 
 // EmptyPredicateMetadataProducer returns a no-op MetadataProducer type.
-func EmptyPredicateMetadataProducer(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata {
+func EmptyPredicateMetadataProducer(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) PredicateMetadata {
 	return nil
 }
 
@@ -330,20 +331,31 @@ func RegisterPredicateMetadataProducerWithExtendedResourceOptions(ignoredExtende
 }
 
 // GetPredicateMetadata returns the predicateMetadata which will be used by various predicates.
-func GetPredicateMetadata(pod *v1.Pod, nodeNameToInfoMap map[string]*schedulernodeinfo.NodeInfo) PredicateMetadata {
+func GetPredicateMetadata(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) PredicateMetadata {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
 	}
+
+	var allNodes []*schedulernodeinfo.NodeInfo
+	if sharedLister != nil {
+		n, err := sharedLister.NodeInfos().List()
+		if err != nil {
+			klog.Errorf("failed to list NodeInfos: %v", err)
+			return nil
+		}
+		allNodes = n
+	}
+
 	// evenPodsSpreadMetadata represents how existing pods match "pod"
 	// on its spread constraints
-	evenPodsSpreadMetadata, err := getEvenPodsSpreadMetadata(pod, nodeNameToInfoMap)
+	evenPodsSpreadMetadata, err := getEvenPodsSpreadMetadata(pod, allNodes)
 	if err != nil {
 		klog.Errorf("Error calculating spreadConstraintsMap: %v", err)
 		return nil
 	}
 
-	podAffinityMetadata, err := getPodAffinityMetadata(pod, nodeNameToInfoMap)
+	podAffinityMetadata, err := getPodAffinityMetadata(pod, allNodes)
 	if err != nil {
 		klog.Errorf("Error calculating podAffinityMetadata: %v", err)
 		return nil
@@ -375,15 +387,15 @@ func getPodFitsResourcesMetedata(pod *v1.Pod) *podFitsResourcesMetadata {
 	}
 }
 
-func getPodAffinityMetadata(pod *v1.Pod, nodeNameToInfoMap map[string]*schedulernodeinfo.NodeInfo) (*podAffinityMetadata, error) {
+func getPodAffinityMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*podAffinityMetadata, error) {
 	// existingPodAntiAffinityMap will be used later for efficient check on existing pods' anti-affinity
-	existingPodAntiAffinityMap, err := getTPMapMatchingExistingAntiAffinity(pod, nodeNameToInfoMap)
+	existingPodAntiAffinityMap, err := getTPMapMatchingExistingAntiAffinity(pod, allNodes)
 	if err != nil {
 		return nil, err
 	}
 	// incomingPodAffinityMap will be used later for efficient check on incoming pod's affinity
 	// incomingPodAntiAffinityMap will be used later for efficient check on incoming pod's anti-affinity
-	incomingPodAffinityMap, incomingPodAntiAffinityMap, err := getTPMapMatchingIncomingAffinityAntiAffinity(pod, nodeNameToInfoMap)
+	incomingPodAffinityMap, incomingPodAntiAffinityMap, err := getTPMapMatchingIncomingAffinityAntiAffinity(pod, allNodes)
 	if err != nil {
 		return nil, err
 	}
@@ -395,17 +407,12 @@ func getPodAffinityMetadata(pod *v1.Pod, nodeNameToInfoMap map[string]*scheduler
 	}, nil
 }
 
-func getEvenPodsSpreadMetadata(pod *v1.Pod, nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) (*evenPodsSpreadMetadata, error) {
+func getEvenPodsSpreadMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*evenPodsSpreadMetadata, error) {
 	// We have feature gating in APIServer to strip the spec
 	// so don't need to re-check feature gate, just check length of constraints.
 	constraints := getHardTopologySpreadConstraints(pod)
 	if len(constraints) == 0 {
 		return nil, nil
-	}
-
-	allNodeNames := make([]string, 0, len(nodeInfoMap))
-	for name := range nodeInfoMap {
-		allNodeNames = append(allNodeNames, name)
 	}
 
 	errCh := schedutil.NewErrorChannel()
@@ -426,10 +433,10 @@ func getEvenPodsSpreadMetadata(pod *v1.Pod, nodeInfoMap map[string]*schedulernod
 	ctx, cancel := context.WithCancel(context.Background())
 
 	processNode := func(i int) {
-		nodeInfo := nodeInfoMap[allNodeNames[i]]
+		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
 		if node == nil {
-			klog.Errorf("node %q not found", allNodeNames[i])
+			klog.Error("node not found")
 			return
 		}
 		// In accordance to design, if NodeAffinity or NodeSelector is defined,
@@ -462,7 +469,7 @@ func getEvenPodsSpreadMetadata(pod *v1.Pod, nodeInfoMap map[string]*schedulernod
 			addTopologyPairMatchNum(pair, matchTotal)
 		}
 	}
-	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processNode)
 
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, err
@@ -726,12 +733,7 @@ func podMatchesAnyAffinityTermProperties(pod *v1.Pod, properties []*affinityTerm
 // getTPMapMatchingExistingAntiAffinity calculates the following for each existing pod on each node:
 // (1) Whether it has PodAntiAffinity
 // (2) Whether any AffinityTerm matches the incoming pod
-func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) (*topologyPairsMaps, error) {
-	allNodeNames := make([]string, 0, len(nodeInfoMap))
-	for name := range nodeInfoMap {
-		allNodeNames = append(allNodeNames, name)
-	}
-
+func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*topologyPairsMaps, error) {
 	errCh := schedutil.NewErrorChannel()
 	var lock sync.Mutex
 	topologyMaps := newTopologyPairsMaps()
@@ -745,10 +747,10 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 	ctx, cancel := context.WithCancel(context.Background())
 
 	processNode := func(i int) {
-		nodeInfo := nodeInfoMap[allNodeNames[i]]
+		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
 		if node == nil {
-			klog.Errorf("node %q not found", allNodeNames[i])
+			klog.Error("node not found")
 			return
 		}
 		for _, existingPod := range nodeInfo.PodsWithAffinity() {
@@ -760,7 +762,7 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 			appendTopologyPairsMaps(existingPodTopologyMaps)
 		}
 	}
-	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processNode)
 
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, err
@@ -773,19 +775,13 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*s
 // It returns a topologyPairsMaps that are checked later by the affinity
 // predicate. With this topologyPairsMaps available, the affinity predicate does not
 // need to check all the pods in the cluster.
-func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[string]*schedulernodeinfo.NodeInfo) (topologyPairsAffinityPodsMaps *topologyPairsMaps, topologyPairsAntiAffinityPodsMaps *topologyPairsMaps, err error) {
+func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (topologyPairsAffinityPodsMaps *topologyPairsMaps, topologyPairsAntiAffinityPodsMaps *topologyPairsMaps, err error) {
 	affinity := pod.Spec.Affinity
 	if affinity == nil || (affinity.PodAffinity == nil && affinity.PodAntiAffinity == nil) {
 		return newTopologyPairsMaps(), newTopologyPairsMaps(), nil
 	}
 
-	allNodeNames := make([]string, 0, len(nodeInfoMap))
-	for name := range nodeInfoMap {
-		allNodeNames = append(allNodeNames, name)
-	}
-
 	errCh := schedutil.NewErrorChannel()
-
 	var lock sync.Mutex
 	topologyPairsAffinityPodsMaps = newTopologyPairsMaps()
 	topologyPairsAntiAffinityPodsMaps = newTopologyPairsMaps()
@@ -811,10 +807,10 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 	ctx, cancel := context.WithCancel(context.Background())
 
 	processNode := func(i int) {
-		nodeInfo := nodeInfoMap[allNodeNames[i]]
+		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
 		if node == nil {
-			klog.Errorf("node %q not found", allNodeNames[i])
+			klog.Error("node not found")
 			return
 		}
 		nodeTopologyPairsAffinityPodsMaps := newTopologyPairsMaps()
@@ -850,7 +846,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, nodeInfoMap map[s
 			appendResult(node.Name, nodeTopologyPairsAffinityPodsMaps, nodeTopologyPairsAntiAffinityPodsMaps)
 		}
 	}
-	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processNode)
 
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, nil, err

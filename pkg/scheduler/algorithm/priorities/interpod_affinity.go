@@ -109,9 +109,9 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 
 	// pm stores (1) all nodes that should be considered and (2) the so-far computed score for each node.
 	pm := newPodAffinityPriorityMap(nodes)
-	allNodeNames := make([]string, 0, len(nodeNameToInfo))
-	for name := range nodeNameToInfo {
-		allNodeNames = append(allNodeNames, name)
+	allNodes, err := ipa.nodeInfoLister.List()
+	if err != nil {
+		return nil, err
 	}
 
 	// convert the topology key based weights to the node name based weights
@@ -186,7 +186,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	errCh := schedutil.NewErrorChannel()
 	ctx, cancel := context.WithCancel(context.Background())
 	processNode := func(i int) {
-		nodeInfo := nodeNameToInfo[allNodeNames[i]]
+		nodeInfo := allNodes[i]
 		if nodeInfo.Node() != nil {
 			if hasAffinityConstraints || hasAntiAffinityConstraints {
 				// We need to process all the pods.
@@ -208,7 +208,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 			}
 		}
 	}
-	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processNode)
+	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processNode)
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, err
 	}

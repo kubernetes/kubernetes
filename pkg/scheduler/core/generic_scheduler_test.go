@@ -49,6 +49,7 @@ import (
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 var (
@@ -1424,14 +1425,14 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				p := fakelisters.PodLister(test.pods)
 				test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(n, p)
 			}
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, nodes)
+
+			g.nodeInfoSnapshot = nodeinfosnapshot.NewSnapshot(test.pods, nodes)
 			// newnode simulate a case that a new node is added to the cluster, but nodeNameToInfo
 			// doesn't have it yet.
 			newnode := makeNode("newnode", 1000*5, priorityutil.DefaultMemoryRequest*5)
 			newnode.ObjectMeta.Labels = map[string]string{"hostname": "newnode"}
 			nodes = append(nodes, newnode)
 			state := framework.NewCycleState()
-			g.nodeInfoSnapshot.NodeInfoMap = nodeNameToInfo
 			nodeToPods, err := g.selectNodesForPreemption(context.Background(), state, test.pod, nodes, nil)
 			if err != nil {
 				t.Error(err)

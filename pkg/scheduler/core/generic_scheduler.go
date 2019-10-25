@@ -483,7 +483,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 		ctx, cancel := context.WithCancel(ctx)
 
 		// We can use the same metadata producer for all nodes.
-		meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
+		meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot)
 		state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
 		checkNode := func(i int) {
@@ -1033,7 +1033,7 @@ func (g *genericScheduler) selectNodesForPreemption(
 	var resultLock sync.Mutex
 
 	// We can use the same metadata producer for all nodes.
-	meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
+	meta := g.predicateMetaProducer(pod, g.nodeInfoSnapshot)
 	checkNode := func(i int) {
 		nodeName := potentialNodes[i].Name
 		if g.nodeInfoSnapshot.NodeInfoMap[nodeName] == nil {

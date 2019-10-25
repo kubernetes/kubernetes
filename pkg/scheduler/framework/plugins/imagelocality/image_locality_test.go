@@ -29,8 +29,11 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	"k8s.io/kubernetes/pkg/util/parsers"
 )
+
+var mb int64 = 1024 * 1024
 
 func TestImageLocalityPriority(t *testing.T) {
 	test40250 := v1.PodSpec{
@@ -205,9 +208,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			state := framework.NewCycleState()
 			state.Write(migration.PrioritiesStateKey, &migration.PrioritiesStateData{Reference: meta})
 
-			fh, _ := framework.NewFramework(nil, nil, nil)
-			snapshot := fh.NodeInfoSnapshot()
-			snapshot.NodeInfoMap = schedulernodeinfo.CreateNodeNameToInfoMap(nil, test.nodes)
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithNodeInfoSnapshot(nodeinfosnapshot.NewSnapshot(nil, test.nodes)))
 
 			p, _ := New(nil, fh)
 			var gotList framework.NodeScoreList

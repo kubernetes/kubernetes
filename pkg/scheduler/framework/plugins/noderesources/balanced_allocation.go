@@ -45,10 +45,11 @@ func (ba *BalancedAllocation) Name() string {
 
 // Score invoked at the score extension point.
 func (ba *BalancedAllocation) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, exist := ba.handle.NodeInfoSnapshot().NodeInfoMap[nodeName]
-	if !exist {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("node %q does not exist in NodeInfoSnapshot", nodeName))
+	nodeInfo, err := ba.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
+
 	// BalancedResourceAllocationMap does not use priority metadata, hence we pass nil here
 	s, err := priorities.BalancedResourceAllocationMap(pod, nil, nodeInfo)
 	return s.Score, migration.ErrorToFrameworkStatus(err)
