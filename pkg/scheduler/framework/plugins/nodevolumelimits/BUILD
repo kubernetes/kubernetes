@@ -6,18 +6,23 @@ go_library(
         "azure.go",
         "cinder.go",
         "csi.go",
+        "csinode_helper.go",
         "ebs.go",
         "gce.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits",
     visibility = ["//visibility:public"],
     deps = [
+        "//pkg/features:go_default_library",
         "//pkg/scheduler/algorithm/predicates:go_default_library",
         "//pkg/scheduler/framework/plugins/migration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
+        "//staging/src/k8s.io/client-go/informers:go_default_library",
+        "//staging/src/k8s.io/client-go/listers/storage/v1beta1:go_default_library",
     ],
 )
 

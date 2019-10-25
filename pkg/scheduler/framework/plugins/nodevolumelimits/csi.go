@@ -52,12 +52,11 @@ func (pl *CSILimits) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 // NewCSI initializes a new plugin and returns it.
 func NewCSI(_ *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	informerFactory := handle.SharedInformerFactory()
-	csiNodeLister := informerFactory.Storage().V1beta1().CSINodes().Lister()
 	pvLister := informerFactory.Core().V1().PersistentVolumes().Lister()
 	pvcLister := informerFactory.Core().V1().PersistentVolumeClaims().Lister()
 	scLister := informerFactory.Storage().V1().StorageClasses().Lister()
 
 	return &CSILimits{
-		predicate: predicates.NewCSIMaxVolumeLimitPredicate(csiNodeLister, pvLister, pvcLister, scLister),
+		predicate: predicates.NewCSIMaxVolumeLimitPredicate(getCSINodeListerIfEnabled(informerFactory), pvLister, pvcLister, scLister),
 	}, nil
 }

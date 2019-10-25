@@ -446,11 +446,17 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta PredicateMetadata,
 		return false, nil, fmt.Errorf("node not found")
 	}
 
-	csiNode, err := c.csiNodeLister.Get(node.Name)
-	if err != nil {
-		// we don't fail here because the CSINode object is only necessary
-		// for determining whether the migration is enabled or not
-		klog.V(5).Infof("Could not get a CSINode object for the node: %v", err)
+	var (
+		csiNode *v1beta1storage.CSINode
+		err     error
+	)
+	if c.csiNodeLister != nil {
+		csiNode, err = c.csiNodeLister.Get(node.Name)
+		if err != nil {
+			// we don't fail here because the CSINode object is only necessary
+			// for determining whether the migration is enabled or not
+			klog.V(5).Infof("Could not get a CSINode object for the node: %v", err)
+		}
 	}
 
 	// if a plugin has been migrated to a CSI driver, defer to the CSI predicate
