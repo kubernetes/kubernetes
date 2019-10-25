@@ -1,0 +1,17 @@
+version: build-{build}.{branch}
+
+shallow_clone: true
+
+environment:
+  GOPATH: C:\gopath
+
+platform:
+  - x64
+
+build_script:
+  - go install -v ./...
+
+test_script:
+  - go test -v
+
+deploy: off

@@ -13,6 +13,7 @@ It is ready for production use. [It is used in several projects by Docker, Googl
 [![Build Status][1]][2]
 [![Coverage Status][7]][8]
 [![Sourcegraph][9]][10]
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fimdario%2Fmergo.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fimdario%2Fmergo?ref=badge_shield)
 
 [1]: https://travis-ci.org/imdario/mergo.png
 [2]: https://travis-ci.org/imdario/mergo
@@ -27,7 +28,7 @@ It is ready for production use. [It is used in several projects by Docker, Googl
 
 ### Latest release
 
-[Release v0.3.4](https://github.com/imdario/mergo/releases/tag/v0.3.4).
+[Release v0.3.7](https://github.com/imdario/mergo/releases/tag/v0.3.7).
 
 ### Important note
 
@@ -217,6 +218,21 @@ If I can help you, you have an idea or you are using Mergo in your projects, don
 
 Written by [Dario Castañé](http://dario.im).
 
+## Top Contributors
+
+[![0](https://sourcerer.io/fame/imdario/imdario/mergo/images/0)](https://sourcerer.io/fame/imdario/imdario/mergo/links/0)
+[![1](https://sourcerer.io/fame/imdario/imdario/mergo/images/1)](https://sourcerer.io/fame/imdario/imdario/mergo/links/1)
+[![2](https://sourcerer.io/fame/imdario/imdario/mergo/images/2)](https://sourcerer.io/fame/imdario/imdario/mergo/links/2)
+[![3](https://sourcerer.io/fame/imdario/imdario/mergo/images/3)](https://sourcerer.io/fame/imdario/imdario/mergo/links/3)
+[![4](https://sourcerer.io/fame/imdario/imdario/mergo/images/4)](https://sourcerer.io/fame/imdario/imdario/mergo/links/4)
+[![5](https://sourcerer.io/fame/imdario/imdario/mergo/images/5)](https://sourcerer.io/fame/imdario/imdario/mergo/links/5)
+[![6](https://sourcerer.io/fame/imdario/imdario/mergo/images/6)](https://sourcerer.io/fame/imdario/imdario/mergo/links/6)
+[![7](https://sourcerer.io/fame/imdario/imdario/mergo/images/7)](https://sourcerer.io/fame/imdario/imdario/mergo/links/7)
+
+
 ## License
 
 [BSD 3-Clause](http://opensource.org/licenses/BSD-3-Clause) license, as [Go language](http://golang.org/LICENSE).
+
+
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fimdario%2Fmergo.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fimdario%2Fmergo?ref=badge_large)

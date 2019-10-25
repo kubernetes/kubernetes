@@ -5,6 +5,7 @@ module k8s.io/cli-runtime
 go 1.12
 
 require (
+	github.com/Masterminds/sprig/v3 v3.0.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/emicklei/go-restful v2.9.5+incompatible // indirect
 	github.com/evanphx/json-patch v4.2.0+incompatible
@@ -14,7 +15,7 @@ require (
 	github.com/pkg/errors v0.8.0
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	golang.org/x/text v0.3.2
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0

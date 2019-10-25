@@ -18,11 +18,11 @@ require (
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
 	github.com/gophercloud/gophercloud v0.1.0
 	github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7
-	github.com/imdario/mergo v0.3.5
+	github.com/imdario/mergo v0.3.7
 	github.com/peterbourgon/diskv v2.0.1+incompatible
 	github.com/spf13/pflag v1.0.3
-	github.com/stretchr/testify v1.3.0
-	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
+	github.com/stretchr/testify v1.4.0
+	golang.org/x/crypto v0.0.0-20190911031432-227b76d455e7
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c

@@ -6,7 +6,7 @@ go 1.12
 
 require (
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	k8s.io/apimachinery v0.0.0
 )
 

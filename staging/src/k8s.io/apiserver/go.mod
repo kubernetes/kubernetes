@@ -34,14 +34,14 @@ require (
 	github.com/sirupsen/logrus v1.4.2 // indirect
 	github.com/soheilhy/cmux v0.1.3 // indirect
 	github.com/spf13/pflag v1.0.3
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8 // indirect
 	github.com/xiang90/probing v0.0.0-20160813154853-07dd2e8dfe18 // indirect
 	go.etcd.io/bbolt v1.3.3 // indirect
 	go.uber.org/atomic v0.0.0-20181018215023-8dc6146f7569 // indirect
 	go.uber.org/multierr v0.0.0-20180122172545-ddea229ff1df // indirect
 	go.uber.org/zap v0.0.0-20180814183419-67bc79d13d15 // indirect
-	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
+	golang.org/x/crypto v0.0.0-20190911031432-227b76d455e7
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 	google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873 // indirect
 	google.golang.org/grpc v1.23.0

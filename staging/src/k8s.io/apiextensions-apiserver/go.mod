@@ -18,7 +18,7 @@ require (
 	github.com/pborman/uuid v1.2.0
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	google.golang.org/grpc v1.23.0
 	gopkg.in/yaml.v2 v2.2.4
 	k8s.io/api v0.0.0

@@ -11,7 +11,7 @@ require (
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0

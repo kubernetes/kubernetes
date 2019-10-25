@@ -117,7 +117,7 @@ require (
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.3.2
 	github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	github.com/thecodeteam/goscaleio v0.1.0
 	github.com/urfave/negroni v1.0.0 // indirect
@@ -125,7 +125,7 @@ require (
 	github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936 // indirect
 	github.com/vmware/govmomi v0.20.1
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
-	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
+	golang.org/x/crypto v0.0.0-20190911031432-227b76d455e7
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 	golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
@@ -191,6 +191,9 @@ replace (
 	github.com/GoogleCloudPlatform/k8s-cloud-provider => github.com/GoogleCloudPlatform/k8s-cloud-provider v0.0.0-20190822182118-27a4ced34534
 	github.com/JeffAshton/win_pdh => github.com/JeffAshton/win_pdh v0.0.0-20161109143554-76bb4ee9f0ab
 	github.com/MakeNowJust/heredoc => github.com/MakeNowJust/heredoc v0.0.0-20170808103936-bb23615498cd
+	github.com/Masterminds/goutils => github.com/Masterminds/goutils v1.1.0
+	github.com/Masterminds/semver/v3 => github.com/Masterminds/semver/v3 v3.0.1
+	github.com/Masterminds/sprig/v3 => github.com/Masterminds/sprig/v3 v3.0.0
 	github.com/Microsoft/go-winio => github.com/Microsoft/go-winio v0.4.11
 	github.com/Microsoft/hcsshim => github.com/Microsoft/hcsshim v0.0.0-20190417211021-672e52e9209d
 	github.com/NYTimes/gziphandler => github.com/NYTimes/gziphandler v0.0.0-20170623195520-56545f4a5d46
@@ -310,7 +313,8 @@ replace (
 	github.com/heketi/heketi => github.com/heketi/heketi v9.0.1-0.20190917153846-c2e2a4ab7ab9+incompatible
 	github.com/heketi/tests => github.com/heketi/tests v0.0.0-20151005000721-f3775cbcefd6
 	github.com/hpcloud/tail => github.com/hpcloud/tail v1.0.0
-	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
+	github.com/huandu/xstrings => github.com/huandu/xstrings v1.2.0
+	github.com/imdario/mergo => github.com/imdario/mergo v0.3.7
 	github.com/inconshreveable/mousetrap => github.com/inconshreveable/mousetrap v1.0.0
 	github.com/jimstudt/http-authentication => github.com/jimstudt/http-authentication v0.0.0-20140401203705-3eca13d6893a
 	github.com/jmespath/go-jmespath => github.com/jmespath/go-jmespath v0.0.0-20180206201540-c2b33e8439af
@@ -349,9 +353,11 @@ replace (
 	github.com/miekg/dns => github.com/miekg/dns v1.1.4
 	github.com/mindprince/gonvml => github.com/mindprince/gonvml v0.0.0-20190828220739-9ebdce4bb989
 	github.com/mistifyio/go-zfs => github.com/mistifyio/go-zfs v2.1.1+incompatible
+	github.com/mitchellh/copystructure => github.com/mitchellh/copystructure v1.0.0
 	github.com/mitchellh/go-homedir => github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/go-wordwrap => github.com/mitchellh/go-wordwrap v1.0.0
 	github.com/mitchellh/mapstructure => github.com/mitchellh/mapstructure v1.1.2
+	github.com/mitchellh/reflectwalk => github.com/mitchellh/reflectwalk v1.0.0
 	github.com/modern-go/concurrent => github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
 	github.com/modern-go/reflect2 => github.com/modern-go/reflect2 v1.0.1
 	github.com/mohae/deepcopy => github.com/mohae/deepcopy v0.0.0-20170603005431-491d3605edfb
@@ -401,7 +407,7 @@ replace (
 	github.com/spf13/viper => github.com/spf13/viper v1.3.2
 	github.com/storageos/go-api => github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
 	github.com/stretchr/objx => github.com/stretchr/objx v0.2.0
-	github.com/stretchr/testify => github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify => github.com/stretchr/testify v1.4.0
 	github.com/syndtr/gocapability => github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2
 	github.com/thecodeteam/goscaleio => github.com/thecodeteam/goscaleio v0.1.0
 	github.com/tmc/grpc-websocket-proxy => github.com/tmc/grpc-websocket-proxy v0.0.0-20170815181823-89b8d40f7ca8

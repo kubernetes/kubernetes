@@ -1,0 +1,26 @@
+run:
+  deadline: 2m
+
+linters:
+  disable-all: true
+  enable:
+    - deadcode
+    - dupl
+    - errcheck
+    - gofmt
+    - goimports
+    - golint
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - structcheck
+    - unused
+    - varcheck
+
+linters-settings:
+  gofmt:
+    simplify: true
+  dupl:
+    threshold: 400
