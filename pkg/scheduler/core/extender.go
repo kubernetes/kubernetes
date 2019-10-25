@@ -245,7 +245,7 @@ func (h *HTTPExtender) convertPodUIDToPod(
 			}
 		}
 		return nil, fmt.Errorf("extender: %v claims to preempt pod (UID: %v) on node: %v, but the pod is not found on that node",
-			h.extenderURL, metaPod, nodeInfo.Node().Name)
+			h.extenderURL, metaPod.UID, nodeInfo.Node().Name)
 	}
 
 	return nil, fmt.Errorf("extender: %v claims to preempt on node: %v but the node is not found in nodeNameToInfo map",

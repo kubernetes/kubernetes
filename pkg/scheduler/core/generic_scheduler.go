@@ -205,9 +205,9 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	trace.Step("Computing predicates done")
 
 	// Run "postfilter" plugins.
-	postfilterStatus := g.framework.RunPostFilterPlugins(ctx, state, pod, filteredNodes, filteredNodesStatuses)
-	if !postfilterStatus.IsSuccess() {
-		return result, postfilterStatus.AsError()
+	postFilterStatus := g.framework.RunPostFilterPlugins(ctx, state, pod, filteredNodes, filteredNodesStatuses)
+	if !postFilterStatus.IsSuccess() {
+		return result, postFilterStatus.AsError()
 	}
 
 	if len(filteredNodes) == 0 {

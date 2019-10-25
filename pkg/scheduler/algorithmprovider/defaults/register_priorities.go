@@ -76,7 +76,7 @@ func init() {
 		},
 	)
 
-	// Prioritize nodes by least requested utilization.
+	// Prioritizes nodes by least requested utilization.
 	scheduler.RegisterPriorityMapReduceFunction(priorities.LeastRequestedPriority, priorities.LeastRequestedPriorityMap, nil, 1)
 
 	// Prioritizes nodes to help achieve balanced resource usage
