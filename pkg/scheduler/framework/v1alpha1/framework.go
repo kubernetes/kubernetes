@@ -31,10 +31,10 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/internal/errchannel"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
 const (
@@ -482,7 +482,7 @@ func (f *framework) RunScorePlugins(ctx context.Context, state *CycleState, pod 
 		pluginToNodeScores[pl.Name()] = make(NodeScoreList, len(nodes))
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	errCh := schedutil.NewErrorChannel()
+	errCh := errchannel.New()
 
 	// Run Score method for each node in parallel.
 	workqueue.ParallelizeUntil(ctx, 16, len(nodes), func(index int) {

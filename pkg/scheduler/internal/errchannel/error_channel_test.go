@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package errchannel
 
 import (
 	"context"
@@ -23,7 +23,7 @@ import (
 )
 
 func TestErrorChannel(t *testing.T) {
-	errCh := NewErrorChannel()
+	errCh := New()
 
 	if actualErr := errCh.ReceiveError(); actualErr != nil {
 		t.Errorf("expect nil from err channel, but got %v", actualErr)

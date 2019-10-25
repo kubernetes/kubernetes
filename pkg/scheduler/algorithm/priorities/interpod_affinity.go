@@ -24,13 +24,12 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	"k8s.io/kubernetes/pkg/scheduler/internal/errchannel"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
-
-	"k8s.io/klog"
 )
 
 type topologyPairToScore map[string]map[string]int64
@@ -240,7 +239,7 @@ func buildTopologyPairToScore(
 		return nil
 	}
 
-	errCh := schedutil.NewErrorChannel()
+	errCh := errchannel.New()
 	ctx, cancel := context.WithCancel(context.Background())
 	processNode := func(i int) {
 		nodeInfo := allNodes[i]

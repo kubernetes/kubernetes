@@ -8,10 +8,7 @@ load(
 
 go_test(
     name = "go_default_test",
-    srcs = [
-        "error_channel_test.go",
-        "utils_test.go",
-    ],
+    srcs = ["utils_test.go"],
     embed = [":go_default_library"],
     deps = [
         "//pkg/scheduler/apis/extender/v1:go_default_library",
@@ -25,7 +22,6 @@ go_library(
     name = "go_default_library",
     srcs = [
         "clock.go",
-        "error_channel.go",
         "utils.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/scheduler/util",

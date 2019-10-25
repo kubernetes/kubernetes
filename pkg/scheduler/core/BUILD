@@ -18,6 +18,7 @@ go_library(
         "//pkg/scheduler/framework/plugins/migration:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/internal/cache:go_default_library",
+        "//pkg/scheduler/internal/errchannel:go_default_library",
         "//pkg/scheduler/internal/queue:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",

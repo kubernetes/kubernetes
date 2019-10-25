@@ -45,6 +45,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
+	"k8s.io/kubernetes/pkg/scheduler/internal/errchannel"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -484,7 +485,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 		// Create filtered list with enough space to avoid growing it
 		// and allow assigning.
 		filtered = make([]*v1.Node, numNodesToFind)
-		errCh := util.NewErrorChannel()
+		errCh := errchannel.New()
 		var (
 			predicateResultLock sync.Mutex
 			filteredLen         int32

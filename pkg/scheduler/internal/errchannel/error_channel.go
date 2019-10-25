@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package util
+package errchannel
 
 import "context"
 
@@ -51,8 +51,8 @@ func (e *ErrorChannel) ReceiveError() error {
 	}
 }
 
-// NewErrorChannel returns a new ErrorChannel.
-func NewErrorChannel() *ErrorChannel {
+// New returns a new ErrorChannel.
+func New() *ErrorChannel {
 	return &ErrorChannel{
 		errCh: make(chan error, 1),
 	}

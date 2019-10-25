@@ -26,12 +26,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-
-	"k8s.io/klog"
 )
 
 type topologyPair struct {

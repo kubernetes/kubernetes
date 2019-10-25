@@ -30,6 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/util/workqueue"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
+	"k8s.io/kubernetes/pkg/scheduler/internal/errchannel"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -731,7 +732,7 @@ func podMatchesAnyAffinityTermProperties(pod *v1.Pod, properties []*affinityTerm
 // (1) Whether it has PodAntiAffinity
 // (2) Whether any AffinityTerm matches the incoming pod
 func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*topologyPairsMaps, error) {
-	errCh := schedutil.NewErrorChannel()
+	errCh := errchannel.New()
 	var lock sync.Mutex
 	topologyMaps := newTopologyPairsMaps()
 
@@ -780,7 +781,7 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, allNodes []*sched
 		return newTopologyPairsMaps(), newTopologyPairsMaps(), nil
 	}
 
-	errCh := schedutil.NewErrorChannel()
+	errCh := errchannel.New()
 	var lock sync.Mutex
 	topologyPairsAffinityPodsMaps = newTopologyPairsMaps()
 	topologyPairsAntiAffinityPodsMaps = newTopologyPairsMaps()
