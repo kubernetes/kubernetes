@@ -101,6 +101,7 @@ type PermitPlugin struct {
 	waitAndRejectPermit bool
 	waitAndAllowPermit  bool
 	allowPermit         bool
+	cancelled           bool
 	fh                  framework.FrameworkHandle
 }
 
@@ -395,8 +396,15 @@ func (pp *PermitPlugin) Permit(ctx context.Context, state *framework.CycleState,
 		return framework.NewStatus(framework.Unschedulable, fmt.Sprintf("reject pod %v", pod.Name)), 0
 	}
 	if pp.timeoutPermit {
+		go func() {
+			select {
+			case <-ctx.Done():
+				pp.cancelled = true
+			}
+		}()
 		return framework.NewStatus(framework.Wait, ""), 3 * time.Second
 	}
+
 	if pp.allowPermit && pod.Name != "waiting-pod" {
 		return nil, 0
 	}
@@ -429,6 +437,11 @@ func (pp *PermitPlugin) allowAllPods() {
 	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Allow(pp.name) })
 }
 
+// rejectAllPods rejects all waiting pods.
+func (pp *PermitPlugin) rejectAllPods() {
+	pp.fh.IterateOverWaitingPods(func(wp framework.WaitingPod) { wp.Reject("rejectAllPods") })
+}
+
 // reset used to reset permit plugin.
 func (pp *PermitPlugin) reset() {
 	pp.numPermitCalled = 0
@@ -438,6 +451,7 @@ func (pp *PermitPlugin) reset() {
 	pp.waitAndRejectPermit = false
 	pp.waitAndAllowPermit = false
 	pp.allowPermit = false
+	pp.cancelled = false
 }
 
 // newPermitPlugin returns a factory for permit plugin with specified PermitPlugin.
@@ -1079,18 +1093,7 @@ func TestPostBindPlugin(t *testing.T) {
 func TestPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
 	perPlugin := &PermitPlugin{name: permitPluginName}
-	registry := framework.Registry{permitPluginName: newPermitPlugin(perPlugin)}
-
-	// Setup initial permit plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		Permit: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: permitPluginName,
-				},
-			},
-		},
-	}
+	registry, plugins := initRegistryAndConfig(perPlugin)
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugin", nil), 2,
@@ -1178,24 +1181,7 @@ func TestMultiplePermitPlugins(t *testing.T) {
 	// Create a plugin registry for testing.
 	perPlugin1 := &PermitPlugin{name: "permit-plugin-1"}
 	perPlugin2 := &PermitPlugin{name: "permit-plugin-2"}
-	registry := framework.Registry{
-		perPlugin1.Name(): newPermitPlugin(perPlugin1),
-		perPlugin2.Name(): newPermitPlugin(perPlugin2),
-	}
-
-	// Setup initial permit plugins for testing.
-	plugins := &schedulerconfig.Plugins{
-		Permit: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: perPlugin1.Name(),
-				},
-				{
-					Name: perPlugin2.Name(),
-				},
-			},
-		},
-	}
+	registry, plugins := initRegistryAndConfig(perPlugin1, perPlugin2)
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "multi-permit-plugin", nil), 2,
@@ -1245,22 +1231,53 @@ func TestMultiplePermitPlugins(t *testing.T) {
 	cleanupPods(context.clientSet, t, []*v1.Pod{pod})
 }
 
+// TestPermitPluginsCancelled tests whether all permit plugins are cancelled when pod is rejected.
+func TestPermitPluginsCancelled(t *testing.T) {
+	// Create a plugin registry for testing.
+	perPlugin1 := &PermitPlugin{name: "permit-plugin-1"}
+	perPlugin2 := &PermitPlugin{name: "permit-plugin-2"}
+	registry, plugins := initRegistryAndConfig(perPlugin1, perPlugin2)
+
+	// Create the master and the scheduler with the test plugin set.
+	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugins", nil), 2,
+		scheduler.WithFrameworkPlugins(plugins),
+		scheduler.WithFrameworkDefaultRegistry(registry))
+	defer cleanupTest(t, context)
+
+	// Both permit plugins will return Wait for permitting
+	perPlugin1.timeoutPermit = true
+	perPlugin2.timeoutPermit = true
+
+	// Create a test pod.
+	podName := "test-pod"
+	pod, err := createPausePod(context.clientSet,
+		initPausePod(context.clientSet, &pausePodConfig{Name: podName, Namespace: context.ns.Name}))
+	if err != nil {
+		t.Errorf("Error while creating a test pod: %v", err)
+	}
+
+	var waitingPod framework.WaitingPod
+	// Wait until the test pod is actually waiting.
+	wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+		waitingPod = perPlugin1.fh.GetWaitingPod(pod.UID)
+		return waitingPod != nil, nil
+	})
+
+	perPlugin1.rejectAllPods()
+	// Wait some time for the permit plugins to be cancelled
+	err = wait.Poll(10*time.Millisecond, 30*time.Second, func() (bool, error) {
+		return perPlugin1.cancelled && perPlugin2.cancelled, nil
+	})
+	if err != nil {
+		t.Errorf("Expected all permit plugins to be cancelled")
+	}
+}
+
 // TestCoSchedulingWithPermitPlugin tests invocation of permit plugins.
 func TestCoSchedulingWithPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
 	permitPlugin := &PermitPlugin{name: permitPluginName}
-	registry := framework.Registry{permitPluginName: newPermitPlugin(permitPlugin)}
-
-	// Setup initial permit plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		Permit: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: permitPluginName,
-				},
-			},
-		},
-	}
+	registry, plugins := initRegistryAndConfig(permitPlugin)
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "permit-plugin", nil), 2,
@@ -1432,18 +1449,7 @@ func TestPostFilterPlugin(t *testing.T) {
 func TestPreemptWithPermitPlugin(t *testing.T) {
 	// Create a plugin registry for testing. Register only a permit plugin.
 	permitPlugin := &PermitPlugin{}
-	registry := framework.Registry{permitPluginName: newPermitPlugin(permitPlugin)}
-
-	// Setup initial permit plugin for testing.
-	plugins := &schedulerconfig.Plugins{
-		Permit: &schedulerconfig.PluginSet{
-			Enabled: []schedulerconfig.Plugin{
-				{
-					Name: permitPluginName,
-				},
-			},
-		},
-	}
+	registry, plugins := initRegistryAndConfig(permitPlugin)
 
 	// Create the master and the scheduler with the test plugin set.
 	context := initTestSchedulerForFrameworkTest(t, initTestMaster(t, "preempt-with-permit-plugin", nil), 0,
@@ -1521,4 +1527,23 @@ func initTestSchedulerForFrameworkTest(t *testing.T, context *testContext, nodeC
 		}
 	}
 	return c
+}
+
+// initRegistryAndConfig returns registry and plugins config based on give plugins.
+// TODO: refactor it to a more generic functions that accepts all kinds of Plugins as arguments
+func initRegistryAndConfig(pp ...*PermitPlugin) (registry framework.Registry, plugins *schedulerconfig.Plugins) {
+	if len(pp) == 0 {
+		return
+	}
+
+	registry = framework.Registry{}
+	plugins = &schedulerconfig.Plugins{
+		Permit: &schedulerconfig.PluginSet{},
+	}
+
+	for _, p := range pp {
+		registry.Register(p.Name(), newPermitPlugin(p))
+		plugins.Permit.Enabled = append(plugins.Permit.Enabled, schedulerconfig.Plugin{Name: p.Name()})
+	}
+	return
 }
