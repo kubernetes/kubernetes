@@ -22,7 +22,7 @@ import (
 	"strings"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
@@ -475,7 +475,7 @@ func TestEBSLimits(t *testing.T) {
 		t.Run(test.test, func(t *testing.T) {
 			node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
 			p := &EBSLimits{
-				predicate: predicates.NewMaxPDVolumeCountPredicate(test.filterName, getFakeCSINodeInfo(csiNode), getFakeCSIStorageClassInfo(test.filterName, test.driverName), getFakePVInfo(test.filterName), getFakePVCInfo(test.filterName)),
+				predicate: predicates.NewMaxPDVolumeCountPredicate(test.filterName, getFakeCSINodeLister(csiNode), getFakeCSIStorageClassLister(test.filterName, test.driverName), getFakePVLister(test.filterName), getFakePVCLister(test.filterName)),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.newPod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
@@ -485,8 +485,8 @@ func TestEBSLimits(t *testing.T) {
 	}
 }
 
-func getFakePVCInfo(filterName string) fakelisters.PersistentVolumeClaimInfo {
-	return fakelisters.PersistentVolumeClaimInfo{
+func getFakePVCLister(filterName string) fakelisters.PersistentVolumeClaimLister {
+	return fakelisters.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeClaimSpec{
@@ -546,8 +546,8 @@ func getFakePVCInfo(filterName string) fakelisters.PersistentVolumeClaimInfo {
 	}
 }
 
-func getFakePVInfo(filterName string) fakelisters.PersistentVolumeInfo {
-	return fakelisters.PersistentVolumeInfo{
+func getFakePVLister(filterName string) fakelisters.PersistentVolumeLister {
+	return fakelisters.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeSpec{

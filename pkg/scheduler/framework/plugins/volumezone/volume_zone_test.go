@@ -49,7 +49,7 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 }
 
 func TestSingleZone(t *testing.T) {
-	pvInfo := fakelisters.PersistentVolumeInfo{
+	pvLister := fakelisters.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
@@ -61,7 +61,7 @@ func TestSingleZone(t *testing.T) {
 		},
 	}
 
-	pvcInfo := fakelisters.PersistentVolumeClaimInfo{
+	pvcLister := fakelisters.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -156,7 +156,7 @@ func TestSingleZone(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				predicate: predicates.NewVolumeZonePredicate(pvInfo, pvcInfo, nil),
+				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, nil),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
@@ -167,7 +167,7 @@ func TestSingleZone(t *testing.T) {
 }
 
 func TestMultiZone(t *testing.T) {
-	pvInfo := fakelisters.PersistentVolumeInfo{
+	pvLister := fakelisters.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
@@ -179,7 +179,7 @@ func TestMultiZone(t *testing.T) {
 		},
 	}
 
-	pvcInfo := fakelisters.PersistentVolumeClaimInfo{
+	pvcLister := fakelisters.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -241,7 +241,7 @@ func TestMultiZone(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				predicate: predicates.NewVolumeZonePredicate(pvInfo, pvcInfo, nil),
+				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, nil),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
@@ -260,7 +260,7 @@ func TestWithBinding(t *testing.T) {
 		classImmediate = "Class_Immediate"
 	)
 
-	classInfo := fakelisters.StorageClassInfo{
+	scLister := fakelisters.StorageClassLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: classImmediate},
 		},
@@ -270,13 +270,13 @@ func TestWithBinding(t *testing.T) {
 		},
 	}
 
-	pvInfo := fakelisters.PersistentVolumeInfo{
+	pvLister := fakelisters.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 	}
 
-	pvcInfo := fakelisters.PersistentVolumeClaimInfo{
+	pvcLister := fakelisters.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -346,7 +346,7 @@ func TestWithBinding(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
 			p := &VolumeZone{
-				predicate: predicates.NewVolumeZonePredicate(pvInfo, pvcInfo, classInfo),
+				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, scLister),
 			}
 			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {

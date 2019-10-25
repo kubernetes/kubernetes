@@ -853,10 +853,10 @@ func TestVolumeCountConflicts(t *testing.T) {
 		os.Setenv(KubeMaxPDVols, strconv.Itoa(test.maxVols))
 		node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
 		pred := NewMaxPDVolumeCountPredicate(test.filterName,
-			getFakeCSINodeInfo(csiNode),
-			getFakeStorageClassInfo(test.filterName),
-			getFakePVInfo(test.filterName),
-			getFakePVCInfo(test.filterName))
+			getFakeCSINodeLister(csiNode),
+			getFakeStorageClassLister(test.filterName),
+			getFakePVLister(test.filterName),
+			getFakePVCLister(test.filterName))
 
 		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
 		if err != nil {
@@ -876,10 +876,10 @@ func TestVolumeCountConflicts(t *testing.T) {
 	for _, test := range tests {
 		node, csiNode := getNodeWithPodAndVolumeLimits("node", test.existingPods, int64(test.maxVols), test.filterName)
 		pred := NewMaxPDVolumeCountPredicate(test.filterName,
-			getFakeCSINodeInfo(csiNode),
-			getFakeStorageClassInfo(test.filterName),
-			getFakePVInfo(test.filterName),
-			getFakePVCInfo(test.filterName))
+			getFakeCSINodeLister(csiNode),
+			getFakeStorageClassLister(test.filterName),
+			getFakePVLister(test.filterName),
+			getFakePVCLister(test.filterName))
 		fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
 		if err != nil {
 			t.Errorf("Using allocatable [%s]%s: unexpected error: %v", test.filterName, test.test, err)
@@ -893,7 +893,7 @@ func TestVolumeCountConflicts(t *testing.T) {
 	}
 }
 
-func getFakeStorageClassInfo(sc string) fakelisters.StorageClassInfo {
+func getFakeStorageClassLister(sc string) fakelisters.StorageClassLister {
 	var provisioner string
 	switch sc {
 	case EBSVolumeFilterType:
@@ -905,9 +905,9 @@ func getFakeStorageClassInfo(sc string) fakelisters.StorageClassInfo {
 	case CinderVolumeFilterType:
 		provisioner = csilibplugins.CinderInTreePluginName
 	default:
-		return fakelisters.StorageClassInfo{}
+		return fakelisters.StorageClassLister{}
 	}
-	return fakelisters.StorageClassInfo{
+	return fakelisters.StorageClassLister{
 		{
 			ObjectMeta:  metav1.ObjectMeta{Name: sc},
 			Provisioner: provisioner,
@@ -919,8 +919,8 @@ func getFakeStorageClassInfo(sc string) fakelisters.StorageClassInfo {
 	}
 }
 
-func getFakePVInfo(filterName string) fakelisters.PersistentVolumeInfo {
-	return fakelisters.PersistentVolumeInfo{
+func getFakePVLister(filterName string) fakelisters.PersistentVolumeLister {
+	return fakelisters.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeSpec{
@@ -938,8 +938,8 @@ func getFakePVInfo(filterName string) fakelisters.PersistentVolumeInfo {
 	}
 }
 
-func getFakePVCInfo(filterName string) fakelisters.PersistentVolumeClaimInfo {
-	return fakelisters.PersistentVolumeClaimInfo{
+func getFakePVCLister(filterName string) fakelisters.PersistentVolumeClaimLister {
+	return fakelisters.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "some" + filterName + "Vol"},
 			Spec: v1.PersistentVolumeClaimSpec{

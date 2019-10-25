@@ -453,10 +453,10 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 				expectedFailureReasons = []PredicateFailureReason{test.expectedFailureReason}
 			}
 
-			pred := NewCSIMaxVolumeLimitPredicate(getFakeCSINodeInfo(csiNode),
-				getFakeCSIPVInfo(test.filterName, test.driverNames...),
-				getFakeCSIPVCInfo(test.filterName, "csi-sc", test.driverNames...),
-				getFakeCSIStorageClassInfo("csi-sc", test.driverNames[0]))
+			pred := NewCSIMaxVolumeLimitPredicate(getFakeCSINodeLister(csiNode),
+				getFakeCSIPVLister(test.filterName, test.driverNames...),
+				getFakeCSIPVCLister(test.filterName, "csi-sc", test.driverNames...),
+				getFakeCSIStorageClassLister("csi-sc", test.driverNames[0]))
 
 			fits, reasons, err := pred(test.newPod, GetPredicateMetadata(test.newPod, nil), node)
 			if err != nil {
@@ -472,8 +472,8 @@ func TestCSIVolumeCountPredicate(t *testing.T) {
 	}
 }
 
-func getFakeCSIPVInfo(volumeName string, driverNames ...string) fakelisters.PersistentVolumeInfo {
-	pvInfos := fakelisters.PersistentVolumeInfo{}
+func getFakeCSIPVLister(volumeName string, driverNames ...string) fakelisters.PersistentVolumeLister {
+	pvLister := fakelisters.PersistentVolumeLister{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			volumeHandle := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -510,15 +510,15 @@ func getFakeCSIPVInfo(volumeName string, driverNames ...string) fakelisters.Pers
 					},
 				}
 			}
-			pvInfos = append(pvInfos, pv)
+			pvLister = append(pvLister, pv)
 		}
 
 	}
-	return pvInfos
+	return pvLister
 }
 
-func getFakeCSIPVCInfo(volumeName, scName string, driverNames ...string) fakelisters.PersistentVolumeClaimInfo {
-	pvcInfos := fakelisters.PersistentVolumeClaimInfo{}
+func getFakeCSIPVCLister(volumeName, scName string, driverNames ...string) fakelisters.PersistentVolumeClaimLister {
+	pvcLister := fakelisters.PersistentVolumeClaimLister{}
 	for _, driver := range driverNames {
 		for j := 0; j < 4; j++ {
 			v := fmt.Sprintf("%s-%s-%d", volumeName, driver, j)
@@ -526,24 +526,24 @@ func getFakeCSIPVCInfo(volumeName, scName string, driverNames ...string) fakelis
 				ObjectMeta: metav1.ObjectMeta{Name: v},
 				Spec:       v1.PersistentVolumeClaimSpec{VolumeName: v},
 			}
-			pvcInfos = append(pvcInfos, pvc)
+			pvcLister = append(pvcLister, pvc)
 		}
 	}
 
-	pvcInfos = append(pvcInfos, v1.PersistentVolumeClaim{
+	pvcLister = append(pvcLister, v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: volumeName + "-4"},
 		Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &scName},
 	})
-	pvcInfos = append(pvcInfos, v1.PersistentVolumeClaim{
+	pvcLister = append(pvcLister, v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: volumeName + "-5"},
 		Spec:       v1.PersistentVolumeClaimSpec{},
 	})
 	// a pvc with missing PV but available storageclass.
-	pvcInfos = append(pvcInfos, v1.PersistentVolumeClaim{
+	pvcLister = append(pvcLister, v1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{Name: volumeName + "-6"},
 		Spec:       v1.PersistentVolumeClaimSpec{StorageClassName: &scName, VolumeName: "missing-in-action"},
 	})
-	return pvcInfos
+	return pvcLister
 }
 
 func enableMigrationOnNode(csiNode *storagev1beta1.CSINode, pluginName string) {
@@ -560,8 +560,8 @@ func enableMigrationOnNode(csiNode *storagev1beta1.CSINode, pluginName string) {
 	csiNode.Annotations = nodeInfoAnnotations
 }
 
-func getFakeCSIStorageClassInfo(scName, provisionerName string) fakelisters.StorageClassInfo {
-	return fakelisters.StorageClassInfo{
+func getFakeCSIStorageClassLister(scName, provisionerName string) fakelisters.StorageClassLister {
+	return fakelisters.StorageClassLister{
 		{
 			ObjectMeta:  metav1.ObjectMeta{Name: scName},
 			Provisioner: provisionerName,
@@ -569,9 +569,9 @@ func getFakeCSIStorageClassInfo(scName, provisionerName string) fakelisters.Stor
 	}
 }
 
-func getFakeCSINodeInfo(csiNode *storagev1beta1.CSINode) fakelisters.CSINodeInfo {
+func getFakeCSINodeLister(csiNode *storagev1beta1.CSINode) fakelisters.CSINodeLister {
 	if csiNode != nil {
-		return fakelisters.CSINodeInfo(*csiNode)
+		return fakelisters.CSINodeLister(*csiNode)
 	}
-	return fakelisters.CSINodeInfo{}
+	return fakelisters.CSINodeLister{}
 }
