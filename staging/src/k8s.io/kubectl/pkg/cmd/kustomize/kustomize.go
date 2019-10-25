@@ -19,12 +19,11 @@ package kustomize
 import (
 	"errors"
 	"github.com/spf13/cobra"
-
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/kustomize"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
-	"sigs.k8s.io/kustomize/pkg/fs"
+	"sigs.k8s.io/kustomize/api/filesys"
 )
 
 type kustomizeOptions struct {
@@ -70,7 +69,10 @@ func NewCmdKustomize(streams genericclioptions.IOStreams) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return kustomize.RunKustomizeBuild(streams.Out, fs.MakeRealFS(), o.kustomizationDir)
+			return kustomize.RunKustomizeBuild(
+				streams.Out,
+				filesys.MakeFsOnDisk(),
+				o.kustomizationDir)
 		},
 	}
 

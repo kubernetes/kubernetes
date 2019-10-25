@@ -40,7 +40,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/kustomize"
-	"sigs.k8s.io/kustomize/pkg/fs"
+	"sigs.k8s.io/kustomize/api/filesys"
 )
 
 const (
@@ -536,9 +536,8 @@ type KustomizeVisitor struct {
 
 // Visit in a KustomizeVisitor gets the output of Kustomize build and save it in the Streamvisitor
 func (v *KustomizeVisitor) Visit(fn VisitorFunc) error {
-	fSys := fs.MakeRealFS()
 	var out bytes.Buffer
-	err := kustomize.RunKustomizeBuild(&out, fSys, v.Path)
+	err := kustomize.RunKustomizeBuild(&out, filesys.MakeFsOnDisk(), v.Path)
 	if err != nil {
 		return err
 	}
