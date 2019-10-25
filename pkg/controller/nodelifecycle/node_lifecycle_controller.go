@@ -433,8 +433,30 @@ func NewNodeLifecycleController(
 	if nc.runTaintManager {
 		podLister := podInformer.Lister()
 		podGetter := func(name, namespace string) (*v1.Pod, error) { return podLister.Pods(namespace).Get(name) }
-		nodeLister := nodeInformer.Lister()
-		nodeGetter := func(name string) (*v1.Node, error) { return nodeLister.Get(name) }
+		podInformer.Informer().AddIndexers(cache.Indexers{
+			nodeNameKeyIndex: func(obj interface{}) ([]string, error) {
+				node, ok := obj.(*v1.Node)
+				if !ok {
+					return []string{}, nil
+				}
+				return []string{node.Name}, nil
+			},
+		})
+		nodeIndexer := nodeInformer.Informer().GetIndexer()
+		nodeGetter := func(name string) (*v1.Node, error) {
+			objs, err := nodeIndexer.ByIndex(nodeNameKeyIndex, name)
+			if err != nil {
+				return nil, err
+			}
+			for _, obj := range objs {
+				node, ok := obj.(*v1.Node)
+				if !ok {
+					continue
+				}
+				return node, nil
+			}
+			return nil, fmt.Errorf("unable to find the node with name: %q", name)
+		}
 		nc.taintManager = scheduler.NewNoExecuteTaintManager(kubeClient, podGetter, nodeGetter, nc.getPodsAssignedToNode)
 		nodeInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
 			AddFunc: nodeutil.CreateAddNodeHandler(func(node *v1.Node) error {
