@@ -57,7 +57,7 @@ var (
 	RequestResult ResultMetric = noopResult{}
 )
 
-// RegisterOpts is the foo bar
+// RegisterOpts contains all the metrics to register. Metrics may be nil.
 type RegisterOpts struct {
 	ClientCertExpiration  ExpirationMetric
 	ClientCertRotationAge DurationMetric
@@ -69,10 +69,18 @@ type RegisterOpts struct {
 // only be called once.
 func Register(opts RegisterOpts) {
 	registerMetrics.Do(func() {
-		ClientCertExpiration = opts.ClientCertExpiration
-		ClientCertRotationAge = opts.ClientCertRotationAge
-		RequestLatency = opts.RequestLatency
-		RequestResult = opts.RequestResult
+		if opts.ClientCertExpiration != nil {
+			ClientCertExpiration = opts.ClientCertExpiration
+		}
+		if opts.ClientCertRotationAge != nil {
+			ClientCertRotationAge = opts.ClientCertRotationAge
+		}
+		if opts.RequestLatency != nil {
+			RequestLatency = opts.RequestLatency
+		}
+		if opts.RequestResult != nil {
+			RequestResult = opts.RequestResult
+		}
 	})
 }
 
