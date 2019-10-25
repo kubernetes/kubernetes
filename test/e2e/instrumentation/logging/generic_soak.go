@@ -90,10 +90,10 @@ func RunLogPodsWithSleepOf(f *framework.Framework, sleep time.Duration, podname 
 		func(n v1.Node) v1.PodSpec {
 			return v1.PodSpec{
 				Containers: []v1.Container{{
-					Name:  "logging-soak",
-					Image: imageutils.GetE2EImage(imageutils.Agnhost),
+					Name:    "logging-soak",
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
+					Command: []string{"/bin/sh"},
 					Args: []string{
-						"/bin/sh",
 						"-c",
 						fmt.Sprintf("while true ; do echo %v ; sleep %v; done", kilobyte, sleep.Seconds()),
 					},

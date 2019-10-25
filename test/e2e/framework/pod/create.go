@@ -28,11 +28,6 @@ import (
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
-var (
-	// BusyBoxImage is the image URI of BusyBox.
-	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
-)
-
 // CreateWaitAndDeletePod creates the test pod, wait for (hopefully) success, and then delete the pod.
 // Note: need named return value so that the err assignment in the defer sets the returned error.
 //       Has been shown to be necessary using Go 1.7.
@@ -162,7 +157,7 @@ func MakePod(ns string, nodeSelector map[string]string, pvclaims []*v1.Persisten
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   BusyBoxImage,
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					SecurityContext: &v1.SecurityContext{
@@ -219,7 +214,7 @@ func MakeSecPod(ns string, pvclaims []*v1.PersistentVolumeClaim, inlineVolumeSou
 			Containers: []v1.Container{
 				{
 					Name:    "write-pod",
-					Image:   imageutils.GetE2EImage(imageutils.BusyBox),
+					Image:   imageutils.GetE2EImage(imageutils.Agnhost),
 					Command: []string{"/bin/sh"},
 					Args:    []string{"-c", command},
 					SecurityContext: &v1.SecurityContext{
