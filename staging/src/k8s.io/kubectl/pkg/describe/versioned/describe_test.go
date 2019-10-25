@@ -3133,7 +3133,7 @@ Spec:
 		},
 	})
 	d := NetworkPolicyDescriber{versionedFake}
-	out, err := d.Describe("", "network-policy-1", describe.DescriberSettings{})
+	out, err := d.Describe("default", "network-policy-1", describe.DescriberSettings{})
 	if err != nil {
 		t.Errorf("unexpected error: %s", err)
 	}
