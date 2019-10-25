@@ -23,6 +23,8 @@ import (
 	"reflect"
 	"text/template"
 
+	"github.com/Masterminds/sprig/v3"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/json"
 )
@@ -35,6 +37,7 @@ type GoTemplatePrinter struct {
 
 func NewGoTemplatePrinter(tmpl []byte) (*GoTemplatePrinter, error) {
 	t, err := template.New("output").
+		Funcs(sprig.TxtFuncMap()).
 		Funcs(template.FuncMap{
 			"exists":       exists,
 			"base64decode": base64decode,
