@@ -123,7 +123,6 @@ filegroup(
         ":package-srcs",
         "//pkg/scheduler/algorithm:all-srcs",
         "//pkg/scheduler/algorithmprovider:all-srcs",
-        "//pkg/scheduler/api:all-srcs",
         "//pkg/scheduler/apis/config:all-srcs",
         "//pkg/scheduler/apis/extender/v1:all-srcs",
         "//pkg/scheduler/core:all-srcs",

@@ -79,7 +79,6 @@
 				"k8s.io/kubernetes/pkg/scheduler/algorithm",
 				"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates",
 				"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util",
-				"k8s.io/kubernetes/pkg/scheduler/api",
 				"k8s.io/kubernetes/pkg/scheduler/metrics",
 				"k8s.io/kubernetes/pkg/scheduler/nodeinfo",
 				"k8s.io/kubernetes/pkg/scheduler/util",
