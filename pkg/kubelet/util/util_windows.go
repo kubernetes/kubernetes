@@ -19,6 +19,7 @@ limitations under the License.
 package util
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/url"
@@ -53,8 +54,8 @@ func CreateListener(endpoint string) (net.Listener, error) {
 	}
 }
 
-// GetAddressAndDialer returns the address parsed from the given endpoint and a dialer.
-func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout time.Duration) (net.Conn, error), error) {
+// GetAddressAndDialer returns the address parsed from the given endpoint and a context dialer.
+func GetAddressAndDialer(endpoint string) (string, func(ctx context.Context, addr string) (net.Conn, error), error) {
 	protocol, addr, err := parseEndpoint(endpoint)
 	if err != nil {
 		return "", nil, err
@@ -71,12 +72,12 @@ func GetAddressAndDialer(endpoint string) (string, func(addr string, timeout tim
 	return "", nil, fmt.Errorf("only support tcp and npipe endpoint")
 }
 
-func tcpDial(addr string, timeout time.Duration) (net.Conn, error) {
-	return net.DialTimeout(tcpProtocol, addr, timeout)
+func tcpDial(ctx context.Context, addr string) (net.Conn, error) {
+	return (&net.Dialer{}).DialContext(ctx, tcpProtocol, addr)
 }
 
-func npipeDial(addr string, timeout time.Duration) (net.Conn, error) {
-	return winio.DialPipe(addr, &timeout)
+func npipeDial(ctx context.Context, addr string) (net.Conn, error) {
+	return winio.DialPipeContext(ctx, addr)
 }
 
 func parseEndpoint(endpoint string) (string, string, error) {

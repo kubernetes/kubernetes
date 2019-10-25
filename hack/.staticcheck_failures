@@ -11,11 +11,6 @@ pkg/controller/podgc
 pkg/controller/replicaset
 pkg/controller/resourcequota
 pkg/controller/statefulset
-pkg/kubelet/apis/podresources
-pkg/kubelet/cm/devicemanager
-pkg/kubelet/pluginmanager/operationexecutor
-pkg/kubelet/pluginmanager/pluginwatcher
-pkg/kubelet/remote
 pkg/probe/http
 pkg/registry/autoscaling/horizontalpodautoscaler/storage
 pkg/registry/core/namespace/storage
