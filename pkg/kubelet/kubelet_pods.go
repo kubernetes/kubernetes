@@ -1458,6 +1458,11 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		switch cs.State {
 		case kubecontainer.ContainerStateRunning:
 			status.State.Running = &v1.ContainerStateRunning{StartedAt: metav1.NewTime(cs.StartedAt)}
+			// Use the ready value from previousStatus so that we don't initialize it to false
+			// See https://github.com/kubernetes/kubernetes/issues/78733 for more details
+			if pc, found := podutil.GetContainerStatus(previousStatus, cs.Name); found && pc.ContainerID == cid {
+				status.Ready = pc.Ready
+			}
 		case kubecontainer.ContainerStateCreated:
 			// Treat containers in the "created" state as if they are exited.
 			// The pod workers are supposed start all containers it creates in

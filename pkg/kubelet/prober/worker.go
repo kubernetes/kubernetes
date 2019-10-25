@@ -201,7 +201,10 @@ func (w *worker) doProbe() (keepGoing bool) {
 			w.resultsManager.Remove(w.containerID)
 		}
 		w.containerID = kubecontainer.ParseContainerID(c.ContainerID)
-		w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		// Set initial value if and only if the container has just been created
+		if c.State.Running == nil || int32(time.Since(c.State.Running.StartedAt.Time).Seconds()) < w.spec.InitialDelaySeconds {
+			w.resultsManager.Set(w.containerID, w.initialValue, w.pod)
+		}
 		// We've got a new container; resume probing.
 		w.onHold = false
 	}

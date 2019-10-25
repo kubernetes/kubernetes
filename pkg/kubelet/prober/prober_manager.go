@@ -241,6 +241,10 @@ func (m *manager) UpdatePodStatus(podUID types.UID, podStatus *v1.PodStatus) {
 			ready = false
 		} else if result, ok := m.readinessManager.Get(kubecontainer.ParseContainerID(c.ContainerID)); ok {
 			ready = result == results.Success
+		} else if c.Ready {
+			// Keep the container ready until we get a new result from readinessManager
+			// See https://github.com/kubernetes/kubernetes/issues/78733 for more details
+			ready = c.Ready
 		} else {
 			// The check whether there is a probe which hasn't run yet.
 			_, exists := m.getWorker(podUID, c.Name, readiness)
