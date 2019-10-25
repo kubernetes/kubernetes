@@ -44,7 +44,7 @@ genrule(
         "//:all-srcs",
     ],
     outs = ["stable-metrics-list.yaml"],
-    cmd = "./$(locations :instrumentation) $(locations //:all-srcs) > $@",
+    cmd = "for loc in $(locations //:all-srcs); do echo $$loc; done | ./$(locations :instrumentation) - > $@",
     message = "Listing all stable metrics.",
     tools = [":instrumentation"],
 )

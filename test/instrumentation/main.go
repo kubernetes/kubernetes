@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -42,18 +43,34 @@ const (
 func main() {
 	flag.Parse()
 	if len(flag.Args()) < 1 {
-		fmt.Fprintf(os.Stderr, "USAGE: %s <DIR or FILE> [...]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "USAGE: %s <DIR or FILE or '-'> [...]\n", os.Args[0])
 		os.Exit(64)
 	}
 
 	stableMetrics := []metric{}
 	errors := []error{}
 
+	addStdin := false
 	for _, arg := range flag.Args() {
+		if arg == "-" {
+			addStdin = true
+			continue
+		}
 		ms, es := searchPathForStableMetrics(arg)
 		stableMetrics = append(stableMetrics, ms...)
 		errors = append(errors, es...)
 	}
+	if addStdin {
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Split(bufio.ScanLines)
+		for scanner.Scan() {
+			arg := scanner.Text()
+			ms, es := searchPathForStableMetrics(arg)
+			stableMetrics = append(stableMetrics, ms...)
+			errors = append(errors, es...)
+		}
+	}
+
 	for _, err := range errors {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 	}
