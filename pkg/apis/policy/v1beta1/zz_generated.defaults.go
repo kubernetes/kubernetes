@@ -35,7 +35,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_PodSecurityPolicy(in *v1beta1.PodSecurityPolicy) {
-	SetDefaults_PodSecurityPolicySpec(&in.Spec)
+	setDefaultsPodSecurityPolicySpec(&in.Spec)
 }
 
 func SetObjectDefaults_PodSecurityPolicyList(in *v1beta1.PodSecurityPolicyList) {
