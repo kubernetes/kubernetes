@@ -151,10 +151,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		return nil
 
 	case leaseResource:
-		if p.features.Enabled(features.NodeLease) {
-			return p.admitLease(nodeName, a)
-		}
-		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gate %s", features.NodeLease))
+		return p.admitLease(nodeName, a)
 
 	case csiNodeResource:
 		if p.features.Enabled(features.CSINodeInfo) {

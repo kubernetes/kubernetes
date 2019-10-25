@@ -57,7 +57,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
-	"k8s.io/kubernetes/pkg/features"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
@@ -472,12 +471,7 @@ func NewNodeLifecycleController(
 	})
 
 	nc.leaseLister = leaseInformer.Lister()
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
-		nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
-	} else {
-		// Always indicate that lease is synced to prevent syncing lease.
-		nc.leaseInformerSynced = func() bool { return true }
-	}
+	nc.leaseInformerSynced = leaseInformer.Informer().HasSynced
 
 	nc.nodeLister = nodeInformer.Lister()
 	nc.nodeInformerSynced = nodeInformer.Informer().HasSynced
@@ -1037,17 +1031,14 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 			readyTransitionTimestamp: transitionTime,
 		}
 	}
-	var observedLease *coordv1.Lease
-	if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
-		// Always update the probe time if node lease is renewed.
-		// Note: If kubelet never posted the node status, but continues renewing the
-		// heartbeat leases, the node controller will assume the node is healthy and
-		// take no action.
-		observedLease, _ = nc.leaseLister.Leases(v1.NamespaceNodeLease).Get(node.Name)
-		if observedLease != nil && (savedLease == nil || savedLease.Spec.RenewTime.Before(observedLease.Spec.RenewTime)) {
-			nodeHealth.lease = observedLease
-			nodeHealth.probeTimestamp = nc.now()
-		}
+	// Always update the probe time if node lease is renewed.
+	// Note: If kubelet never posted the node status, but continues renewing the
+	// heartbeat leases, the node controller will assume the node is healthy and
+	// take no action.
+	observedLease, _ := nc.leaseLister.Leases(v1.NamespaceNodeLease).Get(node.Name)
+	if observedLease != nil && (savedLease == nil || savedLease.Spec.RenewTime.Before(observedLease.Spec.RenewTime)) {
+		nodeHealth.lease = observedLease
+		nodeHealth.probeTimestamp = nc.now()
 	}
 
 	if nc.now().After(nodeHealth.probeTimestamp.Add(gracePeriod)) {

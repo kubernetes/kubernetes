@@ -911,6 +911,16 @@ items:
     - list
     - watch
   - apiGroups:
+    - coordination.k8s.io
+    resources:
+    - leases
+    verbs:
+    - create
+    - delete
+    - get
+    - patch
+    - update
+  - apiGroups:
     - storage.k8s.io
     resources:
     - volumeattachments
@@ -942,16 +952,6 @@ items:
     - storage.k8s.io
     resources:
     - csinodes
-    verbs:
-    - create
-    - delete
-    - get
-    - patch
-    - update
-  - apiGroups:
-    - coordination.k8s.io
-    resources:
-    - leases
     verbs:
     - create
     - delete
