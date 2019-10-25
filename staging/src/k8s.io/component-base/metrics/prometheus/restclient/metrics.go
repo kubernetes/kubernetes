@@ -55,13 +55,36 @@ var (
 		},
 		[]string{"code", "method", "host"},
 	)
+
+	certExpiration = k8smetrics.NewGauge(
+		&k8smetrics.GaugeOpts{
+			Name: "rest_client_certificate_expiration_seconds",
+			Help: "Gauge of the lifetime of the client certificate. The value is the date the certificate will expire in seconds since January 1, 1970 UTC.",
+		},
+	)
+
+	certRotation = k8smetrics.NewHistogram(
+		&k8smetrics.HistogramOpts{
+			Name: "rest_client_certificate_rotation_age",
+			Help: "Count of the number of seconds the last client certificate lived before being rotated.",
+			// [1m, 1h, ... exponential x^4 ..., 7.5y]
+			Buckets: append([]float64{60}, k8smetrics.ExponentialBuckets(3600, 4, 9)...),
+		},
+	)
 )
 
 func init() {
 	legacyregistry.MustRegister(requestLatency)
 	legacyregistry.MustRegister(deprecatedRequestLatency)
 	legacyregistry.MustRegister(requestResult)
-	metrics.Register(&latencyAdapter{m: requestLatency, dm: deprecatedRequestLatency}, &resultAdapter{requestResult})
+	legacyregistry.MustRegister(certExpiration)
+	legacyregistry.MustRegister(certRotation)
+	metrics.Register(metrics.RegisterOpts{
+		ClientCertExpiration:  &expirationAdapter{m: certExpiration},
+		ClientCertRotationAge: &rotationAdapter{m: certRotation},
+		RequestLatency:        &latencyAdapter{m: requestLatency, dm: deprecatedRequestLatency},
+		RequestResult:         &resultAdapter{requestResult},
+	})
 }
 
 type latencyAdapter struct {
@@ -80,4 +103,20 @@ type resultAdapter struct {
 
 func (r *resultAdapter) Increment(code, method, host string) {
 	r.m.WithLabelValues(code, method, host).Inc()
+}
+
+type expirationAdapter struct {
+	m *k8smetrics.Gauge
+}
+
+func (e *expirationAdapter) Set(t time.Time) {
+	e.m.Set(float64(t.Unix()))
+}
+
+type rotationAdapter struct {
+	m *k8smetrics.Histogram
+}
+
+func (r *rotationAdapter) Observe(d time.Duration) {
+	r.m.Observe(d.Seconds())
 }

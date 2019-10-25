@@ -42,6 +42,7 @@ import (
 	"k8s.io/client-go/pkg/apis/clientauthentication/v1alpha1"
 	"k8s.io/client-go/pkg/apis/clientauthentication/v1beta1"
 	"k8s.io/client-go/tools/clientcmd/api"
+	"k8s.io/client-go/tools/metrics"
 	"k8s.io/client-go/transport"
 	"k8s.io/client-go/util/connrotation"
 	"k8s.io/klog"
@@ -367,5 +368,7 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 			onRotate()
 		}
 	}
+	metrics.ClientCertRotationAge.Observe(oldCreds.cert.Leaf.NotAfter.Sub(oldCreds.cert.Leaf.NotBefore))
+	metrics.ClientCertExpiration.Set(newCreds.cert.Leaf.NotAfter)
 	return nil
 }
