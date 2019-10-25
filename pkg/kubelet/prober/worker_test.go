@@ -286,6 +286,15 @@ func expectResult(t *testing.T, w *worker, expectedResult results.Result, msg st
 	}
 }
 
+func expectResultExistence(t *testing.T, w *worker, expectExist bool) {
+	_, ok := resultsManager(w.probeManager, w.probeType).Get(w.containerID)
+	if expectExist && !ok {
+		t.Errorf("[%s] Expected result to be set, but was not set", w.probeType)
+	} else if !expectExist && ok {
+		t.Errorf("[%s] Expected result not to be set, but was set", w.probeType)
+	}
+}
+
 func expectContinue(t *testing.T, w *worker, c bool, msg string) {
 	if !c {
 		t.Errorf("[%s - %s] Expected to continue, but did not", w.probeType, msg)
@@ -395,19 +404,21 @@ func TestResultRunOnStartupCheckFailure(t *testing.T) {
 	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithStarted(false))
 
 	// Below FailureThreshold leaves probe state unchanged
-	// which is failed for startup at first.
+	// which is nil for startup at first.
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg := "probe failure, result failure"
 	expectContinue(t, w, w.doProbe(), msg)
-	expectResult(t, w, results.Failure, msg)
+	expectResultExistence(t, w, false)
 	if w.resultRun != 1 {
 		t.Errorf("Prober resultRun should be 1")
 	}
 
+	// We set FailureThreshold 3, so this 2nd probe should increase resultRun
+	// but shouldn't update result to resultManager
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg = "2nd probe failure, result failure"
 	expectContinue(t, w, w.doProbe(), msg)
-	expectResult(t, w, results.Failure, msg)
+	expectResultExistence(t, w, false)
 	if w.resultRun != 2 {
 		t.Errorf("Prober resultRun should be 2")
 	}
@@ -432,7 +443,8 @@ func TestLivenessProbeDisabledByStarted(t *testing.T) {
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg := "Not started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(), msg)
-	expectResult(t, w, results.Success, msg)
+	// since the probe has never executed, so resultManager should not have any result
+	expectResultExistence(t, w, false)
 	// setting started state
 	m.statusManager.SetContainerStartup(w.pod.UID, w.containerID, true)
 	// livenessProbe fails
@@ -450,7 +462,7 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	m.prober.exec = fakeExecProber{probe.Failure, nil}
 	msg := "Not started, probe failure, result failure"
 	expectContinue(t, w, w.doProbe(), msg)
-	expectResult(t, w, results.Failure, msg)
+	expectResultExistence(t, w, false)
 	// startupProbe succeeds
 	m.prober.exec = fakeExecProber{probe.Success, nil}
 	msg = "Started, probe success, result success"
@@ -463,4 +475,22 @@ func TestStartupProbeDisabledByStarted(t *testing.T) {
 	msg = "Started, probe failure, result success"
 	expectContinue(t, w, w.doProbe(), msg)
 	expectResult(t, w, results.Success, msg)
+}
+
+func TestReadinessProbeOnKubeletRestart(t *testing.T) {
+	m := newTestManager()
+	w := newTestWorker(m, readiness, v1.Probe{SuccessThreshold: 1, FailureThreshold: 2})
+	m.prober.exec = fakeExecProber{probe.Failure, nil}
+	m.statusManager.SetPodStatus(w.pod, getTestRunningStatusWithReady(true))
+
+	// given a ready container with FailureThreshold set 2, following condition should met:
+	// 1. probe worker should not initialize the readiness to false
+	// 2. the 1st probe result should not update to resultManager (because the threshold is not reached)
+	// PS: this is a simulation of kubelet restart
+	expectContinue(t, w, w.doProbe(), "")
+	expectResultExistence(t, w, false)
+
+	// the 2nd probe failure should update the readiness state
+	expectContinue(t, w, w.doProbe(), "")
+	expectResult(t, w, results.Failure, "")
 }
