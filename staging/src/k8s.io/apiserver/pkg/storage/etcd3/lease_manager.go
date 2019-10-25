@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coreos/etcd/clientv3"
+	"go.etcd.io/etcd/clientv3"
 )
 
 // leaseManager is used to manage leases requested from etcd. If a new write

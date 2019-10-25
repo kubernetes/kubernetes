@@ -205,16 +205,28 @@ func (o *SummaryOpts) annotateStabilityLevel() {
 	})
 }
 
+// Deprecated: DefObjectives will not be used as the default objectives in
+// v1.0.0 of the library. The default Summary will have no quantiles then.
+var (
+	defObjectives = map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001}
+)
+
 // convenience function to allow easy transformation to the prometheus
 // counterpart. This will do more once we have a proper label abstraction
 func (o SummaryOpts) toPromSummaryOpts() prometheus.SummaryOpts {
+	// we need to retain existing quantile behavior for backwards compatibility,
+	// so let's do what prometheus used to do prior to v1.
+	objectives := o.Objectives
+	if objectives == nil {
+		objectives = defObjectives
+	}
 	return prometheus.SummaryOpts{
 		Namespace:   o.Namespace,
 		Subsystem:   o.Subsystem,
 		Name:        o.Name,
 		Help:        o.Help,
 		ConstLabels: o.ConstLabels,
-		Objectives:  o.Objectives,
+		Objectives:  objectives,
 		MaxAge:      o.MaxAge,
 		AgeBuckets:  o.AgeBuckets,
 		BufCap:      o.BufCap,

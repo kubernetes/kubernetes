@@ -307,8 +307,8 @@ func (s *DefaultStorageFactory) Backends() []Backend {
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 	}
-	if len(s.StorageConfig.Transport.CAFile) > 0 {
-		if caCert, err := ioutil.ReadFile(s.StorageConfig.Transport.CAFile); err != nil {
+	if len(s.StorageConfig.Transport.TrustedCAFile) > 0 {
+		if caCert, err := ioutil.ReadFile(s.StorageConfig.Transport.TrustedCAFile); err != nil {
 			klog.Errorf("failed to read ca file while getting backends: %s", err)
 		} else {
 			caPool := x509.NewCertPool()
