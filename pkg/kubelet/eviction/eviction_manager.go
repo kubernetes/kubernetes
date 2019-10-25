@@ -543,8 +543,8 @@ func (m *managerImpl) containerEphemeralStorageLimitEviction(podStats statsapi.P
 }
 
 func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg string, annotations map[string]string) bool {
-	// If the pod is marked as critical and static, and support for critical pod annotations is enabled,
-	// do not evict such pods. Static pods are not re-admitted after evictions.
+	// If the pod is marked as critical or static, do not evict such pods.
+	// Static pods are not re-admitted after evictions.
 	// https://github.com/kubernetes/kubernetes/issues/40573 has more details.
 	if kubelettypes.IsCriticalPod(pod) {
 		klog.Errorf("eviction manager: cannot evict a critical pod %s", format.Pod(pod))
