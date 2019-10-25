@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/cli-runtime/pkg/resource"
@@ -313,16 +314,25 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 
 		return nil
 	})
-	if err != nil {
-		return err
-	}
-	if found == 0 {
+	if err == nil && found == 0 {
 		fmt.Fprintf(o.Out, "No resources found\n")
 		return nil
 	}
+
+	waitErr := o.waitDeleted(deletedInfos, uidMap)
+
+	return utilerrors.NewAggregate([]error{err, waitErr})
+}
+
+func (o *DeleteOptions) waitDeleted(deletedInfos []*resource.Info, uidMap cmdwait.UIDMap) error {
 	if !o.WaitForDeletion {
 		return nil
 	}
+
+	if len(deletedInfos) == 0 {
+		return nil
+	}
+
 	// if we don't have a dynamic client, we don't want to wait.  Eventually when delete is cleaned up, this will likely
 	// drop out.
 	if o.DynamicClient == nil {
@@ -344,7 +354,7 @@ func (o *DeleteOptions) DeleteResult(r *resource.Result) error {
 		ConditionFn: cmdwait.IsDeleted,
 		IOStreams:   o.IOStreams,
 	}
-	err = waitOptions.RunWait()
+	err := waitOptions.RunWait()
 	if errors.IsForbidden(err) || errors.IsMethodNotSupported(err) {
 		// if we're forbidden from waiting, we shouldn't fail.
 		// if the resource doesn't support a verb we need, we shouldn't fail.
