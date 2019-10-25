@@ -34,14 +34,14 @@ import (
 
 // InterPodAffinity contains information to calculate inter pod affinity.
 type InterPodAffinity struct {
-	nodeLister            schedulerlisters.NodeLister
+	nodeInfoLister        schedulerlisters.NodeInfoLister
 	hardPodAffinityWeight int32
 }
 
 // NewInterPodAffinityPriority creates an InterPodAffinity.
-func NewInterPodAffinityPriority(nodeLister schedulerlisters.NodeLister, hardPodAffinityWeight int32) PriorityFunction {
+func NewInterPodAffinityPriority(nodeInfoLister schedulerlisters.NodeInfoLister, hardPodAffinityWeight int32) PriorityFunction {
 	interPodAffinity := &InterPodAffinity{
-		nodeLister:            nodeLister,
+		nodeInfoLister:        nodeInfoLister,
 		hardPodAffinityWeight: hardPodAffinityWeight,
 	}
 	return interPodAffinity.CalculateInterPodAffinityPriority
@@ -118,7 +118,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 	var maxCount, minCount int64
 
 	processPod := func(existingPod *v1.Pod) error {
-		existingPodNode, err := ipa.nodeLister.GetNodeInfo(existingPod.Spec.NodeName)
+		existingPodNodeInfo, err := ipa.nodeInfoLister.Get(existingPod.Spec.NodeName)
 		if err != nil {
 			klog.Errorf("Node not found, %v", existingPod.Spec.NodeName)
 			return nil
@@ -126,6 +126,7 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, node
 		existingPodAffinity := existingPod.Spec.Affinity
 		existingHasAffinityConstraints := existingPodAffinity != nil && existingPodAffinity.PodAffinity != nil
 		existingHasAntiAffinityConstraints := existingPodAffinity != nil && existingPodAffinity.PodAntiAffinity != nil
+		existingPodNode := existingPodNodeInfo.Node()
 
 		if hasAffinityConstraints {
 			// For every soft pod affinity term of <pod>, if <existingPod> matches the term,

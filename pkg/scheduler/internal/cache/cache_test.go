@@ -1077,7 +1077,7 @@ func TestNodeOperators(t *testing.T) {
 		}
 
 		// Case 2: dump cached nodes successfully.
-		cachedNodes := nodeinfosnapshot.NewSnapshot()
+		cachedNodes := nodeinfosnapshot.NewEmptySnapshot()
 		cache.UpdateNodeInfoSnapshot(cachedNodes)
 		newNode, found := cachedNodes.NodeInfoMap[node.Name]
 		if !found || len(cachedNodes.NodeInfoMap) != 1 {
@@ -1333,7 +1333,7 @@ func TestSchedulerCache_UpdateNodeInfoSnapshot(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			cache = newSchedulerCache(time.Second, time.Second, nil)
-			snapshot = nodeinfosnapshot.NewSnapshot()
+			snapshot = nodeinfosnapshot.NewEmptySnapshot()
 
 			for _, op := range test.operations {
 				op()
@@ -1382,7 +1382,7 @@ func BenchmarkUpdate1kNodes30kPods(b *testing.B) {
 	cache := setupCacheOf1kNodes30kPods(b)
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
-		cachedNodes := nodeinfosnapshot.NewSnapshot()
+		cachedNodes := nodeinfosnapshot.NewEmptySnapshot()
 		cache.UpdateNodeInfoSnapshot(cachedNodes)
 	}
 }

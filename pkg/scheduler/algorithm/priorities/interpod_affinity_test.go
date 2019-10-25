@@ -23,8 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -515,12 +514,12 @@ func TestInterPodAffinityPriority(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
 			interPodAffinity := InterPodAffinity{
-				nodeLister:            fakelisters.NodeLister(test.nodes),
+				nodeInfoLister:        snapshot.NodeInfos(),
 				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			}
-			list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
+			list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, snapshot.NodeInfoMap, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -603,12 +602,12 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
 			ipa := InterPodAffinity{
-				nodeLister:            fakelisters.NodeLister(test.nodes),
+				nodeInfoLister:        snapshot.NodeInfos(),
 				hardPodAffinityWeight: test.hardPodAffinityWeight,
 			}
-			list, err := ipa.CalculateInterPodAffinityPriority(test.pod, nodeNameToInfo, test.nodes)
+			list, err := ipa.CalculateInterPodAffinityPriority(test.pod, snapshot.NodeInfoMap, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -660,14 +659,14 @@ func BenchmarkInterPodAffinityPriority(b *testing.B) {
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes := tt.prepFunc(tt.existingPodsNum, tt.allNodesNum)
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(existingPods, allNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(existingPods, allNodes)
 			interPodAffinity := InterPodAffinity{
-				nodeLister:            fakelisters.NodeLister(allNodes),
+				nodeInfoLister:        snapshot.NodeInfos(),
 				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				interPodAffinity.CalculateInterPodAffinityPriority(tt.pod, nodeNameToInfo, allNodes)
+				interPodAffinity.CalculateInterPodAffinityPriority(tt.pod, snapshot.NodeInfoMap, allNodes)
 			}
 		})
 	}

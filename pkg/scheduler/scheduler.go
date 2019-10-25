@@ -277,8 +277,7 @@ func New(client clientset.Interface,
 	registry := options.frameworkDefaultRegistry
 	if registry == nil {
 		registry = frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{
-			SchedulerCache: schedulerCache,
-			VolumeBinder:   volumeBinder,
+			VolumeBinder: volumeBinder,
 		})
 	}
 	registry.Merge(options.frameworkOutOfTreeRegistry)

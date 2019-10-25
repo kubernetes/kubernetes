@@ -35,6 +35,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -243,6 +244,10 @@ func (*fakeFramework) ClientSet() clientset.Interface {
 }
 
 func (*fakeFramework) SharedInformerFactory() informers.SharedInformerFactory {
+	return nil
+}
+
+func (*fakeFramework) SnapshotSharedLister() schedulerlisters.SharedLister {
 	return nil
 }
 

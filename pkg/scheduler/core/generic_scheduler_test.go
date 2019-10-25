@@ -1420,7 +1420,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				nodes = append(nodes, node)
 			}
 			if test.addAffinityPredicate {
-				n := fakelisters.NodeLister([]*v1.Node{nodes[0]})
+				n := fakelisters.NewNodeInfoLister([]*v1.Node{nodes[0]})
 				p := fakelisters.PodLister(test.pods)
 				test.predicates[algorithmpredicates.MatchInterPodAffinityPred] = algorithmpredicates.NewPodAffinityPredicate(n, p)
 			}

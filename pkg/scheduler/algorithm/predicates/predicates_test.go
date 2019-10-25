@@ -1858,7 +1858,7 @@ func TestServiceAffinity(t *testing.T) {
 				nodeInfo.SetNode(test.node)
 				nodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{test.node.Name: nodeInfo}
 				// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
-				predicate, precompute := NewServiceAffinityPredicate(fakelisters.NodeLister(nodes), fakelisters.PodLister(test.pods), fakelisters.ServiceLister(test.services), test.labels)
+				predicate, precompute := NewServiceAffinityPredicate(fakelisters.NewNodeInfoLister(nodes), fakelisters.PodLister(test.pods), fakelisters.ServiceLister(test.services), test.labels)
 				// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
 				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", func(pm *predicateMetadata) {
 					if !skipPrecompute {
@@ -2931,8 +2931,8 @@ func TestInterPodAffinity(t *testing.T) {
 			}
 
 			fit := PodAffinityChecker{
-				nodeLister: fakelisters.NodeLister([]*v1.Node{node}),
-				podLister:  fakelisters.PodLister(test.pods),
+				nodeInfoLister: fakelisters.NewNodeInfoLister([]*v1.Node{node}),
+				podLister:      fakelisters.PodLister(test.pods),
 			}
 			nodeInfo := schedulernodeinfo.NewNodeInfo(podsOnNode...)
 			nodeInfo.SetNode(test.node)
@@ -4044,8 +4044,8 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 
 			for indexNode, node := range test.nodes {
 				testFit := PodAffinityChecker{
-					nodeLister: fakelisters.NodeLister(test.nodes),
-					podLister:  fakelisters.PodLister(test.pods),
+					nodeInfoLister: fakelisters.NewNodeInfoLister(test.nodes),
+					podLister:      fakelisters.PodLister(test.pods),
 				}
 
 				var meta PredicateMetadata
