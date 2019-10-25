@@ -28,6 +28,7 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -222,8 +223,8 @@ var _ = SIGDescribe("Firewall rule", func() {
 })
 
 func assertNotReachableHTTPTimeout(ip string, port int, timeout time.Duration) {
-	result := framework.PokeHTTP(ip, port, "/", &framework.HTTPPokeParams{Timeout: timeout})
-	if result.Status == framework.HTTPError {
+	result := e2enetwork.PokeHTTP(ip, port, "/", &e2enetwork.HTTPPokeParams{Timeout: timeout})
+	if result.Status == e2enetwork.HTTPError {
 		framework.Failf("Unexpected error checking for reachability of %s:%d: %v", ip, port, result.Error)
 	}
 	if result.Code != 0 {
@@ -243,8 +244,8 @@ func testHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout
 	hittedHosts := sets.NewString()
 	count := 0
 	condition := func() (bool, error) {
-		result := framework.PokeHTTP(externalIP, int(httpPort), "/hostname", &framework.HTTPPokeParams{Timeout: 1 * time.Second})
-		if result.Status != framework.HTTPSuccess {
+		result := e2enetwork.PokeHTTP(externalIP, int(httpPort), "/hostname", &e2enetwork.HTTPPokeParams{Timeout: 1 * time.Second})
+		if result.Status != e2enetwork.HTTPSuccess {
 			return false, nil
 		}
 
