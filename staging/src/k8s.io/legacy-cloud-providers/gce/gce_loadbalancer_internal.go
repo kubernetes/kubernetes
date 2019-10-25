@@ -22,14 +22,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	"strconv"
 	"strings"
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
+	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	computebeta "google.golang.org/api/compute/v0.beta"
 	compute "google.golang.org/api/compute/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
@@ -433,9 +433,14 @@ func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.Node)
 		return "", err
 	}
 
+	hostNames := nodeNames(nodes)
+	hosts, err := g.getFoundInstanceByNames(hostNames)
+	if err != nil {
+		return "", err
+	}
 	kubeNodes := sets.NewString()
-	for _, n := range nodes {
-		kubeNodes.Insert(n.Name)
+	for _, h := range hosts {
+		kubeNodes.Insert(h.Name)
 	}
 
 	gceNodes := sets.NewString()
