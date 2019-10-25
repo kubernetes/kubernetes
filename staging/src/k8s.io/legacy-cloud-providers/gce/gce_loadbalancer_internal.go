@@ -29,7 +29,7 @@ import (
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud/meta"
 	compute "google.golang.org/api/compute/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
@@ -548,30 +548,15 @@ func (g *Cloud) ensureInternalHealthCheck(name string, svcName types.NamespacedN
 	return hc, nil
 }
 
-func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.Node) (string, error) {
+func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []string) (string, error) {
 	klog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): checking group that it contains %v nodes", name, zone, len(nodes))
 	ig, err := g.GetInstanceGroup(name, zone)
 	if err != nil && !isNotFound(err) {
 		return "", err
 	}
 
-	kubeNodes := sets.NewString()
-	for _, n := range nodes {
-		kubeNodes.Insert(n.Name)
-	}
-
-	// Individual InstanceGroup has a limit for 1000 instances in it.
-	// As a result, it's not possible to add more to it.
-	// Given that the long-term fix (AlphaFeatureILBSubsets) is already in-progress,
-	// to stop the bleeding we now simply cut down the contents to first 1000
-	// instances in the alphabetical order. Since there is a limitation for
-	// 250 backend VMs for ILB, this isn't making things worse.
-	if len(kubeNodes) > maxInstancesPerInstanceGroup {
-		klog.Warningf("Limiting number of VMs for InstanceGroup %s to %d", name, maxInstancesPerInstanceGroup)
-		kubeNodes = sets.NewString(kubeNodes.List()[:maxInstancesPerInstanceGroup]...)
-	}
-
-	gceNodes := sets.NewString()
+	gceNodes := sets.NewString(nodes...)
+	groupNodes := sets.NewString()
 	if ig == nil {
 		klog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): creating instance group", name, zone)
 		newIG := &compute.InstanceGroup{Name: name}
@@ -591,12 +576,12 @@ func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.Node)
 
 		for _, ins := range instances {
 			parts := strings.Split(ins.Instance, "/")
-			gceNodes.Insert(parts[len(parts)-1])
+			groupNodes.Insert(parts[len(parts)-1])
 		}
 	}
 
-	removeNodes := gceNodes.Difference(kubeNodes).List()
-	addNodes := kubeNodes.Difference(gceNodes).List()
+	removeNodes := groupNodes.Difference(gceNodes).List()
+	addNodes := gceNodes.Difference(groupNodes).List()
 
 	if len(removeNodes) != 0 {
 		klog.V(2).Infof("ensureInternalInstanceGroup(%v, %v): removing nodes: %v", name, zone, removeNodes)
@@ -623,9 +608,46 @@ func (g *Cloud) ensureInternalInstanceGroup(name, zone string, nodes []*v1.Node)
 func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]string, error) {
 	zonedNodes := splitNodesByZone(nodes)
 	klog.V(2).Infof("ensureInternalInstanceGroups(%v): %d nodes over %d zones in region %v", name, len(nodes), len(zonedNodes), g.region)
+
 	var igLinks []string
-	for zone, nodes := range zonedNodes {
-		igLink, err := g.ensureInternalInstanceGroup(name, zone, nodes)
+	gceZonedNodes := map[string][]string{}
+	for zone, zNodes := range zonedNodes {
+		hosts, err := g.getFoundInstanceByNames(nodeNames(zNodes))
+		if err != nil {
+			return nil, err
+		}
+		names := sets.NewString()
+		for _, h := range hosts {
+			names.Insert(h.Name)
+		}
+		skip := sets.NewString()
+
+		igs, err := g.ListInstanceGroups(zone)
+		if err != nil {
+			return nil, err
+		}
+		for _, ig := range igs {
+			if strings.EqualFold(ig.Name, name) {
+				continue
+			}
+			instances, err := g.ListInstancesInInstanceGroup(ig.Name, zone, allInstances)
+			if err != nil {
+				return nil, err
+			}
+			groupInstances := sets.NewString()
+			for _, ins := range instances {
+				parts := strings.Split(ins.Instance, "/")
+				groupInstances.Insert(parts[len(parts)-1])
+			}
+			if names.HasAll(groupInstances.UnsortedList()...) {
+				igLinks = append(igLinks, ig.SelfLink)
+				skip.Insert(groupInstances.UnsortedList()...)
+			}
+		}
+		gceZonedNodes[zone] = names.Difference(skip).UnsortedList()
+	}
+	for zone, gceNodes := range gceZonedNodes {
+		igLink, err := g.ensureInternalInstanceGroup(name, zone, gceNodes)
 		if err != nil {
 			return []string{}, err
 		}
