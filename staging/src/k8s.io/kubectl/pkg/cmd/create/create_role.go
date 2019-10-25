@@ -121,13 +121,13 @@ type CreateRoleOptions struct {
 	Resources     []ResourceOptions
 	ResourceNames []string
 
-	DryRun               bool
-	OutputFormat         string
-	Namespace            string
-	NamespaceOverwritten bool
-	Client               clientgorbacv1.RbacV1Interface
-	Mapper               meta.RESTMapper
-	PrintObj             func(obj runtime.Object) error
+	DryRun           bool
+	OutputFormat     string
+	Namespace        string
+	EnforceNamespace bool
+	Client           clientgorbacv1.RbacV1Interface
+	Mapper           meta.RESTMapper
+	PrintObj         func(obj runtime.Object) error
 
 	genericclioptions.IOStreams
 }
@@ -246,7 +246,7 @@ func (o *CreateRoleOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args
 		return printer.PrintObj(obj, o.Out)
 	}
 
-	o.Namespace, o.NamespaceOverwritten, err = f.ToRawKubeConfigLoader().Namespace()
+	o.Namespace, o.EnforceNamespace, err = f.ToRawKubeConfigLoader().Namespace()
 	if err != nil {
 		return err
 	}
@@ -330,7 +330,7 @@ func (o *CreateRoleOptions) RunCreateRole() error {
 		TypeMeta: metav1.TypeMeta{APIVersion: rbacv1.SchemeGroupVersion.String(), Kind: "Role"},
 	}
 	role.Name = o.Name
-	if o.NamespaceOverwritten {
+	if o.EnforceNamespace {
 		role.Namespace = o.Namespace
 	}
 	rules, err := generateResourcePolicyRules(o.Mapper, o.Verbs, o.Resources, o.ResourceNames, []string{})
