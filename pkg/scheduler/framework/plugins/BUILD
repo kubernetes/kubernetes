@@ -12,6 +12,7 @@ go_library(
         "//pkg/scheduler/framework/plugins/imagelocality:go_default_library",
         "//pkg/scheduler/framework/plugins/interpodaffinity:go_default_library",
         "//pkg/scheduler/framework/plugins/nodeaffinity:go_default_library",
+        "//pkg/scheduler/framework/plugins/nodelabel:go_default_library",
         "//pkg/scheduler/framework/plugins/nodename:go_default_library",
         "//pkg/scheduler/framework/plugins/nodeports:go_default_library",
         "//pkg/scheduler/framework/plugins/nodepreferavoidpods:go_default_library",
@@ -26,6 +27,7 @@ go_library(
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
         "//pkg/scheduler/volumebinder:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
@@ -45,6 +47,7 @@ filegroup(
         "//pkg/scheduler/framework/plugins/interpodaffinity:all-srcs",
         "//pkg/scheduler/framework/plugins/migration:all-srcs",
         "//pkg/scheduler/framework/plugins/nodeaffinity:all-srcs",
+        "//pkg/scheduler/framework/plugins/nodelabel:all-srcs",
         "//pkg/scheduler/framework/plugins/nodename:all-srcs",
         "//pkg/scheduler/framework/plugins/nodeports:all-srcs",
         "//pkg/scheduler/framework/plugins/nodepreferavoidpods:all-srcs",

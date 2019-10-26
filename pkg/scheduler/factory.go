@@ -177,6 +177,9 @@ type Configurator struct {
 	pluginConfig                 []config.PluginConfig
 	pluginConfigProducerRegistry *plugins.ConfigProducerRegistry
 	nodeInfoSnapshot             *nodeinfosnapshot.Snapshot
+
+	factoryArgs        *PluginFactoryArgs
+	configProducerArgs *plugins.ConfigProducerArgs
 }
 
 // ConfigFactoryArgs is a set arguments passed to NewConfigFactory.
@@ -263,6 +266,22 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 		pluginConfigProducerRegistry:   args.PluginConfigProducerRegistry,
 		nodeInfoSnapshot:               nodeinfosnapshot.NewEmptySnapshot(),
 	}
+	c.factoryArgs = &PluginFactoryArgs{
+		NodeInfoLister:                 c.nodeInfoSnapshot.NodeInfos(),
+		PodLister:                      c.nodeInfoSnapshot.Pods(),
+		ServiceLister:                  c.serviceLister,
+		ControllerLister:               c.controllerLister,
+		ReplicaSetLister:               c.replicaSetLister,
+		StatefulSetLister:              c.statefulSetLister,
+		PDBLister:                      c.pdbLister,
+		CSINodeLister:                  c.csiNodeLister,
+		PVLister:                       c.pVLister,
+		PVCLister:                      c.pVCLister,
+		StorageClassLister:             c.storageClassLister,
+		VolumeBinder:                   c.volumeBinder,
+		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
+	}
+	c.configProducerArgs = &plugins.ConfigProducerArgs{}
 
 	return c
 }
@@ -307,7 +326,7 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, er
 	} else {
 		for _, predicate := range policy.Predicates {
 			klog.V(2).Infof("Registering predicate: %s", predicate.Name)
-			predicateKeys.Insert(RegisterCustomFitPredicate(predicate))
+			predicateKeys.Insert(RegisterCustomFitPredicate(predicate, c.configProducerArgs))
 		}
 	}
 
@@ -383,7 +402,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		return nil, err
 	}
 
-	priorityMetaProducer, err := c.getPriorityMetadataProducer()
+	priorityMetaProducer, err := getPriorityMetadataProducer(*c.factoryArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -487,9 +506,7 @@ func getBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerEx
 // as framework plugins. Specifically, a priority will run as a framework plugin if a plugin config producer was
 // registered for that priority.
 func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, *config.Plugins, []config.PluginConfig, error) {
-	algorithmArgs, configProducerArgs := c.getAlgorithmArgs()
-
-	allPriorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, *algorithmArgs)
+	allPriorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, *c.factoryArgs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -504,7 +521,7 @@ func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]prioritie
 	frameworkConfigProducers := c.pluginConfigProducerRegistry.PriorityToConfigProducer
 	for _, p := range allPriorityConfigs {
 		if producer, exist := frameworkConfigProducers[p.Name]; exist {
-			args := *configProducerArgs
+			args := *c.configProducerArgs
 			args.Weight = int32(p.Weight)
 			pl, pc := producer(args)
 			plugins.Append(&pl)
@@ -514,12 +531,6 @@ func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]prioritie
 		}
 	}
 	return priorityConfigs, &plugins, pluginConfig, nil
-}
-
-func (c *Configurator) getPriorityMetadataProducer() (priorities.PriorityMetadataProducer, error) {
-	algorithmArgs, _ := c.getAlgorithmArgs()
-
-	return getPriorityMetadataProducer(*algorithmArgs)
 }
 
 // GetPredicateMetadataProducer returns a function to build Predicate Metadata.
@@ -534,9 +545,7 @@ func (c *Configurator) GetPredicateMetadataProducer() (predicates.PredicateMetad
 // Note that the framework executes plugins according to their order in the Plugins list, and so predicates run as plugins
 // are added to the Plugins list according to the order specified in predicates.Ordering().
 func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[string]predicates.FitPredicate, *config.Plugins, []config.PluginConfig, error) {
-	algorithmArgs, configProducerArgs := c.getAlgorithmArgs()
-
-	allFitPredicates, err := getFitPredicateFunctions(predicateKeys, *algorithmArgs)
+	allFitPredicates, err := getFitPredicateFunctions(predicateKeys, *c.factoryArgs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -563,10 +572,11 @@ func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[strin
 	// that the corresponding predicates were supposed to run.
 	var plugins config.Plugins
 	var pluginConfig []config.PluginConfig
+
 	for _, predicateKey := range predicates.Ordering() {
 		if asPlugins.Has(predicateKey) {
 			producer := frameworkConfigProducers[predicateKey]
-			p, pc := producer(*configProducerArgs)
+			p, pc := producer(*c.configProducerArgs)
 			plugins.Append(&p)
 			pluginConfig = append(pluginConfig, pc...)
 			asPlugins.Delete(predicateKey)
@@ -576,30 +586,12 @@ func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[strin
 	// Third, add the rest in no specific order.
 	for predicateKey := range asPlugins {
 		producer := frameworkConfigProducers[predicateKey]
-		p, pc := producer(*configProducerArgs)
+		p, pc := producer(*c.configProducerArgs)
 		plugins.Append(&p)
 		pluginConfig = append(pluginConfig, pc...)
 	}
 
 	return asFitPredicates, &plugins, pluginConfig, nil
-}
-
-func (c *Configurator) getAlgorithmArgs() (*PluginFactoryArgs, *plugins.ConfigProducerArgs) {
-	return &PluginFactoryArgs{
-		NodeInfoLister:                 c.nodeInfoSnapshot.NodeInfos(),
-		PodLister:                      c.nodeInfoSnapshot.Pods(),
-		ServiceLister:                  c.serviceLister,
-		ControllerLister:               c.controllerLister,
-		ReplicaSetLister:               c.replicaSetLister,
-		StatefulSetLister:              c.statefulSetLister,
-		PDBLister:                      c.pdbLister,
-		CSINodeLister:                  c.csiNodeLister,
-		PVLister:                       c.pVLister,
-		PVCLister:                      c.pVCLister,
-		StorageClassLister:             c.storageClassLister,
-		VolumeBinder:                   c.volumeBinder,
-		HardPodAffinitySymmetricWeight: c.hardPodAffinitySymmetricWeight,
-	}, &plugins.ConfigProducerArgs{}
 }
 
 type podInformer struct {

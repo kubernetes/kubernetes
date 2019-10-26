@@ -17,15 +17,18 @@ limitations under the License.
 package plugins
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodename"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeports"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodepreferavoidpods"
@@ -46,9 +49,9 @@ type RegistryArgs struct {
 	VolumeBinder *volumebinder.VolumeBinder
 }
 
-// NewDefaultRegistry builds a default registry with all the default plugins.
-// This is the registry that Kubernetes default scheduler uses. A scheduler that
-// runs custom plugins, can pass a different Registry when initializing the scheduler.
+// NewDefaultRegistry builds the default registry with all the in-tree plugins.
+// This is the registry that Kubernetes default scheduler uses. A scheduler that runs out of tree
+// plugins can register additional plugins through the WithFrameworkOutOfTreeRegistry option.
 func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 	return framework.Registry{
 		imagelocality.Name:                   imagelocality.New,
@@ -74,6 +77,7 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 		nodevolumelimits.AzureDiskName: nodevolumelimits.NewAzureDisk,
 		nodevolumelimits.CinderName:    nodevolumelimits.NewCinder,
 		interpodaffinity.Name:          interpodaffinity.New,
+		nodelabel.Name:                 nodelabel.New,
 	}
 }
 
@@ -83,6 +87,8 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 type ConfigProducerArgs struct {
 	// Weight used for priority functions.
 	Weight int32
+	// NodeLabelArgs is the args for the NodeLabel plugin.
+	NodeLabelArgs *nodelabel.Args
 }
 
 // ConfigProducer produces a framework's configuration.
@@ -191,6 +197,22 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 			plugins.Filter = appendToPluginSet(plugins.Filter, podtopologyspread.Name, nil)
 			return
 		})
+	registry.RegisterPredicate(nodelabel.Name,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, nodelabel.Name, nil)
+			encoding, err := json.Marshal(args.NodeLabelArgs)
+			if err != nil {
+				klog.Fatalf("Failed to marshal %+v", args.NodeLabelArgs)
+				return
+			}
+			config := config.PluginConfig{
+				Name: nodelabel.Name,
+				Args: runtime.Unknown{Raw: encoding},
+			}
+			pluginConfig = append(pluginConfig, config)
+			return
+		})
+
 	// Register Priorities.
 	registry.RegisterPriority(priorities.TaintTolerationPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {

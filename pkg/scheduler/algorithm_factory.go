@@ -32,6 +32,8 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -259,9 +261,10 @@ func RegisterFitPredicateFactory(name string, predicateFactory FitPredicateFacto
 
 // RegisterCustomFitPredicate registers a custom fit predicate with the algorithm registry.
 // Returns the name, with which the predicate was registered.
-func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
+func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, args *plugins.ConfigProducerArgs) string {
 	var predicateFactory FitPredicateFactory
 	var ok bool
+	name := policy.Name
 
 	validatePredicateOrDie(policy)
 
@@ -281,24 +284,31 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy) string {
 				return predicate
 			}
 		} else if policy.Argument.LabelsPresence != nil {
+			// map LabelPresence policy to ConfigProducerArgs that's used to configure the NodeLabel plugin.
+			args.NodeLabelArgs = &nodelabel.Args{
+				Labels:   policy.Argument.LabelsPresence.Labels,
+				Presence: policy.Argument.LabelsPresence.Presence,
+			}
 			predicateFactory = func(args PluginFactoryArgs) predicates.FitPredicate {
 				return predicates.NewNodeLabelPredicate(
 					policy.Argument.LabelsPresence.Labels,
 					policy.Argument.LabelsPresence.Presence,
 				)
 			}
+			// We do not allow specifying the name for custom plugins, see #83472
+			name = nodelabel.Name
 		}
 	} else if predicateFactory, ok = fitPredicateMap[policy.Name]; ok {
 		// checking to see if a pre-defined predicate is requested
 		klog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
-		return policy.Name
+		return name
 	}
 
 	if predicateFactory == nil {
 		klog.Fatalf("Invalid configuration: Predicate type not found for %s", policy.Name)
 	}
 
-	return RegisterFitPredicateFactory(policy.Name, predicateFactory)
+	return RegisterFitPredicateFactory(name, predicateFactory)
 }
 
 // IsFitPredicateRegistered is useful for testing providers.
