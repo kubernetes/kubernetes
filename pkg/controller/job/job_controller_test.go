@@ -23,7 +23,7 @@ import (
 	"time"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -144,6 +144,10 @@ func TestControllerSyncJob(t *testing.T) {
 		backoffLimit int32
 		deleting     bool
 		podLimit     int
+		// first job status
+		active    int32
+		succeeded int32
+		failed    int32
 
 		// pod setup
 		podControllerError error
@@ -164,106 +168,127 @@ func TestControllerSyncJob(t *testing.T) {
 	}{
 		"job start": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 0, 0, 0,
 			2, 0, 2, 0, 0, nil, "",
 		},
 		"WQ job start": {
 			2, -1, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 0, 0, 0,
 			2, 0, 2, 0, 0, nil, "",
 		},
 		"pending pods": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			nil, true, 2, 0, 0, 0,
 			0, 0, 2, 0, 0, nil, "",
 		},
 		"correct # of pods": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 2, 0, 0,
 			0, 0, 2, 0, 0, nil, "",
 		},
 		"WQ job: correct # of pods": {
 			2, -1, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 2, 0, 0,
 			0, 0, 2, 0, 0, nil, "",
 		},
 		"too few active pods": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 1, 1, 0,
 			1, 0, 2, 1, 0, nil, "",
 		},
 		"too few active pods with a dynamic job": {
 			2, -1, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 1, 0, 0,
 			1, 0, 2, 0, 0, nil, "",
 		},
 		"too few active pods, with controller error": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			fmt.Errorf("fake error"), true, 0, 1, 1, 0,
 			1, 0, 1, 1, 0, nil, "",
 		},
 		"too many active pods": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 3, 0, 0,
 			0, 1, 2, 0, 0, nil, "",
 		},
 		"too many active pods, with controller error": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			fmt.Errorf("fake error"), true, 0, 3, 0, 0,
 			0, 1, 3, 0, 0, nil, "",
 		},
 		"failed + succeed pods: reset backoff delay": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			fmt.Errorf("fake error"), true, 0, 1, 1, 1,
 			1, 0, 1, 1, 1, nil, "",
 		},
 		"only new failed pod": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			fmt.Errorf("fake error"), false, 0, 1, 0, 1,
 			1, 0, 1, 0, 1, nil, "",
 		},
 		"job finish": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 0, 5, 0,
 			0, 0, 0, 5, 0, nil, "",
 		},
 		"WQ job finishing": {
 			2, -1, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 1, 1, 0,
 			0, 0, 1, 1, 0, nil, "",
 		},
 		"WQ job all finished": {
 			2, -1, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 0, 2, 0,
 			0, 0, 0, 2, 0, &jobConditionComplete, "",
 		},
 		"WQ job all finished despite one failure": {
 			2, -1, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 0, 1, 1,
 			0, 0, 0, 1, 1, &jobConditionComplete, "",
 		},
 		"more active pods than completions": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 10, 0, 0,
 			0, 8, 2, 0, 0, nil, "",
 		},
 		"status change": {
 			2, 5, 6, false, 0,
+			0, 0, 0,
 			nil, true, 0, 2, 2, 0,
 			0, 0, 2, 2, 0, nil, "",
 		},
 		"deleting job": {
 			2, 5, 6, true, 0,
+			0, 0, 0,
 			nil, true, 1, 1, 1, 0,
 			0, 0, 2, 1, 0, nil, "",
 		},
 		"limited pods": {
 			100, 200, 6, false, 10,
+			0, 0, 0,
 			nil, true, 0, 0, 0, 0,
 			10, 0, 10, 0, 0, nil, "",
 		},
 		"too many job failures": {
 			2, 5, 0, true, 0,
+			0, 0, 0,
 			nil, true, 0, 0, 0, 1,
 			0, 0, 0, 0, 1, &jobConditionFailed, "BackoffLimitExceeded",
 		},
@@ -289,6 +314,11 @@ func TestControllerSyncJob(t *testing.T) {
 			now := metav1.Now()
 			job.DeletionTimestamp = &now
 		}
+		// set first status
+		job.Status.Active = tc.active
+		job.Status.Succeeded = tc.succeeded
+		job.Status.Failed = tc.failed
+
 		sharedInformerFactory.Batch().V1().Jobs().Informer().GetIndexer().Add(job)
 		podIndexer := sharedInformerFactory.Core().V1().Pods().Informer().GetIndexer()
 		setPodsStatuses(podIndexer, job, tc.pendingPods, tc.activePods, tc.succeededPods, tc.failedPods)

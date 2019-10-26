@@ -25,7 +25,7 @@ import (
 	"time"
 
 	batch "k8s.io/api/batch/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -455,10 +455,36 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		}
 		return false, err
 	}
-	job := *sharedJob
+	job := sharedJob.DeepCopy()
 
+	var active, succeeded, failed int32
 	// if job was finished previously, we don't want to redo the termination
-	if IsJobFinished(&job) {
+	if IsJobFinished(job) {
+		pods, err := jm.getPodsForJob(job)
+		if err != nil {
+			return false, err
+		}
+		activePods := controller.FilterActivePods(pods)
+		active = int32(len(activePods))
+		total := len(job.Status.Conditions)
+		if (job.Status.Succeeded+job.Status.Failed) != int32(total) || active != job.Status.Active {
+			job.Status.Active = active
+			for _, condition := range job.Status.Conditions {
+				if condition.Type == batch.JobFailed {
+					failed++
+				} else {
+					succeeded++
+				}
+			}
+			if succeeded != job.Status.Succeeded || failed != job.Status.Failed {
+				job.Status.Succeeded = succeeded
+				job.Status.Failed = failed
+				if err := jm.updateHandler(job); err != nil {
+					return false, err
+				}
+				return true, nil
+			}
+		}
 		return true, nil
 	}
 
@@ -470,14 +496,14 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 	// the store after we've checked the expectation, the job sync is just deferred till the next relist.
 	jobNeedsSync := jm.expectations.SatisfiedExpectations(key)
 
-	pods, err := jm.getPodsForJob(&job)
+	pods, err := jm.getPodsForJob(job)
 	if err != nil {
 		return false, err
 	}
 
 	activePods := controller.FilterActivePods(pods)
-	active := int32(len(activePods))
-	succeeded, failed := getStatus(pods)
+	active = int32(len(activePods))
+	succeeded, failed = getStatus(pods)
 	conditions := len(job.Status.Conditions)
 	// job first start
 	if job.Status.StartTime == nil {
@@ -503,13 +529,13 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 	exceedsBackoffLimit := jobHaveNewFailure && (active != *job.Spec.Parallelism) &&
 		(int32(previousRetry)+1 > *job.Spec.BackoffLimit)
 
-	if exceedsBackoffLimit || pastBackoffLimitOnFailure(&job, pods) {
+	if exceedsBackoffLimit || pastBackoffLimitOnFailure(job, pods) {
 		// check if the number of pod restart exceeds backoff (for restart OnFailure only)
 		// OR if the number of failed jobs increased since the last syncJob
 		jobFailed = true
 		failureReason = "BackoffLimitExceeded"
 		failureMessage = "Job has reached the specified backoff limit"
-	} else if pastActiveDeadline(&job) {
+	} else if pastActiveDeadline(job) {
 		jobFailed = true
 		failureReason = "DeadlineExceeded"
 		failureMessage = "Job was active longer than specified deadline"
@@ -517,7 +543,7 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 
 	if jobFailed {
 		errCh := make(chan error, active)
-		jm.deleteJobPods(&job, activePods, errCh)
+		jm.deleteJobPods(job, activePods, errCh)
 		select {
 		case manageJobErr = <-errCh:
 			if manageJobErr != nil {
@@ -530,10 +556,10 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		failed += active
 		active = 0
 		job.Status.Conditions = append(job.Status.Conditions, newCondition(batch.JobFailed, failureReason, failureMessage))
-		jm.recorder.Event(&job, v1.EventTypeWarning, failureReason, failureMessage)
+		jm.recorder.Event(job, v1.EventTypeWarning, failureReason, failureMessage)
 	} else {
 		if jobNeedsSync && job.DeletionTimestamp == nil {
-			active, manageJobErr = jm.manageJob(activePods, succeeded, &job)
+			active, manageJobErr = jm.manageJob(activePods, succeeded, job)
 		}
 		completions := succeeded
 		complete := false
@@ -555,10 +581,10 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 			if completions >= *job.Spec.Completions {
 				complete = true
 				if active > 0 {
-					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManyActivePods", "Too many active pods running after completion count reached")
+					jm.recorder.Event(job, v1.EventTypeWarning, "TooManyActivePods", "Too many active pods running after completion count reached")
 				}
 				if completions > *job.Spec.Completions {
-					jm.recorder.Event(&job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
+					jm.recorder.Event(job, v1.EventTypeWarning, "TooManySucceededPods", "Too many succeeded pods running after completion count reached")
 				}
 			}
 		}
@@ -584,11 +610,11 @@ func (jm *JobController) syncJob(key string) (bool, error) {
 		job.Status.Succeeded = succeeded
 		job.Status.Failed = failed
 
-		if err := jm.updateHandler(&job); err != nil {
+		if err := jm.updateHandler(job); err != nil {
 			return forget, err
 		}
 
-		if jobHaveNewFailure && !IsJobFinished(&job) {
+		if jobHaveNewFailure && !IsJobFinished(job) {
 			// returning an error will re-enqueue Job after the backoff period
 			return forget, fmt.Errorf("failed pod(s) detected for job key %q", key)
 		}
