@@ -32,6 +32,7 @@ go_library(
         "//plugin/pkg/admission/exec:go_default_library",
         "//plugin/pkg/admission/extendedresourcetoleration:go_default_library",
         "//plugin/pkg/admission/gc:go_default_library",
+        "//plugin/pkg/admission/gvisor_reject:go_default_library",
         "//plugin/pkg/admission/imagepolicy:go_default_library",
         "//plugin/pkg/admission/limitranger:go_default_library",
         "//plugin/pkg/admission/namespace/autoprovision:go_default_library",

@@ -22,6 +22,7 @@ filegroup(
         "//plugin/pkg/admission/exec:all-srcs",
         "//plugin/pkg/admission/extendedresourcetoleration:all-srcs",
         "//plugin/pkg/admission/gc:all-srcs",
+        "//plugin/pkg/admission/gvisor_reject:all-srcs",
         "//plugin/pkg/admission/imagepolicy:all-srcs",
         "//plugin/pkg/admission/limitranger:all-srcs",
         "//plugin/pkg/admission/namespace/autoprovision:all-srcs",
