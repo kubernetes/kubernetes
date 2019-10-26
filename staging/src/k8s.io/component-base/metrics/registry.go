@@ -17,6 +17,7 @@ limitations under the License.
 package metrics
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -32,6 +33,21 @@ var (
 	showHiddenOnce sync.Once
 	showHidden     atomic.Value
 )
+
+// shouldHide be used to check if a specific metric with deprecated version should be hidden
+// according to metrics deprecation lifecycle.
+func shouldHide(currentVersion *semver.Version, deprecatedVersion *semver.Version) bool {
+	guardVersion, err := semver.Make(fmt.Sprintf("%d.%d.0", currentVersion.Major, currentVersion.Minor))
+	if err != nil {
+		panic("failed to make version from current version")
+	}
+
+	if deprecatedVersion.LT(guardVersion) {
+		return true
+	}
+
+	return false
+}
 
 // SetShowHidden will enable showing hidden metrics. This will no-opt
 // after the initial call
