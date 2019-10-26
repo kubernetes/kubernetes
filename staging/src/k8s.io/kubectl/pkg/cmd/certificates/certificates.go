@@ -68,14 +68,6 @@ type CertificateOptions struct {
 	genericclioptions.IOStreams
 }
 
-// NewCertificateOptions creates the options for certificate
-func NewCertificateOptions(ioStreams genericclioptions.IOStreams) *CertificateOptions {
-	return &CertificateOptions{
-		PrintFlags: genericclioptions.NewPrintFlags("approved").WithTypeSetter(scheme.Scheme),
-		IOStreams:  ioStreams,
-	}
-}
-
 func (o *CertificateOptions) Complete(f cmdutil.Factory, cmd *cobra.Command, args []string) error {
 	o.csrNames = args
 	o.outputStyle = cmdutil.GetFlagString(cmd, "output")
@@ -111,7 +103,10 @@ func (o *CertificateOptions) Validate() error {
 }
 
 func NewCmdCertificateApprove(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCertificateOptions(ioStreams)
+	o := &CertificateOptions{
+		PrintFlags: genericclioptions.NewPrintFlags("approved").WithTypeSetter(scheme.Scheme),
+		IOStreams:  ioStreams,
+	}
 
 	cmd := &cobra.Command{
 		Use:                   "approve (-f FILENAME | NAME)",
@@ -166,7 +161,10 @@ func (o *CertificateOptions) RunCertificateApprove(force bool) error {
 }
 
 func NewCmdCertificateDeny(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobra.Command {
-	o := NewCertificateOptions(ioStreams)
+	o := &CertificateOptions{
+		PrintFlags: genericclioptions.NewPrintFlags("denied").WithTypeSetter(scheme.Scheme),
+		IOStreams:  ioStreams,
+	}
 
 	cmd := &cobra.Command{
 		Use:                   "deny (-f FILENAME | NAME)",
