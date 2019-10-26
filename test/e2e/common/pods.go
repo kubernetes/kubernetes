@@ -26,7 +26,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -263,7 +263,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		select {
 		case <-listCompleted:
 			select {
-			case event, _ := <-w.ResultChan():
+			case event := <-w.ResultChan():
 				if event.Type != watch.Added {
 					framework.Failf("Failed to observe pod creation: %v", event)
 				}
@@ -313,7 +313,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 		timer := time.After(framework.DefaultPodDeletionTimeout)
 		for !deleted {
 			select {
-			case event, _ := <-w.ResultChan():
+			case event := <-w.ResultChan():
 				switch event.Type {
 				case watch.Deleted:
 					lastPod = event.Object.(*v1.Pod)
@@ -604,10 +604,10 @@ var _ = framework.KubeDescribe("Pods", func() {
 				buf.Write(msg[1:])
 			}
 			if buf.Len() == 0 {
-				return fmt.Errorf("Unexpected output from server")
+				return fmt.Errorf("unexpected output from server")
 			}
 			if !strings.Contains(buf.String(), "remote execution test") {
-				return fmt.Errorf("Expected to find 'remote execution test' in %q", buf.String())
+				return fmt.Errorf("expected to find 'remote execution test' in %q", buf.String())
 			}
 			return nil
 		}, time.Minute, 10*time.Second).Should(gomega.BeNil())
