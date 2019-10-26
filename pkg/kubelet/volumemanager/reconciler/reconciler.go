@@ -586,24 +586,19 @@ func (rc *reconciler) updateDevicePath(volumesNeedUpdate map[v1.UniqueVolumeName
 }
 
 func getDeviceMountPath(volume *reconstructedVolume) (string, error) {
-	volumeAttacher, err := volume.attachablePlugin.NewAttacher()
-	if volumeAttacher == nil || err != nil {
-		return "", err
-	}
-	deviceMountPath, err :=
-		volumeAttacher.GetDeviceMountPath(volume.volumeSpec)
-	if err != nil {
-		return "", err
-	}
-
 	if volume.blockVolumeMapper != nil {
-		deviceMountPath, err =
-			volume.blockVolumeMapper.GetGlobalMapPath(volume.volumeSpec)
-		if err != nil {
+		// for block volume, we return its global map path
+		return volume.blockVolumeMapper.GetGlobalMapPath(volume.volumeSpec)
+	} else if volume.attachablePlugin != nil {
+		// for filesystem volume, we return its device mount path if the plugin implements AttachableVolumePlugin
+		volumeAttacher, err := volume.attachablePlugin.NewAttacher()
+		if volumeAttacher == nil || err != nil {
 			return "", err
 		}
+		return volumeAttacher.GetDeviceMountPath(volume.volumeSpec)
+	} else {
+		return "", fmt.Errorf("blockVolumeMapper or attachablePlugin required")
 	}
-	return deviceMountPath, nil
 }
 
 func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*reconstructedVolume) error {
@@ -632,7 +627,8 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 			continue
 		}
 		klog.V(4).Infof("Volume: %s (pod UID %s) is marked as mounted and added into the actual state", volume.volumeName, volume.podName)
-		if volume.attachablePlugin != nil {
+		// If the volume has device to mount, we mark its device as mounted.
+		if volume.attachablePlugin != nil || volume.blockVolumeMapper != nil {
 			deviceMountPath, err := getDeviceMountPath(volume)
 			if err != nil {
 				klog.Errorf("Could not find device mount path for volume %s", volume.volumeName)
