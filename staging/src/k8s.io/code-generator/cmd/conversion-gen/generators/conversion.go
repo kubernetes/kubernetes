@@ -669,10 +669,14 @@ func (g *genConversion) Init(c *generator.Context, w io.Writer) error {
 	sw.Do("func RegisterConversions(s $.|raw$) error {\n", schemePtr)
 	for _, t := range g.types {
 		peerType := getPeerTypeFor(c, t, g.peerPackages)
-		args := argsFromType(t, peerType).With("Scope", types.Ref(conversionPackagePath, "Scope"))
-		sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
-		args = argsFromType(peerType, t).With("Scope", types.Ref(conversionPackagePath, "Scope"))
-		sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
+		if _, found := g.preexists(t, peerType); !found {
+			args := argsFromType(t, peerType).With("Scope", types.Ref(conversionPackagePath, "Scope"))
+			sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
+		}
+		if _, found := g.preexists(peerType, t); !found {
+			args := argsFromType(peerType, t).With("Scope", types.Ref(conversionPackagePath, "Scope"))
+			sw.Do("if err := s.AddGeneratedConversionFunc((*$.inType|raw$)(nil), (*$.outType|raw$)(nil), func(a, b interface{}, scope $.Scope|raw$) error { return "+nameTmpl+"(a.(*$.inType|raw$), b.(*$.outType|raw$), scope) }); err != nil { return err }\n", args)
+		}
 	}
 
 	for i := range g.explicitConversions {
