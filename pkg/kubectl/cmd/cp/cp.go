@@ -34,10 +34,15 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
+	executil "k8s.io/client-go/util/exec"
 	"k8s.io/kubectl/pkg/cmd/exec"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	"k8s.io/kubectl/pkg/util/i18n"
 	"k8s.io/kubectl/pkg/util/templates"
+)
+
+const (
+	errorCodeTarNotFound = 126
 )
 
 var (
@@ -260,7 +265,6 @@ func (o *CopyOptions) copyToPod(src, dest fileSpec, options *exec.ExecOptions) e
 	}()
 	var cmdArr []string
 
-	// TODO: Improve error messages by first testing if 'tar' is present in the container?
 	if o.NoPreserve {
 		cmdArr = []string{"tar", "--no-same-permissions", "--no-same-owner", "-xmf", "-"}
 	} else {
@@ -306,7 +310,6 @@ func (o *CopyOptions) copyFromPod(src, dest fileSpec) error {
 			PodName:   src.PodName,
 		},
 
-		// TODO: Improve error messages by first testing if 'tar' is present in the container?
 		Command:  []string{"tar", "cf", "-", src.File},
 		Executor: &exec.DefaultRemoteExecutor{},
 	}
@@ -525,6 +528,10 @@ func (o *CopyOptions) execute(options *exec.ExecOptions) error {
 	}
 
 	if err := options.Run(); err != nil {
+		if exitErr, ok := err.(executil.CodeExitError); ok && exitErr.ExitStatus() == errorCodeTarNotFound {
+			exitErr.Err = errors.New(exitErr.Error() + ": command 'tar' not found in the container")
+			return exitErr
+		}
 		return err
 	}
 	return nil
