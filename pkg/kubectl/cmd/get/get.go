@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/cli-runtime/pkg/printers"
@@ -579,7 +580,11 @@ func (o *GetOptions) Run(f cmdutil.Factory, cmd *cobra.Command, args []string) e
 	if trackingWriter.Written == 0 && !o.IgnoreNotFound && len(allErrs) == 0 {
 		// if we wrote no output, and had no errors, and are not ignoring NotFound, be sure we output something
 		if !o.AllNamespaces {
-			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found in %s namespace.", o.Namespace))
+			if msgs := validation.IsDNS1123Label(o.Namespace); len(msgs) != 0 {
+				fmt.Fprintln(o.ErrOut, fmt.Sprintf("The Namespace %s is invalid.", o.Namespace))
+			} else {
+				fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found in %s namespace.", o.Namespace))
+			}
 		} else {
 			fmt.Fprintln(o.ErrOut, fmt.Sprintf("No resources found"))
 		}
