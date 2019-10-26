@@ -46,14 +46,12 @@ func Convert_apiextensions_JSON_To_v1_JSON(in *apiextensions.JSON, out *JSON, s 
 }
 
 func Convert_v1_JSON_To_apiextensions_JSON(in *JSON, out *apiextensions.JSON, s conversion.Scope) error {
+	out = nil
 	if in != nil {
-		var i interface{}
-		if err := json.Unmarshal(in.Raw, &i); err != nil {
+		out = new(apiextensions.JSON)
+		if err := json.Unmarshal(in.Raw, out); err != nil {
 			return err
 		}
-		*out = i
-	} else {
-		out = nil
 	}
 	return nil
 }
