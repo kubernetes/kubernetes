@@ -104,6 +104,7 @@ func defaultPriorities() sets.String {
 		priorities.NodeAffinityPriority,
 		priorities.TaintTolerationPriority,
 		priorities.ImageLocalityPriority,
+		priorities.ReadyPodPriority,
 	)
 }
 

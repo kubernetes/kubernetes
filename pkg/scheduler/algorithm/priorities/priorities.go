@@ -54,4 +54,6 @@ const (
 	// EvenPodsSpreadPriority defines the name of prioritizer function that prioritizes nodes
 	// which have pods and labels matching the incoming pod's topologySpreadConstraints.
 	EvenPodsSpreadPriority = "EvenPodsSpreadPriority"
+	// ReadyPodPriority defines the name of prioritizer function that prioritizes nodes with lesser non ready pods.
+	ReadyPodPriority = "ReadyPodPriority"
 )

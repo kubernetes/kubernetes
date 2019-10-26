@@ -75,6 +75,16 @@ func init() {
 			Weight: 1,
 		},
 	)
+	// Prioritize nodes with lesser count of non ready pods
+	scheduler.RegisterPriorityConfigFactory(
+		priorities.ReadyPodPriority,
+		scheduler.PriorityConfigFactory{
+			Function: func(args scheduler.PluginFactoryArgs) priorities.PriorityFunction {
+				return priorities.NewReadyPodPriority()
+			},
+			Weight: 1,
+		},
+	)
 
 	// Prioritize nodes by least requested utilization.
 	scheduler.RegisterPriorityMapReduceFunction(priorities.LeastRequestedPriority, priorities.LeastRequestedPriorityMap, nil, 1)
