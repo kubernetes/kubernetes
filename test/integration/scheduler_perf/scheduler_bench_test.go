@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"io/ioutil"
 	v1 "k8s.io/api/core/v1"
 	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -36,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/test/integration/framework"
 	testutils "k8s.io/kubernetes/test/utils"
+	"sigs.k8s.io/yaml"
 )
 
 var (
@@ -44,24 +46,46 @@ var (
 	testCSIDriver = plugins.AWSEBSDriverName
 	// From PV controller
 	annBindCompleted = "pv.kubernetes.io/bind-completed"
+
+	testCaseData = TestCaseData{}
 )
+
+func init() {
+	bytes, err := ioutil.ReadFile("benchmark-config.yml")
+	if err != nil {
+		klog.Fatalf("%v", err)
+	}
+	err = yaml.Unmarshal(bytes, &testCaseData)
+	if err != nil {
+		klog.Fatalf("%v", err)
+	}
+}
+
+type TestCase struct {
+	Nodes, ExistingPods, MinPods int
+}
+
+type TestCaseData struct {
+	BenchmarkScheduling                  []TestCase
+	BenchmarkSchedulingPodAntiAffinity   []TestCase
+	BenchmarkSchedulingSecrets           []TestCase
+	BenchmarkSchedulingInTreePVs         []TestCase
+	BenchmarkSchedulingMigratedInTreePVs []TestCase
+	BenchmarkSchedulingCSIPVs            []TestCase
+	BenchmarkSchedulingPodAffinity       []TestCase
+	BenchmarkSchedulingNodeAffinity      []TestCase
+}
 
 // BenchmarkScheduling benchmarks the scheduling rate when the cluster has
 // various quantities of nodes and scheduled pods.
 func BenchmarkScheduling(b *testing.B) {
-	tests := []struct{ nodes, existingPods, minPods int }{
-		{nodes: 100, existingPods: 0, minPods: 100},
-		{nodes: 100, existingPods: 1000, minPods: 100},
-		{nodes: 1000, existingPods: 0, minPods: 100},
-		{nodes: 1000, existingPods: 1000, minPods: 100},
-		{nodes: 5000, existingPods: 1000, minPods: 1000},
-	}
+	tests := testCaseData.BenchmarkScheduling
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc1")
 	testStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("rc2")
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		name := fmt.Sprintf("%vNodes/%vPods", test.Nodes, test.ExistingPods)
 		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
+			benchmarkScheduling(test.Nodes, test.ExistingPods, test.MinPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
 		})
 	}
 }
@@ -70,12 +94,7 @@ func BenchmarkScheduling(b *testing.B) {
 // PodAntiAffinity rules when the cluster has various quantities of nodes and
 // scheduled pods.
 func BenchmarkSchedulingPodAntiAffinity(b *testing.B) {
-	tests := []struct{ nodes, existingPods, minPods int }{
-		{nodes: 500, existingPods: 250, minPods: 250},
-		{nodes: 500, existingPods: 5000, minPods: 250},
-		{nodes: 1000, existingPods: 1000, minPods: 500},
-		{nodes: 5000, existingPods: 1000, minPods: 1000},
-	}
+	tests := testCaseData.BenchmarkSchedulingPodAffinity
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 	testBasePod := makeBasePodWithPodAntiAffinity(
@@ -84,9 +103,9 @@ func BenchmarkSchedulingPodAntiAffinity(b *testing.B) {
 	// The test strategy creates pods with anti-affinity for each other.
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		name := fmt.Sprintf("%vNodes/%vPods", test.Nodes, test.ExistingPods)
 		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
+			benchmarkScheduling(test.Nodes, test.ExistingPods, test.MinPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
 		})
 	}
 }
@@ -96,21 +115,16 @@ func BenchmarkSchedulingPodAntiAffinity(b *testing.B) {
 // It can be used to compare scheduler efficiency with the other benchmarks
 // that use volume scheduling predicates.
 func BenchmarkSchedulingSecrets(b *testing.B) {
-	tests := []struct{ nodes, existingPods, minPods int }{
-		{nodes: 500, existingPods: 250, minPods: 250},
-		{nodes: 500, existingPods: 5000, minPods: 250},
-		{nodes: 1000, existingPods: 1000, minPods: 500},
-		{nodes: 5000, existingPods: 1000, minPods: 1000},
-	}
+	tests := testCaseData.BenchmarkSchedulingSecrets
 	// The setup strategy creates pods with no volumes.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 	// The test strategy creates pods with a secret.
 	testBasePod := makeBasePodWithSecret()
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		name := fmt.Sprintf("%vNodes/%vPods", test.Nodes, test.ExistingPods)
 		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
+			benchmarkScheduling(test.Nodes, test.ExistingPods, test.MinPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
 		})
 	}
 }
@@ -119,12 +133,7 @@ func BenchmarkSchedulingSecrets(b *testing.B) {
 // in-tree volumes (used via PV/PVC). Nodes have default hardcoded attach limits
 // (39 for AWS EBS).
 func BenchmarkSchedulingInTreePVs(b *testing.B) {
-	tests := []struct{ nodes, existingPods, minPods int }{
-		{nodes: 500, existingPods: 250, minPods: 250},
-		{nodes: 500, existingPods: 5000, minPods: 250},
-		{nodes: 1000, existingPods: 1000, minPods: 500},
-		{nodes: 5000, existingPods: 1000, minPods: 1000},
-	}
+	tests := testCaseData.BenchmarkSchedulingInTreePVs
 	// The setup strategy creates pods with no volumes.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 
@@ -133,9 +142,9 @@ func BenchmarkSchedulingInTreePVs(b *testing.B) {
 	basePod := makeBasePod()
 	testStrategy := testutils.NewCreatePodWithPersistentVolumeStrategy(baseClaim, awsVolumeFactory, basePod)
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		name := fmt.Sprintf("%vNodes/%vPods", test.Nodes, test.ExistingPods)
 		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
+			benchmarkScheduling(test.Nodes, test.ExistingPods, test.MinPods, defaultNodeStrategy, setupStrategy, testStrategy, b)
 		})
 	}
 }
@@ -144,12 +153,7 @@ func BenchmarkSchedulingInTreePVs(b *testing.B) {
 // in-tree volumes (used via PV/PVC) that are migrated to CSI. CSINode instances exist
 // for all nodes and have proper annotation that AWS is migrated.
 func BenchmarkSchedulingMigratedInTreePVs(b *testing.B) {
-	tests := []struct{ nodes, existingPods, minPods int }{
-		{nodes: 500, existingPods: 250, minPods: 250},
-		{nodes: 500, existingPods: 5000, minPods: 250},
-		{nodes: 1000, existingPods: 1000, minPods: 500},
-		{nodes: 5000, existingPods: 1000, minPods: 1000},
-	}
+	tests := testCaseData.BenchmarkSchedulingMigratedInTreePVs
 	// The setup strategy creates pods with no volumes.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 
@@ -172,24 +176,18 @@ func BenchmarkSchedulingMigratedInTreePVs(b *testing.B) {
 	}
 	nodeStrategy := testutils.NewNodeAllocatableStrategy(allocatable, csiAllocatable, []string{csilibplugins.AWSEBSInTreePluginName})
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		name := fmt.Sprintf("%vNodes/%vPods", test.Nodes, test.ExistingPods)
 		b.Run(name, func(b *testing.B) {
 			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CSIMigration, true)()
 			defer featuregatetesting.SetFeatureGateDuringTest(b, utilfeature.DefaultFeatureGate, features.CSIMigrationAWS, true)()
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy, b)
+			benchmarkScheduling(test.Nodes, test.ExistingPods, test.MinPods, nodeStrategy, setupStrategy, testStrategy, b)
 		})
 	}
 }
 
 // node.status.allocatable.
 func BenchmarkSchedulingCSIPVs(b *testing.B) {
-	tests := []struct{ nodes, existingPods, minPods int }{
-		{nodes: 500, existingPods: 250, minPods: 250},
-		{nodes: 500, existingPods: 5000, minPods: 250},
-		{nodes: 1000, existingPods: 1000, minPods: 500},
-		{nodes: 5000, existingPods: 1000, minPods: 1000},
-	}
-
+	tests := testCaseData.BenchmarkSchedulingCSIPVs
 	// The setup strategy creates pods with no volumes.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 
@@ -212,9 +210,9 @@ func BenchmarkSchedulingCSIPVs(b *testing.B) {
 	}
 	nodeStrategy := testutils.NewNodeAllocatableStrategy(allocatable, csiAllocatable, []string{})
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		name := fmt.Sprintf("%vNodes/%vPods", test.Nodes, test.ExistingPods)
 		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy, b)
+			benchmarkScheduling(test.Nodes, test.ExistingPods, test.MinPods, nodeStrategy, setupStrategy, testStrategy, b)
 		})
 	}
 }
@@ -223,12 +221,7 @@ func BenchmarkSchedulingCSIPVs(b *testing.B) {
 // PodAffinity rules when the cluster has various quantities of nodes and
 // scheduled pods.
 func BenchmarkSchedulingPodAffinity(b *testing.B) {
-	tests := []struct{ nodes, existingPods, minPods int }{
-		{nodes: 500, existingPods: 250, minPods: 250},
-		{nodes: 500, existingPods: 5000, minPods: 250},
-		{nodes: 1000, existingPods: 1000, minPods: 500},
-		{nodes: 5000, existingPods: 1000, minPods: 1000},
-	}
+	tests := testCaseData.BenchmarkSchedulingPodAffinity
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 	testBasePod := makeBasePodWithPodAffinity(
@@ -239,9 +232,9 @@ func BenchmarkSchedulingPodAffinity(b *testing.B) {
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
 	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		name := fmt.Sprintf("%vNodes/%vPods", test.Nodes, test.ExistingPods)
 		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy, b)
+			benchmarkScheduling(test.Nodes, test.ExistingPods, test.MinPods, nodeStrategy, setupStrategy, testStrategy, b)
 		})
 	}
 }
@@ -250,12 +243,7 @@ func BenchmarkSchedulingPodAffinity(b *testing.B) {
 // NodeAffinity rules when the cluster has various quantities of nodes and
 // scheduled pods.
 func BenchmarkSchedulingNodeAffinity(b *testing.B) {
-	tests := []struct{ nodes, existingPods, minPods int }{
-		{nodes: 500, existingPods: 250, minPods: 250},
-		{nodes: 500, existingPods: 5000, minPods: 250},
-		{nodes: 1000, existingPods: 1000, minPods: 500},
-		{nodes: 5000, existingPods: 1000, minPods: 1000},
-	}
+	tests := testCaseData.BenchmarkSchedulingNodeAffinity
 	// The setup strategy creates pods with no affinity rules.
 	setupStrategy := testutils.NewSimpleWithControllerCreatePodStrategy("setup")
 	testBasePod := makeBasePodWithNodeAffinity(v1.LabelZoneFailureDomain, []string{"zone1", "zone2"})
@@ -263,9 +251,9 @@ func BenchmarkSchedulingNodeAffinity(b *testing.B) {
 	testStrategy := testutils.NewCustomCreatePodStrategy(testBasePod)
 	nodeStrategy := testutils.NewLabelNodePrepareStrategy(v1.LabelZoneFailureDomain, "zone1")
 	for _, test := range tests {
-		name := fmt.Sprintf("%vNodes/%vPods", test.nodes, test.existingPods)
+		name := fmt.Sprintf("%vNodes/%vPods", test.Nodes, test.ExistingPods)
 		b.Run(name, func(b *testing.B) {
-			benchmarkScheduling(test.nodes, test.existingPods, test.minPods, nodeStrategy, setupStrategy, testStrategy, b)
+			benchmarkScheduling(test.Nodes, test.ExistingPods, test.MinPods, nodeStrategy, setupStrategy, testStrategy, b)
 		})
 	}
 }

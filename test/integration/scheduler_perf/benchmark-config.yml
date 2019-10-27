@@ -1,0 +1,107 @@
+benchmarkScheduling:
+  - nodes: 100
+    existingPods: 0
+    minPods: 100
+  - nodes: 100
+    existingPods: 1000
+    minPods: 100
+  - nodes: 1000
+    existingPods: 0
+    minPods: 100
+  - nodes: 1000
+    existingPods: 1000
+    minPods: 100
+  - nodes: 5000
+    existingPods: 1000
+    minPods: 1000
+benchmarkSchedulingPodAntiAffinity:
+  - nodes: 500
+    existingPods: 250
+    minPods: 250
+  - nodes: 500
+    existingPods: 5000
+    minPods: 250
+  - nodes: 1000
+    existingPods: 1000
+    minPods: 500
+  - nodes: 5000
+    existingPods: 1000
+    minPods: 1000
+benchmarkSchedulingSecrets:
+  - nodes: 500
+    existingPods: 250
+    minPods: 250
+  - nodes: 500
+    existingPods: 5000
+    minPods: 250
+  - nodes: 1000
+    existingPods: 1000
+    minPods: 500
+  - nodes: 5000
+    existingPods: 1000
+    minPods: 1000
+benchmarkSchedulingInTreePVs:
+  - nodes: 500
+    existingPods: 250
+    minPods: 250
+  - nodes: 500
+    existingPods: 5000
+    minPods: 250
+  - nodes: 1000
+    existingPods: 1000
+    minPods: 500
+  - nodes: 5000
+    existingPods: 1000
+    minPods: 1000
+benchmarkSchedulingMigratedInTreePVs:
+  - nodes: 500
+    existingPods: 250
+    minPods: 250
+  - nodes: 500
+    existingPods: 5000
+    minPods: 250
+  - nodes: 1000
+    existingPods: 1000
+    minPods: 500
+  - nodes: 5000
+    existingPods: 1000
+    minPods: 1000
+benchmarkSchedulingCSIPVs:
+  - nodes: 500
+    existingPods: 250
+    minPods: 250
+  - nodes: 500
+    existingPods: 5000
+    minPods: 250
+  - nodes: 1000
+    existingPods: 1000
+    minPods: 500
+  - nodes: 5000
+    existingPods: 1000
+    minPods: 1000
+benchmarkSchedulingPodAffinity:
+  - nodes: 500
+    existingPods: 250
+    minPods: 250
+  - nodes: 500
+    existingPods: 5000
+    minPods: 250
+  - nodes: 1000
+    existingPods: 1000
+    minPods: 500
+  - nodes: 5000
+    existingPods: 1000
+    minPods: 1000
+benchmarkSchedulingNodeAffinity:
+  - nodes: 500
+    existingPods: 250
+    minPods: 250
+  - nodes: 500
+    existingPods: 5000
+    minPods: 250
+  - nodes: 1000
+    existingPods: 1000
+    minPods: 500
+  - nodes: 5000
+    existingPods: 1000
+    minPods: 1000
