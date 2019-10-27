@@ -20,9 +20,52 @@ limitations under the License.
 package yaml
 
 import (
+	"bytes"
+
 	"gopkg.in/yaml.v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	sigyaml "sigs.k8s.io/yaml"
 )
+
+// FuzzDurationStrict is a fuzz target for strict-unmarshaling Duration defined
+// in "k8s.io/apimachinery/pkg/apis/meta/v1". This target also checks that the
+// unmarshaled result can be marshaled back to the input.
+func FuzzDurationStrict(b []byte) int {
+	var durationHolder struct {
+		D metav1.Duration `json:"d"`
+	}
+	if err := sigyaml.UnmarshalStrict(b, &durationHolder); err != nil {
+		return 0
+	}
+	result, err := sigyaml.Marshal(&durationHolder)
+	if err != nil {
+		panic(err)
+	}
+	if !bytes.Equal(result, b) {
+		panic("result != input")
+	}
+	return 1
+}
+
+// FuzzMicroTimeStrict is a fuzz target for strict-unmarshaling MicroTime
+// defined in "k8s.io/apimachinery/pkg/apis/meta/v1". This target also checks
+// that the unmarshaled result can be marshaled back to the input.
+func FuzzMicroTimeStrict(b []byte) int {
+	var microTimeHolder struct {
+		T metav1.MicroTime `json:"t"`
+	}
+	if err := sigyaml.UnmarshalStrict(b, &microTimeHolder); err != nil {
+		return 0
+	}
+	result, err := sigyaml.Marshal(&microTimeHolder)
+	if err != nil {
+		panic(err)
+	}
+	if !bytes.Equal(result, b) {
+		panic("result != input")
+	}
+	return 1
+}
 
 // FuzzSigYaml is a fuzz target for "sigs.k8s.io/yaml" unmarshaling.
 func FuzzSigYaml(b []byte) int {
@@ -36,6 +79,26 @@ func FuzzSigYaml(b []byte) int {
 		out = 1
 	}
 	return out
+}
+
+// FuzzTime is a fuzz target for strict-unmarshaling Time defined in
+// "k8s.io/apimachinery/pkg/apis/meta/v1". This target also checks that the
+// unmarshaled result can be marshaled back to the input.
+func FuzzTime(b []byte) int {
+	var timeHolder struct {
+		T metav1.Time `json:"t"`
+	}
+	if err := sigyaml.UnmarshalStrict(b, &timeHolder); err != nil {
+		return 0
+	}
+	result, err := sigyaml.Marshal(&timeHolder)
+	if err != nil {
+		panic(err)
+	}
+	if !bytes.Equal(result, b) {
+		panic("result != input")
+	}
+	return 1
 }
 
 // FuzzYamlV2 is a fuzz target for "gopkg.in/yaml.v2" unmarshaling.
