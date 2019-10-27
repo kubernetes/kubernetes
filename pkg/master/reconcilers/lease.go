@@ -192,7 +192,7 @@ func (r *leaseEndpointReconciler) doReconcile(serviceName string, endpointPorts 
 	// Next, we compare the current list of endpoints with the list of master IP keys
 	formatCorrect, ipCorrect, portsCorrect := checkEndpointSubsetFormatWithLease(e, masterIPs, endpointPorts, reconcilePorts)
 	if formatCorrect && ipCorrect && portsCorrect {
-		return nil
+		return r.epAdapter.EnsureEndpointSliceFromEndpoints(corev1.NamespaceDefault, e)
 	}
 
 	if !formatCorrect {
