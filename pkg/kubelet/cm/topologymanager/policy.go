@@ -20,10 +20,12 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-//Policy interface for Topology Manager Pod Admit Result
+// Policy interface for Topology Manager Pod Admit Result
 type Policy interface {
-	//Returns Policy Name
+	// Returns Policy Name
 	Name() string
-	//Returns Pod Admit Handler Response based on hints and policy type
+	// Returns Pod Admit Handler Response based on hints and policy type
 	CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult
+	// Returns a merged TopologyHint based on input from hint providers
+	Merge(providersHints []map[string][]TopologyHint, numaNodes []int) TopologyHint
 }

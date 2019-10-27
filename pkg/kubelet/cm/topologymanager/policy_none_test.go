@@ -20,7 +20,7 @@ import (
 	"testing"
 )
 
-func TestName(t *testing.T) {
+func TestPolicyNoneName(t *testing.T) {
 	tcases := []struct {
 		name     string
 		expected string
@@ -62,6 +62,39 @@ func TestPolicyNoneCanAdmitPodResult(t *testing.T) {
 
 		if result.Admit != tc.expected {
 			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
+		}
+	}
+}
+
+func TestPolicyNoneMerge(t *testing.T) {
+	numaNodes := []int{0, 1}
+
+	tcases := []struct {
+		name           string
+		providersHints []map[string][]TopologyHint
+		expected       TopologyHint
+	}{
+		{
+			name:           "merged empty providers hints",
+			providersHints: []map[string][]TopologyHint{},
+			expected:       TopologyHint{},
+		},
+		{
+			name: "merge with a single provider with a single resource",
+			providersHints: []map[string][]TopologyHint{
+				{
+					"resource": {{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true}},
+				},
+			},
+			expected: TopologyHint{},
+		},
+	}
+
+	for _, tc := range tcases {
+		policy := NewNonePolicy()
+		result := policy.Merge(tc.providersHints, numaNodes)
+		if !result.IsEqual(tc.expected) {
+			t.Errorf("Test Case: %s: Expected merge hint to be %v, got %v", tc.name, tc.expected.String(), result.String())
 		}
 	}
 }

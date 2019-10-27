@@ -41,3 +41,7 @@ func (p *nonePolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitRes
 		Admit: true,
 	}
 }
+
+func (p *nonePolicy) Merge(providersHints []map[string][]TopologyHint, numaNodes []int) TopologyHint {
+	return TopologyHint{}
+}
