@@ -920,6 +920,26 @@ func TestComputePodActions(t *testing.T) {
 	}
 }
 
+func TestKillAllContainersIgnoringFailures(t *testing.T) {
+	_, _, m, err := createTestRuntimeManager()
+	require.NoError(t, err)
+
+	// Createing a pair reference pod and status for the test cases to refer
+	// the specific fields.
+	pod, status := makeBasePodAndStatus()
+	pod.Spec.RestartPolicy = v1.RestartPolicyNever
+	status.ContainerStatuses[1].State = kubecontainer.ContainerStateUnknown
+	actions := podActions{
+		SandboxID:         status.SandboxStatuses[0].Id,
+		ContainersToKill:  getKillMap(pod, status, []int{0, 1}),
+		ContainersToStart: []int{1},
+	}
+
+	count, seenErr := m.killAllContainersIgnoringFailures(pod, actions, kubecontainer.PodSyncResult{})
+	assert.Equal(t, 2, count, "2 container killings should be attempted")
+	assert.Equal(t, true, seenErr, "there should have been error killing container")
+}
+
 func getKillMap(pod *v1.Pod, status *kubecontainer.PodStatus, cIndexes []int) map[kubecontainer.ContainerID]containerToKillInfo {
 	m := map[kubecontainer.ContainerID]containerToKillInfo{}
 	for _, i := range cIndexes {
