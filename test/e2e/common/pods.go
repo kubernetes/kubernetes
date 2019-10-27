@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -156,6 +157,22 @@ func getRestartDelay(podClient *framework.PodClient, podName string, containerNa
 		}
 	}
 	return 0, fmt.Errorf("timeout getting pod restart delay")
+}
+
+// expectNoErrorWithRetries checks if an error occurs with the given retry count.
+func expectNoErrorWithRetries(fn func() error, maxRetries int, explain ...interface{}) {
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = fn()
+		if err == nil {
+			return
+		}
+		framework.Logf("(Attempt %d of %d) Unexpected error occurred: %v", i+1, maxRetries, err)
+	}
+	if err != nil {
+		debug.PrintStack()
+	}
+	gomega.ExpectWithOffset(1, err).NotTo(gomega.HaveOccurred(), explain...)
 }
 
 var _ = framework.KubeDescribe("Pods", func() {
@@ -526,7 +543,7 @@ var _ = framework.KubeDescribe("Pods", func() {
 			"FOOSERVICE_PORT_8765_TCP=",
 			"FOOSERVICE_PORT_8765_TCP_ADDR=",
 		}
-		framework.ExpectNoErrorWithRetries(func() error {
+		expectNoErrorWithRetries(func() error {
 			return f.MatchContainerOutput(pod, containerName, expectedVars, gomega.ContainSubstring)
 		}, maxRetries, "Container should have service environment variables set")
 	})
