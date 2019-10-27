@@ -550,6 +550,12 @@ func (m *managerImpl) evictPod(pod *v1.Pod, gracePeriodOverride int64, evictMsg 
 		klog.Errorf("eviction manager: cannot evict a critical pod %s", format.Pod(pod))
 		return false
 	}
+
+	if kubelettypes.IsPodOwnedByDaemonSet(pod) {
+		klog.Errorf("eviction manager: cannot evict a pod created by DaemonSet")
+		return false
+	}
+
 	status := v1.PodStatus{
 		Phase:   v1.PodFailed,
 		Message: evictMsg,

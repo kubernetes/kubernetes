@@ -181,3 +181,14 @@ func Preemptable(preemptor, preemptee *v1.Pod) bool {
 func IsCriticalPodBasedOnPriority(priority int32) bool {
 	return priority >= scheduling.SystemCriticalPriority
 }
+
+// IsPodOwnedByDaemonSet checks if the given pod is owned by DaemonSet
+func IsPodOwnedByDaemonSet(pod *v1.Pod) bool {
+	for _, owner := range pod.OwnerReferences {
+		if *owner.Controller && owner.Kind == "DaemonSet" {
+			return true
+		}
+	}
+
+	return false
+}
