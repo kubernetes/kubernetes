@@ -279,11 +279,11 @@ func RunKubectl(certdir string, host string, kubeconfig string, kubecontext stri
 }
 
 // RunKubectlOrDieInput is a convenience wrapper over KubectlBuilder that takes input to stdin
-func RunKubectlOrDieInput(data string, certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string, args ...string) string {
+func RunKubectlOrDieInput(certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string, data string, args ...string) string {
 	return NewKubectlCommand(certdir, host, kubeconfig, kubecontext, kubectlpath, args...).WithStdinData(data).ExecOrDie(certdir, host, kubeconfig, kubecontext, kubectlpath)
 }
 
 // RunKubectlInput is a convenience wrapper over KubectlBuilder that takes input to stdin
-func RunKubectlInput(data string, certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string, args ...string) (string, error) {
+func RunKubectlInput(certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string, data string, args ...string) (string, error) {
 	return NewKubectlCommand(certdir, host, kubeconfig, kubecontext, kubectlpath, args...).WithStdinData(data).Exec()
 }
