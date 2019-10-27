@@ -81,10 +81,10 @@ func FuzzSigYaml(b []byte) int {
 	return out
 }
 
-// FuzzTime is a fuzz target for strict-unmarshaling Time defined in
+// FuzzTimeStrict is a fuzz target for strict-unmarshaling Time defined in
 // "k8s.io/apimachinery/pkg/apis/meta/v1". This target also checks that the
 // unmarshaled result can be marshaled back to the input.
-func FuzzTime(b []byte) int {
+func FuzzTimeStrict(b []byte) int {
 	var timeHolder struct {
 		T metav1.Time `json:"t"`
 	}
