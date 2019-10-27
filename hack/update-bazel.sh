@@ -63,7 +63,7 @@ done
 
 # Run gazelle to update Go rules in BUILD files.
 # filter out known pkg-config error (see buildozer workaround below)
-# NOTE: the `|| exit "${PIPESTATUS[0]}"` is to ignore grep errors 
+# NOTE: the `|| exit "${PIPESTATUS[0]}"` is to ignore grep errors
 # while preserving the exit code of gazelle
 gazelle fix \
     -external=vendored \

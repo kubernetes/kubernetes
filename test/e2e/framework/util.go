@@ -30,13 +30,11 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"golang.org/x/net/websocket"
@@ -74,7 +72,9 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/master/ports"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -83,7 +83,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	uexec "k8s.io/utils/exec"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -397,22 +396,22 @@ func WaitForDaemonSets(c clientset.Interface, ns string, allowedNotReadyNodes in
 	})
 }
 
-func kubectlLogPod(c clientset.Interface, pod v1.Pod, containerNameSubstr string, logFunc func(ftm string, args ...interface{})) {
-	for _, container := range pod.Spec.Containers {
-		if strings.Contains(container.Name, containerNameSubstr) {
-			// Contains() matches all strings if substr is empty
-			logs, err := e2epod.GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
-			if err != nil {
-				logs, err = e2epod.GetPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
-				if err != nil {
-					logFunc("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
-				}
-			}
-			logFunc("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName)
-			logFunc("%s : STARTLOG\n%s\nENDLOG for container %v:%v:%v", containerNameSubstr, logs, pod.Namespace, pod.Name, container.Name)
-		}
-	}
-}
+// func kubectlLogPod(c clientset.Interface, pod v1.Pod, containerNameSubstr string, logFunc func(ftm string, args ...interface{})) {
+// 	for _, container := range pod.Spec.Containers {
+// 		if strings.Contains(container.Name, containerNameSubstr) {
+// 			// Contains() matches all strings if substr is empty
+// 			logs, err := e2epod.GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
+// 			if err != nil {
+// 				logs, err = e2epod.GetPreviousPodLogs(c, pod.Namespace, pod.Name, container.Name)
+// 				if err != nil {
+// 					logFunc("Failed to get logs of pod %v, container %v, err: %v", pod.Name, container.Name, err)
+// 				}
+// 			}
+// 			logFunc("Logs of %v/%v:%v on node %v", pod.Namespace, pod.Name, container.Name, pod.Spec.NodeName)
+// 			logFunc("%s : STARTLOG\n%s\nENDLOG for container %v:%v:%v", containerNameSubstr, logs, pod.Namespace, pod.Name, container.Name)
+// 		}
+// 	}
+// }
 
 // LogFailedContainers runs `kubectl logs` on a failed containers.
 func LogFailedContainers(c clientset.Interface, ns string, logFunc func(ftm string, args ...interface{})) {
@@ -424,7 +423,7 @@ func LogFailedContainers(c clientset.Interface, ns string, logFunc func(ftm stri
 	logFunc("Running kubectl logs on non-ready containers in %v", ns)
 	for _, pod := range podList.Items {
 		if res, err := testutils.PodRunningReady(&pod); !res || err != nil {
-			kubectlLogPod(c, pod, "", Logf)
+			e2ekubectl.KubectlLogPod(c, pod, "", e2elog.Logf)
 		}
 	}
 }
@@ -868,19 +867,6 @@ func ServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface
 	return sv.AtLeast(v), nil
 }
 
-// KubectlVersion gets the version of kubectl that's currently being used (see
-// --kubectl-path in e2e.go to use an alternate kubectl).
-func KubectlVersion() (*utilversion.Version, error) {
-	output := RunKubectlOrDie("version", "--client")
-	matches := gitVersionRegexp.FindStringSubmatch(output)
-	if len(matches) != 2 {
-		return nil, fmt.Errorf("Could not find kubectl version in output %v", output)
-	}
-	// Don't use the full match, as it contains "GitVersion:\"" and a
-	// trailing "\"".  Just use the submatch.
-	return utilversion.ParseSemantic(matches[1])
-}
-
 // RestclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
 func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
@@ -943,7 +929,7 @@ func Cleanup(filePath, ns string, selectors ...string) {
 	if ns != "" {
 		nsArg = fmt.Sprintf("--namespace=%s", ns)
 	}
-	RunKubectlOrDie("delete", "--grace-period=0", "-f", filePath, nsArg)
+	e2ekubectl.RunKubectlOrDie("delete", "--grace-period=0", "-f", filePath, nsArg)
 	AssertCleanup(ns, selectors...)
 }
 
@@ -958,12 +944,12 @@ func AssertCleanup(ns string, selectors ...string) {
 	verifyCleanupFunc := func() (bool, error) {
 		e = nil
 		for _, selector := range selectors {
-			resources := RunKubectlOrDie("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
+			resources := e2ekubectl.RunKubectlOrDie("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
 			if resources != "" {
 				e = fmt.Errorf("Resources left running after stop:\n%s", resources)
 				return false, nil
 			}
-			pods := RunKubectlOrDie("get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
+			pods := e2ekubectl.RunKubectlOrDie("get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
 			if pods != "" {
 				e = fmt.Errorf("Pods left unterminated after stop:\n%s", pods)
 				return false, nil
@@ -977,40 +963,6 @@ func AssertCleanup(ns string, selectors ...string) {
 	}
 }
 
-// KubectlCmd runs the kubectl executable through the wrapper script.
-func KubectlCmd(args ...string) *exec.Cmd {
-	defaultArgs := []string{}
-
-	// Reference a --server option so tests can run anywhere.
-	if TestContext.Host != "" {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAPIServer+"="+TestContext.Host)
-	}
-	if TestContext.KubeConfig != "" {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
-
-		// Reference the KubeContext
-		if TestContext.KubeContext != "" {
-			defaultArgs = append(defaultArgs, "--"+clientcmd.FlagContext+"="+TestContext.KubeContext)
-		}
-
-	} else {
-		if TestContext.CertDir != "" {
-			defaultArgs = append(defaultArgs,
-				fmt.Sprintf("--certificate-authority=%s", filepath.Join(TestContext.CertDir, "ca.crt")),
-				fmt.Sprintf("--client-certificate=%s", filepath.Join(TestContext.CertDir, "kubecfg.crt")),
-				fmt.Sprintf("--client-key=%s", filepath.Join(TestContext.CertDir, "kubecfg.key")))
-		}
-	}
-	kubectlArgs := append(defaultArgs, args...)
-
-	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
-	//and so on.
-	cmd := exec.Command(TestContext.KubectlPath, kubectlArgs...)
-
-	//caller will invoke this and wait on it.
-	return cmd
-}
-
 // LookForStringInPodExec looks for the given string in the output of a command
 // executed in a specific pod container.
 // TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
@@ -1019,7 +971,7 @@ func LookForStringInPodExec(ns, podName string, command []string, expectedString
 		// use the first container
 		args := []string{"exec", podName, fmt.Sprintf("--namespace=%v", ns), "--"}
 		args = append(args, command...)
-		return RunKubectlOrDie(args...)
+		return e2ekubectl.RunKubectlOrDie(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, args...)
 	})
 }
 
@@ -1038,130 +990,6 @@ func LookForString(expectedString string, timeout time.Duration, fn func() strin
 	return
 }
 
-// KubectlBuilder is used to build, customize and execute a kubectl Command.
-// Add more functions to customize the builder as needed.
-type KubectlBuilder struct {
-	cmd     *exec.Cmd
-	timeout <-chan time.Time
-}
-
-// NewKubectlCommand returns a KubectlBuilder for running kubectl.
-func NewKubectlCommand(args ...string) *KubectlBuilder {
-	b := new(KubectlBuilder)
-	b.cmd = KubectlCmd(args...)
-	return b
-}
-
-// WithEnv sets the given environment and returns itself.
-func (b *KubectlBuilder) WithEnv(env []string) *KubectlBuilder {
-	b.cmd.Env = env
-	return b
-}
-
-// WithTimeout sets the given timeout and returns itself.
-func (b *KubectlBuilder) WithTimeout(t <-chan time.Time) *KubectlBuilder {
-	b.timeout = t
-	return b
-}
-
-// WithStdinData sets the given data to stdin and returns itself.
-func (b KubectlBuilder) WithStdinData(data string) *KubectlBuilder {
-	b.cmd.Stdin = strings.NewReader(data)
-	return &b
-}
-
-// WithStdinReader sets the given reader and returns itself.
-func (b KubectlBuilder) WithStdinReader(reader io.Reader) *KubectlBuilder {
-	b.cmd.Stdin = reader
-	return &b
-}
-
-// ExecOrDie runs the kubectl executable or dies if error occurs.
-func (b KubectlBuilder) ExecOrDie() string {
-	str, err := b.Exec()
-	// In case of i/o timeout error, try talking to the apiserver again after 2s before dying.
-	// Note that we're still dying after retrying so that we can get visibility to triage it further.
-	if isTimeout(err) {
-		Logf("Hit i/o timeout error, talking to the server 2s later to see if it's temporary.")
-		time.Sleep(2 * time.Second)
-		retryStr, retryErr := RunKubectl("version")
-		Logf("stdout: %q", retryStr)
-		Logf("err: %v", retryErr)
-	}
-	ExpectNoError(err)
-	return str
-}
-
-func isTimeout(err error) bool {
-	switch err := err.(type) {
-	case *url.Error:
-		if err, ok := err.Err.(net.Error); ok && err.Timeout() {
-			return true
-		}
-	case net.Error:
-		if err.Timeout() {
-			return true
-		}
-	}
-	return false
-}
-
-// Exec runs the kubectl executable.
-func (b KubectlBuilder) Exec() (string, error) {
-	var stdout, stderr bytes.Buffer
-	cmd := b.cmd
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-
-	Logf("Running '%s %s'", cmd.Path, strings.Join(cmd.Args[1:], " ")) // skip arg[0] as it is printed separately
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("error starting %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err)
-	}
-	errCh := make(chan error, 1)
-	go func() {
-		errCh <- cmd.Wait()
-	}()
-	select {
-	case err := <-errCh:
-		if err != nil {
-			var rc = 127
-			if ee, ok := err.(*exec.ExitError); ok {
-				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
-				Logf("rc: %d", rc)
-			}
-			return "", uexec.CodeExitError{
-				Err:  fmt.Errorf("error running %v:\nCommand stdout:\n%v\nstderr:\n%v\nerror:\n%v", cmd, cmd.Stdout, cmd.Stderr, err),
-				Code: rc,
-			}
-		}
-	case <-b.timeout:
-		b.cmd.Process.Kill()
-		return "", fmt.Errorf("timed out waiting for command %v:\nCommand stdout:\n%v\nstderr:\n%v", cmd, cmd.Stdout, cmd.Stderr)
-	}
-	Logf("stderr: %q", stderr.String())
-	Logf("stdout: %q", stdout.String())
-	return stdout.String(), nil
-}
-
-// RunKubectlOrDie is a convenience wrapper over kubectlBuilder
-func RunKubectlOrDie(args ...string) string {
-	return NewKubectlCommand(args...).ExecOrDie()
-}
-
-// RunKubectl is a convenience wrapper over kubectlBuilder
-func RunKubectl(args ...string) (string, error) {
-	return NewKubectlCommand(args...).Exec()
-}
-
-// RunKubectlOrDieInput is a convenience wrapper over kubectlBuilder that takes input to stdin
-func RunKubectlOrDieInput(data string, args ...string) string {
-	return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
-}
-
-// RunKubectlInput is a convenience wrapper over kubectlBuilder that takes input to stdin
-func RunKubectlInput(data string, args ...string) (string, error) {
-	return NewKubectlCommand(args...).WithStdinData(data).Exec()
-}
-
 // RunKubemciWithKubeconfig is a convenience wrapper over RunKubemciCmd
 func RunKubemciWithKubeconfig(args ...string) (string, error) {
 	if TestContext.KubeConfig != "" {
@@ -1175,10 +1003,10 @@ func RunKubemciWithKubeconfig(args ...string) (string, error) {
 func RunKubemciCmd(args ...string) (string, error) {
 	// kubemci is assumed to be in PATH.
 	kubemci := "kubemci"
-	b := new(KubectlBuilder)
+	b := new(e2ekubectl.KubectlBuilder)
 	args = append(args, "--gcp-project="+TestContext.CloudConfig.ProjectID)
 
-	b.cmd = exec.Command(kubemci, args...)
+	b.Cmd = exec.Command(kubemci, args...)
 	return b.Exec()
 }
 
@@ -1717,7 +1545,7 @@ func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, a
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
-	return RunKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
+	return e2ekubectl.RunKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
 }
 
 // RunHostCmdOrDie calls RunHostCmd and dies on error.
@@ -2208,7 +2036,14 @@ func OpenWebSocketForURL(url *url.URL, config *restclient.Config, protocols []st
 // LookForStringInLog looks for the given string in the log of a specific pod container
 func LookForStringInLog(ns, podName, container, expectedString string, timeout time.Duration) (result string, err error) {
 	return LookForString(expectedString, timeout, func() string {
-		return RunKubectlOrDie("logs", podName, container, fmt.Sprintf("--namespace=%v", ns))
+		return e2ekubectl.RunKubectlOrDie(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "logs", podName, container, fmt.Sprintf("--namespace=%v", ns))
+	})
+}
+
+// LookForStringInFile looks for the given string in a file in a specific pod container
+func LookForStringInFile(ns, podName, container, file, expectedString string, timeout time.Duration) (result string, err error) {
+	return LookForString(expectedString, timeout, func() string {
+		return e2ekubectl.RunKubectlOrDie("exec", podName, "-c", container, fmt.Sprintf("--namespace=%v", ns), "--", "cat", file)
 	})
 }
 
@@ -2612,10 +2447,10 @@ func PollURL(route, host string, timeout time.Duration, interval time.Duration, 
 
 // DescribeIng describes information of ingress by running kubectl describe ing.
 func DescribeIng(ns string) {
-	Logf("\nOutput of kubectl describe ing:\n")
-	desc, _ := RunKubectl(
-		"describe", "ing", fmt.Sprintf("--namespace=%v", ns))
-	Logf(desc)
+	e2elog.Logf("\nOutput of kubectl describe ing:\n")
+	desc, _ := e2ekubectl.RunKubectl(
+		TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "describe", "ing", fmt.Sprintf("--namespace=%v", ns))
+	e2elog.Logf(desc)
 }
 
 // NewTestPod returns a pod that has the specified requests and limits
@@ -2661,7 +2496,7 @@ func (f *Framework) NewAgnhostPod(name string, args ...string) *v1.Pod {
 // CreateEmptyFileOnPod creates empty file at given path on the pod.
 // TODO(alejandrox1): move to subpkg pod once kubectl methods have been refactored.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
-	_, err := RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
+	_, err := e2ekubectl.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
 	return err
 }
 
@@ -2706,11 +2541,10 @@ func PrintSummaries(summaries []TestDataSummary, testBaseName string) {
 func DumpDebugInfo(c clientset.Interface, ns string) {
 	sl, _ := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
 	for _, s := range sl.Items {
-		desc, _ := RunKubectl("describe", "po", s.Name, fmt.Sprintf("--namespace=%v", ns))
-		Logf("\nOutput of kubectl describe %v:\n%v", s.Name, desc)
-
-		l, _ := RunKubectl("logs", s.Name, fmt.Sprintf("--namespace=%v", ns), "--tail=100")
-		Logf("\nLast 100 log lines of %v:\n%v", s.Name, l)
+		desc, _ := e2ekubectl.RunKubectl(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "describe", "po", s.Name, fmt.Sprintf("--namespace=%v", ns))
+		e2elog.Logf("\nOutput of kubectl describe %v:\n%v", s.Name, desc)
+		l, _ := e2ekubectl.RunKubectl(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "logs", s.Name, fmt.Sprintf("--namespace=%v", ns), "--tail=100")
+		e2elog.Logf("\nLast 100 log lines of %v:\n%v", s.Name, l)
 	}
 }
 

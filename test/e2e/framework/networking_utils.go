@@ -37,6 +37,8 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	coreclientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -159,9 +161,9 @@ func (config *NetworkingTestConfig) diagnoseMissingEndpoints(foundEndpoints sets
 		if foundEndpoints.Has(e.Name) {
 			continue
 		}
-		Logf("\nOutput of kubectl describe pod %v/%v:\n", e.Namespace, e.Name)
-		desc, _ := RunKubectl(
-			"describe", "pod", e.Name, fmt.Sprintf("--namespace=%v", e.Namespace))
+		e2elog.Logf("\nOutput of kubectl describe pod %v/%v:\n", e.Namespace, e.Name)
+		desc, _ := e2ekubectl.RunKubectl(
+			TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "describe", "pod", e.Name, fmt.Sprintf("--namespace=%v", e.Namespace))
 		Logf(desc)
 	}
 }
@@ -389,9 +391,9 @@ func (config *NetworkingTestConfig) executeCurlCmd(cmd string, expected string) 
 		}
 		return true, nil
 	}); pollErr != nil {
-		Logf("\nOutput of kubectl describe pod %v/%v:\n", config.Namespace, podName)
-		desc, _ := RunKubectl(
-			"describe", "pod", podName, fmt.Sprintf("--namespace=%v", config.Namespace))
+		e2elog.Logf("\nOutput of kubectl describe pod %v/%v:\n", config.Namespace, podName)
+		desc, _ := e2ekubectl.RunKubectl(
+			TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "describe", "pod", podName, fmt.Sprintf("--namespace=%v", config.Namespace))
 		Logf("%s", desc)
 		Failf("Timed out in %v: %v", retryTimeout, msg)
 	}

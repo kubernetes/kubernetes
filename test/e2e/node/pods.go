@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -103,7 +104,7 @@ var _ = SIGDescribe("Pods Extended", func() {
 			framework.ExpectNoError(err, "failed to GET scheduled pod")
 
 			// start local proxy, so we can send graceful deletion over query string, rather than body parameter
-			cmd := framework.KubectlCmd("proxy", "-p", "0")
+			cmd := e2ekubectl.KubectlCmd(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "proxy", "-p", "0")
 			stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
 			framework.ExpectNoError(err, "failed to start up proxy")
 			defer stdout.Close()

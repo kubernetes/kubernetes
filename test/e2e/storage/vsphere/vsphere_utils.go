@@ -41,6 +41,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
@@ -364,7 +365,7 @@ func getVSpherePodSpecWithVolumePaths(volumePaths []string, keyValuelabel map[st
 
 func verifyFilesExistOnVSphereVolume(namespace string, podName string, filePaths ...string) {
 	for _, filePath := range filePaths {
-		_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
+		_, err := e2ekubectl.RunKubectl(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/ls", filePath)
 		framework.ExpectNoError(err, fmt.Sprintf("failed to verify file: %q on the pod: %q", filePath, podName))
 	}
 }
@@ -822,7 +823,7 @@ func expectFilesToBeAccessible(namespace string, pods []*v1.Pod, filePaths []str
 
 // writeContentToPodFile writes the given content to the specified file.
 func writeContentToPodFile(namespace, podName, filePath, content string) error {
-	_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName,
+	_, err := e2ekubectl.RunKubectl(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "exec", fmt.Sprintf("--namespace=%s", namespace), podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("echo '%s' > %s", content, filePath))
 	return err
 }
@@ -830,7 +831,7 @@ func writeContentToPodFile(namespace, podName, filePath, content string) error {
 // expectFileContentToMatch checks if a given file contains the specified
 // content, else fails.
 func expectFileContentToMatch(namespace, podName, filePath, content string) {
-	_, err := framework.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName,
+	_, err := e2ekubectl.RunKubectl(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "exec", fmt.Sprintf("--namespace=%s", namespace), podName,
 		"--", "/bin/sh", "-c", fmt.Sprintf("grep '%s' %s", content, filePath))
 	framework.ExpectNoError(err, fmt.Sprintf("failed to match content of file: %q on the pod: %q", filePath, podName))
 }

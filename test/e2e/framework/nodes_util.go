@@ -28,6 +28,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
+	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
@@ -326,17 +328,17 @@ func gceUpgradeScript() string {
 }
 
 func waitForSSHTunnels() {
-	Logf("Waiting for SSH tunnels to establish")
-	RunKubectl("run", "ssh-tunnel-test",
+	e2elog.Logf("Waiting for SSH tunnels to establish")
+	e2ekubectl.RunKubectl("run", "ssh-tunnel-test",
 		"--image=busybox",
 		"--restart=Never",
 		"--command", "--",
 		"echo", "Hello")
-	defer RunKubectl("delete", "pod", "ssh-tunnel-test")
+	defer e2ekubectl.RunKubectl(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "delete", "pod", "ssh-tunnel-test")
 
 	// allow up to a minute for new ssh tunnels to establish
 	wait.PollImmediate(5*time.Second, time.Minute, func() (bool, error) {
-		_, err := RunKubectl("logs", "ssh-tunnel-test")
+		_, err := e2ekubectl.RunKubectl(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "logs", "ssh-tunnel-test")
 		return err == nil, nil
 	})
 }

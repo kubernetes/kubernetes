@@ -21,6 +21,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 )
 
@@ -106,7 +107,7 @@ func (h *hostExecutor) IssueCommandWithResult(cmd string, node *v1.Node) (string
 		"-c",
 		cmd,
 	}
-	return framework.RunKubectl(args...)
+	return e2ekubectl.RunKubectl(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, args...)
 }
 
 // IssueCommand works like IssueCommandWithResult, but discards result.

@@ -26,6 +26,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
@@ -104,8 +105,8 @@ func EnableAndDisableInternalLB() (enable func(svc *v1.Service), disable func(sv
 // DescribeSvc logs the output of kubectl describe svc for the given namespace
 func DescribeSvc(ns string) {
 	framework.Logf("\nOutput of kubectl describe svc:\n")
-	desc, _ := framework.RunKubectl(
-		"describe", "svc", fmt.Sprintf("--namespace=%v", ns))
+	desc, _ := e2ekubectl.RunKubectl(
+		framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
 	framework.Logf(desc)
 }
 

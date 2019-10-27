@@ -46,6 +46,7 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/restmapper"
 	scaleclient "k8s.io/client-go/scale"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -671,8 +672,10 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 		fmt.Sprintf("-c=%v", containerName),
 	}
 	cmdArgs = append(cmdArgs, args...)
+	// tk := e2ekubectl.NewTestKubeconfig(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath)
 
-	cmd := KubectlCmd(cmdArgs...)
+	// cmd := tk.KubectlCmd(cmdArgs...)
+	cmd := e2ekubectl.KubectlCmd(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, cmdArgs...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))

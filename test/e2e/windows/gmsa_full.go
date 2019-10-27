@@ -52,6 +52,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -235,9 +236,9 @@ func deployGmsaWebhook(f *framework.Framework, deployScriptPath string) (func(),
 
 	// regardless of whether the deployment succeeded, let's do a best effort at cleanup
 	cleanUpFunc = func() {
-		framework.RunKubectl("delete", "--filename", manifestsFile)
-		framework.RunKubectl("delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
-		framework.RunKubectl("delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", name, namespace))
+		e2ekubectl.RunKubectl(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "delete", "--filename", manifestsFile)
+		e2ekubectl.RunKubectl(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "delete", "CustomResourceDefinition", "gmsacredentialspecs.windows.k8s.io")
+		e2ekubectl.RunKubectl(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "delete", "CertificateSigningRequest", fmt.Sprintf("%s.%s", name, namespace))
 		os.RemoveAll(tempDir)
 	}
 
@@ -272,7 +273,7 @@ func createGmsaCustomResource(crdManifestContents string) (func(), error) {
 	defer tempFile.Close()
 
 	cleanUpFunc = func() {
-		framework.RunKubectl("delete", "--filename", tempFile.Name())
+		e2ekubectl.RunKubectl(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "delete", "--filename", tempFile.Name())
 		os.Remove(tempFile.Name())
 	}
 
@@ -282,7 +283,7 @@ func createGmsaCustomResource(crdManifestContents string) (func(), error) {
 		return cleanUpFunc, err
 	}
 
-	output, err := framework.RunKubectl("apply", "--filename", tempFile.Name())
+	output, err := e2ekubectl.RunKubectl(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "apply", "--filename", tempFile.Name())
 	if err != nil {
 		err = errors.Wrapf(err, "unable to create custom resource, output:\n%s", output)
 	}
@@ -392,5 +393,5 @@ func createPodWithGmsa(f *framework.Framework, serviceAccountName string) string
 
 func runKubectlExecInNamespace(namespace string, args ...string) (string, error) {
 	namespaceOption := fmt.Sprintf("--namespace=%s", namespace)
-	return framework.RunKubectl(append([]string{"exec", namespaceOption}, args...)...)
+	return e2ekubectl.RunKubectl(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, append([]string{"exec", namespaceOption}, args...)...)
 }

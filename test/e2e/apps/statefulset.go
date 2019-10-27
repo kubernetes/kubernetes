@@ -34,6 +34,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
@@ -851,7 +852,7 @@ var _ = SIGDescribe("StatefulSet", func() {
 func kubectlExecWithRetries(args ...string) (out string) {
 	var err error
 	for i := 0; i < 3; i++ {
-		if out, err = framework.RunKubectl(args...); err == nil {
+		if out, err = e2ekubectl.RunKubectl(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, args...); err == nil {
 			return
 		}
 		framework.Logf("Retrying %v:\nerror %v\nstdout %v", args, err, out)
@@ -916,7 +917,7 @@ func (z *zookeeperTester) write(statefulPodIndex int, kv map[string]string) {
 	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
 	for k, v := range kv {
 		cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh create /%v %v", k, v)
-		framework.Logf(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
+		framework.Logf(e2ekubectl.RunKubectlOrDie(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "exec", ns, name, "--", "/bin/sh", "-c", cmd))
 	}
 }
 
@@ -924,7 +925,7 @@ func (z *zookeeperTester) read(statefulPodIndex int, key string) string {
 	name := fmt.Sprintf("%v-%d", z.ss.Name, statefulPodIndex)
 	ns := fmt.Sprintf("--namespace=%v", z.ss.Namespace)
 	cmd := fmt.Sprintf("/opt/zookeeper/bin/zkCli.sh get /%v", key)
-	return lastLine(framework.RunKubectlOrDie("exec", ns, name, "--", "/bin/sh", "-c", cmd))
+	return lastLine(e2ekubectl.RunKubectlOrDie(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "exec", ns, name, "--", "/bin/sh", "-c", cmd))
 }
 
 type mysqlGaleraTester struct {
@@ -981,7 +982,7 @@ func (m *redisTester) name() string {
 
 func (m *redisTester) redisExec(cmd, ns, podName string) string {
 	cmd = fmt.Sprintf("/opt/redis/redis-cli -h %v %v", podName, cmd)
-	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return e2ekubectl.RunKubectlOrDie(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (m *redisTester) deploy(ns string) *appsv1.StatefulSet {
@@ -1012,7 +1013,7 @@ func (c *cockroachDBTester) name() string {
 
 func (c *cockroachDBTester) cockroachDBExec(cmd, ns, podName string) string {
 	cmd = fmt.Sprintf("/cockroach/cockroach sql --insecure --host %s.cockroachdb -e \"%v\"", podName, cmd)
-	return framework.RunKubectlOrDie(fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
+	return e2ekubectl.RunKubectlOrDie(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, fmt.Sprintf("--namespace=%v", ns), "exec", podName, "--", "/bin/sh", "-c", cmd)
 }
 
 func (c *cockroachDBTester) deploy(ns string) *appsv1.StatefulSet {

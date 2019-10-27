@@ -32,6 +32,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2esset "k8s.io/kubernetes/test/e2e/framework/statefulset"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
@@ -61,7 +62,7 @@ func (CassandraUpgradeTest) Skip(upgCtx UpgradeContext) bool {
 
 func cassandraKubectlCreate(ns, file string) {
 	input := string(testfiles.ReadOrDie(filepath.Join(cassandraManifestPath, file)))
-	framework.RunKubectlOrDieInput(input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
+	e2ekubectl.RunKubectlOrDieInput(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, input, "create", "-f", "-", fmt.Sprintf("--namespace=%s", ns))
 }
 
 // Setup creates a Cassandra StatefulSet and a PDB. It also brings up a tester

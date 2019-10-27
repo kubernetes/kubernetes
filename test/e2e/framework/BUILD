@@ -77,7 +77,9 @@ go_library(
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//staging/src/k8s.io/component-base/version:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
+        "//test/e2e/framework/kubectl:go_default_library",
         "//test/e2e/framework/kubelet:go_default_library",
+        "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
@@ -96,8 +98,19 @@ go_library(
         "//vendor/github.com/pkg/errors:go_default_library",
         "//vendor/golang.org/x/net/websocket:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
-        "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/net:go_default_library",
+    ],
+)
+
+go_test(
+    name = "go_default_test",
+    srcs = ["log_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//vendor/github.com/onsi/ginkgo:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/config:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
+        "//vendor/github.com/onsi/gomega:go_default_library",
     ],
 )
 
@@ -121,6 +134,7 @@ filegroup(
         "//test/e2e/framework/gpu:all-srcs",
         "//test/e2e/framework/ingress:all-srcs",
         "//test/e2e/framework/job:all-srcs",
+        "//test/e2e/framework/kubectl:all-srcs",
         "//test/e2e/framework/kubelet:all-srcs",
         "//test/e2e/framework/lifecycle:all-srcs",
         "//test/e2e/framework/log:all-srcs",
@@ -149,16 +163,4 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["log_test.go"],
-    embed = [":go_default_library"],
-    deps = [
-        "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/github.com/onsi/ginkgo/config:go_default_library",
-        "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
-        "//vendor/github.com/onsi/gomega:go_default_library",
-    ],
 )

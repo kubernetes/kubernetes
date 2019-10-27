@@ -64,6 +64,7 @@ go_library(
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
+        "//test/e2e/framework/kubectl:go_default_library",
         "//test/e2e/framework/log:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",

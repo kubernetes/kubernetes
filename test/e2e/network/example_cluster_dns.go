@@ -31,6 +31,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
@@ -87,11 +88,11 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie("create", "-f", backendRcYaml, getNsCmdFlag(ns))
+			e2ekubectl.RunKubectlOrDie(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "create", "-f", backendRcYaml, getNsCmdFlag(ns))
 		}
 
 		for _, ns := range namespaces {
-			framework.RunKubectlOrDie("create", "-f", backendSvcYaml, getNsCmdFlag(ns))
+			e2ekubectl.RunKubectlOrDie(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "create", "-f", backendSvcYaml, getNsCmdFlag(ns))
 		}
 
 		// wait for objects
@@ -139,7 +140,7 @@ var _ = SIGDescribe("ClusterDns [Feature:Example]", func() {
 
 		// create a pod in each namespace
 		for _, ns := range namespaces {
-			framework.NewKubectlCommand("create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie()
+			e2ekubectl.NewKubectlCommand(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "create", "-f", "-", getNsCmdFlag(ns)).WithStdinData(updatedPodYaml).ExecOrDie(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath)
 		}
 
 		// wait until the pods have been scheduler, i.e. are not Pending anymore. Remember

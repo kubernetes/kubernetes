@@ -44,6 +44,7 @@ import (
 	"k8s.io/klog"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/scheduling"
@@ -592,7 +593,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 		if len(newNodesSet) > 1 {
 			ginkgo.By(fmt.Sprintf("Spotted following new nodes in %s: %v", minMig, newNodesSet))
 			klog.Infof("Usually only 1 new node is expected, investigating")
-			klog.Infof("Kubectl:%s\n", framework.RunKubectlOrDie("get", "nodes", "-o", "json"))
+			klog.Infof("Kubectl:%s\n", e2ekubectl.RunKubectlOrDie(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "get", "nodes", "-o", "json"))
 			if output, err := exec.Command("gcloud", "compute", "instances", "list",
 				"--project="+framework.TestContext.CloudConfig.ProjectID,
 				"--zone="+framework.TestContext.CloudConfig.Zone).Output(); err == nil {
@@ -999,7 +1000,7 @@ var _ = SIGDescribe("Cluster size autoscaling [Slow]", func() {
 func installNvidiaDriversDaemonSet() {
 	ginkgo.By("Add daemonset which installs nvidia drivers")
 	// the link differs from one in GKE documentation; discussed with @mindprince this one should be used
-	framework.RunKubectlOrDie("apply", "-f", "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml")
+	e2ekubectl.RunKubectlOrDie(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "apply", "-f", "https://raw.githubusercontent.com/GoogleCloudPlatform/container-engine-accelerators/master/daemonset.yaml")
 }
 
 func execCmd(args ...string) *exec.Cmd {
@@ -1399,8 +1400,8 @@ func waitForCaPodsReadyInNamespace(f *framework.Framework, c clientset.Interface
 		klog.Infof("Too many pods are not ready yet: %v", notready)
 	}
 	klog.Info("Timeout on waiting for pods being ready")
-	klog.Info(framework.RunKubectlOrDie("get", "pods", "-o", "json", "--all-namespaces"))
-	klog.Info(framework.RunKubectlOrDie("get", "nodes", "-o", "json"))
+	klog.Info(e2ekubectl.RunKubectlOrDie(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "get", "pods", "-o", "json", "--all-namespaces"))
+	klog.Info(e2ekubectl.RunKubectlOrDie(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath, "get", "nodes", "-o", "json"))
 
 	// Some pods are still not running.
 	return fmt.Errorf("Too many pods are still not running: %v", notready)
