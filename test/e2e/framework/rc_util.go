@@ -220,7 +220,7 @@ func ValidateController(c clientset.Interface, containerImage string, replicas i
 	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
 waitLoop:
 	for start := time.Now(); time.Since(start) < PodStartTimeout; time.Sleep(5 * time.Second) {
-		getPodsOutput := e2ekubectl.RunKubectlOrDie("get", "pods", "-o", "template", getPodsTemplate, "-l", testname, fmt.Sprintf("--namespace=%v", ns))
+		getPodsOutput := e2ekubectl.RunKubectlOrDie(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "get", "pods", "-o", "template", getPodsTemplate, "-l", testname, fmt.Sprintf("--namespace=%v", ns))
 		pods := strings.Fields(getPodsOutput)
 		if numPods := len(pods); numPods != replicas {
 			ginkgo.By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
@@ -228,13 +228,13 @@ waitLoop:
 		}
 		var runningPods []string
 		for _, podID := range pods {
-			running := e2ekubectl.RunKubectlOrDie("get", "pods", podID, "-o", "template", getContainerStateTemplate, fmt.Sprintf("--namespace=%v", ns))
+			running := e2ekubectl.RunKubectlOrDie(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "get", "pods", podID, "-o", "template", getContainerStateTemplate, fmt.Sprintf("--namespace=%v", ns))
 			if running != "true" {
 				Logf("%s is created but not running", podID)
 				continue waitLoop
 			}
 
-			currentImage := e2ekubectl.RunKubectlOrDie("get", "pods", podID, "-o", "template", getImageTemplate, fmt.Sprintf("--namespace=%v", ns))
+			currentImage := e2ekubectl.RunKubectlOrDie(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "get", "pods", podID, "-o", "template", getImageTemplate, fmt.Sprintf("--namespace=%v", ns))
 			currentImage = trimDockerRegistry(currentImage)
 			if currentImage != containerImage {
 				Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)

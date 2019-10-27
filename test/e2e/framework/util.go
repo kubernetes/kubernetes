@@ -929,7 +929,7 @@ func Cleanup(filePath, ns string, selectors ...string) {
 	if ns != "" {
 		nsArg = fmt.Sprintf("--namespace=%s", ns)
 	}
-	e2ekubectl.RunKubectlOrDie("delete", "--grace-period=0", "-f", filePath, nsArg)
+	e2ekubectl.RunKubectlOrDie(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "delete", "--grace-period=0", "-f", filePath, nsArg)
 	AssertCleanup(ns, selectors...)
 }
 
@@ -944,12 +944,12 @@ func AssertCleanup(ns string, selectors ...string) {
 	verifyCleanupFunc := func() (bool, error) {
 		e = nil
 		for _, selector := range selectors {
-			resources := e2ekubectl.RunKubectlOrDie("get", "rc,svc", "-l", selector, "--no-headers", nsArg)
+			resources := e2ekubectl.RunKubectlOrDie(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "get", "rc,svc", "-l", selector, "--no-headers", nsArg)
 			if resources != "" {
 				e = fmt.Errorf("Resources left running after stop:\n%s", resources)
 				return false, nil
 			}
-			pods := e2ekubectl.RunKubectlOrDie("get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
+			pods := e2ekubectl.RunKubectlOrDie(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "get", "pods", "-l", selector, nsArg, "-o", "go-template={{ range .items }}{{ if not .metadata.deletionTimestamp }}{{ .metadata.name }}{{ \"\\n\" }}{{ end }}{{ end }}")
 			if pods != "" {
 				e = fmt.Errorf("Pods left unterminated after stop:\n%s", pods)
 				return false, nil
@@ -1545,7 +1545,7 @@ func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, a
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
-	return e2ekubectl.RunKubectl("exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
+	return e2ekubectl.RunKubectl(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "exec", fmt.Sprintf("--namespace=%v", ns), name, "--", "/bin/sh", "-x", "-c", cmd)
 }
 
 // RunHostCmdOrDie calls RunHostCmd and dies on error.
@@ -2043,7 +2043,7 @@ func LookForStringInLog(ns, podName, container, expectedString string, timeout t
 // LookForStringInFile looks for the given string in a file in a specific pod container
 func LookForStringInFile(ns, podName, container, file, expectedString string, timeout time.Duration) (result string, err error) {
 	return LookForString(expectedString, timeout, func() string {
-		return e2ekubectl.RunKubectlOrDie("exec", podName, "-c", container, fmt.Sprintf("--namespace=%v", ns), "--", "cat", file)
+		return e2ekubectl.RunKubectlOrDie(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "exec", podName, "-c", container, fmt.Sprintf("--namespace=%v", ns), "--", "cat", file)
 	})
 }
 
@@ -2496,7 +2496,7 @@ func (f *Framework) NewAgnhostPod(name string, args ...string) *v1.Pod {
 // CreateEmptyFileOnPod creates empty file at given path on the pod.
 // TODO(alejandrox1): move to subpkg pod once kubectl methods have been refactored.
 func CreateEmptyFileOnPod(namespace string, podName string, filePath string) error {
-	_, err := e2ekubectl.RunKubectl("exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
+	_, err := e2ekubectl.RunKubectl(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, "exec", fmt.Sprintf("--namespace=%s", namespace), podName, "--", "/bin/sh", "-c", fmt.Sprintf("touch %s", filePath))
 	return err
 }
 
