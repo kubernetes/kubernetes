@@ -76,7 +76,6 @@ func NewTestKubeconfig(certdir string, host string, kubeconfig string, kubeconte
 }
 
 // KubectlCmd runs the kubectl executable through the wrapper script.
-// func (tc *TestContext) KubectlCmd(args ...string) *exec.Cmd {
 func KubectlCmd(certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string, args ...string) *exec.Cmd {
 	defaultArgs := []string{}
 
@@ -100,7 +99,6 @@ func KubectlCmd(certdir string, host string, kubeconfig string, kubecontext stri
 				fmt.Sprintf("--client-key=%s", filepath.Join(certdir, "kubecfg.key")))
 		}
 	}
-	// kubectlArgs := append(defaultArgs, args...)
 	kubectlArgs := append(defaultArgs, args...)
 
 	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
@@ -193,7 +191,6 @@ func (b KubectlBuilder) Exec() (string, error) {
 }
 
 // ExecOrDie runs the kubectl executable or dies if error occurs.
-// func (b KubectlBuilder) ExecOrDie(tk TestKubeconfig) string {
 func (b KubectlBuilder) ExecOrDie(certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string) string {
 	str, err := b.Exec()
 	// In case of i/o timeout error, try talking to the apiserver again after 2s before dying.
@@ -201,8 +198,6 @@ func (b KubectlBuilder) ExecOrDie(certdir string, host string, kubeconfig string
 	if isTimeout(err) {
 		e2elog.Logf("Hit i/o timeout error, talking to the server 2s later to see if it's temporary.")
 		time.Sleep(2 * time.Second)
-		// retryStr, retryErr := RunKubectl(tk.CertDir, tk.Host, tk.KubeConfig, tk.KubeContext, tk.KubectlPath, "version")
-		// retryStr, retryErr := RunKubectl(certdir, host, kubeconfig, kubecontext, kubectlpath, "version")
 		tk := NewTestKubeconfig(certdir, host, kubeconfig, kubecontext, kubectlpath)
 		retryStr, retryErr := RunKubectl(tk.CertDir, tk.Host, tk.KubeConfig, tk.KubeContext, tk.KubectlPath, "version")
 		e2elog.Logf("stdout: %q", retryStr)
@@ -274,31 +269,21 @@ func KubectlLogPod(c clientset.Interface, pod v1.Pod, containerNameSubstr string
 }
 
 // RunKubectlOrDie is a convenience wrapper over KubectlBuilder
-// func RunKubectlOrDie(args ...string) string {
 func RunKubectlOrDie(certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string, args ...string) string {
-	// return NewKubectlCommand(args...).ExecOrDie()
-	// tk := NewTestKubeconfig(certdir, host, kubeconfig, kubecontext, kubectlpath)
 	return NewKubectlCommand(certdir, host, kubeconfig, kubecontext, kubectlpath, args...).ExecOrDie(certdir, host, kubeconfig, kubecontext, kubectlpath)
 }
 
 // RunKubectl is a convenience wrapper over KubectlBuilder
 func RunKubectl(certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string, args ...string) (string, error) {
-	// func RunKubectl(certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string, args ...string) (string, error) {
-	// return NewKubectlCommand(args...).Exec()
 	return NewKubectlCommand(certdir, host, kubeconfig, kubecontext, kubectlpath, args...).Exec()
 }
 
 // RunKubectlOrDieInput is a convenience wrapper over KubectlBuilder that takes input to stdin
-// func RunKubectlOrDieInput(data string, args ...string) string {
 func RunKubectlOrDieInput(data string, certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string, args ...string) string {
-	// return NewKubectlCommand(args...).WithStdinData(data).ExecOrDie()
-	// tk := NewTestKubeconfig(certdir, host, kubeconfig, kubecontext, kubectlpath)
 	return NewKubectlCommand(certdir, host, kubeconfig, kubecontext, kubectlpath, args...).WithStdinData(data).ExecOrDie(certdir, host, kubeconfig, kubecontext, kubectlpath)
 }
 
 // RunKubectlInput is a convenience wrapper over KubectlBuilder that takes input to stdin
-// func RunKubectlInput(data string, args ...string) (string, error) {
 func RunKubectlInput(data string, certdir string, host string, kubeconfig string, kubecontext string, kubectlpath string, args ...string) (string, error) {
-	// return NewKubectlCommand(args...).WithStdinData(data).Exec()
 	return NewKubectlCommand(certdir, host, kubeconfig, kubecontext, kubectlpath, args...).WithStdinData(data).Exec()
 }
