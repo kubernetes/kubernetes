@@ -137,8 +137,10 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 	if kubelettypes.IsCriticalPod(attrs.Pod) {
 		return lifecycle.PodAdmitResult{Admit: true}
 	}
-	// the node has memory pressure, admit if not best-effort
-	if hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) {
+
+	// Conditions other than memory pressure reject all pods
+	nodeOnlyHasMemoryPressureCondition := hasNodeCondition(m.nodeConditions, v1.NodeMemoryPressure) && len(m.nodeConditions) == 1
+	if nodeOnlyHasMemoryPressureCondition {
 		notBestEffort := v1.PodQOSBestEffort != v1qos.GetPodQOS(attrs.Pod)
 		if notBestEffort {
 			return lifecycle.PodAdmitResult{Admit: true}
