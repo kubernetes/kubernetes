@@ -1,0 +1,18 @@
+# See the OWNERS docs at https://go.k8s.io/owners
+
+reviewers:
+  - BenTheElder
+  - bowei
+  - freehan
+  - jingax10
+  - mkumatag
+  - mrhohn
+  - tallclair
+approvers:
+  - BenTheElder
+  - bowei
+  - freehan
+  - jingax10
+  - mkumatag
+  - mrhohn
+  - tallclair

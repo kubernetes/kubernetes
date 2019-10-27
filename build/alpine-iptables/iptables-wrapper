@@ -1,0 +1,38 @@
+#!/bin/sh
+
+# Copyright 2019 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -e
+
+# Detect whether the base system is using iptables-legacy or
+# iptables-nft. This assumes that some non-containerized process (eg
+# kubelet) has already created some iptables rules.
+num_legacy_lines=$( (iptables-legacy-save || true; ip6tables-legacy-save || true) 2>/dev/null | grep '^-' | wc -l)
+num_nft_lines=$( (iptables-nft-save || true; ip6tables-nft-save || true) 2>/dev/null | grep '^-' | wc -l)
+if [ "${num_legacy_lines}" -ge "${num_nft_lines}" ]; then
+    mode=legacy
+else
+    mode=nft
+fi
+
+ln -sf /sbin/iptables-${mode} /usr/sbin/iptables > /dev/null
+ln -sf /sbin/ip6tables-${mode} /usr/sbin/ip6tables > /dev/null
+ln -sf /sbin/iptables-${mode}-restore /usr/sbin/iptables-restore > /dev/null
+ln -sf /sbin/ip6tables-${mode}-restore /usr/sbin/ip6tables-restore > /dev/null
+ln -sf /sbin/iptables-${mode}-save /usr/sbin/iptables-save > /dev/null
+ln -sf /sbin/ip6tables-${mode}-save /usr/sbin/ip6tables-save > /dev/null
+
+# Now re-exec the original command with the newly-selected alternative
+exec "$0" "$@"
