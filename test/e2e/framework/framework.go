@@ -672,9 +672,6 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 		fmt.Sprintf("-c=%v", containerName),
 	}
 	cmdArgs = append(cmdArgs, args...)
-	// tk := e2ekubectl.NewTestKubeconfig(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath)
-
-	// cmd := tk.KubectlCmd(cmdArgs...)
 	cmd := e2ekubectl.KubectlCmd(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath, cmdArgs...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
