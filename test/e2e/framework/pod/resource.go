@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	errorsutil "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -351,6 +352,22 @@ func logPodTerminationMessages(pods []v1.Pod) {
 	}
 }
 
+// LogPodLogs will logs the pod's logs.
+func LogPodLogs(c clientset.Interface, pods []v1.Pod) error {
+	var errs []error
+	for _, pod := range pods {
+		for _, container := range pod.Spec.Containers {
+			logData, err := GetPodLogs(c, pod.Namespace, pod.Name, container.Name)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("%s[%s].container[%s].error=%v", pod.Name, pod.Namespace, container.Name, err))
+				continue
+			}
+			e2elog.Logf("%s[%s].container[%s].log\n%s", pod.Name, pod.Namespace, container.Name, logData)
+		}
+	}
+	return errorsutil.NewAggregate(errs)
+}
+
 // DumpAllPodInfoForNamespace logs all pod information for a given namespace.
 func DumpAllPodInfoForNamespace(c clientset.Interface, namespace string) {
 	pods, err := c.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
@@ -359,6 +376,9 @@ func DumpAllPodInfoForNamespace(c clientset.Interface, namespace string) {
 	}
 	LogPodStates(pods.Items)
 	logPodTerminationMessages(pods.Items)
+	if err := LogPodLogs(c, pods.Items); err != nil {
+		e2elog.Logf("unable to fetch logs for pods: %v", err)
+	}
 }
 
 // FilterNonRestartablePods filters out pods that will never get recreated if
