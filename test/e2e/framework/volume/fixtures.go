@@ -574,13 +574,13 @@ func testVolumeContent(f *framework.Framework, pod *v1.Pod, fsGroup *int64, fsTy
 // and check that the pod sees expected data, e.g. from the server pod.
 // Multiple Tests can be specified to mount multiple volumes to a single
 // pod.
-func TestVolumeClient(f *framework.Framework, client clientset.Interface, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
-	clientPod, err := runVolumeTesterPod(client, config, "client", false, fsGroup, tests)
+func TestVolumeClient(f *framework.Framework, config TestConfig, fsGroup *int64, fsType string, tests []Test) {
+	clientPod, err := runVolumeTesterPod(f.ClientSet, config, "client", false, fsGroup, tests)
 	if err != nil {
 		framework.Failf("Failed to create client pod: %v", err)
 
 	}
-	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(client, clientPod))
+	framework.ExpectNoError(e2epod.WaitForPodRunningInNamespace(f.ClientSet, clientPod))
 	testVolumeContent(f, clientPod, fsGroup, fsType, tests)
 }
 

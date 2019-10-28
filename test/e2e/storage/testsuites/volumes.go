@@ -180,7 +180,7 @@ func (t *volumesTestSuite) defineTests(driver TestDriver, pattern testpatterns.T
 		// not before starting the second pod.
 		volume.InjectContent(f, f.ClientSet, config, fsGroup, pattern.FsType, tests)
 		if driver.GetDriverInfo().Capabilities[CapPersistence] {
-			volume.TestVolumeClient(f, f.ClientSet, config, fsGroup, pattern.FsType, tests)
+			volume.TestVolumeClient(f, config, fsGroup, pattern.FsType, tests)
 		} else {
 			ginkgo.By("Skipping persistence check for non-persistent volume")
 		}
