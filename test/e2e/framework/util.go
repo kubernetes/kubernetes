@@ -307,36 +307,6 @@ func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 	return false
 }
 
-// ProxyMode returns a proxyMode of a kube-proxy.
-func ProxyMode(f *Framework) (string, error) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-proxy-mode-detector",
-			Namespace: f.Namespace.Name,
-		},
-		Spec: v1.PodSpec{
-			HostNetwork: true,
-			Containers: []v1.Container{
-				{
-					Name:  "detector",
-					Image: AgnHostImage,
-					Args:  []string{"pause"},
-				},
-			},
-		},
-	}
-	f.PodClient().CreateSync(pod)
-	defer f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
-
-	cmd := "curl -q -s --connect-timeout 1 http://localhost:10249/proxyMode"
-	stdout, err := RunHostCmd(pod.Namespace, pod.Name, cmd)
-	if err != nil {
-		return "", err
-	}
-	Logf("ProxyMode: %s", stdout)
-	return stdout, nil
-}
-
 // WaitForDaemonSets for all daemonsets in the given namespace to be ready
 // (defined as all but 'allowedNotReadyNodes' pods associated with that
 // daemonset are ready).
@@ -2390,18 +2360,6 @@ func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
 	return len(scheduledPods)
 }
 
-// ListNamespaceEvents lists the events in the given namespace.
-func ListNamespaceEvents(c clientset.Interface, ns string) error {
-	ls, err := c.CoreV1().Events(ns).List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, event := range ls.Items {
-		klog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
-	}
-	return nil
-}
-
 // E2ETestNodePreparer implements testutils.TestNodePreparer interface, which is used
 // to create/modify Nodes before running a test.
 type E2ETestNodePreparer struct {
@@ -2411,15 +2369,6 @@ type E2ETestNodePreparer struct {
 	// be at least <sum_of_keys> Nodes in the cluster.
 	countToStrategy       []testutils.CountToStrategy
 	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
-}
-
-// NewE2ETestNodePreparer returns a new instance of E2ETestNodePreparer.
-func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy) testutils.TestNodePreparer {
-	return &E2ETestNodePreparer{
-		client:                client,
-		countToStrategy:       countToStrategy,
-		nodeToAppliedStrategy: make(map[string]testutils.PrepareNodeStrategy),
-	}
 }
 
 // PrepareNodes prepares nodes in the cluster.
@@ -2521,51 +2470,6 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
 	}
 	return ips.List()
-}
-
-// SimpleGET executes a get on the given url, returns error if non-200 returned.
-func SimpleGET(c *http.Client, url, host string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Host = host
-	res, err := c.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	rawBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-	body := string(rawBody)
-	if res.StatusCode != http.StatusOK {
-		err = fmt.Errorf(
-			"GET returned http error %v", res.StatusCode)
-	}
-	return body, err
-}
-
-// PollURL polls till the url responds with a healthy http code. If
-// expectUnreachable is true, it breaks on first non-healthy http code instead.
-func PollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
-	var lastBody string
-	pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		var err error
-		lastBody, err = SimpleGET(httpClient, route, host)
-		if err != nil {
-			Logf("host %v path %v: %v unreachable", host, route, err)
-			return expectUnreachable, nil
-		}
-		Logf("host %v path %v: reached", host, route)
-		return !expectUnreachable, nil
-	})
-	if pollErr != nil {
-		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v",
-			timeout, route, host, lastBody, pollErr)
-	}
-	return nil
 }
 
 // DescribeIng describes information of ingress by running kubectl describe ing.
