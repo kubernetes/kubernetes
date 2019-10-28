@@ -18,16 +18,24 @@ package kuberuntime
 
 import (
 	"encoding/json"
+	"path"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 	"k8s.io/kubernetes/pkg/credentialprovider"
+	"k8s.io/kubernetes/pkg/features"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
+	"k8s.io/kubernetes/pkg/kubelet/runtimeclass"
+	rctest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
+	"k8s.io/utils/pointer"
 )
 
 func TestPullImage(t *testing.T) {
@@ -42,6 +50,52 @@ func TestPullImage(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(images))
 	assert.Equal(t, images[0].RepoTags, []string{"busybox"})
+}
+
+func TestPullImageRuntimeHandler(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.RuntimeClass, true)()
+	_, fakeImageService, fakeManager, err := createTestRuntimeManager()
+	assert.NoError(t, err)
+
+	rcm := runtimeclass.NewManager(rctest.NewPopulatedClient())
+	defer rctest.StartManagerSync(rcm)()
+
+	fakeManager.runtimeClassManager = rcm
+
+	tests := map[string]struct {
+		podNs           string
+		podName         string
+		rcn             *string
+		expectedHandler string
+		expectError     bool
+	}{
+		"Valid":   {podNs: "hello", podName: "world", rcn: pointer.StringPtr(rctest.SandboxRuntimeClass), expectedHandler: rctest.SandboxRuntimeHandler, expectError: false},
+		"Empty":   {podNs: "hello1", podName: "world", rcn: nil, expectedHandler: "", expectError: false},
+		"Invalid": {podNs: "hello2", podName: "world", rcn: pointer.StringPtr("invalid"), expectedHandler: "invalid", expectError: true},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			fakeImageService.Called = []string{}
+			pod := newNamedTestPod(test.podNs, test.podName)
+			pod.Spec.RuntimeClassName = test.rcn
+
+			podSandboxConfig, err := fakeManager.generatePodSandboxConfig(pod, 1)
+			if test.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+
+				imageRef, err := fakeManager.PullImage(kubecontainer.ImageSpec{Image: "busybox"}, nil, podSandboxConfig)
+				assert.NoError(t, err)
+				assert.Contains(t, fakeImageService.Called, "PullImage")
+
+				assert.Equal(t, "busybox", imageRef)
+
+				m := fakeImageService.ListSandBoxes()
+				assert.Equal(t, test.expectedHandler, m[path.Join(test.podNs, test.podName)])
+			}
+		})
+	}
 }
 
 func TestListImages(t *testing.T) {
@@ -169,5 +223,24 @@ func TestPullWithSecrets(t *testing.T) {
 		_, err = fakeManager.PullImage(kubecontainer.ImageSpec{Image: test.imageName}, test.passedSecrets, nil)
 		require.NoError(t, err)
 		fakeImageService.AssertImagePulledWithAuth(t, &runtimeapi.ImageSpec{Image: test.imageName}, test.expectedAuth, description)
+	}
+}
+
+func newNamedTestPod(ns string, name string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			UID:       "12345678",
+			Namespace: ns,
+			Name:      name,
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:            "foo",
+					Image:           "busybox",
+					ImagePullPolicy: v1.PullIfNotPresent,
+				},
+			},
+		},
 	}
 }

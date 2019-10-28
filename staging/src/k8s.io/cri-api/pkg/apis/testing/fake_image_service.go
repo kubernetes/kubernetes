@@ -17,6 +17,7 @@ limitations under the License.
 package testing
 
 import (
+	"path"
 	"sync"
 	"testing"
 
@@ -31,6 +32,7 @@ type FakeImageService struct {
 	FakeImageSize uint64
 	Called        []string
 	Images        map[string]*runtimeapi.Image
+	SandBoxes     map[string]string
 
 	pulledImages []*pulledImage
 
@@ -121,6 +123,11 @@ func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimea
 
 	r.Called = append(r.Called, "PullImage")
 
+	if r.SandBoxes == nil {
+		r.SandBoxes = make(map[string]string, 0)
+	}
+
+	r.SandBoxes[path.Join(podSandboxConfig.Metadata.Namespace, podSandboxConfig.Metadata.Name)] = podSandboxConfig.RuntimeHandler
 	r.pulledImages = append(r.pulledImages, &pulledImage{imageSpec: image, authConfig: auth})
 	// ImageID should be randomized for real container runtime, but here just use
 	// image's name for easily making fake images.
@@ -130,6 +137,10 @@ func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimea
 	}
 
 	return imageID, nil
+}
+
+func (r *FakeImageService) ListSandBoxes() map[string]string {
+	return r.SandBoxes
 }
 
 func (r *FakeImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
