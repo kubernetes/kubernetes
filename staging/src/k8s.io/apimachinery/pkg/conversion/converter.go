@@ -19,6 +19,9 @@ package conversion
 import (
 	"fmt"
 	"reflect"
+
+	"runtime/debug"
+	"k8s.io/klog"
 )
 
 type typePair struct {
@@ -580,6 +583,7 @@ func (c *Converter) convert(sv, dv reflect.Value, scope *scope) error {
 // defaultConvert recursively copies sv into dv. no conversion function is called
 // for the current stack frame (but conversion functions may be called for nested objects)
 func (c *Converter) defaultConvert(sv, dv reflect.Value, scope *scope) error {
+	klog.Errorf("AAA: %s %s %s", sv.Type().String(), dv.Type().String(), string(debug.Stack()))
 	dt, st := dv.Type(), sv.Type()
 
 	if !dv.CanSet() {
