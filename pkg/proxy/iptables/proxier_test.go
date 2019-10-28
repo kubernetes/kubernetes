@@ -296,10 +296,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 		if tc.protocol == UDP {
 			isIPv6 := func(ip string) bool {
 				netIP := net.ParseIP(ip)
-				if netIP.To4() == nil {
-					return true
-				}
-				return false
+				return netIP.To4() == nil
 			}
 			endpointIP := utilproxy.IPPart(tc.endpoint)
 			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", tc.svcIP, endpointIP)

@@ -189,7 +189,7 @@ func (proxier *Proxier) cleanupStaleStickySessions() {
 			},
 			Port: name.Port,
 		}
-		if servicePortNameMap[servicePortName] == false {
+		if !servicePortNameMap[servicePortName] {
 			// ensure cleanup sticky sessions only gets called once per serviceportname
 			servicePortNameMap[servicePortName] = true
 			proxier.loadBalancer.CleanupStaleStickySessions(servicePortName)
