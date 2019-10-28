@@ -787,6 +787,9 @@ func (pm *VolumePluginMgr) refreshProbedPlugins() {
 
 // ListVolumePluginWithLimits returns plugins that have volume limits on nodes
 func (pm *VolumePluginMgr) ListVolumePluginWithLimits() []VolumePluginWithAttachLimits {
+	pm.mutex.Lock()
+	defer pm.mutex.Unlock()
+
 	matchedPlugins := []VolumePluginWithAttachLimits{}
 	for _, v := range pm.plugins {
 		if plugin, ok := v.(VolumePluginWithAttachLimits); ok {
