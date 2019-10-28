@@ -348,7 +348,7 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 	switch {
 	case errors.IsNotFound(err):
 		gc.absentOwnerCache.Add(reference.UID)
-		klog.V(5).Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
+		klog.Infof("object %s's owner %s/%s, %s is not found", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		return true, nil, nil
 	case err != nil:
 		return false, nil, err
@@ -358,6 +358,11 @@ func (gc *GarbageCollector) isDangling(reference metav1.OwnerReference, item *no
 		klog.V(5).Infof("object %s's owner %s/%s, %s is not found, UID mismatch", item.identity.UID, reference.APIVersion, reference.Kind, reference.Name)
 		gc.absentOwnerCache.Add(reference.UID)
 		return true, nil, nil
+	}
+	if item.identity.Namespace == "" && owner.Namespace != "" {
+		gc.absentOwnerCache.Add(reference.UID)
+		klog.Infof("object %s is cluster scoped but its owner is in %s namespace", item.identity.UID, owner.Namespace)
+		return true, owner, nil
 	}
 	return false, owner, nil
 }
@@ -466,7 +471,12 @@ func (gc *GarbageCollector) attemptToDeleteItem(item *node) error {
 		// ownerReferences, otherwise the referenced objects will be stuck with
 		// the FinalizerDeletingDependents and never get deleted.
 		ownerUIDs := append(ownerRefsToUIDs(dangling), ownerRefsToUIDs(waitingForDependentsDeletion)...)
-		patch := deleteOwnerRefStrategicMergePatch(item.identity.UID, ownerUIDs...)
+		var patch []byte
+		var err error
+		if patch, err = deleteOwnerRefStrategicMergePatch(item.identity.UID, ownerUIDs...); err != nil {
+			klog.Warningf("unable to create merge patch for %v: %v", item.identity.UID, err)
+			return err
+		}
 		_, err = gc.patch(item, patch, func(n *node) ([]byte, error) {
 			return gc.deleteOwnerRefJSONMergePatch(n, ownerUIDs...)
 		})
@@ -545,8 +555,13 @@ func (gc *GarbageCollector) orphanDependents(owner objectReference, dependents [
 		go func(dependent *node) {
 			defer wg.Done()
 			// the dependent.identity.UID is used as precondition
-			patch := deleteOwnerRefStrategicMergePatch(dependent.identity.UID, owner.UID)
-			_, err := gc.patch(dependent, patch, func(n *node) ([]byte, error) {
+			var patch []byte
+			var err error
+			if patch, err = deleteOwnerRefStrategicMergePatch(dependent.identity.UID, owner.UID); err != nil {
+				errCh <- fmt.Errorf("unable to create merge patch for %v: %v", dependent.identity.UID, err)
+				return
+			}
+			_, err = gc.patch(dependent, patch, func(n *node) ([]byte, error) {
 				return gc.deleteOwnerRefJSONMergePatch(n, owner.UID)
 			})
 			// note that if the target ownerReference doesn't exist in the

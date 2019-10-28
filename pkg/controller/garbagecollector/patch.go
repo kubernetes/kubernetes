@@ -37,7 +37,7 @@ type objectMetaForMergePatch struct {
 	OwnerReferences []map[string]string `json:"ownerReferences"`
 }
 
-func deleteOwnerRefStrategicMergePatch(dependentUID types.UID, ownerUIDs ...types.UID) []byte {
+func deleteOwnerRefStrategicMergePatch(dependentUID types.UID, ownerUIDs ...types.UID) ([]byte, error) {
 	var pieces []map[string]string
 	for _, ownerUID := range ownerUIDs {
 		pieces = append(pieces, map[string]string{"$patch": "delete", "uid": string(ownerUID)})
@@ -50,9 +50,9 @@ func deleteOwnerRefStrategicMergePatch(dependentUID types.UID, ownerUIDs ...type
 	}
 	patchBytes, err := json.Marshal(&patch)
 	if err != nil {
-		return []byte{}
+		return []byte{}, err
 	}
-	return patchBytes
+	return patchBytes, nil
 }
 
 // getMetadata tries getting object metadata from local cache, and sends GET request to apiserver when

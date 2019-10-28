@@ -568,7 +568,10 @@ func TestDeleteOwnerRefPatch(t *testing.T) {
 			},
 		},
 	}
-	patch := deleteOwnerRefStrategicMergePatch("100", "2", "3")
+	patch, err := deleteOwnerRefStrategicMergePatch("100", "2", "3")
+	if err != nil {
+		t.Fatal(err)
+	}
 	patched, err := strategicpatch.StrategicMergePatch(originalData, patch, v1.Pod{})
 	if err != nil {
 		t.Fatal(err)
