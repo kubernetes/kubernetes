@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -30,10 +30,10 @@ import (
 )
 
 const (
-	caCertsVolumeName       = "ca-certs"
-	caCertsVolumePath       = "/etc/ssl/certs"
-	flexvolumeDirVolumeName = "flexvolume-dir"
-	flexvolumeDirVolumePath = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
+	caCertsVolumeName              = "ca-certs"
+	caCertsVolumePath              = "/etc/ssl/certs"
+	flexvolumeDirVolumeName        = "flexvolume-dir"
+	defaultFlexvolumeDirVolumePath = "/usr/libexec/kubernetes/kubelet-plugins/volume/exec"
 )
 
 // caCertsExtraVolumePaths specifies the paths that can be conditionally mounted into the apiserver and controller-manager containers
@@ -69,11 +69,13 @@ func getHostPathVolumesForTheControlPlane(cfg *kubeadmapi.ClusterConfiguration) 
 	// Read-only mount for the controller manager kubeconfig file
 	controllerManagerKubeConfigFile := filepath.Join(kubeadmconstants.KubernetesDir, kubeadmconstants.ControllerManagerKubeConfigFileName)
 	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, kubeadmconstants.KubeConfigVolumeName, controllerManagerKubeConfigFile, controllerManagerKubeConfigFile, true, &hostPathFileOrCreate)
-	// Mount for the flexvolume directory (/usr/libexec/kubernetes/kubelet-plugins/volume/exec) directory
+	// Mount for the flexvolume directory (/usr/libexec/kubernetes/kubelet-plugins/volume/exec by default)
 	// Flexvolume dir must NOT be readonly as it is used for third-party plugins to integrate with their storage backends via unix domain socket.
-	if stat, err := os.Stat(flexvolumeDirVolumePath); err == nil && stat.IsDir() {
-		mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, flexvolumeDirVolumeName, flexvolumeDirVolumePath, flexvolumeDirVolumePath, false, &hostPathDirectoryOrCreate)
+	flexvolumeDirVolumePath, ok := cfg.ControllerManager.ExtraArgs["flex-volume-plugin-dir"]
+	if !ok {
+		flexvolumeDirVolumePath = defaultFlexvolumeDirVolumePath
 	}
+	mounts.NewHostPathMount(kubeadmconstants.KubeControllerManager, flexvolumeDirVolumeName, flexvolumeDirVolumePath, flexvolumeDirVolumePath, false, &hostPathDirectoryOrCreate)
 
 	// HostPath volumes for the scheduler
 	// Read-only mount for the scheduler kubeconfig file
