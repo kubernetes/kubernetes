@@ -31,13 +31,13 @@ import (
 )
 
 func TestGetTopologyHints(t *testing.T) {
-	testPod1 := makePod("2", "2")
+	testPod1 := makePod("fakePod", "fakeContainer", "2", "2")
 	testContainer1 := &testPod1.Spec.Containers[0]
-	testPod2 := makePod("5", "5")
+	testPod2 := makePod("fakePod", "fakeContainer", "5", "5")
 	testContainer2 := &testPod2.Spec.Containers[0]
-	testPod3 := makePod("7", "7")
+	testPod3 := makePod("fakePod", "fakeContainer", "7", "7")
 	testContainer3 := &testPod3.Spec.Containers[0]
-	testPod4 := makePod("11", "11")
+	testPod4 := makePod("fakePod", "fakeContainer", "11", "11")
 	testContainer4 := &testPod4.Spec.Containers[0]
 
 	firstSocketMask, _ := bitmask.NewBitMask(0)

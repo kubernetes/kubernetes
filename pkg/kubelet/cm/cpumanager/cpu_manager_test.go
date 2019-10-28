@@ -126,8 +126,8 @@ func (psp mockPodStatusProvider) GetPodStatus(uid types.UID) (v1.PodStatus, bool
 	return psp.podStatus, psp.found
 }
 
-func makePod(cpuRequest, cpuLimit string) *v1.Pod {
-	return &v1.Pod{
+func makePod(podUID, containerName, cpuRequest, cpuLimit string) *v1.Pod {
+	pod := &v1.Pod{
 		Spec: v1.PodSpec{
 			Containers: []v1.Container{
 				{
@@ -145,6 +145,11 @@ func makePod(cpuRequest, cpuLimit string) *v1.Pod {
 			},
 		},
 	}
+
+	pod.UID = types.UID(podUID)
+	pod.Spec.Containers[0].Name = containerName
+
+	return pod
 }
 
 func makeMultiContainerPod(initCPUs, appCPUs []struct{ request, limit string }) *v1.Pod {
@@ -253,7 +258,7 @@ func TestCPUManagerAdd(t *testing.T) {
 			podStatusProvider: mockPodStatusProvider{},
 		}
 
-		pod := makePod("2", "2")
+		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
 		err := mgr.AddContainer(pod, container, "fakeID")
 		if !reflect.DeepEqual(err, testCase.expErr) {
@@ -966,7 +971,7 @@ func TestCPUManagerAddWithResvList(t *testing.T) {
 			podStatusProvider: mockPodStatusProvider{},
 		}
 
-		pod := makePod("2", "2")
+		pod := makePod("fakePod", "fakeContainer", "2", "2")
 		container := &pod.Spec.Containers[0]
 		err := mgr.AddContainer(pod, container, "fakeID")
 		if !reflect.DeepEqual(err, testCase.expErr) {
