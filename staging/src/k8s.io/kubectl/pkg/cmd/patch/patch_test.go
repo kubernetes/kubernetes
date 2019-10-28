@@ -61,6 +61,7 @@ func TestPatchObject(t *testing.T) {
 	cmd.Flags().Set("namespace", "test")
 	cmd.Flags().Set("patch", `{"spec":{"type":"NodePort"}}`)
 	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("resource-version", "1")
 	cmd.Run(cmd, []string{"services/frontend"})
 
 	// uses the name from the response

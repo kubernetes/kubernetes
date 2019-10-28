@@ -67,6 +67,7 @@ func TestReplaceObject(t *testing.T) {
 	cmd := NewCmdReplace(tf, streams)
 	cmd.Flags().Set("filename", "../../../test/data/redis-master-controller.yaml")
 	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("resource-version", "1")
 	cmd.Run(cmd, []string{})
 
 	// uses the name from the file, not the response
