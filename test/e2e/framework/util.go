@@ -138,9 +138,6 @@ const (
 	// PodReadyBeforeTimeout is how long pods have to be "ready" when a test begins.
 	PodReadyBeforeTimeout = 5 * time.Minute
 
-	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
-	ClaimProvisionTimeout = 5 * time.Minute
-
 	// ClaimProvisionShortTimeout is same as `ClaimProvisionTimeout` to wait for claim to be dynamically provisioned, but shorter.
 	// Use it case by case when we are sure this timeout is enough.
 	ClaimProvisionShortTimeout = 1 * time.Minute
@@ -178,6 +175,9 @@ const (
 )
 
 var (
+	// ClaimProvisionTimeout is how long claims have to become dynamically provisioned.
+	ClaimProvisionTimeout = 5 * time.Minute
+
 	// BusyBoxImage is the image URI of BusyBox.
 	BusyBoxImage = imageutils.GetE2EImage(imageutils.BusyBox)
 
