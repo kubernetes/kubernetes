@@ -133,7 +133,7 @@ func (i *ImportRestriction) forbiddenImportsFor(pkg Package) []string {
 		}
 	}
 
-	var forbiddenImports []string
+	forbiddenImports := make([]string, 0, len(forbiddenImportSet))
 	for imp := range forbiddenImportSet {
 		forbiddenImports = append(forbiddenImports, imp)
 	}
