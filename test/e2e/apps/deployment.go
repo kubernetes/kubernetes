@@ -454,6 +454,7 @@ func testRolloverDeployment(f *framework.Framework) {
 	framework.Logf("Make sure deployment %q performs scaling operations", deploymentName)
 	// Make sure the deployment starts to scale up and down replica sets by checking if its updated replicas >= 1
 	err = e2edeploy.WaitForDeploymentUpdatedReplicasGTE(c, ns, deploymentName, deploymentReplicas, deployment.Generation)
+	framework.ExpectNoError(err)
 	// Check if it's updated to revision 1 correctly
 	framework.Logf("Check revision of new replica set for deployment %q", deploymentName)
 	err = e2edeploy.CheckDeploymentRevisionAndImage(c, ns, deploymentName, "1", deploymentImage)
@@ -625,6 +626,7 @@ func testIterativeDeployments(f *framework.Framework) {
 		deployment, err = e2edeploy.UpdateDeploymentWithRetries(c, ns, deployment.Name, func(update *appsv1.Deployment) {
 			update.Spec.Paused = false
 		})
+		framework.ExpectNoError(err)
 	}
 
 	framework.Logf("Waiting for deployment %q to be observed by the controller", deploymentName)
