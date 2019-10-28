@@ -120,6 +120,7 @@ filegroup(
         "//test/e2e/framework/config:all-srcs",
         "//test/e2e/framework/deployment:all-srcs",
         "//test/e2e/framework/endpoints:all-srcs",
+        "//test/e2e/framework/events:all-srcs",
         "//test/e2e/framework/ginkgowrapper:all-srcs",
         "//test/e2e/framework/gpu:all-srcs",
         "//test/e2e/framework/ingress:all-srcs",
