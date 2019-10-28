@@ -70,7 +70,7 @@ import (
 // The local cache starts out empty, and gets populated and updated
 // during `Run()`.
 //
-// As a simple example, if a collection of objects is henceforeth
+// As a simple example, if a collection of objects is henceforth
 // unchanging, a SharedInformer is created that links to that
 // collection, and that SharedInformer is `Run()` then that
 // SharedInformer's cache eventually holds an exact copy of that
@@ -140,7 +140,7 @@ type SharedInformer interface {
 	AddEventHandler(handler ResourceEventHandler)
 	// AddEventHandlerWithResyncPeriod adds an event handler to the
 	// shared informer using the specified resync period.  The resync
-	// operation consists of delivering to the handler a create
+	// operation consists of delivering to the handler an update
 	// notification for every object in the informer's local cache; it
 	// does not add any interactions with the authoritative storage.
 	AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration)
