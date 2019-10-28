@@ -27,11 +27,10 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/component-base/metrics/testutil"
 	dockermetrics "k8s.io/kubernetes/pkg/kubelet/dockershim/metrics"
 	kubeletmetrics "k8s.io/kubernetes/pkg/kubelet/metrics"
 	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
-
-	"github.com/prometheus/common/model"
 )
 
 const (
@@ -39,16 +38,16 @@ const (
 )
 
 // KubeletMetrics is metrics for kubelet
-type KubeletMetrics Metrics
+type KubeletMetrics testutil.Metrics
 
 // Equal returns true if all metrics are the same as the arguments.
 func (m *KubeletMetrics) Equal(o KubeletMetrics) bool {
-	return (*Metrics)(m).Equal(Metrics(o))
+	return (*testutil.Metrics)(m).Equal(testutil.Metrics(o))
 }
 
 // NewKubeletMetrics returns new metrics which are initialized.
 func NewKubeletMetrics() KubeletMetrics {
-	result := NewMetrics()
+	result := testutil.NewMetrics()
 	return KubeletMetrics(result)
 }
 
@@ -69,7 +68,7 @@ func GrabKubeletMetricsWithoutProxy(nodeName, path string) (KubeletMetrics, erro
 
 func parseKubeletMetrics(data string) (KubeletMetrics, error) {
 	result := NewKubeletMetrics()
-	if err := parseMetrics(data, (*Metrics)(&result)); err != nil {
+	if err := testutil.ParseMetrics(data, (*testutil.Metrics)(&result)); err != nil {
 		return KubeletMetrics{}, err
 	}
 	return result, nil
@@ -183,7 +182,7 @@ func GetKubeletLatencyMetrics(ms KubeletMetrics, filterMetricNames sets.String) 
 			latency := sample.Value
 			operation := string(sample.Metric["operation_type"])
 			var quantile float64
-			if val, ok := sample.Metric[model.QuantileLabel]; ok {
+			if val, ok := sample.Metric[testutil.QuantileLabel]; ok {
 				var err error
 				if quantile, err = strconv.ParseFloat(string(val), 64); err != nil {
 					continue
