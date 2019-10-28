@@ -82,8 +82,12 @@ func (q *graceTerminateRSList) remove(rs *listItem) bool {
 }
 
 func (q *graceTerminateRSList) flushList(handler func(rsToDelete *listItem) (bool, error)) bool {
+	q.lock.Lock()
+	list := q.list
+	q.lock.Unlock()
+	
 	success := true
-	for name, rs := range q.list {
+	for name, rs := range list {
 		deleted, err := handler(rs)
 		if err != nil {
 			klog.Errorf("Try delete rs %q err: %v", name, err)
