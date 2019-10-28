@@ -80,7 +80,7 @@ const (
 	// originated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L178
 	serviceNodeExclusionFeature = "ServiceNodeExclusion"
 
-	// legacyNodeRoleBehaviro is the feature gate name that enables legacy
+	// legacyNodeRoleBehaviorFeature is the feature gate name that enables legacy
 	// behavior to vary cluster functionality on the node-role.kubernetes.io
 	// labels.
 	legacyNodeRoleBehaviorFeature = "LegacyNodeRoleBehavior"
