@@ -57,6 +57,7 @@ type PatchOptions struct {
 	Local     bool
 	PatchType string
 	Patch     string
+	ResourceVersion string
 
 	namespace                    string
 	enforceNamespace             bool
@@ -73,7 +74,10 @@ var (
 	patchLong = templates.LongDesc(i18n.T(`
 		Update field(s) of a resource using strategic merge patch, a JSON merge patch, or a JSON patch.
 
-		JSON and YAML formats are accepted.`))
+		JSON and YAML formats are accepted.
+		
+		If --resource-version is specified and does not match the current resource version on 
+		the server the command will fail.`))
 
 	patchExample = templates.Examples(i18n.T(`
 		# Partially update a node using a strategic merge patch. Specify the patch as JSON.
@@ -89,7 +93,10 @@ var (
 		kubectl patch pod valid-pod -p '{"spec":{"containers":[{"name":"kubernetes-serve-hostname","image":"new image"}]}}'
 
 		# Update a container's image using a json patch with positional arrays.
-		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'`))
+		kubectl patch pod valid-pod --type='json' -p='[{"op": "replace", "path": "/spec/containers/0/image", "value":"new image"}]'
+
+		# Update node 'k8s-node-1' only if the resource is unchanged from version 1.
+		kubectl patch node k8s-node-1 -p '{"spec":{"unschedulable":true}}' --resource-version=1`))
 )
 
 func NewPatchOptions(ioStreams genericclioptions.IOStreams) *PatchOptions {
@@ -123,6 +130,7 @@ func NewCmdPatch(f cmdutil.Factory, ioStreams genericclioptions.IOStreams) *cobr
 	cmd.Flags().StringVarP(&o.Patch, "patch", "p", "", "The patch to be applied to the resource JSON file.")
 	cmd.MarkFlagRequired("patch")
 	cmd.Flags().StringVar(&o.PatchType, "type", "strategic", fmt.Sprintf("The type of patch being provided; one of %v", sets.StringKeySet(patchTypes).List()))
+	cmd.Flags().StringVar(&o.ResourceVersion, "resource-version", o.ResourceVersion, i18n.T("If non-empty, the patch will only succeed if this is the current resource-version for the object. Only valid when specifying a single resource."))
 	cmdutil.AddDryRunFlag(cmd)
 	cmdutil.AddFilenameOptionFlags(cmd, &o.FilenameOptions, "identifying the resource to update")
 	cmd.Flags().BoolVar(&o.Local, "local", o.Local, "If true, patch will operate on the content of the file, not the server-side resource.")
@@ -202,6 +210,17 @@ func (o *PatchOptions) RunPatch() error {
 		return err
 	}
 
+	var singleItemImpliedResource bool
+	r.IntoSingleItemImplied(&singleItemImpliedResource)
+
+	// only apply resource version locking on a single resource.
+	// we must perform this check after o.builder.Do() as
+	// []o.resources can not accurately return the proper number
+	// of resources when they are not passed in "resource/name" format.
+	if !singleItemImpliedResource && len(o.ResourceVersion) > 0 {
+		return fmt.Errorf("--resource-version may only be used with a single resource")
+	}
+
 	count := 0
 	err = r.Visit(func(info *resource.Info, err error) error {
 		if err != nil {
@@ -209,6 +228,14 @@ func (o *PatchOptions) RunPatch() error {
 		}
 		count++
 		name, namespace := info.Name, info.Namespace
+
+		accessor, err := meta.Accessor(info.Object)
+		if err != nil {
+			return err
+		}
+		if len(o.ResourceVersion) != 0 {
+			accessor.SetResourceVersion(o.ResourceVersion)
+		}
 
 		if !o.Local && !o.dryRun {
 			mapping := info.ResourceMapping()
