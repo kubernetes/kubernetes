@@ -24,7 +24,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -32,9 +32,11 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	genericoptions "k8s.io/apiserver/pkg/server/options"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/util/proxy"
 	"k8s.io/apiserver/pkg/util/webhook"
 	corev1 "k8s.io/client-go/listers/core/v1"
+	"k8s.io/kubernetes/pkg/kubeapiserver"
 )
 
 const defaultEtcdPathPrefix = "/registry/apiextensions.kubernetes.io"
@@ -99,10 +101,25 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 		return nil, err
 	}
 
+	// TODO remove me #
+	// This the another workflow to run the apiextensions-apiserver outside of kube-apiserver
+	// If everything looks fine
+	// Refactor StorageFactoryConfig as we don't need default resource types
+	// Decouple it from the kubeapiserver package
+	storageConfig := kubeapiserver.NewStorageFactoryConfig()
+	completedStorageFactoryConfig, err := storageConfig.Complete(o.RecommendedOptions.Etcd)
+	if err != nil {
+		return nil, err
+	}
+	storageFactory, err := completedStorageFactoryConfig.New()
+	if err != nil {
+		return nil, err
+	}
+
 	config := &apiserver.Config{
 		GenericConfig: serverConfig,
 		ExtraConfig: apiserver.ExtraConfig{
-			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(*o.RecommendedOptions.Etcd),
+			CRDRESTOptionsGetter: NewCRDRESTOptionsGetter(storageFactory, *o.RecommendedOptions.Etcd),
 			ServiceResolver:      &serviceResolver{serverConfig.SharedInformerFactory.Core().V1().Services().Lister()},
 			AuthResolverWrapper:  webhook.NewDefaultAuthenticationInfoResolverWrapper(nil, serverConfig.LoopbackClientConfig),
 		},
@@ -111,8 +128,9 @@ func (o CustomResourceDefinitionsServerOptions) Config() (*apiserver.Config, err
 }
 
 // NewCRDRESTOptionsGetter create a RESTOptionsGetter for CustomResources.
-func NewCRDRESTOptionsGetter(etcdOptions genericoptions.EtcdOptions) genericregistry.RESTOptionsGetter {
+func NewCRDRESTOptionsGetter(storageFactory serverstorage.StorageFactory, etcdOptions genericoptions.EtcdOptions) genericregistry.RESTOptionsGetter {
 	ret := apiserver.CRDRESTOptionsGetter{
+		StorageFactory:          storageFactory,
 		StorageConfig:           etcdOptions.StorageConfig,
 		StoragePrefix:           etcdOptions.StorageConfig.Prefix,
 		EnableWatchCache:        etcdOptions.EnableWatchCache,

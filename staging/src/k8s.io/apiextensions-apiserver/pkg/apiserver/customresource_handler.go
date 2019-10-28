@@ -73,6 +73,7 @@ import (
 	"k8s.io/apiserver/pkg/registry/generic"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericfilters "k8s.io/apiserver/pkg/server/filters"
+	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilopenapi "k8s.io/apiserver/pkg/util/openapi"
@@ -997,6 +998,7 @@ func (d unstructuredDefaulter) Default(in runtime.Object) {
 }
 
 type CRDRESTOptionsGetter struct {
+	StorageFactory          serverstorage.StorageFactory
 	StorageConfig           storagebackend.Config
 	StoragePrefix           string
 	EnableWatchCache        bool
@@ -1007,8 +1009,16 @@ type CRDRESTOptionsGetter struct {
 }
 
 func (t CRDRESTOptionsGetter) GetRESTOptions(resource schema.GroupResource) (generic.RESTOptions, error) {
+
+	// TODO remove me
+	// # Check if an override is provided, if yes use it
+	// else use the default storageConfig
+	storageConfig, err := t.StorageFactory.NewConfig(resource)
+	if err != nil {
+		storageConfig = &t.StorageConfig
+	}
 	ret := generic.RESTOptions{
-		StorageConfig:           &t.StorageConfig,
+		StorageConfig:           storageConfig,
 		Decorator:               generic.UndecoratedStorage,
 		EnableGarbageCollection: t.EnableGarbageCollection,
 		DeleteCollectionWorkers: t.DeleteCollectionWorkers,
