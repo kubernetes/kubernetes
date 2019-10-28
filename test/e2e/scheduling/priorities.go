@@ -36,8 +36,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1qos "k8s.io/kubernetes/pkg/apis/core/v1/helper/qos"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	"k8s.io/kubernetes/test/e2e/common"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -282,7 +282,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			}
 			return node.Annotations[v1.PreferAvoidPodsAnnotationKey] == string(val)
 		}
-		success, err := common.ObserveNodeUpdateAfterAction(f, nodeName, predicate, action)
+		success, err := e2eevents.ObserveNodeUpdateAfterAction(f.ClientSet, nodeName, predicate, action)
 		framework.ExpectNoError(err)
 		framework.ExpectEqual(success, true)
 

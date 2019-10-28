@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -35,6 +34,7 @@ import (
 	volevents "k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -230,7 +230,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				}.AsSelector().String()
 				msg := "Unable to attach or mount volumes"
 
-				err = waitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
 					framework.Logf("Warning: did not get event about FailedMountVolume")
@@ -267,7 +267,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 				}.AsSelector().String()
 				msg := "does not support block volume provisioning"
 
-				err = waitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.ClaimProvisionTimeout)
+				err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.ClaimProvisionTimeout)
 				// Events are unreliable, don't depend on the event. It's used only to speed up the test.
 				if err != nil {
 					framework.Logf("Warning: did not get event about provisioing failed")
@@ -318,7 +318,7 @@ func (t *volumeModeTestSuite) defineTests(driver TestDriver, pattern testpattern
 		} else {
 			msg = "has volumeMode Filesystem, but is specified in volumeDevices"
 		}
-		err = waitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
+		err = e2eevents.WaitTimeoutForEvent(l.cs, l.ns.Name, eventSelector, msg, framework.PodStartTimeout)
 		// Events are unreliable, don't depend on them. They're used only to speed up the test.
 		if err != nil {
 			framework.Logf("Warning: did not get event about mismatched volume use")
@@ -479,16 +479,6 @@ func listPodDirectory(h utils.HostExec, path string, node *v1.Node) ([]string, e
 		return nil, fmt.Errorf("error checking directory %s on node %s: %s", path, node.Name, err)
 	}
 	return strings.Split(out, "\n"), nil
-}
-
-// NOTE(avalluri): The below code is intentionally copied from e2e/common package.
-// Testsuites depending on common package is not desirable as that pulls quite
-// many tests which are not interested by storage suites.
-//
-// waitTimeoutForEvent waits the given timeout duration for an event to occur.
-func waitTimeoutForEvent(c clientset.Interface, namespace, eventSelector, msg string, timeout time.Duration) error {
-	interval := 2 * time.Second
-	return wait.PollImmediate(interval, timeout, eventOccurred(c, namespace, eventSelector, msg))
 }
 
 // NOTE(avalluri): The below code is intentionally copied from e2e/common package.

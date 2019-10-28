@@ -29,6 +29,7 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 
@@ -258,7 +259,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 			"involvedObject.namespace": f.Namespace.Name,
 			"reason":                   events.ContainerProbeWarning,
 		}.AsSelector().String()
-		framework.ExpectNoError(WaitTimeoutForEvent(
+		framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
 			f.ClientSet, f.Namespace.Name, expectedEvent, "0.0.0.0", framework.PodEventTimeout))
 	})
 })

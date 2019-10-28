@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package events
 
 import (
 	"fmt"
@@ -35,11 +35,12 @@ import (
 	"github.com/onsi/ginkgo"
 )
 
+// Action is a function to be performed by the system.
 type Action func() error
 
-// Returns true if a node update matching the predicate was emitted from the
-// system after performing the supplied action.
-func ObserveNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodePredicate func(*v1.Node) bool, action Action) (bool, error) {
+// ObserveNodeUpdateAfterAction returns true if a node update matching the predicate was emitted
+// from the system after performing the supplied action.
+func ObserveNodeUpdateAfterAction(c clientset.Interface, nodeName string, nodePredicate func(*v1.Node) bool, action Action) (bool, error) {
 	observedMatchingNode := false
 	nodeSelector := fields.OneTermEqualSelector("metadata.name", nodeName)
 	informerStartedChan := make(chan struct{})
@@ -49,14 +50,14 @@ func ObserveNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodeP
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 				options.FieldSelector = nodeSelector.String()
-				ls, err := f.ClientSet.CoreV1().Nodes().List(options)
+				ls, err := c.CoreV1().Nodes().List(options)
 				return ls, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				// Signal parent goroutine that watching has begun.
 				defer informerStartedGuard.Do(func() { close(informerStartedChan) })
 				options.FieldSelector = nodeSelector.String()
-				w, err := f.ClientSet.CoreV1().Nodes().Watch(options)
+				w, err := c.CoreV1().Nodes().Watch(options)
 				return w, err
 			},
 		},
@@ -95,9 +96,9 @@ func ObserveNodeUpdateAfterAction(f *framework.Framework, nodeName string, nodeP
 	return err == nil, err
 }
 
-// Returns true if an event matching the predicate was emitted from the system
-// after performing the supplied action.
-func ObserveEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Event) bool, action Action) (bool, error) {
+// ObserveEventAfterAction returns true if an event matching the predicate was emitted
+// from the system after performing the supplied action.
+func ObserveEventAfterAction(c clientset.Interface, ns string, eventPredicate func(*v1.Event) bool, action Action) (bool, error) {
 	observedMatchingEvent := false
 	informerStartedChan := make(chan struct{})
 	var informerStartedGuard sync.Once
@@ -106,13 +107,13 @@ func ObserveEventAfterAction(f *framework.Framework, eventPredicate func(*v1.Eve
 	_, controller := cache.NewInformer(
 		&cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				ls, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).List(options)
+				ls, err := c.CoreV1().Events(ns).List(options)
 				return ls, err
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				// Signal parent goroutine that watching has begun.
 				defer informerStartedGuard.Do(func() { close(informerStartedChan) })
-				w, err := f.ClientSet.CoreV1().Events(f.Namespace.Name).Watch(options)
+				w, err := c.CoreV1().Events(ns).Watch(options)
 				return w, err
 			},
 		},

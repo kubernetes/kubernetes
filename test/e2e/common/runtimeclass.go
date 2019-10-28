@@ -29,6 +29,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/events"
 	runtimeclasstest "k8s.io/kubernetes/pkg/kubelet/runtimeclass/testing"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2eevents "k8s.io/kubernetes/test/e2e/framework/events"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	utilpointer "k8s.io/utils/pointer"
@@ -144,6 +145,6 @@ func expectSandboxFailureEvent(f *framework.Framework, pod *v1.Pod, msg string) 
 		"involvedObject.namespace": f.Namespace.Name,
 		"reason":                   events.FailedCreatePodSandBox,
 	}.AsSelector().String()
-	framework.ExpectNoError(WaitTimeoutForEvent(
+	framework.ExpectNoError(e2eevents.WaitTimeoutForEvent(
 		f.ClientSet, f.Namespace.Name, eventSelector, msg, framework.PodEventTimeout))
 }
