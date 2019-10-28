@@ -31,9 +31,9 @@ type DurationMetric interface {
 	Observe(duration time.Duration)
 }
 
-// ExpirationMetric sets the time of an expiration.
-type ExpirationMetric interface {
-	Set(expiration time.Time)
+// TTLMetric sets the time to live of something.
+type TTLMetric interface {
+	Set(ttl *time.Duration)
 }
 
 // LatencyMetric observes client latency partitioned by verb and url.
@@ -47,8 +47,8 @@ type ResultMetric interface {
 }
 
 var (
-	// ClientCertExpiration is the lifetime of the client certificate. The value measured in seconds since January 1, 1970 UTC.
-	ClientCertExpiration ExpirationMetric = noopExpiration{}
+	// ClientCertTTL is the time to live of a client certificate
+	ClientCertTTL TTLMetric = noopTTL{}
 	// ClientCertRotationAge is the age of a certificate that has just been rotated.
 	ClientCertRotationAge DurationMetric = noopDuration{}
 	// RequestLatency is the latency metric that rest clients will update.
@@ -59,7 +59,7 @@ var (
 
 // RegisterOpts contains all the metrics to register. Metrics may be nil.
 type RegisterOpts struct {
-	ClientCertExpiration  ExpirationMetric
+	ClientCertTTL         TTLMetric
 	ClientCertRotationAge DurationMetric
 	RequestLatency        LatencyMetric
 	RequestResult         ResultMetric
@@ -69,8 +69,8 @@ type RegisterOpts struct {
 // only be called once.
 func Register(opts RegisterOpts) {
 	registerMetrics.Do(func() {
-		if opts.ClientCertExpiration != nil {
-			ClientCertExpiration = opts.ClientCertExpiration
+		if opts.ClientCertTTL != nil {
+			ClientCertTTL = opts.ClientCertTTL
 		}
 		if opts.ClientCertRotationAge != nil {
 			ClientCertRotationAge = opts.ClientCertRotationAge
@@ -88,9 +88,9 @@ type noopDuration struct{}
 
 func (noopDuration) Observe(time.Duration) {}
 
-type noopExpiration struct{}
+type noopTTL struct{}
 
-func (noopExpiration) Set(time.Time) {}
+func (noopTTL) Set(*time.Duration) {}
 
 type noopLatency struct{}
 

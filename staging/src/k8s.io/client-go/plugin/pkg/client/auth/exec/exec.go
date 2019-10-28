@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -261,6 +262,8 @@ func (a *Authenticator) cert() (*tls.Certificate, error) {
 func (a *Authenticator) getCreds() (*credentials, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	defer expirationMetrics.report(time.Now)
+
 	if a.cachedCreds != nil && !a.credsExpired() {
 		return a.cachedCreds, nil
 	}
@@ -268,6 +271,7 @@ func (a *Authenticator) getCreds() (*credentials, error) {
 	if err := a.refreshCredsLocked(nil); err != nil {
 		return nil, err
 	}
+
 	return a.cachedCreds, nil
 }
 
@@ -356,6 +360,17 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 		if err != nil {
 			return fmt.Errorf("failed parsing client key/certificate: %v", err)
 		}
+
+		// Leaf is initialized to be nil:
+		//  https://golang.org/pkg/crypto/tls/#X509KeyPair
+		// Leaf certificate is the first certificate:
+		//  https://golang.org/pkg/crypto/tls/#Certificate
+		// Populating leaf is useful for quickly accessing the underlying x509
+		// certificate values.
+		cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+		if err != nil {
+			return fmt.Errorf("failed parsing client leaf certificate: %v", err)
+		}
 		newCreds.cert = &cert
 	}
 
@@ -372,9 +387,11 @@ func (a *Authenticator) refreshCredsLocked(r *clientauthentication.Response) err
 			onRotate()
 		}
 	}
-	// Only monitor expiration on certificates. Doesn't apply to token rotation.
-	if newCreds.cert != nil && newCreds.cert.Leaf != nil {
-		metrics.ClientCertExpiration.Set(newCreds.cert.Leaf.NotAfter)
+
+	expiry := time.Time{}
+	if a.cachedCreds.cert != nil && a.cachedCreds.cert.Leaf != nil {
+		expiry = a.cachedCreds.cert.Leaf.NotAfter
 	}
+	expirationMetrics.set(a, expiry)
 	return nil
 }
