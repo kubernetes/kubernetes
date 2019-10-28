@@ -106,7 +106,18 @@ import (
 // and index updates happen before such a prescribed notification.
 // For a given SharedInformer and client, the notifications are
 // delivered sequentially.  For a given SharedInformer, client, and
-// object ID, the notifications are delivered in order.
+// object ID, the notifications are delivered in order.  Because
+// `ObjectMeta.UID` has no role in identifying objects, if an object
+// O1 with ID (e.g. namespace and name) X and `ObjectMeta.UID` U1 in
+// the SharedInformer's local cache is deleted and shortly after
+// another relevant object O2 with ID X and `ObjectMeta.UID` U2 is
+// created a client has no guarantee of seeing O1's deletion and
+// O2's creation as two separate notifications, it might as well
+// receive a single update notification where the old object is O1
+// and the new object is O2. Clients that need to detect such cases
+// might do so by comparing the `ObjectMeta.UID` field of the old
+// and the new object in the code that handles update notifications
+// (i.e. `OnUpdate` method of ResourceEventHandler).
 //
 // A client must process each notification promptly; a SharedInformer
 // is not engineered to deal well with a large backlog of
