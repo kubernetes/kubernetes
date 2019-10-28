@@ -102,7 +102,6 @@ pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
 pkg/controller/volume/persistentvolume/options
 pkg/credentialprovider
-pkg/credentialprovider/gcp
 pkg/features
 pkg/kubeapiserver
 pkg/kubeapiserver/options
