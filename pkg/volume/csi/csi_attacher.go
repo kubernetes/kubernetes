@@ -438,13 +438,12 @@ func (c *csiAttacher) Detach(volumeName string, nodeName types.NodeName) error {
 	}
 
 	klog.V(4).Info(log("detacher deleted ok VolumeAttachment.ID=%s", attachID))
-	return c.waitForVolumeDetachment(volID, attachID)
+	return c.waitForVolumeDetachment(volID, attachID, csiTimeout)
 }
 
-func (c *csiAttacher) waitForVolumeDetachment(volumeHandle, attachID string) error {
+func (c *csiAttacher) waitForVolumeDetachment(volumeHandle, attachID string, timeout time.Duration) error {
 	klog.V(4).Info(log("probing for updates from CSI driver for [attachment.ID=%v]", attachID))
 
-	timeout := c.waitSleepTime * 10
 	timer := time.NewTimer(timeout) // TODO (vladimirvivien) investigate making this configurable
 	defer timer.Stop()
 
