@@ -2944,7 +2944,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 					MinAvailable: &minAvailable,
 				},
 				Status: policy.PodDisruptionBudgetStatus{
-					PodDisruptionsAllowed: 5,
+					DisruptionsAllowed: 5,
 				},
 			},
 			// Columns: Name, Min Available, Max Available, Allowed Disruptions, Age
@@ -2962,7 +2962,7 @@ func TestPrintPodDisruptionBudget(t *testing.T) {
 					MaxUnavailable: &maxUnavailable,
 				},
 				Status: policy.PodDisruptionBudgetStatus{
-					PodDisruptionsAllowed: 5,
+					DisruptionsAllowed: 5,
 				},
 			},
 			// Columns: Name, Min Available, Max Available, Allowed Disruptions, Age
@@ -2999,7 +2999,7 @@ func TestPrintPodDisruptionBudgetList(t *testing.T) {
 					MaxUnavailable: &maxUnavailable,
 				},
 				Status: policy.PodDisruptionBudgetStatus{
-					PodDisruptionsAllowed: 5,
+					DisruptionsAllowed: 5,
 				},
 			},
 			{
@@ -3012,7 +3012,7 @@ func TestPrintPodDisruptionBudgetList(t *testing.T) {
 					MinAvailable: &minAvailable,
 				},
 				Status: policy.PodDisruptionBudgetStatus{
-					PodDisruptionsAllowed: 3,
+					DisruptionsAllowed: 3,
 				},
 			},
 		},

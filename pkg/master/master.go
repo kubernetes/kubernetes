@@ -52,6 +52,7 @@ import (
 	networkingapiv1beta1 "k8s.io/api/networking/v1beta1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	nodev1beta1 "k8s.io/api/node/v1beta1"
+	policyapiv1 "k8s.io/api/policy/v1"
 	policyapiv1beta1 "k8s.io/api/policy/v1beta1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
@@ -584,6 +585,7 @@ func DefaultAPIResourceConfigSource() *serverstorage.ResourceConfig {
 		networkingapiv1.SchemeGroupVersion,
 		networkingapiv1beta1.SchemeGroupVersion,
 		nodev1beta1.SchemeGroupVersion,
+		policyapiv1.SchemeGroupVersion,
 		policyapiv1beta1.SchemeGroupVersion,
 		rbacv1.SchemeGroupVersion,
 		rbacv1beta1.SchemeGroupVersion,

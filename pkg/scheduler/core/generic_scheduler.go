@@ -1057,7 +1057,7 @@ func filterPodsWithPDBViolation(pods []*v1.Pod, pdbs []*policy.PodDisruptionBudg
 					continue
 				}
 				// We have found a matching PDB.
-				if pdb.Status.PodDisruptionsAllowed <= 0 {
+				if pdb.Status.DisruptionsAllowed <= 0 {
 					pdbForPodIsViolated = true
 					break
 				}

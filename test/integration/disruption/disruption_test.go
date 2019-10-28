@@ -170,7 +170,7 @@ func TestPDBWithScaleSubresource(t *testing.T) {
 	if expected, found := int32(replicas)-maxUnavailable, newPdb.Status.DesiredHealthy; expected != found {
 		t.Errorf("Expected %d, but found %d", expected, found)
 	}
-	if expected, found := maxUnavailable, newPdb.Status.PodDisruptionsAllowed; expected != found {
+	if expected, found := maxUnavailable, newPdb.Status.DisruptionsAllowed; expected != found {
 		t.Errorf("Expected %d, but found %d", expected, found)
 	}
 }

@@ -67,7 +67,7 @@ type PodDisruptionBudgetStatus struct {
 	DisruptedPods map[string]metav1.Time
 
 	// Number of pod disruptions that are currently allowed.
-	PodDisruptionsAllowed int32
+	DisruptionsAllowed int32
 
 	// current number of healthy pods
 	CurrentHealthy int32

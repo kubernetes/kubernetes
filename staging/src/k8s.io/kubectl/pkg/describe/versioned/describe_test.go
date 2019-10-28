@@ -1753,7 +1753,7 @@ func TestDescribePodDisruptionBudget(t *testing.T) {
 			MinAvailable: &minAvailable,
 		},
 		Status: policyv1beta1.PodDisruptionBudgetStatus{
-			PodDisruptionsAllowed: 5,
+			DisruptionsAllowed: 5,
 		},
 	})
 	s := PodDisruptionBudgetDescriber{f}

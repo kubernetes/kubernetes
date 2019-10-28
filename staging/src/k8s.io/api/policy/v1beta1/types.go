@@ -67,7 +67,7 @@ type PodDisruptionBudgetStatus struct {
 	DisruptedPods map[string]metav1.Time `json:"disruptedPods,omitempty" protobuf:"bytes,2,rep,name=disruptedPods"`
 
 	// Number of pod disruptions that are currently allowed.
-	PodDisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`
+	DisruptionsAllowed int32 `json:"disruptionsAllowed" protobuf:"varint,3,opt,name=disruptionsAllowed"`
 
 	// current number of healthy pods
 	CurrentHealthy int32 `json:"currentHealthy" protobuf:"varint,4,opt,name=currentHealthy"`
@@ -82,6 +82,8 @@ type PodDisruptionBudgetStatus struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
+// DEPRECATED - This group version of PodDisruptionBudget is deprecated by policy/v1/PodDisruptionBudget. See
+// the release notes for more information.
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 type PodDisruptionBudget struct {
 	metav1.TypeMeta `json:",inline"`

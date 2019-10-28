@@ -71,7 +71,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 			if err != nil {
 				return false, err
 			}
-			return pdb.Status.PodDisruptionsAllowed > 0, nil
+			return pdb.Status.DisruptionsAllowed > 0, nil
 		})
 		framework.ExpectNoError(err)
 	})
