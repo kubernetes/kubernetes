@@ -18,11 +18,10 @@ package flag
 
 import (
 	"fmt"
-	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNamedCertKeyArrayFlag(t *testing.T) {
@@ -123,16 +122,10 @@ func TestNamedCertKeyArrayFlag(t *testing.T) {
 
 		err := fs.Parse(args)
 		if test.parseError != "" {
-			if err == nil {
-				t.Errorf("%d: expected error %q, got nil", i, test.parseError)
-			} else if !strings.Contains(err.Error(), test.parseError) {
-				t.Errorf("%d: expected error %q, got %q", i, test.parseError, err)
-			}
-		} else if err != nil {
-			t.Errorf("%d: expected nil error, got %v", i, err)
-		}
-		if !reflect.DeepEqual(nkcs, test.expected) {
-			t.Errorf("%d: expected %+v, got %+v", i, test.expected, nkcs)
+			assert.Contains(t, err.Error(), test.parseError, "%d: expected error %q, got %q", i, test.parseError, err)
+		} else {
+			assert.Nil(t, err, "%d: expected nil error, got %v", i, err)
+			assert.Equalf(t, test.expected, nkcs, "%d: expected %+v, got %+v", i, test.expected, nkcs)
 		}
 	}
 }

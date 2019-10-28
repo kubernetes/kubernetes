@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/component-base/config"
@@ -59,11 +61,10 @@ func TestValidateClientConnectionConfiguration(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		errs := ValidateClientConnectionConfiguration(scenario.config, field.NewPath("clientConnectionConfiguration"))
-		if len(errs) == 0 && scenario.expectedToFail {
-			t.Errorf("Unexpected success for scenario: %s", name)
-		}
-		if len(errs) > 0 && !scenario.expectedToFail {
-			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		if scenario.expectedToFail {
+			assert.Greaterf(t, len(errs), 0, "Unexpected success for scenario: %s", name)
+		} else {
+			assert.Equalf(t, 0, len(errs), "Unexpected failure for scenario: %s - %+v", name, errs)
 		}
 	}
 }
@@ -162,11 +163,10 @@ func TestValidateLeaderElectionConfiguration(t *testing.T) {
 
 	for name, scenario := range scenarios {
 		errs := ValidateLeaderElectionConfiguration(scenario.config, field.NewPath("leaderElectionConfiguration"))
-		if len(errs) == 0 && scenario.expectedToFail {
-			t.Errorf("Unexpected success for scenario: %s", name)
-		}
-		if len(errs) > 0 && !scenario.expectedToFail {
-			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
+		if scenario.expectedToFail {
+			assert.Greaterf(t, len(errs), 0, "Unexpected success for scenario: %s", name)
+		} else {
+			assert.Equalf(t, 0, len(errs), "Unexpected failure for scenario: %s - %+v", name, errs)
 		}
 	}
 }

@@ -17,8 +17,9 @@ limitations under the License.
 package flag
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestStringMapStringBool(t *testing.T) {
@@ -35,10 +36,7 @@ func TestStringMapStringBool(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			str := c.m.String()
-			if c.expect != str {
-				t.Fatalf("expect %q but got %q", c.expect, str)
-			}
+			assert.Equalf(t, c.expect, c.m.String(), "expect %q but got %q", c.expect, c.m.String())
 		})
 	}
 }
@@ -46,96 +44,143 @@ func TestStringMapStringBool(t *testing.T) {
 func TestSetMapStringBool(t *testing.T) {
 	var nilMap map[string]bool
 	cases := []struct {
-		desc   string
-		vals   []string
-		start  *MapStringBool
-		expect *MapStringBool
-		err    string
+		desc           string
+		vals           []string
+		start          *MapStringBool
+		expect         *MapStringBool
+		err            string
+		expectedToFail bool
 	}{
 		// we initialize the map with a default key that should be cleared by Set
-		{"clears defaults", []string{""},
+		{
+			"clears defaults",
+			[]string{""},
 			NewMapStringBool(&map[string]bool{"default": true}),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{},
-			}, ""},
+			},
+			"",
+			false,
+		},
 		// make sure we still allocate for "initialized" maps where Map was initially set to a nil map
-		{"allocates map if currently nil", []string{""},
+		{
+			"allocates map if currently nil",
+			[]string{""},
 			&MapStringBool{initialized: true, Map: &nilMap},
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{},
-			}, ""},
+			},
+			"",
+			false,
+		},
 		// for most cases, we just reuse nilMap, which should be allocated by Set, and is reset before each test case
-		{"empty", []string{""},
+		{
+			"empty",
+			[]string{""},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{},
-			}, ""},
-		{"one key", []string{"one=true"},
+			},
+			"",
+			false,
+		},
+		{
+			"one key",
+			[]string{"one=true"},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{"one": true},
-			}, ""},
-		{"two keys", []string{"one=true,two=false"},
+			},
+			"",
+			false,
+		},
+		{
+			"two keys",
+			[]string{"one=true,two=false"},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{"one": true, "two": false},
-			}, ""},
-		{"two keys, multiple Set invocations", []string{"one=true", "two=false"},
+			},
+			"",
+			false,
+		},
+		{
+			"two keys, multiple Set invocations",
+			[]string{"one=true", "two=false"},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{"one": true, "two": false},
-			}, ""},
-		{"two keys with space", []string{"one=true, two=false"},
+			},
+			"",
+			false,
+		},
+		{
+			"two keys with space",
+			[]string{"one=true, two=false"},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{"one": true, "two": false},
-			}, ""},
-		{"empty key", []string{"=true"},
+			},
+			"",
+			false,
+		},
+		{
+			"empty key",
+			[]string{"=true"},
 			NewMapStringBool(&nilMap),
 			&MapStringBool{
 				initialized: true,
 				Map:         &map[string]bool{"": true},
-			}, ""},
-		{"missing value", []string{"one"},
+			},
+			"",
+			false,
+		},
+		{
+			"missing value",
+			[]string{"one"},
 			NewMapStringBool(&nilMap),
 			nil,
-			"malformed pair, expect string=bool"},
-		{"non-boolean value", []string{"one=foo"},
+			"malformed pair, expect string=bool",
+			true,
+		},
+		{
+			"non-boolean value",
+			[]string{"one=foo"},
 			NewMapStringBool(&nilMap),
 			nil,
-			`invalid value of one: foo, err: strconv.ParseBool: parsing "foo": invalid syntax`},
-		{"no target", []string{"one=true"},
+			`invalid value of one: foo, err: strconv.ParseBool: parsing "foo": invalid syntax`,
+			true,
+		},
+		{
+			"no target",
+			[]string{"one=true"},
 			NewMapStringBool(nil),
 			nil,
-			"no target (nil pointer to map[string]bool)"},
+			"no target (nil pointer to map[string]bool)",
+			true,
+		},
 	}
 	for _, c := range cases {
 		nilMap = nil
 		t.Run(c.desc, func(t *testing.T) {
 			var err error
 			for _, val := range c.vals {
-				err = c.start.Set(val)
-				if err != nil {
+				if err = c.start.Set(val); err != nil {
 					break
 				}
 			}
-			if c.err != "" {
-				if err == nil || err.Error() != c.err {
-					t.Fatalf("expect error %s but got %v", c.err, err)
-				}
-				return
-			} else if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if !reflect.DeepEqual(c.expect, c.start) {
-				t.Fatalf("expect %#v but got %#v", c.expect, c.start)
+			if c.expectedToFail {
+				assert.Equalf(t, c.err, err.Error(), "expect error %s but got %v", c.err, err)
+			} else {
+				assert.Nil(t, err, "unexpected error: %v", err)
+				assert.Equalf(t, c.expect, c.start, "expect %#v but got %#v", c.expect, c.start)
 			}
 		})
 	}
@@ -154,10 +199,7 @@ func TestEmptyMapStringBool(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.desc, func(t *testing.T) {
-			result := c.val.Empty()
-			if result != c.expect {
-				t.Fatalf("expect %t but got %t", c.expect, result)
-			}
+			assert.Equalf(t, c.expect, c.val.Empty(), "expect %t but got %t", c.expect, c.val.Empty())
 		})
 	}
 }

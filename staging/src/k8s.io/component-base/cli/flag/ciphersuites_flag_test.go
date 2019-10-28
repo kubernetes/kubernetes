@@ -20,56 +20,57 @@ import (
 	"crypto/tls"
 	"fmt"
 	"go/importer"
-	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestStrToUInt16(t *testing.T) {
 	tests := []struct {
 		flag           []string
 		expected       []uint16
-		expected_error bool
+		expectedToFail bool
 	}{
 		{
 			// Happy case
 			flag:           []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA", "TLS_ECDHE_RSA_WITH_RC4_128_SHA", "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA"},
 			expected:       []uint16{tls.TLS_RSA_WITH_RC4_128_SHA, tls.TLS_RSA_WITH_AES_128_CBC_SHA, tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA, tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA},
-			expected_error: false,
+			expectedToFail: false,
 		},
 		{
 			// One flag only
 			flag:           []string{"TLS_RSA_WITH_RC4_128_SHA"},
 			expected:       []uint16{tls.TLS_RSA_WITH_RC4_128_SHA},
-			expected_error: false,
+			expectedToFail: false,
 		},
 		{
 			// Empty flag
 			flag:           []string{},
 			expected:       nil,
-			expected_error: false,
+			expectedToFail: false,
 		},
 		{
 			// Duplicated flag
 			flag:           []string{"TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_AES_128_CBC_SHA", "TLS_ECDHE_RSA_WITH_RC4_128_SHA", "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA", "TLS_RSA_WITH_RC4_128_SHA"},
 			expected:       []uint16{tls.TLS_RSA_WITH_RC4_128_SHA, tls.TLS_RSA_WITH_AES_128_CBC_SHA, tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA, tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA, tls.TLS_RSA_WITH_RC4_128_SHA},
-			expected_error: false,
+			expectedToFail: false,
 		},
 		{
 			// Invalid flag
 			flag:           []string{"foo"},
 			expected:       nil,
-			expected_error: true,
+			expectedToFail: true,
 		},
 	}
 
 	for i, test := range tests {
 		uIntFlags, err := TLSCipherSuites(test.flag)
-		if reflect.DeepEqual(uIntFlags, test.expected) == false {
-			t.Errorf("%d: expected %+v, got %+v", i, test.expected, uIntFlags)
-		}
-		if test.expected_error && err == nil {
-			t.Errorf("%d: expecting error, got %+v", i, err)
+		if test.expectedToFail {
+			assert.NotNil(t, err, "%d: expecting error, got %+v", i, err)
+		} else {
+			assert.Nil(t, err, "%d: unexpected error %s", i, err)
+			assert.ElementsMatchf(t, test.expected, uIntFlags, "%d: expected %+v, got %+v", i, test.expected, uIntFlags)
 		}
 	}
 }
@@ -92,23 +93,19 @@ func TestConstantMaps(t *testing.T) {
 	}
 
 	for k := range discoveredCiphers {
-		if _, ok := ciphers[k]; !ok {
-			t.Errorf("discovered cipher tls.%s not in ciphers map", k)
-		}
+		_, ok := ciphers[k]
+		assert.True(t, ok, "discovered cipher tls.%s not in ciphers map", k)
 	}
 	for k := range ciphers {
-		if _, ok := discoveredCiphers[k]; !ok {
-			t.Errorf("ciphers map has %s not in tls package", k)
-		}
+		_, ok := discoveredCiphers[k]
+		assert.True(t, ok, "ciphers map has %s not in tls package", k)
 	}
 	for k := range discoveredVersions {
-		if _, ok := versions[k]; !ok {
-			t.Errorf("discovered version tls.%s not in version map", k)
-		}
+		_, ok := versions[k]
+		assert.True(t, ok, "discovered version tls.%s not in version map", k)
 	}
 	for k := range versions {
-		if _, ok := discoveredVersions[k]; !ok {
-			t.Errorf("versions map has %s not in tls package", k)
-		}
+		_, ok := discoveredVersions[k]
+		assert.True(t, ok, "versions map has %s not in tls package", k)
 	}
 }

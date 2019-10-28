@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
 	cliflag "k8s.io/component-base/cli/flag"
 )
 
@@ -46,10 +47,7 @@ func TestAddGlobalFlags(t *testing.T) {
 		}
 	})
 	sort.Strings(wantedFlag)
-
-	if !reflect.DeepEqual(wantedFlag, actualFlag) {
-		t.Errorf("[Default]: expected %+v, got %+v", wantedFlag, actualFlag)
-	}
+	assert.Equalf(t, wantedFlag, actualFlag, "[Default]: expected %+v, got %+v", wantedFlag, actualFlag)
 
 	tests := []struct {
 		expectedFlag  []string
@@ -78,8 +76,6 @@ func TestAddGlobalFlags(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		if reflect.DeepEqual(test.expectedFlag, actualFlag) == test.matchExpected {
-			t.Errorf("[%d]: expected %+v, got %+v", i, test.expectedFlag, actualFlag)
-		}
+		assert.NotEqualf(t, test.matchExpected, reflect.DeepEqual(test.expectedFlag, actualFlag), "[%d]: expected %+v, got %+v", i, test.expectedFlag, actualFlag)
 	}
 }
