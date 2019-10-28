@@ -183,13 +183,6 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	}
 	trace.Step("Basic checks done")
 
-	// Run "prefilter" plugins.
-	preFilterStatus := g.framework.RunPreFilterPlugins(ctx, state, pod)
-	if !preFilterStatus.IsSuccess() {
-		return result, preFilterStatus.AsError()
-	}
-	trace.Step("Running prefilter plugins done")
-
 	if err := g.snapshot(); err != nil {
 		return result, err
 	}
@@ -198,6 +191,13 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 	if len(g.nodeInfoSnapshot.NodeInfoList) == 0 {
 		return result, ErrNoNodesAvailable
 	}
+
+	// Run "prefilter" plugins.
+	preFilterStatus := g.framework.RunPreFilterPlugins(ctx, state, pod)
+	if !preFilterStatus.IsSuccess() {
+		return result, preFilterStatus.AsError()
+	}
+	trace.Step("Running prefilter plugins done")
 
 	startPredicateEvalTime := time.Now()
 	filteredNodes, failedPredicateMap, filteredNodesStatuses, err := g.findNodesThatFit(ctx, state, pod)
