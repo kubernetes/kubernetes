@@ -80,7 +80,10 @@ func ConvertV1ReplicaSetToAPIReplicationController(in *appsv1.ReplicaSet, out *a
 }
 
 func TestSetControllerConversion(t *testing.T) {
-	if err := legacyscheme.Scheme.AddConversionFuncs(ConvertV1ReplicaSetToAPIReplicationController); err != nil {
+	s := legacyscheme.Scheme
+	if err := s.AddConversionFunc((*appsv1.ReplicaSet)(nil), (*api.ReplicationController)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return ConvertV1ReplicaSetToAPIReplicationController(a.(*appsv1.ReplicaSet), b.(*api.ReplicationController), scope)
+	}); err != nil {
 		t.Fatal(err)
 	}
 
