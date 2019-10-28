@@ -19,6 +19,7 @@ package cpumanager
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -156,7 +157,7 @@ func makeMultiContainerPod(initCPUs, appCPUs []struct{ request, limit string }) 
 
 	for i, cpu := range initCPUs {
 		pod.Spec.InitContainers = append(pod.Spec.InitContainers, v1.Container{
-			Name: "initContainer-" + string(i),
+			Name: "initContainer-" + strconv.Itoa(i),
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpu.request),
@@ -172,7 +173,7 @@ func makeMultiContainerPod(initCPUs, appCPUs []struct{ request, limit string }) 
 
 	for i, cpu := range appCPUs {
 		pod.Spec.Containers = append(pod.Spec.Containers, v1.Container{
-			Name: "appContainer-" + string(i),
+			Name: "appContainer-" + strconv.Itoa(i),
 			Resources: v1.ResourceRequirements{
 				Requests: v1.ResourceList{
 					v1.ResourceName(v1.ResourceCPU):    resource.MustParse(cpu.request),
