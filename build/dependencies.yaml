@@ -25,7 +25,7 @@ dependencies:
       match: const etcdImage
 
   - name: "docker"
-    version: 18.09
+    version: 19.03
     refPaths:
     - path: cmd/kubeadm/app/util/system/docker_validator.go
       match: latestValidatedDockerVersion

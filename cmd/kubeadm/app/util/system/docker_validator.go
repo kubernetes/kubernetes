@@ -46,7 +46,7 @@ func (d *DockerValidator) Name() string {
 
 const (
 	dockerConfigPrefix           = "DOCKER_"
-	latestValidatedDockerVersion = "18.09"
+	latestValidatedDockerVersion = "19.03"
 )
 
 // Validate is part of the system.Validator interface.
