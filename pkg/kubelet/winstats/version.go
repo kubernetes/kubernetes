@@ -24,7 +24,7 @@ import (
 )
 
 type OSInfo struct {
-	BuildNumber, ProductName string
+	BuildNumber, ProductName        string
 	MajorVersion, MinorVersion, UBR uint64
 }
 

@@ -18,6 +18,8 @@ go_library(
         "kubelet_network_linux.go",
         "kubelet_network_others.go",
         "kubelet_node_status.go",
+        "kubelet_node_status_others.go",
+        "kubelet_node_status_windows.go",
         "kubelet_pods.go",
         "kubelet_resources.go",
         "kubelet_volumes.go",
@@ -151,7 +153,12 @@ go_library(
         "//vendor/k8s.io/utils/exec:go_default_library",
         "//vendor/k8s.io/utils/integer:go_default_library",
         "//vendor/k8s.io/utils/path:go_default_library",
-    ],
+    ] + select({
+        "@io_bazel_rules_go//go/platform:windows": [
+            "//pkg/kubelet/winstats:go_default_library",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 go_test(
