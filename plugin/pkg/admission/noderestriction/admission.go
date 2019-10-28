@@ -22,10 +22,11 @@ import (
 	"io"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
@@ -235,13 +236,20 @@ func (p *Plugin) admitPodStatus(nodeName string, a admission.Attributes) error {
 	switch a.GetOperation() {
 	case admission.Update:
 		// require an existing pod
-		pod, ok := a.GetOldObject().(*api.Pod)
+		oldPod, ok := a.GetOldObject().(*api.Pod)
 		if !ok {
 			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetOldObject()))
 		}
 		// only allow a node to update status of a pod bound to itself
-		if pod.Spec.NodeName != nodeName {
+		if oldPod.Spec.NodeName != nodeName {
 			return admission.NewForbidden(a, fmt.Errorf("node %q can only update pod status for pods with spec.nodeName set to itself", nodeName))
+		}
+		newPod, ok := a.GetObject().(*api.Pod)
+		if !ok {
+			return admission.NewForbidden(a, fmt.Errorf("unexpected type %T", a.GetObject()))
+		}
+		if !labels.Equals(oldPod.Labels, newPod.Labels) {
+			return admission.NewForbidden(a, fmt.Errorf("node %q cannot update labels through pod status", nodeName))
 		}
 		return nil
 

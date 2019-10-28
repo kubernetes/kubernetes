@@ -1,0 +1,23 @@
+{
+   "kind":"Service",
+   "apiVersion":"v1",
+   "metadata":{
+      "name":"agnhost-master",
+      "labels":{
+         "app":"agnhost",
+         "role":"master"
+      }
+   },
+   "spec":{
+      "ports": [
+        {
+          "port":6379,
+          "targetPort":"agnhost-server"
+        }
+      ],
+      "selector":{
+         "app":"agnhost",
+         "role":"master"
+      }
+   }
+}

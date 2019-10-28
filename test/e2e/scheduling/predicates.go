@@ -34,6 +34,7 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
+	k8utilnet "k8s.io/utils/net"
 
 	"github.com/onsi/ginkgo"
 
@@ -810,7 +811,7 @@ func CreateNodeSelectorPods(f *framework.Framework, id string, replicas int, nod
 
 // create pod which using hostport on the specified node according to the nodeSelector
 func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string, port int32, protocol v1.Protocol, nodeSelector map[string]string, expectScheduled bool) {
-	hostIP = framework.TranslateIPv4ToIPv6(hostIP)
+	hostIP = translateIPv4ToIPv6(hostIP)
 	createPausePod(f, pausePodConfig{
 		Name: podName,
 		Ports: []v1.ContainerPort{
@@ -828,4 +829,14 @@ func createHostPortPodOnNode(f *framework.Framework, podName, ns, hostIP string,
 	if expectScheduled {
 		framework.ExpectNoError(err)
 	}
+}
+
+// translateIPv4ToIPv6 maps an IPv4 address into a valid IPv6 address
+// adding the well known prefix "0::ffff:" https://tools.ietf.org/html/rfc2765
+// if the ip is IPv4 and the cluster IPFamily is IPv6, otherwise returns the same ip
+func translateIPv4ToIPv6(ip string) string {
+	if framework.TestContext.IPFamily == "ipv6" && !k8utilnet.IsIPv6String(ip) && ip != "" {
+		ip = "0::ffff:" + ip
+	}
+	return ip
 }

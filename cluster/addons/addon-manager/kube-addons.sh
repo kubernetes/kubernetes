@@ -108,7 +108,11 @@ function log() {
 function generate_prune_whitelist_flags() {
   local -r resources=( "$@" )
   for resource in "${resources[@]}"; do
-    printf "%s" "--prune-whitelist ${resource} "
+    # Check if $resource isn't composed just of whitespaces by replacing ' '
+    # with '' and checking whether the resulting string is not empty.
+    if [[ -n "${resource// /}" ]]; then
+      printf "%s" "--prune-whitelist ${resource} "
+    fi
   done
 }
 

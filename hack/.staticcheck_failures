@@ -11,7 +11,6 @@ pkg/controller/disruption
 pkg/controller/garbagecollector
 pkg/controller/namespace/deletion
 pkg/controller/nodeipam
-pkg/controller/nodeipam/ipam/cidrset
 pkg/controller/podautoscaler
 pkg/controller/podgc
 pkg/controller/replicaset
@@ -28,7 +27,6 @@ pkg/kubelet/pluginmanager/pluginwatcher
 pkg/kubelet/remote
 pkg/master
 pkg/printers
-pkg/printers/internalversion
 pkg/probe/http
 pkg/proxy/healthcheck
 pkg/proxy/iptables
@@ -78,10 +76,8 @@ test/e2e/apimachinery
 test/e2e/apps
 test/e2e/auth
 test/e2e/autoscaling
-test/e2e/common
 test/e2e/instrumentation/logging/stackdriver
 test/e2e/instrumentation/monitoring
-test/e2e/lifecycle
 test/e2e/manifest
 test/e2e/network
 test/e2e/storage
@@ -165,6 +161,7 @@ vendor/k8s.io/apiserver/pkg/util/wsstream
 vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/oidc
 vendor/k8s.io/apiserver/plugin/pkg/authenticator/token/webhook
 vendor/k8s.io/apiserver/plugin/pkg/authorizer/webhook
+vendor/k8s.io/cli-runtime/pkg/printers
 vendor/k8s.io/client-go/discovery/cached/memory
 vendor/k8s.io/client-go/dynamic/fake
 vendor/k8s.io/client-go/metadata/fake
@@ -173,9 +170,6 @@ vendor/k8s.io/client-go/rest/watch
 vendor/k8s.io/client-go/restmapper
 vendor/k8s.io/client-go/tools/leaderelection
 vendor/k8s.io/client-go/transport
-vendor/k8s.io/code-generator/cmd/client-gen/generators/fake
-vendor/k8s.io/code-generator/cmd/client-gen/generators/util
-vendor/k8s.io/code-generator/cmd/go-to-protobuf/protobuf
 vendor/k8s.io/component-base/metrics
 vendor/k8s.io/kubectl/pkg/cmd/annotate
 vendor/k8s.io/kubectl/pkg/cmd/certificates

@@ -70,6 +70,9 @@ var (
 		# Show all logs from pod nginx written in the last hour
 		kubectl logs --since=1h nginx
 
+		# Show logs from a kubelet with an expired serving certificate
+		kubectl logs --insecure-skip-tls-verify-backend nginx
+
 		# Return snapshot logs from first container of a job named hello
 		kubectl logs job/hello
 
@@ -94,15 +97,16 @@ type LogsOptions struct {
 	ConsumeRequestFn func(rest.ResponseWrapper, io.Writer) error
 
 	// PodLogOptions
-	SinceTime       string
-	SinceSeconds    time.Duration
-	Follow          bool
-	Previous        bool
-	Timestamps      bool
-	IgnoreLogErrors bool
-	LimitBytes      int64
-	Tail            int64
-	Container       string
+	SinceTime                    string
+	SinceSeconds                 time.Duration
+	Follow                       bool
+	Previous                     bool
+	Timestamps                   bool
+	IgnoreLogErrors              bool
+	LimitBytes                   int64
+	Tail                         int64
+	Container                    string
+	InsecureSkipTLSVerifyBackend bool
 
 	// whether or not a container name was given via --container
 	ContainerNameSpecified bool
@@ -159,6 +163,8 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 	cmd.Flags().StringVar(&o.SinceTime, "since-time", o.SinceTime, i18n.T("Only return logs after a specific date (RFC3339). Defaults to all logs. Only one of since-time / since may be used."))
 	cmd.Flags().DurationVar(&o.SinceSeconds, "since", o.SinceSeconds, "Only return logs newer than a relative duration like 5s, 2m, or 3h. Defaults to all logs. Only one of since-time / since may be used.")
 	cmd.Flags().StringVarP(&o.Container, "container", "c", o.Container, "Print the logs of this container")
+	cmd.Flags().BoolVar(&o.InsecureSkipTLSVerifyBackend, "insecure-skip-tls-verify-backend", o.InsecureSkipTLSVerifyBackend,
+		"Skip verifying the identity of the kubelet that logs are requested from.  In theory, an attacker could provide invalid log content back. You might want to use this if your kubelet serving certificates have expired.")
 	cmdutil.AddPodRunningTimeoutFlag(cmd, defaultPodLogsTimeout)
 	cmd.Flags().StringVarP(&o.Selector, "selector", "l", o.Selector, "Selector (label query) to filter on.")
 	cmd.Flags().IntVar(&o.MaxFollowConcurrency, "max-log-requests", o.MaxFollowConcurrency, "Specify maximum number of concurrent logs to follow when using by a selector. Defaults to 5.")
@@ -168,10 +174,11 @@ func NewCmdLogs(f cmdutil.Factory, streams genericclioptions.IOStreams) *cobra.C
 
 func (o *LogsOptions) ToLogOptions() (*corev1.PodLogOptions, error) {
 	logOptions := &corev1.PodLogOptions{
-		Container:  o.Container,
-		Follow:     o.Follow,
-		Previous:   o.Previous,
-		Timestamps: o.Timestamps,
+		Container:                    o.Container,
+		Follow:                       o.Follow,
+		Previous:                     o.Previous,
+		Timestamps:                   o.Timestamps,
+		InsecureSkipTLSVerifyBackend: o.InsecureSkipTLSVerifyBackend,
 	}
 
 	if len(o.SinceTime) > 0 {

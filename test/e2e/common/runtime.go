@@ -359,30 +359,10 @@ while true; do sleep 1; done
 				imagePullTest(image, false, v1.PodPending, true, false)
 			})
 
-			ginkgo.It("should not be able to pull non-existing image from gcr.io [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.Invalid)
-				imagePullTest(image, false, v1.PodPending, true, false)
-			})
-
-			ginkgo.It("should be able to pull image from gcr.io [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.DebianBase)
-				isWindows := false
-				if framework.NodeOSDistroIs("windows") {
-					image = imageutils.GetE2EImage(imageutils.WindowsNanoServer)
-					isWindows = true
-				}
-				imagePullTest(image, false, v1.PodRunning, false, isWindows)
-			})
-
-			ginkgo.It("should be able to pull image from docker hub [NodeConformance]", func() {
-				image := imageutils.GetE2EImage(imageutils.Alpine)
-				isWindows := false
-				if framework.NodeOSDistroIs("windows") {
-					// TODO(claudiub): Switch to nanoserver image manifest list.
-					image = "e2eteam/busybox:1.29"
-					isWindows = true
-				}
-				imagePullTest(image, false, v1.PodRunning, false, isWindows)
+			ginkgo.It("should be able to pull image [NodeConformance]", func() {
+				// NOTE(claudiub): The agnhost image is supposed to work on both Linux and Windows.
+				image := imageutils.GetE2EImage(imageutils.Agnhost)
+				imagePullTest(image, false, v1.PodRunning, false, false)
 			})
 
 			ginkgo.It("should not be able to pull from private registry without secret [NodeConformance]", func() {

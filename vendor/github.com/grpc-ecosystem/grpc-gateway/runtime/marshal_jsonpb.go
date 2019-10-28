@@ -14,6 +14,9 @@ import (
 // JSONPb is a Marshaler which marshals/unmarshals into/from JSON
 // with the "github.com/golang/protobuf/jsonpb".
 // It supports fully functionality of protobuf unlike JSONBuiltin.
+//
+// The NewDecoder method returns a DecoderWrapper, so the underlying
+// *json.Decoder methods can be used.
 type JSONPb jsonpb.Marshaler
 
 // ContentType always returns "application/json".
@@ -21,9 +24,7 @@ func (*JSONPb) ContentType() string {
 	return "application/json"
 }
 
-// Marshal marshals "v" into JSON
-// Currently it can marshal only proto.Message.
-// TODO(yugui) Support fields of primitive types in a message.
+// Marshal marshals "v" into JSON.
 func (j *JSONPb) Marshal(v interface{}) ([]byte, error) {
 	if _, ok := v.(proto.Message); !ok {
 		return j.marshalNonProtoField(v)
@@ -49,18 +50,60 @@ func (j *JSONPb) marshalTo(w io.Writer, v interface{}) error {
 	return (*jsonpb.Marshaler)(j).Marshal(w, p)
 }
 
+var (
+	// protoMessageType is stored to prevent constant lookup of the same type at runtime.
+	protoMessageType = reflect.TypeOf((*proto.Message)(nil)).Elem()
+)
+
 // marshalNonProto marshals a non-message field of a protobuf message.
-// This function does not correctly marshals arbitary data structure into JSON,
+// This function does not correctly marshals arbitrary data structure into JSON,
 // but it is only capable of marshaling non-message field values of protobuf,
 // i.e. primitive types, enums; pointers to primitives or enums; maps from
 // integer/string types to primitives/enums/pointers to messages.
 func (j *JSONPb) marshalNonProtoField(v interface{}) ([]byte, error) {
+	if v == nil {
+		return []byte("null"), nil
+	}
 	rv := reflect.ValueOf(v)
 	for rv.Kind() == reflect.Ptr {
 		if rv.IsNil() {
 			return []byte("null"), nil
 		}
 		rv = rv.Elem()
+	}
+
+	if rv.Kind() == reflect.Slice {
+		if rv.IsNil() {
+			if j.EmitDefaults {
+				return []byte("[]"), nil
+			}
+			return []byte("null"), nil
+		}
+
+		if rv.Type().Elem().Implements(protoMessageType) {
+			var buf bytes.Buffer
+			err := buf.WriteByte('[')
+			if err != nil {
+				return nil, err
+			}
+			for i := 0; i < rv.Len(); i++ {
+				if i != 0 {
+					err = buf.WriteByte(',')
+					if err != nil {
+						return nil, err
+					}
+				}
+				if err = (*jsonpb.Marshaler)(j).Marshal(&buf, rv.Index(i).Interface().(proto.Message)); err != nil {
+					return nil, err
+				}
+			}
+			err = buf.WriteByte(']')
+			if err != nil {
+				return nil, err
+			}
+
+			return buf.Bytes(), nil
+		}
 	}
 
 	if rv.Kind() == reflect.Map {
@@ -84,8 +127,6 @@ func (j *JSONPb) marshalNonProtoField(v interface{}) ([]byte, error) {
 }
 
 // Unmarshal unmarshals JSON "data" into "v"
-// Currently it can marshal only proto.Message.
-// TODO(yugui) Support fields of primitive types in a message.
 func (j *JSONPb) Unmarshal(data []byte, v interface{}) error {
 	return unmarshalJSONPb(data, v)
 }
@@ -93,12 +134,32 @@ func (j *JSONPb) Unmarshal(data []byte, v interface{}) error {
 // NewDecoder returns a Decoder which reads JSON stream from "r".
 func (j *JSONPb) NewDecoder(r io.Reader) Decoder {
 	d := json.NewDecoder(r)
-	return DecoderFunc(func(v interface{}) error { return decodeJSONPb(d, v) })
+	return DecoderWrapper{Decoder: d}
+}
+
+// DecoderWrapper is a wrapper around a *json.Decoder that adds
+// support for protos to the Decode method.
+type DecoderWrapper struct {
+	*json.Decoder
+}
+
+// Decode wraps the embedded decoder's Decode method to support
+// protos using a jsonpb.Unmarshaler.
+func (d DecoderWrapper) Decode(v interface{}) error {
+	return decodeJSONPb(d.Decoder, v)
 }
 
 // NewEncoder returns an Encoder which writes JSON stream into "w".
 func (j *JSONPb) NewEncoder(w io.Writer) Encoder {
-	return EncoderFunc(func(v interface{}) error { return j.marshalTo(w, v) })
+	return EncoderFunc(func(v interface{}) error {
+		if err := j.marshalTo(w, v); err != nil {
+			return err
+		}
+		// mimic json.Encoder by adding a newline (makes output
+		// easier to read when it contains multiple encoded items)
+		_, err := w.Write(j.Delimiter())
+		return err
+	})
 }
 
 func unmarshalJSONPb(data []byte, v interface{}) error {
@@ -111,7 +172,7 @@ func decodeJSONPb(d *json.Decoder, v interface{}) error {
 	if !ok {
 		return decodeNonProtoField(d, v)
 	}
-	unmarshaler := &jsonpb.Unmarshaler{AllowUnknownFields: true}
+	unmarshaler := &jsonpb.Unmarshaler{AllowUnknownFields: allowUnknownFields}
 	return unmarshaler.UnmarshalNext(d, p)
 }
 
@@ -125,7 +186,7 @@ func decodeNonProtoField(d *json.Decoder, v interface{}) error {
 			rv.Set(reflect.New(rv.Type().Elem()))
 		}
 		if rv.Type().ConvertibleTo(typeProtoMessage) {
-			unmarshaler := &jsonpb.Unmarshaler{AllowUnknownFields: true}
+			unmarshaler := &jsonpb.Unmarshaler{AllowUnknownFields: allowUnknownFields}
 			return unmarshaler.UnmarshalNext(d, rv.Interface().(proto.Message))
 		}
 		rv = rv.Elem()
@@ -182,3 +243,20 @@ type protoEnum interface {
 }
 
 var typeProtoMessage = reflect.TypeOf((*proto.Message)(nil)).Elem()
+
+// Delimiter for newline encoded JSON streams.
+func (j *JSONPb) Delimiter() []byte {
+	return []byte("\n")
+}
+
+// allowUnknownFields helps not to return an error when the destination
+// is a struct and the input contains object keys which do not match any
+// non-ignored, exported fields in the destination.
+var allowUnknownFields = true
+
+// DisallowUnknownFields enables option in decoder (unmarshaller) to
+// return an error when it finds an unknown field. This function must be
+// called before using the JSON marshaller.
+func DisallowUnknownFields() {
+	allowUnknownFields = false
+}

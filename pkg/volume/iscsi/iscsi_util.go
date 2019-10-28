@@ -89,7 +89,7 @@ func updateISCSIDiscoverydb(b iscsiDiskMounter, tp string) error {
 	}
 	out, err := execWithLog(b, "iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "update", "-n", "discovery.sendtargets.auth.authmethod", "-v", "CHAP")
 	if err != nil {
-		return fmt.Errorf("iscsi: failed to update discoverydb with CHAP, output: %v", string(out))
+		return fmt.Errorf("iscsi: failed to update discoverydb with CHAP, output: %v", out)
 	}
 
 	for _, k := range chapSt {
@@ -112,7 +112,7 @@ func updateISCSINode(b iscsiDiskMounter, tp string) error {
 
 	out, err := execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-T", b.Iqn, "-I", b.Iface, "-o", "update", "-n", "node.session.auth.authmethod", "-v", "CHAP")
 	if err != nil {
-		return fmt.Errorf("iscsi: failed to update node with CHAP, output: %v", string(out))
+		return fmt.Errorf("iscsi: failed to update node with CHAP, output: %v", out)
 	}
 
 	for _, k := range chapSess {
@@ -257,7 +257,7 @@ func waitForMultiPathToExist(devicePaths []string, maxRetries int, deviceUtil vo
 
 	for i := 0; i < maxRetries; i++ {
 		for _, path := range devicePaths {
-			// There shouldnt be any empty device paths. However adding this check
+			// There shouldn't be any empty device paths. However adding this check
 			// for safer side to avoid the possibility of an empty entry.
 			if path == "" {
 				continue
@@ -284,11 +284,11 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 
 	out, err := execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.InitIface, "-o", "show")
 	if err != nil {
-		klog.Errorf("iscsi: could not read iface %s error: %s", b.InitIface, string(out))
+		klog.Errorf("iscsi: could not read iface %s error: %s", b.InitIface, out)
 		return "", err
 	}
 
-	iscsiTransport = extractTransportname(string(out))
+	iscsiTransport = extractTransportname(out)
 
 	bkpPortal := b.Portals
 
@@ -339,7 +339,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 				if err != nil {
 					// delete discoverydb record
 					execWithLog(b, "iscsiadm", "-m", "discoverydb", "-t", "sendtargets", "-p", tp, "-I", b.Iface, "-o", "delete")
-					lastErr = fmt.Errorf("iscsi: failed to sendtargets to portal %s output: %s, err %v", tp, string(out), err)
+					lastErr = fmt.Errorf("iscsi: failed to sendtargets to portal %s output: %s, err %v", tp, out, err)
 					continue
 				}
 
@@ -355,7 +355,7 @@ func (util *ISCSIUtil) AttachDisk(b iscsiDiskMounter) (string, error) {
 				if err != nil {
 					// delete the node record from database
 					execWithLog(b, "iscsiadm", "-m", "node", "-p", tp, "-I", b.Iface, "-T", b.Iqn, "-o", "delete")
-					lastErr = fmt.Errorf("iscsi: failed to attach disk: Error: %s (%v)", string(out), err)
+					lastErr = fmt.Errorf("iscsi: failed to attach disk: Error: %s (%v)", out, err)
 					continue
 				}
 
@@ -796,7 +796,7 @@ func extractDeviceAndPrefix(mntPath string) (string, string, error) {
 
 func extractIface(mntPath string) (string, bool) {
 	reOutput := ifaceRe.FindStringSubmatch(mntPath)
-	if reOutput != nil {
+	if reOutput != nil && len(reOutput) > 1 {
 		return reOutput[1], true
 	}
 
@@ -862,13 +862,13 @@ func cloneIface(b iscsiDiskMounter) error {
 	// get pre-configured iface records
 	out, err := execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.InitIface, "-o", "show")
 	if err != nil {
-		lastErr = fmt.Errorf("iscsi: failed to show iface records: %s (%v)", string(out), err)
+		lastErr = fmt.Errorf("iscsi: failed to show iface records: %s (%v)", out, err)
 		return lastErr
 	}
 	// parse obtained records
-	params, err := parseIscsiadmShow(string(out))
+	params, err := parseIscsiadmShow(out)
 	if err != nil {
-		lastErr = fmt.Errorf("iscsi: failed to parse iface records: %s (%v)", string(out), err)
+		lastErr = fmt.Errorf("iscsi: failed to parse iface records: %s (%v)", out, err)
 		return lastErr
 	}
 	// update initiatorname
@@ -880,7 +880,7 @@ func cloneIface(b iscsiDiskMounter) error {
 		if ok && exit.ExitStatus() == iscsiadmErrorSessExists {
 			klog.Infof("iscsi: there is a session already logged in with iface %s", b.Iface)
 		} else {
-			lastErr = fmt.Errorf("iscsi: failed to create new iface: %s (%v)", string(out), err)
+			lastErr = fmt.Errorf("iscsi: failed to create new iface: %s (%v)", out, err)
 			return lastErr
 		}
 	}
@@ -889,7 +889,7 @@ func cloneIface(b iscsiDiskMounter) error {
 		_, err = execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "update", "-n", key, "-v", val)
 		if err != nil {
 			execWithLog(b, "iscsiadm", "-m", "iface", "-I", b.Iface, "-o", "delete")
-			lastErr = fmt.Errorf("iscsi: failed to update iface records: %s (%v). iface(%s) will be used", string(out), err, b.InitIface)
+			lastErr = fmt.Errorf("iscsi: failed to update iface records: %s (%v). iface(%s) will be used", out, err, b.InitIface)
 			break
 		}
 	}
@@ -963,13 +963,13 @@ func ignoreExitCodes(err error, ignoredExitCodes ...int) error {
 	return err
 }
 
-func execWithLog(b iscsiDiskMounter, cmd string, args ...string) ([]byte, error) {
+func execWithLog(b iscsiDiskMounter, cmd string, args ...string) (string, error) {
 	start := time.Now()
 	out, err := b.exec.Run(cmd, args...)
 	if klog.V(5) {
-		d := time.Now().Sub(start)
+		d := time.Since(start)
 		klog.V(5).Infof("Executed %s %v in %v, err: %v", cmd, args, d, err)
 		klog.V(5).Infof("Output: %s", string(out))
 	}
-	return out, err
+	return string(out), err
 }

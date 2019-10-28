@@ -1376,7 +1376,7 @@ SIG Windows focused on improving reliability for Windows and Kubernetes support
 - `kubectl apply` can now change a deployment strategy from rollout to recreate without explicitly clearing the rollout-related fields ([#70436](https://github.com/kubernetes/kubernetes/pull/70436), [@liggitt](https://github.com/liggitt))
 - The `kubectl plugin list` command now displays discovered plugin paths in the same order as they are found in a user's PATH variable. ([#70443](https://github.com/kubernetes/kubernetes/pull/70443), [@juanvallejo](https://github.com/juanvallejo))
 - `kubectl get` no longer exits before printing all of its results if an error is found ([#70311](https://github.com/kubernetes/kubernetes/pull/70311), [@juanvallejo](https://github.com/juanvallejo))
-- Fixed a runtime error occuring when sorting the output of `kubectl get` with empty results ([#70740](https://github.com/kubernetes/kubernetes/pull/70740), [@mfpierre](https://github.com/mfpierre))
+- Fixed a runtime error occurring when sorting the output of `kubectl get` with empty results ([#70740](https://github.com/kubernetes/kubernetes/pull/70740), [@mfpierre](https://github.com/mfpierre))
 - kubectl: support multiple arguments for cordon/uncordon and drain ([#68655](https://github.com/kubernetes/kubernetes/pull/68655), [@goodluckbot](https://github.com/goodluckbot))
 - Fixed ability for admin/edit/view users to see controller revisions, needed for kubectl rollout commands ([#70699](https://github.com/kubernetes/kubernetes/pull/70699), [@liggitt](https://github.com/liggitt))
 - `kubectl rollout undo` now returns errors when attempting to rollback a deployment to a non-existent revision ([#70039](https://github.com/kubernetes/kubernetes/pull/70039), [@liggitt](https://github.com/liggitt))
@@ -1639,7 +1639,7 @@ filename | sha512 hash
 * CVE-2018-1002105: Fix critical security issue in kube-apiserver upgrade request proxy handler ([#71411](https://github.com/kubernetes/kubernetes/issues/71411), [@liggitt](https://github.com/liggitt))
 * Update Cluster Autoscaler version to 1.13.0-rc.2. Release notes: https://github.com/kubernetes/autoscaler/releases/tag/cluster-autoscaler-1.13.0-rc.2 ([#71452](https://github.com/kubernetes/kubernetes/pull/71452), [@losipiuk](https://github.com/losipiuk))
 * Upgrade Stackdriver Logging Agent addon image to 0.6-1.6.0-1 to use Fluentd v1.2. This provides nanoseconds timestamp granularity for logs. ([#70954](https://github.com/kubernetes/kubernetes/pull/70954), [@qingling128](https://github.com/qingling128))
-* fixes a runtime error occuring when sorting the output of `kubectl get` with empty results ([#70740](https://github.com/kubernetes/kubernetes/pull/70740), [@mfpierre](https://github.com/mfpierre))
+* fixes a runtime error occurring when sorting the output of `kubectl get` with empty results ([#70740](https://github.com/kubernetes/kubernetes/pull/70740), [@mfpierre](https://github.com/mfpierre))
 * fix azure disk attach/detach failed forever issue ([#71377](https://github.com/kubernetes/kubernetes/pull/71377), [@andyzhangx](https://github.com/andyzhangx))
 * Do not detach volume if mount in progress ([#71145](https://github.com/kubernetes/kubernetes/pull/71145), [@gnufied](https://github.com/gnufied))
 

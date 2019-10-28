@@ -136,7 +136,7 @@ func getKubeConfigSpecs(cfg *kubeadmapi.InitConfiguration) (map[string]*kubeConf
 				Organizations: []string{kubeadmconstants.SystemPrivilegedGroup},
 			},
 		},
-		kubeadmconstants.KubeletBootstrapKubeConfigFileName: {
+		kubeadmconstants.KubeletKubeConfigFileName: {
 			CACert:     caCert,
 			APIServer:  controlPlaneEndpoint,
 			ClientName: fmt.Sprintf("%s%s", kubeadmconstants.NodesUserPrefix, cfg.NodeRegistration.Name),
@@ -348,7 +348,7 @@ func writeKubeConfigFromSpec(out io.Writer, spec *kubeConfigSpec, clustername st
 func ValidateKubeconfigsForExternalCA(outDir string, cfg *kubeadmapi.InitConfiguration) error {
 	kubeConfigFileNames := []string{
 		kubeadmconstants.AdminKubeConfigFileName,
-		kubeadmconstants.KubeletBootstrapKubeConfigFileName,
+		kubeadmconstants.KubeletKubeConfigFileName,
 		kubeadmconstants.ControllerManagerKubeConfigFileName,
 		kubeadmconstants.SchedulerKubeConfigFileName,
 	}

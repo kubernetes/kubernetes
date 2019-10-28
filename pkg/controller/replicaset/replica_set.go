@@ -41,6 +41,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appsinformers "k8s.io/client-go/informers/apps/v1"
@@ -191,6 +192,43 @@ func (rsc *ReplicaSetController) Run(workers int, stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
+}
+
+// getReplicaSetsWithSameController returns a list of ReplicaSets with the same
+// owner as the given ReplicaSet.
+func (rsc *ReplicaSetController) getReplicaSetsWithSameController(rs *apps.ReplicaSet) []*apps.ReplicaSet {
+	controllerRef := metav1.GetControllerOf(rs)
+	if controllerRef == nil {
+		utilruntime.HandleError(fmt.Errorf("ReplicaSet has no controller: %v", rs))
+		return nil
+	}
+
+	allRSs, err := rsc.rsLister.ReplicaSets(rs.Namespace).List(labels.Everything())
+	if err != nil {
+		utilruntime.HandleError(err)
+		return nil
+	}
+
+	var relatedRSs []*apps.ReplicaSet
+	for _, r := range allRSs {
+		if ref := metav1.GetControllerOf(r); ref != nil && ref.UID == controllerRef.UID {
+			relatedRSs = append(relatedRSs, r)
+		}
+	}
+
+	if klog.V(2) {
+		var related string
+		if len(relatedRSs) > 0 {
+			var relatedNames []string
+			for _, r := range relatedRSs {
+				relatedNames = append(relatedNames, r.Name)
+			}
+			related = ": " + strings.Join(relatedNames, ", ")
+		}
+		klog.Infof("Found %d related %vs for %v %s/%s%s", len(relatedRSs), rsc.Kind, rsc.Kind, rs.Namespace, rs.Name, related)
+	}
+
+	return relatedRSs
 }
 
 // getPodReplicaSets returns a list of ReplicaSets matching the given pod.
@@ -515,8 +553,11 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 		}
 		klog.V(2).Infof("Too many replicas for %v %s/%s, need %d, deleting %d", rsc.Kind, rs.Namespace, rs.Name, *(rs.Spec.Replicas), diff)
 
+		relatedPods, err := rsc.getIndirectlyRelatedPods(rs)
+		utilruntime.HandleError(err)
+
 		// Choose which Pods to delete, preferring those in earlier phases of startup.
-		podsToDelete := getPodsToDelete(filteredPods, diff)
+		podsToDelete := getPodsToDelete(filteredPods, relatedPods, diff)
 
 		// Snapshot the UIDs (ns/name) of the pods we're expecting to see
 		// deleted, so we know to record their expectations exactly once either
@@ -681,16 +722,65 @@ func slowStartBatch(count int, initialBatchSize int, fn func() error) (int, erro
 	return successes, nil
 }
 
-func getPodsToDelete(filteredPods []*v1.Pod, diff int) []*v1.Pod {
+// getIndirectlyRelatedPods returns all pods that are owned by any ReplicaSet
+// that is owned by the given ReplicaSet's owner.
+func (rsc *ReplicaSetController) getIndirectlyRelatedPods(rs *apps.ReplicaSet) ([]*v1.Pod, error) {
+	var relatedPods []*v1.Pod
+	seen := make(map[types.UID]*apps.ReplicaSet)
+	for _, relatedRS := range rsc.getReplicaSetsWithSameController(rs) {
+		selector, err := metav1.LabelSelectorAsSelector(relatedRS.Spec.Selector)
+		if err != nil {
+			return nil, err
+		}
+		pods, err := rsc.podLister.Pods(relatedRS.Namespace).List(selector)
+		if err != nil {
+			return nil, err
+		}
+		for _, pod := range pods {
+			if otherRS, found := seen[pod.UID]; found {
+				klog.V(5).Infof("Pod %s/%s is owned by both %v %s/%s and %v %s/%s", pod.Namespace, pod.Name, rsc.Kind, otherRS.Namespace, otherRS.Name, rsc.Kind, relatedRS.Namespace, relatedRS.Name)
+				continue
+			}
+			seen[pod.UID] = relatedRS
+			relatedPods = append(relatedPods, pod)
+		}
+	}
+	if klog.V(4) {
+		var relatedNames []string
+		for _, related := range relatedPods {
+			relatedNames = append(relatedNames, related.Name)
+		}
+		klog.Infof("Found %d related pods for %v %s/%s: %v", len(relatedPods), rsc.Kind, rs.Namespace, rs.Name, strings.Join(relatedNames, ", "))
+	}
+	return relatedPods, nil
+}
+
+func getPodsToDelete(filteredPods, relatedPods []*v1.Pod, diff int) []*v1.Pod {
 	// No need to sort pods if we are about to delete all of them.
 	// diff will always be <= len(filteredPods), so not need to handle > case.
 	if diff < len(filteredPods) {
-		// Sort the pods in the order such that not-ready < ready, unscheduled
-		// < scheduled, and pending < running. This ensures that we delete pods
-		// in the earlier stages whenever possible.
-		sort.Sort(controller.ActivePods(filteredPods))
+		podsWithRanks := getPodsRankedByRelatedPodsOnSameNode(filteredPods, relatedPods)
+		sort.Sort(podsWithRanks)
 	}
 	return filteredPods[:diff]
+}
+
+// getPodsRankedByRelatedPodsOnSameNode returns an ActivePodsWithRanks value
+// that wraps podsToRank and assigns each pod a rank equal to the number of
+// active pods in relatedPods that are colocated on the same node with the pod.
+// relatedPods generally should be a superset of podsToRank.
+func getPodsRankedByRelatedPodsOnSameNode(podsToRank, relatedPods []*v1.Pod) controller.ActivePodsWithRanks {
+	podsOnNode := make(map[string]int)
+	for _, pod := range relatedPods {
+		if controller.IsPodActive(pod) {
+			podsOnNode[pod.Spec.NodeName]++
+		}
+	}
+	ranks := make([]int, len(podsToRank))
+	for i, pod := range podsToRank {
+		ranks[i] = podsOnNode[pod.Spec.NodeName]
+	}
+	return controller.ActivePodsWithRanks{Pods: podsToRank, Rank: ranks}
 }
 
 func getPodKeys(pods []*v1.Pod) []string {

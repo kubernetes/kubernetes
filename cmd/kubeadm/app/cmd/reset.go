@@ -49,6 +49,10 @@ var (
 		The reset process does not clean your kubeconfig files and you must remove them manually.
 		Please, check the contents of the $HOME/.kube/config file.
 	`)
+
+	cniCleanupInstructions = dedent.Dedent(`
+		The reset process does not clean CNI configuration. To do so, you must remove /etc/cni/net.d
+	`)
 )
 
 // resetOptions defines all the options exposed via flags by kubeadm reset.
@@ -179,6 +183,8 @@ func NewCmdReset(in io.Reader, out io.Writer, resetOptions *resetOptions) *cobra
 			data := c.(*resetData)
 			cleanDirs(data)
 
+			// output help text instructing user how to remove cni folders
+			fmt.Print(cniCleanupInstructions)
 			// Output help text instructing user how to remove iptables rules
 			fmt.Print(iptablesCleanupInstructions)
 			return nil

@@ -51,40 +51,40 @@ func init() {
 	scheduler.RegisterFitPredicateFactory(
 		predicates.NoVolumeZoneConflictPred,
 		func(args scheduler.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewVolumeZonePredicate(args.PVInfo, args.PVCInfo, args.StorageClassInfo)
+			return predicates.NewVolumeZonePredicate(args.PVLister, args.PVCLister, args.StorageClassLister)
 		},
 	)
 	// Fit is determined by whether or not there would be too many AWS EBS volumes attached to the node
 	scheduler.RegisterFitPredicateFactory(
 		predicates.MaxEBSVolumeCountPred,
 		func(args scheduler.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, args.CSINodeInfo, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.EBSVolumeFilterType, args.CSINodeLister, args.StorageClassLister, args.PVLister, args.PVCLister)
 		},
 	)
 	// Fit is determined by whether or not there would be too many GCE PD volumes attached to the node
 	scheduler.RegisterFitPredicateFactory(
 		predicates.MaxGCEPDVolumeCountPred,
 		func(args scheduler.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, args.CSINodeInfo, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.GCEPDVolumeFilterType, args.CSINodeLister, args.StorageClassLister, args.PVLister, args.PVCLister)
 		},
 	)
 	// Fit is determined by whether or not there would be too many Azure Disk volumes attached to the node
 	scheduler.RegisterFitPredicateFactory(
 		predicates.MaxAzureDiskVolumeCountPred,
 		func(args scheduler.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.CSINodeInfo, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.AzureDiskVolumeFilterType, args.CSINodeLister, args.StorageClassLister, args.PVLister, args.PVCLister)
 		},
 	)
 	scheduler.RegisterFitPredicateFactory(
 		predicates.MaxCSIVolumeCountPred,
 		func(args scheduler.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewCSIMaxVolumeLimitPredicate(args.CSINodeInfo, args.PVInfo, args.PVCInfo, args.StorageClassInfo)
+			return predicates.NewCSIMaxVolumeLimitPredicate(args.CSINodeLister, args.PVLister, args.PVCLister, args.StorageClassLister)
 		},
 	)
 	scheduler.RegisterFitPredicateFactory(
 		predicates.MaxCinderVolumeCountPred,
 		func(args scheduler.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, args.CSINodeInfo, args.StorageClassInfo, args.PVInfo, args.PVCInfo)
+			return predicates.NewMaxPDVolumeCountPredicate(predicates.CinderVolumeFilterType, args.CSINodeLister, args.StorageClassLister, args.PVLister, args.PVCLister)
 		},
 	)
 
@@ -92,7 +92,7 @@ func init() {
 	scheduler.RegisterFitPredicateFactory(
 		predicates.MatchInterPodAffinityPred,
 		func(args scheduler.PluginFactoryArgs) predicates.FitPredicate {
-			return predicates.NewPodAffinityPredicate(args.NodeInfo, args.PodLister)
+			return predicates.NewPodAffinityPredicate(args.NodeInfoLister, args.PodLister)
 		},
 	)
 
@@ -103,20 +103,11 @@ func init() {
 	// (e.g. kubelet and all schedulers)
 	scheduler.RegisterFitPredicate(predicates.GeneralPred, predicates.GeneralPredicates)
 
-	// Fit is determined by node memory pressure condition.
-	scheduler.RegisterFitPredicate(predicates.CheckNodeMemoryPressurePred, predicates.CheckNodeMemoryPressurePredicate)
-
-	// Fit is determined by node disk pressure condition.
-	scheduler.RegisterFitPredicate(predicates.CheckNodeDiskPressurePred, predicates.CheckNodeDiskPressurePredicate)
-
-	// Fit is determined by node pid pressure condition.
-	scheduler.RegisterFitPredicate(predicates.CheckNodePIDPressurePred, predicates.CheckNodePIDPressurePredicate)
-
-	// Fit is determined by node conditions: not ready, network unavailable or out of disk.
-	scheduler.RegisterMandatoryFitPredicate(predicates.CheckNodeConditionPred, predicates.CheckNodeConditionPredicate)
-
 	// Fit is determined based on whether a pod can tolerate all of the node's taints
-	scheduler.RegisterFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
+	scheduler.RegisterMandatoryFitPredicate(predicates.PodToleratesNodeTaintsPred, predicates.PodToleratesNodeTaints)
+
+	// Fit is determined based on whether a pod can tolerate unschedulable of node
+	scheduler.RegisterMandatoryFitPredicate(predicates.CheckNodeUnschedulablePred, predicates.CheckNodeUnschedulablePredicate)
 
 	// Fit is determined by volume topology requirements.
 	scheduler.RegisterFitPredicateFactory(

@@ -17,11 +17,13 @@ limitations under the License.
 package metrics
 
 import (
+	"sync"
+
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
 	dto "github.com/prometheus/client_model/go"
+
 	"k8s.io/klog"
-	"sync"
 )
 
 /*
@@ -99,7 +101,7 @@ func (r *lazyMetric) determineDeprecationStatus(version semver.Version) {
 			klog.Warningf("Hidden metrics have been manually overridden, showing this very deprecated metric.")
 			return
 		}
-		if selfVersion.LT(version) {
+		if shouldHide(&version, selfVersion) {
 			klog.Warningf("This metric has been deprecated for more than one release, hiding.")
 			r.isHidden = true
 		}

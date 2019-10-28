@@ -62,6 +62,7 @@ var CommonImageWhiteList = sets.NewString(
 	imageutils.GetE2EImage(imageutils.TestWebserver),
 	imageutils.GetE2EImage(imageutils.VolumeNFSServer),
 	imageutils.GetE2EImage(imageutils.VolumeGlusterServer),
+	imageutils.GetE2EImage(imageutils.NonRoot),
 )
 
 type testImagesStruct struct {

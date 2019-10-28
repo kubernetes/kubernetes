@@ -101,7 +101,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	webhook.WithExponentialBackoff(ctx, w.initialBackoff, func() error {
 		result, err = w.tokenReview.CreateContext(ctx, r)
 		return err
-	})
+	}, webhook.DefaultShouldRetry)
 	if err != nil {
 		// An error here indicates bad configuration or an outage. Log for debugging.
 		klog.Errorf("Failed to make webhook authenticator request: %v", err)

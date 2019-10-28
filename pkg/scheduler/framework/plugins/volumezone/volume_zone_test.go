@@ -17,14 +17,16 @@ limitations under the License.
 package volumezone
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
+	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -47,7 +49,7 @@ func createPodWithVolume(pod, pv, pvc string) *v1.Pod {
 }
 
 func TestSingleZone(t *testing.T) {
-	pvInfo := predicates.FakePersistentVolumeInfo{
+	pvLister := fakelisters.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
@@ -59,7 +61,7 @@ func TestSingleZone(t *testing.T) {
 		},
 	}
 
-	pvcInfo := predicates.FakePersistentVolumeClaimInfo{
+	pvcLister := fakelisters.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -153,8 +155,10 @@ func TestSingleZone(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
-			p := New(pvInfo, pvcInfo, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(nil, test.Pod, node)
+			p := &VolumeZone{
+				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, nil),
+			}
+			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -163,7 +167,7 @@ func TestSingleZone(t *testing.T) {
 }
 
 func TestMultiZone(t *testing.T) {
-	pvInfo := predicates.FakePersistentVolumeInfo{
+	pvLister := fakelisters.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
@@ -175,7 +179,7 @@ func TestMultiZone(t *testing.T) {
 		},
 	}
 
-	pvcInfo := predicates.FakePersistentVolumeClaimInfo{
+	pvcLister := fakelisters.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -236,8 +240,10 @@ func TestMultiZone(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
-			p := New(pvInfo, pvcInfo, nil)
-			gotStatus := p.(framework.FilterPlugin).Filter(nil, test.Pod, node)
+			p := &VolumeZone{
+				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, nil),
+			}
+			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}
@@ -254,7 +260,7 @@ func TestWithBinding(t *testing.T) {
 		classImmediate = "Class_Immediate"
 	)
 
-	classInfo := predicates.FakeStorageClassInfo{
+	scLister := fakelisters.StorageClassLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: classImmediate},
 		},
@@ -264,13 +270,13 @@ func TestWithBinding(t *testing.T) {
 		},
 	}
 
-	pvInfo := predicates.FakePersistentVolumeInfo{
+	pvLister := fakelisters.PersistentVolumeLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "Vol_1", Labels: map[string]string{v1.LabelZoneFailureDomain: "us-west1-a"}},
 		},
 	}
 
-	pvcInfo := predicates.FakePersistentVolumeClaimInfo{
+	pvcLister := fakelisters.PersistentVolumeClaimLister{
 		{
 			ObjectMeta: metav1.ObjectMeta{Name: "PVC_1", Namespace: "default"},
 			Spec:       v1.PersistentVolumeClaimSpec{VolumeName: "Vol_1"},
@@ -339,8 +345,10 @@ func TestWithBinding(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			node := &schedulernodeinfo.NodeInfo{}
 			node.SetNode(test.Node)
-			p := New(pvInfo, pvcInfo, classInfo)
-			gotStatus := p.(framework.FilterPlugin).Filter(nil, test.Pod, node)
+			p := &VolumeZone{
+				predicate: predicates.NewVolumeZonePredicate(pvLister, pvcLister, scLister),
+			}
+			gotStatus := p.Filter(context.Background(), nil, test.Pod, node)
 			if !reflect.DeepEqual(gotStatus, test.wantStatus) {
 				t.Errorf("status does not match: %v, want: %v", gotStatus, test.wantStatus)
 			}

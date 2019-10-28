@@ -20,25 +20,19 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/component-base/metrics/testutil"
 	statsapi "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 )
 
 func TestNoMetricsCollected(t *testing.T) {
-	ch := make(chan prometheus.Metric)
-
 	collector := &logMetricsCollector{
 		podStats: func() ([]statsapi.PodStats, error) {
 			return []statsapi.PodStats{}, nil
 		},
 	}
-	collector.Collect(ch)
 
-	num := len(ch)
-	if num != 0 {
-		t.Fatalf("Channel expected to be empty, but received %d", num)
+	if err := testutil.CollectAndCompare(collector, strings.NewReader(""), ""); err != nil {
+		t.Fatal(err)
 	}
 }
 

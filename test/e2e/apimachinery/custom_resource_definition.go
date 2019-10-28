@@ -121,7 +121,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 			}
 
 			// Use delete collection to remove the CRDs
-			err = fixtures.DeleteCustomResourceDefinitions(selectorListOpts, apiExtensionClient)
+			err = fixtures.DeleteV1CustomResourceDefinitions(selectorListOpts, apiExtensionClient)
 			framework.ExpectNoError(err, "deleting CustomResourceDefinitions")
 			_, err = apiExtensionClient.ApiextensionsV1().CustomResourceDefinitions().Get(crd.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err, "getting remaining CustomResourceDefinition")

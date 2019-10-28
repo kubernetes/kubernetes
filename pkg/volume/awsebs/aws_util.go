@@ -30,6 +30,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	cloudprovider "k8s.io/cloud-provider"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
@@ -286,4 +287,51 @@ func findNvmeVolume(findName string) (device string, err error) {
 	}
 
 	return resolved, nil
+}
+
+func formatVolumeID(volumeID string) (string, error) {
+	// This is a workaround to fix the issue in converting aws volume id from globalPDPath and globalMapPath
+	// There are three formats for AWSEBSVolumeSource.VolumeID and they are stored on disk in paths like so:
+	// VolumeID									mountPath								mapPath
+	// aws:///vol-1234					aws/vol-1234						aws:/vol-1234
+	// aws://us-east-1/vol-1234 aws/us-east-1/vol-1234  aws:/us-east-1/vol-1234
+	// vol-1234									vol-1234								vol-1234
+	// This code is for converting volume ids from paths back to AWS style VolumeIDs
+	sourceName := volumeID
+	if strings.HasPrefix(volumeID, "aws/") || strings.HasPrefix(volumeID, "aws:/") {
+		names := strings.Split(volumeID, "/")
+		length := len(names)
+		if length < 2 || length > 3 {
+			return "", fmt.Errorf("invalid volume name format %q", volumeID)
+		}
+		volName := names[length-1]
+		if !strings.HasPrefix(volName, "vol-") {
+			return "", fmt.Errorf("Invalid volume name format for AWS volume (%q)", volName)
+		}
+		if length == 2 {
+			sourceName = awsURLNamePrefix + "" + "/" + volName // empty zone label
+		}
+		if length == 3 {
+			sourceName = awsURLNamePrefix + names[1] + "/" + volName // names[1] is the zone label
+		}
+		klog.V(4).Infof("Convert aws volume name from %q to %q ", volumeID, sourceName)
+	}
+	return sourceName, nil
+}
+
+func newAWSVolumeSpec(volumeName, volumeID string, mode v1.PersistentVolumeMode) *volume.Spec {
+	awsVolume := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: volumeName,
+		},
+		Spec: v1.PersistentVolumeSpec{
+			PersistentVolumeSource: v1.PersistentVolumeSource{
+				AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+					VolumeID: volumeID,
+				},
+			},
+			VolumeMode: &mode,
+		},
+	}
+	return volume.NewSpecFromPersistentVolume(awsVolume, false)
 }

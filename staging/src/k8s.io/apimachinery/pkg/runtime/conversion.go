@@ -102,6 +102,27 @@ func Convert_Slice_string_To_bool(in *[]string, out *bool, s conversion.Scope) e
 	return nil
 }
 
+// Convert_Slice_string_To_bool will convert a string parameter to boolean.
+// Only the absence of a value (i.e. zero-length slice), a value of "false", or a
+// value of "0" resolve to false.
+// Any other value (including empty string) resolves to true.
+func Convert_Slice_string_To_Pointer_bool(in *[]string, out **bool, s conversion.Scope) error {
+	if len(*in) == 0 {
+		boolVar := false
+		*out = &boolVar
+		return nil
+	}
+	switch {
+	case (*in)[0] == "0", strings.EqualFold((*in)[0], "false"):
+		boolVar := false
+		*out = &boolVar
+	default:
+		boolVar := true
+		*out = &boolVar
+	}
+	return nil
+}
+
 func string_to_int64(in string) (int64, error) {
 	return strconv.ParseInt(in, 10, 64)
 }

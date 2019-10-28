@@ -636,6 +636,40 @@ function Add_InitialHnsNetwork {
       -Verbose
 }
 
+# Get the network in uint32 for the given cidr
+function Get_NetworkDecimal_From_CIDR([string] $cidr) {
+  $network, [int]$subnetlen = $cidr.Split('/')
+  $decimal_network = ConvertTo_DecimalIP($network)
+  return $decimal_network
+}
+
+# Get gateway ip string (the first address) based on pod cidr.
+# For Windows nodes the pod gateway IP address is the first address in the pod
+# CIDR for the host.
+function Get_Gateway_From_CIDR([string] $cidr) {
+  $network=Get_NetworkDecimal_From_CIDR($cidr)
+  $gateway=ConvertTo_DottedDecimalIP($network+1)
+  return $gateway
+}
+
+# Get endpoint gateway ip string (the second address) based on pod cidr.
+# For Windows nodes the pod gateway IP address is the first address in the pod
+# CIDR for the host, but from inside containers it's the second address.
+function Get_Endpoint_Gateway_From_CIDR([string] $cidr) {
+  $network=Get_NetworkDecimal_From_CIDR($cidr)
+  $gateway=ConvertTo_DottedDecimalIP($network+2)
+  return $gateway
+}
+
+# Get pod IP range start based (the third address) on pod cidr
+# We reserve the first two in the cidr range for gateways. Start the cidr
+# range from the third so that IPAM does not allocate those IPs to pods.
+function Get_PodIP_Range_Start([string] $cidr) {
+  $network=Get_NetworkDecimal_From_CIDR($cidr)
+  $start=ConvertTo_DottedDecimalIP($network+3)
+  return $start
+}
+
 # Configures HNS on the Windows node to enable Kubernetes networking:
 #   - Creates the "management" interface associated with an initial HNS network.
 #   - Creates the HNS network $env:KUBE_NETWORK for pod networking.
@@ -651,12 +685,8 @@ function Configure-HostNetworkingService {
 
   Add_InitialHnsNetwork
 
-  # For Windows nodes the pod gateway IP address is the .1 address in the pod
-  # CIDR for the host, but from inside containers it's the .2 address.
-  $pod_gateway = `
-      ${env:POD_CIDR}.substring(0, ${env:POD_CIDR}.lastIndexOf('.')) + '.1'
-  $pod_endpoint_gateway = `
-      ${env:POD_CIDR}.substring(0, ${env:POD_CIDR}.lastIndexOf('.')) + '.2'
+  $pod_gateway = Get_Gateway_From_CIDR(${env:POD_CIDR})
+  $pod_endpoint_gateway = Get_Endpoint_Gateway_From_CIDR(${env:POD_CIDR})
   Log-Output ("Setting up Windows node HNS networking: " +
               "podCidr = ${env:POD_CIDR}, podGateway = ${pod_gateway}, " +
               "podEndpointGateway = ${pod_endpoint_gateway}")
@@ -833,10 +863,7 @@ function Configure-CniNetworking {
   Log-Output ("using mgmt IP ${mgmt_ip} and mgmt subnet ${mgmt_subnet} for " +
               "CNI config")
 
-  # We reserve .1 and .2 for gateways. Start the CIDR range from ".3" so that
-  # IPAM does not allocate those IPs to pods.
-  $cidr_range_start = `
-      ${env:POD_CIDR}.substring(0, ${env:POD_CIDR}.lastIndexOf('.')) + '.3'
+  $cidr_range_start = Get_PodIP_Range_Start(${env:POD_CIDR})
 
   # Explanation of the CNI config values:
   #   CLUSTER_CIDR: the cluster CIDR from which pod CIDRs are allocated.

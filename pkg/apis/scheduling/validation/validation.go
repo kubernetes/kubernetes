@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
+	schedulingapiv1 "k8s.io/kubernetes/pkg/apis/scheduling/v1"
 )
 
 // ValidatePriorityClass tests whether required fields in the PriorityClass are
@@ -34,7 +35,7 @@ func ValidatePriorityClass(pc *scheduling.PriorityClass) field.ErrorList {
 	// If the priorityClass starts with a system prefix, it must be one of the
 	// predefined system priority classes.
 	if strings.HasPrefix(pc.Name, scheduling.SystemPriorityClassPrefix) {
-		if is, err := scheduling.IsKnownSystemPriorityClass(pc); !is {
+		if is, err := schedulingapiv1.IsKnownSystemPriorityClass(pc.Name, pc.Value, pc.GlobalDefault); !is {
 			allErrs = append(allErrs, field.Forbidden(field.NewPath("metadata", "name"), "priority class names with '"+scheduling.SystemPriorityClassPrefix+"' prefix are reserved for system use only. error: "+err.Error()))
 		}
 	} else if pc.Value > scheduling.HighestUserDefinablePriority {

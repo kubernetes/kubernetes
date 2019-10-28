@@ -26,7 +26,6 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/spf13/pflag"
@@ -402,6 +401,6 @@ func main() {
 
 	// Serve our metrics on listenAddress/metricsPath.
 	klog.Infof("Listening on: %v", listenAddress)
-	http.Handle(metricsPath, promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
+	http.Handle(metricsPath, metrics.HandlerFor(gatherer, metrics.HandlerOpts{}))
 	klog.Errorf("Stopped listening/serving metrics: %v", http.ListenAndServe(listenAddress, nil))
 }

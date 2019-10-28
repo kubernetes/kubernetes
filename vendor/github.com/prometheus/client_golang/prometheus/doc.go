@@ -183,7 +183,6 @@
 // method can then expose the gathered metrics in some way. Usually, the metrics
 // are served via HTTP on the /metrics endpoint. That's happening in the example
 // above. The tools to expose metrics via HTTP are in the promhttp sub-package.
-// (The top-level functions in the prometheus package are deprecated.)
 //
 // Pushing to the Pushgateway
 //

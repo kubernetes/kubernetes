@@ -389,13 +389,16 @@ func InitGcePDCSIDriver() testsuites.TestDriver {
 			SupportedMountOption: sets.NewString("debug", "nouid32"),
 			Capabilities: map[testsuites.Capability]bool{
 				testsuites.CapPersistence: true,
+				testsuites.CapBlock:       true,
 				testsuites.CapFsGroup:     true,
 				testsuites.CapExec:        true,
 				testsuites.CapMultiPODs:   true,
 				// GCE supports volume limits, but the test creates large
 				// number of volumes and times out test suites.
-				testsuites.CapVolumeLimits: false,
-				testsuites.CapTopology:     true,
+				testsuites.CapVolumeLimits:        false,
+				testsuites.CapTopology:            true,
+				testsuites.CapControllerExpansion: true,
+				testsuites.CapNodeExpansion:       true,
 			},
 			RequiredAccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
 			TopologyKeys:        []string{GCEPDCSIZoneTopologyKey},

@@ -70,7 +70,11 @@ func IsQualifiedName(value string) []string {
 	return errs
 }
 
-// IsFullyQualifiedName checks if the name is fully qualified.
+// IsFullyQualifiedName checks if the name is fully qualified. This is similar
+// to IsFullyQualifiedDomainName but requires a minimum of 3 segments instead of
+// 2 and does not accept a trailing . as valid.
+// TODO: This function is deprecated and preserved until all callers migrate to
+// IsFullyQualifiedDomainName; please don't add new callers.
 func IsFullyQualifiedName(fldPath *field.Path, name string) field.ErrorList {
 	var allErrors field.ErrorList
 	if len(name) == 0 {
@@ -81,6 +85,26 @@ func IsFullyQualifiedName(fldPath *field.Path, name string) field.ErrorList {
 	}
 	if len(strings.Split(name, ".")) < 3 {
 		return append(allErrors, field.Invalid(fldPath, name, "should be a domain with at least three segments separated by dots"))
+	}
+	return allErrors
+}
+
+// IsFullyQualifiedDomainName checks if the domain name is fully qualified. This
+// is similar to IsFullyQualifiedName but only requires a minimum of 2 segments
+// instead of 3 and accepts a trailing . as valid.
+func IsFullyQualifiedDomainName(fldPath *field.Path, name string) field.ErrorList {
+	var allErrors field.ErrorList
+	if len(name) == 0 {
+		return append(allErrors, field.Required(fldPath, ""))
+	}
+	if strings.HasSuffix(name, ".") {
+		name = name[:len(name)-1]
+	}
+	if errs := IsDNS1123Subdomain(name); len(errs) > 0 {
+		return append(allErrors, field.Invalid(fldPath, name, strings.Join(errs, ",")))
+	}
+	if len(strings.Split(name, ".")) < 2 {
+		return append(allErrors, field.Invalid(fldPath, name, "should be a domain with at least two segments separated by dots"))
 	}
 	return allErrors
 }

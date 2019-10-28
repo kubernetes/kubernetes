@@ -19,6 +19,7 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -84,7 +85,7 @@ func (fp *tokenFilter) Name() string {
 	return tokenFilterName
 }
 
-func (fp *tokenFilter) Filter(state *framework.CycleState, pod *v1.Pod,
+func (fp *tokenFilter) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod,
 	nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	if fp.Tokens > 0 {
 		fp.Tokens--
@@ -97,17 +98,17 @@ func (fp *tokenFilter) Filter(state *framework.CycleState, pod *v1.Pod,
 	return framework.NewStatus(status, fmt.Sprintf("can't fit %v", pod.Name))
 }
 
-func (fp *tokenFilter) PreFilter(state *framework.CycleState, pod *v1.Pod) *framework.Status {
+func (fp *tokenFilter) PreFilter(ctx context.Context, state *framework.CycleState, pod *v1.Pod) *framework.Status {
 	return nil
 }
 
-func (fp *tokenFilter) AddPod(state *framework.CycleState, podToSchedule *v1.Pod,
+func (fp *tokenFilter) AddPod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
 	podToAdd *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	fp.Tokens--
 	return nil
 }
 
-func (fp *tokenFilter) RemovePod(state *framework.CycleState, podToSchedule *v1.Pod,
+func (fp *tokenFilter) RemovePod(ctx context.Context, state *framework.CycleState, podToSchedule *v1.Pod,
 	podToRemove *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	fp.Tokens++
 	return nil
@@ -117,7 +118,7 @@ func (fp *tokenFilter) PreFilterExtensions() framework.PreFilterExtensions {
 	return fp
 }
 
-var _ = framework.FilterPlugin(&tokenFilter{})
+var _ framework.FilterPlugin = &tokenFilter{}
 
 // TestPreemption tests a few preemption scenarios.
 func TestPreemption(t *testing.T) {
@@ -526,8 +527,8 @@ func TestPodPriorityResolution(t *testing.T) {
 	externalInformers := informers.NewSharedInformerFactory(externalClientset, time.Second)
 	admission.SetExternalKubeClientSet(externalClientset)
 	admission.SetExternalKubeInformerFactory(externalInformers)
-	externalInformers.Start(context.stopCh)
-	externalInformers.WaitForCacheSync(context.stopCh)
+	externalInformers.Start(context.ctx.Done())
+	externalInformers.WaitForCacheSync(context.ctx.Done())
 
 	tests := []struct {
 		Name             string

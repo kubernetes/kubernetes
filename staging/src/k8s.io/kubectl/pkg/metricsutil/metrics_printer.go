@@ -23,8 +23,8 @@ import (
 
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/kubectl/pkg/util/printers"
 	metricsapi "k8s.io/metrics/pkg/apis/metrics"
 )
 

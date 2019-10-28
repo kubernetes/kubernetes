@@ -93,6 +93,20 @@ func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.P
 	return corePod, v1Pod
 }
 
+func withLabels(pod *api.Pod, labels map[string]string) *api.Pod {
+	labeledPod := pod.DeepCopy()
+	if labels == nil {
+		labeledPod.Labels = nil
+		return labeledPod
+	}
+	// Clone.
+	labeledPod.Labels = map[string]string{}
+	for key, value := range labels {
+		labeledPod.Labels[key] = value
+	}
+	return labeledPod
+}
+
 func makeTestPodEviction(name string) *policy.Eviction {
 	eviction := &policy.Eviction{}
 	eviction.Name = name
@@ -337,6 +351,16 @@ func Test_nodePlugin_Admit(t *testing.T) {
 
 		existingPodsIndex = cache.NewIndexer(cache.MetaNamespaceKeyFunc, nil)
 		existingPods      = corev1lister.NewPodLister(existingPodsIndex)
+
+		labelsA = map[string]string{
+			"label-a": "value-a",
+		}
+		labelsAB = map[string]string{
+			"label-a": "value-a",
+			"label-b": "value-b",
+		}
+		aLabeledPod  = withLabels(coremypod, labelsA)
+		abLabeledPod = withLabels(coremypod, labelsAB)
 	)
 
 	existingPodsIndex.Add(v1mymirrorpod)
@@ -587,6 +611,30 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(nil, nil, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Delete, &metav1.DeleteOptions{}, false, mynode),
 			err:        "forbidden: unexpected operation",
+		},
+		{
+			name:       "forbid addition of pod status preexisting labels",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(abLabeledPod, aLabeledPod, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update labels through pod status",
+		},
+		{
+			name:       "forbid deletion of pod status preexisting labels",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(aLabeledPod, abLabeledPod, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update labels through pod status",
+		},
+		{
+			name:       "forbid deletion of all pod status preexisting labels",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(aLabeledPod, coremypod, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update labels through pod status",
+		},
+		{
+			name:       "forbid addition of pod status labels",
+			podsGetter: noExistingPods,
+			attributes: admission.NewAttributesRecord(coremypod, aLabeledPod, podKind, coremypod.Namespace, coremypod.Name, podResource, "status", admission.Update, &metav1.UpdateOptions{}, false, mynode),
+			err:        "cannot update labels through pod status",
 		},
 		{
 			name:       "forbid update of eviction for normal pod bound to self",

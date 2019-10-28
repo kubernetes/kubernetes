@@ -403,11 +403,6 @@ func NewProxier(ipt utiliptables.Interface,
 	masqueradeValue := 1 << uint(masqueradeBit)
 	masqueradeMark := fmt.Sprintf("%#08x/%#08x", masqueradeValue, masqueradeValue)
 
-	if nodeIP == nil {
-		klog.Warningf("invalid nodeIP, initializing kube-proxy with 127.0.0.1 as nodeIP")
-		nodeIP = net.ParseIP("127.0.0.1")
-	}
-
 	isIPv6 := utilnet.IsIPv6(nodeIP)
 
 	klog.V(2).Infof("nodeIP: %v, isIPv6: %v", nodeIP, isIPv6)

@@ -70,7 +70,6 @@ var (
 	KindRC         = schema.GroupVersionKind{Version: "v1", Kind: "ReplicationController"}
 	KindDeployment = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "Deployment"}
 	KindReplicaSet = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}
-	subresource    = "scale"
 )
 
 /*
@@ -472,7 +471,6 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 	switch kind {
 	case KindRC:
 		framework.ExpectNoError(framework.RunRC(rcConfig))
-		break
 	case KindDeployment:
 		dpConfig := testutils.DeploymentConfig{
 			RCConfig: rcConfig,
@@ -481,14 +479,12 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		dpConfig.NodeDumpFunc = framework.DumpNodeDebugInfo
 		dpConfig.ContainerDumpFunc = framework.LogFailedContainers
 		framework.ExpectNoError(testutils.RunDeployment(dpConfig))
-		break
 	case KindReplicaSet:
 		rsConfig := testutils.ReplicaSetConfig{
 			RCConfig: rcConfig,
 		}
 		ginkgo.By(fmt.Sprintf("creating replicaset %s in namespace %s", rsConfig.Name, rsConfig.Namespace))
 		framework.ExpectNoError(replicaset.RunReplicaSet(rsConfig))
-		break
 	default:
 		framework.Failf(invalidKind)
 	}

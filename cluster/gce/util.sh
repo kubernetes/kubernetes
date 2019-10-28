@@ -2288,8 +2288,8 @@ function kube-up() {
     create-loadbalancer
     # If replication of master fails, we need to ensure that the replica is removed from etcd clusters.
     if ! replicate-master; then
-      remove-replica-from-etcd 2379 || true
-      remove-replica-from-etcd 4002 || true
+      remove-replica-from-etcd 2379 true || true
+      remove-replica-from-etcd 4002 false || true
     fi
   else
     check-existing
@@ -2495,6 +2495,10 @@ function detect-subnetworks() {
 #   NETWORK
 function create-cloud-nat-router() {
   if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
+    if gcloud compute routers describe "$NETWORK-nat-router" --project $NETWORK_PROJECT --region $REGION &>/dev/null; then
+      echo "Cloud nat already exists"
+      return 0
+    fi
     gcloud compute routers create "$NETWORK-nat-router" \
       --project $NETWORK_PROJECT \
       --region $REGION \
@@ -2503,8 +2507,9 @@ function create-cloud-nat-router() {
       --project $NETWORK_PROJECT \
       --router-region $REGION \
       --router "$NETWORK-nat-router" \
-      --nat-all-subnet-ip-ranges \
-      --auto-allocate-nat-external-ips
+      --nat-primary-subnet-ip-ranges \
+      --auto-allocate-nat-external-ips \
+      ${GCE_PRIVATE_CLUSTER_PORTS_PER_VM:+--min-ports-per-vm ${GCE_PRIVATE_CLUSTER_PORTS_PER_VM}}
   fi
 }
 
@@ -2751,17 +2756,21 @@ function create-master() {
 #
 # $1: etcd client port
 # $2: etcd internal port
+# $3: whether etcd communication should use mtls
 # returns the result of ssh command which adds replica
-#### WARNING: THIS DOESN'T WORK IN CLUSTERS WITH MTLS ENABLED.
-# TODO(mborsz): Fix this
 function add-replica-to-etcd() {
   local -r client_port="${1}"
   local -r internal_port="${2}"
-  gcloud compute ssh "${EXISTING_MASTER_NAME}" \
-    --project "${PROJECT}" \
-    --zone "${EXISTING_MASTER_ZONE}" \
-    --command \
-      "curl localhost:${client_port}/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"https://${REPLICA_NAME}:${internal_port}\"]}' -s"
+  local -r use_mtls="${3}"
+
+  TLSARG=""
+  PROTO="http://"
+  if [[ "${use_mtls}" == "true" ]]; then
+    # Keep in sync with ETCD_APISERVER_CA_CERT_PATH, ETCD_APISERVER_CLIENT_CERT_PATH and ETCD_APISERVER_CLIENT_KEY_PATH in configure-helper.sh.
+    TLSARG="--cacert /etc/srv/kubernetes/pki/etcd-apiserver-ca.crt --cert /etc/srv/kubernetes/pki/etcd-apiserver-client.crt --key /etc/srv/kubernetes/pki/etcd-apiserver-client.key"
+    PROTO="https://"
+  fi
+  run-gcloud-command "${EXISTING_MASTER_NAME}" "${EXISTING_MASTER_ZONE}" "curl ${TLSARG} ${PROTO}127.0.0.1:${client_port}/v2/members -XPOST -H \"Content-Type: application/json\" -d '{\"peerURLs\":[\"https://${REPLICA_NAME}:${internal_port}\"]}' -s"
   return $?
 }
 
@@ -2787,11 +2796,11 @@ function replicate-master() {
   echo "Experimental: replicating existing master ${EXISTING_MASTER_ZONE}/${EXISTING_MASTER_NAME} as ${ZONE}/${REPLICA_NAME}"
 
   # Before we do anything else, we should configure etcd to expect more replicas.
-  if ! add-replica-to-etcd 2379 2380; then
+  if ! add-replica-to-etcd 2379 2380 true; then
     echo "Failed to add master replica to etcd cluster."
     return 1
   fi
-  if ! add-replica-to-etcd 4002 2381; then
+  if ! add-replica-to-etcd 4002 2381 false; then
     echo "Failed to add master replica to etcd events cluster."
     return 1
   fi
@@ -3401,17 +3410,21 @@ function check-cluster() {
 #   EXISTING_MASTER_ZONE
 #
 # $1: etcd client port
+# $2: whether etcd communication should use mtls
 # returns the result of ssh command which removes replica
-#### WARNING: THIS DOESN'T WORK IN CLUSTERS WITH MTLS ENABLED.
-# TODO(mborsz): Fix this
 function remove-replica-from-etcd() {
   local -r port="${1}"
+  local -r use_mtls="${2}"
+
+  TLSARG=""
+  PROTO="http://"
+  if [[ "${use_mtls}" == "true" ]]; then
+    # Keep in sync with ETCD_APISERVER_CA_CERT_PATH, ETCD_APISERVER_CLIENT_CERT_PATH and ETCD_APISERVER_CLIENT_KEY_PATH in configure-helper.sh.
+    TLSARG="--cacert /etc/srv/kubernetes/pki/etcd-apiserver-ca.crt --cert /etc/srv/kubernetes/pki/etcd-apiserver-client.crt --key /etc/srv/kubernetes/pki/etcd-apiserver-client.key"
+    PROTO="https://"
+  fi
   [[ -n "${EXISTING_MASTER_NAME}" ]] || return
-  gcloud compute ssh "${EXISTING_MASTER_NAME}" \
-    --project "${PROJECT}" \
-    --zone "${EXISTING_MASTER_ZONE}" \
-    --command \
-    "curl -s localhost:${port}/v2/members/\$(curl -s localhost:${port}/v2/members -XGET | sed 's/{\\\"id/\n/g' | grep ${REPLICA_NAME}\\\" | cut -f 3 -d \\\") -XDELETE -L 2>/dev/null"
+  run-gcloud-command "${EXISTING_MASTER_NAME}" "${EXISTING_MASTER_ZONE}" "curl -s ${TLSARG} ${PROTO}127.0.0.1:${port}/v2/members/\$(curl -s ${TLSARG} ${PROTO}127.0.0.1:${port}/v2/members -XGET | sed 's/{\\\"id/\n/g' | grep ${REPLICA_NAME}\\\" | cut -f 3 -d \\\") -XDELETE -L 2>/dev/null"
   local -r res=$?
   echo "Removing etcd replica, name: ${REPLICA_NAME}, port: ${port}, result: ${res}"
   return "${res}"
@@ -3496,8 +3509,8 @@ function kube-down() {
   set-existing-master
 
   # Un-register the master replica from etcd and events etcd.
-  remove-replica-from-etcd 2379
-  remove-replica-from-etcd 4002
+  remove-replica-from-etcd 2379 true
+  remove-replica-from-etcd 4002 false
 
   # Delete the master replica (if it exists).
   if gcloud compute instances describe "${REPLICA_NAME}" --zone "${ZONE}" --project "${PROJECT}" &>/dev/null; then
@@ -3841,13 +3854,6 @@ function check-resources() {
   if gcloud compute addresses describe --project "${PROJECT}" "${MASTER_NAME}-ip" --region "${REGION}" &>/dev/null; then
     KUBE_RESOURCE_FOUND="Master's reserved IP"
     return 1
-  fi
-
-  if [[ ${GCE_PRIVATE_CLUSTER:-} == "true" ]]; then
-    if gcloud compute routers describe --project "${NETWORK_PROJECT}" --region "${REGION}" "${NETWORK}-nat-router" &>/dev/null; then
-      KUBE_RESOURCE_FOUND="Cloud NAT router"
-      return 1
-    fi
   fi
 
   # No resources found.

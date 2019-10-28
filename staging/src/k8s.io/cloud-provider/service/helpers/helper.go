@@ -115,3 +115,30 @@ func HasLBFinalizer(service *v1.Service) bool {
 	}
 	return false
 }
+
+// LoadBalancerStatusEqual checks if load balancer status are equal
+func LoadBalancerStatusEqual(l, r *v1.LoadBalancerStatus) bool {
+	return ingressSliceEqual(l.Ingress, r.Ingress)
+}
+
+func ingressSliceEqual(lhs, rhs []v1.LoadBalancerIngress) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	for i := range lhs {
+		if !ingressEqual(&lhs[i], &rhs[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func ingressEqual(lhs, rhs *v1.LoadBalancerIngress) bool {
+	if lhs.IP != rhs.IP {
+		return false
+	}
+	if lhs.Hostname != rhs.Hostname {
+		return false
+	}
+	return true
+}

@@ -86,7 +86,7 @@ var _ = ginkgo.Describe("[sig-storage] Projected combined", func() {
 			},
 		}
 		f.TestContainerOutput("Check all projections for projected volume plugin", pod, 0, []string{
-			fmt.Sprintf("%s", podName),
+			podName,
 			"secret-value-1",
 			"configmap-value-1",
 		})

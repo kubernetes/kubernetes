@@ -47,7 +47,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/initsystem"
 	utilruntime "k8s.io/kubernetes/cmd/kubeadm/app/util/runtime"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/system"
-	"k8s.io/kubernetes/pkg/registry/core/service/ipallocator"
 	utilsexec "k8s.io/utils/exec"
 	utilsnet "k8s.io/utils/net"
 )
@@ -479,7 +478,7 @@ func (subnet HTTPProxyCIDRCheck) Check() (warnings, errorList []error) {
 		return nil, []error{errors.Wrapf(err, "error parsing CIDR %q", subnet.CIDR)}
 	}
 
-	testIP, err := ipallocator.GetIndexedIP(cidr, 1)
+	testIP, err := utilsnet.GetIndexedIP(cidr, 1)
 	if err != nil {
 		return nil, []error{errors.Wrapf(err, "unable to get first IP address from the given CIDR (%s)", cidr.String())}
 	}

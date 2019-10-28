@@ -3,6 +3,7 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "events.go",
         "pod_backoff.go",
         "scheduling_queue.go",
     ],
@@ -36,8 +37,10 @@ go_test(
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/scheduler/framework/v1alpha1:go_default_library",
+        "//pkg/scheduler/listers:go_default_library",
         "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
+        "//pkg/scheduler/nodeinfo/snapshot:go_default_library",
         "//pkg/scheduler/util:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",

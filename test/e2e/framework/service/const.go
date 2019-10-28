@@ -56,6 +56,10 @@ const (
 	// LoadBalancerCreateTimeoutLarge is the maximum time to wait for a load balancer to be created/modified.
 	LoadBalancerCreateTimeoutLarge = 2 * time.Hour
 
+	// LoadBalancerPropagationTimeoutDefault is the default time to wait for pods to
+	// be targeted by load balancers.
+	LoadBalancerPropagationTimeoutDefault = 10 * time.Minute
+
 	// LoadBalancerCleanupTimeout is the time required by the loadbalancer to cleanup, proportional to numApps/Ing.
 	// Bring the cleanup timeout back down to 5m once b/33588344 is resolved.
 	LoadBalancerCleanupTimeout = 15 * time.Minute

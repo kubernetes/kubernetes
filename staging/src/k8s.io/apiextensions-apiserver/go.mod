@@ -5,7 +5,6 @@ module k8s.io/apiextensions-apiserver
 go 1.12
 
 require (
-	github.com/coreos/etcd v3.3.17+incompatible
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/go-openapi/errors v0.19.2
 	github.com/go-openapi/spec v0.19.2
@@ -19,7 +18,8 @@ require (
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.3.0
-	google.golang.org/grpc v1.23.0
+	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
+	google.golang.org/grpc v1.23.1
 	gopkg.in/yaml.v2 v2.2.4
 	k8s.io/api v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -36,6 +36,7 @@ require (
 replace (
 	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
 	golang.org/x/lint => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
+	golang.org/x/net => golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
 	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
 	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503

@@ -17,6 +17,8 @@ limitations under the License.
 package scheduler
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -45,6 +47,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -101,11 +104,47 @@ func TestCreateFromConfig(t *testing.T) {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
-	factory.CreateFromConfig(policy)
+	conf, err := factory.CreateFromConfig(policy)
+	if err != nil {
+		t.Fatalf("CreateFromConfig failed: %v", err)
+	}
 	hpa := factory.GetHardPodAffinitySymmetricWeight()
 	if hpa != v1.DefaultHardPodAffinitySymmetricWeight {
 		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", v1.DefaultHardPodAffinitySymmetricWeight, hpa)
 	}
+
+	// Verify that custom predicates are converted to framework plugins.
+	if !pluginExists(nodelabel.Name, "FilterPlugin", conf) {
+		t.Error("NodeLabel plugin not exist in framework.")
+	}
+	// Verify that the policy config is converted to plugin config for custom predicates.
+	nodeLabelConfig := findPluginConfig(nodelabel.Name, conf)
+	encoding, err := json.Marshal(nodeLabelConfig)
+	if err != nil {
+		t.Errorf("Failed to marshal %+v: %v", nodeLabelConfig, err)
+	}
+	want := `{"Name":"NodeLabel","Args":{"labels":["zone"],"presence":true}}`
+	if string(encoding) != want {
+		t.Errorf("Config for NodeLabel plugin mismatch. got: %v, want: %v", string(encoding), want)
+	}
+}
+
+func pluginExists(name, extensionPoint string, schedConf *Config) bool {
+	for _, pl := range schedConf.Framework.ListPlugins()[extensionPoint] {
+		if pl.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func findPluginConfig(name string, schedConf *Config) config.PluginConfig {
+	for _, c := range schedConf.PluginConfig {
+		if c.Name == name {
+			return c
+		}
+	}
+	return config.PluginConfig{}
 }
 
 func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
@@ -293,7 +332,7 @@ func TestDefaultErrorFunc(t *testing.T) {
 	queue.Delete(testPod)
 
 	// Trigger a move request
-	queue.MoveAllToActiveQueue()
+	queue.MoveAllToActiveOrBackoffQueue("test")
 
 	// Trigger error handling again to put the pod in backoff queue
 	errFunc(testPodInfo, nil)
@@ -633,11 +672,14 @@ type TestPlugin struct {
 	name string
 }
 
+var _ framework.ScorePlugin = &TestPlugin{}
+var _ framework.FilterPlugin = &TestPlugin{}
+
 func (t *TestPlugin) Name() string {
 	return t.name
 }
 
-func (t *TestPlugin) Score(state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
+func (t *TestPlugin) Score(ctx context.Context, state *framework.CycleState, p *v1.Pod, nodeName string) (int64, *framework.Status) {
 	return 1, nil
 }
 
@@ -645,7 +687,7 @@ func (t *TestPlugin) ScoreExtensions() framework.ScoreExtensions {
 	return nil
 }
 
-func (t *TestPlugin) Filter(state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+func (t *TestPlugin) Filter(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	return nil
 }
 

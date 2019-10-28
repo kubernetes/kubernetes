@@ -104,7 +104,7 @@ var _ = framework.KubeDescribe("Probing container", func() {
 		p, err := podClient.Get(p.Name, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 
-		isReady, err := testutils.PodRunningReady(p)
+		isReady, _ := testutils.PodRunningReady(p)
 		gomega.Expect(isReady).NotTo(gomega.BeTrue(), "pod should be not ready")
 
 		restartCount := getRestartCount(p)
@@ -269,7 +269,7 @@ func GetContainerStartedTime(p *v1.Pod, containerName string) (time.Time, error)
 			continue
 		}
 		if status.State.Running == nil {
-			return time.Time{}, fmt.Errorf("Container is not running")
+			return time.Time{}, fmt.Errorf("container is not running")
 		}
 		return status.State.Running.StartedAt.Time, nil
 	}
@@ -282,7 +282,7 @@ func GetTransitionTimeForReadyCondition(p *v1.Pod) (time.Time, error) {
 			return cond.LastTransitionTime.Time, nil
 		}
 	}
-	return time.Time{}, fmt.Errorf("No ready condition can be found for pod")
+	return time.Time{}, fmt.Errorf("no ready condition can be found for pod")
 }
 
 func getRestartCount(p *v1.Pod) int {

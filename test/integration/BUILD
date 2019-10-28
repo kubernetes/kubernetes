@@ -19,8 +19,8 @@ go_library(
         "//staging/src/k8s.io/apiserver/pkg/storage/storagebackend:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/typed/core/v1:go_default_library",
-        "//vendor/github.com/coreos/etcd/clientv3:go_default_library",
-        "//vendor/github.com/coreos/etcd/pkg/transport:go_default_library",
+        "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
+        "//vendor/go.etcd.io/etcd/pkg/transport:go_default_library",
         "//vendor/google.golang.org/grpc:go_default_library",
     ],
 )

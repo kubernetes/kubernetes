@@ -13,11 +13,10 @@ spec:
       labels:
         app: gcp-compute-persistent-disk-csi-driver
     spec:
-      serviceAccountName: csi-controller-sa
+      serviceAccountName: csi-gce-pd-controller-sa
       containers:
         - name: csi-provisioner
-          # TODO: replace with official 1.4.0 release when ready
-          image: quay.io/k8scsi/csi-provisioner:v1.4.0-rc1
+          image: gcr.io/gke-release/csi-provisioner:v1.4.0-gke.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -26,7 +25,15 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: csi-attacher
-          image: gcr.io/gke-release/csi-attacher:v1.2.0-gke.0
+          image: gcr.io/gke-release/csi-attacher:v2.0.0-gke.0
+          args:
+            - "--v=5"
+            - "--csi-address=/csi/csi.sock"
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+        - name: csi-resizer
+          image: gcr.io/gke-release/csi-resizer:v0.3.0-gke.0
           args:
             - "--v=5"
             - "--csi-address=/csi/csi.sock"
@@ -34,7 +41,7 @@ spec:
             - name: socket-dir
               mountPath: /csi
         - name: gce-pd-driver
-          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.5.2-gke.0
+          image: gcr.io/gke-release/gcp-compute-persistent-disk-csi-driver:v0.6.0-gke.0
           args:
             - "--v=5"
             - "--endpoint=unix:/csi/csi.sock"

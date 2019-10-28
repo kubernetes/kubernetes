@@ -38,7 +38,6 @@ reviewers:
 - piosz
 - madhusudancs
 - hongchaodeng
-- jszczepkowski
 - enj
 labels:
 - sig/api-machinery
