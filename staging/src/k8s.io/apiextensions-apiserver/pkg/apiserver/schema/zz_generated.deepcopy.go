@@ -33,6 +33,11 @@ func (in *Extensions) DeepCopyInto(out *Extensions) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.XMapType != nil {
+		in, out := &in.XMapType, &out.XMapType
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 

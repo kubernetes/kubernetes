@@ -527,6 +527,7 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XIntOrString
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XListMapKeys
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XListType
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XMapType
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaProps,XPreserveUnknownFields
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1,JSONSchemaPropsOrArray,Schema
@@ -542,6 +543,7 @@ API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiexten
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XIntOrString
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XListMapKeys
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XListType
+API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XMapType
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaProps,XPreserveUnknownFields
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrArray,JSONSchemas
 API rule violation: names_match,k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1,JSONSchemaPropsOrArray,Schema
