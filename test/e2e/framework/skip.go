@@ -174,3 +174,11 @@ func serverVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface
 	}
 	return sv.AtLeast(v), nil
 }
+
+// AppArmorDistros are distros with AppArmor support
+var AppArmorDistros = []string{"gci", "ubuntu"}
+
+// SkipIfAppArmorNotSupported skips if the AppArmor is not supported by the node OS distro.
+func SkipIfAppArmorNotSupported() {
+	SkipUnlessNodeOSDistroIs(AppArmorDistros...)
+}
