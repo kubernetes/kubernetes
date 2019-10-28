@@ -102,6 +102,26 @@ func TestValidatePolicy(t *testing.T) {
 				}},
 			expected: errors.New("kubernetes.io/foo is an invalid extended resource name"),
 		},
+		{
+			name: "invalid redeclared custom predicate",
+			policy: api.Policy{
+				Predicates: []api.PredicatePolicy{
+					{Name: "customPredicate1", Argument: &api.PredicateArgument{ServiceAffinity: &api.ServiceAffinity{Labels: []string{"label1"}}}},
+					{Name: "customPredicate2", Argument: &api.PredicateArgument{ServiceAffinity: &api.ServiceAffinity{Labels: []string{"label2"}}}},
+				},
+			},
+			expected: errors.New("Predicate 'customPredicate2' redeclares custom predicate 'ServiceAffinity', from:'customPredicate1'"),
+		},
+		{
+			name: "invalid redeclared custom priority",
+			policy: api.Policy{
+				Priorities: []api.PriorityPolicy{
+					{Name: "customPriority1", Weight: 1, Argument: &api.PriorityArgument{ServiceAntiAffinity: &api.ServiceAntiAffinity{Label: "label1"}}},
+					{Name: "customPriority2", Weight: 1, Argument: &api.PriorityArgument{ServiceAntiAffinity: &api.ServiceAntiAffinity{Label: "label2"}}},
+				},
+			},
+			expected: errors.New("Priority 'customPriority2' redeclares custom priority 'ServiceAntiAffinity', from:'customPriority1'"),
+		},
 	}
 
 	for _, test := range tests {

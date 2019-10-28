@@ -89,7 +89,7 @@ func validatePriorityRedeclared(priorities map[string]schedulerapi.PriorityPolic
 			return fmt.Errorf("No priority arguments set for priority %s", priority.Name)
 		}
 		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
-			return fmt.Errorf("Priority %s is redeclared (was %+v)", priority.Name, existing)
+			return fmt.Errorf("Priority '%s' redeclares custom priority '%s', from:'%s'", priority.Name, priorityType, existing.Name)
 		}
 		priorities[priorityType] = priority
 	}
@@ -109,7 +109,7 @@ func validatePredicateRedeclared(predicates map[string]schedulerapi.PredicatePol
 			return fmt.Errorf("No priority arguments set for priority %s", predicate.Name)
 		}
 		if existing, alreadyDeclared := predicates[predicateType]; alreadyDeclared {
-			return fmt.Errorf("Priority %s is redeclared (was %+v)", predicate.Name, existing)
+			return fmt.Errorf("Predicate '%s' redeclares custom predicate '%s', from:'%s'", predicate.Name, predicateType, existing.Name)
 		}
 		predicates[predicateType] = predicate
 	}
