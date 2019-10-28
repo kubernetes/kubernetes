@@ -18,6 +18,7 @@ package validation
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,6 +98,20 @@ func TestValidateEndpointSlice(t *testing.T) {
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}, {
 					Name:     utilpointer.StringPtr("http"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{{
+					Addresses: generateIPAddresses(1),
+				}},
+			},
+		},
+		"long-port-name": {
+			expectedErrors: 0,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: addressTypePtr(discovery.AddressTypeIP),
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(strings.Repeat("a", 63)),
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{{
@@ -195,6 +210,18 @@ func TestValidateEndpointSlice(t *testing.T) {
 				AddressType: addressTypePtr(discovery.AddressTypeIP),
 				Ports: []discovery.EndpointPort{{
 					Name:     utilpointer.StringPtr("almost_valid"),
+					Protocol: protocolPtr(api.ProtocolTCP),
+				}},
+				Endpoints: []discovery.Endpoint{},
+			},
+		},
+		"bad-port-name-length": {
+			expectedErrors: 1,
+			endpointSlice: &discovery.EndpointSlice{
+				ObjectMeta:  standardMeta,
+				AddressType: addressTypePtr(discovery.AddressTypeIP),
+				Ports: []discovery.EndpointPort{{
+					Name:     utilpointer.StringPtr(strings.Repeat("a", 64)),
 					Protocol: protocolPtr(api.ProtocolTCP),
 				}},
 				Endpoints: []discovery.Endpoint{},
