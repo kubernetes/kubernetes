@@ -76,8 +76,7 @@ func parseKubeletMetrics(data string) (KubeletMetrics, error) {
 
 func (g *Grabber) getMetricsFromNode(nodeName string, kubeletPort int) (string, error) {
 	// There's a problem with timing out during proxy. Wrapping this in a goroutine to prevent deadlock.
-	// Hanging goroutine will be leaked.
-	finished := make(chan struct{})
+	finished := make(chan struct{}, 1)
 	var err error
 	var rawOutput []byte
 	go func() {
