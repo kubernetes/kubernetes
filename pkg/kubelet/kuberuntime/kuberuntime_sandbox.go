@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"sort"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	kubetypes "k8s.io/apimachinery/pkg/types"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
@@ -50,19 +50,7 @@ func (m *kubeGenericRuntimeManager) createPodSandbox(pod *v1.Pod, attempt uint32
 		return "", message, err
 	}
 
-	runtimeHandler := ""
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && m.runtimeClassManager != nil {
-		runtimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
-		if err != nil {
-			message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
-			return "", message, err
-		}
-		if runtimeHandler != "" {
-			klog.V(2).Infof("Running pod %s with RuntimeHandler %q", format.Pod(pod), runtimeHandler)
-		}
-	}
-
-	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig, runtimeHandler)
+	podSandBoxID, err := m.runtimeService.RunPodSandbox(podSandboxConfig, podSandboxConfig.GetRuntimeHandler())
 	if err != nil {
 		message := fmt.Sprintf("CreatePodSandbox for pod %q failed: %v", format.Pod(pod), err)
 		klog.Error(message)
@@ -133,6 +121,16 @@ func (m *kubeGenericRuntimeManager) generatePodSandboxConfig(pod *v1.Pod, attemp
 		return nil, err
 	}
 	podSandboxConfig.Linux = lc
+
+	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) && m.runtimeClassManager != nil {
+		podSandboxConfig.RuntimeHandler, err = m.runtimeClassManager.LookupRuntimeHandler(pod.Spec.RuntimeClassName)
+		if err != nil {
+			return nil, err
+		}
+		if podSandboxConfig.RuntimeHandler != "" {
+			klog.V(2).Infof("Running pod %s with RuntimeHandler %q", format.Pod(pod), podSandboxConfig.RuntimeHandler)
+		}
+	}
 
 	return podSandboxConfig, nil
 }

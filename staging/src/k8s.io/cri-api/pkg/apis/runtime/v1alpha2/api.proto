@@ -357,6 +357,8 @@ message PodSandboxConfig {
     map<string, string> annotations = 7;
     // Optional configurations specific to Linux hosts.
     LinuxPodSandboxConfig linux = 8;
+    // KEP - https://github.com/kubernetes/enhancements/blob/master/keps/sig-windows/windows-runtimeclass-support.md
+    string runtime_handler = 9;
 }
 
 message RunPodSandboxRequest {
