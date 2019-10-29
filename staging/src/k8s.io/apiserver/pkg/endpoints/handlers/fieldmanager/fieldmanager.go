@@ -58,6 +58,20 @@ type fieldManager struct {
 
 var _ FieldManager = &fieldManager{}
 
+type scaleFieldManager struct{}
+
+func NewScaleFieldManager() (FieldManager, error) {
+	return nil, fmt.Errorf("TODO-implement")
+}
+
+func (f *scaleFieldManager) Update(liveObj, newObj runtime.Object, manager string) (runtime.Object, error) {
+	return nil, fmt.Errorf("TODO-implement Update logic")
+}
+
+func (f *scaleFieldManager) Apply(liveObj runtime.Object, patch []byte, fieldManager string, force bool) (runtime.Object, error) {
+	return nil, fmt.Errorf("TODO-implement Apply logic")
+}
+
 // NewFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
 func NewFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (FieldManager, error) {

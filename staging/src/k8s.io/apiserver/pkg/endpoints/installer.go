@@ -549,19 +549,27 @@ func (a *APIInstaller) registerResourceHandlers(path string, storage rest.Storag
 	if a.group.MetaGroupVersion != nil {
 		reqScope.MetaGroupVersion = *a.group.MetaGroupVersion
 	}
+
 	if a.group.OpenAPIModels != nil && utilfeature.DefaultFeatureGate.Enabled(features.ServerSideApply) {
-		fm, err := fieldmanager.NewFieldManager(
-			a.group.OpenAPIModels,
-			a.group.UnsafeConvertor,
-			a.group.Defaulter,
-			fqKindToRegister.GroupVersion(),
-			reqScope.HubGroupVersion,
-		)
+		var fm fieldmanager.FieldManager
+		var err error
+		if subresource == "scale" {
+			fm, err = fieldmanager.NewScaleFieldManager()
+		} else {
+			fm, err = fieldmanager.NewFieldManager(
+				a.group.OpenAPIModels,
+				a.group.UnsafeConvertor,
+				a.group.Defaulter,
+				fqKindToRegister.GroupVersion(),
+				reqScope.HubGroupVersion,
+			)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to create field manager: %v", err)
 		}
 		fm = fieldmanager.NewSkipNonAppliedManager(fm, a.group.Creater, fqKindToRegister)
 		reqScope.FieldManager = fm
+		// reqScope.ScaleFieldManager = fieldmanager.ScaleFieldManager(...)
 	}
 	for _, action := range actions {
 		producedObject := storageMeta.ProducesObject(action.Verb)
@@ -1111,6 +1119,7 @@ func restfulDeleteCollection(r rest.CollectionDeleter, checkBody bool, scope han
 
 func restfulUpdateResource(r rest.Updater, scope handlers.RequestScope, admit admission.Interface) restful.RouteFunction {
 	return func(req *restful.Request, res *restful.Response) {
+		//scope here has the field manager(s)
 		handlers.UpdateResource(r, &scope, admit)(res.ResponseWriter, req.Request)
 	}
 }
