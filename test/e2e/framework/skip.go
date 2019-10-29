@@ -108,13 +108,6 @@ func SkipIfMultizone(c clientset.Interface) {
 	}
 }
 
-// SkipUnlessPrometheusMonitoringIsEnabled skips if the prometheus monitoring is not enabled.
-func SkipUnlessPrometheusMonitoringIsEnabled(supportedMonitoring ...string) {
-	if !TestContext.EnablePrometheusMonitoring {
-		skipInternalf(1, "Skipped because prometheus monitoring is not enabled")
-	}
-}
-
 // SkipUnlessMasterOSDistroIs skips if the master OS distro is not included in the supportedMasterOsDistros.
 func SkipUnlessMasterOSDistroIs(supportedMasterOsDistros ...string) {
 	if !MasterOSDistroIs(supportedMasterOsDistros...) {

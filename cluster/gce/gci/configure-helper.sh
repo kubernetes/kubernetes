@@ -2279,10 +2279,6 @@ EOF
     prepare-kube-proxy-manifest-variables "$src_dir/kube-proxy/kube-proxy-ds.yaml"
     setup-addon-manifests "addons" "kube-proxy"
   fi
-  # Setup prometheus stack for monitoring kubernetes cluster
-  if [[ "${ENABLE_PROMETHEUS_MONITORING:-}" == "true" ]]; then
-    setup-addon-manifests "addons" "prometheus"
-  fi
   # Setup cluster monitoring using heapster
   if [[ "${ENABLE_CLUSTER_MONITORING:-}" == "influxdb" ]] || \
      [[ "${ENABLE_CLUSTER_MONITORING:-}" == "google" ]] || \
