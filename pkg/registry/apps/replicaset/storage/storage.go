@@ -20,6 +20,7 @@ package storage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -209,7 +210,40 @@ func (r *ScaleREST) Update(ctx context.Context, name string, objInfo rest.Update
 	rs.ResourceVersion = scale.ResourceVersion
 
 	rs.Spec.Replicas = scale.Spec.Replicas
-	rs.ObjectMeta.SetManagedFields(append(rs.ObjectMeta.GetManagedFields(), metav1.ManagedFieldsEntry{
+	currentManagedFields := rs.ObjectMeta.GetManagedFields()
+	howMany := len(currentManagedFields)
+	//uuughhh this is yucky but temporary
+	for i := 0; i < howMany; i++ {
+		var entryJson map[string]interface{}
+		if err := json.Unmarshal(currentManagedFields[i].FieldsV1.Raw, &entryJson); err != nil {
+			return nil, false, fmt.Errorf("can't unmarshal")
+		}
+
+		var ok bool
+
+		var spec map[string]interface{}
+		if spec, ok = entryJson["f:spec"].(map[string]interface{}); !ok {
+			// continue with the next managedField, as we this field does not hold the spec entry
+			continue
+		}
+
+		if _, ok = spec["f:replicas"]; !ok {
+			// continue with the next managedField, as we this field does not hold the spec.replicas entry
+			continue
+		}
+
+		delete(spec, "f:replicas")
+
+		var err error
+
+		currentManagedFields[i].FieldsV1.Raw, err = json.Marshal(entryJson)
+
+		if err != nil {
+			return nil, false, fmt.Errorf("can't marshal back")
+		}
+	}
+
+	rs.ObjectMeta.SetManagedFields(append(currentManagedFields, metav1.ManagedFieldsEntry{
 		Manager:    replicasFieldManager,
 		Operation:  metav1.ManagedFieldsOperationApply,
 		FieldsType: "FieldsV1",

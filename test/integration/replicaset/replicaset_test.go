@@ -373,7 +373,7 @@ func testScalingUsingScaleSubresource(t *testing.T, c clientset.Interface, rs *a
 	}
 
 	mf := (*newRS).ObjectMeta.GetManagedFields()
-	assertOwnership(t, mf, "this-is-the-cool-field-manager", []string{"spec", "replicas"})
+	assertCompleteOwnership(t, mf, "this-is-the-cool-field-manager", []string{"spec", "replicas"})
 }
 
 func getManagedFieldsEntry(managedFields []metav1.ManagedFieldsEntry, fieldManager string) (metav1.ManagedFieldsEntry, error) {
@@ -385,6 +385,43 @@ func getManagedFieldsEntry(managedFields []metav1.ManagedFieldsEntry, fieldManag
 	}
 
 	return metav1.ManagedFieldsEntry{}, fmt.Errorf("Managed field for manager '%s' not found in %v", fieldManager, managedFields)
+}
+
+func assertCompleteOwnership(t *testing.T, managedFields []metav1.ManagedFieldsEntry, fieldManager string, path []string) {
+	var managerSeen = false
+
+	for _, managedField := range managedFields {
+		var entryJson map[string]interface{}
+		if err := json.Unmarshal(managedField.FieldsV1.Raw, &entryJson); err != nil {
+			t.Fatalf("failed to read into json")
+		}
+
+		var ok bool
+
+		var spec map[string]interface{}
+		if spec, ok = entryJson["f:spec"].(map[string]interface{}); !ok {
+			// continue with the next managedField, as we this field does not hold the spec entry
+			continue
+		}
+
+		if _, ok = spec["f:replicas"]; !ok {
+			// continue with the next managedField, as we this field does not hold the spec.replicas entry
+			continue
+		}
+
+		fmt.Printf("found manager %s for field: %v\n", managedField.Manager, managedField)
+
+		if managerSeen {
+			t.Fatalf("not only field manager")
+		}
+
+		//found a spec.replicas entry, is the manage right?
+		if managedField.Manager != fieldManager {
+			t.Fatalf("not expected manager")
+		}
+
+		managerSeen = true
+	}
 }
 
 // temporary, to have a nicer target to run the test: `go generate -run test ./test/...`
