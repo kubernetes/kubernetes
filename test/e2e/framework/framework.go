@@ -22,11 +22,9 @@ limitations under the License.
 package framework
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"math/rand"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -864,18 +862,6 @@ func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
 	}
 
 	return err
-}
-
-// GetLogToFileFunc is a convenience function that returns a function that have the same interface as
-// e2elog.Logf, but writes to a specified file.
-func GetLogToFileFunc(file *os.File) func(format string, args ...interface{}) {
-	return func(format string, args ...interface{}) {
-		writer := bufio.NewWriter(file)
-		if _, err := fmt.Fprintf(writer, format, args...); err != nil {
-			Logf("Failed to write file %v with test performance data: %v", file.Name(), err)
-		}
-		writer.Flush()
-	}
 }
 
 const (
