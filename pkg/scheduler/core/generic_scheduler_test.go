@@ -1008,7 +1008,7 @@ func TestZeroRequest(t *testing.T) {
 				informerFactory.Apps().V1().StatefulSets().Lister(),
 			)
 
-			metaData := metaDataProducer(test.pod, snapshot)
+			metaData := metaDataProducer(test.pod, test.nodes, snapshot)
 
 			list, err := PrioritizeNodes(
 				context.Background(),

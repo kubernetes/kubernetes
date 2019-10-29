@@ -62,7 +62,7 @@ type priorityMetadata struct {
 }
 
 // PriorityMetadata is a PriorityMetadataProducer.  Node info can be nil.
-func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) interface{} {
+func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, _ []*v1.Node, sharedLister schedulerlisters.SharedLister) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil

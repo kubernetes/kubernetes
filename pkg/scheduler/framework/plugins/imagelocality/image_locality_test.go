@@ -201,7 +201,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			)
 
 			snapshot := nodeinfosnapshot.NewSnapshot(nil, test.nodes)
-			meta := metaDataProducer(test.pod, snapshot)
+			meta := metaDataProducer(test.pod, test.nodes, snapshot)
 
 			state := framework.NewCycleState()
 			state.Write(migration.PrioritiesStateKey, &migration.PrioritiesStateData{Reference: meta})

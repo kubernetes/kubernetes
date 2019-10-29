@@ -30,10 +30,11 @@ import (
 func TestEmptyPriorityMetadataProducer(t *testing.T) {
 	fakePod := st.MakePod().Name("p1").Node("node2").Obj()
 	fakeLabelSelector := labels.SelectorFromSet(labels.Set{"foo": "bar"})
+	fakeNodes := []*v1.Node{st.MakeNode().Name("node1").Obj(), st.MakeNode().Name("node-a").Obj()}
 
-	snapshot := nodeinfosnapshot.NewSnapshot([]*v1.Pod{fakePod}, []*v1.Node{st.MakeNode().Name("node1").Obj(), st.MakeNode().Name("node-a").Obj()})
+	snapshot := nodeinfosnapshot.NewSnapshot([]*v1.Pod{fakePod}, fakeNodes)
 	// Test EmptyPriorityMetadataProducer
-	metadata := EmptyPriorityMetadataProducer(fakePod, snapshot)
+	metadata := EmptyPriorityMetadataProducer(fakePod, fakeNodes, snapshot)
 	if metadata != nil {
 		t.Errorf("failed to produce empty metadata: got %v, expected nil", metadata)
 	}

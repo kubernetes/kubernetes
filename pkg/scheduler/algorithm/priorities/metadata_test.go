@@ -173,7 +173,7 @@ func TestPriorityMetadata(t *testing.T) {
 	)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			ptData := metaDataProducer(test.pod, nil)
+			ptData := metaDataProducer(test.pod, nil, nil)
 			if !reflect.DeepEqual(test.expected, ptData) {
 				t.Errorf("expected %#v, got %#v", test.expected, ptData)
 			}
