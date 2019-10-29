@@ -58,7 +58,7 @@ var (
 		# Disable cert checking for the dev cluster entry
 		kubectl config set-cluster e2e --insecure-skip-tls-verify=true
 
-		# Set custom TLS server name to use for validataion for the e2e cluster entry
+		# Set custom TLS server name to use for validation for the e2e cluster entry
 		kubectl config set-cluster e2e --tls-server-name=my-cluster-name`)
 )
 
