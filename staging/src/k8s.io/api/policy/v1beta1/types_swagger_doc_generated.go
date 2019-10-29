@@ -96,7 +96,7 @@ func (IDRange) SwaggerDoc() map[string]string {
 }
 
 var map_PodDisruptionBudget = map[string]string{
-	"":       "PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods",
+	"":       "DEPRECATED - This group version of PodDisruptionBudget is deprecated by policy/v1/PodDisruptionBudget. See the release notes for more information. PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods",
 	"spec":   "Specification of the desired behavior of the PodDisruptionBudget.",
 	"status": "Most recently observed status of the PodDisruptionBudget.",
 }

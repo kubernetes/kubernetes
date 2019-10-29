@@ -103,6 +103,8 @@ message IDRange {
   optional int64 max = 2;
 }
 
+// DEPRECATED - This group version of PodDisruptionBudget is deprecated by policy/v1/PodDisruptionBudget. See
+// the release notes for more information.
 // PodDisruptionBudget is an object to define the max disruption that can be caused to a collection of pods
 message PodDisruptionBudget {
   // +optional

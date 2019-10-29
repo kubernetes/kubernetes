@@ -50,6 +50,7 @@ filegroup(
         "//staging/src/k8s.io/client-go/listers/networking/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/node/v1alpha1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/node/v1beta1:all-srcs",
+        "//staging/src/k8s.io/client-go/listers/policy/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/policy/v1beta1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/rbac/v1:all-srcs",
         "//staging/src/k8s.io/client-go/listers/rbac/v1alpha1:all-srcs",

@@ -464,7 +464,7 @@ func Convert_policy_PodDisruptionBudgetSpec_To_v1beta1_PodDisruptionBudgetSpec(i
 func autoConvert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStatus(in *v1beta1.PodDisruptionBudgetStatus, out *policy.PodDisruptionBudgetStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.DisruptedPods = *(*map[string]v1.Time)(unsafe.Pointer(&in.DisruptedPods))
-	out.PodDisruptionsAllowed = in.PodDisruptionsAllowed
+	out.DisruptionsAllowed = in.DisruptionsAllowed
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
 	out.ExpectedPods = in.ExpectedPods
@@ -479,7 +479,7 @@ func Convert_v1beta1_PodDisruptionBudgetStatus_To_policy_PodDisruptionBudgetStat
 func autoConvert_policy_PodDisruptionBudgetStatus_To_v1beta1_PodDisruptionBudgetStatus(in *policy.PodDisruptionBudgetStatus, out *v1beta1.PodDisruptionBudgetStatus, s conversion.Scope) error {
 	out.ObservedGeneration = in.ObservedGeneration
 	out.DisruptedPods = *(*map[string]v1.Time)(unsafe.Pointer(&in.DisruptedPods))
-	out.PodDisruptionsAllowed = in.PodDisruptionsAllowed
+	out.DisruptionsAllowed = in.DisruptionsAllowed
 	out.CurrentHealthy = in.CurrentHealthy
 	out.DesiredHealthy = in.DesiredHealthy
 	out.ExpectedPods = in.ExpectedPods
