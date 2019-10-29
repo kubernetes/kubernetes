@@ -64,7 +64,7 @@ func TestInterPodAffinity(t *testing.T) {
 
 	cs := context.clientSet
 	podLabel := map[string]string{"service": "securityscan"}
-	// podLabel2 := map[string]string{"security": "S1"}
+	podLabel2 := map[string]string{"security": "S1"}
 
 	tests := []struct {
 		pod       *v1.Pod
@@ -74,7 +74,7 @@ func TestInterPodAffinity(t *testing.T) {
 		errorType string
 		test      string
 	}{
-		/*{
+		{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:   "fakename",
@@ -91,7 +91,6 @@ func TestInterPodAffinity(t *testing.T) {
 											{
 												Key:      "security",
 												Operator: metav1.LabelSelectorOpDoesNotExist,
-												Values:   []string{"securityscan"},
 											},
 										},
 									},
@@ -586,7 +585,7 @@ func TestInterPodAffinity(t *testing.T) {
 			node: nodes[0],
 			fits: false,
 			test: "satisfies the PodAffinity but doesn't satisfies the PodAntiAffinity with the existing pod",
-		},*/
+		},
 		{
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{
