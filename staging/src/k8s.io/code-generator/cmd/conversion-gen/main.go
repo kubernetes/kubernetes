@@ -43,8 +43,8 @@ limitations under the License.
 // object that will be input to an apiserver), for such an override to
 // be used by the apiserver the developer-maintained conversion
 // functions must also be registered by invoking the
-// `AddConversionFuncs` method of the relevant `Scheme` object from
-// k8s.io/apimachinery/pkg/runtime.
+// `AddConversionFunc`/`AddGeneratedConversionFunc` method of the
+// relevant `Scheme` object from k8s.io/apimachinery/pkg/runtime.
 //
 // `conversion-gen` will scan its `--input-dirs`, looking at the
 // package defined in each of those directories for comment tags that
