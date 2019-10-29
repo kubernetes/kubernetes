@@ -179,6 +179,10 @@ func (f *fakeFramework) HasFilterPlugins() bool {
 	return true
 }
 
+func (f *fakeFramework) HasScorePlugins() bool {
+	return true
+}
+
 func (f *fakeFramework) ListPlugins() map[string][]config.Plugin {
 	return nil
 }

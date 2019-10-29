@@ -635,6 +635,11 @@ func (f *framework) HasFilterPlugins() bool {
 	return len(f.filterPlugins) > 0
 }
 
+// HasScorePlugins returns true if at least one score plugin is defined.
+func (f *framework) HasScorePlugins() bool {
+	return len(f.scorePlugins) > 0
+}
+
 // ListPlugins returns a map of extension point name to plugin names configured at each extension
 // point. Returns nil if no plugins where configred.
 func (f *framework) ListPlugins() map[string][]config.Plugin {
