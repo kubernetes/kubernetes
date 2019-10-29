@@ -238,7 +238,12 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	}
 	if IsCoreDNSConfigMapMigrationRequired(corefile) {
 		if err := migrateCoreDNSCorefile(client, coreDNSConfigMap, corefile, currentInstalledCoreDNSVersion); err != nil {
-			return err
+			// Errors in Corefile Migration is verified during preflight checks. This part will be executed when a user has chosen
+			// to ignore preflight check errors.
+			klog.Warningf("the CoreDNS Configuration was not migrated: %v. The existing CoreDNS Corefile configuration has been retained.", err)
+			if err := apiclient.CreateOrRetainConfigMap(client, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
+				return err
+			}
 		}
 	} else {
 		if err := apiclient.CreateOrUpdateConfigMap(client, coreDNSConfigMap); err != nil {
