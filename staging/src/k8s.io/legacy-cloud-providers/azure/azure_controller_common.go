@@ -69,7 +69,7 @@ type controllerCommon struct {
 }
 
 // getNodeVMSet gets the VMSet interface based on config.VMType and the real virtual machine type.
-func (c *controllerCommon) getNodeVMSet(nodeName types.NodeName) (VMSet, error) {
+func (c *controllerCommon) getNodeVMSet(nodeName types.NodeName, crt cacheReadType) (VMSet, error) {
 	// 1. vmType is standard, return cloud.vmSet directly.
 	if c.cloud.VMType == vmTypeStandard {
 		return c.cloud.vmSet, nil
@@ -82,7 +82,7 @@ func (c *controllerCommon) getNodeVMSet(nodeName types.NodeName) (VMSet, error) 
 	}
 
 	// 3. If the node is managed by availability set, then return ss.availabilitySet.
-	managedByAS, err := ss.isNodeManagedByAvailabilitySet(mapNodeNameToVMName(nodeName))
+	managedByAS, err := ss.isNodeManagedByAvailabilitySet(mapNodeNameToVMName(nodeName), crt)
 	if err != nil {
 		return nil, err
 	}
@@ -124,14 +124,14 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 		}
 	}
 
-	vmset, err := c.getNodeVMSet(nodeName)
+	vmset, err := c.getNodeVMSet(nodeName, cacheReadTypeUnsafe)
 	if err != nil {
 		return -1, err
 	}
 
 	instanceid, err := c.cloud.InstanceID(context.TODO(), nodeName)
 	if err != nil {
-		klog.Warningf("failed to get azure instance id (%v)", err)
+		klog.Warningf("failed to get azure instance id (%v) for node %s", err, nodeName)
 		return -1, fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
 	}
 
@@ -162,7 +162,7 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 		return fmt.Errorf("failed to get azure instance id for node %q (%v)", nodeName, err)
 	}
 
-	vmset, err := c.getNodeVMSet(nodeName)
+	vmset, err := c.getNodeVMSet(nodeName, cacheReadTypeUnsafe)
 	if err != nil {
 		return err
 	}
@@ -197,18 +197,20 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 }
 
 // getNodeDataDisks invokes vmSet interfaces to get data disks for the node.
-func (c *controllerCommon) getNodeDataDisks(nodeName types.NodeName) ([]compute.DataDisk, error) {
-	vmset, err := c.getNodeVMSet(nodeName)
+func (c *controllerCommon) getNodeDataDisks(nodeName types.NodeName, crt cacheReadType) ([]compute.DataDisk, error) {
+	vmset, err := c.getNodeVMSet(nodeName, crt)
 	if err != nil {
 		return nil, err
 	}
 
-	return vmset.GetDataDisks(nodeName)
+	return vmset.GetDataDisks(nodeName, crt)
 }
 
 // GetDiskLun finds the lun on the host that the vhd is attached to, given a vhd's diskName and diskURI.
 func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.NodeName) (int32, error) {
-	disks, err := c.getNodeDataDisks(nodeName)
+	// getNodeDataDisks need to fetch the cached data/fresh data if cache expired here
+	// to ensure we get LUN based on latest entry.
+	disks, err := c.getNodeDataDisks(nodeName, cacheReadTypeDefault)
 	if err != nil {
 		klog.Errorf("error of getting data disks for node %q: %v", nodeName, err)
 		return -1, err
@@ -228,7 +230,7 @@ func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.N
 
 // GetNextDiskLun searches all vhd attachment on the host and find unused lun. Return -1 if all luns are used.
 func (c *controllerCommon) GetNextDiskLun(nodeName types.NodeName) (int32, error) {
-	disks, err := c.getNodeDataDisks(nodeName)
+	disks, err := c.getNodeDataDisks(nodeName, cacheReadTypeDefault)
 	if err != nil {
 		klog.Errorf("error of getting data disks for node %q: %v", nodeName, err)
 		return -1, err
@@ -255,7 +257,11 @@ func (c *controllerCommon) DisksAreAttached(diskNames []string, nodeName types.N
 		attached[diskName] = false
 	}
 
-	disks, err := c.getNodeDataDisks(nodeName)
+	// doing stalled read for getNodeDataDisks to ensure we don't call ARM
+	// for every reconcile call. The cache is invalidated after Attach/Detach
+	// disk. So the new entry will be fetched and cached the first time reconcile
+	// loop runs after the Attach/Disk OP which will reflect the latest model.
+	disks, err := c.getNodeDataDisks(nodeName, cacheReadTypeUnsafe)
 	if err != nil {
 		if err == cloudprovider.InstanceNotFound {
 			// if host doesn't exist, no need to detach
