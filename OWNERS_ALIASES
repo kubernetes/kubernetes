@@ -473,3 +473,9 @@ aliases:
     - timothysc       # Cluster Lifecycle, Scheduling
     - wojtek-t        # Scalability
     - zehicle         # Cluster Ops
+
+  # conformance aliases https://git.k8s.io/enhancements/keps/sig-architecture/20190412-conformance-behaviors.md
+  conformance-behavior-approvers:
+    - bgrant0607
+    - smarterclayton
+    - johnbelamaric
