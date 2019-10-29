@@ -17,9 +17,11 @@ limitations under the License.
 package metrics
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/blang/semver"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 
 	apimachineryversion "k8s.io/apimachinery/pkg/version"
@@ -187,6 +189,81 @@ func TestGaugeVec(t *testing.T) {
 
 			for _, mf := range ms {
 				assert.Equalf(t, 3, len(mf.GetMetric()), "Got %v metrics, wanted 3 as the count", len(mf.GetMetric()))
+			}
+		})
+	}
+}
+
+func TestGaugeFunc(t *testing.T) {
+	currentVersion := apimachineryversion.Info{
+		Major:      "1",
+		Minor:      "17",
+		GitVersion: "v1.17.0-alpha-1.12345",
+	}
+
+	var function = func() float64 {
+		return 1
+	}
+
+	var tests = []struct {
+		desc string
+		GaugeOpts
+		expectedMetrics string
+	}{
+		{
+			desc: "Test non deprecated",
+			GaugeOpts: GaugeOpts{
+				Namespace: "namespace",
+				Subsystem: "subsystem",
+				Name:      "metric_non_deprecated",
+				Help:      "gauge help",
+			},
+			expectedMetrics: `
+# HELP namespace_subsystem_metric_non_deprecated [ALPHA] gauge help
+# TYPE namespace_subsystem_metric_non_deprecated gauge
+namespace_subsystem_metric_non_deprecated 1
+			`,
+		},
+		{
+			desc: "Test deprecated",
+			GaugeOpts: GaugeOpts{
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				Name:              "metric_deprecated",
+				Help:              "gauge help",
+				DeprecatedVersion: "1.17.0",
+			},
+			expectedMetrics: `
+# HELP namespace_subsystem_metric_deprecated [ALPHA] (Deprecated since 1.17.0) gauge help
+# TYPE namespace_subsystem_metric_deprecated gauge
+namespace_subsystem_metric_deprecated 1
+`,
+		},
+		{
+			desc: "Test hidden",
+			GaugeOpts: GaugeOpts{
+				Namespace:         "namespace",
+				Subsystem:         "subsystem",
+				Name:              "metric_hidden",
+				Help:              "gauge help",
+				DeprecatedVersion: "1.16.0",
+			},
+			expectedMetrics: "",
+		},
+	}
+
+	for _, test := range tests {
+		tc := test
+		t.Run(test.desc, func(t *testing.T) {
+			registry := newKubeRegistry(currentVersion)
+			gauge := newGaugeFunc(tc.GaugeOpts, function, parseVersion(currentVersion))
+			if gauge != nil { // hidden metrics will not be initialize, register is not allowed
+				registry.RawMustRegister(gauge)
+			}
+
+			metricName := BuildFQName(tc.GaugeOpts.Namespace, tc.GaugeOpts.Subsystem, tc.GaugeOpts.Name)
+			if err := testutil.GatherAndCompare(registry, strings.NewReader(tc.expectedMetrics), metricName); err != nil {
+				t.Fatal(err)
 			}
 		})
 	}

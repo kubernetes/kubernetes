@@ -42,6 +42,17 @@ type KubeOpts struct {
 	StabilityLevel    StabilityLevel
 }
 
+// BuildFQName joins the given three name components by "_". Empty name
+// components are ignored. If the name parameter itself is empty, an empty
+// string is returned, no matter what. Metric implementations included in this
+// library use this function internally to generate the fully-qualified metric
+// name from the name component in their Opts. Users of the library will only
+// need this function if they implement their own Metric or instantiate a Desc
+// (with NewDesc) directly.
+func BuildFQName(namespace, subsystem, name string) string {
+	return prometheus.BuildFQName(namespace, subsystem, name)
+}
+
 // StabilityLevel represents the API guarantees for a given defined metric.
 type StabilityLevel string
 
