@@ -713,7 +713,7 @@ func PrioritizeNodes(
 	state *framework.CycleState) (framework.NodeScoreList, error) {
 	// If no priority configs are provided, then the EqualPriority function is applied
 	// This is required to generate the priority list in the required format
-	if len(priorityConfigs) == 0 && len(extenders) == 0 {
+	if len(priorityConfigs) == 0 && len(extenders) == 0 && !fwk.HasScorePlugins() {
 		result := make(framework.NodeScoreList, 0, len(nodes))
 		for i := range nodes {
 			hostPriority, err := EqualPriorityMap(pod, meta, nodeNameToInfo[nodes[i].Name])
