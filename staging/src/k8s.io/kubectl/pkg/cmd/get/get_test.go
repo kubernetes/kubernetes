@@ -1079,7 +1079,7 @@ func TestGetObjectsIdentifiedByFile(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
+	cmd.Flags().Set("filename", "../../../test/data/controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := `NAME   AGE
@@ -1105,7 +1105,7 @@ func TestGetTableObjectsIdentifiedByFile(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdGet("kubectl", tf, streams)
 	cmd.SetOutput(buf)
-	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
+	cmd.Flags().Set("filename", "../../../test/data/controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := `NAME   READY   STATUS   RESTARTS   AGE
@@ -2495,7 +2495,7 @@ func TestWatchResourceIdentifiedByFile(t *testing.T) {
 	cmd.SetOutput(buf)
 
 	cmd.Flags().Set("watch", "true")
-	cmd.Flags().Set("filename", "../../../../test/e2e/testing-manifests/statefulset/cassandra/controller.yaml")
+	cmd.Flags().Set("filename", "../../../test/data/controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	expected := `NAME   AGE
