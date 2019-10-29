@@ -269,7 +269,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			ginkgo.By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
 			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
-				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
+				err := waitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
 				framework.ExpectNoError(err)
 
 				ginkgo.By("verifying whether the pod from the unreachable node is recreated")
@@ -338,7 +338,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			ginkgo.By(fmt.Sprintf("blocking network traffic from node %s", node.Name))
 			framework.TestUnderTemporaryNetworkFailure(c, ns, node, func() {
 				framework.Logf("Waiting for pod %s to be removed", pods.Items[0].Name)
-				err := framework.WaitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
+				err := waitForRCPodToDisappear(c, ns, name, pods.Items[0].Name)
 				framework.ExpectEqual(err, wait.ErrWaitTimeout, "Pod was not deleted during network partition.")
 
 				ginkgo.By(fmt.Sprintf("verifying that there are %v running pods during partition", replicas))
@@ -658,3 +658,13 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 		})
 	})
 })
+
+// waitForRCPodToDisappear returns nil if the pod from the given replication controller (described by rcName) no longer exists.
+// In case of failure or too long waiting time, an error is returned.
+func waitForRCPodToDisappear(c clientset.Interface, ns, rcName, podName string) error {
+	label := labels.SelectorFromSet(labels.Set(map[string]string{"name": rcName}))
+	// NodeController evicts pod after 5 minutes, so we need timeout greater than that to observe effects.
+	// The grace period must be set to 0 on the pod for it to be deleted during the partition.
+	// Otherwise, it goes to the 'Terminating' state till the kubelet confirms deletion.
+	return e2epod.WaitForPodToDisappear(c, ns, podName, label, 20*time.Second, 10*time.Minute)
+}

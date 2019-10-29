@@ -116,6 +116,53 @@ var (
 	cronJobGroupVersionResourceBeta  = schema.GroupVersionResource{Group: "batch", Version: "v1beta1", Resource: "cronjobs"}
 )
 
+var schemaFoo = []byte(`description: Foo CRD for Testing
+type: object
+properties:
+  spec:
+    type: object
+    description: Specification of Foo
+    properties:
+      bars:
+        description: List of Bars and their specs.
+        type: array
+        items:
+          type: object
+          required:
+          - name
+          properties:
+            name:
+              description: Name of Bar.
+              type: string
+            age:
+              description: Age of Bar.
+              type: string
+            bazs:
+              description: List of Bazs.
+              items:
+                type: string
+              type: array
+  status:
+    description: Status of Foo
+    type: object
+    properties:
+      bars:
+        description: List of Bars and their statuses.
+        type: array
+        items:
+          type: object
+          properties:
+            name:
+              description: Name of Bar.
+              type: string
+            available:
+              description: Whether the Bar is installed.
+              type: boolean
+            quxType:
+              description: Indicates to external qux type.
+              pattern: in-tree|out-of-tree
+              type: string`)
+
 // Stops everything from filePath from namespace ns and checks if everything matching selectors from the given namespace is correctly stopped.
 // Aware of the kubectl example files map.
 func cleanupKubectlInputs(fileContents string, ns string, selectors ...string) {
@@ -286,7 +333,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("creating a replication controller")
 			framework.RunKubectlOrDieInput(nautilus, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
 		/*
@@ -299,15 +346,15 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("creating a replication controller")
 			framework.RunKubectlOrDieInput(nautilus, "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			ginkgo.By("scaling down the replication controller")
 			debugDiscovery()
 			framework.RunKubectlOrDie("scale", "rc", "update-demo-nautilus", "--replicas=1", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, nautilusImage, 1, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 1, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			ginkgo.By("scaling up the replication controller")
 			debugDiscovery()
 			framework.RunKubectlOrDie("scale", "rc", "update-demo-nautilus", "--replicas=2", "--timeout=5m", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 		})
 
 		/*
@@ -318,11 +365,11 @@ var _ = SIGDescribe("Kubectl client", func() {
 		framework.ConformanceIt("should do a rolling update of a replication controller ", func() {
 			ginkgo.By("creating the initial replication controller")
 			framework.RunKubectlOrDieInput(string(nautilus[:]), "create", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
+			validateController(c, nautilusImage, 2, "update-demo", updateDemoSelector, getUDData("nautilus.jpg", ns), ns)
 			ginkgo.By("rolling-update to new replication controller")
 			debugDiscovery()
 			framework.RunKubectlOrDieInput(string(kitten[:]), "rolling-update", "update-demo-nautilus", "--update-period=1s", "-f", "-", fmt.Sprintf("--namespace=%v", ns))
-			framework.ValidateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
+			validateController(c, kittenImage, 2, "update-demo", updateDemoSelector, getUDData("kitten.jpg", ns), ns)
 			// Everything will hopefully be cleaned up when the namespace is deleted.
 		})
 	})
@@ -1565,7 +1612,7 @@ metadata:
 
 			debugDiscovery()
 			runKubectlRetryOrDie("rolling-update", rcName, "--update-period=1s", "--image="+httpdImage, "--image-pull-policy="+string(v1.PullIfNotPresent), nsFlag)
-			framework.ValidateController(c, httpdImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
+			validateController(c, httpdImage, 1, rcName, "run="+rcName, noOpValidatorFn, ns)
 		})
 	})
 
@@ -2367,49 +2414,71 @@ func createApplyCustomResource(resource, namespace, name string, crd *crd.TestCr
 	return nil
 }
 
-var schemaFoo = []byte(`description: Foo CRD for Testing
-type: object
-properties:
-  spec:
-    type: object
-    description: Specification of Foo
-    properties:
-      bars:
-        description: List of Bars and their specs.
-        type: array
-        items:
-          type: object
-          required:
-          - name
-          properties:
-            name:
-              description: Name of Bar.
-              type: string
-            age:
-              description: Age of Bar.
-              type: string
-            bazs:
-              description: List of Bazs.
-              items:
-                type: string
-              type: array
-  status:
-    description: Status of Foo
-    type: object
-    properties:
-      bars:
-        description: List of Bars and their statuses.
-        type: array
-        items:
-          type: object
-          properties:
-            name:
-              description: Name of Bar.
-              type: string
-            available:
-              description: Whether the Bar is installed.
-              type: boolean
-            quxType:
-              description: Indicates to external qux type.
-              pattern: in-tree|out-of-tree
-              type: string`)
+// trimDockerRegistry is the function for trimming the docker.io/library from the beginning of the imagename.
+// If community docker installed it will not prefix the registry names with the dockerimages vs registry names prefixed with other runtimes or docker installed via RHEL extra repo.
+// So this function will help to trim the docker.io/library if exists
+func trimDockerRegistry(imagename string) string {
+	imagename = strings.Replace(imagename, "docker.io/", "", 1)
+	return strings.Replace(imagename, "library/", "", 1)
+}
+
+// validatorFn is the function which is individual tests will implement.
+// we may want it to return more than just an error, at some point.
+type validatorFn func(c clientset.Interface, podID string) error
+
+// validateController is a generic mechanism for testing RC's that are running.
+// It takes a container name, a test name, and a validator function which is plugged in by a specific test.
+// "containername": this is grepped for.
+// "containerImage" : this is the name of the image we expect to be launched.  Not to confuse w/ images (kitten.jpg)  which are validated.
+// "testname":  which gets bubbled up to the logging/failure messages if errors happen.
+// "validator" function: This function is given a podID and a client, and it can do some specific validations that way.
+func validateController(c clientset.Interface, containerImage string, replicas int, containername string, testname string, validator validatorFn, ns string) {
+	containerImage = trimDockerRegistry(containerImage)
+	getPodsTemplate := "--template={{range.items}}{{.metadata.name}} {{end}}"
+
+	getContainerStateTemplate := fmt.Sprintf(`--template={{if (exists . "status" "containerStatuses")}}{{range .status.containerStatuses}}{{if (and (eq .name "%s") (exists . "state" "running"))}}true{{end}}{{end}}{{end}}`, containername)
+
+	getImageTemplate := fmt.Sprintf(`--template={{if (exists . "spec" "containers")}}{{range .spec.containers}}{{if eq .name "%s"}}{{.image}}{{end}}{{end}}{{end}}`, containername)
+
+	ginkgo.By(fmt.Sprintf("waiting for all containers in %s pods to come up.", testname)) //testname should be selector
+waitLoop:
+	for start := time.Now(); time.Since(start) < framework.PodStartTimeout; time.Sleep(5 * time.Second) {
+		getPodsOutput := framework.RunKubectlOrDie("get", "pods", "-o", "template", getPodsTemplate, "-l", testname, fmt.Sprintf("--namespace=%v", ns))
+		pods := strings.Fields(getPodsOutput)
+		if numPods := len(pods); numPods != replicas {
+			ginkgo.By(fmt.Sprintf("Replicas for %s: expected=%d actual=%d", testname, replicas, numPods))
+			continue
+		}
+		var runningPods []string
+		for _, podID := range pods {
+			running := framework.RunKubectlOrDie("get", "pods", podID, "-o", "template", getContainerStateTemplate, fmt.Sprintf("--namespace=%v", ns))
+			if running != "true" {
+				framework.Logf("%s is created but not running", podID)
+				continue waitLoop
+			}
+
+			currentImage := framework.RunKubectlOrDie("get", "pods", podID, "-o", "template", getImageTemplate, fmt.Sprintf("--namespace=%v", ns))
+			currentImage = trimDockerRegistry(currentImage)
+			if currentImage != containerImage {
+				framework.Logf("%s is created but running wrong image; expected: %s, actual: %s", podID, containerImage, currentImage)
+				continue waitLoop
+			}
+
+			// Call the generic validator function here.
+			// This might validate for example, that (1) getting a url works and (2) url is serving correct content.
+			if err := validator(c, podID); err != nil {
+				framework.Logf("%s is running right image but validator function failed: %v", podID, err)
+				continue waitLoop
+			}
+
+			framework.Logf("%s is verified up and running", podID)
+			runningPods = append(runningPods, podID)
+		}
+		// If we reach here, then all our checks passed.
+		if len(runningPods) == replicas {
+			return
+		}
+	}
+	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
+	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", framework.PodStartTimeout.Seconds(), testname)
+}
