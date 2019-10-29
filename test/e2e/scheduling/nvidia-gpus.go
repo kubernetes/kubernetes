@@ -32,6 +32,7 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
+	"k8s.io/kubernetes/test/e2e/scheduling/gatherer"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -121,7 +122,7 @@ func getGPUsAvailable(f *framework.Framework) int64 {
 }
 
 // SetupNVIDIAGPUNode install Nvidia Drivers and wait for Nvidia GPUs to be available on nodes
-func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *framework.ContainerResourceGatherer {
+func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *gatherer.ContainerResourceGatherer {
 	logOSImages(f)
 
 	dsYamlURLFromEnv := os.Getenv("NVIDIA_DRIVER_INSTALLER_DAEMONSET")
@@ -150,10 +151,10 @@ func SetupNVIDIAGPUNode(f *framework.Framework, setupResourceGatherer bool) *fra
 		pods.Items = append(pods.Items, devicepluginPods.Items...)
 	}
 
-	var rsgather *framework.ContainerResourceGatherer
+	var rsgather *gatherer.ContainerResourceGatherer
 	if setupResourceGatherer {
 		framework.Logf("Starting ResourceUsageGather for the created DaemonSet pods.")
-		rsgather, err = framework.NewResourceUsageGatherer(f.ClientSet, framework.ResourceGathererOptions{InKubemark: false, Nodes: framework.AllNodes, ResourceDataGatheringPeriod: 2 * time.Second, ProbeDuration: 2 * time.Second, PrintVerboseLogs: true}, pods)
+		rsgather, err = gatherer.NewResourceUsageGatherer(f.ClientSet, gatherer.ResourceGathererOptions{InKubemark: false, Nodes: gatherer.AllNodes, ResourceDataGatheringPeriod: 2 * time.Second, ProbeDuration: 2 * time.Second, PrintVerboseLogs: true}, pods)
 		framework.ExpectNoError(err, "creating ResourceUsageGather for the daemonset pods")
 		go rsgather.StartGatheringData()
 	}
@@ -194,7 +195,7 @@ func testNvidiaGPUs(f *framework.Framework) {
 	}
 
 	framework.Logf("Stopping ResourceUsageGather")
-	constraints := make(map[string]framework.ResourceConstraint)
+	constraints := make(map[string]gatherer.ResourceConstraint)
 	// For now, just gets summary. Can pass valid constraints in the future.
 	summary, err := rsgather.StopAndSummarize([]int{50, 90, 100}, constraints)
 	f.TestSummaries = append(f.TestSummaries, summary)
