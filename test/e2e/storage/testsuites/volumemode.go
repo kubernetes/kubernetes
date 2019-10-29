@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/errors"
-	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	volevents "k8s.io/kubernetes/pkg/controller/volume/events"
 	"k8s.io/kubernetes/pkg/kubelet/events"
@@ -479,23 +478,4 @@ func listPodDirectory(h utils.HostExec, path string, node *v1.Node) ([]string, e
 		return nil, fmt.Errorf("error checking directory %s on node %s: %s", path, node.Name, err)
 	}
 	return strings.Split(out, "\n"), nil
-}
-
-// NOTE(avalluri): The below code is intentionally copied from e2e/common package.
-// Testsuites depending on common package is not desirable as that pulls quite
-// many tests which are not interested by storage suites.
-func eventOccurred(c clientset.Interface, namespace, eventSelector, msg string) wait.ConditionFunc {
-	options := metav1.ListOptions{FieldSelector: eventSelector}
-	return func() (bool, error) {
-		events, err := c.CoreV1().Events(namespace).List(options)
-		if err != nil {
-			return false, fmt.Errorf("got error while getting events: %v", err)
-		}
-		for _, event := range events.Items {
-			if strings.Contains(event.Message, msg) {
-				return true, nil
-			}
-		}
-		return false, nil
-	}
 }
