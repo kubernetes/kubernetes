@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package autoscaling
 
 import (
 	"context"
@@ -67,8 +67,11 @@ var (
 )
 
 var (
-	KindRC         = schema.GroupVersionKind{Version: "v1", Kind: "ReplicationController"}
+	// KindRC is the GVK for ReplicationController
+	KindRC = schema.GroupVersionKind{Version: "v1", Kind: "ReplicationController"}
+	// KindDeployment is the GVK for Deployment
 	KindDeployment = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "Deployment"}
+	// KindReplicaSet is the GVK for ReplicaSet
 	KindReplicaSet = schema.GroupVersionKind{Group: "apps", Version: "v1beta2", Kind: "ReplicaSet"}
 )
 
@@ -105,17 +108,20 @@ func GetResourceConsumerImage() string {
 	return resourceConsumerImage
 }
 
+// NewDynamicResourceConsumer is a wrapper to create a new dynamic ResourceConsumer
 func NewDynamicResourceConsumer(name, nsName string, kind schema.GroupVersionKind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter) *ResourceConsumer {
 	return newResourceConsumer(name, nsName, kind, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, dynamicConsumptionTimeInSeconds,
 		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, cpuLimit, memLimit, clientset, scaleClient, nil, nil)
 }
 
+// NewStaticResourceConsumer is a wrapper to create a new static ResourceConsumer
 // TODO this still defaults to replication controller
 func NewStaticResourceConsumer(name, nsName string, replicas, initCPUTotal, initMemoryTotal, initCustomMetric int, cpuLimit, memLimit int64, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter) *ResourceConsumer {
 	return newResourceConsumer(name, nsName, KindRC, replicas, initCPUTotal, initMemoryTotal, initCustomMetric, staticConsumptionTimeInSeconds,
 		initCPUTotal/replicas, initMemoryTotal/replicas, initCustomMetric/replicas, cpuLimit, memLimit, clientset, scaleClient, nil, nil)
 }
 
+// NewMetricExporter is a wrapper to create a new ResourceConsumer for metrics exporter
 func NewMetricExporter(name, nsName string, podAnnotations, serviceAnnotations map[string]string, metricValue int, clientset clientset.Interface, scaleClient scaleclient.ScalesGetter) *ResourceConsumer {
 	return newResourceConsumer(name, nsName, KindDeployment, 1, 0, 0, metricValue, dynamicConsumptionTimeInSeconds,
 		dynamicRequestSizeInMillicores, dynamicRequestSizeInMegabytes, dynamicRequestSizeCustomMetric, 100, 100, clientset, scaleClient, podAnnotations, serviceAnnotations)
@@ -328,6 +334,7 @@ func (rc *ResourceConsumer) sendConsumeCustomMetric(delta int) {
 	framework.ExpectNoError(err)
 }
 
+// GetReplicas get the replicas
 func (rc *ResourceConsumer) GetReplicas() int {
 	switch rc.kind {
 	case KindRC:
@@ -357,6 +364,7 @@ func (rc *ResourceConsumer) GetReplicas() int {
 	return 0
 }
 
+// GetReplicas get the corresponding horizontalPodAutoscaler object
 func (rc *ResourceConsumer) GetHpa(name string) (*autoscalingv1.HorizontalPodAutoscaler, error) {
 	return rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Get(name, metav1.GetOptions{})
 }
@@ -371,10 +379,12 @@ func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int, duration time.D
 	framework.ExpectNoErrorWithOffset(1, err, "timeout waiting %v for %d replicas", duration, desiredReplicas)
 }
 
+// EnsureDesiredReplicas ensure the replicas to desired number
 func (rc *ResourceConsumer) EnsureDesiredReplicas(desiredReplicas int, duration time.Duration, hpaName string) {
 	rc.EnsureDesiredReplicasInRange(desiredReplicas, desiredReplicas, duration, hpaName)
 }
 
+// EnsureDesiredReplicasInRange ensure the replicas is in a desired range
 func (rc *ResourceConsumer) EnsureDesiredReplicasInRange(minDesiredReplicas, maxDesiredReplicas int, duration time.Duration, hpaName string) {
 	interval := 10 * time.Second
 	err := wait.PollImmediate(interval, duration, func() (bool, error) {
@@ -411,7 +421,7 @@ func (rc *ResourceConsumer) Pause() {
 	rc.stopWaitGroup.Wait()
 }
 
-// Pause starts background goroutines responsible for consuming resources.
+// Resume starts background goroutines responsible for consuming resources.
 func (rc *ResourceConsumer) Resume() {
 	ginkgo.By(fmt.Sprintf("HPA resuming RC %s", rc.name))
 	go rc.makeConsumeCPURequests()
@@ -419,6 +429,7 @@ func (rc *ResourceConsumer) Resume() {
 	go rc.makeConsumeCustomMetric()
 }
 
+// CleanUp clean up the background goroutines responsible for consuming resources.
 func (rc *ResourceConsumer) CleanUp() {
 	ginkgo.By(fmt.Sprintf("Removing consuming RC %s", rc.name))
 	close(rc.stopCPU)
@@ -526,6 +537,8 @@ func runServiceAndWorkloadForResourceConsumer(c clientset.Interface, ns, name st
 		c, ns, controllerName, 1, startServiceInterval, startServiceTimeout))
 }
 
+// CreateCPUHorizontalPodAutoscaler create a horizontalPodAutoscaler with CPU target
+// for consuming resources.
 func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, maxRepl int32) *autoscalingv1.HorizontalPodAutoscaler {
 	hpa := &autoscalingv1.HorizontalPodAutoscaler{
 		ObjectMeta: metav1.ObjectMeta{
@@ -548,6 +561,7 @@ func CreateCPUHorizontalPodAutoscaler(rc *ResourceConsumer, cpu, minReplicas, ma
 	return hpa
 }
 
+// DeleteHorizontalPodAutoscaler delete the horizontalPodAutoscaler for consuming resources.
 func DeleteHorizontalPodAutoscaler(rc *ResourceConsumer, autoscalerName string) {
 	rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Delete(autoscalerName, nil)
 }
