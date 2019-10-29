@@ -23,6 +23,7 @@ import (
 	"golang.org/x/sys/windows/registry"
 )
 
+//OSInfo is a convenience class for retrieving Windows OS information
 type OSInfo struct {
 	BuildNumber, ProductName        string
 	MajorVersion, MinorVersion, UBR uint64
@@ -70,10 +71,12 @@ func GetOSInfo() (*OSInfo, error) {
 	}, nil
 }
 
+//GetPatchVersion returns full OS version with patch
 func (o *OSInfo) GetPatchVersion() string {
 	return fmt.Sprintf("%d.%d.%s.%d", o.MajorVersion, o.MinorVersion, o.BuildNumber, o.UBR)
 }
 
+//GetBuild returns OS version upto build number
 func (o *OSInfo) GetBuild() string {
 	return fmt.Sprintf("%d.%d.%s", o.MajorVersion, o.MinorVersion, o.BuildNumber)
 }
