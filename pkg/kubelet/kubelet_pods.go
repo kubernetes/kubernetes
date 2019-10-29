@@ -1546,11 +1546,21 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 				continue
 			}
 		}
+
+		status := statuses[container.Name]
+		expectedHash := kubecontainer.HashContainer(&container)
+		containerStatus := podStatus.FindContainerStatusByName(container.Name)
+		if containerStatus != nil && containerStatus.Hash != expectedHash {
+			status.LastTerminationState = status.State
+			status.State = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"}}
+			statuses[container.Name] = status
+		}
+
 		// If a container should be restarted in next syncpod, it is *Waiting*.
 		if !kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 			continue
 		}
-		status := statuses[container.Name]
+
 		reason, ok := kl.reasonCache.Get(pod.UID, container.Name)
 		if !ok {
 			// In fact, we could also apply Waiting state here, but it is less informative,
