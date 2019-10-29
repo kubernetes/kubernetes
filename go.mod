@@ -78,7 +78,6 @@ require (
 	github.com/json-iterator/go v1.1.7
 	github.com/karrick/godirwalk v1.7.5 // indirect
 	github.com/libopenstorage/openstorage v1.0.0
-	github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de
 	github.com/lithammer/dedent v1.1.0
 	github.com/lpabon/godbc v0.1.1 // indirect
 	github.com/magiconair/properties v1.8.1 // indirect
@@ -123,7 +122,6 @@ require (
 	github.com/vishvananda/netlink v0.0.0-20171020171820-b2de5d10e38e
 	github.com/vishvananda/netns v0.0.0-20171111001504-be1fbeda1936 // indirect
 	github.com/vmware/govmomi v0.20.1
-	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
@@ -170,7 +168,6 @@ require (
 	k8s.io/utils v0.0.0-20191010214722-8d271d903fe4
 	sigs.k8s.io/kustomize v2.0.3+incompatible
 	sigs.k8s.io/yaml v1.1.0
-	vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
 )
 
 replace (
