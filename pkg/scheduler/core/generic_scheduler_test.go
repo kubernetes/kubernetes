@@ -47,6 +47,7 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -83,7 +84,7 @@ func hasNoPodsPredicate(pod *v1.Pod, meta algorithmpredicates.PredicateMetadata,
 	return false, []algorithmpredicates.PredicateFailureReason{algorithmpredicates.ErrFakePredicate}, nil
 }
 
-func numericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (framework.NodeScoreList, error) {
+func numericPriority(pod *v1.Pod, sharedLister schedulerlisters.SharedLister, nodes []*v1.Node) (framework.NodeScoreList, error) {
 	result := []framework.NodeScore{}
 	for _, node := range nodes {
 		score, err := strconv.Atoi(node.Name)
@@ -98,11 +99,11 @@ func numericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.N
 	return result, nil
 }
 
-func reverseNumericPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (framework.NodeScoreList, error) {
+func reverseNumericPriority(pod *v1.Pod, sharedLister schedulerlisters.SharedLister, nodes []*v1.Node) (framework.NodeScoreList, error) {
 	var maxScore float64
 	minScore := math.MaxFloat64
 	reverseResult := []framework.NodeScore{}
-	result, err := numericPriority(pod, nodeNameToInfo, nodes)
+	result, err := numericPriority(pod, sharedLister, nodes)
 	if err != nil {
 		return nil, err
 	}
@@ -132,7 +133,7 @@ func falseMapPriority(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo
 	return framework.NodeScore{}, errPrioritize
 }
 
-func getNodeReducePriority(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result framework.NodeScoreList) error {
+func getNodeReducePriority(pod *v1.Pod, meta interface{}, sharedLister schedulerlisters.SharedLister, result framework.NodeScoreList) error {
 	for _, host := range result {
 		if host.Name == "" {
 			return fmt.Errorf("unexpected empty host name")
@@ -998,7 +999,7 @@ func TestZeroRequest(t *testing.T) {
 			pc := priorities.PriorityConfig{Map: selectorSpreadPriorityMap, Reduce: selectorSpreadPriorityReduce, Weight: 1}
 			priorityConfigs = append(priorityConfigs, pc)
 
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
 
 			metaDataProducer := priorities.NewPriorityMetadataFactory(
 				informerFactory.Core().V1().Services().Lister(),
@@ -1007,11 +1008,11 @@ func TestZeroRequest(t *testing.T) {
 				informerFactory.Apps().V1().StatefulSets().Lister(),
 			)
 
-			metaData := metaDataProducer(test.pod, nodeNameToInfo)
+			metaData := metaDataProducer(test.pod, snapshot)
 
 			list, err := PrioritizeNodes(
 				context.Background(),
-				test.pod, nodeNameToInfo, metaData, priorityConfigs,
+				test.pod, snapshot, metaData, priorityConfigs,
 				test.nodes, []algorithm.SchedulerExtender{}, emptyFramework, framework.NewCycleState())
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -1646,21 +1647,22 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			g := &genericScheduler{
-				framework:             emptyFramework,
-				predicates:            test.predicates,
-				predicateMetaProducer: algorithmpredicates.GetPredicateMetadata,
-			}
-			assignDefaultStartTime(test.pods)
-			g.nodeInfoSnapshot = g.framework.NodeInfoSnapshot()
-
 			nodes := []*v1.Node{}
 			for _, n := range test.nodes {
 				nodes = append(nodes, makeNode(n, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5))
 			}
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
+			fwk, _ := framework.NewFramework(EmptyPluginRegistry, nil, []schedulerconfig.PluginConfig{}, framework.WithNodeInfoSnapshot(snapshot))
+
+			g := &genericScheduler{
+				framework:             fwk,
+				predicates:            test.predicates,
+				predicateMetaProducer: algorithmpredicates.GetPredicateMetadata,
+				nodeInfoSnapshot:      snapshot,
+			}
+			assignDefaultStartTime(test.pods)
+
 			state := framework.NewCycleState()
-			g.nodeInfoSnapshot.NodeInfoMap = nodeNameToInfo
 			candidateNodes, _ := g.selectNodesForPreemption(context.Background(), state, test.pod, nodes, nil)
 			node := pickOneNodeForPreemption(candidateNodes)
 			found := false

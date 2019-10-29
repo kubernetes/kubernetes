@@ -238,8 +238,8 @@ func (g *genericScheduler) Schedule(ctx context.Context, state *framework.CycleS
 		}, nil
 	}
 
-	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.nodeInfoSnapshot.NodeInfoMap)
-	priorityList, err := PrioritizeNodes(ctx, pod, g.nodeInfoSnapshot.NodeInfoMap, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders, g.framework, state)
+	metaPrioritiesInterface := g.priorityMetaProducer(pod, g.nodeInfoSnapshot)
+	priorityList, err := PrioritizeNodes(ctx, pod, g.nodeInfoSnapshot, metaPrioritiesInterface, g.prioritizers, filteredNodes, g.extenders, g.framework, state)
 	if err != nil {
 		return result, err
 	}
@@ -704,7 +704,7 @@ func (g *genericScheduler) podFitsOnNode(
 func PrioritizeNodes(
 	ctx context.Context,
 	pod *v1.Pod,
-	nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo,
+	snapshot *nodeinfosnapshot.Snapshot,
 	meta interface{},
 	priorityConfigs []priorities.PriorityConfig,
 	nodes []*v1.Node,
@@ -716,7 +716,7 @@ func PrioritizeNodes(
 	if len(priorityConfigs) == 0 && len(extenders) == 0 && !fwk.HasScorePlugins() {
 		result := make(framework.NodeScoreList, 0, len(nodes))
 		for i := range nodes {
-			hostPriority, err := EqualPriorityMap(pod, meta, nodeNameToInfo[nodes[i].Name])
+			hostPriority, err := EqualPriorityMap(pod, meta, snapshot.NodeInfoMap[nodes[i].Name])
 			if err != nil {
 				return nil, err
 			}
@@ -750,7 +750,7 @@ func PrioritizeNodes(
 					wg.Done()
 				}()
 				var err error
-				results[index], err = priorityConfigs[index].Function(pod, nodeNameToInfo, nodes)
+				results[index], err = priorityConfigs[index].Function(pod, snapshot, nodes)
 				if err != nil {
 					appendError(err)
 				}
@@ -761,7 +761,7 @@ func PrioritizeNodes(
 	}
 
 	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), func(index int) {
-		nodeInfo := nodeNameToInfo[nodes[index].Name]
+		nodeInfo := snapshot.NodeInfoMap[nodes[index].Name]
 		for i := range priorityConfigs {
 			if priorityConfigs[i].Function != nil {
 				continue
@@ -787,7 +787,7 @@ func PrioritizeNodes(
 				metrics.SchedulerGoroutines.WithLabelValues("prioritizing_mapreduce").Dec()
 				wg.Done()
 			}()
-			if err := priorityConfigs[index].Reduce(pod, meta, nodeNameToInfo, results[index]); err != nil {
+			if err := priorityConfigs[index].Reduce(pod, meta, snapshot, results[index]); err != nil {
 				appendError(err)
 			}
 			if klog.V(10) {
@@ -825,7 +825,7 @@ func PrioritizeNodes(
 	}
 
 	if len(extenders) != 0 && nodes != nil {
-		combinedScores := make(map[string]int64, len(nodeNameToInfo))
+		combinedScores := make(map[string]int64, len(snapshot.NodeInfoList))
 		for i := range extenders {
 			if !extenders[i].IsInterested(pod) {
 				continue

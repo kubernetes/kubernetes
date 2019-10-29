@@ -22,6 +22,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -61,10 +62,16 @@ type priorityMetadata struct {
 }
 
 // PriorityMetadata is a PriorityMetadataProducer.  Node info can be nil.
-func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo) interface{} {
+func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
+	}
+	totalNumNodes := 0
+	if sharedLister != nil {
+		if l, err := sharedLister.NodeInfos().List(); err == nil {
+			totalNumNodes = len(l)
+		}
 	}
 	return &priorityMetadata{
 		podLimits:               getResourceLimits(pod),
@@ -73,7 +80,7 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, nodeNameToInfo
 		podSelectors:            getSelectors(pod, pmf.serviceLister, pmf.controllerLister, pmf.replicaSetLister, pmf.statefulSetLister),
 		controllerRef:           metav1.GetControllerOf(pod),
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
-		totalNumNodes:           len(nodeNameToInfo),
+		totalNumNodes:           totalNumNodes,
 	}
 }
 

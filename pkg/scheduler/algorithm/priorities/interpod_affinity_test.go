@@ -516,10 +516,9 @@ func TestInterPodAffinityPriority(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
 			interPodAffinity := InterPodAffinity{
-				nodeInfoLister:        snapshot.NodeInfos(),
 				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			}
-			list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, snapshot.NodeInfoMap, test.nodes)
+			list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -604,10 +603,9 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
 			ipa := InterPodAffinity{
-				nodeInfoLister:        snapshot.NodeInfos(),
 				hardPodAffinityWeight: test.hardPodAffinityWeight,
 			}
-			list, err := ipa.CalculateInterPodAffinityPriority(test.pod, snapshot.NodeInfoMap, test.nodes)
+			list, err := ipa.CalculateInterPodAffinityPriority(test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -661,12 +659,11 @@ func BenchmarkInterPodAffinityPriority(b *testing.B) {
 			existingPods, allNodes := tt.prepFunc(tt.existingPodsNum, tt.allNodesNum)
 			snapshot := nodeinfosnapshot.NewSnapshot(existingPods, allNodes)
 			interPodAffinity := InterPodAffinity{
-				nodeInfoLister:        snapshot.NodeInfos(),
 				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				interPodAffinity.CalculateInterPodAffinityPriority(tt.pod, snapshot.NodeInfoMap, allNodes)
+				interPodAffinity.CalculateInterPodAffinityPriority(tt.pod, snapshot, allNodes)
 			}
 		})
 	}

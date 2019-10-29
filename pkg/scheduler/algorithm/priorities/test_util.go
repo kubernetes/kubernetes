@@ -23,7 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 )
 
 func makeNode(node string, milliCPU, memory int64) *v1.Node {
@@ -59,17 +59,21 @@ func makeNodeWithExtendedResource(node string, milliCPU, memory int64, extendedR
 }
 
 func priorityFunction(mapFn PriorityMapFunction, reduceFn PriorityReduceFunction, metaData interface{}) PriorityFunction {
-	return func(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (framework.NodeScoreList, error) {
+	return func(pod *v1.Pod, sharedLister schedulerlisters.SharedLister, nodes []*v1.Node) (framework.NodeScoreList, error) {
 		result := make(framework.NodeScoreList, 0, len(nodes))
 		for i := range nodes {
-			hostResult, err := mapFn(pod, metaData, nodeNameToInfo[nodes[i].Name])
+			nodeInfo, err := sharedLister.NodeInfos().Get(nodes[i].Name)
+			if err != nil {
+				return nil, err
+			}
+			hostResult, err := mapFn(pod, metaData, nodeInfo)
 			if err != nil {
 				return nil, err
 			}
 			result = append(result, hostResult)
 		}
 		if reduceFn != nil {
-			if err := reduceFn(pod, metaData, nodeNameToInfo, result); err != nil {
+			if err := reduceFn(pod, metaData, sharedLister, result); err != nil {
 				return nil, err
 			}
 		}

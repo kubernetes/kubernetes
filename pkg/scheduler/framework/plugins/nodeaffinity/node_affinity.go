@@ -66,7 +66,7 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 // NormalizeScore invoked after scoring all nodes.
 func (pl *NodeAffinity) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
 	// Note that CalculateNodeAffinityPriorityReduce doesn't use priority metadata, hence passing nil here.
-	err := priorities.CalculateNodeAffinityPriorityReduce(pod, nil, pl.handle.NodeInfoSnapshot().NodeInfoMap, scores)
+	err := priorities.CalculateNodeAffinityPriorityReduce(pod, nil, pl.handle.SnapshotSharedLister(), scores)
 	return migration.ErrorToFrameworkStatus(err)
 }
 

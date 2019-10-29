@@ -66,7 +66,7 @@ func (pl *TaintToleration) Score(ctx context.Context, state *framework.CycleStat
 // NormalizeScore invoked after scoring all nodes.
 func (pl *TaintToleration) NormalizeScore(ctx context.Context, _ *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
 	// Note that ComputeTaintTolerationPriorityReduce doesn't use priority metadata, hence passing nil here.
-	err := priorities.ComputeTaintTolerationPriorityReduce(pod, nil, pl.handle.NodeInfoSnapshot().NodeInfoMap, scores)
+	err := priorities.ComputeTaintTolerationPriorityReduce(pod, nil, pl.handle.SnapshotSharedLister(), scores)
 	return migration.ErrorToFrameworkStatus(err)
 }
 
