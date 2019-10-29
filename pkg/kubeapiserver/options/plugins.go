@@ -55,8 +55,6 @@ import (
 	"k8s.io/apiserver/pkg/admission/plugin/namespace/lifecycle"
 	mutatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/mutating"
 	validatingwebhook "k8s.io/apiserver/pkg/admission/plugin/webhook/validating"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // AllOrderedPlugins is the list of all the plugins in order.
@@ -143,11 +141,8 @@ func DefaultOffAdmissionPlugins() sets.String {
 		storageobjectinuseprotection.PluginName, //StorageObjectInUseProtection
 		podpriority.PluginName,                  //PodPriority
 		nodetaint.PluginName,                    //TaintNodesByCondition
+		runtimeclass.PluginName,                 //RuntimeClass, gates internally on the feature
 	)
-
-	if utilfeature.DefaultFeatureGate.Enabled(features.RuntimeClass) {
-		defaultOnPlugins.Insert(runtimeclass.PluginName) //RuntimeClass
-	}
 
 	return sets.NewString(AllOrderedPlugins...).Difference(defaultOnPlugins)
 }
