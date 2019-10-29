@@ -461,6 +461,10 @@ func (config *DirectClientConfig) getCluster() (clientcmdapi.Cluster, error) {
 		mergedClusterInfo.CertificateAuthorityData = config.overrides.ClusterInfo.CertificateAuthorityData
 	}
 
+	if config.overrides.ClusterInfo.TLSServerName != "" {
+		mergedClusterInfo.TLSServerName = config.overrides.ClusterInfo.TLSServerName
+	}
+
 	return *mergedClusterInfo, nil
 }
 
