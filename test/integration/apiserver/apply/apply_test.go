@@ -514,6 +514,115 @@ func TestApplyManagedFields(t *testing.T) {
 	}
 }
 
+func TestApplyOnScale(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	obj := []byte(`{
+		"apiVersion": "apps/v1",
+		"kind": "Deployment",
+		"metadata": {
+			"name": "deployment",
+		},
+		"spec": {
+			"replicas": 1,
+			"selector": {
+				"matchLabels": {
+					 "app": "nginx"
+				}
+			},
+			"template": {
+				"metadata": {
+					"labels": {
+						"app": "nginx"
+					}
+				},
+				"spec": {
+					"containers": [{
+						"name":  "nginx",
+						"image": "nginx:latest"
+					}]
+				}
+			}
+		}
+	}`)
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		AbsPath("/apis/apps/v1").
+		Namespace("default").
+		Resource("deployments").
+		Name("deployment").
+		Param("fieldManager", "apply_test").
+		Body(obj).Do().Get()
+
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	var scaleReplicas int32 = 5
+	// var scaleManager = "TODO"
+
+	scale, err := client.AppsV1().Deployments("default").GetScale("deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to get scale: %v", err)
+	}
+	scale.Spec.Replicas = scaleReplicas
+	_, err = client.AppsV1().Deployments("default").UpdateScale("deployment", scale)
+	if err != nil {
+		t.Fatalf("Failed to scale deployment: %v", err)
+	}
+
+	deployment, err := client.AppsV1().Deployments("default").Get("deployment", metav1.GetOptions{})
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	if *deployment.Spec.Replicas != scaleReplicas {
+		t.Fatalf("Expected to scale replicas to %v, but got object: \n%#v", scaleReplicas, deployment)
+	}
+
+	assertCompleteOwnership(t, (*deployment).GetManagedFields(), "apply_test", []string{"f:spec", "f:replicas"})
+}
+
+func assertCompleteOwnership(t *testing.T, managedFields []metav1.ManagedFieldsEntry, fieldManager string, path []string) {
+	var managerSeen = false
+
+	for _, managedField := range managedFields {
+		var entryJson map[string]interface{}
+		if err := json.Unmarshal(managedField.FieldsV1.Raw, &entryJson); err != nil {
+			t.Fatalf("failed to read into json")
+		}
+
+		var ok bool
+
+		var spec map[string]interface{}
+		if spec, ok = entryJson["f:spec"].(map[string]interface{}); !ok {
+			// continue with the next managedField, as we this field does not hold the spec entry
+			continue
+		}
+
+		if _, ok = spec["f:replicas"]; !ok {
+			// continue with the next managedField, as we this field does not hold the spec.replicas entry
+			continue
+		}
+
+		// fmt.Printf("found manager %s for field: %v\n", managedField.Manager, managedField)
+
+		if managerSeen {
+			t.Fatalf("not only field manager")
+		}
+
+		// found a spec.replicas entry, is the manage right?
+		if managedField.Manager != fieldManager {
+			t.Fatalf("not expected manager")
+		}
+
+		managerSeen = true
+	}
+}
+
 // TestApplyRemovesEmptyManagedFields there are no empty managers in managedFields
 func TestApplyRemovesEmptyManagedFields(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
