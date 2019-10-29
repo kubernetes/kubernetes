@@ -89,10 +89,9 @@ type RuntimeOperationErrorRate struct {
 
 // ProxyRequest performs a get on a node proxy endpoint given the nodename and rest client.
 func ProxyRequest(c clientset.Interface, node, endpoint string, port int) (restclient.Result, error) {
-	// proxy tends to hang in some cases when Node is not ready. Add an artificial timeout for this call.
-	// This will leak a goroutine if proxy hangs. #22165
+	// proxy tends to hang in some cases when Node is not ready. Add an artificial timeout for this call. #22165
 	var result restclient.Result
-	finished := make(chan struct{})
+	finished := make(chan struct{}, 1)
 	go func() {
 		result = c.CoreV1().RESTClient().Get().
 			Resource("nodes").
