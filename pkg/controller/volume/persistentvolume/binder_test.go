@@ -19,7 +19,7 @@ package persistentvolume
 import (
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -609,9 +609,9 @@ func TestSyncBlockVolumeDisabled(t *testing.T) {
 			// syncVolume binds a requested block claim to a block volume
 			"14-1 - binding to volumeMode block",
 			withVolumeVolumeMode(&modeBlock, newVolumeArray("volume14-1", "10Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty)),
-			withVolumeVolumeMode(&modeBlock, newVolumeArray("volume14-1", "10Gi", "uid14-1", "claim14-1", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, annBoundByController)),
+			withVolumeVolumeMode(&modeBlock, newVolumeArray("volume14-1", "10Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty)),
 			withClaimVolumeMode(&modeBlock, newClaimArray("claim14-1", "uid14-1", "10Gi", "", v1.ClaimPending, nil)),
-			withClaimVolumeMode(&modeBlock, newClaimArray("claim14-1", "uid14-1", "10Gi", "volume14-1", v1.ClaimBound, nil, annBoundByController, annBindCompleted)),
+			withClaimVolumeMode(&modeBlock, newClaimArray("claim14-1", "uid14-1", "10Gi", "", v1.ClaimPending, nil)),
 			noevents, noerrors, testSyncClaim,
 		},
 		{
@@ -645,9 +645,9 @@ func TestSyncBlockVolumeDisabled(t *testing.T) {
 			// syncVolume binds a requested filesystem claim to an unspecified volumeMode for volume
 			"14-5 - binding different volumeModes should be ignored",
 			withVolumeVolumeMode(&modeBlock, newVolumeArray("volume14-5", "10Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty)),
-			withVolumeVolumeMode(&modeBlock, newVolumeArray("volume14-5", "10Gi", "uid14-5", "claim14-5", v1.VolumeBound, v1.PersistentVolumeReclaimRetain, classEmpty, annBoundByController)),
+			withVolumeVolumeMode(&modeBlock, newVolumeArray("volume14-5", "10Gi", "", "", v1.VolumeAvailable, v1.PersistentVolumeReclaimRetain, classEmpty)),
 			withClaimVolumeMode(&modeFile, newClaimArray("claim14-5", "uid14-5", "10Gi", "", v1.ClaimPending, nil)),
-			withClaimVolumeMode(&modeFile, newClaimArray("claim14-5", "uid14-5", "10Gi", "volume14-5", v1.ClaimBound, nil, annBoundByController, annBindCompleted)),
+			withClaimVolumeMode(&modeFile, newClaimArray("claim14-5", "uid14-5", "10Gi", "", v1.ClaimPending, nil)),
 			noevents, noerrors, testSyncClaim,
 		},
 	}

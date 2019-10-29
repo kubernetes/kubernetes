@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -276,11 +276,7 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 		return fmt.Errorf("storageClassName does not match")
 	}
 
-	isMismatch, err := checkVolumeModeMismatches(&claim.Spec, &volume.Spec)
-	if err != nil {
-		return fmt.Errorf("error checking volumeMode: %v", err)
-	}
-	if isMismatch {
+	if checkVolumeModeMismatches(&claim.Spec, &volume.Spec) {
 		return fmt.Errorf("incompatible volumeMode")
 	}
 
@@ -610,7 +606,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 			}
 			return nil
 		} else if claim.Spec.VolumeName == "" {
-			if isMismatch, err := checkVolumeModeMismatches(&claim.Spec, &volume.Spec); err != nil || isMismatch {
+			if checkVolumeModeMismatches(&claim.Spec, &volume.Spec) {
 				// Binding for the volume won't be called in syncUnboundClaim,
 				// because findBestMatchForClaim won't return the volume due to volumeMode mismatch.
 				volumeMsg := fmt.Sprintf("Cannot bind PersistentVolume to requested PersistentVolumeClaim %q due to incompatible volumeMode.", claim.Name)
