@@ -44,13 +44,6 @@ func makeNUMADevice(id string, numa int) pluginapi.Device {
 	}
 }
 
-func topologyHintLessThan(a topologymanager.TopologyHint, b topologymanager.TopologyHint) bool {
-	if a.Preferred != b.Preferred {
-		return a.Preferred == true
-	}
-	return a.NUMANodeAffinity.IsNarrowerThan(b.NUMANodeAffinity)
-}
-
 func makeSocketMask(sockets ...int) bitmask.BitMask {
 	mask, _ := bitmask.NewBitMask(sockets...)
 	return mask
@@ -292,10 +285,10 @@ func TestGetTopologyHints(t *testing.T) {
 
 		for r := range tc.expectedHints {
 			sort.SliceStable(hints[r], func(i, j int) bool {
-				return topologyHintLessThan(hints[r][i], hints[r][j])
+				return hints[r][i].LessThan(hints[r][j])
 			})
 			sort.SliceStable(tc.expectedHints[r], func(i, j int) bool {
-				return topologyHintLessThan(tc.expectedHints[r][i], tc.expectedHints[r][j])
+				return tc.expectedHints[r][i].LessThan(tc.expectedHints[r][j])
 			})
 			if !reflect.DeepEqual(hints[r], tc.expectedHints[r]) {
 				t.Errorf("%v: Expected result to be %v, got %v", tc.description, tc.expectedHints[r], hints[r])

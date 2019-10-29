@@ -18,6 +18,8 @@ package topologymanager
 
 import (
 	"testing"
+
+	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
 func TestPolicyNoneName(t *testing.T) {
@@ -38,63 +40,46 @@ func TestPolicyNoneName(t *testing.T) {
 	}
 }
 
-func TestPolicyNoneCanAdmitPodResult(t *testing.T) {
-	tcases := []struct {
-		name     string
-		hint     TopologyHint
-		expected bool
-	}{
-		{
-			name:     "Preferred is set to false in topology hints",
-			hint:     TopologyHint{nil, false},
-			expected: true,
-		},
-		{
-			name:     "Preferred is set to true in topology hints",
-			hint:     TopologyHint{nil, true},
-			expected: true,
-		},
-	}
-
-	for _, tc := range tcases {
-		policy := NewNonePolicy()
-		result := policy.CanAdmitPodResult(&tc.hint)
-
-		if result.Admit != tc.expected {
-			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
-		}
-	}
-}
-
 func TestPolicyNoneMerge(t *testing.T) {
-	numaNodes := []int{0, 1}
-
 	tcases := []struct {
 		name           string
 		providersHints []map[string][]TopologyHint
-		expected       TopologyHint
+		expectedHint   TopologyHint
+		expectedAdmit  lifecycle.PodAdmitResult
 	}{
 		{
 			name:           "merged empty providers hints",
 			providersHints: []map[string][]TopologyHint{},
-			expected:       TopologyHint{},
+			expectedHint:   TopologyHint{},
+			expectedAdmit:  lifecycle.PodAdmitResult{Admit: true},
 		},
 		{
-			name: "merge with a single provider with a single resource",
+			name: "merge with a single provider with a single preferred resource",
 			providersHints: []map[string][]TopologyHint{
 				{
 					"resource": {{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: true}},
 				},
 			},
-			expected: TopologyHint{},
+			expectedHint:  TopologyHint{},
+			expectedAdmit: lifecycle.PodAdmitResult{Admit: true},
+		},
+		{
+			name: "merge with a single provider with a single non-preferred resource",
+			providersHints: []map[string][]TopologyHint{
+				{
+					"resource": {{NUMANodeAffinity: NewTestBitMask(0, 1), Preferred: false}},
+				},
+			},
+			expectedHint:  TopologyHint{},
+			expectedAdmit: lifecycle.PodAdmitResult{Admit: true},
 		},
 	}
 
 	for _, tc := range tcases {
 		policy := NewNonePolicy()
-		result := policy.Merge(tc.providersHints, numaNodes)
-		if !result.IsEqual(tc.expected) {
-			t.Errorf("Test Case: %s: Expected merge hint to be %v, got %v", tc.name, tc.expected.String(), result.String())
+		result, admit := policy.Merge(tc.providersHints)
+		if !result.IsEqual(tc.expectedHint) || admit.Admit != tc.expectedAdmit.Admit {
+			t.Errorf("Test Case: %s: Expected merge hint to be %v, got %v", tc.name, tc.expectedHint, result)
 		}
 	}
 }

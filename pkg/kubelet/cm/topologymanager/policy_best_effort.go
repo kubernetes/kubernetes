@@ -22,7 +22,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-type bestEffortPolicy struct{}
+type bestEffortPolicy struct {
+	//List of NUMA Nodes available on the underlying machine
+	numaNodes []int
+}
 
 var _ Policy = &bestEffortPolicy{}
 
@@ -30,15 +33,15 @@ var _ Policy = &bestEffortPolicy{}
 const PolicyBestEffort string = "best-effort"
 
 // NewBestEffortPolicy returns best-effort policy.
-func NewBestEffortPolicy() Policy {
-	return &bestEffortPolicy{}
+func NewBestEffortPolicy(numaNodes []int) Policy {
+	return &bestEffortPolicy{numaNodes: numaNodes}
 }
 
 func (p *bestEffortPolicy) Name() string {
 	return PolicyBestEffort
 }
 
-func (p *bestEffortPolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
+func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
 	return lifecycle.PodAdmitResult{
 		Admit: true,
 	}
@@ -85,7 +88,7 @@ func (p *bestEffortPolicy) iterateAllProviderTopologyHints(allProviderHints [][]
 // Merge a TopologyHints permutation to a single hint by performing a bitwise-AND
 // of their affinity masks. The hint shall be preferred if all hits in the permutation
 // are preferred.
-func (p *bestEffortPolicy) mergePermutation(permutation []TopologyHint, numaNodes []int) TopologyHint {
+func (p *bestEffortPolicy) mergePermutation(permutation []TopologyHint) TopologyHint {
 	// Get the NUMANodeAffinity from each hint in the permutation and see if any
 	// of them encode unpreferred allocations.
 	preferred := true
@@ -101,17 +104,17 @@ func (p *bestEffortPolicy) mergePermutation(permutation []TopologyHint, numaNode
 	}
 
 	// Merge the affinities using a bitwise-and operation.
-	mergedAffinity, _ := bitmask.NewBitMask(numaNodes...)
+	mergedAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
 	mergedAffinity.And(numaAffinities...)
 	// Build a mergedHint from the merged affinity mask, indicating if an
 	// preferred allocation was used to generate the affinity mask or not.
 	return TopologyHint{mergedAffinity, preferred}
 }
 
-func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint, numaNodes []int) TopologyHint {
+func (p *bestEffortPolicy) merge(providersHints []map[string][]TopologyHint) TopologyHint {
 	// Set the default affinity as an any-numa affinity containing the list
 	// of NUMA Nodes available on this machine.
-	defaultAffinity, _ := bitmask.NewBitMask(numaNodes...)
+	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
 
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider. If no hints are provided, assume
@@ -150,8 +153,7 @@ func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint, num
 	// found that has at least one NUMA ID set, return the 'defaultAffinity'.
 	bestHint := TopologyHint{defaultAffinity, false}
 	p.iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
-
-		mergedHint := p.mergePermutation(permutation, numaNodes)
+		mergedHint := p.mergePermutation(permutation)
 		// Only consider mergedHints that result in a NUMANodeAffinity > 0 to
 		// replace the current bestHint.
 		if mergedHint.NUMANodeAffinity.Count() == 0 {
@@ -183,4 +185,10 @@ func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint, num
 		bestHint = mergedHint
 	})
 	return bestHint
+}
+
+func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
+	hint := p.merge(providersHints)
+	admit := p.canAdmitPodResult(&hint)
+	return hint, admit
 }

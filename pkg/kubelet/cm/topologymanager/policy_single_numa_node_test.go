@@ -44,10 +44,11 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 		},
 	}
 
+	numaNodes := []int{0, 1}
 	for _, tc := range tcases {
-		policy := NewSingleNumaNodePolicy()
+		policy := NewSingleNumaNodePolicy(numaNodes)
 		hint := tc.hint
-		result := policy.CanAdmitPodResult(&hint)
+		result := policy.(*singleNumaNodePolicy).canAdmitPodResult(&hint)
 
 		if result.Admit != tc.expected {
 			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
@@ -164,8 +165,9 @@ func TestPolicySingleNumaNodeFilterHints(t *testing.T) {
 		},
 	}
 
+	numaNodes := []int{0, 1, 2, 3}
 	for _, tc := range tcases {
-		policy := NewSingleNumaNodePolicy()
+		policy := NewSingleNumaNodePolicy(numaNodes)
 		actual := policy.(*singleNumaNodePolicy).filterHints(tc.allResources)
 		if !reflect.DeepEqual(tc.expectedResources, actual) {
 			t.Errorf("Test Case: %s", tc.name)
@@ -315,8 +317,9 @@ func TestPolicySingleNumaNodeGetHintMatch(t *testing.T) {
 		},
 	}
 
+	numaNodes := []int{0, 1, 2, 3, 4, 5}
 	for _, tc := range tcases {
-		policy := NewSingleNumaNodePolicy()
+		policy := NewSingleNumaNodePolicy(numaNodes)
 		found, match := policy.(*singleNumaNodePolicy).getHintMatch(tc.resources)
 		if found != tc.expectedFound {
 			t.Errorf("Test Case: %s", tc.name)
@@ -730,11 +733,11 @@ func TestPolicySingleNumaNodeMerge(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		policy := NewSingleNumaNodePolicy()
-		actual := policy.Merge(tc.providersHints, numaNodes)
+		policy := NewSingleNumaNodePolicy(numaNodes)
+		actual := policy.(*singleNumaNodePolicy).merge(tc.providersHints)
 		if !actual.IsEqual(tc.expected) {
 			t.Errorf("Test Case: %s", tc.name)
-			t.Errorf("Expected result to be %v, got %v", tc.expected.String(), actual.String())
+			t.Errorf("Expected result to be %v, got %v", tc.expected, actual)
 		}
 	}
 }

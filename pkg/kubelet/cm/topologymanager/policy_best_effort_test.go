@@ -31,7 +31,7 @@ func TestPolicyBestEffortName(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		policy := NewBestEffortPolicy()
+		policy := NewBestEffortPolicy([]int{})
 		if policy.Name() != tc.expected {
 			t.Errorf("Expected Policy Name to be %s, got %s", tc.expected, policy.Name())
 		}
@@ -57,9 +57,8 @@ func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		policy := NewBestEffortPolicy()
-		result := policy.CanAdmitPodResult(&tc.hint)
-
+		policy := NewBestEffortPolicy([]int{})
+		result := policy.(*bestEffortPolicy).canAdmitPodResult(&tc.hint)
 		if result.Admit != tc.expected {
 			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
 		}
@@ -67,12 +66,11 @@ func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 }
 
 func TestPolicyBestEffortMerge(t *testing.T) {
-	testOptimalMerge(t, NewBestEffortPolicy())
+	numaNodes := []int{0, 1}
+	testOptimalMerge(t, NewBestEffortPolicy(numaNodes), numaNodes)
 }
 
-func testOptimalMerge(t *testing.T, policy Policy) {
-	numaNodes := []int{0, 1}
-
+func testOptimalMerge(t *testing.T, policy Policy, numaNodes []int) {
 	tcases := []struct {
 		name           string
 		providersHints []map[string][]TopologyHint
@@ -464,9 +462,17 @@ func testOptimalMerge(t *testing.T, policy Policy) {
 	}
 
 	for _, tc := range tcases {
-		result := policy.Merge(tc.providersHints, numaNodes)
+		var result TopologyHint
+		if policy.Name() == "best-effort" {
+			result = policy.(*bestEffortPolicy).merge(tc.providersHints)
+		} else if policy.Name() == "restricted" {
+			result = policy.(*restrictedPolicy).merge(tc.providersHints)
+		} else {
+			// We should not get here.
+			t.Errorf("Unknown policy.")
+		}
 		if !result.IsEqual(tc.expected) {
-			t.Errorf("Test Case: %s: Expected merge hint to be %v, got %v", tc.name, tc.expected.String(), result.String())
+			t.Errorf("Test Case: %s: Expected merge hint to be %v, got %v", tc.name, tc.expected, result)
 		}
 	}
 }

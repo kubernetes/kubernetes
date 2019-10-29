@@ -23,7 +23,10 @@ import (
 	"sort"
 )
 
-type singleNumaNodePolicy struct{}
+type singleNumaNodePolicy struct {
+	//List of NUMA Nodes available on the underlying machine
+	numaNodes []int
+}
 
 var _ Policy = &singleNumaNodePolicy{}
 
@@ -31,16 +34,16 @@ var _ Policy = &singleNumaNodePolicy{}
 const PolicySingleNumaNode string = "single-numa-node"
 
 // NewSingleNumaNodePolicy returns single-numa-node policy.
-func NewSingleNumaNodePolicy() Policy {
-	return &singleNumaNodePolicy{}
+func NewSingleNumaNodePolicy(numaNodes []int) Policy {
+	return &singleNumaNodePolicy{numaNodes: numaNodes}
 }
 
 func (p *singleNumaNodePolicy) Name() string {
 	return PolicySingleNumaNode
 }
 
-func (p *singleNumaNodePolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
-	if !hint.Preferred || hint.NUMANodeAffinity.Count() > 1 {
+func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
+	if !hint.Preferred || hint.NUMANodeAffinity.Count() != 1 {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
 			Reason:  "Topology Affinity Error",
@@ -116,11 +119,11 @@ func (p *singleNumaNodePolicy) filterHints(allResourcesHints [][]TopologyHint) [
 	return filteredResourcesHints
 }
 
-func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint, numaNodes []int) TopologyHint {
+func (p *singleNumaNodePolicy) merge(providersHints []map[string][]TopologyHint) TopologyHint {
 	// Set the default hint to return from this function as an any-socket
 	// affinity with an unpreferred allocation. This will only be returned if
 	// no better hint can be found when merging hints from each hint provider.
-	defaultAffinity, _ := bitmask.NewBitMask(numaNodes...)
+	defaultAffinity, _ := bitmask.NewBitMask(p.numaNodes...)
 	defaultHint := TopologyHint{defaultAffinity, false}
 
 	// Loop through all provider hints and save an accumulated list of the
@@ -181,4 +184,10 @@ func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint,
 	}
 	klog.Infof("[topologymanager] Strict Policy no match: %v", defaultHint)
 	return defaultHint
+}
+
+func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
+	hint := p.merge(providersHints)
+	admit := p.canAdmitPodResult(&hint)
+	return hint, admit
 }

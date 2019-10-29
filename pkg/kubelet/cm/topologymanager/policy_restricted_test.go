@@ -31,7 +31,7 @@ func TestPolicyRestrictedName(t *testing.T) {
 		},
 	}
 	for _, tc := range tcases {
-		policy := NewRestrictedPolicy()
+		policy := NewRestrictedPolicy([]int{0, 1})
 		if policy.Name() != tc.expected {
 			t.Errorf("Expected Policy Name to be %s, got %s", tc.expected, policy.Name())
 		}
@@ -57,8 +57,8 @@ func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		policy := NewRestrictedPolicy()
-		result := policy.CanAdmitPodResult(&tc.hint)
+		policy := NewRestrictedPolicy([]int{0, 1})
+		result := policy.(*restrictedPolicy).canAdmitPodResult(&tc.hint)
 
 		if result.Admit != tc.expected {
 			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
@@ -76,5 +76,6 @@ func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 }
 
 func TestPolicyRestrictedMerge(t *testing.T) {
-	testOptimalMerge(t, NewRestrictedPolicy())
+	numaNodes := []int{0, 1}
+	testOptimalMerge(t, NewRestrictedPolicy(numaNodes), numaNodes)
 }

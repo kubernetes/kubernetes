@@ -63,8 +63,6 @@ type manager struct {
 	podMap map[string]string
 	//Topology Manager Policy
 	policy Policy
-	//List of NUMA Nodes available on the underlying machine
-	numaNodes []int
 }
 
 // HintProvider is an interface for components that want to collaborate to
@@ -105,13 +103,14 @@ func (th *TopologyHint) IsEqual(topologyHint TopologyHint) bool {
 	return false
 }
 
-// String converts TopologyHint to string
-func (th *TopologyHint) String() string {
-	nodeAffinity := "nil"
-	if th.NUMANodeAffinity != nil {
-		nodeAffinity = th.NUMANodeAffinity.String()
+// LessThan checks if TopologyHint `a` is less than TopologyHint `b`
+// this means that either `a` is a preferred hint and `b` is not
+// or `a` NUMANodeAffinity attribute is narrower than `b` NUMANodeAffinity attribute.
+func (th *TopologyHint) LessThan(other TopologyHint) bool {
+	if th.Preferred != other.Preferred {
+		return th.Preferred == true
 	}
-	return fmt.Sprintf("(Preferred=%t, NUMANodeAffinity=%s)", th.Preferred, nodeAffinity)
+	return th.NUMANodeAffinity.IsNarrowerThan(other.NUMANodeAffinity)
 }
 
 var _ Manager = &manager{}
@@ -119,6 +118,14 @@ var _ Manager = &manager{}
 //NewManager creates a new TopologyManager based on provided policy
 func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string) (Manager, error) {
 	klog.Infof("[topologymanager] Creating topology manager with %s policy", topologyPolicyName)
+	var numaNodes []int
+	for node := range numaNodeInfo {
+		numaNodes = append(numaNodes, node)
+	}
+
+	if len(numaNodes) > maxAllowableNUMANodes {
+		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
+	}
 	var policy Policy
 
 	switch topologyPolicyName {
@@ -127,25 +134,16 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 		policy = NewNonePolicy()
 
 	case PolicyBestEffort:
-		policy = NewBestEffortPolicy()
+		policy = NewBestEffortPolicy(numaNodes)
 
 	case PolicyRestricted:
-		policy = NewRestrictedPolicy()
+		policy = NewRestrictedPolicy(numaNodes)
 
 	case PolicySingleNumaNode:
-		policy = NewSingleNumaNodePolicy()
+		policy = NewSingleNumaNodePolicy(numaNodes)
 
 	default:
 		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
-	}
-
-	var numaNodes []int
-	for node := range numaNodeInfo {
-		numaNodes = append(numaNodes, node)
-	}
-
-	if len(numaNodes) > maxAllowableNUMANodes {
-		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
 	}
 
 	var hp []HintProvider
@@ -156,7 +154,6 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 		podTopologyHints: pth,
 		podMap:           pm,
 		policy:           policy,
-		numaNodes:        numaNodes,
 	}
 
 	return manager, nil
@@ -179,11 +176,11 @@ func (m *manager) getTopologyHints(pod v1.Pod, container v1.Container) (provider
 }
 
 // Collect Hints from hint providers and pass to policy to retrieve the best one.
-func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) TopologyHint {
+func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) (TopologyHint, lifecycle.PodAdmitResult) {
 	providersHints := m.getTopologyHints(pod, container)
-	bestHint := m.policy.Merge(providersHints, m.numaNodes)
+	bestHint, admit := m.policy.Merge(providersHints)
 	klog.Infof("[topologymanager] ContainerTopologyHint: %v", bestHint)
-	return bestHint
+	return bestHint, admit
 }
 
 func (m *manager) AddHintProvider(h HintProvider) {
@@ -215,8 +212,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	c := make(map[string]TopologyHint)
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		result := m.calculateAffinity(*pod, container)
-		admitPod := m.policy.CanAdmitPodResult(&result)
+		result, admitPod := m.calculateAffinity(*pod, container)
 		if !admitPod.Admit {
 			return admitPod
 		}
