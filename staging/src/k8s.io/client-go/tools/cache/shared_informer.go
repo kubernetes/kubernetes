@@ -148,6 +148,11 @@ type SharedInformer interface {
 	// store. The value returned is not synchronized with access to the underlying store and is not
 	// thread-safe.
 	LastSyncResourceVersion() string
+	// RemoveEventHandler removes an event handler from the shared informer
+	// It returns true if removal is successful
+	RemoveEventHandler(handler ResourceEventHandler) bool
+	// EventHandlerCount returns the number of event handlers currently registered with the shared informer
+	EventHandlerCount() int
 }
 
 // SharedIndexInformer provides add and get Indexers ability based on SharedInformer.
@@ -395,6 +400,31 @@ func determineResyncPeriod(desired, check time.Duration) time.Duration {
 
 const minimumResyncPeriod = 1 * time.Second
 
+// RemoveEventHandler removes an event handler from the shared informer
+// It returns true if removal is successful
+func (s *sharedIndexInformer) RemoveEventHandler(handler ResourceEventHandler) bool {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.stopped {
+		klog.V(2).Infof("Handler %v was not removed from shared informer because it has stopped already", handler)
+		return false
+	}
+	return s.processor.removeListener(handler)
+}
+
+// EventHandlerCount returns the number of event handlers currently registered with the shared informer
+func (s *sharedIndexInformer) EventHandlerCount() int {
+	s.startedLock.Lock()
+	defer s.startedLock.Unlock()
+
+	if s.stopped {
+		klog.V(2).Infof("shared informer because it has stopped already")
+		return 0
+	}
+	return len(s.processor.listeners)
+}
+
 func (s *sharedIndexInformer) AddEventHandlerWithResyncPeriod(handler ResourceEventHandler, resyncPeriod time.Duration) {
 	s.startedLock.Lock()
 	defer s.startedLock.Unlock()
@@ -483,6 +513,25 @@ type sharedProcessor struct {
 	syncingListeners []*processorListener
 	clock            clock.Clock
 	wg               wait.Group
+}
+
+// removeListener returns true if the listener is removed. false otherwise
+func (p *sharedProcessor) removeListener(handler ResourceEventHandler) bool {
+	p.listenersLock.Lock()
+	defer p.listenersLock.Unlock()
+	index := -1
+	for i := range p.listeners {
+		if p.listeners[i].handler == handler {
+			index = i
+			break;
+		}
+	}
+	if index >= 0 {
+		p.listeners = append(p.listeners[:index], p.listeners[index+1:]...)
+		p.syncingListeners = append(p.syncingListeners[:index], p.syncingListeners[index+1:]...)
+		return true
+	}
+	return false
 }
 
 func (p *sharedProcessor) addListener(listener *processorListener) {

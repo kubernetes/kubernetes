@@ -99,6 +99,8 @@ type QuotaMonitor struct {
 
 	// maintains list of evaluators
 	registry quota.Registry
+	// maintains map of resource to handlers
+	handlersMap map[schema.GroupVersionResource]cache.ResourceEventHandlerFuncs
 }
 
 func NewQuotaMonitor(informersStarted <-chan struct{}, informerFactory controller.InformerFactory, ignoredResources map[schema.GroupResource]struct{}, resyncPeriod controller.ResyncPeriodFunc, replenishmentFunc ReplenishmentFunc, registry quota.Registry) *QuotaMonitor {
@@ -110,6 +112,7 @@ func NewQuotaMonitor(informersStarted <-chan struct{}, informerFactory controlle
 		resyncPeriod:      resyncPeriod,
 		replenishmentFunc: replenishmentFunc,
 		registry:          registry,
+		handlersMap:       make(map[schema.GroupVersionResource]cache.ResourceEventHandlerFuncs),
 	}
 }
 
@@ -175,6 +178,10 @@ func (qm *QuotaMonitor) controllerFor(resource schema.GroupVersionResource) (cac
 	if err == nil {
 		klog.V(4).Infof("QuotaMonitor using a shared informer for resource %q", resource.String())
 		shared.Informer().AddEventHandlerWithResyncPeriod(handlers, qm.resyncPeriod())
+		if qm.handlersMap == nil {
+			qm.handlersMap = make(map[schema.GroupVersionResource]cache.ResourceEventHandlerFuncs)
+		}
+		qm.handlersMap[resource] = handlers
 		return shared.Informer().GetController(), nil
 	}
 	klog.V(4).Infof("QuotaMonitor unable to use a shared informer for resource %q: %v", resource.String(), err)
@@ -234,9 +241,13 @@ func (qm *QuotaMonitor) SyncMonitors(resources map[schema.GroupVersionResource]s
 	}
 	qm.monitors = current
 
-	for _, monitor := range toRemove {
+	for resource, monitor := range toRemove {
 		if monitor.stopCh != nil {
 			close(monitor.stopCh)
+		}
+		shared, err := qm.informerFactory.ForResource(resource)
+		if err == nil {
+			shared.Informer().RemoveEventHandler(qm.handlersMap[resource])
 		}
 	}
 

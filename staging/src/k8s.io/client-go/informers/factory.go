@@ -61,6 +61,8 @@ type sharedInformerFactory struct {
 	customResync     map[reflect.Type]time.Duration
 
 	informers map[reflect.Type]cache.SharedIndexInformer
+	// sidelined informers
+	sidelinedInformers  map[reflect.Type]cache.SharedIndexInformer
 	// startedInformers is used for tracking which informers have been started.
 	// This allows Start() to be called multiple times safely.
 	startedInformers map[reflect.Type]bool
@@ -108,12 +110,13 @@ func NewFilteredSharedInformerFactory(client kubernetes.Interface, defaultResync
 // NewSharedInformerFactoryWithOptions constructs a new instance of a SharedInformerFactory with additional options.
 func NewSharedInformerFactoryWithOptions(client kubernetes.Interface, defaultResync time.Duration, options ...SharedInformerOption) SharedInformerFactory {
 	factory := &sharedInformerFactory{
-		client:           client,
-		namespace:        v1.NamespaceAll,
-		defaultResync:    defaultResync,
-		informers:        make(map[reflect.Type]cache.SharedIndexInformer),
-		startedInformers: make(map[reflect.Type]bool),
-		customResync:     make(map[reflect.Type]time.Duration),
+		client:             client,
+		namespace:          v1.NamespaceAll,
+		defaultResync:      defaultResync,
+		informers:          make(map[reflect.Type]cache.SharedIndexInformer),
+		startedInformers:   make(map[reflect.Type]bool),
+		sidelinedInformers: make(map[reflect.Type]cache.SharedIndexInformer),
+		customResync:       make(map[reflect.Type]time.Duration),
 	}
 
 	// Apply all options
@@ -153,6 +156,16 @@ func (f *sharedInformerFactory) WaitForCacheSync(stopCh <-chan struct{}) map[ref
 	}()
 
 	res := map[reflect.Type]bool{}
+	toSideline := make(map[reflect.Type]cache.SharedIndexInformer)
+	for informType, informer := range informers {
+		if informer.EventHandlerCount() == 0 {
+			toSideline[informType] = informer
+		}
+	}
+	for informType, informer := range toSideline {
+		delete(f.informers, informType)
+		f.sidelinedInformers[informType] = informer
+	}
 	for informType, informer := range informers {
 		res[informType] = cache.WaitForCacheSync(stopCh, informer.HasSynced)
 	}
