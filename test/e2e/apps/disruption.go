@@ -25,6 +25,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/api/core/v1"
+	policyv1 "k8s.io/api/policy/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -67,7 +68,7 @@ var _ = SIGDescribe("DisruptionController", func() {
 		// Since disruptionAllowed starts out 0, if we see it ever become positive,
 		// that means the controller is working.
 		err := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-			pdb, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
+			pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -227,45 +228,45 @@ var _ = SIGDescribe("DisruptionController", func() {
 })
 
 func createPDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable intstr.IntOrString) {
-	pdb := policyv1beta1.PodDisruptionBudget{
+	pdb := policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
 		},
-		Spec: policyv1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector:     &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			MinAvailable: &minAvailable,
 		},
 	}
-	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
+	_, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(&pdb)
 	framework.ExpectNoError(err, "Waiting for the pdb to be created with minAvailable %d in namespace %s", minAvailable.IntVal, ns)
 	waitForPdbToBeProcessed(cs, ns)
 }
 
 func createPDBMaxUnavailableOrDie(cs kubernetes.Interface, ns string, maxUnavailable intstr.IntOrString) {
-	pdb := policyv1beta1.PodDisruptionBudget{
+	pdb := policyv1.PodDisruptionBudget{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "foo",
 			Namespace: ns,
 		},
-		Spec: policyv1beta1.PodDisruptionBudgetSpec{
+		Spec: policyv1.PodDisruptionBudgetSpec{
 			Selector:       &metav1.LabelSelector{MatchLabels: map[string]string{"foo": "bar"}},
 			MaxUnavailable: &maxUnavailable,
 		},
 	}
-	_, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Create(&pdb)
+	_, err := cs.PolicyV1().PodDisruptionBudgets(ns).Create(&pdb)
 	framework.ExpectNoError(err, "Waiting for the pdb to be created with maxUnavailable %d in namespace %s", maxUnavailable.IntVal, ns)
 	waitForPdbToBeProcessed(cs, ns)
 }
 
 func updatePDBMinAvailableOrDie(cs kubernetes.Interface, ns string, minAvailable intstr.IntOrString) {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		old, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
+		old, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 		old.Spec.MinAvailable = &minAvailable
-		if _, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Update(old); err != nil {
+		if _, err := cs.PolicyV1().PodDisruptionBudgets(ns).Update(old); err != nil {
 			return err
 		}
 		return nil
@@ -387,7 +388,7 @@ func locateRunningPod(cs kubernetes.Interface, ns string) (pod *v1.Pod, err erro
 func waitForPdbToBeProcessed(cs kubernetes.Interface, ns string) {
 	ginkgo.By("Waiting for the pdb to be processed")
 	err := wait.PollImmediate(framework.Poll, schedulingTimeout, func() (bool, error) {
-		pdb, err := cs.PolicyV1beta1().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
+		pdb, err := cs.PolicyV1().PodDisruptionBudgets(ns).Get("foo", metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
