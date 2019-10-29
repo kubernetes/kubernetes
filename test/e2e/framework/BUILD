@@ -74,7 +74,6 @@ go_library(
         "//staging/src/k8s.io/client-go/tools/remotecommand:go_default_library",
         "//staging/src/k8s.io/client-go/tools/watch:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
-        "//staging/src/k8s.io/component-base/version:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
         "//test/e2e/framework/ginkgowrapper:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
@@ -82,7 +81,6 @@ go_library(
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/resource:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
-        "//test/e2e/manifest:go_default_library",
         "//test/e2e/system:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",
@@ -94,7 +92,6 @@ go_library(
         "//vendor/golang.org/x/net/websocket:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
-        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 
