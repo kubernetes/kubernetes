@@ -123,11 +123,12 @@ func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimea
 
 	r.Called = append(r.Called, "PullImage")
 
-	if r.SandBoxes == nil {
-		r.SandBoxes = make(map[string]string, 0)
+	if podSandboxConfig != nil {
+		if r.SandBoxes == nil {
+			r.SandBoxes = make(map[string]string, 0)
+		}
+		r.SandBoxes[path.Join(podSandboxConfig.Metadata.Namespace, podSandboxConfig.Metadata.Name)] = podSandboxConfig.RuntimeHandler
 	}
-
-	r.SandBoxes[path.Join(podSandboxConfig.Metadata.Namespace, podSandboxConfig.Metadata.Name)] = podSandboxConfig.RuntimeHandler
 	r.pulledImages = append(r.pulledImages, &pulledImage{imageSpec: image, authConfig: auth})
 	// ImageID should be randomized for real container runtime, but here just use
 	// image's name for easily making fake images.
