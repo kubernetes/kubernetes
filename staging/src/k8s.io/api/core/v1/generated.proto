@@ -1344,6 +1344,8 @@ message EphemeralContainers {
   // or modified.
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated EphemeralContainer ephemeralContainers = 2;
 }
 
@@ -3299,6 +3301,8 @@ message PodSpec {
   // +optional
   // +patchMergeKey=name
   // +patchStrategy=merge
+  // +listType=map
+  // +listMapKey=name
   repeated EphemeralContainer ephemeralContainers = 34;
 
   // Restart policy for all containers within the pod.
@@ -3604,6 +3608,7 @@ message PodStatus {
   // Status for any ephemeral containers that have run in this pod.
   // This field is alpha-level and is only populated by servers that enable the EphemeralContainers feature.
   // +optional
+  // +listType=atomic
   repeated ContainerStatus ephemeralContainerStatuses = 13;
 }
 
