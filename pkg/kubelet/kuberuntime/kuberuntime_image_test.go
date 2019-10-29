@@ -91,7 +91,7 @@ func TestPullImageRuntimeHandler(t *testing.T) {
 
 				assert.Equal(t, "busybox", imageRef)
 
-				m := fakeImageService.ListSandBoxes()
+				m := fakeImageService.ListSandboxes()
 				assert.Equal(t, test.expectedHandler, m[path.Join(test.podNs, test.podName)])
 			}
 		})

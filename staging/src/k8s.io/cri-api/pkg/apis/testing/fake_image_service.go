@@ -32,7 +32,7 @@ type FakeImageService struct {
 	FakeImageSize uint64
 	Called        []string
 	Images        map[string]*runtimeapi.Image
-	SandBoxes     map[string]string
+	Sandboxes     map[string]string
 
 	pulledImages []*pulledImage
 
@@ -124,10 +124,10 @@ func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimea
 	r.Called = append(r.Called, "PullImage")
 
 	if podSandboxConfig != nil {
-		if r.SandBoxes == nil {
-			r.SandBoxes = make(map[string]string, 0)
+		if r.Sandboxes == nil {
+			r.Sandboxes = make(map[string]string)
 		}
-		r.SandBoxes[path.Join(podSandboxConfig.Metadata.Namespace, podSandboxConfig.Metadata.Name)] = podSandboxConfig.RuntimeHandler
+		r.Sandboxes[path.Join(podSandboxConfig.Metadata.Namespace, podSandboxConfig.Metadata.Name)] = podSandboxConfig.RuntimeHandler
 	}
 	r.pulledImages = append(r.pulledImages, &pulledImage{imageSpec: image, authConfig: auth})
 	// ImageID should be randomized for real container runtime, but here just use
@@ -140,8 +140,8 @@ func (r *FakeImageService) PullImage(image *runtimeapi.ImageSpec, auth *runtimea
 	return imageID, nil
 }
 
-func (r *FakeImageService) ListSandBoxes() map[string]string {
-	return r.SandBoxes
+func (r *FakeImageService) ListSandboxes() map[string]string {
+	return r.Sandboxes
 }
 
 func (r *FakeImageService) RemoveImage(image *runtimeapi.ImageSpec) error {
