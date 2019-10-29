@@ -34,6 +34,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/requestedtocapacityratio"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -372,8 +373,9 @@ func RegisterPriorityConfigFactory(name string, pcf PriorityConfigFactory) strin
 
 // RegisterCustomPriorityFunction registers a custom priority function with the algorithm registry.
 // Returns the name, with which the priority function was registered.
-func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
+func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, args *plugins.ConfigProducerArgs) string {
 	var pcf *PriorityConfigFactory
+	name := policy.Name
 
 	validatePriorityOrDie(policy)
 
@@ -401,17 +403,23 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 				Weight: policy.Weight,
 			}
 		} else if policy.Argument.RequestedToCapacityRatioArguments != nil {
+			scoringFunctionShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
+			args.RequestedToCapacityRatioArgs = &requestedtocapacityratio.Args{
+				FunctionShape:       scoringFunctionShape,
+				ResourceToWeightMap: resources,
+			}
 			pcf = &PriorityConfigFactory{
 				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
-					scoringFunctionShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
 					p := priorities.RequestedToCapacityRatioResourceAllocationPriority(scoringFunctionShape, resources)
 					return p.PriorityMap, nil
 				},
 				Weight: policy.Weight,
 			}
+			// We do not allow specifying the name for custom plugins, see #83472
+			name = requestedtocapacityratio.Name
 		}
-	} else if existingPcf, ok := priorityFunctionMap[policy.Name]; ok {
-		klog.V(2).Infof("Priority type %s already registered, reusing.", policy.Name)
+	} else if existingPcf, ok := priorityFunctionMap[name]; ok {
+		klog.V(2).Infof("Priority type %s already registered, reusing.", name)
 		// set/update the weight based on the policy
 		pcf = &PriorityConfigFactory{
 			Function:          existingPcf.Function,
@@ -421,10 +429,10 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy) string {
 	}
 
 	if pcf == nil {
-		klog.Fatalf("Invalid configuration: Priority type not found for %s", policy.Name)
+		klog.Fatalf("Invalid configuration: Priority type not found for %s", name)
 	}
 
-	return RegisterPriorityConfigFactory(policy.Name, *pcf)
+	return RegisterPriorityConfigFactory(name, *pcf)
 }
 
 func buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(arguments *schedulerapi.RequestedToCapacityRatioArguments) (priorities.FunctionShape, priorities.ResourceToWeightMap) {
