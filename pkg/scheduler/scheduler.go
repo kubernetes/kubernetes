@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"os"
 	"time"
 
@@ -55,6 +56,8 @@ const (
 	BindTimeoutSeconds = 100
 	// SchedulerError is the reason recorded for events when an error occurs during scheduling a pod.
 	SchedulerError = "SchedulerError"
+	// Percentage of framework metrics to be sampled.
+	frameworkMetricsSamplePercent = 10
 )
 
 // podConditionUpdater updates the condition of a pod based on the passed
@@ -613,6 +616,7 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 	// Synchronously attempt to find a fit for the pod.
 	start := time.Now()
 	state := framework.NewCycleState()
+	state.SetRecordFrameworkMetrics(rand.Intn(100) < frameworkMetricsSamplePercent)
 	schedulingCycleCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	scheduleResult, err := sched.Algorithm.Schedule(schedulingCycleCtx, state, pod)
