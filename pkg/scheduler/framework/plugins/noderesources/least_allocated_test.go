@@ -25,7 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func TestNodeResourcesLeastAllocated(t *testing.T) {
@@ -233,11 +233,8 @@ func TestNodeResourcesLeastAllocated(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, test.nodes)
-			fh, _ := framework.NewFramework(nil, nil, nil)
-			snapshot := fh.NodeInfoSnapshot()
-			snapshot.NodeInfoMap = nodeNameToInfo
-
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithNodeInfoSnapshot(snapshot))
 			p, _ := NewLeastAllocated(nil, fh)
 			for i := range test.nodes {
 				hostResult, err := p.(framework.ScorePlugin).Score(context.Background(), nil, test.pod, test.nodes[i].Name)

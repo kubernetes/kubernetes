@@ -36,6 +36,7 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -1854,19 +1855,18 @@ func TestServiceAffinity(t *testing.T) {
 		testIt := func(skipPrecompute bool) {
 			t.Run(fmt.Sprintf("%v/skipPrecompute/%v", test.name, skipPrecompute), func(t *testing.T) {
 				nodes := []*v1.Node{&node1, &node2, &node3, &node4, &node5}
-				nodeInfo := schedulernodeinfo.NewNodeInfo()
-				nodeInfo.SetNode(test.node)
-				nodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{test.node.Name: nodeInfo}
+				s := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
+
 				// Reimplementing the logic that the scheduler implements: Any time it makes a predicate, it registers any precomputations.
-				predicate, precompute := NewServiceAffinityPredicate(fakelisters.NewNodeInfoLister(nodes), fakelisters.PodLister(test.pods), fakelisters.ServiceLister(test.services), test.labels)
+				predicate, precompute := NewServiceAffinityPredicate(s.NodeInfos(), s.Pods(), fakelisters.ServiceLister(test.services), test.labels)
 				// Register a precomputation or Rewrite the precomputation to a no-op, depending on the state we want to test.
 				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", func(pm *predicateMetadata) {
 					if !skipPrecompute {
 						precompute(pm)
 					}
 				})
-				if pmeta, ok := (GetPredicateMetadata(test.pod, nodeInfoMap)).(*predicateMetadata); ok {
-					fits, reasons, err := predicate(test.pod, pmeta, nodeInfo)
+				if pmeta, ok := (GetPredicateMetadata(test.pod, s)).(*predicateMetadata); ok {
+					fits, reasons, err := predicate(test.pod, pmeta, s.NodeInfoMap[test.node.Name])
 					if err != nil {
 						t.Errorf("unexpected error: %v", err)
 					}
@@ -2922,22 +2922,13 @@ func TestInterPodAffinity(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			node := test.node
-			var podsOnNode []*v1.Pod
-			for _, pod := range test.pods {
-				if pod.Spec.NodeName == node.Name {
-					podsOnNode = append(podsOnNode, pod)
-				}
-			}
+			s := nodeinfosnapshot.NewSnapshot(test.pods, []*v1.Node{test.node})
 
 			fit := PodAffinityChecker{
-				nodeInfoLister: fakelisters.NewNodeInfoLister([]*v1.Node{node}),
+				nodeInfoLister: s.NodeInfos(),
 				podLister:      fakelisters.PodLister(test.pods),
 			}
-			nodeInfo := schedulernodeinfo.NewNodeInfo(podsOnNode...)
-			nodeInfo.SetNode(test.node)
-			nodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{test.node.Name: nodeInfo}
-			fits, reasons, _ := fit.InterPodAffinityMatches(test.pod, GetPredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+			fits, reasons, _ := fit.InterPodAffinityMatches(test.pod, GetPredicateMetadata(test.pod, s), s.NodeInfoMap[test.node.Name])
 			if !fits && !reflect.DeepEqual(reasons, test.expectFailureReasons) {
 				t.Errorf("unexpected failure reasons: %v, want: %v", reasons, test.expectFailureReasons)
 			}
@@ -4024,48 +4015,32 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 		},
 	}
 
-	selectorExpectedFailureReasons := []PredicateFailureReason{ErrNodeSelectorNotMatch}
-
 	for indexTest, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeInfoMap := make(map[string]*schedulernodeinfo.NodeInfo)
-			for i, node := range test.nodes {
-				var podsOnNode []*v1.Pod
-				for _, pod := range test.pods {
-					if pod.Spec.NodeName == node.Name {
-						podsOnNode = append(podsOnNode, pod)
-					}
-				}
-
-				nodeInfo := schedulernodeinfo.NewNodeInfo(podsOnNode...)
-				nodeInfo.SetNode(test.nodes[i])
-				nodeInfoMap[node.Name] = nodeInfo
-			}
-
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
 			for indexNode, node := range test.nodes {
 				testFit := PodAffinityChecker{
-					nodeInfoLister: fakelisters.NewNodeInfoLister(test.nodes),
-					podLister:      fakelisters.PodLister(test.pods),
+					nodeInfoLister: snapshot.NodeInfos(),
+					podLister:      snapshot.Pods(),
 				}
 
 				var meta PredicateMetadata
 				if !test.nometa {
-					meta = GetPredicateMetadata(test.pod, nodeInfoMap)
+					meta = GetPredicateMetadata(test.pod, snapshot)
 				}
 
-				fits, reasons, _ := testFit.InterPodAffinityMatches(test.pod, meta, nodeInfoMap[node.Name])
+				fits, reasons, _ := testFit.InterPodAffinityMatches(test.pod, meta, snapshot.NodeInfoMap[node.Name])
 				if !fits && !reflect.DeepEqual(reasons, test.nodesExpectAffinityFailureReasons[indexNode]) {
 					t.Errorf("index: %d unexpected failure reasons: %v expect: %v", indexTest, reasons, test.nodesExpectAffinityFailureReasons[indexNode])
 				}
 				affinity := test.pod.Spec.Affinity
 				if affinity != nil && affinity.NodeAffinity != nil {
-					nodeInfo := schedulernodeinfo.NewNodeInfo()
-					nodeInfo.SetNode(node)
-					nodeInfoMap := map[string]*schedulernodeinfo.NodeInfo{node.Name: nodeInfo}
-					fits2, reasons, err := PodMatchNodeSelector(test.pod, GetPredicateMetadata(test.pod, nodeInfoMap), nodeInfo)
+					s := nodeinfosnapshot.NewSnapshot(nil, []*v1.Node{node})
+					fits2, reasons, err := PodMatchNodeSelector(test.pod, GetPredicateMetadata(test.pod, s), s.NodeInfoMap[node.Name])
 					if err != nil {
 						t.Errorf("unexpected error: %v", err)
 					}
+					selectorExpectedFailureReasons := []PredicateFailureReason{ErrNodeSelectorNotMatch}
 					if !fits2 && !reflect.DeepEqual(reasons, selectorExpectedFailureReasons) {
 						t.Errorf("unexpected failure reasons: %v, want: %v", reasons, selectorExpectedFailureReasons)
 					}
@@ -4981,10 +4956,10 @@ func TestEvenPodsSpreadPredicate_SingleConstraint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
-			meta := GetPredicateMetadata(tt.pod, nodeInfoMap)
+			s := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
+			meta := GetPredicateMetadata(tt.pod, s)
 			for _, node := range tt.nodes {
-				fits, _, _ := EvenPodsSpreadPredicate(tt.pod, meta, nodeInfoMap[node.Name])
+				fits, _, _ := EvenPodsSpreadPredicate(tt.pod, meta, s.NodeInfoMap[node.Name])
 				if fits != tt.fits[node.Name] {
 					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], fits)
 				}
@@ -5174,10 +5149,10 @@ func TestEvenPodsSpreadPredicate_MultipleConstraints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
-			meta := GetPredicateMetadata(tt.pod, nodeInfoMap)
+			s := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
+			meta := GetPredicateMetadata(tt.pod, s)
 			for _, node := range tt.nodes {
-				fits, _, _ := EvenPodsSpreadPredicate(tt.pod, meta, nodeInfoMap[node.Name])
+				fits, _, _ := EvenPodsSpreadPredicate(tt.pod, meta, s.NodeInfoMap[node.Name])
 				if fits != tt.fits[node.Name] {
 					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], fits)
 				}
