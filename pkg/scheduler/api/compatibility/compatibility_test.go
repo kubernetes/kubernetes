@@ -804,7 +804,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"EqualPriority",
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
-				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -830,6 +829,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "RequestedToCapacityRatio", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -913,7 +913,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"EqualPriority",
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
-				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -940,6 +939,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "RequestedToCapacityRatio", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -1022,7 +1022,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"EqualPriority",
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
-				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -1050,6 +1049,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "RequestedToCapacityRatio", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -1136,7 +1136,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"EqualPriority",
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
-				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -1164,6 +1163,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "RequestedToCapacityRatio", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -1264,6 +1264,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		"NodeResourcesLeastAllocated":     "LeastRequestedPriority",
 		"NodeResourcesBalancedAllocation": "BalancedResourceAllocation",
 		"NodeResourcesMostAllocated":      "MostRequestedPriority",
+		"RequestedToCapacityRatio":        "RequestedToCapacityRatioPriority",
 	}
 
 	for _, tc := range testcases {
