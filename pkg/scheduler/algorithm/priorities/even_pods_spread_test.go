@@ -22,7 +22,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -434,9 +434,8 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, allNodes)
-
-			got, _ := CalculateEvenPodsSpreadPriority(tt.pod, nodeNameToInfo, tt.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(tt.existingPods, allNodes)
+			got, _ := CalculateEvenPodsSpreadPriority(tt.pod, snapshot, tt.nodes)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("CalculateEvenPodsSpreadPriority() = %#v, want %#v", got, tt.want)
 			}
@@ -484,10 +483,10 @@ func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 	for _, tt := range tests {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(existingPods, allNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(existingPods, allNodes)
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				CalculateEvenPodsSpreadPriority(tt.pod, nodeNameToInfo, filteredNodes)
+				CalculateEvenPodsSpreadPriority(tt.pod, snapshot, filteredNodes)
 			}
 		})
 	}

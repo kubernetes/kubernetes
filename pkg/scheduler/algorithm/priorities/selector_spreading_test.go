@@ -25,7 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func controllerRef(kind, name, uid string) []metav1.OwnerReference {
@@ -337,7 +337,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, makeNodeList(test.nodes))
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, makeNodeList(test.nodes))
 			selectorSpread := SelectorSpread{
 				serviceLister:     fakelisters.ServiceLister(test.services),
 				controllerLister:  fakelisters.ControllerLister(test.rcs),
@@ -350,10 +350,10 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				fakelisters.ControllerLister(test.rcs),
 				fakelisters.ReplicaSetLister(test.rss),
 				fakelisters.StatefulSetLister(test.sss))
-			metaData := metaDataProducer(test.pod, nodeNameToInfo)
+			metaData := metaDataProducer(test.pod, snapshot)
 
 			ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, metaData)
-			list, err := ttp(test.pod, nodeNameToInfo, makeNodeList(test.nodes))
+			list, err := ttp(test.pod, snapshot, makeNodeList(test.nodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v \n", err)
 			}
@@ -573,7 +573,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, makeLabeledNodeList(labeledNodes))
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, makeLabeledNodeList(labeledNodes))
 			selectorSpread := SelectorSpread{
 				serviceLister:     fakelisters.ServiceLister(test.services),
 				controllerLister:  fakelisters.ControllerLister(test.rcs),
@@ -586,9 +586,9 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				fakelisters.ControllerLister(test.rcs),
 				fakelisters.ReplicaSetLister(test.rss),
 				fakelisters.StatefulSetLister(test.sss))
-			metaData := metaDataProducer(test.pod, nodeNameToInfo)
+			metaData := metaDataProducer(test.pod, snapshot)
 			ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, metaData)
-			list, err := ttp(test.pod, nodeNameToInfo, makeLabeledNodeList(labeledNodes))
+			list, err := ttp(test.pod, snapshot, makeLabeledNodeList(labeledNodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -765,17 +765,17 @@ func TestZoneSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(test.pods, makeLabeledNodeList(test.nodes))
-			zoneSpread := ServiceAntiAffinity{podLister: fakelisters.PodLister(test.pods), serviceLister: fakelisters.ServiceLister(test.services), label: "zone"}
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, makeLabeledNodeList(test.nodes))
+			zoneSpread := ServiceAntiAffinity{podLister: snapshot.Pods(), serviceLister: fakelisters.ServiceLister(test.services), label: "zone"}
 
 			metaDataProducer := NewPriorityMetadataFactory(
 				fakelisters.ServiceLister(test.services),
 				fakelisters.ControllerLister(rcs),
 				fakelisters.ReplicaSetLister(rss),
 				fakelisters.StatefulSetLister(sss))
-			metaData := metaDataProducer(test.pod, nodeNameToInfo)
+			metaData := metaDataProducer(test.pod, snapshot)
 			ttp := priorityFunction(zoneSpread.CalculateAntiAffinityPriorityMap, zoneSpread.CalculateAntiAffinityPriorityReduce, metaData)
-			list, err := ttp(test.pod, nodeNameToInfo, makeLabeledNodeList(test.nodes))
+			list, err := ttp(test.pod, snapshot, makeLabeledNodeList(test.nodes))
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

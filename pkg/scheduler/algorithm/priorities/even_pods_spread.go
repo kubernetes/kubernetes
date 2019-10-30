@@ -25,7 +25,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 
 	"k8s.io/klog"
@@ -82,7 +82,7 @@ func (t *topologySpreadConstraintsMap) initialize(pod *v1.Pod, nodes []*v1.Node)
 // Note: Symmetry is not applicable. We only weigh how incomingPod matches existingPod.
 // Whether existingPod matches incomingPod doesn't contribute to the final score.
 // This is different from the Affinity API.
-func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, nodes []*v1.Node) (framework.NodeScoreList, error) {
+func CalculateEvenPodsSpreadPriority(pod *v1.Pod, sharedLister schedulerlisters.SharedLister, nodes []*v1.Node) (framework.NodeScoreList, error) {
 	result := make(framework.NodeScoreList, len(nodes))
 	// return if incoming pod doesn't have soft topology spread constraints.
 	constraints := getSoftTopologySpreadConstraints(pod)
@@ -90,18 +90,18 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 		return result, nil
 	}
 
+	allNodes, err := sharedLister.NodeInfos().List()
+	if err != nil {
+		return nil, err
+	}
+
 	t := newTopologySpreadConstraintsMap()
 	t.initialize(pod, nodes)
-
-	allNodeNames := make([]string, 0, len(nodeNameToInfo))
-	for name := range nodeNameToInfo {
-		allNodeNames = append(allNodeNames, name)
-	}
 
 	errCh := schedutil.NewErrorChannel()
 	ctx, cancel := context.WithCancel(context.Background())
 	processAllNode := func(i int) {
-		nodeInfo := nodeNameToInfo[allNodeNames[i]]
+		nodeInfo := allNodes[i]
 		node := nodeInfo.Node()
 		if node == nil {
 			return
@@ -136,7 +136,7 @@ func CalculateEvenPodsSpreadPriority(pod *v1.Pod, nodeNameToInfo map[string]*sch
 			atomic.AddInt32(t.topologyPairToPodCounts[pair], matchSum)
 		}
 	}
-	workqueue.ParallelizeUntil(ctx, 16, len(allNodeNames), processAllNode)
+	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processAllNode)
 	if err := errCh.ReceiveError(); err != nil {
 		return nil, err
 	}
