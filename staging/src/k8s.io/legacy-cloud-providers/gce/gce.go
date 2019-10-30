@@ -42,7 +42,7 @@ import (
 
 	"github.com/GoogleCloudPlatform/k8s-cloud-provider/pkg/cloud"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/informers"
@@ -142,6 +142,9 @@ type Cloud struct {
 	useMetadataServer        bool
 	operationPollRateLimiter flowcontrol.RateLimiter
 	manager                  diskServiceManager
+
+	externalInstanceGroupsPrefix string // If non-"", finds prefixed instance groups for ILB.
+
 	// Lock for access to nodeZones
 	nodeZonesLock sync.Mutex
 	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
@@ -189,6 +192,9 @@ type ConfigGlobal struct {
 	NodeInstancePrefix string   `gcfg:"node-instance-prefix"`
 	Regional           bool     `gcfg:"regional"`
 	Multizone          bool     `gcfg:"multizone"`
+	// ExternalInstanceGroupsPrefix, when not-empty, is used to filter instance groups
+	// and include them in the backend for ILB.
+	ExternalInstanceGroupsPrefix string `gcfg:"external-instance-groups-prefix"`
 	// APIEndpoint is the GCE compute API endpoint to use. If this is blank,
 	// then the default endpoint is used.
 	APIEndpoint string `gcfg:"api-endpoint"`
@@ -229,12 +235,13 @@ type CloudConfig struct {
 	SubnetworkName       string
 	SubnetworkURL        string
 	// DEPRECATED: Do not rely on this value as it may be incorrect.
-	SecondaryRangeName string
-	NodeTags           []string
-	NodeInstancePrefix string
-	TokenSource        oauth2.TokenSource
-	UseMetadataServer  bool
-	AlphaFeatureGate   *AlphaFeatureGate
+	SecondaryRangeName           string
+	NodeTags                     []string
+	NodeInstancePrefix           string
+	ExternalInstanceGroupsPrefix string
+	TokenSource                  oauth2.TokenSource
+	UseMetadataServer            bool
+	AlphaFeatureGate             *AlphaFeatureGate
 }
 
 func init() {
@@ -324,6 +331,7 @@ func generateCloudConfig(configFile *ConfigFile) (cloudConfig *CloudConfig, err 
 
 		cloudConfig.NodeTags = configFile.Global.NodeTags
 		cloudConfig.NodeInstancePrefix = configFile.Global.NodeInstancePrefix
+		cloudConfig.ExternalInstanceGroupsPrefix = configFile.Global.ExternalInstanceGroupsPrefix
 		cloudConfig.AlphaFeatureGate = NewAlphaFeatureGate(configFile.Global.AlphaFeatures)
 	}
 
