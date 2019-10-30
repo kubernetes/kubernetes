@@ -337,7 +337,8 @@ func TestSelectorSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, makeNodeList(test.nodes))
+			nodes := makeNodeList(test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
 			selectorSpread := SelectorSpread{
 				serviceLister:     fakelisters.ServiceLister(test.services),
 				controllerLister:  fakelisters.ControllerLister(test.rcs),
@@ -350,7 +351,7 @@ func TestSelectorSpreadPriority(t *testing.T) {
 				fakelisters.ControllerLister(test.rcs),
 				fakelisters.ReplicaSetLister(test.rss),
 				fakelisters.StatefulSetLister(test.sss))
-			metaData := metaDataProducer(test.pod, snapshot)
+			metaData := metaDataProducer(test.pod, nodes, snapshot)
 
 			ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, metaData)
 			list, err := ttp(test.pod, snapshot, makeNodeList(test.nodes))
@@ -573,7 +574,8 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, makeLabeledNodeList(labeledNodes))
+			nodes := makeLabeledNodeList(labeledNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
 			selectorSpread := SelectorSpread{
 				serviceLister:     fakelisters.ServiceLister(test.services),
 				controllerLister:  fakelisters.ControllerLister(test.rcs),
@@ -586,7 +588,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				fakelisters.ControllerLister(test.rcs),
 				fakelisters.ReplicaSetLister(test.rss),
 				fakelisters.StatefulSetLister(test.sss))
-			metaData := metaDataProducer(test.pod, snapshot)
+			metaData := metaDataProducer(test.pod, nodes, snapshot)
 			ttp := priorityFunction(selectorSpread.CalculateSpreadPriorityMap, selectorSpread.CalculateSpreadPriorityReduce, metaData)
 			list, err := ttp(test.pod, snapshot, makeLabeledNodeList(labeledNodes))
 			if err != nil {
@@ -765,7 +767,8 @@ func TestZoneSpreadPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, makeLabeledNodeList(test.nodes))
+			nodes := makeLabeledNodeList(labeledNodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
 			zoneSpread := ServiceAntiAffinity{podLister: snapshot.Pods(), serviceLister: fakelisters.ServiceLister(test.services), label: "zone"}
 
 			metaDataProducer := NewPriorityMetadataFactory(
@@ -773,7 +776,7 @@ func TestZoneSpreadPriority(t *testing.T) {
 				fakelisters.ControllerLister(rcs),
 				fakelisters.ReplicaSetLister(rss),
 				fakelisters.StatefulSetLister(sss))
-			metaData := metaDataProducer(test.pod, snapshot)
+			metaData := metaDataProducer(test.pod, nodes, snapshot)
 			ttp := priorityFunction(zoneSpread.CalculateAntiAffinityPriorityMap, zoneSpread.CalculateAntiAffinityPriorityReduce, metaData)
 			list, err := ttp(test.pod, snapshot, makeLabeledNodeList(test.nodes))
 			if err != nil {

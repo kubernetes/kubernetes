@@ -36,7 +36,7 @@ type PriorityReduceFunction func(pod *v1.Pod, meta interface{}, sharedLister sch
 
 // PriorityMetadataProducer is a function that computes metadata for a given pod. This
 // is now used for only for priority functions. For predicates please use PredicateMetadataProducer.
-type PriorityMetadataProducer func(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) interface{}
+type PriorityMetadataProducer func(pod *v1.Pod, filteredNodes []*v1.Node, sharedLister schedulerlisters.SharedLister) interface{}
 
 // PriorityFunction is a function that computes scores for all nodes.
 // DEPRECATED
@@ -55,6 +55,6 @@ type PriorityConfig struct {
 }
 
 // EmptyPriorityMetadataProducer returns a no-op PriorityMetadataProducer type.
-func EmptyPriorityMetadataProducer(pod *v1.Pod, sharedLister schedulerlisters.SharedLister) interface{} {
+func EmptyPriorityMetadataProducer(pod *v1.Pod, filteredNodes []*v1.Node, sharedLister schedulerlisters.SharedLister) interface{} {
 	return nil
 }
