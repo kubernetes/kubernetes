@@ -4,6 +4,7 @@ go_library(
     name = "go_default_library",
     srcs = [
         "counter.go",
+        "desc.go",
         "gauge.go",
         "histogram.go",
         "http.go",
@@ -13,6 +14,7 @@ go_library(
         "processstarttime.go",
         "registry.go",
         "summary.go",
+        "value.go",
         "version.go",
         "version_parser.go",
         "wrappers.go",
