@@ -418,7 +418,7 @@ func (o *Options) loadConfig(data []byte) (*kubeproxyconfig.KubeProxyConfigurati
 		if lenientErr != nil {
 			// Lenient decoding failed with the current version, return the
 			// original strict error.
-			return nil, fmt.Errorf("failed lenient decoding: %v", err)
+			return nil, fmt.Errorf("failed lenient decoding: %v, strict decoding failed: %v", lenientErr, err)
 		}
 
 		// Continue with the v1alpha1 object that was decoded leniently, but emit a warning.
