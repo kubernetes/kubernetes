@@ -236,16 +236,31 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 	testCases := []struct {
 		podCIDR         []string
 		ip              string
+		expectedPodCIDR []string
 		expectedGateway []string
 	}{
 		{
-			podCIDR:         []string{"10.0.0.1/24"},
+			podCIDR:         []string{"10.0.0.0/24"},
 			ip:              "10.0.0.1",
+			expectedPodCIDR: []string{"10.0.0.0/24"},
 			expectedGateway: []string{"10.0.0.1"},
 		},
 		{
-			podCIDR:         []string{"2001:beef::1/48"},
+			podCIDR:         []string{"2001:beef::/48"},
 			ip:              "2001:beef::1",
+			expectedPodCIDR: []string{"2001:beef::/48"},
+			expectedGateway: []string{"2001:beef::1"},
+		},
+		{
+			podCIDR:         []string{"10.0.0.3/24"},
+			ip:              "10.0.0.1",
+			expectedPodCIDR: []string{"10.0.0.0/24"},
+			expectedGateway: []string{"10.0.0.1"},
+		},
+		{
+			podCIDR:         []string{"2001:beef::221/48"},
+			ip:              "2001:beef::1",
+			expectedPodCIDR: []string{"2001:beef::/48"},
 			expectedGateway: []string{"2001:beef::1"},
 		},
 	}
@@ -289,13 +304,13 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 			}
 		}
 
-		if len(kubenet.podCIDRs) != len(tc.podCIDR) {
+		if len(kubenet.podCIDRs) != len(tc.expectedPodCIDR) {
 			t.Errorf("generated podCidr: %q, expecting: %q are not of the same length", kubenet.podCIDRs, tc.podCIDR)
 			continue
 		}
-		for idx := range tc.podCIDR {
-			if kubenet.podCIDRs[idx].String() != tc.podCIDR[idx] {
-				t.Errorf("generated podCidr: %q, expecting: %q", kubenet.podCIDRs[idx].String(), tc.podCIDR[idx])
+		for idx := range tc.expectedPodCIDR {
+			if kubenet.podCIDRs[idx].String() != tc.expectedPodCIDR[idx] {
+				t.Errorf("generated podCidr: %q, expecting: %q", kubenet.podCIDRs[idx].String(), tc.expectedPodCIDR[idx])
 			}
 		}
 
@@ -313,7 +328,7 @@ func TestTearDownWithoutRuntime(t *testing.T) {
 	}
 }
 
-func TestGetRoutesConifg(t *testing.T) {
+func TestGetRoutesConfig(t *testing.T) {
 	for _, test := range []struct {
 		cidrs  []string
 		routes string
@@ -339,6 +354,59 @@ func TestGetRoutesConifg(t *testing.T) {
 		}
 		fakeKubenet := &kubenetNetworkPlugin{podCIDRs: cidrs}
 		assert.Equal(t, test.routes, fakeKubenet.getRoutesConfig())
+	}
+}
+
+func TestGetRangesConfig(t *testing.T) {
+	for _, test := range []struct {
+		cidrs    []string
+		gateways []string
+		ranges   string
+	}{
+		{
+			cidrs:    []string{"10.0.0.0/24"},
+			gateways: []string{"10.0.0.1"},
+			ranges: `
+[{
+"subnet": "10.0.0.0/24",
+"gateway": "10.0.0.1"
+}]`,
+		},
+		{
+			cidrs:    []string{"2001:4860::/32"},
+			gateways: []string{"2001:4860::1"},
+			ranges: `
+[{
+"subnet": "2001:4860::/32",
+"gateway": "2001:4860::1"
+}]`,
+		},
+		{
+			cidrs:    []string{"10.0.0.0/24", "2001:4860::/32"},
+			gateways: []string{"10.0.0.1", "2001:4860::1"},
+			ranges: `
+[{
+"subnet": "10.0.0.0/24",
+"gateway": "10.0.0.1"
+}],
+[{
+"subnet": "2001:4860::/32",
+"gateway": "2001:4860::1"
+}]`,
+		},
+	} {
+		var cidrs []*net.IPNet
+		var gateways []net.IP
+		for idx, c := range test.cidrs {
+			_, cidr, err := net.ParseCIDR(c)
+			assert.NoError(t, err)
+			cidrs = append(cidrs, cidr)
+			gw := net.ParseIP(test.gateways[idx])
+			gateways = append(gateways, gw)
+
+		}
+		fakeKubenet := &kubenetNetworkPlugin{podCIDRs: cidrs, podGateways: gateways}
+		assert.Equal(t, test.ranges, fakeKubenet.getRangesConfig())
 	}
 }
 

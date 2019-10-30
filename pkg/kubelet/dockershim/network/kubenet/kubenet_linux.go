@@ -270,9 +270,16 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 			return
 		}
 		// create list of ips and gateways
-		cidr.IP[len(cidr.IP)-1] += 1 // Set bridge address to first address in IPNet
 		plugin.podCIDRs = append(plugin.podCIDRs, cidr)
-		plugin.podGateways = append(plugin.podGateways, cidr.IP)
+		// the CNI is able to generate the gateway address
+		// and we only need the gateway to configure ebtables rules
+		// TODO: remove the need to generate gateway
+		gateway, err := netutils.GetIndexedIP(cidr, 1)
+		if err != nil {
+			klog.Warningf("Failed to generate CNI network config with cidr %s at indx:%v: %v", currentPodCIDR, idx, err)
+			return
+		}
+		plugin.podGateways = append(plugin.podGateways, gateway)
 	}
 
 	//setup hairpinMode
@@ -828,18 +835,18 @@ func (plugin *kubenetNetworkPlugin) disableContainerDAD(id kubecontainer.Contain
 // given a n cidrs assigned to nodes,
 // create bridge configuration that conforms to them
 func (plugin *kubenetNetworkPlugin) getRangesConfig() string {
-	createRange := func(thisNet *net.IPNet) string {
+	createRange := func(thisNet, thisGw string) string {
 		template := `
 [{
 "subnet": "%s",
 "gateway": "%s"
 }]`
-		return fmt.Sprintf(template, thisNet.String(), thisNet.IP.String())
+		return fmt.Sprintf(template, thisNet, thisGw)
 	}
 
 	ranges := make([]string, len(plugin.podCIDRs))
-	for idx, thisCIDR := range plugin.podCIDRs {
-		ranges[idx] = createRange(thisCIDR)
+	for idx := range plugin.podCIDRs {
+		ranges[idx] = createRange(plugin.podCIDRs[idx].String(), plugin.podGateways[idx].String())
 	}
 	//[{range}], [{range}]
 	// each range is a subnet and a gateway
