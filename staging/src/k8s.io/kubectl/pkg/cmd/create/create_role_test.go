@@ -22,7 +22,7 @@ import (
 
 	rbac "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
-	"k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
@@ -669,5 +669,114 @@ func TestComplete(t *testing.T) {
 		if !reflect.DeepEqual(test.roleOptions.ResourceNames, test.expected.ResourceNames) {
 			t.Errorf("%s:\nexpected resource names:\n%#v\nsaw resource names:\n%#v", name, test.expected.ResourceNames, test.roleOptions.ResourceNames)
 		}
+	}
+}
+
+func TestRunCreateRole(t *testing.T) {
+	defaultTestName := "my-role"
+	defaultTestNamespace := "my-namespace"
+	defaultTestVerbs := []string{"get", "watch", "list"}
+	defaultTestResources := []ResourceOptions{
+		{Group: "", Resource: "pods", SubResource: ""},
+		{Group: "extensions", Resource: "replicasets", SubResource: "scale"},
+	}
+	defaultTestResourceNames := []string{}
+	defaultExpectedRules := []rbac.PolicyRule{
+		{
+			Verbs:         []string{"get", "watch", "list"},
+			Resources:     []string{"pods"},
+			APIGroups:     []string{""},
+			ResourceNames: []string{},
+		},
+		{
+			Verbs:         []string{"get", "watch", "list"},
+			Resources:     []string{"replicasets/scale"},
+			APIGroups:     []string{"extensions"},
+			ResourceNames: []string{},
+		},
+	}
+
+	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	defer tf.Cleanup()
+
+	tf.Client = &fake.RESTClient{}
+	tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
+
+	tests := map[string]struct {
+		roleOptions  *CreateRoleOptions
+		expectedRole *rbac.Role
+	}{
+		"test-valid-case": {
+			roleOptions: &CreateRoleOptions{
+				Name:          defaultTestName,
+				Namespace:     defaultTestNamespace,
+				DryRun:        true,
+				Verbs:         defaultTestVerbs,
+				Resources:     defaultTestResources,
+				ResourceNames: defaultTestResourceNames,
+			},
+			expectedRole: &rbac.Role{
+				TypeMeta: v1.TypeMeta{
+					APIVersion: "rbac.authorization.k8s.io/v1",
+					Kind:       "Role",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name: defaultTestName,
+				},
+				Rules: defaultExpectedRules,
+			},
+		},
+		"test-valid-case-enforce-namespace": {
+			roleOptions: &CreateRoleOptions{
+				Name:             defaultTestName,
+				Namespace:        defaultTestNamespace,
+				EnforceNamespace: true,
+				DryRun:           true,
+				Verbs:            defaultTestVerbs,
+				Resources:        defaultTestResources,
+				ResourceNames:    defaultTestResourceNames,
+			},
+			expectedRole: &rbac.Role{
+				TypeMeta: v1.TypeMeta{
+					APIVersion: "rbac.authorization.k8s.io/v1",
+					Kind:       "Role",
+				},
+				ObjectMeta: v1.ObjectMeta{
+					Name:      defaultTestName,
+					Namespace: defaultTestNamespace,
+				},
+				Rules: defaultExpectedRules,
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var err error
+			test.roleOptions.Mapper, err = tf.ToRESTMapper()
+			if err != nil {
+				t.Fatal(err)
+			}
+			clientset, err := tf.KubernetesClientSet()
+			if err != nil {
+				t.Fatal(err)
+			}
+			test.roleOptions.Client = clientset.RbacV1()
+
+			var actual *rbac.Role
+			test.roleOptions.PrintObj = func(obj runtime.Object) error {
+				actual = obj.(*rbac.Role)
+				return nil
+			}
+
+			err = test.roleOptions.RunCreateRole()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if !equality.Semantic.DeepEqual(test.expectedRole, actual) {
+				t.Errorf("%s", diff.ObjectReflectDiff(test.expectedRole, actual))
+			}
+		})
 	}
 }
