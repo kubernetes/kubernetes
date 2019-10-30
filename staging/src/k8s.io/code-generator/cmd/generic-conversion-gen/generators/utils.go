@@ -77,6 +77,25 @@ func ConversionNamer() *namer.NameStrategy {
 	}
 }
 
+// unwrapAlias recurses down aliased types to find the bedrock type.
+func unwrapAlias(in *types.Type) *types.Type {
+	for in.Kind == types.Alias {
+		in = in.Underlying
+	}
+	return in
+}
+
+func functionHasTag(function *types.Type, functionTagName, tagValue string) bool {
+	if functionTagName == "" {
+		return false
+	}
+	values := types.ExtractCommentTags("+", function.CommentLines)[functionTagName]
+	return len(values) == 1 && values[0] == tagValue
+}
+
+func isCopyOnlyFunction(function *types.Type, functionTagName string) bool {
+	return functionHasTag(function, functionTagName, "copy-only")
+}
 func conversionFunctionName(in, out *types.Type, conversionNamer *namer.NameStrategy, buffer *bytes.Buffer) string {
 	namerName := "conversion"
 	tmpl, err := template.New(fmt.Sprintf("conversion function name from %s to %s", in.Name, out.Name)).
