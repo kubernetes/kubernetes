@@ -1244,7 +1244,7 @@ type Stats struct {
 	// Time spent in writes in ms
 	WriteMs    uint64 `protobuf:"varint,5,opt,name=write_ms,json=writeMs" json:"write_ms,omitempty"`
 	WriteBytes uint64 `protobuf:"varint,6,opt,name=write_bytes,json=writeBytes" json:"write_bytes,omitempty"`
-	// IOs curently in progress
+	// IOs currently in progress
 	IoProgress uint64 `protobuf:"varint,7,opt,name=io_progress,json=ioProgress" json:"io_progress,omitempty"`
 	// Time spent doing IOs ms
 	IoMs uint64 `protobuf:"varint,8,opt,name=io_ms,json=ioMs" json:"io_ms,omitempty"`
