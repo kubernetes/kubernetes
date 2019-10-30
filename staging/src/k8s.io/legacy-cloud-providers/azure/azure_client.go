@@ -1404,7 +1404,7 @@ func (az *azStorageAccountClient) ListKeys(ctx context.Context, resourceGroupNam
 		klog.V(10).Infof("azStorageAccountClient.ListKeys(%q,%q): end", resourceGroupName, accountName)
 	}()
 
-	result, err = az.client.ListKeys(ctx, resourceGroupName, accountName)
+	result, err = az.client.ListKeys(ctx, resourceGroupName, accountName, storage.Kerb)
 	mc.Observe(err)
 	return
 }
