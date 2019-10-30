@@ -18,6 +18,7 @@ package endpointslice
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
@@ -91,14 +92,32 @@ func TestPodToEndpoint(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name             string
-		pod              *v1.Pod
-		node             *v1.Node
-		expectedEndpoint discovery.Endpoint
+		name                     string
+		pod                      *v1.Pod
+		node                     *v1.Node
+		expectedEndpoint         discovery.Endpoint
+		publishNotReadyAddresses bool
 	}{
 		{
 			name: "Ready pod",
 			pod:  readyPod,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPod.Name,
+					UID:             readyPod.UID,
+					ResourceVersion: readyPod.ResourceVersion,
+				},
+			},
+		},
+		{
+			name:                     "Ready pod + publishNotReadyAddresses",
+			pod:                      readyPod,
+			publishNotReadyAddresses: true,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -118,6 +137,23 @@ func TestPodToEndpoint(t *testing.T) {
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
+				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPod.Name,
+					UID:             readyPod.UID,
+					ResourceVersion: readyPod.ResourceVersion,
+				},
+			},
+		},
+		{
+			name:                     "Unready pod + publishNotReadyAddresses",
+			pod:                      unreadyPod,
+			publishNotReadyAddresses: true,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 				Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
 				TargetRef: &v1.ObjectReference{
 					Kind:            "Pod",
@@ -174,8 +210,10 @@ func TestPodToEndpoint(t *testing.T) {
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			endpoint := podToEndpoint(testCase.pod, testCase.node)
-			assert.EqualValues(t, testCase.expectedEndpoint, endpoint, "Test case failed: %s", testCase.name)
+			endpoint := podToEndpoint(testCase.pod, testCase.node, testCase.publishNotReadyAddresses)
+			if !reflect.DeepEqual(testCase.expectedEndpoint, endpoint) {
+				t.Errorf("Expected endpoint: %v, got: %v", testCase.expectedEndpoint, endpoint)
+			}
 		})
 	}
 }
