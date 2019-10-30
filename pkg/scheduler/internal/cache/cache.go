@@ -29,6 +29,7 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/features"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
+	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
@@ -635,9 +636,11 @@ func (cache *schedulerCache) cleanupExpiredAssumedPods() {
 }
 
 // cleanupAssumedPods exists for making test deterministic by taking time as input argument.
+// It also reports metrics on the cache size for nodes, pods, and assumed pods.
 func (cache *schedulerCache) cleanupAssumedPods(now time.Time) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
+	defer cache.updateMetrics()
 
 	// The size of assumedPods should be small
 	for key := range cache.assumedPods {
@@ -679,4 +682,11 @@ func (cache *schedulerCache) GetNodeInfo(nodeName string) (*v1.Node, error) {
 	}
 
 	return n.info.Node(), nil
+}
+
+// updateMetrics updates cache size metric values for pods, assumed pods, and nodes
+func (cache *schedulerCache) updateMetrics() {
+	metrics.CacheSize.WithLabelValues("assumed_pods").Set(float64(len(cache.assumedPods)))
+	metrics.CacheSize.WithLabelValues("pods").Set(float64(len(cache.podStates)))
+	metrics.CacheSize.WithLabelValues("nodes").Set(float64(len(cache.nodes)))
 }
