@@ -1182,9 +1182,10 @@ func validateStatefulSet(config *localTestConfig, ss *appsv1.StatefulSet, anti b
 // and skips if a disk of that type does not exist on the node
 func SkipUnlessLocalSSDExists(config *localTestConfig, ssdInterface, filesystemType string, node *v1.Node) {
 	ssdCmd := fmt.Sprintf("ls -1 /mnt/disks/by-uuid/google-local-ssds-%s-%s/ | wc -l", ssdInterface, filesystemType)
-	res, err := config.hostExec.IssueCommandWithResult(ssdCmd, node)
+	res, err := config.hostExec.Execute(ssdCmd, node)
+	utils.LogResult(res)
 	framework.ExpectNoError(err)
-	num, err := strconv.Atoi(strings.TrimSpace(res))
+	num, err := strconv.Atoi(strings.TrimSpace(res.Stdout))
 	framework.ExpectNoError(err)
 	if num < 1 {
 		framework.Skipf("Requires at least 1 %s %s localSSD ", ssdInterface, filesystemType)
