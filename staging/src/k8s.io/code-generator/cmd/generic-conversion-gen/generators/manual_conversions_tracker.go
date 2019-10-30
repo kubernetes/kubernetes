@@ -37,8 +37,8 @@ type ManualConversionsTracker struct {
 	// is no need to ever process the same package twice.
 	processedPackages map[string][]error
 
-	// ConversionFunctions keeps track of the manual function definitions known to this tracker.
-	ConversionFunctions map[ConversionPair]*types.Type
+	// conversionFunctions keeps track of the manual function definitions known to this tracker.
+	conversionFunctions map[ConversionPair]*types.Type
 
 	// see conversionFunctionName
 	buffer          *bytes.Buffer
@@ -57,7 +57,7 @@ func NewManualConversionsTracker(additionalConversionArguments ...NamedVariable)
 	return &ManualConversionsTracker{
 		additionalConversionArguments: additionalConversionArguments,
 		processedPackages:             make(map[string][]error),
-		ConversionFunctions:           make(map[ConversionPair]*types.Type),
+		conversionFunctions:           make(map[ConversionPair]*types.Type),
 		buffer:                        &bytes.Buffer{},
 		conversionNamer:               ConversionNamer(),
 	}
@@ -65,8 +65,8 @@ func NewManualConversionsTracker(additionalConversionArguments ...NamedVariable)
 
 var errorName = types.Ref("", "error").Name
 
-// FindManualConversionFunctions looks for conversion functions in the given package.
-func (t *ManualConversionsTracker) FindManualConversionFunctions(context *generator.Context, packagePath string) (errors []error) {
+// findManualConversionFunctions looks for conversion functions in the given package.
+func (t *ManualConversionsTracker) findManualConversionFunctions(context *generator.Context, packagePath string) (errors []error) {
 	if e, present := t.processedPackages[packagePath]; present {
 		// already processed
 		return e
@@ -105,12 +105,12 @@ func (t *ManualConversionsTracker) FindManualConversionFunctions(context *genera
 
 		// it is a conversion function
 		key := ConversionPair{inType.Elem, outType.Elem}
-		if previousConversionFunc, present := t.ConversionFunctions[key]; present {
+		if previousConversionFunc, present := t.conversionFunctions[key]; present {
 			errors = append(errors, fmt.Errorf("duplicate static conversion defined: %s -> %s from:\n%s.%s\n%s.%s",
 				inType, outType, previousConversionFunc.Name.Package, previousConversionFunc.Name.Name, function.Name.Package, function.Name.Name))
 			continue
 		}
-		t.ConversionFunctions[key] = function
+		t.conversionFunctions[key] = function
 	}
 
 	t.processedPackages[packagePath] = errors
@@ -159,7 +159,7 @@ func (t *ManualConversionsTracker) isConversionFunction(function *types.Type) (b
 }
 
 func (t *ManualConversionsTracker) preexists(inType, outType *types.Type) (*types.Type, bool) {
-	function, ok := t.ConversionFunctions[ConversionPair{inType, outType}]
+	function, ok := t.conversionFunctions[ConversionPair{inType, outType}]
 	return function, ok
 }
 

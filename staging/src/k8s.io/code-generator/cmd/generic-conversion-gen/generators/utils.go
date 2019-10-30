@@ -85,6 +85,41 @@ func unwrapAlias(in *types.Type) *types.Type {
 	return in
 }
 
+func findMember(t *types.Type, name string) (types.Member, bool) {
+	if t.Kind != types.Struct {
+		return types.Member{}, false
+	}
+	for _, member := range t.Members {
+		if member.Name == name {
+			return member, true
+		}
+	}
+	return types.Member{}, false
+}
+
+func isFastConversion(inType, outType *types.Type) bool {
+	switch inType.Kind {
+	case types.Builtin:
+		return true
+	case types.Map, types.Slice, types.Pointer, types.Struct, types.Alias:
+		return isDirectlyAssignable(inType, outType)
+	default:
+		return false
+	}
+}
+
+func isDirectlyAssignable(inType, outType *types.Type) bool {
+	// TODO: This should maybe check for actual assignability between the two
+	// types, rather than superficial traits that happen to indicate it is
+	// assignable in the ways we currently use this code.
+	return inType.IsAssignable() && (inType.IsPrimitive() || isSamePackage(inType, outType)) ||
+		unwrapAlias(inType) == unwrapAlias(outType)
+}
+
+func isSamePackage(inType, outType *types.Type) bool {
+	return inType.Name.Package == outType.Name.Package
+}
+
 func functionHasTag(function *types.Type, functionTagName, tagValue string) bool {
 	if functionTagName == "" {
 		return false
@@ -96,6 +131,12 @@ func functionHasTag(function *types.Type, functionTagName, tagValue string) bool
 func isCopyOnlyFunction(function *types.Type, functionTagName string) bool {
 	return functionHasTag(function, functionTagName, "copy-only")
 }
+
+// ConversionFunctionName returns the name of the conversion function for in to out.
+func ConversionFunctionName(in, out *types.Type) string {
+	return conversionFunctionName(in, out, ConversionNamer(), &bytes.Buffer{})
+}
+
 func conversionFunctionName(in, out *types.Type, conversionNamer *namer.NameStrategy, buffer *bytes.Buffer) string {
 	namerName := "conversion"
 	tmpl, err := template.New(fmt.Sprintf("conversion function name from %s to %s", in.Name, out.Name)).

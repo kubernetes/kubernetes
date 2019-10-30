@@ -20,8 +20,8 @@ import (
 	"k8s.io/gengo/types"
 )
 
-// an UnsafeConversionArbitrator decides whether conversions can be done using unsafe casts.
-type UnsafeConversionArbitrator struct {
+// an unsafeConversionArbitrator decides whether conversions can be done using unsafe casts.
+type unsafeConversionArbitrator struct {
 	processedPairs           map[ConversionPair]unsafeConversionDecision
 	manualConversionsTracker *ManualConversionsTracker
 	functionTagName          string
@@ -42,21 +42,21 @@ const (
 	possible
 )
 
-func NewUnsafeConversionArbitrator(manualConversionsTracker *ManualConversionsTracker) *UnsafeConversionArbitrator {
-	return &UnsafeConversionArbitrator{
+func newUnsafeConversionArbitrator(manualConversionsTracker *ManualConversionsTracker) *unsafeConversionArbitrator {
+	return &unsafeConversionArbitrator{
 		processedPairs:           make(map[ConversionPair]unsafeConversionDecision),
 		manualConversionsTracker: manualConversionsTracker,
 	}
 }
 
-// CanUseUnsafeConversion returns true iff x can be converted to y using an unsafe conversion.
-func (a *UnsafeConversionArbitrator) CanUseUnsafeConversion(x, y *types.Type) bool {
+// canUseUnsafeConversion returns true iff x can be converted to y using an unsafe conversion.
+func (a *unsafeConversionArbitrator) canUseUnsafeConversion(x, y *types.Type) bool {
 	// alreadyVisitedTypes holds all the types that have already been checked in the structural type recursion.
 	alreadyVisitedTypes := make(map[*types.Type]bool)
 	return a.canUseUnsafeConversionWithCaching(x, y, alreadyVisitedTypes) == possible
 }
 
-func (a *UnsafeConversionArbitrator) canUseUnsafeConversionWithCaching(x, y *types.Type, alreadyVisitedTypes map[*types.Type]bool) unsafeConversionDecision {
+func (a *unsafeConversionArbitrator) canUseUnsafeConversionWithCaching(x, y *types.Type, alreadyVisitedTypes map[*types.Type]bool) unsafeConversionDecision {
 	if x == y {
 		return possible
 	}
@@ -80,21 +80,21 @@ func (a *UnsafeConversionArbitrator) canUseUnsafeConversionWithCaching(x, y *typ
 
 // nonCopyOnlyManualConversionFunctionExists returns true iff the manual conversion tracker
 // knows of a conversion function from x to y, that is not a copy-only conversion function.
-func (a *UnsafeConversionArbitrator) nonCopyOnlyManualConversionFunctionExists(x, y *types.Type) bool {
+func (a *unsafeConversionArbitrator) nonCopyOnlyManualConversionFunctionExists(x, y *types.Type) bool {
 	conversionFunction, exists := a.manualConversionsTracker.preexists(x, y)
 	return exists && !isCopyOnlyFunction(conversionFunction, a.functionTagName)
 }
 
 // setFunctionTagName sets the function tag name.
 // That also invalidates the cache if the new function tag name is different than the previous one.
-func (a *UnsafeConversionArbitrator) setFunctionTagName(functionTagName string) {
+func (a *unsafeConversionArbitrator) setFunctionTagName(functionTagName string) {
 	if a.functionTagName != functionTagName {
 		a.functionTagName = functionTagName
 		a.processedPairs = make(map[ConversionPair]unsafeConversionDecision)
 	}
 }
 
-func (a *UnsafeConversionArbitrator) canUseUnsafeRecursive(x, y *types.Type, alreadyVisitedTypes map[*types.Type]bool) unsafeConversionDecision {
+func (a *unsafeConversionArbitrator) canUseUnsafeRecursive(x, y *types.Type, alreadyVisitedTypes map[*types.Type]bool) unsafeConversionDecision {
 	in, out := unwrapAlias(x), unwrapAlias(y)
 	switch {
 	case in == out:
