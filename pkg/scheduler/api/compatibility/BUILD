@@ -5,7 +5,9 @@ go_test(
     srcs = ["compatibility_test.go"],
     deps = [
         "//pkg/apis/core/install:go_default_library",
+        "//pkg/features:go_default_library",
         "//pkg/scheduler:go_default_library",
+        "//pkg/scheduler/algorithmprovider:go_default_library",
         "//pkg/scheduler/algorithmprovider/defaults:go_default_library",
         "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
@@ -13,8 +15,11 @@ go_test(
         "//staging/src/k8s.io/api/core/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/client-go/informers:go_default_library",
         "//staging/src/k8s.io/client-go/kubernetes/fake:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate:go_default_library",
+        "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//vendor/github.com/google/go-cmp/cmp:go_default_library",
     ],
 )
