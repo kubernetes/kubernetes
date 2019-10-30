@@ -50,6 +50,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	e2eskipper "k8s.io/kubernetes/test/e2e/framework/skipper"
 	testutil "k8s.io/kubernetes/test/utils"
+	"k8s.io/utils/integer"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -129,6 +130,7 @@ var _ = SIGDescribe("Deployment", func() {
 		testProportionalScalingDeployment(f)
 	})
 	ginkgo.It("should not disrupt a cloud load-balancer's connectivity during rollout", func() {
+		e2eskipper.SkipUnlessNodeCountIsAtLeast(2)
 		e2eskipper.SkipUnlessProviderIs("aws", "azure", "gce", "gke")
 		testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f)
 	})
@@ -872,7 +874,7 @@ func testRollingUpdateDeploymentWithLocalTrafficLoadBalancer(f *framework.Framew
 	name := "test-rolling-update-with-lb"
 	framework.Logf("Creating Deployment %q", name)
 	podLabels := map[string]string{"name": name}
-	replicas := int32(3)
+	replicas := int32(integer.IntMin(5, framework.TestContext.CloudConfig.NumNodes))
 	d := e2edeployment.NewDeployment(name, replicas, podLabels, AgnhostImageName, AgnhostImage, appsv1.RollingUpdateDeploymentStrategyType)
 	// NewDeployment assigned the same value to both d.Spec.Selector and
 	// d.Spec.Template.Labels, so mutating the one would mutate the other.
