@@ -78,6 +78,7 @@ func TestReplaceObject(t *testing.T) {
 	cmd.Flags().Set("force", "true")
 	cmd.Flags().Set("cascade", "false")
 	cmd.Flags().Set("output", "name")
+	cmd.Flags().Set("resource-version", "1")
 	cmd.Run(cmd, []string{})
 
 	if buf.String() != "replicationcontroller/redis-master\nreplicationcontroller/rc1\n" {
