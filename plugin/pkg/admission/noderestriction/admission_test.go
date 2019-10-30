@@ -48,7 +48,6 @@ import (
 
 var (
 	trEnabledFeature           = featuregate.NewFeatureGate()
-	trDisabledFeature          = featuregate.NewFeatureGate()
 	csiNodeInfoEnabledFeature  = featuregate.NewFeatureGate()
 	csiNodeInfoDisabledFeature = featuregate.NewFeatureGate()
 )
@@ -61,7 +60,6 @@ func init() {
 		features.ExpandPersistentVolumes: {Default: false},
 	}
 	utilruntime.Must(trEnabledFeature.Add(relevantFeatures))
-	utilruntime.Must(trDisabledFeature.Add(relevantFeatures))
 	utilruntime.Must(csiNodeInfoEnabledFeature.Add(relevantFeatures))
 	utilruntime.Must(csiNodeInfoDisabledFeature.Add(relevantFeatures))
 
@@ -83,6 +81,18 @@ func makeTestPod(namespace, name, node string, mirror bool) (*api.Pod, *corev1.P
 	if mirror {
 		corePod.Annotations = map[string]string{api.MirrorPodAnnotationKey: "true"}
 		v1Pod.Annotations = map[string]string{api.MirrorPodAnnotationKey: "true"}
+
+		// Insert a valid owner reference by default.
+		controller := true
+		owner := metav1.OwnerReference{
+			APIVersion: "v1",
+			Kind:       "Node",
+			Name:       node,
+			UID:        "node-uid-12345",
+			Controller: &controller,
+		}
+		corePod.OwnerReferences = []metav1.OwnerReference{owner}
+		v1Pod.OwnerReferences = []metav1.OwnerReference{owner}
 	}
 	return corePod, v1Pod
 }
@@ -376,6 +386,22 @@ func Test_nodePlugin_Admit(t *testing.T) {
 	pvcpod, _ := makeTestPod("ns", "mypvcpod", "mynode", true)
 	pvcpod.Spec.Volumes = []api.Volume{{VolumeSource: api.VolumeSource{PersistentVolumeClaim: &api.PersistentVolumeClaimVolumeSource{ClaimName: "foo"}}}}
 
+	orphanedPod, _ := makeTestPod("ns", "annie", "mynode", true)
+	orphanedPod.OwnerReferences = nil
+
+	invalidOwnerPod, _ := makeTestPod("ns", "alice", "mynode", true)
+	controller := true
+	invalidOwnerPod.OwnerReferences[0] = metav1.OwnerReference{
+		APIVersion: "apps/v1",
+		Kind:       "ReplicaSet",
+		Name:       "foo",
+		UID:        "foo-uid-12345",
+		Controller: &controller,
+	}
+
+	uncontrolledPod, _ := makeTestPod("ns", "billy-kid", "mynode", true)
+	uncontrolledPod.OwnerReferences[0].Controller = nil
+
 	tests := []struct {
 		name       string
 		podsGetter corev1lister.PodLister
@@ -443,6 +469,24 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			podsGetter: existingPods,
 			attributes: admission.NewAttributesRecord(unnamedEviction, nil, evictionKind, coremymirrorpod.Namespace, coremymirrorpod.Name, podResource, "eviction", admission.Create, &metav1.CreateOptions{}, false, mynode),
 			err:        "",
+		},
+		{
+			name:       "forbid creating a mirror pod with a non-node owner",
+			podsGetter: noExistingPods,
+			attributes: createPodAttributes(invalidOwnerPod, mynode),
+			err:        "can only create pods with an owner reference set to itself",
+		},
+		{
+			name:       "forbid creating a mirror pod with a non-controller owner",
+			podsGetter: noExistingPods,
+			attributes: createPodAttributes(uncontrolledPod, mynode),
+			err:        "can only create pods with a controller owner reference set to itself",
+		},
+		{
+			// Note: This behavior may change with a feature roll out in the future.
+			name:       "allow creating a mirror pod without an owner",
+			podsGetter: noExistingPods,
+			attributes: createPodAttributes(orphanedPod, mynode),
 		},
 
 		// Mirror pods bound to another node
@@ -1325,4 +1369,10 @@ func Test_getModifiedLabels(t *testing.T) {
 			}
 		})
 	}
+}
+
+func createPodAttributes(pod *api.Pod, user user.Info) admission.Attributes {
+	podResource := api.Resource("pods").WithVersion("v1")
+	podKind := api.Kind("Pod").WithVersion("v1")
+	return admission.NewAttributesRecord(pod, nil, podKind, pod.Namespace, pod.Name, podResource, "", admission.Create, &metav1.CreateOptions{}, false, user)
 }
