@@ -5046,6 +5046,10 @@ const (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // Event is a report of an event somewhere in the cluster.
+//
+// There is a pending enhancement to replace `Event.v1.` with what is currently
+// `Event.v1beta1.events.k8s.io`; see <https://github.com/kubernetes/enhancements/issues/383> and
+// <https://git.k8s.io/community/contributors/design-proposals/instrumentation/events-redesign.md>.
 type Event struct {
 	metav1.TypeMeta `json:",inline"`
 	// Standard object's metadata.
@@ -5087,32 +5091,61 @@ type Event struct {
 	Type string `json:"type,omitempty" protobuf:"bytes,9,opt,name=type"`
 
 	// Time when this Event was first observed.
+	//
+	// This exists to enable future migration with `Event.v1beta1.events.k8s.io`; prefer to use
+	// `.firstTimestamp` for native `Event.v1.`.
+	//
 	// +optional
 	EventTime metav1.MicroTime `json:"eventTime,omitempty" protobuf:"bytes,10,opt,name=eventTime"`
 
 	// Data about the Event series this event represents or nil if it's a singleton Event.
+	//
+	// This exists to enable future migration with `Event.v1beta1.events.k8s.io`; prefer to use
+	// `.count` and `.lastTimestamp` for native `Event.v1.` (there is no native `Event.v1.`
+	// equivalent of `.series.state`, but `.series.state` is deprecated and slated for removal
+	// in 1.18).
+	//
 	// +optional
 	Series *EventSeries `json:"series,omitempty" protobuf:"bytes,11,opt,name=series"`
 
-	// What action was taken/failed regarding to the Regarding object.
+	// What action was taken/failed regarding the `.involvedObject` object.
+	//
+	// This exists to enable future migration with `Event.v1beta1.events.k8s.io`; there is no
+	// native `Event.v1.` equivalent.
+	//
 	// +optional
 	Action string `json:"action,omitempty" protobuf:"bytes,12,opt,name=action"`
 
 	// Optional secondary object for more complex actions.
+	//
+	// This exists to enable future migration with `Event.v1beta1.events.k8s.io`; there is no
+	// native `Event.v1.` equivalent.
+	//
 	// +optional
 	Related *ObjectReference `json:"related,omitempty" protobuf:"bytes,13,opt,name=related"`
 
 	// Name of the controller that emitted this Event, e.g. `kubernetes.io/kubelet`.
+	//
+	// This exists to enable future migration with `Event.v1beta1.events.k8s.io`; prefer to use
+	// `.source.component` for native `Event.v1.`.
+	//
 	// +optional
 	ReportingController string `json:"reportingComponent" protobuf:"bytes,14,opt,name=reportingComponent"`
 
 	// ID of the controller instance, e.g. `kubelet-xyzf`.
+	//
+	// This exists to enable future migration with `Event.v1beta1.events.k8s.io`; prefer to use
+	// `.source.host` for native `Event.v1.`.
+	//
 	// +optional
 	ReportingInstance string `json:"reportingInstance" protobuf:"bytes,15,opt,name=reportingInstance"`
 }
 
 // EventSeries contain information on series of events, i.e. thing that was/is happening
 // continuously for some time.
+//
+// This exists to enable future migration with `EventSeries.v1beta1.events.k8s.io`; prefer to not
+// use it for native `Event.v1.`.
 type EventSeries struct {
 	// Number of occurrences in this series up to the last heartbeat time
 	Count int32 `json:"count,omitempty" protobuf:"varint,1,name=count"`
