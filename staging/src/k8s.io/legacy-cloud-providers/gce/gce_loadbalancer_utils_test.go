@@ -206,7 +206,7 @@ func assertInternalLbResources(t *testing.T, gce *Cloud, apiService *v1.Service,
 
 	// Check that Firewalls are created for the LoadBalancer and the HealthCheck
 	fwNames := []string{
-		lbName, // Firewalls for internal LBs are named the same name as the loadbalancer.
+		MakeFirewallName(lbName),
 		makeHealthCheckFirewallName(lbName, vals.ClusterID, true),
 	}
 
