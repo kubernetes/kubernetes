@@ -108,7 +108,7 @@ func TestGetEtcdImage(t *testing.T) {
 					Local: &kubeadmapi.LocalEtcd{},
 				},
 			},
-			expected: "real.repo/etcd:3.3.15-0",
+			expected: "real.repo/etcd:3.3.17-0",
 		},
 		{
 			cfg: &kubeadmapi.ClusterConfiguration{
@@ -136,7 +136,7 @@ func TestGetEtcdImage(t *testing.T) {
 					},
 				},
 			},
-			expected: "override/etcd:3.3.15-0",
+			expected: "override/etcd:3.3.17-0",
 		},
 		{
 			expected: GetGenericImage(gcrPrefix, "etcd", constants.DefaultEtcdVersion),

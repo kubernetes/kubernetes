@@ -19,7 +19,7 @@ package priorities
 import (
 	"k8s.io/api/core/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 )
 
 // NormalizeReduce generates a PriorityReduceFunction that can normalize the result
@@ -29,7 +29,7 @@ func NormalizeReduce(maxPriority int64, reverse bool) PriorityReduceFunction {
 	return func(
 		_ *v1.Pod,
 		_ interface{},
-		_ map[string]*schedulernodeinfo.NodeInfo,
+		_ schedulerlisters.SharedLister,
 		result framework.NodeScoreList) error {
 
 		var maxCount int64

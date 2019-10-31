@@ -22,11 +22,9 @@ limitations under the License.
 package framework
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"math/rand"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -481,7 +479,7 @@ func (f *Framework) WriteFileViaContainer(podName, containerName string, path st
 			return fmt.Errorf("Unsupported character in string to write: %v", c)
 		}
 	}
-	command := fmt.Sprintf("echo '%s' > '%s'", contents, path)
+	command := fmt.Sprintf("echo '%s' > '%s'; sync", contents, path)
 	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "/bin/sh", "-c", command)
 	if err != nil {
 		Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
@@ -864,18 +862,6 @@ func (cl *ClusterVerification) ForEach(podFunc func(v1.Pod)) error {
 	}
 
 	return err
-}
-
-// GetLogToFileFunc is a convenience function that returns a function that have the same interface as
-// e2elog.Logf, but writes to a specified file.
-func GetLogToFileFunc(file *os.File) func(format string, args ...interface{}) {
-	return func(format string, args ...interface{}) {
-		writer := bufio.NewWriter(file)
-		if _, err := fmt.Fprintf(writer, format, args...); err != nil {
-			Logf("Failed to write file %v with test performance data: %v", file.Name(), err)
-		}
-		writer.Flush()
-	}
 }
 
 const (

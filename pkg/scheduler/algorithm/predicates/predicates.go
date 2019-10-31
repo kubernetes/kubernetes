@@ -150,12 +150,6 @@ func Ordering() []string {
 	return predicatesOrdering
 }
 
-// NodeInfo interface represents anything that can get node object from node name.
-// TODO(ahg-g): should be deleted, still exist because kubelet depends on it.
-type NodeInfo interface {
-	GetNodeInfo(nodeName string) (*v1.Node, error)
-}
-
 // FitPredicate is a function that indicates if a pod fits into an existing node.
 // The failure information is given by the error.
 type FitPredicate func(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []PredicateFailureReason, error)

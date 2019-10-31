@@ -140,7 +140,6 @@ try {
 
   Create-DockerRegistryKey
   Configure-Dockerd
-  Pull-InfraContainer
   DownloadAndInstall-KubernetesBinaries
   Create-NodePki
   Create-KubeletKubeconfig
@@ -159,6 +158,8 @@ try {
 
   $config = New-FileRotationConfig
   Schedule-LogRotation -Pattern '.*\.log$' -Path ${env:LOGS_DIR} -RepetitionInterval $(New-Timespan -Hour 1) -Config $config
+
+  Pull-InfraContainer
 }
 catch {
   Write-Host 'Exception caught in script:'

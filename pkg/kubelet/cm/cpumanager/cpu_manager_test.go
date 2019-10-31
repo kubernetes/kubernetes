@@ -635,7 +635,7 @@ func TestReconcileState(t *testing.T) {
 				found:     testCase.pspFound,
 			},
 		}
-
+		mgr.sourcesReady = &sourcesReadyStub{}
 		success, failure := mgr.reconcileState()
 
 		if testCase.expectSucceededContainerName != "" {

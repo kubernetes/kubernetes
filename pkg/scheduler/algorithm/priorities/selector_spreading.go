@@ -98,7 +98,7 @@ func (s *SelectorSpread) CalculateSpreadPriorityMap(pod *v1.Pod, meta interface{
 // based on the number of existing matching pods on the node
 // where zone information is included on the nodes, it favors nodes
 // in zones with fewer existing matching pods.
-func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result framework.NodeScoreList) error {
+func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interface{}, sharedLister schedulerlisters.SharedLister, result framework.NodeScoreList) error {
 	countsByZone := make(map[string]int64, 10)
 	maxCountByZone := int64(0)
 	maxCountByNodeName := int64(0)
@@ -107,7 +107,11 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 		if result[i].Score > maxCountByNodeName {
 			maxCountByNodeName = result[i].Score
 		}
-		zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Name].Node())
+		nodeInfo, err := sharedLister.NodeInfos().Get(result[i].Name)
+		if err != nil {
+			return err
+		}
+		zoneID := utilnode.GetZoneKey(nodeInfo.Node())
 		if zoneID == "" {
 			continue
 		}
@@ -134,7 +138,12 @@ func (s *SelectorSpread) CalculateSpreadPriorityReduce(pod *v1.Pod, meta interfa
 		}
 		// If there is zone information present, incorporate it
 		if haveZones {
-			zoneID := utilnode.GetZoneKey(nodeNameToInfo[result[i].Name].Node())
+			nodeInfo, err := sharedLister.NodeInfos().Get(result[i].Name)
+			if err != nil {
+				return err
+			}
+
+			zoneID := utilnode.GetZoneKey(nodeInfo.Node())
 			if zoneID != "" {
 				zoneScore := MaxNodeScoreFloat64
 				if maxCountByZone > 0 {
@@ -240,7 +249,7 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityMap(pod *v1.Pod, meta
 
 // CalculateAntiAffinityPriorityReduce computes each node score with the same value for a particular label.
 // The label to be considered is provided to the struct (ServiceAntiAffinity).
-func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, meta interface{}, nodeNameToInfo map[string]*schedulernodeinfo.NodeInfo, result framework.NodeScoreList) error {
+func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, meta interface{}, sharedLister schedulerlisters.SharedLister, result framework.NodeScoreList) error {
 	var numServicePods int64
 	var label string
 	podCounts := map[string]int64{}
@@ -249,10 +258,15 @@ func (s *ServiceAntiAffinity) CalculateAntiAffinityPriorityReduce(pod *v1.Pod, m
 
 	for _, hostPriority := range result {
 		numServicePods += hostPriority.Score
-		if !labels.Set(nodeNameToInfo[hostPriority.Name].Node().Labels).Has(s.label) {
+		nodeInfo, err := sharedLister.NodeInfos().Get(hostPriority.Name)
+		if err != nil {
+			return err
+		}
+		if !labels.Set(nodeInfo.Node().Labels).Has(s.label) {
 			continue
 		}
-		label = labels.Set(nodeNameToInfo[hostPriority.Name].Node().Labels).Get(s.label)
+
+		label = labels.Set(nodeInfo.Node().Labels).Get(s.label)
 		labelNodesStatus[hostPriority.Name] = label
 		podCounts[label] += hostPriority.Score
 	}

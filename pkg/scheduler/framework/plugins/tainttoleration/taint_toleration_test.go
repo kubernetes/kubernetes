@@ -26,6 +26,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func nodeWithTaints(nodeName string, taints []v1.Taint) *v1.Node {
@@ -229,10 +230,8 @@ func TestTaintTolerationScore(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
-
-			fh, _ := framework.NewFramework(nil, nil, nil)
-			snapshot := fh.NodeInfoSnapshot()
-			snapshot.NodeInfoMap = schedulernodeinfo.CreateNodeNameToInfoMap(nil, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nil, test.nodes)
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithNodeInfoSnapshot(snapshot))
 
 			p, _ := New(nil, fh)
 			var gotList framework.NodeScoreList

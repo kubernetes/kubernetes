@@ -733,7 +733,7 @@ func TestSingleNode(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, []*v1.Node{test.node})
-			meta := predicates.GetPredicateMetadata(test.pod, snapshot.NodeInfoMap)
+			meta := predicates.GetPredicateMetadata(test.pod, snapshot)
 			state := framework.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
@@ -1434,7 +1434,7 @@ func TestMultipleNodes(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
 			for indexNode, node := range test.nodes {
-				meta := predicates.GetPredicateMetadata(test.pod, snapshot.NodeInfoMap)
+				meta := predicates.GetPredicateMetadata(test.pod, snapshot)
 				state := framework.NewCycleState()
 				state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 

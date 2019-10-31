@@ -146,7 +146,7 @@ func NewRCByName(c clientset.Interface, ns, name string, replicas int32, gracePe
 		containerArgs = []string{"serve-hostname"}
 	}
 
-	return c.CoreV1().ReplicationControllers(ns).Create(framework.RcByNamePort(
+	return c.CoreV1().ReplicationControllers(ns).Create(rcByNamePort(
 		name, replicas, framework.ServeHostnameImage, containerArgs, 9376, v1.ProtocolTCP, map[string]string{}, gracePeriod))
 }
 
@@ -193,4 +193,16 @@ func RestartNodes(c clientset.Interface, nodes []v1.Node) error {
 		}
 	}
 	return nil
+}
+
+// rcByNamePort returns a ReplicationController with specified name and port
+func rcByNamePort(name string, replicas int32, image string, containerArgs []string, port int, protocol v1.Protocol,
+	labels map[string]string, gracePeriod *int64) *v1.ReplicationController {
+
+	return framework.RcByNameContainer(name, replicas, image, labels, v1.Container{
+		Name:  name,
+		Image: image,
+		Args:  containerArgs,
+		Ports: []v1.ContainerPort{{ContainerPort: int32(port), Protocol: protocol}},
+	}, gracePeriod)
 }

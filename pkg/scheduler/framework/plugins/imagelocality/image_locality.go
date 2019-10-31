@@ -27,8 +27,6 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 )
 
-var mb int64 = 1024 * 1024
-
 // ImageLocality is a score plugin that favors nodes that already have requested pod container's images.
 type ImageLocality struct {
 	handle framework.FrameworkHandle
@@ -46,9 +44,9 @@ func (pl *ImageLocality) Name() string {
 
 // Score invoked at the score extension point.
 func (pl *ImageLocality) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, exist := pl.handle.NodeInfoSnapshot().NodeInfoMap[nodeName]
-	if !exist {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("node %q does not exist in NodeInfoSnapshot", nodeName))
+	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
 
 	meta := migration.PriorityMetadata(state)

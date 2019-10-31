@@ -42,7 +42,6 @@ import (
 )
 
 // TODO: Move to its own subpkg.
-// expectNoErrorWithRetries to their own subpackages within framework.
 // expectNoError checks if "err" is set, and if so, fails assertion while logging the error.
 func expectNoError(err error, explain ...interface{}) {
 	expectNoErrorWithOffset(1, err, explain...)

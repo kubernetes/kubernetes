@@ -272,7 +272,7 @@ type csrBuilder struct {
 }
 
 func makeFancyTestCsr(b csrBuilder) *capi.CertificateSigningRequest {
-	pk, err := ecdsa.GenerateKey(elliptic.P224(), insecureRand)
+	pk, err := ecdsa.GenerateKey(elliptic.P256(), insecureRand)
 	if err != nil {
 		panic(err)
 	}

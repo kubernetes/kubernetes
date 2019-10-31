@@ -40,7 +40,7 @@ For example, let's consider the following `pod.yaml` file:
       containers:
       - args:
         - dns-suffix
-        image: gcr.io/kubernetes-e2e-test-images/agnhost:2.2
+        image: gcr.io/kubernetes-e2e-test-images/agnhost:2.7
         name: agnhost
       dnsConfig:
         nameservers:
@@ -258,14 +258,14 @@ Examples:
 
 ```console
 docker run -i \
-  gcr.io/kubernetes-e2e-test-images/agnhost:2.2 \
+  gcr.io/kubernetes-e2e-test-images/agnhost:2.7 \
   logs-generator --log-lines-total 10 --run-duration 1s
 ```
 
 ```console
 kubectl run logs-generator \
   --generator=run-pod/v1 \
-  --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.2 \
+  --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.7 \
   --restart=Never \
   -- logs-generator -t 10 -d 1s
 ```
@@ -392,7 +392,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.2 \
+      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.7 \
       --restart=Never \
       --env "POD_IP=<POD_IP>" \
       --env "NODE_IP=<NODE_IP>" \
@@ -447,7 +447,7 @@ Usage:
 ```console
     kubectl run test-agnhost \
       --generator=run-pod/v1 \
-      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.1 \
+      --image=gcr.io/kubernetes-e2e-test-images/agnhost:2.7 \
       --restart=Never \
       --env "BIND_ADDRESS=localhost" \
       --env "BIND_PORT=8080" \
@@ -534,6 +534,6 @@ The image contains `iperf`.
 
 ## Image
 
-The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:2.2` for Linux
-containers, and `e2eteam/agnhost:2.2` for Windows containers. In the future, the same
+The image can be found at `gcr.io/kubernetes-e2e-test-images/agnhost:2.7` for Linux
+containers, and `e2eteam/agnhost:2.7` for Windows containers. In the future, the same
 repository can be used for both OSes.

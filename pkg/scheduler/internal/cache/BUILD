@@ -12,6 +12,7 @@ go_library(
     deps = [
         "//pkg/features:go_default_library",
         "//pkg/scheduler/listers:go_default_library",
+        "//pkg/scheduler/metrics:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/nodeinfo/snapshot:go_default_library",
         "//pkg/util/node:go_default_library",

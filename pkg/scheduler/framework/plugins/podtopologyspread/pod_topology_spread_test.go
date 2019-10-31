@@ -24,7 +24,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
@@ -267,13 +267,14 @@ func TestPodTopologySpreadFilter_SingleConstraint(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
-			meta := predicates.GetPredicateMetadata(tt.pod, nodeInfoMap)
+			snapshot := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
+			meta := predicates.GetPredicateMetadata(tt.pod, snapshot)
 			state := v1alpha1.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 			plugin, _ := New(nil, nil)
 			for _, node := range tt.nodes {
-				status := plugin.(*PodTopologySpread).Filter(context.Background(), state, tt.pod, nodeInfoMap[node.Name])
+				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
+				status := plugin.(*PodTopologySpread).Filter(context.Background(), state, tt.pod, nodeInfo)
 				if status.IsSuccess() != tt.fits[node.Name] {
 					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
 				}
@@ -463,13 +464,14 @@ func TestPodTopologySpreadFilter_MultipleConstraints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(tt.existingPods, tt.nodes)
-			meta := predicates.GetPredicateMetadata(tt.pod, nodeInfoMap)
+			snapshot := nodeinfosnapshot.NewSnapshot(tt.existingPods, tt.nodes)
+			meta := predicates.GetPredicateMetadata(tt.pod, snapshot)
 			state := v1alpha1.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 			plugin, _ := New(nil, nil)
 			for _, node := range tt.nodes {
-				status := plugin.(*PodTopologySpread).Filter(context.Background(), state, tt.pod, nodeInfoMap[node.Name])
+				nodeInfo, _ := snapshot.NodeInfos().Get(node.Name)
+				status := plugin.(*PodTopologySpread).Filter(context.Background(), state, tt.pod, nodeInfo)
 				if status.IsSuccess() != tt.fits[node.Name] {
 					t.Errorf("[%s]: expected %v got %v", node.Name, tt.fits[node.Name], status.IsSuccess())
 				}

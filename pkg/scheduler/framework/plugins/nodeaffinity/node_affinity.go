@@ -53,9 +53,9 @@ func (pl *NodeAffinity) Filter(ctx context.Context, state *framework.CycleState,
 
 // Score invoked at the Score extension point.
 func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, exist := pl.handle.NodeInfoSnapshot().NodeInfoMap[nodeName]
-	if !exist {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("node %q does not exist in NodeInfoSnapshot", nodeName))
+	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
 
 	meta := migration.PriorityMetadata(state)
@@ -66,7 +66,7 @@ func (pl *NodeAffinity) Score(ctx context.Context, state *framework.CycleState, 
 // NormalizeScore invoked after scoring all nodes.
 func (pl *NodeAffinity) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
 	// Note that CalculateNodeAffinityPriorityReduce doesn't use priority metadata, hence passing nil here.
-	err := priorities.CalculateNodeAffinityPriorityReduce(pod, nil, pl.handle.NodeInfoSnapshot().NodeInfoMap, scores)
+	err := priorities.CalculateNodeAffinityPriorityReduce(pod, nil, pl.handle.SnapshotSharedLister(), scores)
 	return migration.ErrorToFrameworkStatus(err)
 }
 

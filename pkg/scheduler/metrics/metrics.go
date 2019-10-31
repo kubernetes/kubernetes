@@ -272,6 +272,14 @@ var (
 		},
 		[]string{"result"})
 
+	CacheSize = metrics.NewGaugeVec(
+		&metrics.GaugeOpts{
+			Subsystem:      SchedulerSubsystem,
+			Name:           "scheduler_cache_size",
+			Help:           "Number of nodes, pods, and assumed (bound) pods in the scheduler cache.",
+			StabilityLevel: metrics.ALPHA,
+		}, []string{"type"})
+
 	metricsList = []metrics.Registerable{
 		scheduleAttempts,
 		SchedulingLatency,
@@ -297,6 +305,7 @@ var (
 		SchedulerQueueIncomingPods,
 		SchedulerGoroutines,
 		PermitWaitDuration,
+		CacheSize,
 	}
 )
 

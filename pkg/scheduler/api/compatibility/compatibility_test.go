@@ -24,10 +24,15 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/component-base/featuregate"
+	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
+	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler"
+	"k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider/defaults"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -35,21 +40,23 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/core"
 )
 
-func TestCompatibility_v1_Scheduler(t *testing.T) {
-	snapshot := scheduler.RegisteredPredicatesAndPrioritiesSnapshot()
-	defer scheduler.ApplyPredicatesAndPriorities(snapshot)
+type testCase struct {
+	name             string
+	JSON             string
+	featureGates     map[featuregate.Feature]bool
+	wantPredicates   sets.String
+	wantPrioritizers sets.String
+	wantPlugins      map[string][]kubeschedulerconfig.Plugin
+	wantExtenders    []schedulerapi.ExtenderConfig
+}
 
+func TestCompatibility_v1_Scheduler(t *testing.T) {
 	// Add serialized versions of scheduler config that exercise available options to ensure compatibility between releases
-	schedulerFiles := map[string]struct {
-		JSON             string
-		wantPredicates   sets.String
-		wantPrioritizers sets.String
-		wantPlugins      map[string][]kubeschedulerconfig.Plugin
-		wantExtenders    []schedulerapi.ExtenderConfig
-	}{
+	testcases := []testCase{
 		// This is a special test for the "composite" predicate "GeneralPredicate". GeneralPredicate is a combination
 		// of predicates, and here we test that if given, it is mapped to the set of plugins that should be executed.
-		"GeneralPredicate": {
+		{
+			name: "GeneralPredicate",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -72,7 +79,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
-		"1.0": {
+		{
+			name: "1.0",
 			JSON: `{
   "kind": "Policy",
   "apiVersion": "v1",
@@ -116,7 +124,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
-		"1.1": {
+		{
+			name: "1.1",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -163,10 +172,10 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 			},
 		},
-
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
-		"1.2": {
+		{
+			name: "1.2",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -228,7 +237,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
-		"1.3": {
+		{
+			name: "1.3",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -293,7 +303,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
-		"1.4": {
+		{
+			name: "1.4",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -361,7 +372,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
-		"1.7": {
+		{
+			name: "1.7",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -450,7 +462,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
-		"1.8": {
+		{
+			name: "1.8",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -539,7 +552,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
-		"1.9": {
+		{
+			name: "1.9",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -631,7 +645,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
-		"1.10": {
+		{
+			name: "1.10",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -726,7 +741,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
-		"1.11": {
+		{
+			name: "1.11",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -788,7 +804,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"EqualPriority",
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
-				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -814,6 +829,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "RequestedToCapacityRatio", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -833,7 +849,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		},
 		// Do not change this JSON after the corresponding release has been tagged.
 		// A failure indicates backwards compatibility with the specified release was broken.
-		"1.12": {
+		{
+			name: "1.12",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -896,7 +913,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"EqualPriority",
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
-				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -923,6 +939,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "RequestedToCapacityRatio", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -940,7 +957,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				Ignorable:        true,
 			}},
 		},
-		"1.14": {
+		{
+			name: "1.14",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -1004,7 +1022,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"EqualPriority",
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
-				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -1032,6 +1049,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "RequestedToCapacityRatio", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -1049,7 +1067,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				Ignorable:        true,
 			}},
 		},
-		"1.16": {
+		{
+			name: "1.16",
 			JSON: `{
 		  "kind": "Policy",
 		  "apiVersion": "v1",
@@ -1117,7 +1136,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"EqualPriority",
 				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
-				"RequestedToCapacityRatioPriority",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -1145,6 +1163,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "RequestedToCapacityRatio", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -1161,6 +1180,56 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				ManagedResources: []schedulerapi.ExtenderManagedResource{{Name: v1.ResourceName("example.com/foo"), IgnoredByScheduler: true}},
 				Ignorable:        true,
 			}},
+		},
+		{
+			name: "enable alpha feature EvenPodsSpread",
+			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
+		  "predicates": [
+			{"name": "EvenPodsSpread"}
+		  ],
+		  "priorities": [
+			{"name": "EvenPodsSpreadPriority",   "weight": 2}
+		  ]
+		}`,
+			featureGates: map[featuregate.Feature]bool{
+				features.EvenPodsSpread: true,
+			},
+			wantPrioritizers: sets.NewString(
+				"EvenPodsSpreadPriority",
+			),
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
+					{Name: "TaintToleration"},
+					{Name: "PodTopologySpread"},
+				},
+			},
+		},
+		{
+			name: "disable beta feature AttachVolumeLimit",
+			JSON: `{
+		  "kind": "Policy",
+		  "apiVersion": "v1",
+		  "predicates": [
+			{"name": "MaxCSIVolumeCountPred"},
+			{"name": "CheckVolumeBinding"}
+		  ],		  
+		  "priorities": [
+		  ]
+		}`,
+			featureGates: map[featuregate.Feature]bool{
+				features.AttachVolumeLimit: false,
+			},
+			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
+				"FilterPlugin": {
+					{Name: "NodeUnschedulable"},
+					{Name: "TaintToleration"},
+					{Name: "NodeVolumeLimits"},
+					{Name: "VolumeBinding"},
+				},
+			},
 		},
 	}
 	registeredPredicates := sets.NewString(scheduler.ListRegisteredFitPredicates()...)
@@ -1185,6 +1254,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		"AzureDiskLimits":    "MaxAzureDiskVolumeCount",
 		"CinderLimits":       "MaxCinderVolumeCount",
 		"InterPodAffinity":   "MatchInterPodAffinity",
+		"PodTopologySpread":  "EvenPodsSpread",
 	}
 	scoreToPriorityMap := map[string]string{
 		"ImageLocality":                   "ImageLocalityPriority",
@@ -1194,10 +1264,19 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		"NodeResourcesLeastAllocated":     "LeastRequestedPriority",
 		"NodeResourcesBalancedAllocation": "BalancedResourceAllocation",
 		"NodeResourcesMostAllocated":      "MostRequestedPriority",
+		"RequestedToCapacityRatio":        "RequestedToCapacityRatioPriority",
 	}
 
-	for v, tc := range schedulerFiles {
-		t.Run(v, func(t *testing.T) {
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			for feature, value := range tc.featureGates {
+				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, feature, value)()
+			}
+			defer algorithmprovider.ApplyFeatureGates()()
+			if len(tc.featureGates) > 0 {
+				// The enabled featuregate can register more predicates
+				registeredPredicates = registeredPredicates.Union(sets.NewString(scheduler.ListRegisteredFitPredicates()...))
+			}
 			policyConfigMap := v1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: "scheduler-custom-policy-config"},
 				Data:       map[string]string{schedulerconfig.SchedulerPolicyConfigMapKey: tc.JSON},
@@ -1223,7 +1302,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			)
 
 			if err != nil {
-				t.Fatalf("%s: Error constructing: %v", v, err)
+				t.Fatalf("Error constructing: %v", err)
 			}
 			gotPredicates := sets.NewString()
 			for p := range sched.Algorithm.Predicates() {

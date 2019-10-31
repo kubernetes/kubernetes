@@ -96,6 +96,20 @@ func (s *SecureServingInfo) tlsConfig(stopCh <-chan struct{}) (*tls.Config, erro
 
 			go controller.Run(1, stopCh)
 		}
+		for _, sniCert := range s.SNICerts {
+			if notifier, ok := sniCert.(dynamiccertificates.Notifier); ok {
+				notifier.AddListener(dynamicCertificateController)
+			}
+
+			if controller, ok := sniCert.(dynamiccertificates.ControllerRunner); ok {
+				// runonce to be sure that we have a value.
+				if err := controller.RunOnce(); err != nil {
+					return nil, err
+				}
+
+				go controller.Run(1, stopCh)
+			}
+		}
 
 		// runonce to be sure that we have a value.
 		if err := dynamicCertificateController.RunOnce(); err != nil {

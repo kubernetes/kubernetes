@@ -23,7 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func TestResourceLimitsPriority(t *testing.T) {
@@ -138,7 +138,7 @@ func TestResourceLimitsPriority(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nodeNameToInfo := schedulernodeinfo.CreateNodeNameToInfoMap(nil, test.nodes)
+			snapshot := nodeinfosnapshot.NewSnapshot(nil, test.nodes)
 			metadata := &priorityMetadata{
 				podLimits: getResourceLimits(test.pod),
 			}
@@ -151,7 +151,7 @@ func TestResourceLimitsPriority(t *testing.T) {
 					function = priorityFunction(ResourceLimitsPriorityMap, nil, nil)
 				}
 
-				list, err := function(test.pod, nodeNameToInfo, test.nodes)
+				list, err := function(test.pod, snapshot, test.nodes)
 
 				if err != nil {
 					t.Errorf("unexpected error: %v", err)

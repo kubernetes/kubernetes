@@ -22,20 +22,19 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
-	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
+	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
 // EmptyPriorityMetadataProducer should return a no-op PriorityMetadataProducer type.
 func TestEmptyPriorityMetadataProducer(t *testing.T) {
-	fakePod := new(v1.Pod)
+	fakePod := st.MakePod().Name("p1").Node("node2").Obj()
 	fakeLabelSelector := labels.SelectorFromSet(labels.Set{"foo": "bar"})
+	fakeNodes := []*v1.Node{st.MakeNode().Name("node1").Obj(), st.MakeNode().Name("node-a").Obj()}
 
-	nodeNameToInfo := map[string]*schedulernodeinfo.NodeInfo{
-		"2": schedulernodeinfo.NewNodeInfo(fakePod),
-		"1": schedulernodeinfo.NewNodeInfo(),
-	}
+	snapshot := nodeinfosnapshot.NewSnapshot([]*v1.Pod{fakePod}, fakeNodes)
 	// Test EmptyPriorityMetadataProducer
-	metadata := EmptyPriorityMetadataProducer(fakePod, nodeNameToInfo)
+	metadata := EmptyPriorityMetadataProducer(fakePod, fakeNodes, snapshot)
 	if metadata != nil {
 		t.Errorf("failed to produce empty metadata: got %v, expected nil", metadata)
 	}

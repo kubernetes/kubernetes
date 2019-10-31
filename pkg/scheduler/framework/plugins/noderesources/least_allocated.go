@@ -44,10 +44,11 @@ func (la *LeastAllocated) Name() string {
 
 // Score invoked at the score extension point.
 func (la *LeastAllocated) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
-	nodeInfo, exist := la.handle.NodeInfoSnapshot().NodeInfoMap[nodeName]
-	if !exist {
-		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("node %q does not exist in NodeInfoSnapshot", nodeName))
+	nodeInfo, err := la.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
 	}
+
 	// LeastRequestedPriorityMap does not use priority metadata, hence we pass nil here
 	s, err := priorities.LeastRequestedPriorityMap(pod, nil, nodeInfo)
 	return s.Score, migration.ErrorToFrameworkStatus(err)
