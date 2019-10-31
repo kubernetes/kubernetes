@@ -85,6 +85,15 @@ REGISTRY=gcr.io/kubernetes-e2e-test-images make all-push WHAT=agnhost
 REGISTRY=gcr.io/k8s-authenticated-test make all-push WHAT=agnhost
 ```
 
+*NOTE THIS TOO*: If you see an error like:
+
+```
+open /etc/docker/certs.d/gcr.io: permission denied
+make: *** [Makefile:40: all-push] Error 1
+```
+
+you need to set your permissions on `/etc/docker` with `sudo chmod o+x
+/etc/docker`. See [this Docker issue](https://github.com/docker/for-linux/issues/396) for more details.
 
 ## Testing the new image
 
