@@ -256,14 +256,26 @@ func (g *Cloud) ensureInternalLoadBalancerDeleted(clusterName, clusterID string,
 		return err
 	}
 
-	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting firewall for traffic", loadBalancerName)
-	if err := ignoreNotFound(g.DeleteFirewall(loadBalancerName)); err != nil {
-		if isForbidden(err) && g.OnXPN() {
-			klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): could not delete traffic firewall on XPN cluster. Raising event.", loadBalancerName)
-			g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(loadBalancerName, g.NetworkProjectID()))
-		} else {
+	deleteFunc := func(fwName string) error {
+		if err := ignoreNotFound(g.DeleteFirewall(fwName)); err != nil {
+			if isForbidden(err) && g.OnXPN() {
+				klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): could not delete traffic firewall on XPN cluster. Raising event.", loadBalancerName)
+				g.raiseFirewallChangeNeededEvent(svc, FirewallToGCloudDeleteCmd(fwName, g.NetworkProjectID()))
+				return nil
+			}
 			return err
 		}
+		return nil
+	}
+	fwName := MakeFirewallName(loadBalancerName)
+	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting firewall %s for traffic",
+		loadBalancerName, fwName)
+	if err := deleteFunc(fwName); err != nil {
+		return err
+	}
+	klog.V(2).Infof("ensureInternalLoadBalancerDeleted(%v): deleting legacy name firewall for traffic", loadBalancerName)
+	if err := deleteFunc(loadBalancerName); err != nil {
+		return err
 	}
 
 	hcName := makeHealthCheckName(loadBalancerName, clusterID, sharedHealthCheck)
@@ -325,7 +337,7 @@ func (g *Cloud) teardownInternalHealthCheckAndFirewall(svc *v1.Service, hcName s
 	return nil
 }
 
-func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, ports []string, protocol v1.Protocol, nodes []*v1.Node) error {
+func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, sourceRanges []string, ports []string, protocol v1.Protocol, nodes []*v1.Node, legacyFwName string) error {
 	klog.V(2).Infof("ensureInternalFirewall(%v): checking existing firewall", fwName)
 	targetTags, err := g.GetNodeTags(nodeNames(nodes))
 	if err != nil {
@@ -335,6 +347,29 @@ func (g *Cloud) ensureInternalFirewall(svc *v1.Service, fwName, fwDesc string, s
 	existingFirewall, err := g.GetFirewall(fwName)
 	if err != nil && !isNotFound(err) {
 		return err
+	}
+	// TODO(84821) Remove legacyFwName logic after 3 releases, so there would have been atleast 2 master upgrades that would
+	// have triggered service sync and deletion of the legacy rules.
+	if legacyFwName != "" {
+		// Check for firewall named with the legacy naming scheme and delete if found.
+		legacyFirewall, err := g.GetFirewall(legacyFwName)
+		if err != nil && !isNotFound(err) {
+			return err
+		}
+		if legacyFirewall != nil && existingFirewall != nil {
+			// Delete the legacyFirewall rule if the new one was already created. If not, it will be deleted in the
+			// next sync or when the service is deleted.
+			defer func() {
+				err = g.DeleteFirewall(legacyFwName)
+				if err != nil {
+					klog.Errorf("Failed to delete legacy firewall %s for service %s/%s, err %v",
+						legacyFwName, svc.Namespace, svc.Name, err)
+				} else {
+					klog.V(2).Infof("Successfully deleted legacy firewall %s for service %s/%s",
+						legacyFwName, svc.Namespace, svc.Name)
+				}
+			}()
+		}
 	}
 
 	expectedFirewall := &compute.Firewall{
@@ -384,7 +419,7 @@ func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID s
 	if err != nil {
 		return err
 	}
-	err = g.ensureInternalFirewall(svc, loadBalancerName, fwDesc, sourceRanges.StringSlice(), ports, protocol, nodes)
+	err = g.ensureInternalFirewall(svc, MakeFirewallName(loadBalancerName), fwDesc, sourceRanges.StringSlice(), ports, protocol, nodes, loadBalancerName)
 	if err != nil {
 		return err
 	}
@@ -392,7 +427,7 @@ func (g *Cloud) ensureInternalFirewalls(loadBalancerName, ipAddress, clusterID s
 	// Second firewall is for health checking nodes / services
 	fwHCName := makeHealthCheckFirewallName(loadBalancerName, clusterID, sharedHealthCheck)
 	hcSrcRanges := LoadBalancerSrcRanges()
-	return g.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes)
+	return g.ensureInternalFirewall(svc, fwHCName, "", hcSrcRanges, []string{healthCheckPort}, v1.ProtocolTCP, nodes, "")
 }
 
 func (g *Cloud) ensureInternalHealthCheck(name string, svcName types.NamespacedName, shared bool, path string, port int32) (*compute.HealthCheck, error) {
