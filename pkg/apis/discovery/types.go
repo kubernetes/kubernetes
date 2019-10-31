@@ -118,11 +118,10 @@ type EndpointPort struct {
 	// The name of this port. All ports in an EndpointSlice must have a unique
 	// name. If the EndpointSlice is dervied from a Kubernetes service, this
 	// corresponds to the Service.ports[].name.
-	// Name must either be an empty string or pass IANA_SVC_NAME validation:
-	// * must be no more than 15 characters long
-	// * may contain only [-a-z0-9]
-	// * must contain at least one letter [a-z]
-	// * it must not start or end with a hyphen, nor contain adjacent hyphens
+	// Name must either be an empty string or pass DNS_LABEL validation:
+	// * must be no more than 63 characters long.
+	// * must consist of lower case alphanumeric characters or '-'.
+	// * must start and end with an alphanumeric character.
 	Name *string
 	// The IP protocol for this port.
 	// Must be UDP, TCP, or SCTP.
