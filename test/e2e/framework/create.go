@@ -165,7 +165,7 @@ func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
 	for _, item := range items {
 		// Each factory knows which item(s) it supports, so try each one.
 		done := false
-		description := DescribeItem(item)
+		description := describeItem(item)
 		// Uncomment this line to get a full dump of the entire item.
 		// description = fmt.Sprintf("%s:\n%s", description, PrettyPrint(item))
 		Logf("creating %s", description)
@@ -260,11 +260,11 @@ type ItemFactory interface {
 	Create(f *Framework, item interface{}) (func() error, error)
 }
 
-// DescribeItem always returns a string that describes the item,
+// describeItem always returns a string that describes the item,
 // usually by calling out to cache.MetaNamespaceKeyFunc which
 // concatenates namespace (if set) and name. If that fails, the entire
 // item gets converted to a string.
-func DescribeItem(item interface{}) string {
+func describeItem(item interface{}) string {
 	key, err := cache.MetaNamespaceKeyFunc(item)
 	if err == nil && key != "" {
 		return fmt.Sprintf("%T: %s", item, key)
