@@ -70,9 +70,11 @@ func getAuthMethods(req *http.Request) string {
 		authMethods = append(authMethods, "bearer")
 	}
 
-	token := strings.TrimSpace(req.URL.Query().Get("access_token"))
-	if len(token) > 0 {
-		authMethods = append(authMethods, "access_token")
+	if req.URL != nil && len(req.URL.Query()) != 0 {
+		token := strings.TrimSpace(req.URL.Query().Get("access_token"))
+		if len(token) > 0 {
+			authMethods = append(authMethods, "access_token")
+		}
 	}
 
 	if req.TLS != nil && len(req.TLS.PeerCertificates) > 0 {

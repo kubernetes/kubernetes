@@ -25,8 +25,10 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/audit"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/endpoints/handlers/responsewriters"
+	"k8s.io/apiserver/pkg/endpoints/request"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
@@ -42,9 +44,10 @@ import (
  * the metric stability policy.
  */
 const (
-	successLabel = "success"
-	failureLabel = "failure"
-	errorLabel   = "error"
+	successLabel       = "success"
+	failureLabel       = "failure"
+	errorLabel         = "error"
+	auditAnnotationKey = "authentication.k8s.io/authenticator-name"
 )
 
 var (
@@ -98,6 +101,8 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		if len(apiAuds) > 0 {
 			req = req.WithContext(authenticator.WithAudiences(req.Context(), apiAuds))
 		}
+		ae := request.AuditEventFrom(req.Context())
+		audit.LogAnnotation(ae, auditAnnotationKey, getAuthMethods(req))
 		resp, ok, err := auth.AuthenticateRequest(req)
 		if err != nil || !ok {
 			if err != nil {
