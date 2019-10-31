@@ -108,7 +108,6 @@ pkg/features
 pkg/kubeapiserver
 pkg/kubeapiserver/options
 pkg/kubectl/cmd/convert
-pkg/kubectl/cmd/get
 pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
 pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
@@ -501,6 +500,7 @@ staging/src/k8s.io/kubectl/pkg/cmd/drain
 staging/src/k8s.io/kubectl/pkg/cmd/exec
 staging/src/k8s.io/kubectl/pkg/cmd/explain
 staging/src/k8s.io/kubectl/pkg/cmd/expose
+staging/src/k8s.io/kubectl/pkg/cmd/get
 staging/src/k8s.io/kubectl/pkg/cmd/label
 staging/src/k8s.io/kubectl/pkg/cmd/logs
 staging/src/k8s.io/kubectl/pkg/cmd/patch

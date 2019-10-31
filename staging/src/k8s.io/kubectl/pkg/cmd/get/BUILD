@@ -26,7 +26,8 @@ go_library(
         "sorter.go",
         "table_printer.go",
     ],
-    importpath = "k8s.io/kubernetes/pkg/kubectl/cmd/get",
+    importmap = "k8s.io/kubernetes/vendor/k8s.io/kubectl/pkg/cmd/get",
+    importpath = "k8s.io/kubectl/pkg/cmd/get",
     visibility = ["//visibility:public"],
     deps = [
         "//staging/src/k8s.io/api/core/v1:go_default_library",
@@ -72,11 +73,7 @@ go_test(
         "humanreadable_flags_test.go",
         "sorter_test.go",
     ],
-    data = [
-        "//api/openapi-spec",
-        "//test/e2e/testing-manifests:all-srcs",
-        "//test/fixtures",
-    ],
+    data = ["//staging/src/k8s.io/kubectl/test/data"],
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/api/apps/v1:go_default_library",
