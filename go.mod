@@ -65,6 +65,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20160516000752-02826c3e7903
 	github.com/golang/mock v1.2.0
 	github.com/golang/protobuf v1.3.2
+	github.com/golangci/golangci-lint v1.21.0 // indirect
 	github.com/google/cadvisor v0.34.0
 	github.com/google/certificate-transparency-go v1.0.21 // indirect
 	github.com/google/go-cmp v0.3.0
@@ -100,7 +101,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.0 // indirect
 	github.com/opencontainers/selinux v1.3.1-0.20190929122143-5215b1806f52
 	github.com/pborman/uuid v1.2.0
-	github.com/pkg/errors v0.8.0
+	github.com/pkg/errors v0.8.1
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/pquerna/ffjson v0.0.0-20180717144149-af8b230fcd20 // indirect
 	github.com/prometheus/client_golang v1.0.0
@@ -113,10 +114,10 @@ require (
 	github.com/spf13/afero v1.2.2
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	github.com/spf13/pflag v1.0.3
-	github.com/spf13/viper v1.3.2
+	github.com/spf13/pflag v1.0.5
+	github.com/spf13/viper v1.4.0
 	github.com/storageos/go-api v0.0.0-20180912212459-343b3eff91fc
-	github.com/stretchr/testify v1.3.0
+	github.com/stretchr/testify v1.4.0
 	github.com/syndtr/gocapability v0.0.0-20180916011248-d98352740cb2 // indirect
 	github.com/thecodeteam/goscaleio v0.1.0
 	github.com/urfave/negroni v1.0.0 // indirect
@@ -125,13 +126,13 @@ require (
 	github.com/vmware/govmomi v0.20.1
 	github.com/xlab/handysort v0.0.0-20150421192137-fb3537ed64a1 // indirect
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
-	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
+	golang.org/x/crypto v0.0.0-20190923035154-9ee001bba392
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
-	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7
+	golang.org/x/net v0.0.0-20190923162816-aa69164e4478
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 	golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c
-	golang.org/x/tools v0.0.0-20190621195816-6e04913cbbac
+	golang.org/x/tools v0.0.0-20191010075000-0337d82405ff
 	gonum.org/v1/gonum v0.0.0-20190331200053-3d26580ed485
 	google.golang.org/api v0.6.1-0.20190607001116-5213b8090861
 	google.golang.org/grpc v1.23.1
@@ -140,7 +141,7 @@ require (
 	gopkg.in/yaml.v2 v2.2.4
 	gotest.tools v2.2.0+incompatible
 	gotest.tools/gotestsum v0.3.5
-	honnef.co/go/tools v0.0.1-2019.2.2
+	honnef.co/go/tools v0.0.1-2019.2.3
 	k8s.io/api v0.0.0
 	k8s.io/apiextensions-apiserver v0.0.0
 	k8s.io/apimachinery v0.0.0
@@ -503,3 +504,5 @@ replace (
 	sigs.k8s.io/yaml => sigs.k8s.io/yaml v1.1.0
 	vbom.ml/util => vbom.ml/util v0.0.0-20160121211510-db5cfe13f5cc
 )
+
+replace github.com/golangci/golangci-lint => github.com/golangci/golangci-lint v1.21.0
