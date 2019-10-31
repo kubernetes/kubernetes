@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package psp
+package framework
 
 import (
 	"fmt"
@@ -30,10 +30,8 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	"k8s.io/kubernetes/test/e2e/framework/auth"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
 
 	"github.com/onsi/ginkgo"
-	"github.com/onsi/gomega"
 )
 
 const (
@@ -85,13 +83,13 @@ func IsPodSecurityPolicyEnabled(kubeClient clientset.Interface) bool {
 	isPSPEnabledOnce.Do(func() {
 		psps, err := kubeClient.PolicyV1beta1().PodSecurityPolicies().List(metav1.ListOptions{})
 		if err != nil {
-			e2elog.Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
+			Logf("Error listing PodSecurityPolicies; assuming PodSecurityPolicy is disabled: %v", err)
 			isPSPEnabled = false
 		} else if psps == nil || len(psps.Items) == 0 {
-			e2elog.Logf("No PodSecurityPolicies found; assuming PodSecurityPolicy is disabled.")
+			Logf("No PodSecurityPolicies found; assuming PodSecurityPolicy is disabled.")
 			isPSPEnabled = false
 		} else {
-			e2elog.Logf("Found PodSecurityPolicies; assuming PodSecurityPolicy is enabled.")
+			Logf("Found PodSecurityPolicies; assuming PodSecurityPolicy is enabled.")
 			isPSPEnabled = true
 		}
 	})
@@ -156,12 +154,4 @@ func CreatePrivilegedPSPBinding(kubeClient clientset.Interface, namespace string
 			serviceaccount.MakeUsername(namespace, "default"), namespace, "use", podSecurityPolicyPrivileged,
 			schema.GroupResource{Group: "extensions", Resource: "podsecuritypolicies"}, true))
 	}
-}
-
-// ExpectNoError is a copy from the same name function in file test/e2e/framework.go
-func ExpectNoError(err error, explain ...interface{}) {
-	if err != nil {
-		e2elog.Logf("Unexpected error occurred: %v", err)
-	}
-	gomega.ExpectWithOffset(2, err).NotTo(gomega.HaveOccurred(), explain...)
 }
