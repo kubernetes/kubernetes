@@ -1480,8 +1480,7 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 		return status
 	}
 
-	// Fetch old containers statuses from old pod status.
-	statuses := make(map[string]*v1.ContainerStatus, len(containers))
+	statuses := make(map[string]v1.ContainerStatus, len(containers))
 	defaultWaitingState := v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "ContainerCreating"}}
 	if hasInitContainers {
 		defaultWaitingState = v1.ContainerState{Waiting: &v1.ContainerStateWaiting{Reason: "PodInitializing"}}
@@ -1492,47 +1491,56 @@ func (kl *Kubelet) convertToAPIContainerStatuses(pod *v1.Pod, podStatus *kubecon
 	// Set container statuses according to the statuses seen in pod status
 	containerStats := map[string][]int{}
 	for i, cStatus := range podStatus.ContainerStatuses {
-		if v, ok := containerStats[cStatus.Name]; ok {
-			if len(v) >= 2 {
+		if v,ok:=containerStats[cStatus.Name];ok{
+			if len(v)>=2{
 				continue
 			}
 		}
 		containerStats[cStatus.Name] = append(containerStats[cStatus.Name], i)
 	}
-	for _, prestatus := range previousStatus {
-		if _, ok := containerStats[prestatus.Name]; ok {
+	for _, preStat := range previousStatus {
+		if _,ok:=containerStats[preStat.Name];ok{
 			continue
 		}
-		statuses[prestatus.Name] = &prestatus
+		statuses[preStat.Name] = preStat
 	}
 	var (
 		containerStatuses []v1.ContainerStatus
-		v1status          *v1.ContainerStatus
+		v1status *v1.ContainerStatus
 	)
 	for _, container := range containers {
 		if isInitContainer {
 			// If the init container is terminated with exit code 0, it won't be restarted.
 			// TODO(random-liu): Handle this in a cleaner way.
-			if v, ok := containerStats[container.Name]; ok {
-				s := podStatus.ContainerStatuses[len(v)-1]
-				if s.State == kubecontainer.ContainerStateExited && s.ExitCode == 0 {
+			if indexs,ok:=containerStats[container.Name];ok{
+				s := podStatus.ContainerStatuses[indexs[0]]
+				if s.State == kubecontainer.ContainerStateExited && s.ExitCode == 0{
 					continue
 				}
 			}
 		}
-		// If a container should be restarted in next syncpod, it is *Waiting*.
 		if !kubecontainer.ShouldContainerBeRestarted(&container, pod, podStatus) {
 			continue
 		}
-		if indexs, ok := containerStats[container.Name]; ok {
-			v1status = convertContainerStatus(podStatus.ContainerStatuses[len(indexs)-1])
-		} else if oldstat, ok := statuses[container.Name]; ok {
-			v1status = oldstat
-		} else {
-			v1status = &v1.ContainerStatus{
-				Name:  container.Name,
-				Image: container.Image,
-				State: defaultWaitingState,
+		v1status = &v1.ContainerStatus{
+			Name:  container.Name,
+			Image: container.Image,
+			State: defaultWaitingState,
+		}
+		if indexs,ok:=containerStats[container.Name];ok{
+			v1status = convertContainerStatus(podStatus.ContainerStatuses[indexs[0]])
+			if len(indexs)>1{
+				v1status.LastTerminationState = convertContainerStatus(podStatus.ContainerStatuses[indexs[len(indexs)-1]]).State
+			}
+		}else if oldstat,ok:=statuses[container.Name];ok{
+			if oldstat.State.Terminated != nil {
+				// Do not update status on terminated init containers as
+				// they be removed at any time.
+				v1status = &oldstat
+			} else {
+				// Apply some values from the old statuses as the default values.
+				v1status.RestartCount = oldstat.RestartCount
+				v1status.LastTerminationState = oldstat.LastTerminationState
 			}
 		}
 
