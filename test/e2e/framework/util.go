@@ -75,6 +75,7 @@ import (
 	uexec "k8s.io/utils/exec"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -620,40 +621,6 @@ func AssertCleanup(ns string, selectors ...string) {
 	}
 }
 
-// KubectlCmd runs the kubectl executable through the wrapper script.
-func KubectlCmd(args ...string) *exec.Cmd {
-	defaultArgs := []string{}
-
-	// Reference a --server option so tests can run anywhere.
-	if TestContext.Host != "" {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.FlagAPIServer+"="+TestContext.Host)
-	}
-	if TestContext.KubeConfig != "" {
-		defaultArgs = append(defaultArgs, "--"+clientcmd.RecommendedConfigPathFlag+"="+TestContext.KubeConfig)
-
-		// Reference the KubeContext
-		if TestContext.KubeContext != "" {
-			defaultArgs = append(defaultArgs, "--"+clientcmd.FlagContext+"="+TestContext.KubeContext)
-		}
-
-	} else {
-		if TestContext.CertDir != "" {
-			defaultArgs = append(defaultArgs,
-				fmt.Sprintf("--certificate-authority=%s", filepath.Join(TestContext.CertDir, "ca.crt")),
-				fmt.Sprintf("--client-certificate=%s", filepath.Join(TestContext.CertDir, "kubecfg.crt")),
-				fmt.Sprintf("--client-key=%s", filepath.Join(TestContext.CertDir, "kubecfg.key")))
-		}
-	}
-	kubectlArgs := append(defaultArgs, args...)
-
-	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
-	//and so on.
-	cmd := exec.Command(TestContext.KubectlPath, kubectlArgs...)
-
-	//caller will invoke this and wait on it.
-	return cmd
-}
-
 // LookForStringInPodExec looks for the given string in the output of a command
 // executed in a specific pod container.
 // TODO(alejandrox1): move to pod/ subpkg once kubectl methods are refactored.
@@ -691,7 +658,8 @@ type KubectlBuilder struct {
 // NewKubectlCommand returns a KubectlBuilder for running kubectl.
 func NewKubectlCommand(args ...string) *KubectlBuilder {
 	b := new(KubectlBuilder)
-	b.cmd = KubectlCmd(args...)
+	tk := e2ekubectl.NewTestKubeconfig(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath)
+	b.cmd = tk.KubectlCmd(args...)
 	return b
 }
 

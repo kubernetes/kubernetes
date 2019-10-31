@@ -70,6 +70,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/auth"
 	e2eendpoints "k8s.io/kubernetes/test/e2e/framework/endpoints"
 	jobutil "k8s.io/kubernetes/test/e2e/framework/job"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
@@ -1993,7 +1994,8 @@ metadata:
 			path := filepath.Join(tmpdir, "test")
 			defer os.Remove(path)
 			defer os.Remove(tmpdir)
-			cmd := framework.KubectlCmd("proxy", fmt.Sprintf("--unix-socket=%s", path))
+			tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath)
+			cmd := tk.KubectlCmd("proxy", fmt.Sprintf("--unix-socket=%s", path))
 			stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
 			if err != nil {
 				framework.Failf("Failed to start kubectl command: %v", err)
@@ -2249,7 +2251,8 @@ func getAPIVersions(apiEndpoint string) (*metav1.APIVersions, error) {
 
 func startProxyServer() (int, *exec.Cmd, error) {
 	// Specifying port 0 indicates we want the os to pick a random port.
-	cmd := framework.KubectlCmd("proxy", "-p", "0", "--disable-filter")
+	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath)
+	cmd := tk.KubectlCmd("proxy", "-p", "0", "--disable-filter")
 	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
 	if err != nil {
 		return -1, nil, err
