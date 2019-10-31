@@ -573,7 +573,7 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 
 	// Initialize CPU manager
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CPUManager) {
-		cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), podStatusProvider, runtimeService)
+		cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService)
 	}
 
 	// cache the node Info including resource capacity and

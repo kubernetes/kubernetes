@@ -32,6 +32,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpumanager/topology"
 	"k8s.io/kubernetes/pkg/kubelet/cm/cpuset"
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager"
+	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
 	"k8s.io/kubernetes/pkg/kubelet/status"
 )
@@ -51,7 +52,7 @@ const cpuManagerStateFileName = "cpu_manager_state"
 // Manager interface provides methods for Kubelet to manage pod cpus.
 type Manager interface {
 	// Start is called during Kubelet initialization.
-	Start(activePods ActivePodsFunc, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService)
+	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService)
 
 	// AddContainer is called between container create and container start
 	// so that initial CPU affinity settings can be written through to the
@@ -98,9 +99,18 @@ type manager struct {
 	topology *topology.CPUTopology
 
 	nodeAllocatableReservation v1.ResourceList
+
+	// sourcesReady provides the readiness of kubelet configuration sources such as apiserver update readiness.
+	// We use it to determine when we can purge inactive pods from checkpointed state.
+	sourcesReady config.SourcesReady
 }
 
 var _ Manager = &manager{}
+
+type sourcesReadyStub struct{}
+
+func (s *sourcesReadyStub) AddSource(source string) {}
+func (s *sourcesReadyStub) AllReady() bool          { return true }
 
 // NewManager creates new cpu manager based on provided policy
 func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo *cadvisorapi.MachineInfo, numaNodeInfo topology.NUMANodeInfo, nodeAllocatableReservation v1.ResourceList, stateFileDirectory string, affinity topologymanager.Store) (Manager, error) {
@@ -155,13 +165,14 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		topology:                   topo,
 		nodeAllocatableReservation: nodeAllocatableReservation,
 	}
+	manager.sourcesReady = &sourcesReadyStub{}
 	return manager, nil
 }
 
-func (m *manager) Start(activePods ActivePodsFunc, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService) {
+func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService) {
 	klog.Infof("[cpumanager] starting with %s policy", m.policy.Name())
 	klog.Infof("[cpumanager] reconciling every %v", m.reconcilePeriod)
-
+	m.sourcesReady = sourcesReady
 	m.activePods = activePods
 	m.podStatusProvider = podStatusProvider
 	m.containerRuntime = containerRuntime
@@ -229,6 +240,9 @@ type reconciledContainer struct {
 }
 
 func (m *manager) reconcileState() (success []reconciledContainer, failure []reconciledContainer) {
+	if !m.sourcesReady.AllReady() {
+		return
+	}
 	success = []reconciledContainer{}
 	failure = []reconciledContainer{}
 
