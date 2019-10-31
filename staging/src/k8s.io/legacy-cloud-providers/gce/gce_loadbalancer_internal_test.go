@@ -811,11 +811,12 @@ func TestEnsureInternalInstanceGroupsReuseGroups(t *testing.T) {
 	vals := DefaultTestClusterValues()
 	gce, err := fakeGCECloud(vals)
 	require.NoError(t, err)
+	gce.externalInstanceGroupsPrefix = "pre-existing"
 
 	_, err = createAndInsertNodes(gce, []string{"test-node-1", "test-node-2"}, vals.ZoneName)
 	require.NoError(t, err)
 
-	preIGName := "pre-existing"
+	preIGName := "pre-existing-ig"
 	igName := makeInstanceGroupName(vals.ClusterID)
 	err = gce.CreateInstanceGroup(&compute.InstanceGroup{Name: preIGName}, vals.ZoneName)
 	require.NoError(t, err)
