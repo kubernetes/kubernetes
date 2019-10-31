@@ -67,7 +67,7 @@ func TestImageLocal(t *testing.T) {
 	opts := SetImageOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../test/data/controller.yaml"}},
+			Filenames: []string{"../../../testdata/controller.yaml"}},
 		Local:     true,
 		IOStreams: streams,
 	}
@@ -179,7 +179,7 @@ func TestSetMultiResourcesImageLocal(t *testing.T) {
 	opts := SetImageOptions{
 		PrintFlags: genericclioptions.NewPrintFlags("").WithDefaultOutput(outputFormat).WithTypeSetter(scheme.Scheme),
 		FilenameOptions: resource.FilenameOptions{
-			Filenames: []string{"../../../test/data/set/multi-resource-yaml.yaml"}},
+			Filenames: []string{"../../../testdata/set/multi-resource-yaml.yaml"}},
 		Local:     true,
 		IOStreams: streams,
 	}

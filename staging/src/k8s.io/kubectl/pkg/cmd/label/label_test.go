@@ -392,7 +392,7 @@ func TestLabelForResourceFromFile(t *testing.T) {
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdLabel(tf, ioStreams)
 	opts := NewLabelOptions(ioStreams)
-	opts.Filenames = []string{"../../../test/data/controller.yaml"}
+	opts.Filenames = []string{"../../../testdata/controller.yaml"}
 	err := opts.Complete(tf, cmd, []string{"a=b"})
 	if err == nil {
 		err = opts.Validate()
@@ -424,7 +424,7 @@ func TestLabelLocal(t *testing.T) {
 	ioStreams, _, buf, _ := genericclioptions.NewTestIOStreams()
 	cmd := NewCmdLabel(tf, ioStreams)
 	opts := NewLabelOptions(ioStreams)
-	opts.Filenames = []string{"../../../test/data/controller.yaml"}
+	opts.Filenames = []string{"../../../testdata/controller.yaml"}
 	opts.local = true
 	err := opts.Complete(tf, cmd, []string{"a=b"})
 	if err == nil {

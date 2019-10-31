@@ -54,7 +54,7 @@ import (
 )
 
 var (
-	fakeSchema                 = sptest.Fake{Path: filepath.Join("..", "..", "..", "test", "data", "openapi", "swagger.json")}
+	fakeSchema                 = sptest.Fake{Path: filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json")}
 	testingOpenAPISchemaFns    = []func() (openapi.Resources, error){nil, AlwaysErrorOpenAPISchemaFn, openAPISchemaFn}
 	AlwaysErrorOpenAPISchemaFn = func() (openapi.Resources, error) {
 		return nil, errors.New("cannot get openapi spec")
@@ -87,23 +87,23 @@ func validateApplyArgs(cmd *cobra.Command, args []string) error {
 }
 
 const (
-	filenameCM                = "../../../test/data/apply/cm.yaml"
-	filenameRC                = "../../../test/data/apply/rc.yaml"
-	filenameRCArgs            = "../../../test/data/apply/rc-args.yaml"
-	filenameRCLastAppliedArgs = "../../../test/data/apply/rc-lastapplied-args.yaml"
-	filenameRCNoAnnotation    = "../../../test/data/apply/rc-no-annotation.yaml"
-	filenameRCLASTAPPLIED     = "../../../test/data/apply/rc-lastapplied.yaml"
-	filenameSVC               = "../../../test/data/apply/service.yaml"
-	filenameRCSVC             = "../../../test/data/apply/rc-service.yaml"
-	filenameNoExistRC         = "../../../test/data/apply/rc-noexist.yaml"
-	filenameRCPatchTest       = "../../../test/data/apply/patch.json"
-	dirName                   = "../../../test/data/apply/testdir"
-	filenameRCJSON            = "../../../test/data/apply/rc.json"
+	filenameCM                = "../../../testdata/apply/cm.yaml"
+	filenameRC                = "../../../testdata/apply/rc.yaml"
+	filenameRCArgs            = "../../../testdata/apply/rc-args.yaml"
+	filenameRCLastAppliedArgs = "../../../testdata/apply/rc-lastapplied-args.yaml"
+	filenameRCNoAnnotation    = "../../../testdata/apply/rc-no-annotation.yaml"
+	filenameRCLASTAPPLIED     = "../../../testdata/apply/rc-lastapplied.yaml"
+	filenameSVC               = "../../../testdata/apply/service.yaml"
+	filenameRCSVC             = "../../../testdata/apply/rc-service.yaml"
+	filenameNoExistRC         = "../../../testdata/apply/rc-noexist.yaml"
+	filenameRCPatchTest       = "../../../testdata/apply/patch.json"
+	dirName                   = "../../../testdata/apply/testdir"
+	filenameRCJSON            = "../../../testdata/apply/rc.json"
 
-	filenameWidgetClientside    = "../../../test/data/apply/widget-clientside.yaml"
-	filenameWidgetServerside    = "../../../test/data/apply/widget-serverside.yaml"
-	filenameDeployObjServerside = "../../../test/data/apply/deploy-serverside.yaml"
-	filenameDeployObjClientside = "../../../test/data/apply/deploy-clientside.yaml"
+	filenameWidgetClientside    = "../../../testdata/apply/widget-clientside.yaml"
+	filenameWidgetServerside    = "../../../testdata/apply/widget-serverside.yaml"
+	filenameDeployObjServerside = "../../../testdata/apply/deploy-serverside.yaml"
+	filenameDeployObjClientside = "../../../testdata/apply/deploy-clientside.yaml"
 )
 
 func readConfigMapList(t *testing.T, filename string) [][]byte {
