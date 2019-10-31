@@ -26,13 +26,13 @@ import (
 	st "k8s.io/kubernetes/pkg/scheduler/testing"
 )
 
-func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
+func Test_podTopologySpreadMap_initialize(t *testing.T) {
 	tests := []struct {
 		name                string
 		pod                 *v1.Pod
 		nodes               []*v1.Node
-		wantNodeNameMap     map[string]int32
-		wantTopologyPairMap map[topologyPair]*int32
+		wantNodeNameSet     map[string]struct{}
+		wantTopologyPairMap map[topologyPair]*int64
 	}{
 		{
 			name: "normal case",
@@ -45,17 +45,17 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("zone", "zone2").Label("node", "node-x").Obj(),
 			},
-			wantNodeNameMap: map[string]int32{
-				"node-a": 0,
-				"node-b": 0,
-				"node-x": 0,
+			wantNodeNameSet: map[string]struct{}{
+				"node-a": {},
+				"node-b": {},
+				"node-x": {},
 			},
-			wantTopologyPairMap: map[topologyPair]*int32{
-				{key: "zone", value: "zone1"}:  new(int32),
-				{key: "zone", value: "zone2"}:  new(int32),
-				{key: "node", value: "node-a"}: new(int32),
-				{key: "node", value: "node-b"}: new(int32),
-				{key: "node", value: "node-x"}: new(int32),
+			wantTopologyPairMap: map[topologyPair]*int64{
+				{key: "zone", value: "zone1"}:  new(int64),
+				{key: "zone", value: "zone2"}:  new(int64),
+				{key: "node", value: "node-a"}: new(int64),
+				{key: "node", value: "node-b"}: new(int64),
+				{key: "node", value: "node-x"}: new(int64),
 			},
 		},
 		{
@@ -69,26 +69,26 @@ func Test_topologySpreadConstraintsMap_initialize(t *testing.T) {
 				st.MakeNode().Name("node-b").Label("zone", "zone1").Label("node", "node-b").Obj(),
 				st.MakeNode().Name("node-x").Label("node", "node-x").Obj(),
 			},
-			wantNodeNameMap: map[string]int32{
-				"node-a": 0,
-				"node-b": 0,
+			wantNodeNameSet: map[string]struct{}{
+				"node-a": {},
+				"node-b": {},
 			},
-			wantTopologyPairMap: map[topologyPair]*int32{
-				{key: "zone", value: "zone1"}:  new(int32),
-				{key: "node", value: "node-a"}: new(int32),
-				{key: "node", value: "node-b"}: new(int32),
+			wantTopologyPairMap: map[topologyPair]*int64{
+				{key: "zone", value: "zone1"}:  new(int64),
+				{key: "node", value: "node-a"}: new(int64),
+				{key: "node", value: "node-b"}: new(int64),
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tMap := newTopologySpreadConstraintsMap()
-			tMap.initialize(tt.pod, tt.nodes)
-			if !reflect.DeepEqual(tMap.nodeNameToPodCounts, tt.wantNodeNameMap) {
-				t.Errorf("initilize().nodeNameToPodCounts = %#v, want %#v", tMap.nodeNameToPodCounts, tt.wantNodeNameMap)
+			m := newTopologySpreadConstraintsMap()
+			m.initialize(tt.pod, tt.nodes)
+			if !reflect.DeepEqual(m.nodeNameSet, tt.wantNodeNameSet) {
+				t.Errorf("initilize().nodeNameSet = %#v, want %#v", m.nodeNameSet, tt.wantNodeNameSet)
 			}
-			if !reflect.DeepEqual(tMap.topologyPairToPodCounts, tt.wantTopologyPairMap) {
-				t.Errorf("initilize().topologyPairToPodCounts = %#v, want %#v", tMap.topologyPairToPodCounts, tt.wantTopologyPairMap)
+			if !reflect.DeepEqual(m.topologyPairToPodCounts, tt.wantTopologyPairMap) {
+				t.Errorf("initilize().topologyPairToPodCounts = %#v, want %#v", m.topologyPairToPodCounts, tt.wantTopologyPairMap)
 			}
 		})
 	}
@@ -435,9 +435,23 @@ func TestCalculateEvenPodsSpreadPriority(t *testing.T) {
 			allNodes := append([]*v1.Node{}, tt.nodes...)
 			allNodes = append(allNodes, tt.failedNodes...)
 			snapshot := nodeinfosnapshot.NewSnapshot(tt.existingPods, allNodes)
-			got, _ := CalculateEvenPodsSpreadPriority(tt.pod, snapshot, tt.nodes)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("CalculateEvenPodsSpreadPriority() = %#v, want %#v", got, tt.want)
+
+			meta := &priorityMetadata{
+				podTopologySpreadMap: buildPodTopologySpreadMap(tt.pod, tt.nodes, snapshot.NodeInfoList),
+			}
+			var gotList framework.NodeScoreList
+			for _, n := range tt.nodes {
+				nodeName := n.Name
+				nodeScore, err := CalculateEvenPodsSpreadPriorityMap(tt.pod, meta, snapshot.NodeInfoMap[nodeName])
+				if err != nil {
+					t.Error(err)
+				}
+				gotList = append(gotList, nodeScore)
+			}
+
+			CalculateEvenPodsSpreadPriorityReduce(tt.pod, meta, snapshot, gotList)
+			if !reflect.DeepEqual(gotList, tt.want) {
+				t.Errorf("CalculateEvenPodsSpreadPriorityReduce() = %#v, want %#v", gotList, tt.want)
 			}
 		})
 	}
@@ -484,9 +498,19 @@ func BenchmarkTestCalculateEvenPodsSpreadPriority(b *testing.B) {
 		b.Run(tt.name, func(b *testing.B) {
 			existingPods, allNodes, filteredNodes := st.MakeNodesAndPodsForEvenPodsSpread(tt.pod, tt.existingPodsNum, tt.allNodesNum, tt.filteredNodesNum)
 			snapshot := nodeinfosnapshot.NewSnapshot(existingPods, allNodes)
+			meta := &priorityMetadata{
+				podTopologySpreadMap: buildPodTopologySpreadMap(tt.pod, filteredNodes, snapshot.NodeInfoList),
+			}
 			b.ResetTimer()
+
 			for i := 0; i < b.N; i++ {
-				CalculateEvenPodsSpreadPriority(tt.pod, snapshot, filteredNodes)
+				var gotList framework.NodeScoreList
+				for _, n := range filteredNodes {
+					nodeName := n.Name
+					nodeScore, _ := CalculateEvenPodsSpreadPriorityMap(tt.pod, meta, snapshot.NodeInfoMap[nodeName])
+					gotList = append(gotList, nodeScore)
+				}
+				CalculateEvenPodsSpreadPriorityReduce(tt.pod, meta, snapshot, gotList)
 			}
 		})
 	}

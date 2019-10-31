@@ -68,7 +68,12 @@ func ApplyFeatureGates() (restore func()) {
 		scheduler.RegisterFitPredicate(predicates.EvenPodsSpreadPred, predicates.EvenPodsSpreadPredicate)
 		// register priority
 		scheduler.InsertPriorityKeyToAlgorithmProviderMap(priorities.EvenPodsSpreadPriority)
-		scheduler.RegisterPriorityFunction(priorities.EvenPodsSpreadPriority, priorities.CalculateEvenPodsSpreadPriority, 1)
+		scheduler.RegisterPriorityMapReduceFunction(
+			priorities.EvenPodsSpreadPriority,
+			priorities.CalculateEvenPodsSpreadPriorityMap,
+			priorities.CalculateEvenPodsSpreadPriorityReduce,
+			1,
+		)
 	}
 
 	// Prioritizes nodes that satisfy pod's resource limits
