@@ -215,6 +215,8 @@ func (plugin *localVolumePlugin) ConstructVolumeSpec(volumeName, mountPath strin
 			if err != nil {
 				return nil, err
 			}
+			klog.V(4).Infof("local: reconstructing volume %q (pod volume mount: %q) with device %q", volumeName, mountPath, path)
+			break
 		}
 	}
 	localVolume := &v1.PersistentVolume{
