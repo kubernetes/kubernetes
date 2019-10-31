@@ -255,7 +255,7 @@ func TestEnsureInternalLoadBalancerClearPreviousResources(t *testing.T) {
 	rule, _ := gce.GetRegionForwardingRule(lbName, gce.region)
 	assert.NotEqual(t, existingFwdRule, rule)
 
-	firewall, err := gce.GetFirewall(lbName)
+	firewall, err := gce.GetFirewall(MakeFirewallName(lbName))
 	require.NoError(t, err)
 	assert.NotEqual(t, firewall, existingFirewall)
 
@@ -539,12 +539,87 @@ func TestClearPreviousInternalResources(t *testing.T) {
 	assert.Nil(t, hc1, "HealthCheck should be deleted.")
 }
 
+func TestEnsureInternalFirewallDeletesLegacyFirewall(t *testing.T) {
+	gce, err := fakeGCECloud(DefaultTestClusterValues())
+	require.NoError(t, err)
+	vals := DefaultTestClusterValues()
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	fwName := MakeFirewallName(lbName)
+
+	c := gce.c.(*cloud.MockGCE)
+	c.MockFirewalls.InsertHook = nil
+	c.MockFirewalls.UpdateHook = nil
+
+	nodes, err := createAndInsertNodes(gce, []string{"test-node-1"}, vals.ZoneName)
+	require.NoError(t, err)
+	sourceRange := []string{"10.0.0.0/20"}
+	// Manually create a firewall rule with the legacy name - lbName
+	gce.ensureInternalFirewall(
+		svc,
+		lbName,
+		"firewall with legacy name",
+		sourceRange,
+		[]string{"123"},
+		v1.ProtocolTCP,
+		nodes,
+		"")
+	if err != nil {
+		t.Errorf("Unexpected error %v when ensuring legacy firewall %s for svc %+v", err, lbName, svc)
+	}
+
+	// Now ensure the firewall again with the correct name to simulate a sync after updating to new code.
+	err = gce.ensureInternalFirewall(
+		svc,
+		fwName,
+		"firewall with new name",
+		sourceRange,
+		[]string{"123", "456"},
+		v1.ProtocolTCP,
+		nodes,
+		lbName)
+	if err != nil {
+		t.Errorf("Unexpected error %v when ensuring firewall %s for svc %+v", err, fwName, svc)
+	}
+
+	existingFirewall, err := gce.GetFirewall(fwName)
+	require.Nil(t, err)
+	require.NotNil(t, existingFirewall)
+	// Existing firewall will not be deleted yet since this was the first sync with the new rule created.
+	existingLegacyFirewall, err := gce.GetFirewall(lbName)
+	require.Nil(t, err)
+	require.NotNil(t, existingLegacyFirewall)
+
+	// Now ensure the firewall again to simulate a second sync where the old rule will be deleted.
+	err = gce.ensureInternalFirewall(
+		svc,
+		fwName,
+		"firewall with new name",
+		sourceRange,
+		[]string{"123", "456", "789"},
+		v1.ProtocolTCP,
+		nodes,
+		lbName)
+	if err != nil {
+		t.Errorf("Unexpected error %v when ensuring firewall %s for svc %+v", err, fwName, svc)
+	}
+
+	existingFirewall, err = gce.GetFirewall(fwName)
+	require.Nil(t, err)
+	require.NotNil(t, existingFirewall)
+	existingLegacyFirewall, err = gce.GetFirewall(lbName)
+	require.NotNil(t, err)
+	require.Nil(t, existingLegacyFirewall)
+
+}
+
 func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 	gce, err := fakeGCECloud(DefaultTestClusterValues())
 	require.NoError(t, err)
 	vals := DefaultTestClusterValues()
 	svc := fakeLoadbalancerService(string(LBTypeInternal))
-	fwName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+	fwName := MakeFirewallName(lbName)
 
 	c := gce.c.(*cloud.MockGCE)
 	c.MockFirewalls.InsertHook = mock.InsertFirewallsUnauthorizedErrHook
@@ -565,7 +640,8 @@ func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 		sourceRange,
 		[]string{"123"},
 		v1.ProtocolTCP,
-		nodes)
+		nodes,
+		lbName)
 	require.Nil(t, err, "Should success when XPN is on.")
 
 	checkEvent(t, recorder, FilewallChangeMsg, true)
@@ -582,7 +658,8 @@ func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 		sourceRange,
 		[]string{"123"},
 		v1.ProtocolTCP,
-		nodes)
+		nodes,
+		lbName)
 	require.Nil(t, err)
 	existingFirewall, err := gce.GetFirewall(fwName)
 	require.Nil(t, err)
@@ -600,7 +677,8 @@ func TestEnsureInternalFirewallSucceedsOnXPN(t *testing.T) {
 		sourceRange,
 		[]string{"123"},
 		v1.ProtocolTCP,
-		nodes)
+		nodes,
+		lbName)
 	require.Nil(t, err, "Should success when XPN is on.")
 
 	checkEvent(t, recorder, FilewallChangeMsg, true)
