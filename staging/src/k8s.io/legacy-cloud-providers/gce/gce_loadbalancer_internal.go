@@ -587,7 +587,7 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 		}
 		skip := sets.NewString()
 
-		igs, err := g.ListInstanceGroups(zone)
+		igs, err := g.candidateExternalInstanceGroups(zone)
 		if err != nil {
 			return nil, err
 		}
@@ -620,6 +620,13 @@ func (g *Cloud) ensureInternalInstanceGroups(name string, nodes []*v1.Node) ([]s
 	}
 
 	return igLinks, nil
+}
+
+func (g *Cloud) candidateExternalInstanceGroups(zone string) ([]*compute.InstanceGroup, error) {
+	if g.externalInstanceGroupsPrefix == "" {
+		return nil, nil
+	}
+	return g.ListInstanceGroupsWithPrefix(zone, g.externalInstanceGroupsPrefix)
 }
 
 func (g *Cloud) ensureInternalInstanceGroupsDeleted(name string) error {
