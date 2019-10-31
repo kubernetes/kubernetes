@@ -19,7 +19,6 @@ package controlplane
 import (
 	"fmt"
 	"net"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -59,7 +58,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeAPIServer)),
 			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetAPIServerProbeAddress(endpoint), "/healthz", int(endpoint.BindPort), v1.URISchemeHTTPS),
 			Resources:       staticpodutil.ComponentResources("250m"),
-			Env:             getProxyEnvVars(),
+			Env:             kubeadmutil.GetProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeAPIServer)),
 		kubeadmconstants.KubeControllerManager: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeControllerManager,
@@ -69,7 +68,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeControllerManager)),
 			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetControllerManagerProbeAddress(cfg), "/healthz", kubeadmconstants.InsecureKubeControllerManagerPort, v1.URISchemeHTTP),
 			Resources:       staticpodutil.ComponentResources("200m"),
-			Env:             getProxyEnvVars(),
+			Env:             kubeadmutil.GetProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeControllerManager)),
 		kubeadmconstants.KubeScheduler: staticpodutil.ComponentPod(v1.Container{
 			Name:            kubeadmconstants.KubeScheduler,
@@ -79,7 +78,7 @@ func GetStaticPodSpecs(cfg *kubeadmapi.ClusterConfiguration, endpoint *kubeadmap
 			VolumeMounts:    staticpodutil.VolumeMountMapToSlice(mounts.GetVolumeMounts(kubeadmconstants.KubeScheduler)),
 			LivenessProbe:   staticpodutil.LivenessProbe(staticpodutil.GetSchedulerProbeAddress(cfg), "/healthz", kubeadmconstants.InsecureSchedulerPort, v1.URISchemeHTTP),
 			Resources:       staticpodutil.ComponentResources("100m"),
-			Env:             getProxyEnvVars(),
+			Env:             kubeadmutil.GetProxyEnvVars(),
 		}, mounts.GetVolumes(kubeadmconstants.KubeScheduler)),
 	}
 	return staticPodSpecs
@@ -358,23 +357,4 @@ func getSchedulerCommand(cfg *kubeadmapi.ClusterConfiguration) []string {
 	command := []string{"kube-scheduler"}
 	command = append(command, kubeadmutil.BuildArgumentListFromMap(defaultArguments, cfg.Scheduler.ExtraArgs)...)
 	return command
-}
-
-// getProxyEnvVars builds a list of environment variables to use in the control plane containers in order to use the right proxy
-func getProxyEnvVars() []v1.EnvVar {
-	envs := []v1.EnvVar{}
-	for _, env := range os.Environ() {
-		pos := strings.Index(env, "=")
-		if pos == -1 {
-			// malformed environment variable, skip it.
-			continue
-		}
-		name := env[:pos]
-		value := env[pos+1:]
-		if strings.HasSuffix(strings.ToLower(name), "_proxy") && value != "" {
-			envVar := v1.EnvVar{Name: name, Value: value}
-			envs = append(envs, envVar)
-		}
-	}
-	return envs
 }
