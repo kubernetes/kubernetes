@@ -52,6 +52,7 @@ import (
 	"github.com/onsi/gomega"
 
 	// TODO: Remove the following imports (ref: https://github.com/kubernetes/kubernetes/issues/81245)
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -702,7 +703,8 @@ func kubectlExec(namespace string, podName, containerName string, args ...string
 	}
 	cmdArgs = append(cmdArgs, args...)
 
-	cmd := KubectlCmd(cmdArgs...)
+	tk := e2ekubectl.NewTestKubeconfig(TestContext.CertDir, TestContext.Host, TestContext.KubeConfig, TestContext.KubeContext, TestContext.KubectlPath)
+	cmd := tk.KubectlCmd(cmdArgs...)
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
 	Logf("Running '%s %s'", cmd.Path, strings.Join(cmdArgs, " "))

@@ -35,6 +35,7 @@ import (
 	kubeletconfigv1beta1 "k8s.io/kubelet/config/v1beta1"
 	kubeletconfig "k8s.io/kubernetes/pkg/kubelet/apis/config"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2ekubectl "k8s.io/kubernetes/test/e2e/framework/kubectl"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
 	"github.com/onsi/ginkgo"
@@ -263,7 +264,8 @@ func getCurrentKubeletConfig(nodeName string) (*kubeletconfig.KubeletConfigurati
 func pollConfigz(timeout time.Duration, pollInterval time.Duration, nodeName string) *http.Response {
 	// start local proxy, so we can send graceful deletion over query string, rather than body parameter
 	ginkgo.By("Opening proxy to cluster")
-	cmd := framework.KubectlCmd("proxy", "-p", "0")
+	tk := e2ekubectl.NewTestKubeconfig(framework.TestContext.CertDir, framework.TestContext.Host, framework.TestContext.KubeConfig, framework.TestContext.KubeContext, framework.TestContext.KubectlPath)
+	cmd := tk.KubectlCmd("proxy", "-p", "0")
 	stdout, stderr, err := framework.StartCmdAndStreamOutput(cmd)
 	framework.ExpectNoError(err)
 	defer stdout.Close()
