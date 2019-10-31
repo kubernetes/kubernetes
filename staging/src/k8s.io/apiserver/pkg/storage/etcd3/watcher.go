@@ -191,6 +191,15 @@ func (wc *watchChan) sync() error {
 	return nil
 }
 
+// logWatchChannelErr checks whether the error is about mvcc revision compaction which is regarded as warning
+func logWatchChannelErr(err error) {
+	if !strings.Contains(err.Error(), "mvcc: required revision has been compacted") {
+		klog.Errorf("watch chan error: %v", err)
+	} else {
+		klog.Warningf("watch chan error: %v", err)
+	}
+}
+
 // startWatching does:
 // - get current objects if initialRev=0; set initialRev to current rev
 // - watch on given key and send events to process.
@@ -211,14 +220,14 @@ func (wc *watchChan) startWatching(watchClosedCh chan struct{}) {
 		if wres.Err() != nil {
 			err := wres.Err()
 			// If there is an error on server (e.g. compaction), the channel will return it before closed.
-			klog.Errorf("watch chan error: %v", err)
+			logWatchChannelErr(err)
 			wc.sendError(err)
 			return
 		}
 		for _, e := range wres.Events {
 			parsedEvent, err := parseEvent(e)
 			if err != nil {
-				klog.Errorf("watch chan error: %v", err)
+				logWatchChannelErr(err)
 				wc.sendError(err)
 				return
 			}
