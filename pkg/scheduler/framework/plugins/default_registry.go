@@ -229,25 +229,26 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 			plugins.Score = appendToPluginSet(plugins.Score, nodepreferavoidpods.Name, &args.Weight)
 			return
 		})
-
 	registry.RegisterPriority(priorities.MostRequestedPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, noderesources.MostAllocatedName, &args.Weight)
 			return
 		})
-
 	registry.RegisterPriority(priorities.BalancedResourceAllocation,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, noderesources.BalancedAllocationName, &args.Weight)
 			return
 		})
-
 	registry.RegisterPriority(priorities.LeastRequestedPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, noderesources.LeastAllocatedName, &args.Weight)
 			return
 		})
-
+	registry.RegisterPriority(priorities.EvenPodsSpreadPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, podtopologyspread.Name, &args.Weight)
+			return
+		})
 	registry.RegisterPriority(requestedtocapacityratio.Name,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, requestedtocapacityratio.Name, &args.Weight)
