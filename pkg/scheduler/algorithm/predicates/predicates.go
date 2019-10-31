@@ -677,62 +677,69 @@ func (c *VolumeZoneChecker) predicate(pod *v1.Pod, meta PredicateMetadata, nodeI
 	manifest := &(pod.Spec)
 	for i := range manifest.Volumes {
 		volume := &manifest.Volumes[i]
-		if volume.PersistentVolumeClaim != nil {
-			pvcName := volume.PersistentVolumeClaim.ClaimName
-			if pvcName == "" {
-				return false, nil, fmt.Errorf("PersistentVolumeClaim had no name")
+		if volume.PersistentVolumeClaim == nil {
+			continue
+		}
+		pvcName := volume.PersistentVolumeClaim.ClaimName
+		if pvcName == "" {
+			return false, nil, fmt.Errorf("PersistentVolumeClaim had no name")
+		}
+		pvc, err := c.pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
+		if err != nil {
+			return false, nil, err
+		}
+
+		if pvc == nil {
+			return false, nil, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
+		}
+
+		pvName := pvc.Spec.VolumeName
+		if pvName == "" {
+			scName := v1helper.GetPersistentVolumeClaimClass(pvc)
+			if len(scName) == 0 {
+				return false, nil, fmt.Errorf("PersistentVolumeClaim had no pv name and storageClass name")
 			}
-			pvc, err := c.pvcLister.PersistentVolumeClaims(namespace).Get(pvcName)
+
+			class, _ := c.scLister.Get(scName)
+			if class == nil {
+				return false, nil, fmt.Errorf("StorageClass %q claimed by PersistentVolumeClaim %q not found",
+					scName, pvcName)
+
+			}
+			if class.VolumeBindingMode == nil {
+				return false, nil, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", scName)
+			}
+			if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
+				// Skip unbound volumes
+				continue
+			}
+
+			return false, nil, fmt.Errorf("PersistentVolume had no name")
+		}
+
+		pv, err := c.pvLister.Get(pvName)
+		if err != nil {
+			return false, nil, err
+		}
+
+		if pv == nil {
+			return false, nil, fmt.Errorf("PersistentVolume was not found: %q", pvName)
+		}
+
+		for k, v := range pv.ObjectMeta.Labels {
+			if k != v1.LabelZoneFailureDomain && k != v1.LabelZoneRegion {
+				continue
+			}
+			nodeV, _ := nodeConstraints[k]
+			volumeVSet, err := volumehelpers.LabelZonesToSet(v)
 			if err != nil {
-				return false, nil, err
+				klog.Warningf("Failed to parse label for %q: %q. Ignoring the label. err=%v. ", k, v, err)
+				continue
 			}
 
-			if pvc == nil {
-				return false, nil, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
-			}
-
-			pvName := pvc.Spec.VolumeName
-			if pvName == "" {
-				scName := v1helper.GetPersistentVolumeClaimClass(pvc)
-				if len(scName) > 0 {
-					class, _ := c.scLister.Get(scName)
-					if class != nil {
-						if class.VolumeBindingMode == nil {
-							return false, nil, fmt.Errorf("VolumeBindingMode not set for StorageClass %q", scName)
-						}
-						if *class.VolumeBindingMode == storage.VolumeBindingWaitForFirstConsumer {
-							// Skip unbound volumes
-							continue
-						}
-					}
-				}
-				return false, nil, fmt.Errorf("PersistentVolumeClaim was not found: %q", pvcName)
-			}
-
-			pv, err := c.pvLister.Get(pvName)
-			if err != nil {
-				return false, nil, err
-			}
-
-			if pv == nil {
-				return false, nil, fmt.Errorf("PersistentVolume was not found: %q", pvName)
-			}
-
-			for k, v := range pv.ObjectMeta.Labels {
-				if k != v1.LabelZoneFailureDomain && k != v1.LabelZoneRegion {
-					continue
-				}
-				nodeV, _ := nodeConstraints[k]
-				volumeVSet, err := volumehelpers.LabelZonesToSet(v)
-				if err != nil {
-					klog.Warningf("Failed to parse label for %q: %q. Ignoring the label. err=%v. ", k, v, err)
-					continue
-				}
-
-				if !volumeVSet.Has(nodeV) {
-					klog.V(10).Infof("Won't schedule pod %q onto node %q due to volume %q (mismatch on %q)", pod.Name, node.Name, pvName, k)
-					return false, []PredicateFailureReason{ErrVolumeZoneConflict}, nil
-				}
+			if !volumeVSet.Has(nodeV) {
+				klog.V(10).Infof("Won't schedule pod %q onto node %q due to volume %q (mismatch on %q)", pod.Name, node.Name, pvName, k)
+				return false, []PredicateFailureReason{ErrVolumeZoneConflict}, nil
 			}
 		}
 	}
