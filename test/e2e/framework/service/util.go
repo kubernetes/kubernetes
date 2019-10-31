@@ -28,6 +28,7 @@ import (
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/kubernetes/test/e2e/framework"
+	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 )
 
 // TestReachableHTTP tests that the given host serves HTTP on the given port.
@@ -38,12 +39,12 @@ func TestReachableHTTP(host string, port int, timeout time.Duration) {
 // TestReachableHTTPWithRetriableErrorCodes tests that the given host serves HTTP on the given port with the given retriableErrCodes.
 func TestReachableHTTPWithRetriableErrorCodes(host string, port int, retriableErrCodes []int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
-		result := framework.PokeHTTP(host, port, "/echo?msg=hello",
-			&framework.HTTPPokeParams{
+		result := e2enetwork.PokeHTTP(host, port, "/echo?msg=hello",
+			&e2enetwork.HTTPPokeParams{
 				BodyContains:   "hello",
 				RetriableCodes: retriableErrCodes,
 			})
-		if result.Status == framework.HTTPSuccess {
+		if result.Status == e2enetwork.HTTPSuccess {
 			return true, nil
 		}
 		return false, nil // caller can retry
@@ -61,7 +62,7 @@ func TestReachableHTTPWithRetriableErrorCodes(host string, port int, retriableEr
 // TestNotReachableHTTP tests that a HTTP request doesn't connect to the given host and port.
 func TestNotReachableHTTP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
-		result := framework.PokeHTTP(host, port, "/", nil)
+		result := e2enetwork.PokeHTTP(host, port, "/", nil)
 		if result.Code == 0 {
 			return true, nil
 		}
@@ -76,8 +77,8 @@ func TestNotReachableHTTP(host string, port int, timeout time.Duration) {
 // TestRejectedHTTP tests that the given host rejects a HTTP request on the given port.
 func TestRejectedHTTP(host string, port int, timeout time.Duration) {
 	pollfn := func() (bool, error) {
-		result := framework.PokeHTTP(host, port, "/", nil)
-		if result.Status == framework.HTTPRefused {
+		result := e2enetwork.PokeHTTP(host, port, "/", nil)
+		if result.Status == e2enetwork.HTTPRefused {
 			return true, nil
 		}
 		return false, nil // caller can retry
@@ -201,8 +202,8 @@ func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Re
 func GetHTTPContent(host string, port int, timeout time.Duration, url string) bytes.Buffer {
 	var body bytes.Buffer
 	if pollErr := wait.PollImmediate(framework.Poll, timeout, func() (bool, error) {
-		result := framework.PokeHTTP(host, port, url, nil)
-		if result.Status == framework.HTTPSuccess {
+		result := e2enetwork.PokeHTTP(host, port, url, nil)
+		if result.Status == e2enetwork.HTTPSuccess {
 			body.Write(result.Body)
 			return true, nil
 		}

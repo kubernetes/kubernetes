@@ -38,6 +38,7 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/kubelet:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
+        "//test/e2e/framework/network:go_default_library",
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/service:go_default_library",
