@@ -334,3 +334,81 @@ func generateEndpointsAndSlice(name, namespace string, ports []int, addresses []
 		Subsets:    []corev1.EndpointSubset{subset},
 	}, epSlice
 }
+
+func TestEndpointsAdapterEnsureEndpointSliceFromEndpoints(t *testing.T) {
+	endpoints1, epSlice1 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4"})
+	endpoints2, epSlice2 := generateEndpointsAndSlice("foo", "testing", []int{80, 443}, []string{"10.1.2.3", "10.1.2.4", "10.1.2.5"})
+
+	testCases := map[string]struct {
+		endpointSlicesEnabled bool
+		expectedError         error
+		expectedEndpointSlice *discovery.EndpointSlice
+		endpointSlices        []*discovery.EndpointSlice
+		namespaceParam        string
+		endpointsParam        *corev1.Endpoints
+	}{
+		"existing-endpointslice-no-change": {
+			endpointSlicesEnabled: true,
+			expectedError:         nil,
+			expectedEndpointSlice: epSlice1,
+			endpointSlices:        []*discovery.EndpointSlice{epSlice1},
+			namespaceParam:        "testing",
+			endpointsParam:        endpoints1,
+		},
+		"existing-endpointslice-change": {
+			endpointSlicesEnabled: true,
+			expectedError:         nil,
+			expectedEndpointSlice: epSlice2,
+			endpointSlices:        []*discovery.EndpointSlice{epSlice1},
+			namespaceParam:        "testing",
+			endpointsParam:        endpoints2,
+		},
+		"missing-endpointslice": {
+			endpointSlicesEnabled: true,
+			expectedError:         nil,
+			expectedEndpointSlice: epSlice1,
+			endpointSlices:        []*discovery.EndpointSlice{},
+			namespaceParam:        "testing",
+			endpointsParam:        endpoints1,
+		},
+		"endpointslices-disabled": {
+			endpointSlicesEnabled: false,
+			expectedError:         nil,
+			expectedEndpointSlice: nil,
+			endpointSlices:        []*discovery.EndpointSlice{},
+			namespaceParam:        "testing",
+			endpointsParam:        endpoints1,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			client := fake.NewSimpleClientset()
+			epAdapter := EndpointsAdapter{endpointClient: client.CoreV1()}
+			if testCase.endpointSlicesEnabled {
+				epAdapter.endpointSliceClient = client.DiscoveryV1alpha1()
+			}
+
+			for _, endpointSlice := range testCase.endpointSlices {
+				_, err := client.DiscoveryV1alpha1().EndpointSlices(endpointSlice.Namespace).Create(endpointSlice)
+				if err != nil {
+					t.Fatalf("Error creating EndpointSlice: %v", err)
+				}
+			}
+
+			err := epAdapter.EnsureEndpointSliceFromEndpoints(testCase.namespaceParam, testCase.endpointsParam)
+			if !apiequality.Semantic.DeepEqual(testCase.expectedError, err) {
+				t.Errorf("Expected error: %v, got: %v", testCase.expectedError, err)
+			}
+
+			endpointSlice, err := client.DiscoveryV1alpha1().EndpointSlices(testCase.namespaceParam).Get(testCase.endpointsParam.Name, metav1.GetOptions{})
+			if err != nil && !errors.IsNotFound(err) {
+				t.Fatalf("Error getting Endpoint Slice: %v", err)
+			}
+
+			if !apiequality.Semantic.DeepEqual(endpointSlice, testCase.expectedEndpointSlice) {
+				t.Errorf("Expected Endpoint Slice: %v, got: %v", testCase.expectedEndpointSlice, endpointSlice)
+			}
+		})
+	}
+}

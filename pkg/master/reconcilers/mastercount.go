@@ -100,7 +100,7 @@ func (r *masterCountEndpointReconciler) ReconcileEndpoints(serviceName string, i
 		return err
 	}
 	if ipCorrect && portsCorrect {
-		return nil
+		return r.epAdapter.EnsureEndpointSliceFromEndpoints(metav1.NamespaceDefault, e)
 	}
 	if !ipCorrect {
 		// We *always* add our own IP address.
