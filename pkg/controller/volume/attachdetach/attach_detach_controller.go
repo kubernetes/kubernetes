@@ -420,14 +420,14 @@ func (adc *attachDetachController) populateActualStateOfWorld() error {
 		pvName := *va.Spec.Source.PersistentVolumeName
 		pv, err := adc.pvLister.Get(pvName)
 		var uniqueVolumeName v1.UniqueVolumeName
-		if err != nil && apierrors.IsNotFound(err) ||
-			pv == nil {
-			deleteError := adc.kubeClient.StorageV1().VolumeAttachments().Delete(context.TODO(), va.Name,
-				metav1.DeleteOptions{})
-			if deleteError != nil && apierrors.IsNotFound(deleteError) {
-				continue
+		if err != nil && apierrors.IsNotFound(err) {
+			if _, err = adc.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), pvName,
+				metav1.GetOptions{}); err != nil && apierrors.IsNotFound(err) {
+				deleteError := adc.kubeClient.StorageV1().VolumeAttachments().Delete(context.TODO(), va.Name, metav1.DeleteOptions{})
+				if deleteError != nil && apierrors.IsNotFound(deleteError) {
+					continue
+				}
 			}
-			klog.Error(deleteError)
 		}
 		volumeName = fmt.Sprintf("%s%s%s", driverName, "^", pv.Spec.CSI.VolumeHandle)
 		uniqueVolumeName = volumeutil.GetUniqueVolumeName(pluginName, volumeName)
@@ -809,12 +809,15 @@ func (adc *attachDetachController) syncVAByKey(key string) error {
 	pv, err := adc.pvLister.Get(pvName)
 	// If the pv also has been deleted, we can not find volumeHandler,
 	// we need delete the volumeAttachment directly.
-	if err != nil && apierrors.IsNotFound(err) || pv == nil {
-		deleteError := adc.kubeClient.StorageV1().VolumeAttachments().Delete(context.TODO(), va.Name, metav1.DeleteOptions{})
-		if deleteError != nil && apierrors.IsNotFound(deleteError) {
-			return nil
+	if err != nil && apierrors.IsNotFound(err) {
+		if _, err = adc.kubeClient.CoreV1().PersistentVolumes().Get(context.TODO(), pvName,
+			metav1.GetOptions{}); err != nil && apierrors.IsNotFound(err) {
+			deleteError := adc.kubeClient.StorageV1().VolumeAttachments().Delete(context.TODO(), va.Name, metav1.DeleteOptions{})
+			if deleteError != nil && apierrors.IsNotFound(deleteError) {
+				return nil
+			}
+			return deleteError
 		}
-		return deleteError
 	}
 
 	var volumeName string
