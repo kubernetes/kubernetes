@@ -69,6 +69,7 @@ go_test(
         "requested_to_capacity_ratio_test.go",
         "resource_limits_test.go",
         "selector_spreading_test.go",
+        "spreading_perf_test.go",
         "taint_toleration_test.go",
         "types_test.go",
     ],
