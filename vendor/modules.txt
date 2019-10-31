@@ -1899,7 +1899,7 @@ k8s.io/sample-apiserver/pkg/generated/openapi
 k8s.io/sample-apiserver/pkg/registry
 k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 k8s.io/sample-apiserver/pkg/registry/wardle/flunder
-# k8s.io/utils v0.0.0-20191010214722-8d271d903fe4 => k8s.io/utils v0.0.0-20191010214722-8d271d903fe4
+# k8s.io/utils v0.0.0-20191030222137-2b95a09bc58d => k8s.io/utils v0.0.0-20191030222137-2b95a09bc58d
 k8s.io/utils/buffer
 k8s.io/utils/clock
 k8s.io/utils/exec
