@@ -1178,14 +1178,14 @@ func (fv *FakeVolumePathHandler) AttachFileDevice(path string) (string, error) {
 	return "", nil
 }
 
+func (fv *FakeVolumePathHandler) DetachFileDevice(path string) error {
+	// nil is success, else error
+	return nil
+}
+
 func (fv *FakeVolumePathHandler) GetLoopDevice(path string) (string, error) {
 	// nil is success, else error
 	return "/dev/loop1", nil
-}
-
-func (fv *FakeVolumePathHandler) RemoveLoopDevice(device string) error {
-	// nil is success, else error
-	return nil
 }
 
 // FindEmptyDirectoryUsageOnTmpfs finds the expected usage of an empty directory existing on

@@ -1096,7 +1096,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 		// that the block device is silently removed and attached another device with same name.
 		// Container runtime can't handler this problem. To avoid unexpected condition fd lock
 		// for the block device is required.
-		_, err = og.blkUtil.AttachFileDevice(devicePath)
+		_, err = og.blkUtil.AttachFileDevice(filepath.Join(globalMapPath, string(volumeToMount.Pod.UID)))
 		if err != nil {
 			return volumeToMount.GenerateError("MapVolume.AttachFileDevice failed", err)
 		}
@@ -1207,6 +1207,14 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 	}
 
 	unmapVolumeFunc := func() (error, error) {
+		globalUnmapPath := volumeToUnmount.DeviceMountPath
+
+		// Release file descriptor lock.
+		err := og.blkUtil.DetachFileDevice(filepath.Join(globalUnmapPath, string(volumeToUnmount.PodUID)))
+		if err != nil {
+			return volumeToUnmount.GenerateError("UnmapVolume.UnmapDevice Detaching descriptor lock failed", err)
+		}
+
 		// Try to unmap volumeName symlink under pod device map path dir
 		// pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
 		podDeviceUnmapPath, volName := blockVolumeUnmapper.GetPodDeviceMapPath()
@@ -1217,7 +1225,6 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		}
 		// Try to unmap podUID symlink under global map path dir
 		// plugins/kubernetes.io/{PluginName}/volumeDevices/{volumePluginDependentPath}/{podUID}
-		globalUnmapPath := volumeToUnmount.DeviceMountPath
 		unmapDeviceErr = og.blkUtil.UnmapDevice(globalUnmapPath, string(volumeToUnmount.PodUID), true /* bindMount */)
 		if unmapDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
@@ -1313,27 +1320,6 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		if len(refs) > 0 {
 			err = fmt.Errorf("The device %q is still referenced from other Pods %v", globalMapPath, refs)
 			return deviceToDetach.GenerateError("UnmapDevice failed", err)
-		}
-
-		// The block volume is not referenced from Pods. Release file descriptor lock.
-		// This should be done before calling TearDownDevice, because some plugins that do local detach
-		// in TearDownDevice will fail in detaching device due to the refcnt on the loopback device.
-		klog.V(4).Infof("UnmapDevice: deviceToDetach.DevicePath: %v", deviceToDetach.DevicePath)
-		loopPath, err := og.blkUtil.GetLoopDevice(deviceToDetach.DevicePath)
-		if err != nil {
-			if err.Error() == volumepathhandler.ErrDeviceNotFound {
-				klog.Warningf(deviceToDetach.GenerateMsgDetailed("UnmapDevice: Couldn't find loopback device which takes file descriptor lock", fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)))
-			} else {
-				errInfo := "UnmapDevice.GetLoopDevice failed to get loopback device, " + fmt.Sprintf("device path: %q", deviceToDetach.DevicePath)
-				return deviceToDetach.GenerateError(errInfo, err)
-			}
-		} else {
-			if len(loopPath) != 0 {
-				err = og.blkUtil.RemoveLoopDevice(loopPath)
-				if err != nil {
-					return deviceToDetach.GenerateError("UnmapDevice.RemoveLoopDevice failed", err)
-				}
-			}
 		}
 
 		// Execute tear down device

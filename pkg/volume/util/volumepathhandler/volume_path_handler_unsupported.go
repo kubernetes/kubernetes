@@ -30,14 +30,15 @@ func (v VolumePathHandler) AttachFileDevice(path string) (string, error) {
 	return "", fmt.Errorf("AttachFileDevice not supported for this build.")
 }
 
+// DetachFileDevice takes a path to the attached block device and
+// detach it from block device.
+func (v VolumePathHandler) DetachFileDevice(path string) error {
+	return fmt.Errorf("DetachFileDevice not supported for this build.")
+}
+
 // GetLoopDevice returns the full path to the loop device associated with the given path.
 func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
 	return "", fmt.Errorf("GetLoopDevice not supported for this build.")
-}
-
-// RemoveLoopDevice removes specified loopback device
-func (v VolumePathHandler) RemoveLoopDevice(device string) error {
-	return fmt.Errorf("RemoveLoopDevice not supported for this build.")
 }
 
 // FindGlobalMapPathUUIDFromPod finds {pod uuid} bind mount under globalMapPath

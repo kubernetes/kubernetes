@@ -50,6 +50,27 @@ func (v VolumePathHandler) AttachFileDevice(path string) (string, error) {
 	return blockDevicePath, nil
 }
 
+// DetachFileDevice takes a path to the attached block device and
+// detach it from block device.
+func (v VolumePathHandler) DetachFileDevice(path string) error {
+	loopPath, err := v.GetLoopDevice(path)
+	if err != nil {
+		if err.Error() == ErrDeviceNotFound {
+			klog.Warningf("DetachFileDevice: Couldn't find loopback device which takes file descriptor lock. device path: %q", path)
+		} else {
+			return err
+		}
+	} else {
+		if len(loopPath) != 0 {
+			err = removeLoopDevice(loopPath)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 // GetLoopDevice returns the full path to the loop device associated with the given path.
 func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
 	_, err := os.Stat(path)
@@ -88,8 +109,8 @@ func makeLoopDevice(path string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// RemoveLoopDevice removes specified loopback device
-func (v VolumePathHandler) RemoveLoopDevice(device string) error {
+// removeLoopDevice removes specified loopback device
+func removeLoopDevice(device string) error {
 	args := []string{"-d", device}
 	cmd := exec.Command(losetupPath, args...)
 	out, err := cmd.CombinedOutput()

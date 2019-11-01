@@ -55,10 +55,11 @@ type BlockVolumePathHandler interface {
 	// AttachFileDevice takes a path to a regular file and makes it available as an
 	// attached block device.
 	AttachFileDevice(path string) (string, error)
+	// DetachFileDevice takes a path to the attached block device and
+	// detach it from block device.
+	DetachFileDevice(path string) error
 	// GetLoopDevice returns the full path to the loop device associated with the given path.
 	GetLoopDevice(path string) (string, error)
-	// RemoveLoopDevice removes specified loopback device
-	RemoveLoopDevice(device string) error
 }
 
 // NewBlockVolumePathHandler returns a new instance of BlockVolumeHandler.
