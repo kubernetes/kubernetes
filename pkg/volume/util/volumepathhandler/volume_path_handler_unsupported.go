@@ -20,6 +20,8 @@ package volumepathhandler
 
 import (
 	"fmt"
+
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // AttachFileDevice takes a path to a regular file and makes it available as an
@@ -36,4 +38,10 @@ func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
 // RemoveLoopDevice removes specified loopback device
 func (v VolumePathHandler) RemoveLoopDevice(device string) error {
 	return fmt.Errorf("RemoveLoopDevice not supported for this build.")
+}
+
+// FindGlobalMapPathUUIDFromPod finds {pod uuid} bind mount under globalMapPath
+// corresponding to map path symlink, and then return global map path with pod uuid.
+func (v VolumePathHandler) FindGlobalMapPathUUIDFromPod(pluginDir, mapPath string, podUID types.UID) (string, error) {
+	return "", fmt.Errorf("FindGlobalMapPathUUIDFromPod not supported for this build.")
 }

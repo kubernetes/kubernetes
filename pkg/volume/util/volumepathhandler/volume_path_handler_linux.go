@@ -19,12 +19,15 @@ limitations under the License.
 package volumepathhandler
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog"
 )
 
@@ -64,7 +67,7 @@ func (v VolumePathHandler) GetLoopDevice(path string) (string, error) {
 		klog.V(2).Infof("Failed device discover command for path %s: %v %s", path, err, out)
 		return "", err
 	}
-	return parseLosetupOutputForDevice(out)
+	return parseLosetupOutputForDevice(out, path)
 }
 
 func makeLoopDevice(path string) (string, error) {
@@ -75,7 +78,14 @@ func makeLoopDevice(path string) (string, error) {
 		klog.V(2).Infof("Failed device create command for path: %s %v %s ", path, err, out)
 		return "", err
 	}
-	return parseLosetupOutputForDevice(out)
+
+	// losetup -f --show {path} returns device in the format:
+	// /dev/loop1
+	if len(out) == 0 {
+		return "", errors.New(ErrDeviceNotFound)
+	}
+
+	return strings.TrimSpace(string(out)), nil
 }
 
 // RemoveLoopDevice removes specified loopback device
@@ -93,16 +103,97 @@ func (v VolumePathHandler) RemoveLoopDevice(device string) error {
 	return nil
 }
 
-func parseLosetupOutputForDevice(output []byte) (string, error) {
+func parseLosetupOutputForDevice(output []byte, path string) (string, error) {
 	if len(output) == 0 {
 		return "", errors.New(ErrDeviceNotFound)
 	}
 
-	// losetup returns device in the format:
-	// /dev/loop1: [0073]:148662 (/dev/sda)
-	device := strings.TrimSpace(strings.SplitN(string(output), ":", 2)[0])
+	// losetup -j {path} returns device in the format:
+	// /dev/loop1: [0073]:148662 (/dev/{globalMapPath}/{pod1-UUID})
+	// /dev/loop2: [0073]:148662 (/dev/{globalMapPath}/{pod2-UUID})
+	s := string(output)
+	// Find line that exact matches the path
+	var matched string
+	scanner := bufio.NewScanner(strings.NewReader(s))
+	for scanner.Scan() {
+		if strings.HasSuffix(scanner.Text(), "("+path+")") {
+			matched = scanner.Text()
+			break
+		}
+	}
+	if len(matched) == 0 {
+		return "", errors.New(ErrDeviceNotFound)
+	}
+	s = matched
+
+	device := strings.TrimSpace(strings.SplitN(s, ":", 2)[0])
 	if len(device) == 0 {
 		return "", errors.New(ErrDeviceNotFound)
 	}
 	return device, nil
+}
+
+// FindGlobalMapPathUUIDFromPod finds {pod uuid} bind mount under globalMapPath
+// corresponding to map path symlink, and then return global map path with pod uuid.
+// ex. mapPath symlink: pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName} -> /dev/sdX
+//     globalMapPath/{pod uuid} bind mount: plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid} -> /dev/sdX
+func (v VolumePathHandler) FindGlobalMapPathUUIDFromPod(pluginDir, mapPath string, podUID types.UID) (string, error) {
+	var globalMapPathUUID string
+	// Find symbolic link named pod uuid under plugin dir
+	err := filepath.Walk(pluginDir, func(path string, fi os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if (fi.Mode()&os.ModeDevice == os.ModeDevice) && (fi.Name() == string(podUID)) {
+			klog.V(5).Infof("FindGlobalMapPathFromPod: path %s, mapPath %s", path, mapPath)
+			if res, err := compareBindMountAndSymlinks(path, mapPath); err == nil && res {
+				globalMapPathUUID = path
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	klog.V(5).Infof("FindGlobalMapPathFromPod: globalMapPathUUID %s", globalMapPathUUID)
+	// Return path contains global map path + {pod uuid}
+	return globalMapPathUUID, nil
+}
+
+func compareBindMountAndSymlinks(global, pod string) (bool, error) {
+	devNumGlobal, err := getDeviceMajorMinor(global)
+	if err != nil {
+		return false, err
+	}
+	devPod, err := os.Readlink(pod)
+	if err != nil {
+		return false, err
+	}
+	devNumPod, err := getDeviceMajorMinor(devPod)
+	if err != nil {
+		return false, err
+	}
+	klog.V(5).Infof("CompareBindMountAndSymlinks: devNumGlobal %s, devNumPod %s", devNumGlobal, devNumPod)
+	if devNumGlobal == devNumPod {
+		return true, nil
+	}
+	return false, nil
+}
+
+func getDeviceMajorMinor(path string) (string, error) {
+	args := []string{"-c", "%t:%T", path}
+	cmd := exec.Command(statPath, args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		klog.V(2).Infof("Failed to stat path: %s %v %s ", path, err, out)
+		return "", err
+	}
+
+	// stat -c "%t:%T" {path} outputs following format(major:minor in hex):
+	// fc:10
+	if len(out) == 0 {
+		return "", errors.New(ErrDeviceNotFound)
+	}
+
+	return strings.TrimSpace(string(out)), nil
 }

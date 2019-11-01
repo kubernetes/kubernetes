@@ -1138,12 +1138,12 @@ type FakeVolumePathHandler struct {
 	sync.RWMutex
 }
 
-func (fv *FakeVolumePathHandler) MapDevice(devicePath string, mapDir string, linkName string) error {
+func (fv *FakeVolumePathHandler) MapDevice(devicePath string, mapDir string, linkName string, bindMount bool) error {
 	// nil is success, else error
 	return nil
 }
 
-func (fv *FakeVolumePathHandler) UnmapDevice(mapDir string, linkName string) error {
+func (fv *FakeVolumePathHandler) UnmapDevice(mapDir string, linkName string, bindMount bool) error {
 	// nil is success, else error
 	return nil
 }
@@ -1158,7 +1158,12 @@ func (fv *FakeVolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 	return true, nil
 }
 
-func (fv *FakeVolumePathHandler) GetDeviceSymlinkRefs(devPath string, mapPath string) ([]string, error) {
+func (fv *FakeVolumePathHandler) IsBindMountExist(mapPath string) (bool, error) {
+	// nil is success, else error
+	return true, nil
+}
+
+func (fv *FakeVolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error) {
 	// nil is success, else error
 	return []string{}, nil
 }

@@ -23,12 +23,14 @@ import (
 	"path/filepath"
 
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/util/mount"
 
 	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
 	losetupPath           = "losetup"
+	statPath              = "stat"
 	ErrDeviceNotFound     = "device not found"
 	ErrDeviceNotSupported = "device not supported"
 )
@@ -36,15 +38,17 @@ const (
 // BlockVolumePathHandler defines a set of operations for handling block volume-related operations
 type BlockVolumePathHandler interface {
 	// MapDevice creates a symbolic link to block device under specified map path
-	MapDevice(devicePath string, mapPath string, linkName string) error
+	MapDevice(devicePath string, mapPath string, linkName string, bindMount bool) error
 	// UnmapDevice removes a symbolic link to block device under specified map path
-	UnmapDevice(mapPath string, linkName string) error
+	UnmapDevice(mapPath string, linkName string, bindMount bool) error
 	// RemovePath removes a file or directory on specified map path
 	RemoveMapPath(mapPath string) error
 	// IsSymlinkExist retruns true if specified symbolic link exists
 	IsSymlinkExist(mapPath string) (bool, error)
-	// GetDeviceSymlinkRefs searches symbolic links under global map path
-	GetDeviceSymlinkRefs(devPath string, mapPath string) ([]string, error)
+	// IsBindMountExist retruns true if specified bind mount exists
+	IsBindMountExist(mapPath string) (bool, error)
+	// GetDeviceBindMountRefs searches bind mounts under global map path
+	GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error)
 	// FindGlobalMapPathUUIDFromPod finds {pod uuid} symbolic link under globalMapPath
 	// corresponding to map path symlink, and then return global map path with pod uuid.
 	FindGlobalMapPathUUIDFromPod(pluginDir, mapPath string, podUID types.UID) (string, error)
@@ -68,7 +72,7 @@ type VolumePathHandler struct {
 }
 
 // MapDevice creates a symbolic link to block device under specified map path
-func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName string) error {
+func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName string, bindMount bool) error {
 	// Example of global map path:
 	//   globalMapPath/linkName: plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{podUid}
 	//   linkName: {podUid}
@@ -98,25 +102,105 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 	if err = os.MkdirAll(mapPath, 0750); err != nil {
 		return fmt.Errorf("Failed to mkdir %s, error %v", mapPath, err)
 	}
+
+	if bindMount {
+		return mapBindMountDevice(v, devicePath, mapPath, linkName)
+	}
+	return mapSymlinkDevice(v, devicePath, mapPath, linkName)
+}
+
+func mapBindMountDevice(v VolumePathHandler, devicePath string, mapPath string, linkName string) error {
+	// Check bind mount exists
+	linkPath := filepath.Join(mapPath, string(linkName))
+
+	file, err := os.Stat(linkPath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("Failed to stat file %s: %v", linkPath, err)
+		}
+
+		klog.Warningf("Warning: Path to bind mount %v has not yet been created", linkPath)
+		// Create file
+		newFile, err := os.OpenFile(linkPath, os.O_CREATE|os.O_RDWR, 0750)
+		if err != nil {
+			return err
+		}
+		if err := newFile.Close(); err != nil {
+			return err
+		}
+	} else {
+		// Check if device file
+		// TODO: Need to check if this device file is actually the expected bind mount
+		if file.Mode()&os.ModeDevice == os.ModeDevice {
+			klog.Warningf("Warning: Map skipped because bind mount already exist on the path: %v", linkPath)
+			return nil
+		}
+
+		klog.Warningf("Warning: file %s is already exist but not mounted, skip creating file", linkPath)
+	}
+
+	// Bind mount file
+	mounter := &mount.SafeFormatAndMount{Interface: mount.New(""), Exec: mount.NewOSExec()}
+	if err := mounter.Mount(devicePath, linkPath, "" /* fsType */, []string{"bind"}); err != nil {
+		klog.Errorf("Failed to bind mount devicePath: %s to linkPath %s: %v", devicePath, linkPath, err)
+		return err
+	}
+
+	return nil
+}
+
+func mapSymlinkDevice(v VolumePathHandler, devicePath string, mapPath string, linkName string) error {
 	// Remove old symbolic link(or file) then create new one.
 	// This should be done because current symbolic link is
 	// stale across node reboot.
 	linkPath := filepath.Join(mapPath, string(linkName))
-	if err = os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	err = os.Symlink(devicePath, linkPath)
-	return err
+	return os.Symlink(devicePath, linkPath)
 }
 
 // UnmapDevice removes a symbolic link associated to block device under specified map path
-func (v VolumePathHandler) UnmapDevice(mapPath string, linkName string) error {
+func (v VolumePathHandler) UnmapDevice(mapPath string, linkName string, bindMount bool) error {
 	if len(mapPath) == 0 {
 		return fmt.Errorf("Failed to unmap device from map path. mapPath is empty")
 	}
 	klog.V(5).Infof("UnmapDevice: mapPath %s", mapPath)
 	klog.V(5).Infof("UnmapDevice: linkName %s", linkName)
 
+	if bindMount {
+		return unmapBindMountDevice(v, mapPath, linkName)
+	}
+	return unmapSymlinkDevice(v, mapPath, linkName)
+}
+
+func unmapBindMountDevice(v VolumePathHandler, mapPath string, linkName string) error {
+	// Check bind mount exists
+	linkPath := filepath.Join(mapPath, string(linkName))
+	if isMountExist, checkErr := v.IsBindMountExist(linkPath); checkErr != nil {
+		return checkErr
+	} else if !isMountExist {
+		klog.Warningf("Warning: Unmap skipped because bind mount does not exist on the path: %v", linkPath)
+		// TODO: consider deleting empty file if it exists
+		return nil
+	}
+
+	// Unmount file
+	mounter := &mount.SafeFormatAndMount{Interface: mount.New(""), Exec: mount.NewOSExec()}
+	if err := mounter.Unmount(linkPath); err != nil {
+		klog.Errorf("Failed to unmount linkPath %s: %v", linkPath, err)
+		return err
+	}
+
+	// Remove file
+	if err := os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	return nil
+}
+
+func unmapSymlinkDevice(v VolumePathHandler, mapPath string, linkName string) error {
 	// Check symbolic link exists
 	linkPath := filepath.Join(mapPath, string(linkName))
 	if islinkExist, checkErr := v.IsSymlinkExist(linkPath); checkErr != nil {
@@ -125,8 +209,7 @@ func (v VolumePathHandler) UnmapDevice(mapPath string, linkName string) error {
 		klog.Warningf("Warning: Unmap skipped because symlink does not exist on the path: %v", linkPath)
 		return nil
 	}
-	err := os.Remove(linkPath)
-	return err
+	return os.Remove(linkPath)
 }
 
 // RemoveMapPath removes a file or directory on specified map path
@@ -163,70 +246,42 @@ func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 	return false, err
 }
 
-// GetDeviceSymlinkRefs searches symbolic links under global map path
-func (v VolumePathHandler) GetDeviceSymlinkRefs(devPath string, mapPath string) ([]string, error) {
+// IsBindMountExist returns true if specified file exists and the type is device.
+// If file doesn't exist, or file exists but not device, return false with no error.
+// On other cases, return false with error from Lstat().
+func (v VolumePathHandler) IsBindMountExist(mapPath string) (bool, error) {
+	fi, err := os.Lstat(mapPath)
+	if err == nil {
+		// If file exits and it's device, return true and no error
+		if fi.Mode()&os.ModeDevice == os.ModeDevice {
+			return true, nil
+		}
+		// If file exits but it's not device, return fale and no error
+		return false, nil
+	}
+	// If file doesn't exist, return false and no error
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	// Return error from Lstat()
+	return false, err
+}
+
+// GetDeviceBindMountRefs searches bind mounts under global map path
+func (v VolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error) {
 	var refs []string
 	files, err := ioutil.ReadDir(mapPath)
 	if err != nil {
 		return nil, fmt.Errorf("Directory cannot read %v", err)
 	}
 	for _, file := range files {
-		if file.Mode()&os.ModeSymlink != os.ModeSymlink {
+		if file.Mode()&os.ModeDevice != os.ModeDevice {
 			continue
 		}
 		filename := file.Name()
-		fp, err := os.Readlink(filepath.Join(mapPath, filename))
-		if err != nil {
-			return nil, fmt.Errorf("Symbolic link cannot be retrieved %v", err)
-		}
-		klog.V(5).Infof("GetDeviceSymlinkRefs: filepath: %v, devPath: %v", fp, devPath)
-		if fp == devPath {
-			refs = append(refs, filepath.Join(mapPath, filename))
-		}
+		// TODO: Might need to check if the file is actually linked to devPath
+		refs = append(refs, filepath.Join(mapPath, filename))
 	}
-	klog.V(5).Infof("GetDeviceSymlinkRefs: refs %v", refs)
+	klog.V(5).Infof("GetDeviceBindMountRefs: refs %v", refs)
 	return refs, nil
-}
-
-// FindGlobalMapPathUUIDFromPod finds {pod uuid} symbolic link under globalMapPath
-// corresponding to map path symlink, and then return global map path with pod uuid.
-// ex. mapPath symlink: pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName} -> /dev/sdX
-//     globalMapPath/{pod uuid}: plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid} -> /dev/sdX
-func (v VolumePathHandler) FindGlobalMapPathUUIDFromPod(pluginDir, mapPath string, podUID types.UID) (string, error) {
-	var globalMapPathUUID string
-	// Find symbolic link named pod uuid under plugin dir
-	err := filepath.Walk(pluginDir, func(path string, fi os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if (fi.Mode()&os.ModeSymlink == os.ModeSymlink) && (fi.Name() == string(podUID)) {
-			klog.V(5).Infof("FindGlobalMapPathFromPod: path %s, mapPath %s", path, mapPath)
-			if res, err := compareSymlinks(path, mapPath); err == nil && res {
-				globalMapPathUUID = path
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		return "", err
-	}
-	klog.V(5).Infof("FindGlobalMapPathFromPod: globalMapPathUUID %s", globalMapPathUUID)
-	// Return path contains global map path + {pod uuid}
-	return globalMapPathUUID, nil
-}
-
-func compareSymlinks(global, pod string) (bool, error) {
-	devGlobal, err := os.Readlink(global)
-	if err != nil {
-		return false, err
-	}
-	devPod, err := os.Readlink(pod)
-	if err != nil {
-		return false, err
-	}
-	klog.V(5).Infof("CompareSymlinks: devGloBal %s, devPod %s", devGlobal, devPod)
-	if devGlobal == devPod {
-		return true, nil
-	}
-	return false, nil
 }

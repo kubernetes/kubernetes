@@ -1210,7 +1210,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		// Try to unmap volumeName symlink under pod device map path dir
 		// pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
 		podDeviceUnmapPath, volName := blockVolumeUnmapper.GetPodDeviceMapPath()
-		unmapDeviceErr := og.blkUtil.UnmapDevice(podDeviceUnmapPath, volName)
+		unmapDeviceErr := og.blkUtil.UnmapDevice(podDeviceUnmapPath, volName, false /* bindMount */)
 		if unmapDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToUnmount.GenerateError("UnmapVolume.UnmapDevice on pod device map path failed", unmapDeviceErr)
@@ -1218,7 +1218,7 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 		// Try to unmap podUID symlink under global map path dir
 		// plugins/kubernetes.io/{PluginName}/volumeDevices/{volumePluginDependentPath}/{podUID}
 		globalUnmapPath := volumeToUnmount.DeviceMountPath
-		unmapDeviceErr = og.blkUtil.UnmapDevice(globalUnmapPath, string(volumeToUnmount.PodUID))
+		unmapDeviceErr = og.blkUtil.UnmapDevice(globalUnmapPath, string(volumeToUnmount.PodUID), true /* bindMount */)
 		if unmapDeviceErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToUnmount.GenerateError("UnmapVolume.UnmapDevice on global map path failed", unmapDeviceErr)
@@ -1306,9 +1306,9 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 		// Search under globalMapPath dir if all symbolic links from pods have been removed already.
 		// If symbolic links are there, pods may still refer the volume.
 		globalMapPath := deviceToDetach.DeviceMountPath
-		refs, err := og.blkUtil.GetDeviceSymlinkRefs(deviceToDetach.DevicePath, globalMapPath)
+		refs, err := og.blkUtil.GetDeviceBindMountRefs(deviceToDetach.DevicePath, globalMapPath)
 		if err != nil {
-			return deviceToDetach.GenerateError("UnmapDevice.GetDeviceSymlinkRefs check failed", err)
+			return deviceToDetach.GenerateError("UnmapDevice.GetDeviceBindMountRefs check failed", err)
 		}
 		if len(refs) > 0 {
 			err = fmt.Errorf("The device %q is still referenced from other Pods %v", globalMapPath, refs)

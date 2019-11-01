@@ -515,16 +515,18 @@ func MapBlockVolume(
 ) error {
 	blkUtil := volumepathhandler.NewBlockVolumePathHandler()
 
-	// map devicePath to global node path
-	mapErr := blkUtil.MapDevice(devicePath, globalMapPath, string(podUID))
+	// map devicePath to global node path as bind mount
+	mapErr := blkUtil.MapDevice(devicePath, globalMapPath, string(podUID), true /* bindMount */)
 	if mapErr != nil {
-		return mapErr
+		return fmt.Errorf("blkUtil.MapDevice failed. devicePath: %s, globalMapPath:%s, podUID: %s, bindMount: %v: %v",
+			devicePath, globalMapPath, string(podUID), true, mapErr)
 	}
 
 	// map devicePath to pod volume path
-	mapErr = blkUtil.MapDevice(devicePath, podVolumeMapPath, volumeMapName)
+	mapErr = blkUtil.MapDevice(devicePath, podVolumeMapPath, volumeMapName, false /* bindMount */)
 	if mapErr != nil {
-		return mapErr
+		return fmt.Errorf("blkUtil.MapDevice failed. devicePath: %s, podVolumeMapPath:%s, volumeMapName: %s, bindMount: %v: %v",
+			devicePath, podVolumeMapPath, volumeMapName, false, mapErr)
 	}
 
 	return nil
