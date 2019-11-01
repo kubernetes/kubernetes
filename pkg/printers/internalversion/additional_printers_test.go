@@ -18,25 +18,20 @@ package internalversion
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"testing"
 
-	yaml "gopkg.in/yaml.v2"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1beta1 "k8s.io/apimachinery/pkg/apis/meta/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	yamlserializer "k8s.io/apimachinery/pkg/runtime/serializer/yaml"
-	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	genericprinters "k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
-	"k8s.io/kubernetes/pkg/api/testapi"
 	"k8s.io/kubernetes/pkg/printers"
 )
 
@@ -46,27 +41,6 @@ import (
 // should be moved (mostly to cli-runtime). seans3.
 //
 /////////////////////////////////////////////////////////////
-
-var testData = TestStruct{
-	TypeMeta:   metav1.TypeMeta{APIVersion: "foo/bar", Kind: "TestStruct"},
-	Key:        "testValue",
-	Map:        map[string]int{"TestSubkey": 1},
-	StringList: []string{"a", "b", "c"},
-	IntList:    []int{1, 2, 3},
-}
-
-type TestStruct struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-	Key               string         `json:"Key"`
-	Map               map[string]int `json:"Map"`
-	StringList        []string       `json:"StringList"`
-	IntList           []int          `json:"IntList"`
-}
-
-func (in *TestStruct) DeepCopyObject() runtime.Object {
-	panic("never called")
-}
 
 type TestPrintType struct {
 	Data string
@@ -79,68 +53,6 @@ func (obj *TestPrintType) DeepCopyObject() runtime.Object {
 	}
 	clone := *obj
 	return &clone
-}
-
-// TODO(seans3): Move this test to cli-runtime/pkg/printers.
-func testPrinter(t *testing.T, printer printers.ResourcePrinter, unmarshalFunc func(data []byte, v interface{}) error) {
-	buf := bytes.NewBuffer([]byte{})
-
-	err := printer.PrintObj(&testData, buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var poutput TestStruct
-	// Verify that given function runs without error.
-	err = unmarshalFunc(buf.Bytes(), &poutput)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Use real decode function to undo the versioning process.
-	poutput = TestStruct{}
-	s := yamlserializer.NewDecodingSerializer(testapi.Default.Codec())
-	if err := runtime.DecodeInto(s, buf.Bytes(), &poutput); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(testData, poutput) {
-		t.Errorf("Test data and unmarshaled data are not equal: %v", diff.ObjectDiff(poutput, testData))
-	}
-
-	obj := &v1.Pod{
-		TypeMeta:   metav1.TypeMeta{APIVersion: "v1", Kind: "Pod"},
-		ObjectMeta: metav1.ObjectMeta{Name: "foo"},
-	}
-	// our decoder defaults, so we should default our expected object as well
-	legacyscheme.Scheme.Default(obj)
-	buf.Reset()
-	printer.PrintObj(obj, buf)
-	var objOut v1.Pod
-	// Verify that given function runs without error.
-	err = unmarshalFunc(buf.Bytes(), &objOut)
-	if err != nil {
-		t.Fatalf("unexpected error: %#v", err)
-	}
-	// Use real decode function to undo the versioning process.
-	objOut = v1.Pod{}
-	if err := runtime.DecodeInto(s, buf.Bytes(), &objOut); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(obj, &objOut) {
-		t.Errorf("Unexpected inequality:\n%v", diff.ObjectDiff(obj, &objOut))
-	}
-}
-
-func yamlUnmarshal(data []byte, v interface{}) error {
-	return yaml.Unmarshal(data, v)
-}
-
-// TODO(seans3): Move this test to cli-runtime/pkg/printers.
-func TestYAMLPrinter(t *testing.T) {
-	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.YAMLPrinter{}), yamlUnmarshal)
-}
-
-// TODO(seans3): Move this test to cli-runtime/pkg/printers.
-func TestJSONPrinter(t *testing.T) {
-	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}), json.Unmarshal)
 }
 
 func PrintCustomType(obj *TestPrintType, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
