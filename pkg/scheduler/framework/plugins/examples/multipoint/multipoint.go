@@ -31,7 +31,7 @@ type CommunicatingPlugin struct{}
 var _ framework.ReservePlugin = CommunicatingPlugin{}
 var _ framework.PreBindPlugin = CommunicatingPlugin{}
 
-// Name is the name of the plug used in Registry and configurations.
+// Name is the name of the plugin used in Registry and configurations.
 const Name = "multipoint-communicating-plugin"
 
 // Name returns name of the plugin. It is used in logs, etc.
@@ -43,9 +43,9 @@ type stateData struct {
 	data string
 }
 
-func (f *stateData) Clone() framework.StateData {
+func (s *stateData) Clone() framework.StateData {
 	copy := &stateData{
-		data: f.data,
+		data: s.data,
 	}
 	return copy
 }

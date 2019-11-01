@@ -50,7 +50,7 @@ type KubeSchedulerConfiguration struct {
 	AlgorithmSource SchedulerAlgorithmSource
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range [0-100].
 	HardPodAffinitySymmetricWeight int32
 
 	// LeaderElection defines the configuration of leader election client.
@@ -94,7 +94,7 @@ type KubeSchedulerConfiguration struct {
 	PodInitialBackoffSeconds *int64
 
 	// PodMaxBackoffSeconds is the max backoff for unschedulable pods.
-	// If specified, it must be greater than podInitialBackoffSeconds. If this value is null,
+	// If specified, it must be greater than or equal to podInitialBackoffSeconds. If this value is null,
 	// the default value (10s) will be used.
 	PodMaxBackoffSeconds *int64
 
@@ -140,7 +140,7 @@ type SchedulerPolicyFileSource struct {
 type SchedulerPolicyConfigMapSource struct {
 	// Namespace is the namespace of the policy config map.
 	Namespace string
-	// Name is the name of hte policy config map.
+	// Name is the name of the policy config map.
 	Name string
 }
 
