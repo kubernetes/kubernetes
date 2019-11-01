@@ -31,7 +31,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/controlplane"
 	kubeadmutil "k8s.io/kubernetes/cmd/kubeadm/app/util"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -58,7 +57,7 @@ var (
 // NewCmdDiff returns the cobra command for `kubeadm upgrade diff`
 func NewCmdDiff(out io.Writer) *cobra.Command {
 	flags := &diffFlags{
-		kubeConfigPath: kubeadmconstants.GetAdminKubeConfigPath(),
+		kubeConfigPath: constants.GetAdminKubeConfigPath(),
 		out:            out,
 	}
 
