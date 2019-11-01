@@ -91,6 +91,12 @@ func TestValidateDockerInfo(t *testing.T) {
 			err:  false,
 			warn: true,
 		},
+		{
+			name: "Docker daemon not available",
+			info: dockerInfo{ServerErrors: []string{"Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running"}},
+			err:  true,
+			warn: false,
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			warn, err := v.validateDockerInfo(spec, test.info)
@@ -121,6 +127,11 @@ func TestUnmarshalDockerInfo(t *testing.T) {
 			name:         "valid: expected dockerInfo is valid",
 			input:        `{ "Driver":"foo", "ServerVersion":"bar" }`,
 			expectedInfo: dockerInfo{Driver: "foo", ServerVersion: "bar"},
+		},
+		{
+			name:         "valid: expected dockerInfo is valid although daemon is not running",
+			input:        `{ "ServerErrors":["Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?"]}`,
+			expectedInfo: dockerInfo{ServerErrors: []string{"Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running"}},
 		},
 		{
 			name:          "invalid: the JSON input is not valid",
