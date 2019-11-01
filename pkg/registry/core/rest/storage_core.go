@@ -32,6 +32,7 @@ import (
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/registry/rest"
+	registryrest "k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/etcd3"
@@ -97,6 +98,14 @@ type LegacyRESTStorage struct {
 	ServiceClusterIPAllocator          rangeallocation.RangeRegistry
 	SecondaryServiceClusterIPAllocator rangeallocation.RangeRegistry
 	ServiceNodePortAllocator           rangeallocation.RangeRegistry
+
+	destroyFuncs []func()
+}
+
+func (c LegacyRESTStorage) Destroy() {
+	for _, destroyFn := range c.destroyFuncs {
+		destroyFn()
+	}
 }
 
 func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generic.RESTOptionsGetter) (LegacyRESTStorage, genericapiserver.APIGroupInfo, error) {
@@ -325,6 +334,20 @@ func (c LegacyRESTStorageProvider) NewLegacyRESTStorage(restOptionsGetter generi
 		restStorageMap["pods/ephemeralcontainers"] = podStorage.EphemeralContainers
 	}
 	apiGroupInfo.VersionedResourcesStorageMap["v1"] = restStorageMap
+
+	restStorage.destroyFuncs = append(restStorage.destroyFuncs, serviceRESTStorage.Store.DestroyFunc)
+	for restStorageName, storage := range restStorageMap {
+		// Do not destroy configMaps rest storage as after merging https://github.com/kubernetes/kubernetes/pull/82705
+		// connection to http server is no longer closed during apiserver shutdown phase.
+		// Which causes the integration tests to timeout. See https://github.com/kubernetes/kubernetes/issues/85948.
+		if restStorageName == "configMaps" {
+			continue
+		}
+		destroyable, ok := storage.(registryrest.Destroyable)
+		if ok {
+			restStorage.destroyFuncs = append(restStorage.destroyFuncs, destroyable.Destroy)
+		}
+	}
 
 	return restStorage, apiGroupInfo, nil
 }

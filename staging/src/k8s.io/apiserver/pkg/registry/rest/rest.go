@@ -58,6 +58,12 @@ type Storage interface {
 	New() runtime.Object
 }
 
+// Destroyable indicates a RESTful storage is capable of cleaning its allocated resources.
+type Destroyable interface {
+	// Destroy clears resources allocated by the storage, e.g. etcd connections
+	Destroy()
+}
+
 // Scoper indicates what scope the resource is at. It must be specified.
 // It is usually provided automatically based on your strategy.
 type Scoper interface {
@@ -274,6 +280,7 @@ type StandardStorage interface {
 	GracefulDeleter
 	CollectionDeleter
 	Watcher
+	Destroyable
 }
 
 // Redirector know how to return a remote resource's location.
