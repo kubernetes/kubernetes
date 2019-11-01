@@ -125,7 +125,6 @@ const (
 // ExtraConfig defines extra configuration for the master
 type ExtraConfig struct {
 	ClusterAuthenticationInfo clusterauthenticationtrust.ClusterAuthenticationInfo
-	ClientCARegistrationHook  ClientCARegistrationHook
 
 	APIResourceConfigSource  serverstorage.APIResourceConfigSource
 	StorageFactory           serverstorage.StorageFactory
