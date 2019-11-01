@@ -442,7 +442,7 @@ func (c completedConfig) New(delegationTarget genericapiserver.DelegationTarget)
 			}
 		}
 
-		go controller.Run(1, hookContext.StopCh)
+		// go controller.Run(1, hookContext.StopCh)
 		return nil
 	})
 
