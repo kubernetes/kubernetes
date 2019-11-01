@@ -858,6 +858,24 @@ func TestAdmit(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "QOSClass set as BestEffort. single-numa-node Policy. No Hints.",
+			qosClass: v1.PodQOSBestEffort,
+			policy:   NewRestrictedPolicy(),
+			hp: []HintProvider{
+				&mockHintProvider{},
+			},
+			expected: true,
+		},
+		{
+			name:     "QOSClass set as BestEffort. Restricted Policy. No Hints.",
+			qosClass: v1.PodQOSBestEffort,
+			policy:   NewRestrictedPolicy(),
+			hp: []HintProvider{
+				&mockHintProvider{},
+			},
+			expected: true,
+		},
+		{
 			name:     "QOSClass set as Guaranteed. BestEffort Policy. Preferred Affinity.",
 			qosClass: v1.PodQOSGuaranteed,
 			policy:   NewBestEffortPolicy(),

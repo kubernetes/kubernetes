@@ -37,7 +37,7 @@ func (p *singleNumaNodePolicy) Name() string {
 }
 
 func (p *singleNumaNodePolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
-	if !hint.Preferred || hint.NUMANodeAffinity.Count() > 1 {
+	if !hint.Preferred {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
 			Reason:  "Topology Affinity Error",
