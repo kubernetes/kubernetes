@@ -60,8 +60,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/discovery"
-	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
@@ -337,30 +335,6 @@ func ProxyMode(f *Framework) (string, error) {
 	}
 	Logf("ProxyMode: %s", stdout)
 	return stdout, nil
-}
-
-// SkipUnlessServerVersionGTE skips if the server version is less than v.
-func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) {
-	gte, err := ServerVersionGTE(v, c)
-	if err != nil {
-		Failf("Failed to get server version: %v", err)
-	}
-	if !gte {
-		skipInternalf(1, "Not supported for server versions before %q", v)
-	}
-}
-
-// SkipIfMissingResource skips if the gvr resource is missing.
-func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
-	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
-	_, err := resourceClient.List(metav1.ListOptions{})
-	if err != nil {
-		// not all resources support list, so we ignore those
-		if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
-			skipInternalf(1, "Could not find %s resource, skipping test: %#v", gvr, err)
-		}
-		Failf("Unexpected error getting %v: %v", gvr, err)
-	}
 }
 
 // WaitForDaemonSets for all daemonsets in the given namespace to be ready
@@ -850,22 +824,6 @@ func countEndpointsNum(e *v1.Endpoints) int {
 		num += len(sub.Addresses)
 	}
 	return num
-}
-
-// ServerVersionGTE returns true if v is greater than or equal to the server
-// version.
-//
-// TODO(18726): This should be incorporated into client.VersionInterface.
-func ServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) (bool, error) {
-	serverVersion, err := c.ServerVersion()
-	if err != nil {
-		return false, fmt.Errorf("Unable to get server version: %v", err)
-	}
-	sv, err := utilversion.ParseSemantic(serverVersion.GitVersion)
-	if err != nil {
-		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
-	}
-	return sv.AtLeast(v), nil
 }
 
 // KubectlVersion gets the version of kubectl that's currently being used (see

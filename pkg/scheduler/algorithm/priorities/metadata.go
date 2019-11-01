@@ -59,18 +59,21 @@ type priorityMetadata struct {
 	controllerRef           *metav1.OwnerReference
 	podFirstServiceSelector labels.Selector
 	totalNumNodes           int
+	podTopologySpreadMap    *podTopologySpreadMap
 }
 
 // PriorityMetadata is a PriorityMetadataProducer.  Node info can be nil.
-func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, _ []*v1.Node, sharedLister schedulerlisters.SharedLister) interface{} {
+func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, filteredNodes []*v1.Node, sharedLister schedulerlisters.SharedLister) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
 	}
 	totalNumNodes := 0
+	var allNodes []*schedulernodeinfo.NodeInfo
 	if sharedLister != nil {
 		if l, err := sharedLister.NodeInfos().List(); err == nil {
 			totalNumNodes = len(l)
+			allNodes = l
 		}
 	}
 	return &priorityMetadata{
@@ -81,6 +84,7 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, _ []*v1.Node, 
 		controllerRef:           metav1.GetControllerOf(pod),
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
 		totalNumNodes:           totalNumNodes,
+		podTopologySpreadMap:    buildPodTopologySpreadMap(pod, filteredNodes, allNodes),
 	}
 }
 

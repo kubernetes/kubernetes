@@ -28,7 +28,6 @@ import (
 // metav1.TypeMeta and metav1.ObjectMeta
 type BootstrapToken struct {
 	metav1.TypeMeta
-	metav1.ObjectMeta
 
 	kubeadmapiv1beta2.BootstrapToken
 }

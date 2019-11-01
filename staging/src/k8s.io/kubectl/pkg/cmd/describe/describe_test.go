@@ -126,7 +126,7 @@ func TestDescribeObject(t *testing.T) {
 	streams, _, buf, _ := genericclioptions.NewTestIOStreams()
 
 	cmd := NewCmdDescribe("kubectl", tf, streams)
-	cmd.Flags().Set("filename", "../../../test/data/redis-master-controller.yaml")
+	cmd.Flags().Set("filename", "../../../testdata/redis-master-controller.yaml")
 	cmd.Run(cmd, []string{})
 
 	if d.Name != "redis-master" || d.Namespace != "test" {

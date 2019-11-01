@@ -49,7 +49,7 @@ export ARTIFACTS=${ARTIFACTS:-"${WORKSPACE}/artifacts"}
 export FULL_LOG="true"
 
 mkdir -p "${ARTIFACTS}"
-cd /go/src/k8s.io/kubernetes
+cd "${GOPATH}/src/k8s.io/kubernetes"
 
 ./hack/install-etcd.sh
 

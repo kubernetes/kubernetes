@@ -1196,14 +1196,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			featureGates: map[featuregate.Feature]bool{
 				features.EvenPodsSpread: true,
 			},
-			wantPrioritizers: sets.NewString(
-				"EvenPodsSpreadPriority",
-			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
 					{Name: "TaintToleration"},
 					{Name: "PodTopologySpread"},
+				},
+				"ScorePlugin": {
+					{Name: "PodTopologySpread", Weight: 2},
 				},
 			},
 		},

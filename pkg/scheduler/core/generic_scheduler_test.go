@@ -1010,10 +1010,31 @@ func TestZeroRequest(t *testing.T) {
 
 			metaData := metaDataProducer(test.pod, test.nodes, snapshot)
 
-			list, err := PrioritizeNodes(
+			scheduler := NewGenericScheduler(
+				nil,
+				nil,
+				nil,
+				nil,
+				priorityConfigs,
+				metaDataProducer,
+				emptyFramework,
+				[]algorithm.SchedulerExtender{},
+				nil,
+				nil,
+				nil,
+				false,
+				false,
+				schedulerapi.DefaultPercentageOfNodesToScore,
+				false).(*genericScheduler)
+			scheduler.nodeInfoSnapshot = snapshot
+
+			list, err := scheduler.prioritizeNodes(
 				context.Background(),
-				test.pod, snapshot, metaData, priorityConfigs,
-				test.nodes, []algorithm.SchedulerExtender{}, emptyFramework, framework.NewCycleState())
+				framework.NewCycleState(),
+				test.pod,
+				metaData,
+				test.nodes,
+			)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

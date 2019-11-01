@@ -28,7 +28,6 @@ import (
 func (in *BootstrapToken) DeepCopyInto(out *BootstrapToken) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
-	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
 	in.BootstrapToken.DeepCopyInto(&out.BootstrapToken)
 	return
 }

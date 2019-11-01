@@ -143,26 +143,6 @@ func TestJSONPrinter(t *testing.T) {
 	testPrinter(t, genericprinters.NewTypeSetter(legacyscheme.Scheme).ToPrinter(&genericprinters.JSONPrinter{}), json.Unmarshal)
 }
 
-// TODO(seans3): Move this test to cli-runtime/pkg/printers.
-func TestFormatResourceName(t *testing.T) {
-	tests := []struct {
-		kind schema.GroupKind
-		name string
-		want string
-	}{
-		{schema.GroupKind{}, "", ""},
-		{schema.GroupKind{}, "name", "name"},
-		{schema.GroupKind{Kind: "Kind"}, "", "kind/"}, // should not happen in practice
-		{schema.GroupKind{Kind: "Kind"}, "name", "kind/name"},
-		{schema.GroupKind{Group: "group", Kind: "Kind"}, "name", "kind.group/name"},
-	}
-	for _, tt := range tests {
-		if got := formatResourceName(tt.kind, tt.name, true); got != tt.want {
-			t.Errorf("formatResourceName(%q, %q) = %q, want %q", tt.kind, tt.name, got, tt.want)
-		}
-	}
-}
-
 func PrintCustomType(obj *TestPrintType, options printers.GenerateOptions) ([]metav1beta1.TableRow, error) {
 	return []metav1beta1.TableRow{{Cells: []interface{}{obj.Data}}}, nil
 }

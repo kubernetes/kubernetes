@@ -23,15 +23,19 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
 // PodTopologySpread is a plugin that ensures pod's topologySpreadConstraints is satisfied.
-type PodTopologySpread struct{}
+type PodTopologySpread struct {
+	handle framework.FrameworkHandle
+}
 
 var _ framework.FilterPlugin = &PodTopologySpread{}
+var _ framework.ScorePlugin = &PodTopologySpread{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "PodTopologySpread"
@@ -51,7 +55,33 @@ func (pl *PodTopologySpread) Filter(ctx context.Context, cycleState *framework.C
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
 }
 
+// Score invoked at the Score extension point.
+// The "score" returned in this function is the matching number of pods on the `nodeName`,
+// it is normalized later.
+func (pl *PodTopologySpread) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+	}
+
+	meta := migration.PriorityMetadata(state)
+	s, err := priorities.CalculateEvenPodsSpreadPriorityMap(pod, meta, nodeInfo)
+	return s.Score, migration.ErrorToFrameworkStatus(err)
+}
+
+// NormalizeScore invoked after scoring all nodes.
+func (pl *PodTopologySpread) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+	meta := migration.PriorityMetadata(state)
+	err := priorities.CalculateEvenPodsSpreadPriorityReduce(pod, meta, pl.handle.SnapshotSharedLister(), scores)
+	return migration.ErrorToFrameworkStatus(err)
+}
+
+// ScoreExtensions of the Score plugin.
+func (pl *PodTopologySpread) ScoreExtensions() framework.ScoreExtensions {
+	return pl
+}
+
 // New initializes a new plugin and returns it.
-func New(_ *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
-	return &PodTopologySpread{}, nil
+func New(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
+	return &PodTopologySpread{handle: h}, nil
 }

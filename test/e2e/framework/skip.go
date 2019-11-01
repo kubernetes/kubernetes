@@ -19,7 +19,13 @@ package framework
 import (
 	"fmt"
 
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	utilversion "k8s.io/apimachinery/pkg/util/version"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
@@ -37,6 +43,42 @@ func Skipf(format string, args ...interface{}) {
 	skipInternalf(1, format, args...)
 }
 
+// SkipUnlessAtLeast skips if the value is less than the minValue.
+func SkipUnlessAtLeast(value int, minValue int, message string) {
+	if value < minValue {
+		skipInternalf(1, message)
+	}
+}
+
+// SkipIfContainerRuntimeIs skips if the container runtime is included in the runtimes.
+func SkipIfContainerRuntimeIs(runtimes ...string) {
+	for _, containerRuntime := range runtimes {
+		if containerRuntime == TestContext.ContainerRuntime {
+			skipInternalf(1, "Not supported under container runtime %s", containerRuntime)
+		}
+	}
+}
+
+// SkipUnlessLocalEphemeralStorageEnabled skips if the LocalStorageCapacityIsolation is not enabled.
+func SkipUnlessLocalEphemeralStorageEnabled() {
+	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
+		skipInternalf(1, "Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
+	}
+}
+
+// SkipIfMissingResource skips if the gvr resource is missing.
+func SkipIfMissingResource(dynamicClient dynamic.Interface, gvr schema.GroupVersionResource, namespace string) {
+	resourceClient := dynamicClient.Resource(gvr).Namespace(namespace)
+	_, err := resourceClient.List(metav1.ListOptions{})
+	if err != nil {
+		// not all resources support list, so we ignore those
+		if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
+			skipInternalf(1, "Could not find %s resource, skipping test: %#v", gvr, err)
+		}
+		Failf("Unexpected error getting %v: %v", gvr, err)
+	}
+}
+
 // SkipUnlessNodeCountIsAtLeast skips if the number of nodes is less than the minNodeCount.
 func SkipUnlessNodeCountIsAtLeast(minNodeCount int) {
 	if TestContext.CloudConfig.NumNodes < minNodeCount {
@@ -51,31 +93,10 @@ func SkipUnlessNodeCountIsAtMost(maxNodeCount int) {
 	}
 }
 
-// SkipUnlessAtLeast skips if the value is less than the minValue.
-func SkipUnlessAtLeast(value int, minValue int, message string) {
-	if value < minValue {
-		skipInternalf(1, message)
-	}
-}
-
 // SkipIfProviderIs skips if the provider is included in the unsupportedProviders.
 func SkipIfProviderIs(unsupportedProviders ...string) {
 	if ProviderIs(unsupportedProviders...) {
 		skipInternalf(1, "Not supported for providers %v (found %s)", unsupportedProviders, TestContext.Provider)
-	}
-}
-
-// SkipUnlessLocalEphemeralStorageEnabled skips if the LocalStorageCapacityIsolation is not enabled.
-func SkipUnlessLocalEphemeralStorageEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
-		skipInternalf(1, "Only supported when %v feature is enabled", features.LocalStorageCapacityIsolation)
-	}
-}
-
-// SkipUnlessSSHKeyPresent skips if no SSH key is found.
-func SkipUnlessSSHKeyPresent() {
-	if _, err := e2essh.GetSigner(TestContext.Provider); err != nil {
-		skipInternalf(1, "No SSH Key for provider %s: '%v'", TestContext.Provider, err)
 	}
 }
 
@@ -129,6 +150,24 @@ func SkipIfNodeOSDistroIs(unsupportedNodeOsDistros ...string) {
 	}
 }
 
+// SkipUnlessServerVersionGTE skips if the server version is less than v.
+func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) {
+	gte, err := serverVersionGTE(v, c)
+	if err != nil {
+		Failf("Failed to get server version: %v", err)
+	}
+	if !gte {
+		skipInternalf(1, "Not supported for server versions before %q", v)
+	}
+}
+
+// SkipUnlessSSHKeyPresent skips if no SSH key is found.
+func SkipUnlessSSHKeyPresent() {
+	if _, err := e2essh.GetSigner(TestContext.Provider); err != nil {
+		skipInternalf(1, "No SSH Key for provider %s: '%v'", TestContext.Provider, err)
+	}
+}
+
 // SkipUnlessTaintBasedEvictionsEnabled skips if the TaintBasedEvictions is not enabled.
 func SkipUnlessTaintBasedEvictionsEnabled() {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions) {
@@ -136,11 +175,18 @@ func SkipUnlessTaintBasedEvictionsEnabled() {
 	}
 }
 
-// SkipIfContainerRuntimeIs skips if the container runtime is included in the runtimes.
-func SkipIfContainerRuntimeIs(runtimes ...string) {
-	for _, containerRuntime := range runtimes {
-		if containerRuntime == TestContext.ContainerRuntime {
-			skipInternalf(1, "Not supported under container runtime %s", containerRuntime)
-		}
+// serverVersionGTE returns true if v is greater than or equal to the server
+// version.
+//
+// TODO(18726): This should be incorporated into client.VersionInterface.
+func serverVersionGTE(v *utilversion.Version, c discovery.ServerVersionInterface) (bool, error) {
+	serverVersion, err := c.ServerVersion()
+	if err != nil {
+		return false, fmt.Errorf("Unable to get server version: %v", err)
 	}
+	sv, err := utilversion.ParseSemantic(serverVersion.GitVersion)
+	if err != nil {
+		return false, fmt.Errorf("Unable to parse server version %q: %v", serverVersion.GitVersion, err)
+	}
+	return sv.AtLeast(v), nil
 }
