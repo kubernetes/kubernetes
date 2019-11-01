@@ -98,6 +98,7 @@ func (c *controllerCommon) getNodeVMSet(nodeName types.NodeName, crt cacheReadTy
 // AttachDisk attaches a vhd to vm. The vhd must exist, can be identified by diskName, diskURI.
 // return (lun, error)
 func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, cachingMode compute.CachingTypes) (int32, error) {
+	diskEncryptionSetID := ""
 	if isManagedDisk {
 		diskName := path.Base(diskURI)
 		resourceGroup, err := getResourceGroupFromDiskURI(diskURI)
@@ -122,6 +123,11 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 			danglingErr := volerr.NewDanglingError(attachErr, types.NodeName(attachedNode), "")
 			return -1, danglingErr
 		}
+
+		if disk.DiskProperties != nil && disk.DiskProperties.Encryption != nil &&
+			disk.DiskProperties.Encryption.DiskEncryptionSetID != nil {
+			diskEncryptionSetID = *disk.DiskProperties.Encryption.DiskEncryptionSetID
+		}
 	}
 
 	vmset, err := c.getNodeVMSet(nodeName, cacheReadTypeUnsafe)
@@ -145,7 +151,7 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	}
 
 	klog.V(2).Infof("Trying to attach volume %q lun %d to node %q.", diskURI, lun, nodeName)
-	return lun, vmset.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode)
+	return lun, vmset.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode, diskEncryptionSetID)
 }
 
 // DetachDisk detaches a disk from host. The vhd can be identified by diskName or diskURI.
