@@ -240,24 +240,34 @@ func TestValidatePolicy(t *testing.T) {
 			expected: errors.New("kubernetes.io/foo is an invalid extended resource name"),
 		},
 		{
-			name: "invalid redeclared custom predicate",
-			policy: config.Policy{
-				Predicates: []config.PredicatePolicy{
-					{Name: "customPredicate1", Argument: &config.PredicateArgument{ServiceAffinity: &config.ServiceAffinity{Labels: []string{"label1"}}}},
-					{Name: "customPredicate2", Argument: &config.PredicateArgument{ServiceAffinity: &config.ServiceAffinity{Labels: []string{"label2"}}}},
-				},
-			},
-			expected: errors.New("Predicate 'customPredicate2' redeclares custom predicate 'ServiceAffinity', from:'customPredicate1'"),
-		},
-		{
-			name: "invalid redeclared custom priority",
+			name: "invalid redeclared RequestedToCapacityRatio custom priority",
 			policy: config.Policy{
 				Priorities: []config.PriorityPolicy{
-					{Name: "customPriority1", Weight: 1, Argument: &config.PriorityArgument{ServiceAntiAffinity: &config.ServiceAntiAffinity{Label: "label1"}}},
-					{Name: "customPriority2", Weight: 1, Argument: &config.PriorityArgument{ServiceAntiAffinity: &config.ServiceAntiAffinity{Label: "label2"}}},
+					{Name: "customPriority1", Weight: 1, Argument: &config.PriorityArgument{RequestedToCapacityRatioArguments: &config.RequestedToCapacityRatioArguments{}}},
+					{Name: "customPriority2", Weight: 1, Argument: &config.PriorityArgument{RequestedToCapacityRatioArguments: &config.RequestedToCapacityRatioArguments{}}},
 				},
 			},
-			expected: errors.New("Priority 'customPriority2' redeclares custom priority 'ServiceAntiAffinity', from:'customPriority1'"),
+			expected: errors.New("Priority \"customPriority2\" redeclares custom priority \"RequestedToCapacityRatio\", from:\"customPriority1\""),
+		},
+		{
+			name: "different weights for LabelPreference custom priority",
+			policy: config.Policy{
+				Priorities: []config.PriorityPolicy{
+					{Name: "customPriority1", Weight: 1, Argument: &config.PriorityArgument{LabelPreference: &config.LabelPreference{}}},
+					{Name: "customPriority2", Weight: 2, Argument: &config.PriorityArgument{LabelPreference: &config.LabelPreference{}}},
+				},
+			},
+			expected: errors.New("LabelPreference  priority \"customPriority2\" has a different weight with \"customPriority1\""),
+		},
+		{
+			name: "different weights for ServiceAntiAffinity custom priority",
+			policy: config.Policy{
+				Priorities: []config.PriorityPolicy{
+					{Name: "customPriority1", Weight: 1, Argument: &config.PriorityArgument{ServiceAntiAffinity: &config.ServiceAntiAffinity{}}},
+					{Name: "customPriority2", Weight: 2, Argument: &config.PriorityArgument{ServiceAntiAffinity: &config.ServiceAntiAffinity{}}},
+				},
+			},
+			expected: errors.New("ServiceAntiAffinity  priority \"customPriority2\" has a different weight with \"customPriority1\""),
 		},
 	}
 

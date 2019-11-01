@@ -89,13 +89,7 @@ func ValidatePolicy(policy config.Policy) error {
 		if priority.Weight <= 0 || priority.Weight >= config.MaxWeight {
 			validationErrors = append(validationErrors, fmt.Errorf("Priority %s should have a positive weight applied to it or it has overflown", priority.Name))
 		}
-
-		validationErrors = append(validationErrors, validatePriorityRedeclared(priorities, priority))
-	}
-
-	predicates := make(map[string]config.PredicatePolicy, len(policy.Predicates))
-	for _, predicate := range policy.Predicates {
-		validationErrors = append(validationErrors, validatePredicateRedeclared(predicates, predicate))
+		validationErrors = append(validationErrors, validateCustomPriorities(priorities, priority))
 	}
 
 	binders := 0
@@ -124,44 +118,43 @@ func ValidatePolicy(policy config.Policy) error {
 	return utilerrors.NewAggregate(validationErrors)
 }
 
-// validatePriorityRedeclared checks if any custom priorities have been declared multiple times in the policy config
-// by examining the specified priority arguments
-func validatePriorityRedeclared(priorities map[string]config.PriorityPolicy, priority config.PriorityPolicy) error {
-	var priorityType string
+// validateCustomPriorities validates that:
+// 1. RequestedToCapacityRatioRedeclared custom priority cannot be declared multiple times,
+// 2. LabelPreference/ServiceAntiAffinity custom priorities can be declared multiple times,
+// however the weights for each custom priority type should be the same.
+func validateCustomPriorities(priorities map[string]config.PriorityPolicy, priority config.PriorityPolicy) error {
+	verifyRedeclaration := func(priorityType string) error {
+		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
+			return fmt.Errorf("Priority %q redeclares custom priority %q, from:%q", priority.Name, priorityType, existing.Name)
+		}
+		priorities[priorityType] = priority
+		return nil
+	}
+	verifyDifferentWeights := func(priorityType string) error {
+		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
+			if existing.Weight != priority.Weight {
+				return fmt.Errorf("%s  priority %q has a different weight with %q", priorityType, priority.Name, existing.Name)
+			}
+		}
+		priorities[priorityType] = priority
+		return nil
+	}
 	if priority.Argument != nil {
 		if priority.Argument.LabelPreference != nil {
-			priorityType = "LabelPreference"
-		} else if priority.Argument.RequestedToCapacityRatioArguments != nil {
-			priorityType = "RequestedToCapacityRatioArguments"
+			if err := verifyDifferentWeights("LabelPreference"); err != nil {
+				return err
+			}
 		} else if priority.Argument.ServiceAntiAffinity != nil {
-			priorityType = "ServiceAntiAffinity"
+			if err := verifyDifferentWeights("ServiceAntiAffinity"); err != nil {
+				return err
+			}
+		} else if priority.Argument.RequestedToCapacityRatioArguments != nil {
+			if err := verifyRedeclaration("RequestedToCapacityRatio"); err != nil {
+				return err
+			}
 		} else {
 			return fmt.Errorf("No priority arguments set for priority %s", priority.Name)
 		}
-		if existing, alreadyDeclared := priorities[priorityType]; alreadyDeclared {
-			return fmt.Errorf("Priority '%s' redeclares custom priority '%s', from:'%s'", priority.Name, priorityType, existing.Name)
-		}
-		priorities[priorityType] = priority
-	}
-	return nil
-}
-
-// validatePredicateRedeclared checks if any custom predicates have been declared multiple times in the policy config
-// by examining the specified predicate arguments
-func validatePredicateRedeclared(predicates map[string]config.PredicatePolicy, predicate config.PredicatePolicy) error {
-	var predicateType string
-	if predicate.Argument != nil {
-		if predicate.Argument.LabelsPresence != nil {
-			predicateType = "LabelsPresence"
-		} else if predicate.Argument.ServiceAffinity != nil {
-			predicateType = "ServiceAffinity"
-		} else {
-			return fmt.Errorf("No priority arguments set for priority %s", predicate.Name)
-		}
-		if existing, alreadyDeclared := predicates[predicateType]; alreadyDeclared {
-			return fmt.Errorf("Predicate '%s' redeclares custom predicate '%s', from:'%s'", predicate.Name, predicateType, existing.Name)
-		}
-		predicates[predicateType] = predicate
 	}
 	return nil
 }
