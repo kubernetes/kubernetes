@@ -393,6 +393,10 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, args *pl
 				Weight: policy.Weight,
 			}
 		} else if policy.Argument.LabelPreference != nil {
+			args.NodeLabelArgs = &nodelabel.Args{
+				PreferenceLabel:         policy.Argument.LabelPreference.Label,
+				PreferenceLabelPresence: policy.Argument.LabelPreference.Presence,
+			}
 			pcf = &PriorityConfigFactory{
 				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 					return priorities.NewNodeLabelPriority(
@@ -402,6 +406,8 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, args *pl
 				},
 				Weight: policy.Weight,
 			}
+			// We do not allow specifying the name for custom plugins, see http://issues.k8s.io/83472
+			name = nodelabel.Name
 		} else if policy.Argument.RequestedToCapacityRatioArguments != nil {
 			scoringFunctionShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
 			args.RequestedToCapacityRatioArgs = &requestedtocapacityratio.Args{
