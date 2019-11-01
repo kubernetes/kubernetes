@@ -39,6 +39,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume"
 	"k8s.io/kubernetes/pkg/volume/csi"
 	"k8s.io/kubernetes/pkg/volume/util"
+	ioutil "k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/hostutil"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
@@ -1084,21 +1085,19 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			return volumeToMount.GenerateError("MapVolume.EvalHostSymlinks failed", err)
 		}
 
-		// Map device to global and pod device map path
+		// Execute driver specific map
 		volumeMapPath, volName := blockVolumeMapper.GetPodDeviceMapPath()
 		mapErr = blockVolumeMapper.MapDevice(devicePath, globalMapPath, volumeMapPath, volName, volumeToMount.Pod.UID)
 		if mapErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateError("MapVolume.MapDevice failed", mapErr)
+			return volumeToMount.GenerateError("MapVolume.MapPodDevice failed", mapErr)
 		}
 
-		// Take filedescriptor lock to keep a block device opened. Otherwise, there is a case
-		// that the block device is silently removed and attached another device with same name.
-		// Container runtime can't handler this problem. To avoid unexpected condition fd lock
-		// for the block device is required.
-		_, err = og.blkUtil.AttachFileDevice(filepath.Join(globalMapPath, string(volumeToMount.Pod.UID)))
-		if err != nil {
-			return volumeToMount.GenerateError("MapVolume.AttachFileDevice failed", err)
+		// Execute common map
+		mapErr = ioutil.MapBlockVolume(og.blkUtil, devicePath, globalMapPath, volumeMapPath, volName, volumeToMount.Pod.UID)
+		if mapErr != nil {
+			// On failure, return error. Caller will log and retry.
+			return volumeToMount.GenerateError("MapVolume.MapDevice failed", mapErr)
 		}
 
 		// Update actual state of world to reflect volume is globally mounted
@@ -1207,28 +1206,16 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 	}
 
 	unmapVolumeFunc := func() (error, error) {
-		globalUnmapPath := volumeToUnmount.DeviceMountPath
-
-		// Release file descriptor lock.
-		err := og.blkUtil.DetachFileDevice(filepath.Join(globalUnmapPath, string(volumeToUnmount.PodUID)))
-		if err != nil {
-			return volumeToUnmount.GenerateError("UnmapVolume.UnmapDevice Detaching descriptor lock failed", err)
-		}
-
-		// Try to unmap volumeName symlink under pod device map path dir
 		// pods/{podUid}/volumeDevices/{escapeQualifiedPluginName}/{volumeName}
 		podDeviceUnmapPath, volName := blockVolumeUnmapper.GetPodDeviceMapPath()
-		unmapDeviceErr := og.blkUtil.UnmapDevice(podDeviceUnmapPath, volName, false /* bindMount */)
-		if unmapDeviceErr != nil {
-			// On failure, return error. Caller will log and retry.
-			return volumeToUnmount.GenerateError("UnmapVolume.UnmapDevice on pod device map path failed", unmapDeviceErr)
-		}
-		// Try to unmap podUID symlink under global map path dir
 		// plugins/kubernetes.io/{PluginName}/volumeDevices/{volumePluginDependentPath}/{podUID}
-		unmapDeviceErr = og.blkUtil.UnmapDevice(globalUnmapPath, string(volumeToUnmount.PodUID), true /* bindMount */)
-		if unmapDeviceErr != nil {
+		globalUnmapPath := volumeToUnmount.DeviceMountPath
+
+		// Execute common unmap
+		unmapErr := ioutil.UnmapBlockVolume(og.blkUtil, globalUnmapPath, podDeviceUnmapPath, volName, volumeToUnmount.PodUID)
+		if unmapErr != nil {
 			// On failure, return error. Caller will log and retry.
-			return volumeToUnmount.GenerateError("UnmapVolume.UnmapDevice on global map path failed", unmapDeviceErr)
+			return volumeToUnmount.GenerateError("UnmapVolume.UnmapBlockVolume failed", unmapErr)
 		}
 
 		klog.Infof(

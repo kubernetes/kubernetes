@@ -917,7 +917,7 @@ func (rbd *rbdDiskMapper) SetUpDevice() (string, error) {
 }
 
 func (rbd *rbdDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return volutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
+	return nil
 }
 
 func (rbd *rbd) rbdGlobalMapPath(spec *volume.Spec) (string, error) {
