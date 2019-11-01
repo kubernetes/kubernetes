@@ -12,6 +12,7 @@ filegroup(
     srcs = [
         ":package-srcs",
         "//pkg/api/endpoints:all-srcs",
+        "//pkg/api/endpointslice:all-srcs",
         "//pkg/api/legacyscheme:all-srcs",
         "//pkg/api/persistentvolume:all-srcs",
         "//pkg/api/persistentvolumeclaim:all-srcs",
