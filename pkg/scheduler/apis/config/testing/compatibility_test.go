@@ -98,7 +98,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 }`,
 			wantPredicates: sets.NewString(
 				"PodFitsPorts",
-				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
 				"ServiceSpreadingPriority",
@@ -112,6 +111,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
@@ -144,9 +144,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TestLabelPreference",      "weight": 4, "argument": {"labelPreference": {"label": "bar", "presence":true}}}
 		  ]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"TestServiceAntiAffinity",
@@ -161,6 +159,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
 					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -200,9 +199,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TestLabelPreference",      "weight": 4, "argument": {"labelPreference": {"label": "bar", "presence":true}}}
 		  ]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"TestServiceAntiAffinity",
@@ -216,11 +213,12 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 					{Name: "EBSLimits"},
 					{Name: "GCEPDLimits"},
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeZone"},
-					{Name: "NodeLabel"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -265,9 +263,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "InterPodAffinityPriority",   "weight": 2}
 		  ]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"InterPodAffinityPriority",
@@ -281,12 +277,13 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 					{Name: "EBSLimits"},
 					{Name: "GCEPDLimits"},
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
-					{Name: "NodeLabel"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -333,9 +330,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MostRequestedPriority",   "weight": 2}
 		  ]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"InterPodAffinityPriority",
@@ -349,12 +344,13 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 					{Name: "EBSLimits"},
 					{Name: "GCEPDLimits"},
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
-					{Name: "NodeLabel"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -412,9 +408,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"InterPodAffinityPriority",
@@ -428,12 +422,13 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 					{Name: "EBSLimits"},
 					{Name: "GCEPDLimits"},
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
-					{Name: "NodeLabel"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -502,9 +497,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"InterPodAffinityPriority",
@@ -518,12 +511,13 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 					{Name: "EBSLimits"},
 					{Name: "GCEPDLimits"},
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
-					{Name: "NodeLabel"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -593,9 +587,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"InterPodAffinityPriority",
@@ -609,13 +601,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 					{Name: "EBSLimits"},
 					{Name: "GCEPDLimits"},
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
-					{Name: "NodeLabel"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -688,9 +681,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"InterPodAffinityPriority",
@@ -704,13 +695,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 					{Name: "EBSLimits"},
 					{Name: "GCEPDLimits"},
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
-					{Name: "NodeLabel"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -795,9 +787,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"InterPodAffinityPriority",
@@ -811,13 +801,14 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 					{Name: "EBSLimits"},
 					{Name: "GCEPDLimits"},
 					{Name: "AzureDiskLimits"},
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
-					{Name: "NodeLabel"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -904,9 +895,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"InterPodAffinityPriority",
@@ -920,6 +909,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 					{Name: "EBSLimits"},
 					{Name: "GCEPDLimits"},
 					{Name: "NodeVolumeLimits"},
@@ -927,7 +918,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
-					{Name: "NodeLabel"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -1013,9 +1003,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"InterPodAffinityPriority",
@@ -1029,6 +1017,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 					{Name: "EBSLimits"},
 					{Name: "GCEPDLimits"},
 					{Name: "NodeVolumeLimits"},
@@ -1037,7 +1027,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
-					{Name: "NodeLabel"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -1127,9 +1116,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(
-				"TestServiceAffinity",
-			),
+			wantPredicates: sets.NewString(),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"InterPodAffinityPriority",
@@ -1143,6 +1130,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesFit"},
 					{Name: "VolumeRestrictions"},
 					{Name: "TaintToleration"},
+					{Name: "NodeLabel"},
+					{Name: "ServiceAffinity"},
 					{Name: "EBSLimits"},
 					{Name: "GCEPDLimits"},
 					{Name: "NodeVolumeLimits"},
@@ -1151,7 +1140,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "VolumeBinding"},
 					{Name: "VolumeZone"},
 					{Name: "InterPodAffinity"},
-					{Name: "NodeLabel"},
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
@@ -1333,6 +1321,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				seenPriorities.Insert(scoreToPriorityMap[p.Name])
 
 			}
+
 			if diff := cmp.Diff(tc.wantPlugins, gotPlugins); diff != "" {
 				t.Errorf("unexpected plugins diff (-want, +got): %s", diff)
 			}

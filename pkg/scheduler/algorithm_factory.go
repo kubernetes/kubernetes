@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/requestedtocapacityratio"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -263,60 +264,73 @@ func RegisterFitPredicateFactory(name string, predicateFactory FitPredicateFacto
 
 // RegisterCustomFitPredicate registers a custom fit predicate with the algorithm registry.
 // Returns the name, with which the predicate was registered.
-func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, args *plugins.ConfigProducerArgs) string {
+func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, pluginArgs *plugins.ConfigProducerArgs) string {
 	var predicateFactory FitPredicateFactory
 	var ok bool
-	name := policy.Name
+	policyName := policy.Name
 
 	validatePredicateOrDie(policy)
 
 	// generate the predicate function, if a custom type is requested
 	if policy.Argument != nil {
 		if policy.Argument.ServiceAffinity != nil {
+			// We use the ServiceAffinity plugin name for all ServiceAffinity custom priorities.
+			// It may get called multiple times but we essentially only register one instance of ServiceAffinity predicate.
+			// This name is then used to find the registered plugin and run the plugin instead of the predicate.
+			policyName = predicates.CheckServiceAffinityPred
+
+			// map LabelsPresence policy to ConfigProducerArgs that's used to configure the ServiceAffinity plugin.
+			if pluginArgs.ServiceAffinityArgs == nil {
+				pluginArgs.ServiceAffinityArgs = &serviceaffinity.Args{}
+			}
+
+			pluginArgs.ServiceAffinityArgs.Labels = append(pluginArgs.ServiceAffinityArgs.Labels, policy.Argument.ServiceAffinity.Labels...)
+
 			predicateFactory = func(args PluginFactoryArgs) predicates.FitPredicate {
 				predicate, precomputationFunction := predicates.NewServiceAffinityPredicate(
 					args.NodeInfoLister,
 					args.PodLister,
 					args.ServiceLister,
-					policy.Argument.ServiceAffinity.Labels,
+					pluginArgs.ServiceAffinityArgs.Labels,
 				)
 
 				// Once we generate the predicate we should also Register the Precomputation
-				predicates.RegisterPredicateMetadataProducer(policy.Name, precomputationFunction)
+				predicates.RegisterPredicateMetadataProducer(policyName, precomputationFunction)
 				return predicate
 			}
 		} else if policy.Argument.LabelsPresence != nil {
-			// map LabelPresence policy to ConfigProducerArgs that's used to configure the NodeLabel plugin.
-			if args.NodeLabelArgs == nil {
-				args.NodeLabelArgs = &nodelabel.Args{}
-			}
-			if policy.Argument.LabelsPresence.Presence {
-				args.NodeLabelArgs.PresentLabels = append(args.NodeLabelArgs.PresentLabels, policy.Argument.LabelsPresence.Labels...)
-			} else {
-				args.NodeLabelArgs.AbsentLabels = append(args.NodeLabelArgs.AbsentLabels, policy.Argument.LabelsPresence.Labels...)
-			}
-			predicateFactory = func(_ PluginFactoryArgs) predicates.FitPredicate {
-				return predicates.NewNodeLabelPredicate(
-					args.NodeLabelArgs.PresentLabels,
-					args.NodeLabelArgs.AbsentLabels,
-				)
-			}
 			// We use the NodeLabel plugin name for all NodeLabel custom priorities.
 			// It may get called multiple times but we essentially only register one instance of NodeLabel predicate.
 			// This name is then used to find the registered plugin and run the plugin instead of the predicate.
-			name = nodelabel.Name
+			policyName = predicates.CheckNodeLabelPresencePred
+
+			// map LabelPresence policy to ConfigProducerArgs that's used to configure the NodeLabel plugin.
+			if pluginArgs.NodeLabelArgs == nil {
+				pluginArgs.NodeLabelArgs = &nodelabel.Args{}
+			}
+			if policy.Argument.LabelsPresence.Presence {
+				pluginArgs.NodeLabelArgs.PresentLabels = append(pluginArgs.NodeLabelArgs.PresentLabels, policy.Argument.LabelsPresence.Labels...)
+			} else {
+				pluginArgs.NodeLabelArgs.AbsentLabels = append(pluginArgs.NodeLabelArgs.AbsentLabels, policy.Argument.LabelsPresence.Labels...)
+			}
+			predicateFactory = func(_ PluginFactoryArgs) predicates.FitPredicate {
+				return predicates.NewNodeLabelPredicate(
+					pluginArgs.NodeLabelArgs.PresentLabels,
+					pluginArgs.NodeLabelArgs.AbsentLabels,
+				)
+			}
 		}
-	} else if predicateFactory, ok = fitPredicateMap[policy.Name]; ok {
+	} else if predicateFactory, ok = fitPredicateMap[policyName]; ok {
 		// checking to see if a pre-defined predicate is requested
-		klog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
-		return name
+		klog.V(2).Infof("Predicate type %s already registered, reusing.", policyName)
+		return policyName
 	}
 
 	if predicateFactory == nil {
-		klog.Fatalf("Invalid configuration: Predicate type not found for %s", policy.Name)
+		klog.Fatalf("Invalid configuration: Predicate type not found for %s", policyName)
 	}
 
-	return RegisterFitPredicateFactory(name, predicateFactory)
+	return RegisterFitPredicateFactory(policyName, predicateFactory)
 }
 
 // IsFitPredicateRegistered is useful for testing providers.
