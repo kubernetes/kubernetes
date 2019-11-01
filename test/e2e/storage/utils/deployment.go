@@ -18,6 +18,7 @@ package utils
 
 import (
 	"path"
+	"strconv"
 	"strings"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -70,6 +71,16 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 		}
 	}
 
+	patchContainerPorts := func(containerPorts []v1.ContainerPort) {
+		for i := range containerPorts {
+			p := &containerPorts[i]
+			switch p.Name {
+			case o.HealthzPortName:
+				p.ContainerPort = o.NewHealthzPort
+			}
+		}
+	}
+
 	patchContainers := func(containers []v1.Container) {
 		for i := range containers {
 			container := &containers[i]
@@ -86,6 +97,7 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 			switch container.Name {
 			case o.DriverContainerName:
 				container.Args = append(container.Args, o.DriverContainerArguments...)
+				patchContainerPorts(container.Ports)
 			case o.ProvisionerContainerName:
 				// Driver name is expected to be the same
 				// as the provisioner here.
@@ -94,6 +106,10 @@ func PatchCSIDeployment(f *framework.Framework, o PatchCSIOptions, object interf
 				// Driver name is expected to be the same
 				// as the snapshotter here.
 				container.Args = append(container.Args, "--snapshotter="+o.NewDriverName)
+			case o.LivenessProbeContainerName:
+				// Health port is expected to be the same
+				// as the healthz port defined in hostpath container
+				container.Args = append(container.Args, "--health-port="+strconv.Itoa(int(o.NewHealthzPort)))
 			}
 		}
 	}
@@ -173,6 +189,15 @@ type PatchCSIOptions struct {
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.
 	CanAttach *bool
+	// The name of the healthz port.
+	// If not empty, the healthz port will be randomized.
+	HealthzPortName string
+	// The healthz port that replaces the original port.
+	NewHealthzPort int32
+	// The name of the container which has the liveness probe binary.
+	// If non-empty, --health-port with a random integer will be appended
+	// to the argument list.
+	LivenessProbeContainerName string
 	// If not nil, the value to use for the CSIDriver.Spec.VolumeLifecycleModes
 	// field *if* the driver deploys a CSIDriver object. Ignored
 	// otherwise.

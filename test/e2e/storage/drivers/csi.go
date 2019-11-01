@@ -47,6 +47,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -179,13 +180,16 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 	}
 
 	o := utils.PatchCSIOptions{
-		OldDriverName:            h.driverInfo.Name,
-		NewDriverName:            config.GetUniqueDriverName(),
-		DriverContainerName:      "hostpath",
-		DriverContainerArguments: []string{"--drivername=" + config.GetUniqueDriverName()},
-		ProvisionerContainerName: "csi-provisioner",
-		SnapshotterContainerName: "csi-snapshotter",
-		NodeName:                 node.Name,
+		OldDriverName:              h.driverInfo.Name,
+		NewDriverName:              config.GetUniqueDriverName(),
+		DriverContainerName:        "hostpath",
+		DriverContainerArguments:   []string{"--drivername=" + config.GetUniqueDriverName()},
+		ProvisionerContainerName:   "csi-provisioner",
+		SnapshotterContainerName:   "csi-snapshotter",
+		NodeName:                   node.Name,
+		HealthzPortName:            "healthz",
+		NewHealthzPort:             int32(rand.IntnRange(1, 32767)),
+		LivenessProbeContainerName: "liveness-probe",
 	}
 	cleanup, err := config.Framework.CreateFromManifests(func(item interface{}) error {
 		return utils.PatchCSIDeployment(config.Framework, o, item)
