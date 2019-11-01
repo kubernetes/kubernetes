@@ -104,7 +104,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"ServiceSpreadingPriority",
-				"TestServiceAntiAffinity",
 				"TestLabelPreference",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
@@ -118,6 +117,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
+					{Name: "ServiceAffinity", Weight: 3},
 				},
 			},
 		},
@@ -152,7 +152,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"SelectorSpreadPriority",
-				"TestServiceAntiAffinity",
 				"TestLabelPreference",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
@@ -169,6 +168,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
+					{Name: "ServiceAffinity", Weight: 3},
 				},
 			},
 		},
@@ -208,7 +208,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
 				"SelectorSpreadPriority",
-				"TestServiceAntiAffinity",
 				"TestLabelPreference",
 			),
 			wantPlugins: map[string][]kubeschedulerconfig.Plugin{
@@ -231,6 +230,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "ImageLocality", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
+					{Name: "ServiceAffinity", Weight: 3},
 				},
 			},
 		},
@@ -1265,6 +1265,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		"NodeResourcesBalancedAllocation": "BalancedResourceAllocation",
 		"NodeResourcesMostAllocated":      "MostRequestedPriority",
 		"RequestedToCapacityRatio":        "RequestedToCapacityRatioPriority",
+		"ServiceAffinity":                 "TestServiceAntiAffinity",
 	}
 
 	for _, tc := range testcases {

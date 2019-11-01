@@ -35,6 +35,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/requestedtocapacityratio"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -382,6 +383,9 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, args *pl
 	// generate the priority function, if a custom priority is requested
 	if policy.Argument != nil {
 		if policy.Argument.ServiceAntiAffinity != nil {
+			args.ServiceAffinityArgs = &serviceaffinity.Args{
+				Label: policy.Argument.ServiceAntiAffinity.Label,
+			}
 			pcf = &PriorityConfigFactory{
 				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 					return priorities.NewServiceAntiAffinityPriority(
@@ -392,6 +396,8 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, args *pl
 				},
 				Weight: policy.Weight,
 			}
+			// We do not allow specifying the name for custom plugins, see http://issues.k8s.io/83472
+			name = serviceaffinity.Name
 		} else if policy.Argument.LabelPreference != nil {
 			pcf = &PriorityConfigFactory{
 				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {

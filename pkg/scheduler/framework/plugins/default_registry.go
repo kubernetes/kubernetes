@@ -37,6 +37,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/requestedtocapacityratio"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
@@ -80,6 +81,7 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 		interpodaffinity.Name:          interpodaffinity.New,
 		nodelabel.Name:                 nodelabel.New,
 		requestedtocapacityratio.Name:  requestedtocapacityratio.New,
+		serviceaffinity.Name:           serviceaffinity.New,
 	}
 }
 
@@ -93,6 +95,8 @@ type ConfigProducerArgs struct {
 	NodeLabelArgs *nodelabel.Args
 	// RequestedToCapacityRatioArgs is the args for the RequestedToCapacityRatio plugin.
 	RequestedToCapacityRatioArgs *requestedtocapacityratio.Args
+	// ServiceAffinityArgs is the args for the ServiceAffinity plugin.
+	ServiceAffinityArgs *serviceaffinity.Args
 }
 
 // ConfigProducer produces a framework's configuration.
@@ -255,6 +259,12 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 			return
 		})
 
+	registry.RegisterPriority(serviceaffinity.Name,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, serviceaffinity.Name, &args.Weight)
+			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			return
+		})
 	return registry
 }
 
