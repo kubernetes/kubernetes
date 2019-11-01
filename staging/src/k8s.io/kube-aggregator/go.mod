@@ -21,7 +21,7 @@ require (
 	k8s.io/component-base v0.0.0
 	k8s.io/klog v1.0.0
 	k8s.io/kube-openapi v0.0.0-20190816220812-743ec37842bf
-	k8s.io/utils v0.0.0-20191010214722-8d271d903fe4
+	k8s.io/utils v0.0.0-20191030222137-2b95a09bc58d
 )
 
 replace (
