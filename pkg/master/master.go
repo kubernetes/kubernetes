@@ -68,6 +68,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apiserver/pkg/endpoints/discovery"
 	"k8s.io/apiserver/pkg/registry/generic"
+	registryrest "k8s.io/apiserver/pkg/registry/rest"
 	genericapiserver "k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
 	"k8s.io/apiserver/pkg/server/healthz"
@@ -455,6 +456,11 @@ func (m *Master) InstallLegacyAPI(c *completedConfig, restOptionsGetter generic.
 		return fmt.Errorf("Error building core storage: %v", err)
 	}
 
+	m.GenericAPIServer.AddPreShutdownHookOrDie("NewLegacyRESTStorageDestroy", func() error {
+		legacyRESTStorage.Destroy()
+		return nil
+	})
+
 	controllerName := "bootstrap-controller"
 	coreClient := corev1client.NewForConfigOrDie(c.GenericConfig.LoopbackClientConfig)
 	bootstrapController := c.NewBootstrapController(legacyRESTStorage, coreClient, coreClient, coreClient, coreClient.RESTClient())
@@ -489,6 +495,7 @@ type RESTStorageProvider interface {
 // InstallAPIs will install the APIs for the restStorageProviders if they are enabled.
 func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceConfigSource, restOptionsGetter generic.RESTOptionsGetter, restStorageProviders ...RESTStorageProvider) error {
 	apiGroupsInfo := []*genericapiserver.APIGroupInfo{}
+	var destroyFuncs []func()
 
 	for _, restStorageBuilder := range restStorageProviders {
 		groupName := restStorageBuilder.GroupName()
@@ -515,7 +522,21 @@ func (m *Master) InstallAPIs(apiResourceConfigSource serverstorage.APIResourceCo
 		}
 
 		apiGroupsInfo = append(apiGroupsInfo, &apiGroupInfo)
+		for _, versionedResourceStorage := range apiGroupInfo.VersionedResourcesStorageMap {
+			for _, storage := range versionedResourceStorage {
+				if d, ok := storage.(registryrest.Destroyable); ok {
+					destroyFuncs = append(destroyFuncs, d.Destroy)
+				}
+			}
+		}
 	}
+
+	m.GenericAPIServer.AddPreShutdownHookOrDie("InstallAPIsRESTStorageDestroy", func() error {
+		for _, destroyFn := range destroyFuncs {
+			destroyFn()
+		}
+		return nil
+	})
 
 	if err := m.GenericAPIServer.InstallAPIGroups(apiGroupsInfo...); err != nil {
 		return fmt.Errorf("Error in registering group versions: %v", err)

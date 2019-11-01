@@ -246,6 +246,19 @@ func NoNamespaceKeyFunc(ctx context.Context, prefix string, name string) (string
 	return key, nil
 }
 
+// Destroy implements RESTStorage.Destroyable.
+func (e *Store) Destroy() {
+	// Nothing to destroy by default since e.DestroyFunc is set by a decorator
+	// inside Store.CompleteWithOptions. The decorator is injected so there is
+	// no guarantee value of e.DestroyFunc will be always set.
+	// E.g. in case of etcd3, the decorator is equivalent to calling an etcd3
+	// storage backend factory (k8s.io/apiserver/pkg/storage/storagebackend/factory)
+	// which among other steps is responsible for creating a connection to etcd3 server.
+	if e.DestroyFunc != nil {
+		e.DestroyFunc()
+	}
+}
+
 // New implements RESTStorage.New.
 func (e *Store) New() runtime.Object {
 	return e.NewFunc()
