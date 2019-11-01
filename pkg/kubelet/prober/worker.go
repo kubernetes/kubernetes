@@ -182,7 +182,7 @@ func (w *worker) doProbe() (keepGoing bool) {
 	}
 
 	// Worker should terminate if pod is terminated.
-	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded {
+	if status.Phase == v1.PodFailed || status.Phase == v1.PodSucceeded || w.pod.DeletionTimestamp != nil {
 		klog.V(3).Infof("Pod %v %v, exiting probe worker",
 			format.Pod(w.pod), status.Phase)
 		return false
