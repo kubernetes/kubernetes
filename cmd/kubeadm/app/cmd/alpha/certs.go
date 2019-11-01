@@ -32,7 +32,6 @@ import (
 	"k8s.io/kubernetes/cmd/kubeadm/app/cmd/options"
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs/renewal"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/copycerts"
 	configutil "k8s.io/kubernetes/cmd/kubeadm/app/util/config"
@@ -80,7 +79,7 @@ func newCmdCertsUtility(out io.Writer) *cobra.Command {
 	}
 
 	cmd.AddCommand(newCmdCertsRenewal())
-	cmd.AddCommand(newCmdCertsExpiration(out, kubeadmconstants.KubernetesDir))
+	cmd.AddCommand(newCmdCertsExpiration(out, constants.KubernetesDir))
 	cmd.AddCommand(NewCmdCertificateKey())
 	return cmd
 }
@@ -112,7 +111,7 @@ func newCmdCertsRenewal() *cobra.Command {
 		RunE:  cmdutil.SubCmdRunE("renew"),
 	}
 
-	cmd.AddCommand(getRenewSubCommands(kubeadmconstants.KubernetesDir)...)
+	cmd.AddCommand(getRenewSubCommands(constants.KubernetesDir)...)
 
 	return cmd
 }
