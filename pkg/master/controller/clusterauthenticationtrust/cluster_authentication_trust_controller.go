@@ -23,6 +23,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -86,7 +87,7 @@ type ClusterAuthenticationInfo struct {
 	RequestHeaderCA dynamiccertificates.CAContentProvider
 }
 
-// NewClusterAuthenticationTrustController returns a controller that will maintain the `kubectl get -n kube-system configmap/extension-apiserver-authentication`
+// NewClusterAuthenticationTrustController returns a controller that will maintain the kube-system configmap/extension-apiserver-authentication
 // that holds information about how to aggregated apiservers are recommended (but not required) to configure themselves.
 func NewClusterAuthenticationTrustController(requiredAuthenticationData ClusterAuthenticationInfo, kubeClient kubernetes.Interface) *Controller {
 	// we construct our own informer because we need such a small subset of the information available.  Just one namespace.
@@ -195,6 +196,18 @@ func writeConfigMap(configMapClient corev1client.ConfigMapsGetter, required *cor
 	_, err := configMapClient.ConfigMaps(required.Namespace).Update(required)
 	if apierrors.IsNotFound(err) {
 		_, err := configMapClient.ConfigMaps(required.Namespace).Create(required)
+		return err
+	}
+
+	// If the configmap is too big, clear the entire thing and count on this controller (or another one) to add the correct data back.
+	// We return the original error which causes the controller to re-queue.
+	// Too big means
+	//   1. request is so big the generic request catcher finds it
+	//   2. the content is so large that that the server sends a validation error "Too long: must have at most 1048576 characters"
+	if apierrors.IsRequestEntityTooLargeError(err) || (apierrors.IsInvalid(err) && strings.Contains(err.Error(), "Too long")) {
+		if deleteErr := configMapClient.ConfigMaps(required.Namespace).Delete(required.Name, nil); deleteErr != nil {
+			return deleteErr
+		}
 		return err
 	}
 
