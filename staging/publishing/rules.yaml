@@ -751,11 +751,11 @@ rules:
     go: 1.12.12
     dependencies:
     - repository: apimachinery
-      branch: release-1.7
+      branch: release-1.17
     - repository: component-base
       branch: release-1.17
     - repository: api
-      branch: release-1.7
+      branch: release-1.17
     - repository: client-go
       branch: release-14.0
 - destination: kubelet
