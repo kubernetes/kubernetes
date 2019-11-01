@@ -579,7 +579,10 @@ func (cm *containerManagerImpl) Start(node *v1.Node,
 		if err != nil {
 			return fmt.Errorf("failed to build map of initial containers from runtime: %v", err)
 		}
-		cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+		err = cm.cpuManager.Start(cpumanager.ActivePodsFunc(activePods), sourcesReady, podStatusProvider, runtimeService, containerMap)
+		if err != nil {
+			return fmt.Errorf("start cpu manager error: %v", err)
+		}
 	}
 
 	// cache the node Info including resource capacity and

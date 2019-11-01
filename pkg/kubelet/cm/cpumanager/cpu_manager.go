@@ -53,7 +53,7 @@ const cpuManagerStateFileName = "cpu_manager_state"
 // Manager interface provides methods for Kubelet to manage pod cpus.
 type Manager interface {
 	// Start is called during Kubelet initialization.
-	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap)
+	Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error
 
 	// AddContainer is called between container create and container start
 	// so that initial CPU affinity settings can be written through to the
@@ -155,7 +155,10 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		// exclusively allocated.
 		reservedCPUsFloat := float64(reservedCPUs.MilliValue()) / 1000
 		numReservedCPUs := int(math.Ceil(reservedCPUsFloat))
-		policy = NewStaticPolicy(topo, numReservedCPUs, specificCPUs, affinity)
+		policy, err = NewStaticPolicy(topo, numReservedCPUs, specificCPUs, affinity)
+		if err != nil {
+			return nil, fmt.Errorf("new static policy error: %v", err)
+		}
 
 	default:
 		return nil, fmt.Errorf("unknown policy: \"%s\"", cpuPolicyName)
@@ -173,7 +176,7 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 	return manager, nil
 }
 
-func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) {
+func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesReady, podStatusProvider status.PodStatusProvider, containerRuntime runtimeService, initialContainers containermap.ContainerMap) error {
 	klog.Infof("[cpumanager] starting with %s policy", m.policy.Name())
 	klog.Infof("[cpumanager] reconciling every %v", m.reconcilePeriod)
 	m.sourcesReady = sourcesReady
@@ -183,16 +186,22 @@ func (m *manager) Start(activePods ActivePodsFunc, sourcesReady config.SourcesRe
 
 	stateImpl, err := state.NewCheckpointState(m.stateFileDirectory, cpuManagerStateFileName, m.policy.Name(), initialContainers)
 	if err != nil {
-		klog.Errorf("[cpumanager] could not initialize checkpoint manager: %v\n", err)
-		panic("[cpumanager] - please drain node and remove policy state file")
+		klog.Errorf("[cpumanager] could not initialize checkpoint manager: %v, please drain node and remove policy state file", err)
+		return err
 	}
 	m.state = stateImpl
 
-	m.policy.Start(m.state)
+	err = m.policy.Start(m.state)
+	if err != nil {
+		klog.Errorf("[cpumanager] policy start error: %v", err)
+		return err
+	}
+
 	if m.policy.Name() == string(PolicyNone) {
-		return
+		return nil
 	}
 	go wait.Until(func() { m.reconcileState() }, m.reconcilePeriod, wait.NeverStop)
+	return nil
 }
 
 func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) error {
