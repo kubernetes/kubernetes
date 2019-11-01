@@ -111,11 +111,11 @@ func NewNodeIpamController(
 		// - modify mask to allow flexible masks for IPv4 and IPv6
 		// - for alpha status they are the same
 
-		// for each cidr, node mask size must be < cidr mask
+		// for each cidr, cidr mask size must be <= node mask
 		for _, cidr := range clusterCIDRs {
 			mask := cidr.Mask
 			if maskSize, _ := mask.Size(); maskSize > nodeCIDRMaskSize {
-				klog.Fatal("Controller: Invalid --cluster-cidr, mask size of cluster CIDR must be less than --node-cidr-mask-size")
+				klog.Fatal("Controller: Invalid --cluster-cidr, mask size of cluster CIDR must be less than or equal to --node-cidr-mask-size")
 			}
 		}
 	}
