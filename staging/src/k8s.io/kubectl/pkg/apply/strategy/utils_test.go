@@ -37,7 +37,7 @@ const (
 	noConflict  = false
 )
 
-var fakeResources = tst.NewFakeResources(filepath.Join("..", "..", "..", "test", "data", "openapi", "swagger.json"))
+var fakeResources = tst.NewFakeResources(filepath.Join("..", "..", "..", "testdata", "openapi", "swagger.json"))
 
 // run parses the openapi and runs the tests
 func run(instance apply.Strategy, recorded, local, remote, expected map[string]interface{}) {
