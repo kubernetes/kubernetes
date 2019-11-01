@@ -52,34 +52,31 @@ var _ volume.BlockVolumeStager = &csiBlockMapper{}
 var _ volume.BlockVolumePublisher = &csiBlockMapper{}
 
 // GetGlobalMapPath returns a global map path (on the node) to a device file which will be symlinked to
-// Example: plugins/kubernetes.io/csi/volumeDevices/{pvname}/dev
+// Example: plugins/kubernetes.io/csi/volumeDevices/{specName}/dev
 func (m *csiBlockMapper) GetGlobalMapPath(spec *volume.Spec) (string, error) {
-	dir := getVolumeDevicePluginDir(spec.Name(), m.plugin.host)
+	dir := getVolumeDevicePluginDir(m.specName, m.plugin.host)
 	klog.V(4).Infof(log("blockMapper.GetGlobalMapPath = %s", dir))
 	return dir, nil
 }
 
 // getStagingPath returns a staging path for a directory (on the node) that should be used on NodeStageVolume/NodeUnstageVolume
-// Example: plugins/kubernetes.io/csi/volumeDevices/staging/{pvname}
+// Example: plugins/kubernetes.io/csi/volumeDevices/staging/{specName}
 func (m *csiBlockMapper) getStagingPath() string {
-	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(m.specName)
-	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", sanitizedSpecVolID)
+	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "staging", m.specName)
 }
 
 // getPublishPath returns a publish path for a file (on the node) that should be used on NodePublishVolume/NodeUnpublishVolume
-// Example: plugins/kubernetes.io/csi/volumeDevices/publish/{pvname}
+// Example: plugins/kubernetes.io/csi/volumeDevices/publish/{specName}/{podUID}
 func (m *csiBlockMapper) getPublishPath() string {
-	sanitizedSpecVolID := utilstrings.EscapeQualifiedName(m.specName)
-	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "publish", sanitizedSpecVolID)
+	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "publish", m.specName, string(m.podUID))
 }
 
 // GetPodDeviceMapPath returns pod's device file which will be mapped to a volume
-// returns: pods/{podUid}/volumeDevices/kubernetes.io~csi, {pvname}
+// returns: pods/{podUid}/volumeDevices/kubernetes.io~csi, {specName}
 func (m *csiBlockMapper) GetPodDeviceMapPath() (string, string) {
 	path := m.plugin.host.GetPodVolumeDeviceDir(m.podUID, utilstrings.EscapeQualifiedName(CSIPluginName))
-	specName := m.specName
-	klog.V(4).Infof(log("blockMapper.GetPodDeviceMapPath [path=%s; name=%s]", path, specName))
-	return path, specName
+	klog.V(4).Infof(log("blockMapper.GetPodDeviceMapPath [path=%s; name=%s]", path, m.specName))
+	return path, m.specName
 }
 
 // stageVolumeForBlock stages a block volume to stagingPath
