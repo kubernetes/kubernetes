@@ -29,7 +29,6 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/util/mount"
 	"k8s.io/kubernetes/pkg/volume"
-	"k8s.io/kubernetes/pkg/volume/util"
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	"k8s.io/legacy-cloud-providers/aws"
 	utilstrings "k8s.io/utils/strings"
@@ -126,10 +125,6 @@ func (plugin *awsElasticBlockStorePlugin) newUnmapperInternal(volName string, po
 		}}, nil
 }
 
-func (c *awsElasticBlockStoreUnmapper) TearDownDevice(mapPath, devicePath string) error {
-	return nil
-}
-
 type awsElasticBlockStoreUnmapper struct {
 	*awsElasticBlockStore
 }
@@ -142,14 +137,6 @@ type awsElasticBlockStoreMapper struct {
 }
 
 var _ volume.BlockVolumeMapper = &awsElasticBlockStoreMapper{}
-
-func (b *awsElasticBlockStoreMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *awsElasticBlockStoreMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
-}
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/volumeID

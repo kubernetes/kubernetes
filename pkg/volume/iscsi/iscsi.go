@@ -382,14 +382,6 @@ type iscsiDiskMapper struct {
 
 var _ volume.BlockVolumeMapper = &iscsiDiskMapper{}
 
-func (b *iscsiDiskMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *iscsiDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return ioutil.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
-}
-
 type iscsiDiskUnmapper struct {
 	*iscsiDisk
 	exec       mount.Exec
@@ -397,6 +389,7 @@ type iscsiDiskUnmapper struct {
 }
 
 var _ volume.BlockVolumeUnmapper = &iscsiDiskUnmapper{}
+var _ volume.BlockVolumeUnstager = &iscsiDiskUnmapper{}
 
 // Even though iSCSI plugin has attacher/detacher implementation, iSCSI plugin
 // needs volume detach operation during TearDownDevice(). This method is only

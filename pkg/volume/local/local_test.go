@@ -372,9 +372,13 @@ func TestMapUnmap(t *testing.T) {
 	if volName != testPVName {
 		t.Errorf("Got unexpected volNamne: %s, expected %s", volName, testPVName)
 	}
-	devPath, err := mapper.SetUpDevice()
-	if err != nil {
-		t.Errorf("Failed to SetUpDevice, err: %v", err)
+	var devPath string
+
+	if customMapper, ok := mapper.(volume.BlockVolumePublisher); ok {
+		devPath, err = customMapper.MapPodDevice()
+		if err != nil {
+			t.Errorf("Failed to MapPodDevice, err: %v", err)
+		}
 	}
 
 	if _, err := os.Stat(devPath); err != nil {
@@ -391,10 +395,6 @@ func TestMapUnmap(t *testing.T) {
 	}
 	if unmapper == nil {
 		t.Fatalf("Got a nil Unmapper")
-	}
-
-	if err := unmapper.TearDownDevice(globalPath, devPath); err != nil {
-		t.Errorf("TearDownDevice failed, err: %v", err)
 	}
 }
 

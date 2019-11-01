@@ -412,20 +412,13 @@ type fcDiskMapper struct {
 
 var _ volume.BlockVolumeMapper = &fcDiskMapper{}
 
-func (b *fcDiskMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *fcDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return util.MapBlockVolume(devicePath, globalMapPath, volumeMapPath, volumeMapName, podUID)
-}
-
 type fcDiskUnmapper struct {
 	*fcDisk
 	deviceUtil util.DeviceUtil
 }
 
 var _ volume.BlockVolumeUnmapper = &fcDiskUnmapper{}
+var _ volume.BlockVolumeUnstager = &fcDiskUnmapper{}
 
 func (c *fcDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
 	err := c.manager.DetachBlockFCDisk(*c, mapPath, devicePath)

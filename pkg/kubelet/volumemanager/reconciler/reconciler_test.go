@@ -527,7 +527,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 		1 /* expectedAttachCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, fakePlugin))
-	assert.NoError(t, volumetesting.VerifyGetMapDeviceCallCount(
+	assert.NoError(t, volumetesting.VerifyGetMapPodDeviceCallCount(
 		1 /* expectedGetMapDeviceCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroTearDownDeviceCallCount(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
@@ -631,7 +631,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 	assert.NoError(t, volumetesting.VerifyZeroAttachCalls(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, fakePlugin))
-	assert.NoError(t, volumetesting.VerifyGetMapDeviceCallCount(
+	assert.NoError(t, volumetesting.VerifyGetMapPodDeviceCallCount(
 		1 /* expectedGetMapDeviceCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroTearDownDeviceCallCount(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
@@ -731,7 +731,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 		1 /* expectedAttachCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, fakePlugin))
-	assert.NoError(t, volumetesting.VerifyGetMapDeviceCallCount(
+	assert.NoError(t, volumetesting.VerifyGetMapPodDeviceCallCount(
 		1 /* expectedGetMapDeviceCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroTearDownDeviceCallCount(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))
@@ -847,7 +847,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 	assert.NoError(t, volumetesting.VerifyZeroAttachCalls(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyWaitForAttachCallCount(
 		1 /* expectedWaitForAttachCallCount */, fakePlugin))
-	assert.NoError(t, volumetesting.VerifyGetMapDeviceCallCount(
+	assert.NoError(t, volumetesting.VerifyGetMapPodDeviceCallCount(
 		1 /* expectedGetMapDeviceCallCount */, fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroTearDownDeviceCallCount(fakePlugin))
 	assert.NoError(t, volumetesting.VerifyZeroDetachCallCount(fakePlugin))

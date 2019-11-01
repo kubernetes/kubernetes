@@ -239,15 +239,9 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	}
 	t.Log("created attachement ", attachID)
 
-	devicePath, err := csiMapper.SetUpDevice()
+	err = csiMapper.SetUpDevice()
 	if err != nil {
 		t.Fatalf("mapper failed to SetupDevice: %v", err)
-	}
-
-	// Check if SetUpDevice returns the right path
-	publishPath := csiMapper.getPublishPath()
-	if devicePath != publishPath {
-		t.Fatalf("mapper.SetupDevice returned unexpected path %s instead of %v", devicePath, publishPath)
 	}
 
 	// Check if NodeStageVolume staged to the right path
@@ -267,12 +261,14 @@ func TestBlockMapperSetupDevice(t *testing.T) {
 	if !ok {
 		t.Error("csi server may not have received NodePublishVolume call")
 	}
+
+	publishPath := csiMapper.getPublishPath()
 	if pvol.Path != publishPath {
 		t.Errorf("csi server expected path %s, got %s", publishPath, pvol.Path)
 	}
 }
 
-func TestBlockMapperMapDevice(t *testing.T) {
+func TestBlockMapperMapPodDevice(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 
 	plug, tmpDir := newTestPlugin(t, nil)
@@ -306,56 +302,18 @@ func TestBlockMapperMapDevice(t *testing.T) {
 	}
 	t.Log("created attachement ", attachID)
 
-	devicePath, err := csiMapper.SetUpDevice()
-	if err != nil {
-		t.Fatalf("mapper failed to SetupDevice: %v", err)
-	}
-	globalMapPath, err := csiMapper.GetGlobalMapPath(csiMapper.spec)
-	if err != nil {
-		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
-	}
-
-	// Actual SetupDevice should create a symlink to or a bind mout of device in devicePath.
-	// Create dummy file there before calling MapDevice to test it properly.
-	fd, err := os.Create(devicePath)
-	if err != nil {
-		t.Fatalf("mapper failed to create dummy file in devicePath: %v", err)
-	}
-	if err := fd.Close(); err != nil {
-		t.Fatalf("mapper failed to close dummy file in devicePath: %v", err)
-	}
-
 	// Map device to global and pod device map path
-	volumeMapPath, volName := csiMapper.GetPodDeviceMapPath()
-	err = csiMapper.MapDevice(devicePath, globalMapPath, volumeMapPath, volName, csiMapper.podUID)
+	path, err := csiMapper.MapPodDevice()
 	if err != nil {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
 	}
-
-	// Check if symlink {globalMapPath}/{podUID} exists
-	globalMapFilePath := filepath.Join(globalMapPath, string(csiMapper.podUID))
-	if _, err := os.Stat(globalMapFilePath); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("mapper.MapDevice failed, symlink in globalMapPath not created: %v", err)
-			t.Errorf("mapper.MapDevice devicePath:%v, globalMapPath: %v, globalMapFilePath: %v",
-				devicePath, globalMapPath, globalMapFilePath)
-		} else {
-			t.Errorf("mapper.MapDevice failed: %v", err)
-		}
-	}
-
-	// Check if symlink {volumeMapPath}/{volName} exists
-	volumeMapFilePath := filepath.Join(volumeMapPath, volName)
-	if _, err := os.Stat(volumeMapFilePath); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("mapper.MapDevice failed, symlink in volumeMapPath not created: %v", err)
-		} else {
-			t.Errorf("mapper.MapDevice failed: %v", err)
-		}
+	publishPath := csiMapper.getPublishPath()
+	if path != publishPath {
+		t.Errorf("path %s and %s doesn't match", path, publishPath)
 	}
 }
 
-func TestBlockMapperMapDeviceNotSupportAttach(t *testing.T) {
+func TestBlockMapperMapPodDeviceNotSupportAttach(t *testing.T) {
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIBlockVolume, true)()
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.CSIDriverRegistry, true)()
 
@@ -393,52 +351,15 @@ func TestBlockMapperMapDeviceNotSupportAttach(t *testing.T) {
 		t.Fatalf("Failed to make a new Mapper: %v", err)
 	}
 	csiMapper.csiClient = setupClient(t, true)
-	devicePath, err := csiMapper.SetUpDevice()
-	if err != nil {
-		t.Fatalf("mapper failed to SetupDevice: %v", err)
-	}
-	globalMapPath, err := csiMapper.GetGlobalMapPath(csiMapper.spec)
-	if err != nil {
-		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
-	}
-
-	// Actual SetupDevice should create a symlink to or a bind mout of device in devicePath.
-	// Create dummy file there before calling MapDevice to test it properly.
-	fd, err := os.Create(devicePath)
-	if err != nil {
-		t.Fatalf("mapper failed to create dummy file in devicePath: %v", err)
-	}
-	if err := fd.Close(); err != nil {
-		t.Fatalf("mapper failed to close dummy file in devicePath: %v", err)
-	}
 
 	// Map device to global and pod device map path
-	volumeMapPath, volName := csiMapper.GetPodDeviceMapPath()
-	err = csiMapper.MapDevice(devicePath, globalMapPath, volumeMapPath, volName, csiMapper.podUID)
+	path, err := csiMapper.MapPodDevice()
 	if err != nil {
 		t.Fatalf("mapper failed to GetGlobalMapPath: %v", err)
 	}
-
-	// Check if symlink {globalMapPath}/{podUID} exists
-	globalMapFilePath := filepath.Join(globalMapPath, string(csiMapper.podUID))
-	if _, err := os.Stat(globalMapFilePath); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("mapper.MapDevice failed, symlink in globalMapPath not created: %v", err)
-			t.Errorf("mapper.MapDevice devicePath:%v, globalMapPath: %v, globalMapFilePath: %v",
-				devicePath, globalMapPath, globalMapFilePath)
-		} else {
-			t.Errorf("mapper.MapDevice failed: %v", err)
-		}
-	}
-
-	// Check if symlink {volumeMapPath}/{volName} exists
-	volumeMapFilePath := filepath.Join(volumeMapPath, volName)
-	if _, err := os.Stat(volumeMapFilePath); err != nil {
-		if os.IsNotExist(err) {
-			t.Errorf("mapper.MapDevice failed, symlink in volumeMapPath not created: %v", err)
-		} else {
-			t.Errorf("mapper.MapDevice failed: %v", err)
-		}
+	publishPath := csiMapper.getPublishPath()
+	if path != publishPath {
+		t.Errorf("path %s and %s doesn't match", path, publishPath)
 	}
 }
 
