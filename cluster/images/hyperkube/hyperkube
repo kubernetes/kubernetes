@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+
+# Copyright 2019 The Kubernetes Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set -o errexit
+set -o nounset
+set -o pipefail
+
+BINS=(
+  kube-apiserver
+  kube-controller-manager
+  kube-proxy
+  kube-scheduler
+  kubectl
+  kubelet
+)
+
+function array_contains() {
+  local search="$1"
+  local element
+  shift
+  for element; do
+    if [[ "${element}" == "${search}" ]]; then
+      return 0
+     fi
+  done
+  return 1
+}
+
+function print_usage() {
+  cat <<EOF
+Usage:
+  $(basename "$0") [command]
+
+Available Commands:
+  help                     Help about any command
+  kube-apiserver
+  kube-controller-manager
+  kube-proxy
+  kube-scheduler
+  kubectl                  kubectl controls the Kubernetes cluster manager
+  kubelet
+EOF
+  exit 0
+}
+
+function main() {
+  if [[ "$#" -lt 1 || "${1:-}" == "--help" || "${1:-}" == "help" ]]; then
+    print_usage
+  fi
+  if ! array_contains "$1" "${BINS[@]}"; then
+    echo "$1: command not supported"
+    print_usage
+  fi
+  command=${1}
+  shift
+  if ! command -v "${command}" &>/dev/null; then
+    echo "${command}: command not found"
+    exit 1
+  fi
+  exec "${command}" "${@}"
+}
+
+main "${@}"
