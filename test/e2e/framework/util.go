@@ -74,7 +74,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller"
 	"k8s.io/kubernetes/pkg/master/ports"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
-	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
@@ -102,6 +101,9 @@ const (
 
 	// PodDeleteTimeout is how long to wait for a pod to be deleted.
 	PodDeleteTimeout = 5 * time.Minute
+
+	// PodGetTimeout is how long to wait for a pod to be got.
+	PodGetTimeout = 2 * time.Minute
 
 	// PodEventTimeout is how much we wait for a pod event to occur.
 	PodEventTimeout = 2 * time.Minute
@@ -1370,7 +1372,7 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 				e.Source, e.Type, e.Message, e.Reason, e.FirstTimestamp, e.LastTimestamp, e.InvolvedObject)
 		}
 		logFunc("\nLogging pods the kubelet thinks is on node %v", n)
-		podList, err := e2ekubelet.GetKubeletPods(c, n)
+		podList, err := getKubeletPods(c, n)
 		if err != nil {
 			logFunc("Unable to retrieve kubelet pods for node %v: %v", n, err)
 			continue
@@ -1388,6 +1390,33 @@ func DumpNodeDebugInfo(c clientset.Interface, nodeNames []string, logFunc func(f
 		}
 		e2emetrics.HighLatencyKubeletOperations(c, 10*time.Second, n, logFunc)
 		// TODO: Log node resource info
+	}
+}
+
+// getKubeletPods retrieves the list of pods on the kubelet.
+func getKubeletPods(c clientset.Interface, node string) (*v1.PodList, error) {
+	var result *v1.PodList
+	var client restclient.Result
+	finished := make(chan struct{}, 1)
+	go func() {
+		// call chain tends to hang in some cases when Node is not ready. Add an artificial timeout for this call. #22165
+		client = c.CoreV1().RESTClient().Get().
+			Resource("nodes").
+			SubResource("proxy").
+			Name(fmt.Sprintf("%v:%v", node, ports.KubeletPort)).
+			Suffix("pods").
+			Do()
+
+		finished <- struct{}{}
+	}()
+	select {
+	case <-finished:
+		if err := client.Into(result); err != nil {
+			return &v1.PodList{}, err
+		}
+		return result, nil
+	case <-time.After(PodGetTimeout):
+		return &v1.PodList{}, fmt.Errorf("Waiting up to %v for getting the list of pods", PodGetTimeout)
 	}
 }
 
