@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package framework
+package utils
 
 import (
 	"bytes"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/kubernetes/test/e2e/framework"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 )
@@ -51,7 +52,7 @@ import (
 //   and silently ignored
 // - the latest stable API version for each item is used, regardless of what
 //   is specified in the manifest files
-func (f *Framework) LoadFromManifests(files ...string) ([]interface{}, error) {
+func LoadFromManifests(files ...string) ([]interface{}, error) {
 	var items []interface{}
 	err := visitManifests(func(data []byte) error {
 		// Ignore any additional fields for now, just determine what we have.
@@ -80,7 +81,7 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 	for _, fileName := range files {
 		data, err := testfiles.Read(fileName)
 		if err != nil {
-			Failf("reading manifest file: %v", err)
+			framework.Failf("reading manifest file: %v", err)
 		}
 
 		// Split at the "---" separator before working on
@@ -113,11 +114,11 @@ func visitManifests(cb func([]byte) error, files ...string) error {
 // PatchItems has some limitations:
 // - only some common items are supported, unknown ones trigger an error
 // - only the latest stable API version for each item is supported
-func (f *Framework) PatchItems(items ...interface{}) error {
+func PatchItems(f *framework.Framework, items ...interface{}) error {
 	for _, item := range items {
 		// Uncomment when debugging the loading and patching of items.
 		// Logf("patching original content of %T:\n%s", item, PrettyPrint(item))
-		if err := f.patchItemRecursively(item); err != nil {
+		if err := patchItemRecursively(f, item); err != nil {
 			return err
 		}
 	}
@@ -138,15 +139,15 @@ func (f *Framework) PatchItems(items ...interface{}) error {
 // PatchItems has the some limitations as LoadFromManifests:
 // - only some common items are supported, unknown ones trigger an error
 // - only the latest stable API version for each item is supported
-func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
+func CreateItems(f *framework.Framework, items ...interface{}) (func(), error) {
 	var destructors []func() error
-	var cleanupHandle CleanupActionHandle
+	var cleanupHandle framework.CleanupActionHandle
 	cleanup := func() {
 		if cleanupHandle == nil {
 			// Already done.
 			return
 		}
-		RemoveCleanupAction(cleanupHandle)
+		framework.RemoveCleanupAction(cleanupHandle)
 
 		// TODO (?): use same logic as framework.go for determining
 		// whether we are expected to clean up? This would change the
@@ -155,11 +156,11 @@ func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
 		// to non-namespaced items.
 		for _, destructor := range destructors {
 			if err := destructor(); err != nil && !apierrs.IsNotFound(err) {
-				Logf("deleting failed: %s", err)
+				framework.Logf("deleting failed: %s", err)
 			}
 		}
 	}
-	cleanupHandle = AddCleanupAction(cleanup)
+	cleanupHandle = framework.AddCleanupAction(cleanup)
 
 	var result error
 	for _, item := range items {
@@ -168,12 +169,12 @@ func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
 		description := describeItem(item)
 		// Uncomment this line to get a full dump of the entire item.
 		// description = fmt.Sprintf("%s:\n%s", description, PrettyPrint(item))
-		Logf("creating %s", description)
+		framework.Logf("creating %s", description)
 		for _, factory := range factories {
 			destructor, err := factory.Create(f, item)
 			if destructor != nil {
 				destructors = append(destructors, func() error {
-					Logf("deleting %s", description)
+					framework.Logf("deleting %s", description)
 					return destructor()
 				})
 			}
@@ -202,12 +203,12 @@ func (f *Framework) CreateItems(items ...interface{}) (func(), error) {
 // CreateFromManifests is a combination of LoadFromManifests,
 // PatchItems, patching with an optional custom function,
 // and CreateItems.
-func (f *Framework) CreateFromManifests(patch func(item interface{}) error, files ...string) (func(), error) {
-	items, err := f.LoadFromManifests(files...)
+func CreateFromManifests(f *framework.Framework, patch func(item interface{}) error, files ...string) (func(), error) {
+	items, err := LoadFromManifests(files...)
 	if err != nil {
 		return nil, errors.Wrap(err, "CreateFromManifests")
 	}
-	if err := f.PatchItems(items...); err != nil {
+	if err := PatchItems(f, items...); err != nil {
 		return nil, err
 	}
 	if patch != nil {
@@ -217,7 +218,7 @@ func (f *Framework) CreateFromManifests(patch func(item interface{}) error, file
 			}
 		}
 	}
-	return f.CreateItems(items...)
+	return CreateItems(f, items...)
 }
 
 // What is a subset of metav1.TypeMeta which (in contrast to
@@ -257,7 +258,7 @@ type ItemFactory interface {
 	// error or a cleanup function for the created item.
 	// If the item is of an unsupported type, it must return
 	// an error that has errorItemNotSupported as cause.
-	Create(f *Framework, item interface{}) (func() error, error)
+	Create(f *framework.Framework, item interface{}) (func() error, error)
 }
 
 // describeItem always returns a string that describes the item,
@@ -292,7 +293,7 @@ var factories = map[What]ItemFactory{
 
 // PatchName makes the name of some item unique by appending the
 // generated unique name.
-func (f *Framework) PatchName(item *string) {
+func PatchName(f *framework.Framework, item *string) {
 	if *item != "" {
 		*item = *item + "-" + f.UniqueName
 	}
@@ -301,64 +302,64 @@ func (f *Framework) PatchName(item *string) {
 // PatchNamespace moves the item into the test's namespace.  Not
 // all items can be namespaced. For those, the name also needs to be
 // patched.
-func (f *Framework) PatchNamespace(item *string) {
+func PatchNamespace(f *framework.Framework, item *string) {
 	if f.Namespace != nil {
 		*item = f.Namespace.GetName()
 	}
 }
 
-func (f *Framework) patchItemRecursively(item interface{}) error {
+func patchItemRecursively(f *framework.Framework, item interface{}) error {
 	switch item := item.(type) {
 	case *rbacv1.Subject:
-		f.PatchNamespace(&item.Namespace)
+		PatchNamespace(f, &item.Namespace)
 	case *rbacv1.RoleRef:
 		// TODO: avoid hard-coding this special name. Perhaps add a Framework.PredefinedRoles
 		// which contains all role names that are defined cluster-wide before the test starts?
 		// All those names are excempt from renaming. That list could be populated by querying
 		// and get extended by tests.
 		if item.Name != "e2e-test-privileged-psp" {
-			f.PatchName(&item.Name)
+			PatchName(f, &item.Name)
 		}
 	case *rbacv1.ClusterRole:
-		f.PatchName(&item.Name)
+		PatchName(f, &item.Name)
 	case *rbacv1.Role:
-		f.PatchNamespace(&item.Namespace)
+		PatchNamespace(f, &item.Namespace)
 		// Roles are namespaced, but because for RoleRef above we don't
 		// know whether the referenced role is a ClusterRole or Role
 		// and therefore always renames, we have to do the same here.
-		f.PatchName(&item.Name)
+		PatchName(f, &item.Name)
 	case *storagev1.StorageClass:
-		f.PatchName(&item.Name)
+		PatchName(f, &item.Name)
 	case *storagev1beta1.CSIDriver:
-		f.PatchName(&item.Name)
+		PatchName(f, &item.Name)
 	case *v1.ServiceAccount:
-		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		PatchNamespace(f, &item.ObjectMeta.Namespace)
 	case *v1.Secret:
-		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		PatchNamespace(f, &item.ObjectMeta.Namespace)
 	case *rbacv1.ClusterRoleBinding:
-		f.PatchName(&item.Name)
+		PatchName(f, &item.Name)
 		for i := range item.Subjects {
-			if err := f.patchItemRecursively(&item.Subjects[i]); err != nil {
+			if err := patchItemRecursively(f, &item.Subjects[i]); err != nil {
 				return errors.Wrapf(err, "%T", f)
 			}
 		}
-		if err := f.patchItemRecursively(&item.RoleRef); err != nil {
+		if err := patchItemRecursively(f, &item.RoleRef); err != nil {
 			return errors.Wrapf(err, "%T", f)
 		}
 	case *rbacv1.RoleBinding:
-		f.PatchNamespace(&item.Namespace)
+		PatchNamespace(f, &item.Namespace)
 		for i := range item.Subjects {
-			if err := f.patchItemRecursively(&item.Subjects[i]); err != nil {
+			if err := patchItemRecursively(f, &item.Subjects[i]); err != nil {
 				return errors.Wrapf(err, "%T", f)
 			}
 		}
-		if err := f.patchItemRecursively(&item.RoleRef); err != nil {
+		if err := patchItemRecursively(f, &item.RoleRef); err != nil {
 			return errors.Wrapf(err, "%T", f)
 		}
 	case *v1.Service:
-		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		PatchNamespace(f, &item.ObjectMeta.Namespace)
 	case *appsv1.StatefulSet:
-		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		PatchNamespace(f, &item.ObjectMeta.Namespace)
 		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
 			return err
 		}
@@ -366,7 +367,7 @@ func (f *Framework) patchItemRecursively(item interface{}) error {
 			return err
 		}
 	case *appsv1.DaemonSet:
-		f.PatchNamespace(&item.ObjectMeta.Namespace)
+		PatchNamespace(f, &item.ObjectMeta.Namespace)
 		if err := e2epod.PatchContainerImages(item.Spec.Template.Spec.Containers); err != nil {
 			return err
 		}
@@ -390,7 +391,7 @@ func (f *serviceAccountFactory) New() runtime.Object {
 	return &v1.ServiceAccount{}
 }
 
-func (*serviceAccountFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*serviceAccountFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*v1.ServiceAccount)
 	if !ok {
 		return nil, errorItemNotSupported
@@ -410,13 +411,13 @@ func (f *clusterRoleFactory) New() runtime.Object {
 	return &rbacv1.ClusterRole{}
 }
 
-func (*clusterRoleFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*clusterRoleFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*rbacv1.ClusterRole)
 	if !ok {
 		return nil, errorItemNotSupported
 	}
 
-	Logf("Define cluster role %v", item.GetName())
+	framework.Logf("Define cluster role %v", item.GetName())
 	client := f.ClientSet.RbacV1().ClusterRoles()
 	if _, err := client.Create(item); err != nil {
 		return nil, errors.Wrap(err, "create ClusterRole")
@@ -432,7 +433,7 @@ func (f *clusterRoleBindingFactory) New() runtime.Object {
 	return &rbacv1.ClusterRoleBinding{}
 }
 
-func (*clusterRoleBindingFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*clusterRoleBindingFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*rbacv1.ClusterRoleBinding)
 	if !ok {
 		return nil, errorItemNotSupported
@@ -453,7 +454,7 @@ func (f *roleFactory) New() runtime.Object {
 	return &rbacv1.Role{}
 }
 
-func (*roleFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*roleFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*rbacv1.Role)
 	if !ok {
 		return nil, errorItemNotSupported
@@ -474,7 +475,7 @@ func (f *roleBindingFactory) New() runtime.Object {
 	return &rbacv1.RoleBinding{}
 }
 
-func (*roleBindingFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*roleBindingFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*rbacv1.RoleBinding)
 	if !ok {
 		return nil, errorItemNotSupported
@@ -495,7 +496,7 @@ func (f *serviceFactory) New() runtime.Object {
 	return &v1.Service{}
 }
 
-func (*serviceFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*serviceFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*v1.Service)
 	if !ok {
 		return nil, errorItemNotSupported
@@ -516,7 +517,7 @@ func (f *statefulSetFactory) New() runtime.Object {
 	return &appsv1.StatefulSet{}
 }
 
-func (*statefulSetFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*statefulSetFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*appsv1.StatefulSet)
 	if !ok {
 		return nil, errorItemNotSupported
@@ -537,7 +538,7 @@ func (f *daemonSetFactory) New() runtime.Object {
 	return &appsv1.DaemonSet{}
 }
 
-func (*daemonSetFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*daemonSetFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*appsv1.DaemonSet)
 	if !ok {
 		return nil, errorItemNotSupported
@@ -558,7 +559,7 @@ func (f *storageClassFactory) New() runtime.Object {
 	return &storagev1.StorageClass{}
 }
 
-func (*storageClassFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*storageClassFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*storagev1.StorageClass)
 	if !ok {
 		return nil, errorItemNotSupported
@@ -579,7 +580,7 @@ func (f *csiDriverFactory) New() runtime.Object {
 	return &storagev1beta1.CSIDriver{}
 }
 
-func (*csiDriverFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*csiDriverFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*storagev1beta1.CSIDriver)
 	if !ok {
 		return nil, errorItemNotSupported
@@ -600,7 +601,7 @@ func (f *secretFactory) New() runtime.Object {
 	return &v1.Secret{}
 }
 
-func (*secretFactory) Create(f *Framework, i interface{}) (func() error, error) {
+func (*secretFactory) Create(f *framework.Framework, i interface{}) (func() error, error) {
 	item, ok := i.(*v1.Secret)
 	if !ok {
 		return nil, errorItemNotSupported

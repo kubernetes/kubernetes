@@ -187,7 +187,7 @@ func (h *hostpathCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.Per
 		SnapshotterContainerName: "csi-snapshotter",
 		NodeName:                 node.Name,
 	}
-	cleanup, err := config.Framework.CreateFromManifests(func(item interface{}) error {
+	cleanup, err := utils.CreateFromManifests(config.Framework, func(item interface{}) error {
 		return utils.PatchCSIDeployment(config.Framework, o, item)
 	},
 		h.manifests...)
@@ -329,7 +329,7 @@ func (m *mockCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTest
 			storagev1beta1.VolumeLifecycleEphemeral,
 		},
 	}
-	cleanup, err := f.CreateFromManifests(func(item interface{}) error {
+	cleanup, err := utils.CreateFromManifests(f, func(item interface{}) error {
 		return utils.PatchCSIDeployment(f, o, item)
 	},
 		m.manifests...)
@@ -459,7 +459,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 		"test/e2e/testing-manifests/storage-csi/gce-pd/controller_ss.yaml",
 	}
 
-	cleanup, err := f.CreateFromManifests(nil, manifests...)
+	cleanup, err := utils.CreateFromManifests(f, nil, manifests...)
 	if err != nil {
 		framework.Failf("deploying csi gce-pd driver: %v", err)
 	}
