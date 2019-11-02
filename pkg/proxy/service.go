@@ -325,7 +325,6 @@ func (sm *ServiceMap) apply(changes *ServiceChangeTracker, UDPStaleClusterIP set
 	// clear changes after applying them to ServiceMap.
 	changes.items = make(map[types.NamespacedName]*serviceChange)
 	metrics.ServiceChangesPending.Set(0)
-	return
 }
 
 // merge adds other ServiceMap's elements to current ServiceMap.

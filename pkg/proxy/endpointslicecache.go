@@ -117,7 +117,7 @@ func newEndpointSliceInfo(endpointSlice *discovery.EndpointSlice, remove bool) *
 
 	if !remove {
 		for _, endpoint := range endpointSlice.Endpoints {
-			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready == true {
+			if endpoint.Conditions.Ready == nil || *endpoint.Conditions.Ready {
 				esInfo.Endpoints = append(esInfo.Endpoints, &endpointInfo{
 					Addresses: endpoint.Addresses,
 					Topology:  endpoint.Topology,
