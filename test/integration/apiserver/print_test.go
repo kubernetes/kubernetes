@@ -32,6 +32,7 @@ import (
 	batchv2alpha1 "k8s.io/api/batch/v2alpha1"
 	discoveryv1alpha1 "k8s.io/api/discovery/v1alpha1"
 	extensionsv1beta1 "k8s.io/api/extensions/v1beta1"
+	flowcontrolv1alpha1 "k8s.io/api/flowcontrol/v1alpha1"
 	nodev1alpha1 "k8s.io/api/node/v1alpha1"
 	rbacv1alpha1 "k8s.io/api/rbac/v1alpha1"
 	schedulerapi "k8s.io/api/scheduling/v1"
@@ -138,6 +139,8 @@ var missingHanlders = sets.NewString(
 	"AuditSink",
 	"CSINode",
 	"CSIDriver",
+	"FlowSchema",                 // TODO(yue9944882): remove this comment by merging print-handler for flow-control API
+	"PriorityLevelConfiguration", // TODO(yue9944882): remove this comment by merging print-handler for flow-control API
 )
 
 func TestServerSidePrint(t *testing.T) {
@@ -155,6 +158,7 @@ func TestServerSidePrint(t *testing.T) {
 			appsv1beta2.SchemeGroupVersion,
 			extensionsv1beta1.SchemeGroupVersion,
 			nodev1alpha1.SchemeGroupVersion,
+			flowcontrolv1alpha1.SchemeGroupVersion,
 		},
 		[]schema.GroupVersionResource{
 			extensionsv1beta1.SchemeGroupVersion.WithResource("daemonsets"),
