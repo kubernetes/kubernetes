@@ -220,11 +220,7 @@ func validateObjectSource(src *autoscaling.ObjectMetricSource, fldPath *field.Pa
 
 	allErrs = append(allErrs, ValidateCrossVersionObjectReference(src.DescribedObject, fldPath.Child("describedObject"))...)
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
-	if &src.Target == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target"), "must specify a metric target"))
-	} else {
-		allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
-	}
+	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 
 	if src.Target.Value == nil && src.Target.AverageValue == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value or averageValue"))
@@ -237,11 +233,7 @@ func validateExternalSource(src *autoscaling.ExternalMetricSource, fldPath *fiel
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
-	if &src.Target == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target"), "must specify a metric target"))
-	} else {
-		allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
-	}
+	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 
 	if src.Target.Value == nil && src.Target.AverageValue == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must set either a target value for metric or a per-pod target"))
@@ -258,11 +250,7 @@ func validatePodsSource(src *autoscaling.PodsMetricSource, fldPath *field.Path) 
 	allErrs := field.ErrorList{}
 
 	allErrs = append(allErrs, validateMetricIdentifier(src.Metric, fldPath.Child("metric"))...)
-	if &src.Target == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target"), "must specify a metric target"))
-	} else {
-		allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
-	}
+	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 
 	if src.Target.AverageValue == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageValue"), "must specify a positive target averageValue"))
@@ -277,11 +265,8 @@ func validateResourceSource(src *autoscaling.ResourceMetricSource, fldPath *fiel
 	if len(src.Name) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("name"), "must specify a resource name"))
 	}
-	if &src.Target == nil {
-		allErrs = append(allErrs, field.Required(fldPath.Child("target"), "must specify a metric target"))
-	} else {
-		allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
-	}
+
+	allErrs = append(allErrs, validateMetricTarget(src.Target, fldPath.Child("target"))...)
 
 	if src.Target.AverageUtilization == nil && src.Target.AverageValue == nil {
 		allErrs = append(allErrs, field.Required(fldPath.Child("target").Child("averageUtilization"), "must set either a target raw value or a target utilization"))
