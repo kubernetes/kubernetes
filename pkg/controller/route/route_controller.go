@@ -25,7 +25,7 @@ import (
 
 	"k8s.io/klog"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
@@ -96,7 +96,7 @@ func New(routes cloudprovider.Routes, kubeClient clientset.Interface, nodeInform
 	return rc
 }
 
-// Run starts the route controller until the provided stop channel is closed
+// Run starts the controller reconciling routes against node changes every five minutes
 func (rc *Controller) Run(stopCh <-chan struct{}, syncPeriod time.Duration) {
 	defer utilruntime.HandleCrash()
 

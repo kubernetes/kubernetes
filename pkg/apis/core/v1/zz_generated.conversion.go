@@ -21,6 +21,7 @@ limitations under the License.
 package v1
 
 import (
+	url "net/url"
 	unsafe "unsafe"
 
 	v1 "k8s.io/api/core/v1"
@@ -1040,16 +1041,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.NodeSpec)(nil), (*core.NodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_NodeSpec_To_core_NodeSpec(a.(*v1.NodeSpec), b.(*core.NodeSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.NodeSpec)(nil), (*v1.NodeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_NodeSpec_To_v1_NodeSpec(a.(*core.NodeSpec), b.(*v1.NodeSpec), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.NodeStatus)(nil), (*core.NodeStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_NodeStatus_To_core_NodeStatus(a.(*v1.NodeStatus), b.(*core.NodeStatus), scope)
 	}); err != nil {
@@ -1180,16 +1171,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.PersistentVolumeSpec)(nil), (*core.PersistentVolumeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PersistentVolumeSpec_To_core_PersistentVolumeSpec(a.(*v1.PersistentVolumeSpec), b.(*core.PersistentVolumeSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.PersistentVolumeSpec)(nil), (*v1.PersistentVolumeSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_PersistentVolumeSpec_To_v1_PersistentVolumeSpec(a.(*core.PersistentVolumeSpec), b.(*v1.PersistentVolumeSpec), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.PersistentVolumeStatus)(nil), (*core.PersistentVolumeStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_PersistentVolumeStatus_To_core_PersistentVolumeStatus(a.(*v1.PersistentVolumeStatus), b.(*core.PersistentVolumeStatus), scope)
 	}); err != nil {
@@ -1207,16 +1188,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*core.PhotonPersistentDiskVolumeSource)(nil), (*v1.PhotonPersistentDiskVolumeSource)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_PhotonPersistentDiskVolumeSource_To_v1_PhotonPersistentDiskVolumeSource(a.(*core.PhotonPersistentDiskVolumeSource), b.(*v1.PhotonPersistentDiskVolumeSource), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.Pod)(nil), (*core.Pod)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Pod_To_core_Pod(a.(*v1.Pod), b.(*core.Pod), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.Pod)(nil), (*v1.Pod)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_Pod_To_v1_Pod(a.(*core.Pod), b.(*v1.Pod), scope)
 	}); err != nil {
 		return err
 	}
@@ -1380,26 +1351,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.PodSpec)(nil), (*core.PodSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodSpec_To_core_PodSpec(a.(*v1.PodSpec), b.(*core.PodSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.PodSpec)(nil), (*v1.PodSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_PodSpec_To_v1_PodSpec(a.(*core.PodSpec), b.(*v1.PodSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.PodStatus)(nil), (*core.PodStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodStatus_To_core_PodStatus(a.(*v1.PodStatus), b.(*core.PodStatus), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.PodStatus)(nil), (*v1.PodStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_PodStatus_To_v1_PodStatus(a.(*core.PodStatus), b.(*v1.PodStatus), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.PodStatusResult)(nil), (*core.PodStatusResult)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_PodStatusResult_To_core_PodStatusResult(a.(*v1.PodStatusResult), b.(*core.PodStatusResult), scope)
 	}); err != nil {
@@ -1427,16 +1378,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*core.PodTemplateList)(nil), (*v1.PodTemplateList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_PodTemplateList_To_v1_PodTemplateList(a.(*core.PodTemplateList), b.(*v1.PodTemplateList), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.PodTemplateSpec)(nil), (*core.PodTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_PodTemplateSpec_To_core_PodTemplateSpec(a.(*v1.PodTemplateSpec), b.(*core.PodTemplateSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.PodTemplateSpec)(nil), (*v1.PodTemplateSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_PodTemplateSpec_To_v1_PodTemplateSpec(a.(*core.PodTemplateSpec), b.(*v1.PodTemplateSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -1570,16 +1511,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.ReplicationControllerSpec)(nil), (*core.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_ReplicationControllerSpec_To_core_ReplicationControllerSpec(a.(*v1.ReplicationControllerSpec), b.(*core.ReplicationControllerSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*core.ReplicationControllerSpec)(nil), (*v1.ReplicationControllerSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_core_ReplicationControllerSpec_To_v1_ReplicationControllerSpec(a.(*core.ReplicationControllerSpec), b.(*v1.ReplicationControllerSpec), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.ReplicationControllerStatus)(nil), (*core.ReplicationControllerStatus)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_ReplicationControllerStatus_To_core_ReplicationControllerStatus(a.(*v1.ReplicationControllerStatus), b.(*core.ReplicationControllerStatus), scope)
 	}); err != nil {
@@ -1697,11 +1628,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*core.ScopedResourceSelectorRequirement)(nil), (*v1.ScopedResourceSelectorRequirement)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_ScopedResourceSelectorRequirement_To_v1_ScopedResourceSelectorRequirement(a.(*core.ScopedResourceSelectorRequirement), b.(*v1.ScopedResourceSelectorRequirement), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.Secret)(nil), (*core.Secret)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Secret_To_core_Secret(a.(*v1.Secret), b.(*core.Secret), scope)
 	}); err != nil {
 		return err
 	}
@@ -2077,6 +2003,21 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*core.WindowsSecurityContextOptions)(nil), (*v1.WindowsSecurityContextOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_core_WindowsSecurityContextOptions_To_v1_WindowsSecurityContextOptions(a.(*core.WindowsSecurityContextOptions), b.(*v1.WindowsSecurityContextOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*url.Values)(nil), (*v1.NodeProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_url_Values_To_v1_NodeProxyOptions(a.(*url.Values), b.(*v1.NodeProxyOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*url.Values)(nil), (*v1.PodProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_url_Values_To_v1_PodProxyOptions(a.(*url.Values), b.(*v1.PodProxyOptions), scope)
+	}); err != nil {
+		return err
+	}
+	if err := s.AddGeneratedConversionFunc((*url.Values)(nil), (*v1.ServiceProxyOptions)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_url_Values_To_v1_ServiceProxyOptions(a.(*url.Values), b.(*v1.ServiceProxyOptions), scope)
 	}); err != nil {
 		return err
 	}
@@ -4743,6 +4684,24 @@ func Convert_core_NodeProxyOptions_To_v1_NodeProxyOptions(in *core.NodeProxyOpti
 	return autoConvert_core_NodeProxyOptions_To_v1_NodeProxyOptions(in, out, s)
 }
 
+func autoConvert_url_Values_To_v1_NodeProxyOptions(in *url.Values, out *v1.NodeProxyOptions, s conversion.Scope) error {
+	// WARNING: Field TypeMeta does not have json tag, skipping.
+
+	if values, ok := map[string][]string(*in)["path"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_string(&values, &out.Path, s); err != nil {
+			return err
+		}
+	} else {
+		out.Path = ""
+	}
+	return nil
+}
+
+// Convert_url_Values_To_v1_NodeProxyOptions is an autogenerated conversion function.
+func Convert_url_Values_To_v1_NodeProxyOptions(in *url.Values, out *v1.NodeProxyOptions, s conversion.Scope) error {
+	return autoConvert_url_Values_To_v1_NodeProxyOptions(in, out, s)
+}
+
 func autoConvert_v1_NodeResources_To_core_NodeResources(in *v1.NodeResources, out *core.NodeResources, s conversion.Scope) error {
 	out.Capacity = *(*core.ResourceList)(unsafe.Pointer(&in.Capacity))
 	return nil
@@ -5665,6 +5624,7 @@ func autoConvert_v1_PodLogOptions_To_core_PodLogOptions(in *v1.PodLogOptions, ou
 	out.Timestamps = in.Timestamps
 	out.TailLines = (*int64)(unsafe.Pointer(in.TailLines))
 	out.LimitBytes = (*int64)(unsafe.Pointer(in.LimitBytes))
+	out.InsecureSkipTLSVerifyBackend = in.InsecureSkipTLSVerifyBackend
 	return nil
 }
 
@@ -5682,6 +5642,7 @@ func autoConvert_core_PodLogOptions_To_v1_PodLogOptions(in *core.PodLogOptions, 
 	out.Timestamps = in.Timestamps
 	out.TailLines = (*int64)(unsafe.Pointer(in.TailLines))
 	out.LimitBytes = (*int64)(unsafe.Pointer(in.LimitBytes))
+	out.InsecureSkipTLSVerifyBackend = in.InsecureSkipTLSVerifyBackend
 	return nil
 }
 
@@ -5728,6 +5689,24 @@ func autoConvert_core_PodProxyOptions_To_v1_PodProxyOptions(in *core.PodProxyOpt
 // Convert_core_PodProxyOptions_To_v1_PodProxyOptions is an autogenerated conversion function.
 func Convert_core_PodProxyOptions_To_v1_PodProxyOptions(in *core.PodProxyOptions, out *v1.PodProxyOptions, s conversion.Scope) error {
 	return autoConvert_core_PodProxyOptions_To_v1_PodProxyOptions(in, out, s)
+}
+
+func autoConvert_url_Values_To_v1_PodProxyOptions(in *url.Values, out *v1.PodProxyOptions, s conversion.Scope) error {
+	// WARNING: Field TypeMeta does not have json tag, skipping.
+
+	if values, ok := map[string][]string(*in)["path"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_string(&values, &out.Path, s); err != nil {
+			return err
+		}
+	} else {
+		out.Path = ""
+	}
+	return nil
+}
+
+// Convert_url_Values_To_v1_PodProxyOptions is an autogenerated conversion function.
+func Convert_url_Values_To_v1_PodProxyOptions(in *url.Values, out *v1.PodProxyOptions, s conversion.Scope) error {
+	return autoConvert_url_Values_To_v1_PodProxyOptions(in, out, s)
 }
 
 func autoConvert_v1_PodReadinessGate_To_core_PodReadinessGate(in *v1.PodReadinessGate, out *core.PodReadinessGate, s conversion.Scope) error {
@@ -7266,6 +7245,24 @@ func autoConvert_core_ServiceProxyOptions_To_v1_ServiceProxyOptions(in *core.Ser
 // Convert_core_ServiceProxyOptions_To_v1_ServiceProxyOptions is an autogenerated conversion function.
 func Convert_core_ServiceProxyOptions_To_v1_ServiceProxyOptions(in *core.ServiceProxyOptions, out *v1.ServiceProxyOptions, s conversion.Scope) error {
 	return autoConvert_core_ServiceProxyOptions_To_v1_ServiceProxyOptions(in, out, s)
+}
+
+func autoConvert_url_Values_To_v1_ServiceProxyOptions(in *url.Values, out *v1.ServiceProxyOptions, s conversion.Scope) error {
+	// WARNING: Field TypeMeta does not have json tag, skipping.
+
+	if values, ok := map[string][]string(*in)["path"]; ok && len(values) > 0 {
+		if err := runtime.Convert_Slice_string_To_string(&values, &out.Path, s); err != nil {
+			return err
+		}
+	} else {
+		out.Path = ""
+	}
+	return nil
+}
+
+// Convert_url_Values_To_v1_ServiceProxyOptions is an autogenerated conversion function.
+func Convert_url_Values_To_v1_ServiceProxyOptions(in *url.Values, out *v1.ServiceProxyOptions, s conversion.Scope) error {
+	return autoConvert_url_Values_To_v1_ServiceProxyOptions(in, out, s)
 }
 
 func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *core.ServiceSpec, s conversion.Scope) error {

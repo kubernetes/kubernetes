@@ -29,8 +29,8 @@ import (
 
 	"k8s.io/klog"
 
-	"github.com/coreos/etcd/clientv3"
-	"github.com/prometheus/client_golang/prometheus"
+	"go.etcd.io/etcd/clientv3"
+	"k8s.io/component-base/metrics/legacyregistry"
 	"sigs.k8s.io/yaml"
 
 	corev1 "k8s.io/api/core/v1"
@@ -241,7 +241,7 @@ func (e *transformTest) readRawRecordFromETCD(path string) (*clientv3.GetRespons
 
 func (e *transformTest) printMetrics() error {
 	e.logger.Logf("Transformation Metrics:")
-	metrics, err := prometheus.DefaultGatherer.Gather()
+	metrics, err := legacyregistry.DefaultGatherer.Gather()
 	if err != nil {
 		return fmt.Errorf("failed to gather metrics: %s", err)
 	}

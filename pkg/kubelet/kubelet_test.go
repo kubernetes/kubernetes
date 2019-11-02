@@ -35,12 +35,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/flowcontrol"
-	"k8s.io/component-base/featuregate"
-	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	cadvisortest "k8s.io/kubernetes/pkg/kubelet/cadvisor/testing"
 	"k8s.io/kubernetes/pkg/kubelet/cm"
 	"k8s.io/kubernetes/pkg/kubelet/config"
@@ -2029,17 +2026,6 @@ func runVolumeManager(kubelet *Kubelet) chan struct{} {
 	stopCh := make(chan struct{})
 	go kubelet.volumeManager.Run(kubelet.sourcesReady, stopCh)
 	return stopCh
-}
-
-func forEachFeatureGate(t *testing.T, fs []featuregate.Feature, tf func(t *testing.T)) {
-	for _, fg := range fs {
-		for _, f := range []bool{true, false} {
-			func() {
-				defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, fg, f)()
-				t.Run(fmt.Sprintf("%v(%t)", fg, f), tf)
-			}()
-		}
-	}
 }
 
 // Sort pods by UID.

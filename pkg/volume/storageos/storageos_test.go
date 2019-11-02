@@ -268,8 +268,9 @@ func TestPlugin(t *testing.T) {
 		// PVName: "test-volume-name",
 		PersistentVolumeReclaimPolicy: v1.PersistentVolumeReclaimDelete,
 		Parameters: map[string]string{
-			"VolumeNamespace": "test-volume-namespace",
-			"adminSecretName": secretName,
+			"VolumeNamespace":      "test-volume-namespace",
+			"adminSecretName":      secretName,
+			"adminsecretnamespace": "default",
 		},
 		MountOptions: mountOptions,
 	}

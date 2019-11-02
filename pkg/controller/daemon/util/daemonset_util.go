@@ -21,7 +21,7 @@ import (
 	"strconv"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
@@ -204,7 +204,7 @@ func GetTargetNodeName(pod *v1.Pod) (string, error) {
 		return pod.Spec.NodeName, nil
 	}
 
-	// If ScheduleDaemonSetPods was enabled before, retrieve node name of unscheduled pods from NodeAffinity
+	// Retrieve node name of unscheduled pods from NodeAffinity
 	if pod.Spec.Affinity == nil ||
 		pod.Spec.Affinity.NodeAffinity == nil ||
 		pod.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution == nil {

@@ -414,3 +414,36 @@ func TestGetCandidateZone(t *testing.T) {
 		assert.Equal(t, test.expectedZones, zones)
 	}
 }
+
+func TestFormatVolumeID(t *testing.T) {
+	tests := []struct {
+		volumeIDFromPath string
+		expectedVolumeID string
+	}{
+		{
+			"aws/vol-1234",
+			"aws:///vol-1234",
+		},
+		{
+			"aws:/vol-1234",
+			"aws:///vol-1234",
+		},
+		{
+			"aws/us-east-1/vol-1234",
+			"aws://us-east-1/vol-1234",
+		},
+		{
+			"aws:/us-east-1/vol-1234",
+			"aws://us-east-1/vol-1234",
+		},
+		{
+			"vol-1234",
+			"vol-1234",
+		},
+	}
+	for _, test := range tests {
+		volumeID, err := formatVolumeID(test.volumeIDFromPath)
+		assert.Nil(t, err)
+		assert.Equal(t, test.expectedVolumeID, volumeID, test.volumeIDFromPath)
+	}
+}

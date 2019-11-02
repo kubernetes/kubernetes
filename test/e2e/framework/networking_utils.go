@@ -40,7 +40,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	imageutils "k8s.io/kubernetes/test/utils/image"
-	k8utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -75,16 +74,6 @@ const (
 
 // NetexecImageName is the image name for agnhost.
 var NetexecImageName = imageutils.GetE2EImage(imageutils.Agnhost)
-
-// TranslateIPv4ToIPv6 maps an IPv4 address into a valid IPv6 address
-// adding the well known prefix "0::ffff:" https://tools.ietf.org/html/rfc2765
-// if the ip is IPv4 and the cluster IPFamily is IPv6, otherwise returns the same ip
-func TranslateIPv4ToIPv6(ip string) string {
-	if TestContext.IPFamily == "ipv6" && !k8utilnet.IsIPv6String(ip) && ip != "" {
-		ip = "0::ffff:" + ip
-	}
-	return ip
-}
 
 // NewNetworkingTestConfig creates and sets up a new test config helper.
 func NewNetworkingTestConfig(f *Framework) *NetworkingTestConfig {
@@ -683,25 +672,6 @@ func (config *NetworkingTestConfig) getServiceClient() coreclientset.ServiceInte
 	return config.f.ClientSet.CoreV1().Services(config.Namespace)
 }
 
-// CheckReachabilityFromPod checks reachability from the specified pod.
-func CheckReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, namespace, pod, target string) {
-	cmd := fmt.Sprintf("wget -T 5 -qO- %q", target)
-	err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		_, err := RunHostCmd(namespace, pod, cmd)
-		if expectToBeReachable && err != nil {
-			Logf("Expect target to be reachable. But got err: %v. Retry until timeout", err)
-			return false, nil
-		}
-
-		if !expectToBeReachable && err == nil {
-			Logf("Expect target NOT to be reachable. But it is reachable. Retry until timeout")
-			return false, nil
-		}
-		return true, nil
-	})
-	ExpectNoError(err)
-}
-
 // HTTPPokeParams is a struct for HTTP poke parameters.
 type HTTPPokeParams struct {
 	Timeout        time.Duration
@@ -847,179 +817,6 @@ func httpGetNoConnectionPoolTimeout(url string, timeout time.Duration) (*http.Re
 	}
 
 	return client.Get(url)
-}
-
-// UDPPokeParams is a struct for UDP poke parameters.
-type UDPPokeParams struct {
-	Timeout  time.Duration
-	Response string
-}
-
-// UDPPokeResult is a struct for UDP poke result.
-type UDPPokeResult struct {
-	Status   UDPPokeStatus
-	Error    error  // if there was any error
-	Response []byte // if code != 0
-}
-
-// UDPPokeStatus is string for representing UDP poke status.
-type UDPPokeStatus string
-
-const (
-	// UDPSuccess is UDP poke status which is success.
-	UDPSuccess UDPPokeStatus = "Success"
-	// UDPError is UDP poke status which is error.
-	UDPError UDPPokeStatus = "UnknownError"
-	// UDPTimeout is UDP poke status which is timeout.
-	UDPTimeout UDPPokeStatus = "TimedOut"
-	// UDPRefused is UDP poke status which is connection refused.
-	UDPRefused UDPPokeStatus = "ConnectionRefused"
-	// UDPBadResponse is UDP poke status which is bad response.
-	UDPBadResponse UDPPokeStatus = "BadResponse"
-	// Any time we add new errors, we should audit all callers of this.
-)
-
-// PokeUDP tries to connect to a host on a port and send the given request. Callers
-// can specify additional success parameters, if desired.
-//
-// The result status will be characterized as precisely as possible, given the
-// known users of this.
-//
-// The result error will be populated for any status other than Success.
-//
-// The result response will be populated if the UDP transaction was completed, even
-// if the other test params make this a failure).
-func PokeUDP(host string, port int, request string, params *UDPPokeParams) UDPPokeResult {
-	hostPort := net.JoinHostPort(host, strconv.Itoa(port))
-	url := fmt.Sprintf("udp://%s", hostPort)
-
-	ret := UDPPokeResult{}
-
-	// Sanity check inputs, because it has happened.  These are the only things
-	// that should hard fail the test - they are basically ASSERT()s.
-	if host == "" {
-		Failf("Got empty host for UDP poke (%s)", url)
-		return ret
-	}
-	if port == 0 {
-		Failf("Got port==0 for UDP poke (%s)", url)
-		return ret
-	}
-
-	// Set default params.
-	if params == nil {
-		params = &UDPPokeParams{}
-	}
-
-	Logf("Poking %v", url)
-
-	con, err := net.Dial("udp", hostPort)
-	if err != nil {
-		ret.Status = UDPError
-		ret.Error = err
-		Logf("Poke(%q): %v", url, err)
-		return ret
-	}
-
-	_, err = con.Write([]byte(fmt.Sprintf("%s\n", request)))
-	if err != nil {
-		ret.Error = err
-		neterr, ok := err.(net.Error)
-		if ok && neterr.Timeout() {
-			ret.Status = UDPTimeout
-		} else if strings.Contains(err.Error(), "connection refused") {
-			ret.Status = UDPRefused
-		} else {
-			ret.Status = UDPError
-		}
-		Logf("Poke(%q): %v", url, err)
-		return ret
-	}
-
-	if params.Timeout != 0 {
-		err = con.SetDeadline(time.Now().Add(params.Timeout))
-		if err != nil {
-			ret.Status = UDPError
-			ret.Error = err
-			Logf("Poke(%q): %v", url, err)
-			return ret
-		}
-	}
-
-	bufsize := len(params.Response) + 1
-	if bufsize == 0 {
-		bufsize = 4096
-	}
-	var buf = make([]byte, bufsize)
-	n, err := con.Read(buf)
-	if err != nil {
-		ret.Error = err
-		neterr, ok := err.(net.Error)
-		if ok && neterr.Timeout() {
-			ret.Status = UDPTimeout
-		} else if strings.Contains(err.Error(), "connection refused") {
-			ret.Status = UDPRefused
-		} else {
-			ret.Status = UDPError
-		}
-		Logf("Poke(%q): %v", url, err)
-		return ret
-	}
-	ret.Response = buf[0:n]
-
-	if params.Response != "" && string(ret.Response) != params.Response {
-		ret.Status = UDPBadResponse
-		ret.Error = fmt.Errorf("response does not match expected string: %q", string(ret.Response))
-		Logf("Poke(%q): %v", url, ret.Error)
-		return ret
-	}
-
-	ret.Status = UDPSuccess
-	Logf("Poke(%q): success", url)
-	return ret
-}
-
-// TestHitNodesFromOutside checkes HTTP connectivity from outside.
-func TestHitNodesFromOutside(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String) error {
-	return TestHitNodesFromOutsideWithCount(externalIP, httpPort, timeout, expectedHosts, 1)
-}
-
-// TestHitNodesFromOutsideWithCount checkes HTTP connectivity from outside with count.
-func TestHitNodesFromOutsideWithCount(externalIP string, httpPort int32, timeout time.Duration, expectedHosts sets.String,
-	countToSucceed int) error {
-	Logf("Waiting up to %v for satisfying expectedHosts for %v times", timeout, countToSucceed)
-	hittedHosts := sets.NewString()
-	count := 0
-	condition := func() (bool, error) {
-		result := PokeHTTP(externalIP, int(httpPort), "/hostname", &HTTPPokeParams{Timeout: 1 * time.Second})
-		if result.Status != HTTPSuccess {
-			return false, nil
-		}
-
-		hittedHost := strings.TrimSpace(string(result.Body))
-		if !expectedHosts.Has(hittedHost) {
-			Logf("Error hitting unexpected host: %v, reset counter: %v", hittedHost, count)
-			count = 0
-			return false, nil
-		}
-		if !hittedHosts.Has(hittedHost) {
-			hittedHosts.Insert(hittedHost)
-			Logf("Missing %+v, got %+v", expectedHosts.Difference(hittedHosts), hittedHosts)
-		}
-		if hittedHosts.Equal(expectedHosts) {
-			count++
-			if count >= countToSucceed {
-				return true, nil
-			}
-		}
-		return false, nil
-	}
-
-	if err := wait.Poll(time.Second, timeout, condition); err != nil {
-		return fmt.Errorf("error waiting for expectedHosts: %v, hittedHosts: %v, count: %v, expected count: %v",
-			expectedHosts, hittedHosts, count, countToSucceed)
-	}
-	return nil
 }
 
 // TestUnderTemporaryNetworkFailure blocks outgoing network traffic on 'node'. Then runs testFunc and returns its status.

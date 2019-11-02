@@ -18,6 +18,8 @@ package metrics
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDefaultStabilityLevel(t *testing.T) {
@@ -53,9 +55,7 @@ func TestDefaultStabilityLevel(t *testing.T) {
 			var stability = tc.inputValue
 
 			stability.setDefaults()
-			if stability != tc.expectValue {
-				t.Errorf("Got %s, expected: %v ", stability, tc.expectValue)
-			}
+			assert.Equalf(t, tc.expectValue, stability, "Got %s, expected: %v ", stability, tc.expectValue)
 		})
 	}
 }

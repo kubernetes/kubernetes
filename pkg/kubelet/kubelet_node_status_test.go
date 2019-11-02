@@ -48,7 +48,6 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	core "k8s.io/client-go/testing"
-	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	"k8s.io/component-base/version"
 	"k8s.io/kubernetes/pkg/features"
@@ -1983,25 +1982,23 @@ func TestRegisterWithApiServerWithTaint(t *testing.T) {
 	// Make node to be unschedulable.
 	kubelet.registerSchedulable = false
 
-	forEachFeatureGate(t, []featuregate.Feature{features.TaintNodesByCondition}, func(t *testing.T) {
-		// Reset kubelet status for each test.
-		kubelet.registrationCompleted = false
+	// Reset kubelet status for each test.
+	kubelet.registrationCompleted = false
 
-		// Register node to apiserver.
-		kubelet.registerWithAPIServer()
+	// Register node to apiserver.
+	kubelet.registerWithAPIServer()
 
-		// Check the unschedulable taint.
-		got := gotNode.(*v1.Node)
-		unschedulableTaint := &v1.Taint{
-			Key:    schedulerapi.TaintNodeUnschedulable,
-			Effect: v1.TaintEffectNoSchedule,
-		}
+	// Check the unschedulable taint.
+	got := gotNode.(*v1.Node)
+	unschedulableTaint := &v1.Taint{
+		Key:    schedulerapi.TaintNodeUnschedulable,
+		Effect: v1.TaintEffectNoSchedule,
+	}
 
-		require.Equal(t,
-			utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition),
-			taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
-			"test unschedulable taint for TaintNodesByCondition")
-	})
+	require.Equal(t,
+		true,
+		taintutil.TaintExists(got.Spec.Taints, unschedulableTaint),
+		"test unschedulable taint for TaintNodesByCondition")
 }
 
 func TestNodeStatusHasChanged(t *testing.T) {

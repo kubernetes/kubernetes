@@ -147,10 +147,10 @@ func TestAddFlags(t *testing.T) {
 			StorageConfig: storagebackend.Config{
 				Type: "etcd3",
 				Transport: storagebackend.TransportConfig{
-					ServerList: nil,
-					KeyFile:    "/var/run/kubernetes/etcd.key",
-					CAFile:     "/var/run/kubernetes/etcdca.crt",
-					CertFile:   "/var/run/kubernetes/etcdce.crt",
+					ServerList:    nil,
+					KeyFile:       "/var/run/kubernetes/etcd.key",
+					TrustedCAFile: "/var/run/kubernetes/etcdca.crt",
+					CertFile:      "/var/run/kubernetes/etcdce.crt",
 				},
 				Paging:                true,
 				Prefix:                "/registry",

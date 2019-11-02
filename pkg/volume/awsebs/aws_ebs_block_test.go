@@ -51,14 +51,22 @@ func TestGetVolumeSpecFromGlobalMapPath(t *testing.T) {
 
 	expectedGlobalPath := filepath.Join(tmpVDir, testGlobalPath)
 
+	plugMgr := volume.VolumePluginMgr{}
+	plugMgr.InitPlugins(ProbeVolumePlugins(), nil /* prober */, volumetest.NewFakeVolumeHost(tmpVDir, nil, nil))
+	plug, err := plugMgr.FindMapperPluginByName(awsElasticBlockStorePluginName)
+	if err != nil {
+		os.RemoveAll(tmpVDir)
+		t.Fatalf("Can't find the plugin by name: %q", awsElasticBlockStorePluginName)
+	}
+
 	//Bad Path
-	badspec, err := getVolumeSpecFromGlobalMapPath("", "")
+	badspec, err := plug.(*awsElasticBlockStorePlugin).getVolumeSpecFromGlobalMapPath("", "")
 	if badspec != nil || err == nil {
 		t.Fatalf("Expected not to get spec from GlobalMapPath but did")
 	}
 
 	// Good Path
-	spec, err := getVolumeSpecFromGlobalMapPath("myVolume", expectedGlobalPath)
+	spec, err := plug.(*awsElasticBlockStorePlugin).getVolumeSpecFromGlobalMapPath("myVolume", expectedGlobalPath)
 	if spec == nil || err != nil {
 		t.Fatalf("Failed to get spec from GlobalMapPath: %v", err)
 	}

@@ -17,6 +17,8 @@ limitations under the License.
 package volumebinding
 
 import (
+	"context"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
@@ -41,7 +43,7 @@ func (pl *VolumeBinding) Name() string {
 }
 
 // Filter invoked at the filter extension point.
-func (pl *VolumeBinding) Filter(cs *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
+func (pl *VolumeBinding) Filter(ctx context.Context, cs *framework.CycleState, pod *v1.Pod, nodeInfo *schedulernodeinfo.NodeInfo) *framework.Status {
 	_, reasons, err := pl.predicate(pod, nil, nodeInfo)
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
 }

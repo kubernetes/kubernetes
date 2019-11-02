@@ -28,15 +28,6 @@ import (
 )
 
 func addConversionFuncs(scheme *runtime.Scheme) error {
-	// Add non-generated conversion functions
-	err := scheme.AddConversionFuncs(
-		Convert_batch_JobSpec_To_v1_JobSpec,
-		Convert_v1_JobSpec_To_batch_JobSpec,
-	)
-	if err != nil {
-		return err
-	}
-
 	return scheme.AddFieldLabelConversionFunc(SchemeGroupVersion.WithKind("Job"),
 		func(label, value string) (string, string, error) {
 			switch label {

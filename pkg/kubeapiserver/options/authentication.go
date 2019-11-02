@@ -324,7 +324,7 @@ func (s *BuiltInAuthenticationOptions) ToAuthenticationConfig() (kubeauthenticat
 
 	if s.ClientCert != nil {
 		var err error
-		ret.ClientVerifyOptionFn, err = s.ClientCert.GetClientVerifyOptionFn()
+		ret.ClientCAContentProvider, err = s.ClientCert.GetClientCAContentProvider()
 		if err != nil {
 			return kubeauthenticator.Config{}, err
 		}
@@ -390,15 +390,24 @@ func (o *BuiltInAuthenticationOptions) ApplyTo(c *genericapiserver.Config) error
 		return nil
 	}
 
-	var err error
 	if o.ClientCert != nil {
-		if err = c.Authentication.ApplyClientCert(o.ClientCert.ClientCA, c.SecureServing); err != nil {
+		clientCertificateCAContentProvider, err := o.ClientCert.GetClientCAContentProvider()
+		if err != nil {
+			return fmt.Errorf("unable to load client CA file: %v", err)
+		}
+		if err = c.Authentication.ApplyClientCert(clientCertificateCAContentProvider, c.SecureServing); err != nil {
 			return fmt.Errorf("unable to load client CA file: %v", err)
 		}
 	}
 	if o.RequestHeader != nil {
-		if err = c.Authentication.ApplyClientCert(o.RequestHeader.ClientCAFile, c.SecureServing); err != nil {
-			return fmt.Errorf("unable to load client CA file: %v", err)
+		requestHeaderConfig, err := o.RequestHeader.ToAuthenticationRequestHeaderConfig()
+		if err != nil {
+			return fmt.Errorf("unable to create request header authentication config: %v", err)
+		}
+		if requestHeaderConfig != nil {
+			if err = c.Authentication.ApplyClientCert(requestHeaderConfig.CAContentProvider, c.SecureServing); err != nil {
+				return fmt.Errorf("unable to load client CA file: %v", err)
+			}
 		}
 	}
 

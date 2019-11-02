@@ -57,7 +57,7 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 				UsernameHeaders:     headerrequest.StaticStringSlice{"x-remote-user"},
 				GroupHeaders:        headerrequest.StaticStringSlice{"x-remote-group"},
 				ExtraHeaderPrefixes: headerrequest.StaticStringSlice{"x-remote-extra-"},
-				VerifyOptionFn:      nil, // this is nil because you can't compare functions
+				CAContentProvider:   nil, // this is nil because you can't compare functions
 				AllowedClientNames:  headerrequest.StaticStringSlice{"kube-aggregator"},
 			},
 		},
@@ -70,10 +70,10 @@ func TestToAuthenticationRequestHeaderConfig(t *testing.T) {
 				t.Fatal(err)
 			}
 			if resultConfig != nil {
-				if resultConfig.VerifyOptionFn == nil {
+				if resultConfig.CAContentProvider == nil {
 					t.Error("missing requestheader verify")
 				}
-				resultConfig.VerifyOptionFn = nil
+				resultConfig.CAContentProvider = nil
 			}
 
 			if !reflect.DeepEqual(resultConfig, testcase.expectConfig) {

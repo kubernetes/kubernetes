@@ -166,7 +166,17 @@ filename | sha512 hash
 
 ## Changelog since v1.16.1
 
-**No notable changes for this release**
+### Other notable changes
+
+* Fixed panic when accessing CustomResources of a CRD with x-kubernetes-int-or-string. ([#83789](https://github.com/kubernetes/kubernetes/pull/83789), [@sttts](https://github.com/sttts))
+* Fixed a bug in the single-numa-node policy of the TopologyManager.  Previously, pods that only requested CPU resources and did not request any third-party devices would fail to launch with a TopologyAffinity error. Now they will launch successfully. ([#83697](https://github.com/kubernetes/kubernetes/pull/83697), [@klueska](https://github.com/klueska))
+* Fixes kube-proxy bug accessing self nodeip:port on windows ([#83027](https://github.com/kubernetes/kubernetes/pull/83027), [@liggitt](https://github.com/liggitt))
+* Fix error where metrics related to dynamic kubelet config isn't registered ([#83184](https://github.com/kubernetes/kubernetes/pull/83184), [@odinuge](https://github.com/odinuge))
+* Use online nodes instead of possible nodes when discovering available NUMA nodes ([#83196](https://github.com/kubernetes/kubernetes/pull/83196), [@zouyee](https://github.com/zouyee))
+* Update Azure load balancer to prevent orphaned public IP addresses ([#82890](https://github.com/kubernetes/kubernetes/pull/82890), [@chewong](https://github.com/chewong))
+* Fixes a goroutine leak in kube-apiserver when a request times out. ([#83333](https://github.com/kubernetes/kubernetes/pull/83333), [@lavalamp](https://github.com/lavalamp))
+* Fix aggressive VM calls for Azure VMSS ([#83102](https://github.com/kubernetes/kubernetes/pull/83102), [@feiskyer](https://github.com/feiskyer))
+* Fixes a flaw (CVE-2019-11253) in json/yaml decoding where large or malformed documents could consume excessive server resources. Request bodies for normal API requests (create/delete/update/patch operations of regular resources) are now limited to 3MB. ([#83261](https://github.com/kubernetes/kubernetes/pull/83261), [@liggitt](https://github.com/liggitt))
 
 
 
@@ -453,7 +463,7 @@ The main themes of this release are:
 - kube-apiserver metrics are now marked as with the ALPHA stability level. ([#81531](https://github.com/kubernetes/kubernetes/pull/81531), [@logicalhan](https://github.com/logicalhan))
 - kubelet metrics for /metrics and /metrics/probes are now marked as with the ALPHA stability level. ([#81534](https://github.com/kubernetes/kubernetes/pull/81534), [@logicalhan](https://github.com/logicalhan))
 - Scheduler metrics are now marked as with the ALPHA stability level. ([#81576](https://github.com/kubernetes/kubernetes/pull/81576), [@logicalhan](https://github.com/logicalhan))
-- The `rejected` label in `apiserver_admission_webhook_admission_duration_seconds` metrices now properly indicates if the request was rejected. ([#81399](https://github.com/kubernetes/kubernetes/pull/81399), [@roycaihw](https://github.com/roycaihw))
+- The `rejected` label in `apiserver_admission_webhook_admission_duration_seconds` metrics now properly indicates if the request was rejected. ([#81399](https://github.com/kubernetes/kubernetes/pull/81399), [@roycaihw](https://github.com/roycaihw))
 - Fixed a bug in the CSI metrics that does not return not supported error when a CSI driver does not support metrics. ([#79851](https://github.com/kubernetes/kubernetes/pull/79851), [@jparklab](https://github.com/jparklab))
 - Fix disk stats in LXD using ZFS storage pool and CRI-O missing network metris bug ([#81972](https://github.com/kubernetes/kubernetes/pull/81972), [@dashpole](https://github.com/dashpole))
 
@@ -1173,7 +1183,7 @@ filename | sha512 hash
 * Added new startupProbe, related to KEP https://github.com/kubernetes/enhancements/issues/950. ([#77807](https://github.com/kubernetes/kubernetes/pull/77807), [@matthyx](https://github.com/matthyx))
 * Adds \livez for liveness health checking for kube-apiserver. Using the parameter `--maximum-startup-sequence-duration` will allow the liveness endpoint to defer boot-sequence failures for the specified duration period. ([#81969](https://github.com/kubernetes/kubernetes/pull/81969), [@logicalhan](https://github.com/logicalhan))
 * Server-side apply is now Beta. ([#81956](https://github.com/kubernetes/kubernetes/pull/81956), [@apelisse](https://github.com/apelisse))
-* The `rejected` label in `apiserver_admission_webhook_admission_duration_seconds` metrices now properly indicates if a request was rejected. Add a new counter metrics `apiserver_admission_webhook_rejection_count` with details about the causing for a webhook rejection. ([#81399](https://github.com/kubernetes/kubernetes/pull/81399), [@roycaihw](https://github.com/roycaihw))
+* The `rejected` label in `apiserver_admission_webhook_admission_duration_seconds` metrics now properly indicates if a request was rejected. Add a new counter metrics `apiserver_admission_webhook_rejection_count` with details about the causing for a webhook rejection. ([#81399](https://github.com/kubernetes/kubernetes/pull/81399), [@roycaihw](https://github.com/roycaihw))
 * Add `container_state` label to `running_container_count` kubelet metrics, to get count of containers based on their state(running/exited/created/unknown) ([#81573](https://github.com/kubernetes/kubernetes/pull/81573), [@irajdeep](https://github.com/irajdeep))
 * Fix a bug in CRD openapi controller that user-defined CRD can overwrite OpenAPI definition/path for the CRD API. ([#81436](https://github.com/kubernetes/kubernetes/pull/81436), [@roycaihw](https://github.com/roycaihw))
 * Service account tokens now include the JWT Key ID field in their header. ([#78502](https://github.com/kubernetes/kubernetes/pull/78502), [@ahmedtd](https://github.com/ahmedtd))
@@ -1188,7 +1198,7 @@ filename | sha512 hash
     * => IPv6 BackendPool name == <clusterName>-IPv6
     * This result into:
     * - clusters moving from IPv4 to duakstack will require no changes
-    * - clusters moving from IPv6 (while not seen in the wild, we can not rule out thier existance) to dualstack will require deleting backend pools (the reconciler will take care of creating correct backendpools)
+    * - clusters moving from IPv6 (while not seen in the wild, we can not rule out their existence) to dualstack will require deleting backend pools (the reconciler will take care of creating correct backendpools)
 * Promotes VolumePVCDataSource (Cloning) feature to beta for 1.16 release  ([#81792](https://github.com/kubernetes/kubernetes/pull/81792), [@j-griffith](https://github.com/j-griffith))
 * Remove kubectl log, use kubectl logs instead ([#78098](https://github.com/kubernetes/kubernetes/pull/78098), [@soltysh](https://github.com/soltysh))
 * CSI ephemeral inline volume support is beta, i.e. the CSIInlineVolume feature gate is enabled by default ([#82004](https://github.com/kubernetes/kubernetes/pull/82004), [@pohly](https://github.com/pohly))

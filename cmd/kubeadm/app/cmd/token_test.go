@@ -338,14 +338,14 @@ func TestRunDeleteTokens(t *testing.T) {
 
 func TestTokenOutput(t *testing.T) {
 	testCases := []struct {
-		name          string
-		id            string
-		secret        string
-		description   string
-		usages        []string
-		extraGroups   []string
-		outputFormat  string
-		expectedBytes []byte
+		name         string
+		id           string
+		secret       string
+		description  string
+		usages       []string
+		extraGroups  []string
+		outputFormat string
+		expected     string
 	}{
 		{
 			name:         "JSON output",
@@ -355,7 +355,7 @@ func TestTokenOutput(t *testing.T) {
 			usages:       []string{"signing", "authentication"},
 			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
 			outputFormat: "json",
-			expectedBytes: []byte(`{
+			expected: `{
     "kind": "BootstrapToken",
     "apiVersion": "output.kubeadm.k8s.io/v1alpha1",
     "creationTimestamp": null,
@@ -369,7 +369,7 @@ func TestTokenOutput(t *testing.T) {
         "system:bootstrappers:kubeadm:default-node-token"
     ]
 }
-`),
+`,
 		},
 		{
 			name:         "YAML output",
@@ -379,7 +379,7 @@ func TestTokenOutput(t *testing.T) {
 			usages:       []string{"signing", "authentication"},
 			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
 			outputFormat: "yaml",
-			expectedBytes: []byte(`apiVersion: output.kubeadm.k8s.io/v1alpha1
+			expected: `apiVersion: output.kubeadm.k8s.io/v1alpha1
 creationTimestamp: null
 description: valid bootstrap tooken
 groups:
@@ -389,7 +389,7 @@ token: abcdef.1234567890123456
 usages:
 - signing
 - authentication
-`),
+`,
 		},
 		{
 			name:         "Go template output",
@@ -399,8 +399,8 @@ usages:
 			usages:       []string{"signing", "authentication"},
 			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
 			outputFormat: "go-template={{println .token .description .usages .groups}}",
-			expectedBytes: []byte(`abcdef.1234567890123456 valid bootstrap tooken [signing authentication] [system:bootstrappers:kubeadm:default-node-token]
-`),
+			expected: `abcdef.1234567890123456 valid bootstrap tooken [signing authentication] [system:bootstrappers:kubeadm:default-node-token]
+`,
 		},
 		{
 			name:         "text output",
@@ -410,19 +410,19 @@ usages:
 			usages:       []string{"signing", "authentication"},
 			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
 			outputFormat: "text",
-			expectedBytes: []byte(`TOKEN                     TTL         EXPIRES   USAGES                   DESCRIPTION                                                EXTRA GROUPS
+			expected: `TOKEN                     TTL         EXPIRES   USAGES                   DESCRIPTION                                                EXTRA GROUPS
 abcdef.1234567890123456   <forever>   <never>   signing,authentication   valid bootstrap tooken                                     system:bootstrappers:kubeadm:default-node-token
-`),
+`,
 		},
 		{
-			name:          "jsonpath output",
-			id:            "abcdef",
-			secret:        "1234567890123456",
-			description:   "valid bootstrap tooken",
-			usages:        []string{"signing", "authentication"},
-			extraGroups:   []string{"system:bootstrappers:kubeadm:default-node-token"},
-			outputFormat:  "jsonpath={.token} {.groups}",
-			expectedBytes: []byte(`abcdef.1234567890123456 [system:bootstrappers:kubeadm:default-node-token]`),
+			name:         "jsonpath output",
+			id:           "abcdef",
+			secret:       "1234567890123456",
+			description:  "valid bootstrap tooken",
+			usages:       []string{"signing", "authentication"},
+			extraGroups:  []string{"system:bootstrappers:kubeadm:default-node-token"},
+			outputFormat: "jsonpath={.token} {.groups}",
+			expected:     "abcdef.1234567890123456 [system:bootstrappers:kubeadm:default-node-token]",
 		},
 	}
 	for _, tc := range testCases {
@@ -435,24 +435,21 @@ abcdef.1234567890123456   <forever>   <never>   signing,authentication   valid b
 					Groups:      tc.extraGroups,
 				},
 			}
-			buf := bytes.NewBufferString("")
+			buf := bytes.Buffer{}
 			outputFlags := output.NewOutputFlags(&tokenTextPrintFlags{}).WithTypeSetter(outputapischeme.Scheme).WithDefaultOutput(tc.outputFormat)
 			printer, err := outputFlags.ToPrinter()
 			if err != nil {
 				t.Errorf("can't create printer for output format %s: %+v", tc.outputFormat, err)
 			}
 
-			if err := printer.PrintObj(&token, buf); err != nil {
+			if err := printer.PrintObj(&token, &buf); err != nil {
 				t.Errorf("unable to print token %s: %+v", token.Token, err)
 			}
 
-			actualBytes := buf.Bytes()
-			if !bytes.Equal(actualBytes, tc.expectedBytes) {
+			actual := buf.String()
+			if actual != tc.expected {
 				t.Errorf(
-					"failed TestTokenOutput:\n\nexpected:\n%s\n\nactual:\n%s",
-					string(tc.expectedBytes),
-					string(actualBytes),
-				)
+					"failed TestTokenOutput:\n\nexpected:\n%s\n\nactual:\n%s", tc.expected, actual)
 			}
 		})
 	}

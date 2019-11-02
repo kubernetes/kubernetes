@@ -78,12 +78,9 @@ func TestDefaultPredicates(t *testing.T) {
 		predicates.MatchInterPodAffinityPred,
 		predicates.NoDiskConflictPred,
 		predicates.GeneralPred,
-		predicates.CheckNodeMemoryPressurePred,
-		predicates.CheckNodeDiskPressurePred,
-		predicates.CheckNodePIDPressurePred,
-		predicates.CheckNodeConditionPred,
 		predicates.PodToleratesNodeTaintsPred,
 		predicates.CheckVolumeBindingPred,
+		predicates.CheckNodeUnschedulablePred,
 	)
 
 	if expected := defaultPredicates(); !result.Equal(expected) {

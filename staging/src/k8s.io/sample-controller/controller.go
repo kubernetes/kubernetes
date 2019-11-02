@@ -284,7 +284,7 @@ func (c *Controller) syncHandler(key string) error {
 	}
 
 	// If the Deployment is not controlled by this Foo resource, we should log
-	// a warning to the event recorder and ret
+	// a warning to the event recorder and return error msg.
 	if !metav1.IsControlledBy(deployment, foo) {
 		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
 		c.recorder.Event(foo, corev1.EventTypeWarning, ErrResourceExists, msg)

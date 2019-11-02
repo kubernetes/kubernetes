@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"sort"
@@ -28,6 +29,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/informers"
+	clientsetfake "k8s.io/client-go/kubernetes/fake"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
@@ -38,7 +41,6 @@ import (
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	schedulertesting "k8s.io/kubernetes/pkg/scheduler/testing"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -532,6 +534,9 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			client := clientsetfake.NewSimpleClientset()
+			informerFactory := informers.NewSharedInformerFactory(client, 0)
+
 			extenders := []algorithm.SchedulerExtender{}
 			for ii := range test.extenders {
 				extenders = append(extenders, &test.extenders[ii])
@@ -551,14 +556,14 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				emptyFramework,
 				extenders,
 				nil,
-				schedulertesting.FakePersistentVolumeClaimLister{},
-				schedulertesting.FakePDBLister{},
+				informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+				informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
 				false,
 				false,
 				schedulerapi.DefaultPercentageOfNodesToScore,
 				false)
 			podIgnored := &v1.Pod{}
-			result, err := scheduler.Schedule(framework.NewCycleState(), podIgnored)
+			result, err := scheduler.Schedule(context.Background(), framework.NewCycleState(), podIgnored)
 			if test.expectsErr {
 				if err == nil {
 					t.Errorf("Unexpected non-error, result %+v", result)

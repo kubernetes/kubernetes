@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -63,7 +63,7 @@ func (kl *Kubelet) registerWithAPIServer() {
 			step = 7 * time.Second
 		}
 
-		node, err := kl.initialNode()
+		node, err := kl.initialNode(context.TODO())
 		if err != nil {
 			klog.Errorf("Unable to construct v1.Node object for kubelet: %v", err)
 			continue
@@ -214,7 +214,7 @@ func (kl *Kubelet) reconcileCMADAnnotationWithExistingNode(node, existingNode *v
 
 // initialNode constructs the initial v1.Node for this Kubelet, incorporating node
 // labels, information from the cloud provider, and Kubelet configuration.
-func (kl *Kubelet) initialNode() (*v1.Node, error) {
+func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: string(kl.nodeName),
@@ -246,13 +246,11 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		Effect: v1.TaintEffectNoSchedule,
 	}
 
-	// If TaintNodesByCondition enabled, taint node with TaintNodeUnschedulable when initializing
+	// Taint node with TaintNodeUnschedulable when initializing
 	// node to avoid race condition; refer to #63897 for more detail.
-	if utilfeature.DefaultFeatureGate.Enabled(features.TaintNodesByCondition) {
-		if node.Spec.Unschedulable &&
-			!taintutil.TaintExists(nodeTaints, &unschedulableTaint) {
-			nodeTaints = append(nodeTaints, unschedulableTaint)
-		}
+	if node.Spec.Unschedulable &&
+		!taintutil.TaintExists(nodeTaints, &unschedulableTaint) {
+		nodeTaints = append(nodeTaints, unschedulableTaint)
 	}
 
 	if kl.externalCloudProvider {
@@ -320,13 +318,13 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		// local metadata server here.
 		var err error
 		if node.Spec.ProviderID == "" {
-			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(context.TODO(), kl.cloud, kl.nodeName)
+			node.Spec.ProviderID, err = cloudprovider.GetInstanceProviderID(ctx, kl.cloud, kl.nodeName)
 			if err != nil {
 				return nil, err
 			}
 		}
 
-		instanceType, err := instances.InstanceType(context.TODO(), kl.nodeName)
+		instanceType, err := instances.InstanceType(ctx, kl.nodeName)
 		if err != nil {
 			return nil, err
 		}
@@ -337,7 +335,7 @@ func (kl *Kubelet) initialNode() (*v1.Node, error) {
 		// If the cloud has zone information, label the node with the zone information
 		zones, ok := kl.cloud.Zones()
 		if ok {
-			zone, err := zones.GetZone(context.TODO())
+			zone, err := zones.GetZone(ctx)
 			if err != nil {
 				return nil, fmt.Errorf("failed to get zone from cloud provider: %v", err)
 			}

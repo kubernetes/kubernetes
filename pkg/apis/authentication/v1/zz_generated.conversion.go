@@ -108,16 +108,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.UserInfo)(nil), (*authentication.UserInfo)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_UserInfo_To_authentication_UserInfo(a.(*v1.UserInfo), b.(*authentication.UserInfo), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*authentication.UserInfo)(nil), (*v1.UserInfo)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_authentication_UserInfo_To_v1_UserInfo(a.(*authentication.UserInfo), b.(*v1.UserInfo), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddConversionFunc((*authentication.UserInfo)(nil), (*v1.UserInfo)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_authentication_UserInfo_To_v1_UserInfo(a.(*authentication.UserInfo), b.(*v1.UserInfo), scope)
 	}); err != nil {

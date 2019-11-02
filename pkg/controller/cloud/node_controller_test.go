@@ -17,11 +17,12 @@ limitations under the License.
 package cloud
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -29,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/record"
-	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/cloud-provider"
 	fakecloud "k8s.io/cloud-provider/fake"
 	"k8s.io/kubernetes/pkg/controller/testutil"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
@@ -147,7 +148,7 @@ func TestEnsureNodeExistsByProviderID(t *testing.T) {
 			}
 
 			instances, _ := fc.Instances()
-			exists, err := ensureNodeExistsByProviderID(instances, tc.node)
+			exists, err := ensureNodeExistsByProviderID(context.TODO(), instances, tc.node)
 			assert.Equal(t, err, tc.providerIDErr)
 
 			assert.EqualValues(t, tc.expectedCalls, fc.Calls,
@@ -229,7 +230,7 @@ func TestNodeInitialized(t *testing.T) {
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
-	cloudNodeController.AddCloudNode(fnh.Existing[0])
+	cloudNodeController.AddCloudNode(context.TODO(), fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
@@ -293,7 +294,7 @@ func TestNodeIgnored(t *testing.T) {
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
-	cloudNodeController.AddCloudNode(fnh.Existing[0])
+	cloudNodeController.AddCloudNode(context.TODO(), fnh.Existing[0])
 	assert.Equal(t, 0, len(fnh.UpdatedNodes), "Node was wrongly updated")
 
 }
@@ -366,7 +367,7 @@ func TestGCECondition(t *testing.T) {
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
-	cloudNodeController.AddCloudNode(fnh.Existing[0])
+	cloudNodeController.AddCloudNode(context.TODO(), fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
@@ -455,7 +456,7 @@ func TestZoneInitialized(t *testing.T) {
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
-	cloudNodeController.AddCloudNode(fnh.Existing[0])
+	cloudNodeController.AddCloudNode(context.TODO(), fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
@@ -545,7 +546,7 @@ func TestNodeAddresses(t *testing.T) {
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
-	cloudNodeController.AddCloudNode(fnh.Existing[0])
+	cloudNodeController.AddCloudNode(context.TODO(), fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
@@ -562,7 +563,7 @@ func TestNodeAddresses(t *testing.T) {
 		},
 	}
 
-	cloudNodeController.UpdateNodeStatus()
+	cloudNodeController.UpdateNodeStatus(context.TODO())
 
 	updatedNodes := fnh.GetUpdatedNodesCopy()
 
@@ -657,13 +658,13 @@ func TestNodeProvidedIPAddresses(t *testing.T) {
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
-	cloudNodeController.AddCloudNode(fnh.Existing[0])
+	cloudNodeController.AddCloudNode(context.TODO(), fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
 	assert.Equal(t, 3, len(fnh.UpdatedNodes[0].Status.Addresses), "Node status unexpectedly updated")
 
-	cloudNodeController.UpdateNodeStatus()
+	cloudNodeController.UpdateNodeStatus(context.TODO())
 
 	updatedNodes := fnh.GetUpdatedNodesCopy()
 
@@ -864,7 +865,7 @@ func TestNodeAddressesNotUpdate(t *testing.T) {
 		cloud:        fakeCloud,
 	}
 
-	cloudNodeController.updateNodeAddress(fnh.Existing[0], fakeCloud)
+	cloudNodeController.updateNodeAddress(context.TODO(), fnh.Existing[0], fakeCloud)
 
 	if len(fnh.UpdatedNodes) != 0 {
 		t.Errorf("Node was not correctly updated, the updated len(nodes) got: %v, wanted=0", len(fnh.UpdatedNodes))
@@ -946,7 +947,7 @@ func TestNodeProviderID(t *testing.T) {
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
-	cloudNodeController.AddCloudNode(fnh.Existing[0])
+	cloudNodeController.AddCloudNode(context.TODO(), fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")
@@ -1029,7 +1030,7 @@ func TestNodeProviderIDAlreadySet(t *testing.T) {
 	}
 	eventBroadcaster.StartLogging(klog.Infof)
 
-	cloudNodeController.AddCloudNode(fnh.Existing[0])
+	cloudNodeController.AddCloudNode(context.TODO(), fnh.Existing[0])
 
 	assert.Equal(t, 1, len(fnh.UpdatedNodes), "Node was not updated")
 	assert.Equal(t, "node0", fnh.UpdatedNodes[0].Name, "Node was not updated")

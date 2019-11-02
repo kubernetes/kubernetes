@@ -55,6 +55,7 @@ go_library(
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/google.golang.org/api/compute/v1:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

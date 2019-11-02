@@ -60,16 +60,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSet)(nil), (*apps.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSet_To_apps_DaemonSet(a.(*v1.DaemonSet), b.(*apps.DaemonSet), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSet)(nil), (*v1.DaemonSet)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSet_To_v1_DaemonSet(a.(*apps.DaemonSet), b.(*v1.DaemonSet), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetCondition)(nil), (*apps.DaemonSetCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_DaemonSetCondition_To_apps_DaemonSetCondition(a.(*v1.DaemonSetCondition), b.(*apps.DaemonSetCondition), scope)
 	}); err != nil {
@@ -87,16 +77,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetList)(nil), (*v1.DaemonSetList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apps_DaemonSetList_To_v1_DaemonSetList(a.(*apps.DaemonSetList), b.(*v1.DaemonSetList), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.DaemonSetSpec)(nil), (*apps.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DaemonSetSpec_To_apps_DaemonSetSpec(a.(*v1.DaemonSetSpec), b.(*apps.DaemonSetSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apps.DaemonSetSpec)(nil), (*v1.DaemonSetSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DaemonSetSpec_To_v1_DaemonSetSpec(a.(*apps.DaemonSetSpec), b.(*v1.DaemonSetSpec), scope)
 	}); err != nil {
 		return err
 	}
@@ -120,16 +100,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
-	if err := s.AddGeneratedConversionFunc((*v1.Deployment)(nil), (*apps.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_Deployment_To_apps_Deployment(a.(*v1.Deployment), b.(*apps.Deployment), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apps.Deployment)(nil), (*v1.Deployment)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_Deployment_To_v1_Deployment(a.(*apps.Deployment), b.(*v1.Deployment), scope)
-	}); err != nil {
-		return err
-	}
 	if err := s.AddGeneratedConversionFunc((*v1.DeploymentCondition)(nil), (*apps.DeploymentCondition)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_v1_DeploymentCondition_To_apps_DeploymentCondition(a.(*v1.DeploymentCondition), b.(*apps.DeploymentCondition), scope)
 	}); err != nil {
@@ -147,16 +117,6 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}
 	if err := s.AddGeneratedConversionFunc((*apps.DeploymentList)(nil), (*v1.DeploymentList)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_apps_DeploymentList_To_v1_DeploymentList(a.(*apps.DeploymentList), b.(*v1.DeploymentList), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*v1.DeploymentSpec)(nil), (*apps.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_v1_DeploymentSpec_To_apps_DeploymentSpec(a.(*v1.DeploymentSpec), b.(*apps.DeploymentSpec), scope)
-	}); err != nil {
-		return err
-	}
-	if err := s.AddGeneratedConversionFunc((*apps.DeploymentSpec)(nil), (*v1.DeploymentSpec)(nil), func(a, b interface{}, scope conversion.Scope) error {
-		return Convert_apps_DeploymentSpec_To_v1_DeploymentSpec(a.(*apps.DeploymentSpec), b.(*v1.DeploymentSpec), scope)
 	}); err != nil {
 		return err
 	}

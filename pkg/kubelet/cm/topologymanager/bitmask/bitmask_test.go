@@ -21,22 +21,50 @@ import (
 	"testing"
 )
 
+func TestNewEmptyiBitMask(t *testing.T) {
+	tcases := []struct {
+		name         string
+		expectedMask string
+	}{
+		{
+			name:         "New empty BitMask",
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+		},
+	}
+	for _, tc := range tcases {
+		bm := NewEmptyBitMask()
+		if bm.String() != tc.expectedMask {
+			t.Errorf("Expected mask to be %v, got %v", tc.expectedMask, bm)
+		}
+	}
+}
+
 func TestNewBitMask(t *testing.T) {
 	tcases := []struct {
 		name         string
-		bit          int
+		bits         []int
 		expectedMask string
 	}{
 		{
 			name:         "New BitMask with bit 0 set",
-			bit:          0,
+			bits:         []int{0},
 			expectedMask: "0000000000000000000000000000000000000000000000000000000000000001",
+		},
+		{
+			name:         "New BitMask with bit 1 set",
+			bits:         []int{1},
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000010",
+		},
+		{
+			name:         "New BitMask with bit 0 and bit 1 set",
+			bits:         []int{0, 1},
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000011",
 		},
 	}
 	for _, tc := range tcases {
-		sm, _ := NewBitMask(0)
-		if sm.String() != tc.expectedMask {
-			t.Errorf("Expected mask to be %v, got %v", tc.expectedMask, sm)
+		mask, _ := NewBitMask(tc.bits...)
+		if mask.String() != tc.expectedMask {
+			t.Errorf("Expected mask to be %v, got %v", tc.expectedMask, mask)
 		}
 	}
 }
@@ -44,20 +72,33 @@ func TestNewBitMask(t *testing.T) {
 func TestAdd(t *testing.T) {
 	tcases := []struct {
 		name         string
-		firstbit     int
-		secondbit    int
+		bits         []int
 		expectedMask string
 	}{
 		{
-			name:         "New BitMask with bits 0 and 1 set",
-			firstbit:     0,
-			secondbit:    1,
+			name:         "Add BitMask with bit 0 set",
+			bits:         []int{0},
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000001",
+		},
+		{
+			name:         "Add BitMask with bit 1 set",
+			bits:         []int{1},
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000010",
+		},
+		{
+			name:         "Add BitMask with bits 0 and 1 set",
+			bits:         []int{0, 1},
 			expectedMask: "0000000000000000000000000000000000000000000000000000000000000011",
+		},
+		{
+			name:         "Add BitMask with bits outside range 0-63",
+			bits:         []int{-1, 64},
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000000",
 		},
 	}
 	for _, tc := range tcases {
 		mask, _ := NewBitMask()
-		mask.Add(tc.firstbit, tc.secondbit)
+		mask.Add(tc.bits...)
 		if mask.String() != tc.expectedMask {
 			t.Errorf("Expected mask to be %v, got %v", tc.expectedMask, mask)
 		}
@@ -66,23 +107,39 @@ func TestAdd(t *testing.T) {
 
 func TestRemove(t *testing.T) {
 	tcases := []struct {
-		name           string
-		firstbitset    int
-		secondbitset   int
-		firstbitRemove int
-		expectedMask   string
+		name         string
+		bitsSet      []int
+		bitsRemove   []int
+		expectedMask string
 	}{
 		{
-			name:           "Reset bit 1 BitMask to 0",
-			firstbitset:    0,
-			secondbitset:   1,
-			firstbitRemove: 0,
-			expectedMask:   "0000000000000000000000000000000000000000000000000000000000000010",
+			name:         "Set bit 0. Remove bit 0",
+			bitsSet:      []int{0},
+			bitsRemove:   []int{0},
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+		},
+		{
+			name:         "Set bits 0 and 1. Remove bit 1",
+			bitsSet:      []int{0, 1},
+			bitsRemove:   []int{1},
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000001",
+		},
+		{
+			name:         "Set bits 0 and 1. Remove bits 0 and 1",
+			bitsSet:      []int{0, 1},
+			bitsRemove:   []int{0, 1},
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+		},
+		{
+			name:         "Set bit 0. Attempt to remove bits outside range 0-63",
+			bitsSet:      []int{0},
+			bitsRemove:   []int{-1, 64},
+			expectedMask: "0000000000000000000000000000000000000000000000000000000000000001",
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewBitMask(tc.firstbitset, tc.secondbitset)
-		mask.Remove(tc.firstbitRemove)
+		mask, _ := NewBitMask(tc.bitsSet...)
+		mask.Remove(tc.bitsRemove...)
 		if mask.String() != tc.expectedMask {
 			t.Errorf("Expected mask to be %v, got %v", tc.expectedMask, mask)
 		}
@@ -91,60 +148,101 @@ func TestRemove(t *testing.T) {
 
 func TestAnd(t *testing.T) {
 	tcases := []struct {
-		name          string
-		firstMaskBit  int
-		secondMaskBit int
-		andMask       string
+		name    string
+		masks   [][]int
+		andMask string
 	}{
 		{
-			name:          "And bit masks",
-			firstMaskBit:  0,
-			secondMaskBit: 0,
-			andMask:       "0000000000000000000000000000000000000000000000000000000000000001",
+			name:    "Mask 11 AND mask 11",
+			masks:   [][]int{{0, 1}, {0, 1}},
+			andMask: "0000000000000000000000000000000000000000000000000000000000000011",
+		},
+		{
+			name:    "Mask 11 AND mask 10",
+			masks:   [][]int{{0, 1}, {1}},
+			andMask: "0000000000000000000000000000000000000000000000000000000000000010",
+		},
+		{
+			name:    "Mask 01 AND mask 11",
+			masks:   [][]int{{0}, {0, 1}},
+			andMask: "0000000000000000000000000000000000000000000000000000000000000001",
+		},
+		{
+			name:    "Mask 11 AND mask 11 AND mask 10",
+			masks:   [][]int{{0, 1}, {0, 1}, {1}},
+			andMask: "0000000000000000000000000000000000000000000000000000000000000010",
+		},
+		{
+			name:    "Mask 01 AND mask 01 AND mask 10 AND mask 11",
+			masks:   [][]int{{0}, {0}, {1}, {0, 1}},
+			andMask: "0000000000000000000000000000000000000000000000000000000000000000",
+		},
+		{
+			name:    "Mask 1111 AND mask 1110 AND mask 1100 AND mask 1000",
+			masks:   [][]int{{0, 1, 2, 3}, {1, 2, 3}, {2, 3}, {3}},
+			andMask: "0000000000000000000000000000000000000000000000000000000000001000",
 		},
 	}
 	for _, tc := range tcases {
-		firstMask, _ := NewBitMask(tc.firstMaskBit)
-		secondMask, _ := NewBitMask(tc.secondMaskBit)
-
-		result := And(firstMask, secondMask)
-		if result.String() != string(tc.andMask) {
-			t.Errorf("Expected mask to be %v, got %v", tc.andMask, result)
+		var bitMasks []BitMask
+		for i := range tc.masks {
+			bitMask, _ := NewBitMask(tc.masks[i]...)
+			bitMasks = append(bitMasks, bitMask)
+		}
+		resultMask := And(bitMasks[0], bitMasks...)
+		if resultMask.String() != string(tc.andMask) {
+			t.Errorf("Expected mask to be %v, got %v", tc.andMask, resultMask)
 		}
 
-		firstMask.And(secondMask)
-		if firstMask.String() != string(tc.andMask) {
-			t.Errorf("Expected mask to be %v, got %v", tc.andMask, firstMask)
-		}
 	}
 }
 
 func TestOr(t *testing.T) {
 	tcases := []struct {
-		name          string
-		firstMaskBit  int
-		secondMaskBit int
-		orMask        string
+		name   string
+		masks  [][]int
+		orMask string
 	}{
 		{
-			name:          "Or bit masks",
-			firstMaskBit:  0,
-			secondMaskBit: 1,
-			orMask:        "0000000000000000000000000000000000000000000000000000000000000011",
+			name:   "Mask 01 OR mask 00",
+			masks:  [][]int{{0}, {}},
+			orMask: "0000000000000000000000000000000000000000000000000000000000000001",
+		},
+		{
+			name:   "Mask 10 OR mask 10",
+			masks:  [][]int{{1}, {1}},
+			orMask: "0000000000000000000000000000000000000000000000000000000000000010",
+		},
+		{
+			name:   "Mask 01 OR mask 10",
+			masks:  [][]int{{0}, {1}},
+			orMask: "0000000000000000000000000000000000000000000000000000000000000011",
+		},
+		{
+			name:   "Mask 11 OR mask 11",
+			masks:  [][]int{{0, 1}, {0, 1}},
+			orMask: "0000000000000000000000000000000000000000000000000000000000000011",
+		},
+		{
+			name:   "Mask 01 OR mask 10 OR mask 11",
+			masks:  [][]int{{0}, {1}, {0, 1}},
+			orMask: "0000000000000000000000000000000000000000000000000000000000000011",
+		},
+		{
+			name:   "Mask 1000 OR mask 0100 OR mask 0010 OR mask 0001",
+			masks:  [][]int{{3}, {2}, {1}, {0}},
+			orMask: "0000000000000000000000000000000000000000000000000000000000001111",
 		},
 	}
 	for _, tc := range tcases {
-		firstMask, _ := NewBitMask(tc.firstMaskBit)
-		secondMask, _ := NewBitMask(tc.secondMaskBit)
-
-		result := Or(firstMask, secondMask)
-		if result.String() != string(tc.orMask) {
-			t.Errorf("Expected mask to be %v, got %v", tc.orMask, result)
+		var bitMasks []BitMask
+		for i := range tc.masks {
+			bitMask, _ := NewBitMask(tc.masks[i]...)
+			bitMasks = append(bitMasks, bitMask)
 		}
-
-		firstMask.Or(secondMask)
-		if firstMask.String() != string(tc.orMask) {
-			t.Errorf("Expected mask to be %v, got %v", tc.orMask, firstMask)
+		resultMask := Or(bitMasks[0], bitMasks...)
+		if resultMask.String() != string(tc.orMask) {
+			t.Errorf("Expected mask to be %v, got %v", tc.orMask, resultMask)
 		}
 	}
 }
@@ -152,19 +250,27 @@ func TestOr(t *testing.T) {
 func TestClear(t *testing.T) {
 	tcases := []struct {
 		name        string
-		firstBit    int
-		secondBit   int
+		mask        []int
 		clearedMask string
 	}{
 		{
-			name:        "Clear bit masks",
-			firstBit:    0,
-			secondBit:   1,
+			name:        "Clear mask 01",
+			mask:        []int{0},
+			clearedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+		},
+		{
+			name:        "Clear mask 10",
+			mask:        []int{1},
+			clearedMask: "0000000000000000000000000000000000000000000000000000000000000000",
+		},
+		{
+			name:        "Clear mask 11",
+			mask:        []int{0, 1},
 			clearedMask: "0000000000000000000000000000000000000000000000000000000000000000",
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewBitMask(tc.firstBit, tc.secondBit)
+		mask, _ := NewBitMask(tc.mask...)
 		mask.Clear()
 		if mask.String() != string(tc.clearedMask) {
 			t.Errorf("Expected mask to be %v, got %v", tc.clearedMask, mask)
@@ -175,15 +281,27 @@ func TestClear(t *testing.T) {
 func TestFill(t *testing.T) {
 	tcases := []struct {
 		name       string
+		mask       []int
 		filledMask string
 	}{
 		{
-			name:       "Fill bit masks",
+			name:       "Fill empty mask",
+			mask:       nil,
+			filledMask: "1111111111111111111111111111111111111111111111111111111111111111",
+		},
+		{
+			name:       "Fill mask 10",
+			mask:       []int{0},
+			filledMask: "1111111111111111111111111111111111111111111111111111111111111111",
+		},
+		{
+			name:       "Fill mask 11",
+			mask:       []int{0, 1},
 			filledMask: "1111111111111111111111111111111111111111111111111111111111111111",
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewBitMask()
+		mask, _ := NewBitMask(tc.mask...)
 		mask.Fill()
 		if mask.String() != string(tc.filledMask) {
 			t.Errorf("Expected mask to be %v, got %v", tc.filledMask, mask)
@@ -194,19 +312,29 @@ func TestFill(t *testing.T) {
 func TestIsEmpty(t *testing.T) {
 	tcases := []struct {
 		name          string
-		maskBit       int
+		mask          []int
 		expectedEmpty bool
 	}{
 		{
-			name:          "Check if mask is empty",
-			maskBit:       0,
+			name:          "Check if mask 00 is empty",
+			mask:          nil,
+			expectedEmpty: true,
+		},
+		{
+			name:          "Check if mask 01 is empty",
+			mask:          []int{0},
+			expectedEmpty: false,
+		},
+		{
+			name:          "Check if mask 11 is empty",
+			mask:          []int{0, 1},
 			expectedEmpty: false,
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewBitMask(tc.maskBit)
+		mask, _ := NewBitMask(tc.mask...)
 		empty := mask.IsEmpty()
-		if empty {
+		if empty != tc.expectedEmpty {
 			t.Errorf("Expected value to be %v, got %v", tc.expectedEmpty, empty)
 		}
 	}
@@ -215,19 +343,39 @@ func TestIsEmpty(t *testing.T) {
 func TestIsSet(t *testing.T) {
 	tcases := []struct {
 		name        string
-		maskBit     int
+		mask        []int
+		checkBit    int
 		expectedSet bool
 	}{
 		{
-			name:        "Check if mask bit is set",
-			maskBit:     0,
+			name:        "Check if bit 0 in mask 00 is set",
+			mask:        nil,
+			checkBit:    0,
+			expectedSet: false,
+		},
+		{
+			name:        "Check if bit 0 in mask 01 is set",
+			mask:        []int{0},
+			checkBit:    0,
 			expectedSet: true,
+		},
+		{
+			name:        "Check if bit 1 in mask 11 is set",
+			mask:        []int{0, 1},
+			checkBit:    1,
+			expectedSet: true,
+		},
+		{
+			name:        "Check if bit outside range 0-63 is set",
+			mask:        []int{0, 1},
+			checkBit:    64,
+			expectedSet: false,
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewBitMask(tc.maskBit)
-		set := mask.IsSet(tc.maskBit)
-		if !set {
+		mask, _ := NewBitMask(tc.mask...)
+		set := mask.IsSet(tc.checkBit)
+		if set != tc.expectedSet {
 			t.Errorf("Expected value to be %v, got %v", tc.expectedSet, set)
 		}
 	}
@@ -236,23 +384,47 @@ func TestIsSet(t *testing.T) {
 func TestIsEqual(t *testing.T) {
 	tcases := []struct {
 		name          string
-		firstMaskBit  int
-		secondMaskBit int
-		isEqual       bool
+		firstMask     []int
+		secondMask    []int
+		expectedEqual bool
 	}{
 		{
-			name:          "Check if two bit masks are equal",
-			firstMaskBit:  0,
-			secondMaskBit: 0,
-			isEqual:       true,
+			name:          "Check if mask 00 equals mask 00",
+			firstMask:     nil,
+			secondMask:    nil,
+			expectedEqual: true,
+		},
+		{
+			name:          "Check if mask 00 equals mask 01",
+			firstMask:     nil,
+			secondMask:    []int{0},
+			expectedEqual: false,
+		},
+		{
+			name:          "Check if mask 01 equals mask 01",
+			firstMask:     []int{0},
+			secondMask:    []int{0},
+			expectedEqual: true,
+		},
+		{
+			name:          "Check if mask 01 equals mask 10",
+			firstMask:     []int{0},
+			secondMask:    []int{1},
+			expectedEqual: false,
+		},
+		{
+			name:          "Check if mask 11 equals mask 11",
+			firstMask:     []int{0, 1},
+			secondMask:    []int{0, 1},
+			expectedEqual: true,
 		},
 	}
 	for _, tc := range tcases {
-		firstMask, _ := NewBitMask(tc.firstMaskBit)
-		secondMask, _ := NewBitMask(tc.secondMaskBit)
+		firstMask, _ := NewBitMask(tc.firstMask...)
+		secondMask, _ := NewBitMask(tc.secondMask...)
 		isEqual := firstMask.IsEqual(secondMask)
-		if !isEqual {
-			t.Errorf("Expected mask to be %v, got %v", tc.isEqual, isEqual)
+		if isEqual != tc.expectedEqual {
+			t.Errorf("Expected mask to be %v, got %v", tc.expectedEqual, isEqual)
 		}
 	}
 }
@@ -260,17 +432,27 @@ func TestIsEqual(t *testing.T) {
 func TestCount(t *testing.T) {
 	tcases := []struct {
 		name          string
-		maskBit       int
+		bits          []int
 		expectedCount int
 	}{
 		{
-			name:          "Count number of bits set in full mask",
-			maskBit:       42,
+			name:          "Count number of bits set in mask 00",
+			bits:          nil,
+			expectedCount: 0,
+		},
+		{
+			name:          "Count number of bits set in mask 01",
+			bits:          []int{0},
 			expectedCount: 1,
+		},
+		{
+			name:          "Count number of bits set in mask 11",
+			bits:          []int{0, 1},
+			expectedCount: 2,
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewBitMask(tc.maskBit)
+		mask, _ := NewBitMask(tc.bits...)
 		count := mask.Count()
 		if count != tc.expectedCount {
 			t.Errorf("Expected value to be %v, got %v", tc.expectedCount, count)
@@ -281,22 +463,30 @@ func TestCount(t *testing.T) {
 func TestGetBits(t *testing.T) {
 	tcases := []struct {
 		name         string
-		firstbit     int
-		secondbit    int
-		expectedbits []int
+		bits         []int
+		expectedBits []int
 	}{
 		{
-			name:         "Get number of each bit which has been set",
-			firstbit:     0,
-			secondbit:    1,
-			expectedbits: []int{0, 1},
+			name:         "Get bits of mask 00",
+			bits:         nil,
+			expectedBits: nil,
+		},
+		{
+			name:         "Get bits of mask 01",
+			bits:         []int{0},
+			expectedBits: []int{0},
+		},
+		{
+			name:         "Get bits of mask 11",
+			bits:         []int{0, 1},
+			expectedBits: []int{0, 1},
 		},
 	}
 	for _, tc := range tcases {
-		mask, _ := NewBitMask(tc.firstbit, tc.secondbit)
+		mask, _ := NewBitMask(tc.bits...)
 		bits := mask.GetBits()
-		if !reflect.DeepEqual(bits, tc.expectedbits) {
-			t.Errorf("Expected value to be %v, got %v", tc.expectedbits, bits)
+		if !reflect.DeepEqual(bits, tc.expectedBits) {
+			t.Errorf("Expected value to be %v, got %v", tc.expectedBits, bits)
 		}
 	}
 }

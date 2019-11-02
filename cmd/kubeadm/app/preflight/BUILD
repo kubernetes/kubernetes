@@ -24,7 +24,6 @@ go_library(
         "//cmd/kubeadm/app/util/initsystem:go_default_library",
         "//cmd/kubeadm/app/util/runtime:go_default_library",
         "//cmd/kubeadm/app/util/system:go_default_library",
-        "//pkg/registry/core/service/ipallocator:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",

@@ -25,6 +25,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -273,4 +274,51 @@ func TestPatchWithMissingObject(t *testing.T) {
 	assert.True(t, handled)
 	assert.Nil(t, node)
 	assert.EqualError(t, err, `nodes "node-1" not found`)
+}
+
+func TestGetWithExactMatch(t *testing.T) {
+	scheme := runtime.NewScheme()
+	codecs := serializer.NewCodecFactory(scheme)
+
+	constructObject := func(s schema.GroupVersionResource, name, namespace string) (*unstructured.Unstructured, schema.GroupVersionResource) {
+		obj := getArbitraryResource(s, name, namespace)
+		gvks, _, err := scheme.ObjectKinds(obj)
+		assert.Nil(t, err)
+		gvr, _ := meta.UnsafeGuessKindToResource(gvks[0])
+		return obj, gvr
+	}
+
+	var err error
+	// Object with empty namespace
+	o := NewObjectTracker(scheme, codecs.UniversalDecoder())
+	nodeResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "node"}
+	node, gvr := constructObject(nodeResource, "node", "")
+
+	assert.Nil(t, o.Add(node))
+
+	// Exact match
+	_, err = o.Get(gvr, "", "node")
+	assert.Nil(t, err)
+
+	// Unexpected namespace provided
+	_, err = o.Get(gvr, "ns", "node")
+	assert.NotNil(t, err)
+	errNotFound := errors.NewNotFound(gvr.GroupResource(), "node")
+	assert.EqualError(t, err, errNotFound.Error())
+
+	// Object with non-empty namespace
+	o = NewObjectTracker(scheme, codecs.UniversalDecoder())
+	podResource := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pod"}
+	pod, gvr := constructObject(podResource, "pod", "default")
+	assert.Nil(t, o.Add(pod))
+
+	// Exact match
+	_, err = o.Get(gvr, "default", "pod")
+	assert.Nil(t, err)
+
+	// Missing namespace
+	_, err = o.Get(gvr, "", "pod")
+	assert.NotNil(t, err)
+	errNotFound = errors.NewNotFound(gvr.GroupResource(), "pod")
+	assert.EqualError(t, err, errNotFound.Error())
 }

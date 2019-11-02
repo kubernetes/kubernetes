@@ -127,6 +127,7 @@ const (
 
 	// owner: @k82cn
 	// beta: v1.12
+	// GA: v1.17
 	//
 	// Taint nodes based on their condition status for 'NetworkUnavailable',
 	// 'MemoryPressure', 'PIDPressure' and 'DiskPressure'.
@@ -240,6 +241,7 @@ const (
 
 	// owner: @k82cn
 	// beta: v1.12
+	// GA: v1.17
 	//
 	// Schedule DaemonSet Pods by default scheduler instead of DaemonSet controller
 	ScheduleDaemonSetPods featuregate.Feature = "ScheduleDaemonSetPods"
@@ -484,6 +486,19 @@ const (
 	//
 	// Enables the startupProbe in kubelet worker.
 	StartupProbe featuregate.Feature = "StartupProbe"
+
+	// owner: @deads2k
+	// beta: v1.17
+	//
+	// Enables the users to skip TLS verification of kubelets on pod logs requests
+	AllowInsecureBackendProxy featuregate.Feature = "AllowInsecureBackendProxy"
+
+	// owner: @mortent
+	// alpha: v1.3
+	// beta:  v1.5
+	//
+	// Enable all logic related to the PodDisruptionBudget API object in policy
+	PodDisruptionBudget featuregate.Feature = "PodDisruptionBudget"
 )
 
 func init() {
@@ -506,7 +521,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EphemeralContainers:            {Default: false, PreRelease: featuregate.Alpha},
 	PodShareProcessNamespace:       {Default: true, PreRelease: featuregate.Beta},
 	PodPriority:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
-	TaintNodesByCondition:          {Default: true, PreRelease: featuregate.Beta},
+	TaintNodesByCondition:          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
 	QOSReserved:                    {Default: false, PreRelease: featuregate.Alpha},
 	ExpandPersistentVolumes:        {Default: true, PreRelease: featuregate.Beta},
 	ExpandInUsePersistentVolumes:   {Default: true, PreRelease: featuregate.Beta},
@@ -527,7 +542,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	SupportPodPidsLimit:            {Default: true, PreRelease: featuregate.Beta},
 	SupportNodePidsLimit:           {Default: true, PreRelease: featuregate.Beta},
 	HyperVContainer:                {Default: false, PreRelease: featuregate.Alpha},
-	ScheduleDaemonSetPods:          {Default: true, PreRelease: featuregate.Beta},
+	ScheduleDaemonSetPods:          {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.18
 	TokenRequest:                   {Default: true, PreRelease: featuregate.Beta},
 	TokenRequestProjection:         {Default: true, PreRelease: featuregate.Beta},
 	BoundServiceAccountTokenVolume: {Default: false, PreRelease: featuregate.Alpha},
@@ -563,6 +578,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	EndpointSlice:                                  {Default: false, PreRelease: featuregate.Alpha},
 	EvenPodsSpread:                                 {Default: false, PreRelease: featuregate.Alpha},
 	StartupProbe:                                   {Default: false, PreRelease: featuregate.Alpha},
+	AllowInsecureBackendProxy:                      {Default: true, PreRelease: featuregate.Beta},
+	PodDisruptionBudget:                            {Default: true, PreRelease: featuregate.Beta},
 
 	// inherited features from generic apiserver, relisted here to get a conflict if it is changed
 	// unintentionally on either side:

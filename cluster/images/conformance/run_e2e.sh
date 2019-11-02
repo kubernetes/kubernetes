@@ -40,8 +40,8 @@ saveResults() {
 # Entry provided via env var to simplify invocation. 
 if [[ -n ${E2E_USE_GO_RUNNER:-} ]]; then
     set -x
-    /gorunner
-    exit $?
+    /gorunner && ret=0 || ret=$?
+    exit ${ret}
 fi
 
 # We get the TERM from kubernetes and handle it gracefully
@@ -67,8 +67,7 @@ ginkgo_args+=(
 )
 
 set -x
-/usr/local/bin/ginkgo "${ginkgo_args[@]}" /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider="${E2E_PROVIDER}" --report-dir="${RESULTS_DIR}" --kubeconfig="${KUBECONFIG}" -v="${E2E_VERBOSITY}" > >(tee "${RESULTS_DIR}"/e2e.log)
-ret=$?
+/usr/local/bin/ginkgo "${ginkgo_args[@]}" /usr/local/bin/e2e.test -- --disable-log-dump --repo-root=/kubernetes --provider="${E2E_PROVIDER}" --report-dir="${RESULTS_DIR}" --kubeconfig="${KUBECONFIG}" -v="${E2E_VERBOSITY}" > >(tee "${RESULTS_DIR}"/e2e.log) && ret=0 || ret=$?
 set +x
 saveResults
 exit ${ret}

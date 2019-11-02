@@ -416,9 +416,6 @@ message ListOptions {
   // If this is not a watch, this field is ignored.
   // If the feature gate WatchBookmarks is not enabled in apiserver,
   // this field is ignored.
-  //
-  // This field is beta.
-  //
   // +optional
   optional bool allowWatchBookmarks = 9;
 

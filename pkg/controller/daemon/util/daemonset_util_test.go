@@ -21,13 +21,12 @@ import (
 	"reflect"
 	"testing"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	extensions "k8s.io/api/extensions/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/component-base/featuregate"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
-	"k8s.io/kubernetes/pkg/features"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	utilpointer "k8s.io/utils/pointer"
 )
@@ -586,5 +585,5 @@ func TestGetTargetNodeName(t *testing.T) {
 		}
 	}
 
-	forEachFeatureGate(t, testFun, features.ScheduleDaemonSetPods)
+	forEachFeatureGate(t, testFun)
 }

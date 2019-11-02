@@ -4808,6 +4808,15 @@ type PodLogOptions struct {
 	// slightly more or slightly less than the specified limit.
 	// +optional
 	LimitBytes *int64 `json:"limitBytes,omitempty" protobuf:"varint,8,opt,name=limitBytes"`
+
+	// insecureSkipTLSVerifyBackend indicates that the apiserver should not confirm the validity of the
+	// serving certificate of the backend it is connecting to.  This will make the HTTPS connection between the apiserver
+	// and the backend insecure. This means the apiserver cannot verify the log data it is receiving came from the real
+	// kubelet.  If the kubelet is configured to verify the apiserver's TLS credentials, it does not mean the
+	// connection to the real kubelet is vulnerable to a man in the middle attack (e.g. an attacker could not intercept
+	// the actual log data coming from the real kubelet).
+	// +optional
+	InsecureSkipTLSVerifyBackend bool `json:"insecureSkipTLSVerifyBackend,omitempty" protobuf:"varint,9,opt,name=insecureSkipTLSVerifyBackend"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -4902,6 +4911,7 @@ type PodPortForwardOptions struct {
 	Ports []int32 `json:"ports,omitempty" protobuf:"varint,1,rep,name=ports"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // PodProxyOptions is the query options to a Pod's proxy call.
@@ -4913,6 +4923,7 @@ type PodProxyOptions struct {
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // NodeProxyOptions is the query options to a Node's proxy call.
@@ -4924,6 +4935,7 @@ type NodeProxyOptions struct {
 	Path string `json:"path,omitempty" protobuf:"bytes,1,opt,name=path"`
 }
 
+// +k8s:conversion-gen:explicit-from=net/url.Values
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // ServiceProxyOptions is the query options to a Service's proxy call.

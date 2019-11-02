@@ -33,7 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/cli-runtime/pkg/printers"
 	"k8s.io/client-go/util/jsonpath"
-	utilprinters "k8s.io/kubectl/pkg/util/printers"
 )
 
 var jsonRegexp = regexp.MustCompile(`^\{\.?([^{}]+)\}$|^\.?([^{}]+)$`)
@@ -164,7 +163,7 @@ func (s *CustomColumnsPrinter) PrintObj(obj runtime.Object, out io.Writer) error
 	}
 
 	if w, found := out.(*tabwriter.Writer); !found {
-		w = utilprinters.GetNewTabWriter(out)
+		w = printers.GetNewTabWriter(out)
 		out = w
 		defer w.Flush()
 	}

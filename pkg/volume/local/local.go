@@ -218,6 +218,7 @@ func (plugin *localVolumePlugin) ConstructBlockVolumeSpec(podUID types.UID, volu
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				Local: &v1.LocalVolumeSource{
+					// Not needed because we don't need to detach local device from the host.
 					Path: "",
 				},
 			},

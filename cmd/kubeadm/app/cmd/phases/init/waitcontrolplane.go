@@ -19,7 +19,6 @@ package phases
 import (
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"text/template"
 	"time"
@@ -99,13 +98,6 @@ func runWaitControlPlanePhase(c workflow.RunData) error {
 		}
 		kubeletFailTempl.Execute(data.OutputWriter(), ctx)
 		return errors.New("couldn't initialize a Kubernetes cluster")
-	}
-
-	// Deletes the kubelet boostrap kubeconfig file, so the credential used for TLS bootstrap is removed from disk
-	// This is done only on success.
-	bootstrapKubeConfigFile := kubeadmconstants.GetBootstrapKubeletKubeConfigPath()
-	if err := os.Remove(bootstrapKubeConfigFile); err != nil {
-		klog.Warningf("[wait-control-plane] could not delete the file %q: %v", bootstrapKubeConfigFile, err)
 	}
 
 	return nil

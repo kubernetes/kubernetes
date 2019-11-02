@@ -112,7 +112,7 @@ type NetworkPluginSettings struct {
 	NonMasqueradeCIDR string
 	// PluginName is the name of the plugin, runtime shim probes for
 	PluginName string
-	// PluginBinDirsString is a list of directiores delimited by commas, in
+	// PluginBinDirString is a list of directiores delimited by commas, in
 	// which the binaries for the plugin with PluginName may be found.
 	PluginBinDirString string
 	// PluginBinDirs is an array of directories in which the binaries for
@@ -419,7 +419,7 @@ func (ds *dockerService) Start() error {
 }
 
 // initCleanup is responsible for cleaning up any crufts left by previous
-// runs. If there are any errros, it simply logs them.
+// runs. If there are any errors, it simply logs them.
 func (ds *dockerService) initCleanup() {
 	errors := ds.platformSpecificContainerInitCleanup()
 

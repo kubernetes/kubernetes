@@ -1261,6 +1261,7 @@ function create-master-etcd-apiserver-auth {
      ETCD_APISERVER_CA_KEY_PATH="${auth_dir}/etcd-apiserver-ca.key"
      echo "${ETCD_APISERVER_CA_KEY}" | base64 --decode > "${ETCD_APISERVER_CA_KEY_PATH}"
 
+     # Keep in sync with add-replica-to-etcd/remove-replica-from-etcd in util.sh.
      ETCD_APISERVER_CA_CERT_PATH="${auth_dir}/etcd-apiserver-ca.crt"
      echo "${ETCD_APISERVER_CA_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_CA_CERT_PATH}"
 
@@ -1270,9 +1271,11 @@ function create-master-etcd-apiserver-auth {
      ETCD_APISERVER_SERVER_CERT_PATH="${auth_dir}/etcd-apiserver-server.crt"
      echo "${ETCD_APISERVER_SERVER_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_SERVER_CERT_PATH}"
 
+     # Keep in sync with add-replica-to-etcd/remove-replica-from-etcd in util.sh.
      ETCD_APISERVER_CLIENT_KEY_PATH="${auth_dir}/etcd-apiserver-client.key"
      echo "${ETCD_APISERVER_CLIENT_KEY}" | base64 --decode > "${ETCD_APISERVER_CLIENT_KEY_PATH}"
 
+     # Keep in sync with add-replica-to-etcd/remove-replica-from-etcd in util.sh.
      ETCD_APISERVER_CLIENT_CERT_PATH="${auth_dir}/etcd-apiserver-client.crt"
      echo "${ETCD_APISERVER_CLIENT_CERT}" | base64 --decode | gunzip > "${ETCD_APISERVER_CLIENT_CERT_PATH}"
    fi
@@ -2124,7 +2127,7 @@ function update-event-exporter {
     sed -i -e "s@{{ exporter_sd_endpoint }}@${STACKDRIVER_ENDPOINT:-}@g" "$1"
 }
 
-function update-dashboard-controller {
+function update-dashboard-deployment {
   if [ -n "${CUSTOM_KUBE_DASHBOARD_BANNER:-}" ]; then
     sed -i -e "s@\( \+\)# PLATFORM-SPECIFIC ARGS HERE@\1- --system-banner=${CUSTOM_KUBE_DASHBOARD_BANNER}\n\1- --system-banner-severity=WARNING@" "$1"
   fi
@@ -2419,8 +2422,8 @@ EOF
   fi
   if [[ "${ENABLE_CLUSTER_UI:-}" == "true" ]]; then
     setup-addon-manifests "addons" "dashboard"
-    local -r dashboard_controller_yaml="${dst_dir}/dashboard/dashboard-controller.yaml"
-    update-dashboard-controller ${dashboard_controller_yaml}
+    local -r dashboard_deployment_yaml="${dst_dir}/dashboard/dashboard-deployment.yaml"
+    update-dashboard-deployment ${dashboard_deployment_yaml}
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "daemonset" ]]; then
     setup-addon-manifests "addons" "node-problem-detector"
