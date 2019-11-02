@@ -238,10 +238,11 @@ func (c *Cloud) ensureLoadBalancerv2(namespacedName types.NamespacedName, loadBa
 						}
 					}
 
-					// recreate targetGroup if trafficPort or protocol changed
+					// recreate targetGroup if trafficPort or protocol changed, or if healthCheckProtocol changed from TCP
 					targetGroupRecreated := false
 					targetGroup, ok := nodePortTargetGroup[nodePort]
-					if !ok || aws.StringValue(targetGroup.Protocol) != mapping.TrafficProtocol {
+					invalidHealthCheckProtocolModification := aws.StringValue(targetGroup.HealthCheckProtocol) == elbv2.ProtocolEnumTcp && aws.StringValue(targetGroup.HealthCheckProtocol) != mapping.HealthCheckProtocol
+					if !ok || aws.StringValue(targetGroup.Protocol) != mapping.TrafficProtocol || invalidHealthCheckProtocolModification {
 						// create new target group
 						targetGroup, err = c.ensureTargetGroup(
 							nil,
