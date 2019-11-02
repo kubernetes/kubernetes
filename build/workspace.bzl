@@ -82,12 +82,12 @@ _DEBIAN_BASE_DIGEST = {
 }
 
 _DEBIAN_IPTABLES_DIGEST = {
-    "manifest": "sha256:b522b0035dba3ac2d5c0dbaaf8217bd66248e790332ccfdf653e0f943a280dcf",
-    "amd64": "sha256:adc40e9ec817c15d35b26d1d6aa4d0f8096fba4c99e26a026159bb0bc98c6a89",
-    "arm": "sha256:58e8a1d3b187eed2d8d3664cd1c9723e5029698714a24dfca4b6ef42ea27a9d4",
-    "arm64": "sha256:1a63fdd216fe7b84561d40ab1ebaa0daae1fc73e4232a6caffbd8353d9a14cea",
-    "ppc64le": "sha256:9f90adbc7513cc96d92fcec7633c4b29e766dd31cf876af03c0b54374e22fa9c",
-    "s390x": "sha256:4f147708deff2a0163ee49b6980cc95423514bec5f4091612d65773b898fbdae",
+    "manifest": "sha256:f6ba11114c271a0dfb45ac7b7ab4e70539de6d9b270cf97880df08c2bef5b7db",
+    "amd64": "sha256:1d3e860f05352ffaa67533abbe9b7529a894c8ba6f7b47b9279f1940b0414ad5",
+    "arm": "sha256:fd5df8611e9d8e6ce5a65bac0e534254459beabe38cdf406e67b52e4bfee0276",
+    "arm64": "sha256:956d737ef34ff799b2f56596be67bf59b5894851cef1ce573a85d56549eabbd6",
+    "ppc64le": "sha256:bb6f6f73cba298fd9e8eda9e9643c2f61cda8439fe96f9a20cdec0f54fe4c597",
+    "s390x": "sha256:7d061ebb9a97ec1ffce68a26ded81483293d26d08d475719f41fedecf2821a18",
 }
 
 _DEBIAN_HYPERKUBE_BASE_DIGEST = {
