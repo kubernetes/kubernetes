@@ -331,7 +331,6 @@ staging/src/k8s.io/apimachinery/pkg/runtime/testing
 staging/src/k8s.io/apimachinery/pkg/selection
 staging/src/k8s.io/apimachinery/pkg/test
 staging/src/k8s.io/apimachinery/pkg/types
-staging/src/k8s.io/apimachinery/pkg/util/cache
 staging/src/k8s.io/apimachinery/pkg/util/clock
 staging/src/k8s.io/apimachinery/pkg/util/errors
 staging/src/k8s.io/apimachinery/pkg/util/framer
