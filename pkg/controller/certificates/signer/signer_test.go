@@ -18,6 +18,7 @@ package signer
 
 import (
 	"crypto/x509"
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"strings"
@@ -34,11 +35,11 @@ func TestSigner(t *testing.T) {
 		return testNow
 	}
 
-	s, err := newCFSSLSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
+	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
-	s.nowFn = testNowFn
+	s.now = testNowFn
 
 	csrb, err := ioutil.ReadFile("./testdata/kubelet.csr")
 	if err != nil {
@@ -101,11 +102,11 @@ func TestSignerExpired(t *testing.T) {
 	hundredYearsFromNowFn := func() time.Time {
 		return time.Now().Add(24 * time.Hour * 365 * 100)
 	}
-	s, err := newCFSSLSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
+	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, 1*time.Hour)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
-	s.nowFn = hundredYearsFromNowFn
+	s.now = hundredYearsFromNowFn
 
 	csrb, err := ioutil.ReadFile("./testdata/kubelet.csr")
 	if err != nil {
@@ -140,11 +141,11 @@ func TestDurationLongerThanExpiry(t *testing.T) {
 	}
 
 	hundredYears := 24 * time.Hour * 365 * 100
-	s, err := newCFSSLSigner("./testdata/ca.crt", "./testdata/ca.key", nil, hundredYears)
+	s, err := newSigner("./testdata/ca.crt", "./testdata/ca.key", nil, hundredYears)
 	if err != nil {
 		t.Fatalf("failed to create signer: %v", err)
 	}
-	s.nowFn = testNowFn
+	s.now = testNowFn
 
 	csrb, err := ioutil.ReadFile("./testdata/kubelet.csr")
 	if err != nil {
@@ -191,5 +192,66 @@ func TestDurationLongerThanExpiry(t *testing.T) {
 	diff := expected.Sub(crt.NotAfter)
 	if diff > 10*time.Minute || diff < -10*time.Minute {
 		t.Fatal(crt.NotAfter)
+	}
+}
+
+func TestKeyUsagesFromStrings(t *testing.T) {
+	testcases := []struct {
+		usages              []capi.KeyUsage
+		expectedKeyUsage    x509.KeyUsage
+		expectedExtKeyUsage []x509.ExtKeyUsage
+		expectErr           bool
+	}{
+		{
+			usages:              []capi.KeyUsage{"signing"},
+			expectedKeyUsage:    x509.KeyUsageDigitalSignature,
+			expectedExtKeyUsage: nil,
+			expectErr:           false,
+		},
+		{
+			usages:              []capi.KeyUsage{"client auth"},
+			expectedKeyUsage:    0,
+			expectedExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth},
+			expectErr:           false,
+		},
+		{
+			usages:              []capi.KeyUsage{"cert sign", "encipher only"},
+			expectedKeyUsage:    x509.KeyUsageCertSign | x509.KeyUsageEncipherOnly,
+			expectedExtKeyUsage: nil,
+			expectErr:           false,
+		},
+		{
+			usages:              []capi.KeyUsage{"ocsp signing", "crl sign", "s/mime", "content commitment"},
+			expectedKeyUsage:    x509.KeyUsageCRLSign | x509.KeyUsageContentCommitment,
+			expectedExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageOCSPSigning, x509.ExtKeyUsageEmailProtection},
+			expectErr:           false,
+		},
+		{
+			usages:              []capi.KeyUsage{"unsupported string"},
+			expectedKeyUsage:    0,
+			expectedExtKeyUsage: nil,
+			expectErr:           true,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(fmt.Sprint(tc.usages), func(t *testing.T) {
+			ku, eku, err := keyUsagesFromStrings(tc.usages)
+
+			if tc.expectErr {
+				if err == nil {
+					t.Errorf("did not return an error, but expected one")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			if ku != tc.expectedKeyUsage || !reflect.DeepEqual(eku, tc.expectedExtKeyUsage) {
+				t.Errorf("got=(%v, %v), want=(%v, %v)", ku, eku, tc.expectedKeyUsage, tc.expectedExtKeyUsage)
+			}
+		})
 	}
 }
