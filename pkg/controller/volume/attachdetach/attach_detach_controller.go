@@ -391,8 +391,7 @@ func (adc *attachDetachController) Run(stopCh <-chan struct{}) {
 		adc.desiredStateOfWorld,
 		&adc.volumePluginMgr,
 		adc.csiMigratedPluginManager,
-		adc.intreeToCSITranslator,
-		adc.vaLister)
+		adc.intreeToCSITranslator)
 
 	<-stopCh
 }

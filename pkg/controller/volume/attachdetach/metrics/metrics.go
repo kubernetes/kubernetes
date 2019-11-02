@@ -22,7 +22,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	corelisters "k8s.io/client-go/listers/core/v1"
-	storagelisters "k8s.io/client-go/listers/storage/v1"
 	"k8s.io/component-base/metrics"
 	"k8s.io/component-base/metrics/legacyregistry"
 	"k8s.io/klog"
@@ -65,8 +64,7 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 	dsw cache.DesiredStateOfWorld,
 	pluginMgr *volume.VolumePluginMgr,
 	csiMigratedPluginManager csimigration.PluginManager,
-	intreeToCSITranslator csimigration.InTreeToCSITranslator,
-	vaLister storagelisters.VolumeAttachmentLister) {
+	intreeToCSITranslator csimigration.InTreeToCSITranslator) {
 	registerMetrics.Do(func() {
 		legacyregistry.CustomMustRegister(newAttachDetachStateCollector(pvcLister,
 			podLister,
@@ -75,8 +73,7 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 			dsw,
 			pluginMgr,
 			csiMigratedPluginManager,
-			intreeToCSITranslator,
-			vaLister))
+			intreeToCSITranslator))
 		legacyregistry.MustRegister(forcedDetachMetricCounter)
 	})
 }
@@ -92,7 +89,6 @@ type attachDetachStateCollector struct {
 	volumePluginMgr          *volume.VolumePluginMgr
 	csiMigratedPluginManager csimigration.PluginManager
 	intreeToCSITranslator    csimigration.InTreeToCSITranslator
-	vaLister                 storagelisters.VolumeAttachmentLister
 }
 
 // volumeCount is a map of maps used as a counter, e.g.:
@@ -119,11 +115,10 @@ func newAttachDetachStateCollector(
 	dsw cache.DesiredStateOfWorld,
 	pluginMgr *volume.VolumePluginMgr,
 	csiMigratedPluginManager csimigration.PluginManager,
-	intreeToCSITranslator csimigration.InTreeToCSITranslator,
-	vaLister storagelisters.VolumeAttachmentLister) *attachDetachStateCollector {
+	intreeToCSITranslator csimigration.InTreeToCSITranslator) *attachDetachStateCollector {
 	return &attachDetachStateCollector{pvcLister: pvcLister, podLister: podLister, pvLister: pvLister, asw: asw,
 		dsw: dsw, volumePluginMgr: pluginMgr, csiMigratedPluginManager: csiMigratedPluginManager,
-		intreeToCSITranslator: intreeToCSITranslator, vaLister: vaLister}
+		intreeToCSITranslator: intreeToCSITranslator}
 }
 
 // Check if our collector implements necessary collector interface
