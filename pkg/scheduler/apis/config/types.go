@@ -17,6 +17,8 @@ limitations under the License.
 package config
 
 import (
+	"math"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -220,9 +222,23 @@ type PluginConfig struct {
 	Args runtime.Unknown
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// NOTE: The following methods are intentionally left out of the staging mirror.
-///////////////////////////////////////////////////////////////////////////////
+/*
+ * NOTE: The following variables and methods are intentionally left out of the staging mirror.
+ */
+const (
+	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
+	// that once found feasible, the scheduler stops looking for more nodes.
+	DefaultPercentageOfNodesToScore = 50
+
+	// MaxCustomPriorityScore is the max score UtilizationShapePoint expects.
+	MaxCustomPriorityScore int64 = 10
+
+	// MaxTotalScore is the maximum total score.
+	MaxTotalScore int64 = math.MaxInt64
+
+	// MaxWeight defines the max weight value allowed for custom PriorityPolicy
+	MaxWeight = MaxTotalScore / MaxCustomPriorityScore
+)
 
 func appendPluginSet(dst *PluginSet, src *PluginSet) *PluginSet {
 	if dst == nil {

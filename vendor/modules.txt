@@ -1238,7 +1238,6 @@ k8s.io/apimachinery/pkg/runtime/serializer/protobuf
 k8s.io/apimachinery/pkg/runtime/serializer/recognizer
 k8s.io/apimachinery/pkg/runtime/serializer/streaming
 k8s.io/apimachinery/pkg/runtime/serializer/versioning
-k8s.io/apimachinery/pkg/runtime/serializer/yaml
 k8s.io/apimachinery/pkg/selection
 k8s.io/apimachinery/pkg/types
 k8s.io/apimachinery/pkg/util/cache
@@ -1755,6 +1754,7 @@ k8s.io/kube-openapi/pkg/util/sets
 # k8s.io/kube-proxy v0.0.0 => ./staging/src/k8s.io/kube-proxy
 k8s.io/kube-proxy/config/v1alpha1
 # k8s.io/kube-scheduler v0.0.0 => ./staging/src/k8s.io/kube-scheduler
+k8s.io/kube-scheduler/config/v1
 k8s.io/kube-scheduler/config/v1alpha1
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
 k8s.io/kubectl/pkg/apps
