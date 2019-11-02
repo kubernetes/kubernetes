@@ -19,8 +19,9 @@
 #>
 
 # IMPORTANT PLEASE NOTE:
-# Any time the file structure in the `windows` directory changes, `windows/BUILD`
-# and `k8s.io/release/lib/releaselib.sh` must be manually updated with the changes.
+# Any time the file structure in the `windows` directory changes,
+# `windows/BUILD` and `k8s.io/release/lib/releaselib.sh` must be manually
+# updated with the changes.
 # We HIGHLY recommend not changing the file structure, because consumers of
 # Kubernetes releases depend on the release structure remaining stable.
 
@@ -542,6 +543,17 @@ function Test-IsTestCluster {
     return $true
   }
   return $false
+}
+
+# Returns true if this node uses a plugin to support authentication to the
+# master, e.g. for TPM-based authentication. $KubeEnv is a hash table
+# containing the kube-env metadata keys+values.
+function Test-NodeUsesAuthPlugin {
+  param (
+    [parameter(Mandatory=$true)] [hashtable]$KubeEnv
+  )
+
+  return $KubeEnv.Contains('EXEC_AUTH_PLUGIN_URL')
 }
 
 # Export all public functions:

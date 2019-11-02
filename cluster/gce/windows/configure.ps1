@@ -133,6 +133,7 @@ try {
 
   DownloadAndInstall-Crictl
   Setup-ContainerRuntime
+  DownloadAndInstall-AuthPlugin
   DownloadAndInstall-KubernetesBinaries
   Create-NodePki
   Create-KubeletKubeconfig
