@@ -173,7 +173,7 @@ func TestForwardPorts(t *testing.T) {
 				continue
 			}
 			b := make([]byte, 4)
-			n, err = clientConn.Read(b)
+			_, err = clientConn.Read(b)
 			if err != nil && err != io.EOF {
 				t.Errorf("%s: Error reading data: %s", testName, err)
 				server.Close()
