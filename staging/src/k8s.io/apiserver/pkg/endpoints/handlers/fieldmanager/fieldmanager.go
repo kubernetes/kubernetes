@@ -68,8 +68,8 @@ func NewFieldManager(f Manager) *FieldManager {
 
 // NewDefaultFieldManager creates a new FieldManager that merges apply requests
 // and update managed fields for other types of requests.
-func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, objectResetter runtime.ObjectResetter, kind schema.GroupVersionKind, hub schema.GroupVersion) (*FieldManager, error) {
-	f, err := NewStructuredMergeManager(models, objectConverter, objectDefaulter, objectResetter, kind.GroupVersion(), hub)
+func NewDefaultFieldManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectCreater runtime.ObjectCreater, kind schema.GroupVersionKind, hub schema.GroupVersion) (*FieldManager, error) {
+	f, err := NewStructuredMergeManager(models, objectConverter, objectDefaulter, kind.GroupVersion(), hub)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create field manager: %v", err)
 	}

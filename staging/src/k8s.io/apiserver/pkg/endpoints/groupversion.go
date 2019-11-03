@@ -71,7 +71,6 @@ type APIGroupVersion struct {
 	Defaulter       runtime.ObjectDefaulter
 	Linker          runtime.SelfLinker
 	UnsafeConvertor runtime.ObjectConvertor
-	Resetter        runtime.ObjectResetter
 
 	EquivalentResourceRegistry runtime.EquivalentResourceRegistry
 

@@ -37,7 +37,6 @@ type structuredMergeManager struct {
 	typeConverter   internal.TypeConverter
 	objectConverter runtime.ObjectConvertor
 	objectDefaulter runtime.ObjectDefaulter
-	objectResetter  runtime.ObjectResetter
 	groupVersion    schema.GroupVersion
 	hubVersion      schema.GroupVersion
 	updater         merge.Updater
@@ -47,7 +46,7 @@ var _ Manager = &structuredMergeManager{}
 
 // NewStructuredMergeManager creates a new Manager that merges apply requests
 // and update managed fields for other types of requests.
-func NewStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, objectResetter runtime.ObjectResetter, gv schema.GroupVersion, hub schema.GroupVersion) (Manager, error) {
+func NewStructuredMergeManager(models openapiproto.Models, objectConverter runtime.ObjectConvertor, objectDefaulter runtime.ObjectDefaulter, gv schema.GroupVersion, hub schema.GroupVersion) (Manager, error) {
 	typeConverter, err := internal.NewTypeConverter(models, false)
 	if err != nil {
 		return nil, err
@@ -57,7 +56,6 @@ func NewStructuredMergeManager(models openapiproto.Models, objectConverter runti
 		typeConverter:   typeConverter,
 		objectConverter: objectConverter,
 		objectDefaulter: objectDefaulter,
-		objectResetter:  objectResetter,
 		groupVersion:    gv,
 		hubVersion:      hub,
 		updater: merge.Updater{
@@ -143,8 +141,6 @@ func (f *structuredMergeManager) Apply(liveObj runtime.Object, patch []byte, man
 	if err := yaml.Unmarshal(patch, &patchObj.Object); err != nil {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
 	}
-
-	f.objectResetter.ResetFields(patchObj, liveObj)
 
 	// Check that the patch object has the same version as the live object
 	if patchObj.GetAPIVersion() != f.groupVersion.String() {
