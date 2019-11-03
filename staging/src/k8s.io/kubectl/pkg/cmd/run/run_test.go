@@ -168,7 +168,7 @@ func TestRunArgsFollowDashRules(t *testing.T) {
 			defer tf.Cleanup()
 
 			codec := scheme.Codecs.LegacyCodec(scheme.Scheme.PrioritizedVersionsAllGroups()...)
-			ns := scheme.Codecs
+			ns := scheme.Codecs.WithoutConversion()
 
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         corev1.SchemeGroupVersion,
@@ -332,7 +332,7 @@ func TestGenerateService(t *testing.T) {
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
 			tf.Client = &fake.RESTClient{
 				GroupVersion:         corev1.SchemeGroupVersion,
-				NegotiatedSerializer: ns,
+				NegotiatedSerializer: ns.WithoutConversion(),
 				Client: fake.CreateHTTPClient(func(req *http.Request) (*http.Response, error) {
 					switch p, m := req.URL.Path, req.Method; {
 					case test.expectPOST && m == "POST" && p == "/namespaces/test/services":
@@ -506,7 +506,7 @@ func TestRunValidations(t *testing.T) {
 
 			_, _, codec := cmdtesting.NewExternalScheme()
 			tf.Client = &fake.RESTClient{
-				NegotiatedSerializer: scheme.Codecs,
+				NegotiatedSerializer: scheme.Codecs.WithoutConversion(),
 				Resp:                 &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, cmdtesting.NewInternalType("", "", ""))},
 			}
 			tf.ClientConfigVal = cmdtesting.DefaultClientConfig()
