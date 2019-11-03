@@ -19,6 +19,7 @@ package cloud
 import (
 	"time"
 
+	v1 "k8s.io/api/core/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -55,7 +56,7 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 
 		framework.Logf("Original number of ready nodes: %d", len(origNodes.Items))
 
-		err = framework.DeleteNodeOnCloudProvider(nodeToDelete)
+		err = deleteNodeOnCloudProvider(nodeToDelete)
 		if err != nil {
 			framework.Failf("failed to delete node %q, err: %q", nodeToDelete.Name, err)
 		}
@@ -73,3 +74,8 @@ var _ = SIGDescribe("[Feature:CloudProvider][Disruptive] Nodes", func() {
 
 	})
 })
+
+// DeleteNodeOnCloudProvider deletes the specified node.
+func deleteNodeOnCloudProvider(node *v1.Node) error {
+	return framework.TestContext.CloudConfig.Provider.DeleteNode(node)
+}
