@@ -54,27 +54,27 @@ type RESTClient struct {
 }
 
 func (c *RESTClient) Get() *restclient.Request {
-	return c.request("GET")
+	return c.Verb("GET")
 }
 
 func (c *RESTClient) Put() *restclient.Request {
-	return c.request("PUT")
+	return c.Verb("PUT")
 }
 
 func (c *RESTClient) Patch(pt types.PatchType) *restclient.Request {
-	return c.request("PATCH").SetHeader("Content-Type", string(pt))
+	return c.Verb("PATCH").SetHeader("Content-Type", string(pt))
 }
 
 func (c *RESTClient) Post() *restclient.Request {
-	return c.request("POST")
+	return c.Verb("POST")
 }
 
 func (c *RESTClient) Delete() *restclient.Request {
-	return c.request("DELETE")
+	return c.Verb("DELETE")
 }
 
 func (c *RESTClient) Verb(verb string) *restclient.Request {
-	return c.request(verb)
+	return c.Request().Verb(verb)
 }
 
 func (c *RESTClient) APIVersion() schema.GroupVersion {
@@ -85,28 +85,16 @@ func (c *RESTClient) GetRateLimiter() flowcontrol.RateLimiter {
 	return nil
 }
 
-func (c *RESTClient) request(verb string) *restclient.Request {
-	config := restclient.ContentConfig{
-		ContentType:          runtime.ContentTypeJSON,
-		GroupVersion:         &c.GroupVersion,
-		NegotiatedSerializer: c.NegotiatedSerializer,
+func (c *RESTClient) Request() *restclient.Request {
+	config := restclient.ClientContentConfig{
+		ContentType:  runtime.ContentTypeJSON,
+		GroupVersion: c.GroupVersion,
+		Negotiator:   runtime.NewClientNegotiator(c.NegotiatedSerializer, c.GroupVersion),
 	}
-
-	ns := c.NegotiatedSerializer
-	info, _ := runtime.SerializerInfoForMediaType(ns.SupportedMediaTypes(), runtime.ContentTypeJSON)
-	serializers := restclient.Serializers{
-		// TODO this was hardcoded before, but it doesn't look right
-		Encoder: ns.EncoderForVersion(info.Serializer, c.GroupVersion),
-		Decoder: ns.DecoderToVersion(info.Serializer, c.GroupVersion),
-	}
-	if info.StreamSerializer != nil {
-		serializers.StreamingSerializer = info.StreamSerializer.Serializer
-		serializers.Framer = info.StreamSerializer.Framer
-	}
-	return restclient.NewRequest(c, verb, &url.URL{Host: "localhost"}, c.VersionedAPIPath, config, serializers, nil, nil, 0)
+	return restclient.NewRequestWithClient(&url.URL{Scheme: "https", Host: "localhost"}, c.VersionedAPIPath, config, CreateHTTPClient(c.do))
 }
 
-func (c *RESTClient) Do(req *http.Request) (*http.Response, error) {
+func (c *RESTClient) do(req *http.Request) (*http.Response, error) {
 	if c.Err != nil {
 		return nil, c.Err
 	}
