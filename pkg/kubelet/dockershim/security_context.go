@@ -146,24 +146,23 @@ func modifyHostConfig(sc *runtimeapi.LinuxContainerSecurityContext, hostConfig *
 // modifySandboxNamespaceOptions apply namespace options for sandbox
 func modifySandboxNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig, network *knetwork.PluginManager) {
 	// The sandbox's PID namespace is the one that's shared, so CONTAINER and POD are equivalent for it
-	modifyCommonNamespaceOptions(nsOpts, hostConfig)
+	if nsOpts.GetPid() == runtimeapi.NamespaceMode_NODE {
+		hostConfig.PidMode = namespaceModeHost
+	}
 	modifyHostOptionsForSandbox(nsOpts, network, hostConfig)
 }
 
 // modifyContainerNamespaceOptions apply namespace options for container
 func modifyContainerNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, podSandboxID string, hostConfig *dockercontainer.HostConfig) {
-	if nsOpts.GetPid() == runtimeapi.NamespaceMode_POD {
-		hostConfig.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", podSandboxID))
-	}
-	modifyCommonNamespaceOptions(nsOpts, hostConfig)
-	modifyHostOptionsForContainer(nsOpts, podSandboxID, hostConfig)
-}
-
-// modifyCommonNamespaceOptions apply common namespace options for sandbox and container
-func modifyCommonNamespaceOptions(nsOpts *runtimeapi.NamespaceOption, hostConfig *dockercontainer.HostConfig) {
-	if nsOpts.GetPid() == runtimeapi.NamespaceMode_NODE {
+	switch nsOpts.GetPid() {
+	case runtimeapi.NamespaceMode_NODE:
 		hostConfig.PidMode = namespaceModeHost
+	case runtimeapi.NamespaceMode_POD:
+		hostConfig.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", podSandboxID))
+	case runtimeapi.NamespaceMode_TARGET:
+		hostConfig.PidMode = dockercontainer.PidMode(fmt.Sprintf("container:%v", nsOpts.GetTargetId()))
 	}
+	modifyHostOptionsForContainer(nsOpts, podSandboxID, hostConfig)
 }
 
 // modifyHostOptionsForSandbox applies NetworkMode/UTSMode to sandbox's dockercontainer.HostConfig.
