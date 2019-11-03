@@ -38,6 +38,7 @@ import (
 // API conventions.
 type RESTCreateStrategy interface {
 	runtime.ObjectTyper
+	ObjectResetter
 	// The name generator is used when the standard GenerateName field is set.
 	// The NameGenerator will be invoked prior to validation.
 	names.NameGenerator

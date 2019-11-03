@@ -344,3 +344,11 @@ type StorageVersionProvider interface {
 	// list of kinds the object might belong to.
 	StorageVersion() runtime.GroupVersioner
 }
+
+// ObjectResetter is an optional interface that a strategy can implement
+// to reset fields not meant to be changed by a user
+type ObjectResetter interface {
+	// ResetFields takes an Object (must be a pointer) and resets any fields that are not allowed to be changed by a user
+	// If old is not nil, fields in the new object will be reset based on old.
+	ResetFields(new, old runtime.Object)
+}
