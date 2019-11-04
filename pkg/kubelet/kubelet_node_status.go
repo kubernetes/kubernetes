@@ -242,7 +242,7 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 	}
 
 	unschedulableTaint := v1.Taint{
-		Key:    schedulerapi.TaintNodeUnschedulable,
+		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 

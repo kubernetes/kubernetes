@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apiserver/pkg/admission"
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
@@ -28,8 +29,6 @@ import (
 const (
 	// PluginName is the name of the plugin.
 	PluginName = "TaintNodesByCondition"
-	// TaintNodeNotReady is the not-ready label as specified in the API.
-	TaintNodeNotReady = "node.kubernetes.io/not-ready"
 )
 
 // Register registers a plugin
@@ -83,7 +82,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 
 func addNotReadyTaint(node *api.Node) {
 	notReadyTaint := api.Taint{
-		Key:    TaintNodeNotReady,
+		Key:    v1.TaintNodeNotReady,
 		Effect: api.TaintEffectNoSchedule,
 	}
 	for _, taint := range node.Spec.Taints {

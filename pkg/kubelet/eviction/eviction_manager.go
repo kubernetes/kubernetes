@@ -40,7 +40,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/server/stats"
 	kubelettypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 const (
@@ -149,7 +148,7 @@ func (m *managerImpl) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAd
 		// When node has memory pressure, check BestEffort Pod's toleration:
 		// admit it if tolerates memory pressure taint, fail for other tolerations, e.g. DiskPressure.
 		if v1helper.TolerationsTolerateTaint(attrs.Pod.Spec.Tolerations, &v1.Taint{
-			Key:    schedulerapi.TaintNodeMemoryPressure,
+			Key:    v1.TaintNodeMemoryPressure,
 			Effect: v1.TaintEffectNoSchedule,
 		}) {
 			return lifecycle.PodAdmitResult{Admit: true}

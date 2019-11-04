@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	legacyapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -1520,7 +1519,7 @@ func CheckNodeUnschedulablePredicate(pod *v1.Pod, meta PredicateMetadata, nodeIn
 
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
 	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
-		Key:    legacyapi.TaintNodeUnschedulable,
+		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	})
 
