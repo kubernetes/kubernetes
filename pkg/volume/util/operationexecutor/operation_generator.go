@@ -1055,20 +1055,40 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			klog.Infof(volumeToMount.GenerateMsgDetailed("MapVolume.WaitForAttach succeeded", fmt.Sprintf("DevicePath %q", devicePath)))
 
 		}
-		// A plugin doesn't have attacher also needs to map device to global map path with SetUpDevice()
-		pluginDevicePath, mapErr := blockVolumeMapper.SetUpDevice()
-		if mapErr != nil {
-			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateError("MapVolume.SetUpDevice failed", mapErr)
+		// Call SetUpDevice if blockVolumeMapper implements CustomBlockVolumeMapper
+		if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok {
+			mapErr := customBlockVolumeMapper.SetUpDevice()
+			if mapErr != nil {
+				// On failure, return error. Caller will log and retry.
+				return volumeToMount.GenerateError("MapVolume.SetUpDevice failed", mapErr)
+			}
 		}
 
-		// if pluginDevicePath is provided, assume attacher may not provide device
-		// or attachment flow uses SetupDevice to get device path
-		if len(pluginDevicePath) != 0 {
-			devicePath = pluginDevicePath
+		// Update actual state of world to reflect volume is globally mounted
+		markDeviceMappedErr := actualStateOfWorld.MarkDeviceAsMounted(
+			volumeToMount.VolumeName, devicePath, globalMapPath)
+		if markDeviceMappedErr != nil {
+			// On failure, return error. Caller will log and retry.
+			return volumeToMount.GenerateError("MapVolume.MarkDeviceAsMounted failed", markDeviceMappedErr)
 		}
-		if len(devicePath) == 0 {
-			return volumeToMount.GenerateError("MapVolume failed", goerrors.New("Device path of the volume is empty"))
+
+		// Call MapPodDevice if blockVolumeMapper implements CustomBlockVolumeMapper
+		if customBlockVolumeMapper, ok := blockVolumeMapper.(volume.CustomBlockVolumeMapper); ok {
+			// Execute driver specific map
+			pluginDevicePath, mapErr := customBlockVolumeMapper.MapPodDevice()
+			if mapErr != nil {
+				// On failure, return error. Caller will log and retry.
+				return volumeToMount.GenerateError("MapVolume.MapPodDevice failed", mapErr)
+			}
+
+			// if pluginDevicePath is provided, assume attacher may not provide device
+			// or attachment flow uses SetupDevice to get device path
+			if len(pluginDevicePath) != 0 {
+				devicePath = pluginDevicePath
+			}
+			if len(devicePath) == 0 {
+				return volumeToMount.GenerateError("MapVolume failed", goerrors.New("Device path of the volume is empty"))
+			}
 		}
 
 		// When kubelet is containerized, devicePath may be a symlink at a place unavailable to
@@ -1085,37 +1105,22 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			return volumeToMount.GenerateError("MapVolume.EvalHostSymlinks failed", err)
 		}
 
-		// Execute driver specific map
-		volumeMapPath, volName := blockVolumeMapper.GetPodDeviceMapPath()
-		mapErr = blockVolumeMapper.MapDevice(devicePath, globalMapPath, volumeMapPath, volName, volumeToMount.Pod.UID)
-		if mapErr != nil {
-			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateError("MapVolume.MapDevice failed", mapErr)
-		}
-
 		// Execute common map
-		mapErr = ioutil.MapBlockVolume(og.blkUtil, devicePath, globalMapPath, volumeMapPath, volName, volumeToMount.Pod.UID)
+		volumeMapPath, volName := blockVolumeMapper.GetPodDeviceMapPath()
+		mapErr := ioutil.MapBlockVolume(og.blkUtil, devicePath, globalMapPath, volumeMapPath, volName, volumeToMount.Pod.UID)
 		if mapErr != nil {
 			// On failure, return error. Caller will log and retry.
 			return volumeToMount.GenerateError("MapVolume.MapBlockVolume failed", mapErr)
 		}
 
-		// Update actual state of world to reflect volume is globally mounted
-		markDeviceMappedErr := actualStateOfWorld.MarkDeviceAsMounted(
-			volumeToMount.VolumeName, devicePath, globalMapPath)
-		if markDeviceMappedErr != nil {
-			// On failure, return error. Caller will log and retry.
-			return volumeToMount.GenerateError("MapVolume.MarkDeviceAsMounted failed", markDeviceMappedErr)
-		}
-
 		// Device mapping for global map path succeeded
-		simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MapVolume.MapDevice succeeded", fmt.Sprintf("globalMapPath %q", globalMapPath))
+		simpleMsg, detailedMsg := volumeToMount.GenerateMsg("MapVolume.MapPodDevice succeeded", fmt.Sprintf("globalMapPath %q", globalMapPath))
 		verbosity := klog.Level(4)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.SuccessfulMountVolume, simpleMsg)
 		klog.V(verbosity).Infof(detailedMsg)
 
 		// Device mapping for pod device map path succeeded
-		simpleMsg, detailedMsg = volumeToMount.GenerateMsg("MapVolume.MapDevice succeeded", fmt.Sprintf("volumeMapPath %q", volumeMapPath))
+		simpleMsg, detailedMsg = volumeToMount.GenerateMsg("MapVolume.MapPodDevice succeeded", fmt.Sprintf("volumeMapPath %q", volumeMapPath))
 		verbosity = klog.Level(1)
 		og.recorder.Eventf(volumeToMount.Pod, v1.EventTypeNormal, kevents.SuccessfulMountVolume, simpleMsg)
 		klog.V(verbosity).Infof(detailedMsg)
@@ -1218,6 +1223,16 @@ func (og *operationGenerator) GenerateUnmapVolumeFunc(
 			return volumeToUnmount.GenerateError("UnmapVolume.UnmapBlockVolume failed", unmapErr)
 		}
 
+		// Call UnmapPodDevice if blockVolumeUnmapper implements CustomBlockVolumeUnmapper
+		if customBlockVolumeUnmapper, ok := blockVolumeUnmapper.(volume.CustomBlockVolumeUnmapper); ok {
+			// Execute plugin specific unmap
+			unmapErr = customBlockVolumeUnmapper.UnmapPodDevice()
+			if unmapErr != nil {
+				// On failure, return error. Caller will log and retry.
+				return volumeToUnmount.GenerateError("UnmapVolume.UnmapPodDevice failed", unmapErr)
+			}
+		}
+
 		klog.Infof(
 			"UnmapVolume succeeded for volume %q (OuterVolumeSpecName: %q) pod %q (UID: %q). InnerVolumeSpecName %q. PluginName %q, VolumeGidValue %q",
 			volumeToUnmount.VolumeName,
@@ -1309,11 +1324,14 @@ func (og *operationGenerator) GenerateUnmapDeviceFunc(
 			return deviceToDetach.GenerateError("UnmapDevice failed", err)
 		}
 
-		// Execute tear down device
-		unmapErr := blockVolumeUnmapper.TearDownDevice(globalMapPath, deviceToDetach.DevicePath)
-		if unmapErr != nil {
-			// On failure, return error. Caller will log and retry.
-			return deviceToDetach.GenerateError("UnmapDevice.TearDownDevice failed", unmapErr)
+		// Call TearDownDevice if blockVolumeUnmapper implements CustomBlockVolumeUnmapper
+		if customBlockVolumeUnmapper, ok := blockVolumeUnmapper.(volume.CustomBlockVolumeUnmapper); ok {
+			// Execute tear down device
+			unmapErr := customBlockVolumeUnmapper.TearDownDevice(globalMapPath, deviceToDetach.DevicePath)
+			if unmapErr != nil {
+				// On failure, return error. Caller will log and retry.
+				return deviceToDetach.GenerateError("UnmapDevice.TearDownDevice failed", unmapErr)
+			}
 		}
 
 		// Plugin finished TearDownDevice(). Now globalMapPath dir and plugin's stored data

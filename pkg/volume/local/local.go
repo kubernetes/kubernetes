@@ -612,16 +612,18 @@ type localVolumeMapper struct {
 }
 
 var _ volume.BlockVolumeMapper = &localVolumeMapper{}
+var _ volume.CustomBlockVolumeMapper = &localVolumeMapper{}
 
-// SetUpDevice provides physical device path for the local PV.
-func (m *localVolumeMapper) SetUpDevice() (string, error) {
-	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
-	klog.V(4).Infof("SetupDevice returning path %s", globalPath)
-	return globalPath, nil
+// SetUpDevice prepares the volume to the node by the plugin specific way.
+func (m *localVolumeMapper) SetUpDevice() error {
+	return nil
 }
 
-func (m *localVolumeMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return nil
+// SetUpDevice provides physical device path for the local PV.
+func (m *localVolumeMapper) MapPodDevice() (string, error) {
+	globalPath := util.MakeAbsolutePath(runtime.GOOS, m.globalPath)
+	klog.V(4).Infof("MapPodDevice returning path %s", globalPath)
+	return globalPath, nil
 }
 
 // localVolumeUnmapper implements the BlockVolumeUnmapper interface for local volumes.
@@ -630,12 +632,6 @@ type localVolumeUnmapper struct {
 }
 
 var _ volume.BlockVolumeUnmapper = &localVolumeUnmapper{}
-
-// TearDownDevice will undo SetUpDevice procedure. In local PV, all of this already handled by operation_generator.
-func (u *localVolumeUnmapper) TearDownDevice(mapPath, _ string) error {
-	klog.V(4).Infof("local: TearDownDevice completed for: %s", mapPath)
-	return nil
-}
 
 // GetGlobalMapPath returns global map path and error.
 // path: plugins/kubernetes.io/kubernetes.io/local-volume/volumeDevices/{volumeName}

@@ -132,22 +132,10 @@ type vsphereBlockVolumeMapper struct {
 	*vsphereVolume
 }
 
-func (v vsphereBlockVolumeMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (v vsphereBlockVolumeMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return nil
-}
-
 var _ volume.BlockVolumeUnmapper = &vsphereBlockVolumeUnmapper{}
 
 type vsphereBlockVolumeUnmapper struct {
 	*vsphereVolume
-}
-
-func (v *vsphereBlockVolumeUnmapper) TearDownDevice(mapPath, devicePath string) error {
-	return nil
 }
 
 // GetGlobalMapPath returns global map path and error

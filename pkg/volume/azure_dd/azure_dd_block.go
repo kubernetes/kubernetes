@@ -118,10 +118,6 @@ func (plugin *azureDataDiskPlugin) newUnmapperInternal(volName string, podUID ty
 	return &azureDataDiskUnmapper{dataDisk: disk}, nil
 }
 
-func (c *azureDataDiskUnmapper) TearDownDevice(mapPath, devicePath string) error {
-	return nil
-}
-
 type azureDataDiskUnmapper struct {
 	*dataDisk
 }
@@ -134,14 +130,6 @@ type azureDataDiskMapper struct {
 }
 
 var _ volume.BlockVolumeMapper = &azureDataDiskMapper{}
-
-func (b *azureDataDiskMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *azureDataDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return nil
-}
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/volumeID

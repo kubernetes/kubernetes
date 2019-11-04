@@ -125,10 +125,6 @@ func (plugin *awsElasticBlockStorePlugin) newUnmapperInternal(volName string, po
 		}}, nil
 }
 
-func (c *awsElasticBlockStoreUnmapper) TearDownDevice(mapPath, devicePath string) error {
-	return nil
-}
-
 type awsElasticBlockStoreUnmapper struct {
 	*awsElasticBlockStore
 }
@@ -141,14 +137,6 @@ type awsElasticBlockStoreMapper struct {
 }
 
 var _ volume.BlockVolumeMapper = &awsElasticBlockStoreMapper{}
-
-func (b *awsElasticBlockStoreMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (b *awsElasticBlockStoreMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return nil
-}
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/volumeID

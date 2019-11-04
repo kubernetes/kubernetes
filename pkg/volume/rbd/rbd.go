@@ -898,6 +898,7 @@ type rbdDiskMapper struct {
 }
 
 var _ volume.BlockVolumeUnmapper = &rbdDiskUnmapper{}
+var _ volume.CustomBlockVolumeUnmapper = &rbdDiskUnmapper{}
 
 // GetGlobalMapPath returns global map path and error
 // path: plugins/kubernetes.io/{PluginName}/volumeDevices/{rbd pool}-image-{rbd image-name}/{podUid}
@@ -910,14 +911,6 @@ func (rbd *rbd) GetGlobalMapPath(spec *volume.Spec) (string, error) {
 // volumeName: pv0001
 func (rbd *rbd) GetPodDeviceMapPath() (string, string) {
 	return rbd.rbdPodDeviceMapPath()
-}
-
-func (rbd *rbdDiskMapper) SetUpDevice() (string, error) {
-	return "", nil
-}
-
-func (rbd *rbdDiskMapper) MapDevice(devicePath, globalMapPath, volumeMapPath, volumeMapName string, podUID types.UID) error {
-	return nil
 }
 
 func (rbd *rbd) rbdGlobalMapPath(spec *volume.Spec) (string, error) {
@@ -1000,6 +993,10 @@ func (rbd *rbdDiskUnmapper) TearDownDevice(mapPath, _ string) error {
 	}
 	klog.V(4).Infof("rbd: successfully detached disk: %s", mapPath)
 
+	return nil
+}
+
+func (rbd *rbdDiskUnmapper) UnmapPodDevice() error {
 	return nil
 }
 
