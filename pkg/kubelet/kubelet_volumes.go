@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/klog"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
-	"k8s.io/kubernetes/pkg/util/removeall"
 	"k8s.io/kubernetes/pkg/volume"
 	volumetypes "k8s.io/kubernetes/pkg/volume/util/types"
 )
@@ -143,7 +142,7 @@ func (kl *Kubelet) cleanupOrphanedPodDirs(pods []*v1.Pod, runningPods []*kubecon
 		}
 
 		klog.V(3).Infof("Orphaned pod %q found, removing", uid)
-		if err := removeall.RemoveAllOneFilesystem(kl.mounter, kl.getPodDir(uid)); err != nil {
+		if err := kubecontainer.RemoveAllOneFilesystem(kl.mounter, kl.getPodDir(uid)); err != nil {
 			klog.Errorf("Failed to remove orphaned pod %q dir; err: %v", uid, err)
 			orphanRemovalErrors = append(orphanRemovalErrors, err)
 		}

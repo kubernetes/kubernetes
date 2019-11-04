@@ -101,7 +101,6 @@ go_library(
         "//pkg/util/mount:go_default_library",
         "//pkg/util/node:go_default_library",
         "//pkg/util/oom:go_default_library",
-        "//pkg/util/removeall:go_default_library",
         "//pkg/util/selinux:go_default_library",
         "//pkg/util/taints:go_default_library",
         "//pkg/volume:go_default_library",

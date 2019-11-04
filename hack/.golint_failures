@@ -232,7 +232,6 @@ pkg/util/labels
 pkg/util/mount
 pkg/util/oom
 pkg/util/procfs
-pkg/util/removeall
 pkg/util/rlimit
 pkg/util/selinux
 pkg/util/sysctl/testing
