@@ -130,10 +130,14 @@ func parseLosetupOutputForDevice(output []byte, path string) (string, error) {
 	}
 
 	// losetup -j {path} returns device in the format:
-	// /dev/loop1: [0073]:148662 (/dev/{globalMapPath}/{pod1-UUID})
-	// /dev/loop2: [0073]:148662 (/dev/{globalMapPath}/{pod2-UUID})
+	// /dev/loop1: [0073]:148662 ({path})
+	// /dev/loop2: [0073]:148662 (/dev/sdX)
+	//
+	// losetup -j shows all the loop device for the same device that has the same
+	// major/minor number, by resolving symlink and matching major/minor number.
+	// Therefore, there will be other path than {path} in output, as shown in above output.
 	s := string(output)
-	// Find line that exact matches the path
+	// Find the line that exact matches to the path, or "({path})"
 	var matched string
 	scanner := bufio.NewScanner(strings.NewReader(s))
 	for scanner.Scan() {
@@ -147,6 +151,8 @@ func parseLosetupOutputForDevice(output []byte, path string) (string, error) {
 	}
 	s = matched
 
+	// Get device name, or the 0th field of the output separated with ":".
+	// We don't need 1st field or later to be splitted, so passing 2 to SplitN.
 	device := strings.TrimSpace(strings.SplitN(s, ":", 2)[0])
 	if len(device) == 0 {
 		return "", errors.New(ErrDeviceNotFound)
@@ -181,26 +187,42 @@ func (v VolumePathHandler) FindGlobalMapPathUUIDFromPod(pluginDir, mapPath strin
 	return globalMapPathUUID, nil
 }
 
+// compareBindMountAndSymlinks returns if global path (bind mount) and
+// pod path (symlink) are pointing to the same device.
+// If there is an error in checking it returns error.
 func compareBindMountAndSymlinks(global, pod string) (bool, error) {
+	// To check if bind mount and symlink are pointing to the same device,
+	// we need to check if they are pointing to the devices that have same major/minor number.
+
+	// Get the major/minor number for global path
 	devNumGlobal, err := getDeviceMajorMinor(global)
 	if err != nil {
 		return false, err
 	}
+
+	// Get the symlinked device from the pod path
 	devPod, err := os.Readlink(pod)
 	if err != nil {
 		return false, err
 	}
+	// Get the major/minor number for the symlinked device from the pod path
 	devNumPod, err := getDeviceMajorMinor(devPod)
 	if err != nil {
 		return false, err
 	}
 	klog.V(5).Infof("CompareBindMountAndSymlinks: devNumGlobal %s, devNumPod %s", devNumGlobal, devNumPod)
+
+	// Check if the major/minor number are the same
 	if devNumGlobal == devNumPod {
 		return true, nil
 	}
 	return false, nil
 }
 
+// getDeviceMajorMinor returns major/minor number for the path with belwo format:
+// major:minor (in hex)
+// ex)
+//     fc:10
 func getDeviceMajorMinor(path string) (string, error) {
 	args := []string{"-c", "%t:%T", path}
 	cmd := exec.Command(statPath, args...)

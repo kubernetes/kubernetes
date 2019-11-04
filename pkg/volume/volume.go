@@ -41,12 +41,12 @@ type Volume interface {
 // and pod device map path.
 type BlockVolume interface {
 	// GetGlobalMapPath returns a global map path which contains
-	// symbolic links associated to a block device.
+	// bind mount associated to a block device.
 	// ex. plugins/kubernetes.io/{PluginName}/{DefaultKubeletVolumeDevicesDirName}/{volumePluginDependentPath}/{pod uuid}
 	GetGlobalMapPath(spec *Spec) (string, error)
 	// GetPodDeviceMapPath returns a pod device map path
 	// and name of a symbolic link associated to a block device.
-	// ex. pods/{podUid}}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
+	// ex. pods/{podUid}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/, {volumeName}
 	GetPodDeviceMapPath() (string, string)
 }
 
