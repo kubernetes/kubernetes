@@ -460,7 +460,7 @@ var _ = SIGDescribe("Kubectl client", func() {
 						// tolerate discovery errors for non-k8s.io groups (like aggregated/crd groups)
 						continue
 					}
-					if gv.Group == "wardle.k8s.io" || gv.Group == "metrics.k8s.io" {
+					if gv.Group == "metrics.k8s.io" {
 						// tolerate discovery errors for known test k8s.io groups like aggregated/metrics groups
 						continue
 					}
