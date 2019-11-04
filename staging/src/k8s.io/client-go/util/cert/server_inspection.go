@@ -57,8 +57,8 @@ func GetClientCANamesForURL(kubeConfigURL string) ([]string, error) {
 	return GetClientCANames(apiserverURL.Host)
 }
 
-// GetServingCertificates returns the x509 certs used by a server.  The serverName is optional for specifying a different
-// name to get SNI certificates.  apiHost is "host:port"
+// GetServingCertificates returns the x509 certs used by a server as certificates and pem encoded bytes.
+// The serverName is optional for specifying a different name to get SNI certificates.  apiHost is "host:port"
 func GetServingCertificates(apiHost, serverName string) ([]*x509.Certificate, [][]byte, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: true, // this is insecure so that we always get connected
