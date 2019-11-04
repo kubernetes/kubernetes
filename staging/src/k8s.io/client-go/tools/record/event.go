@@ -129,6 +129,25 @@ type EventBroadcaster interface {
 	NewRecorder(scheme *runtime.Scheme, source v1.EventSource) EventRecorder
 }
 
+// EventRecorderAdapter is a wrapper around EventRecorder implementing the
+// new EventRecorder interface.
+type EventRecorderAdapter struct {
+	recorder EventRecorder
+}
+
+// NewEventRecorderAdapter returns an adapter implementing new EventRecorder
+// interface.
+func NewEventRecorderAdapter(recorder EventRecorder) *EventRecorderAdapter {
+	return &EventRecorderAdapter{
+		recorder: recorder,
+	}
+}
+
+// Eventf is a wrapper around v1 Eventf
+func (a *EventRecorderAdapter) Eventf(regarding, _ runtime.Object, eventtype, reason, action, note string, args ...interface{}) {
+	a.recorder.Eventf(regarding, eventtype, reason, note, args...)
+}
+
 // Creates a new event broadcaster.
 func NewBroadcaster() EventBroadcaster {
 	return &eventBroadcasterImpl{
