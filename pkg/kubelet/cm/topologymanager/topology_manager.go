@@ -120,25 +120,6 @@ var _ Manager = &manager{}
 //NewManager creates a new TopologyManager based on provided policy
 func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string) (Manager, error) {
 	klog.Infof("[topologymanager] Creating topology manager with %s policy", topologyPolicyName)
-	var policy Policy
-
-	switch topologyPolicyName {
-
-	case PolicyNone:
-		policy = NewNonePolicy()
-
-	case PolicyBestEffort:
-		policy = NewBestEffortPolicy()
-
-	case PolicyRestricted:
-		policy = NewRestrictedPolicy()
-
-	case PolicySingleNumaNode:
-		policy = NewSingleNumaNodePolicy()
-
-	default:
-		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
-	}
 
 	var numaNodes []int
 	for node := range numaNodeInfo {
@@ -147,6 +128,25 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 
 	if len(numaNodes) > maxAllowableNUMANodes {
 		return nil, fmt.Errorf("unsupported on machines with more than %v NUMA Nodes", maxAllowableNUMANodes)
+	}
+
+	var policy Policy
+	switch topologyPolicyName {
+
+	case PolicyNone:
+		policy = NewNonePolicy()
+
+	case PolicyBestEffort:
+		policy = NewBestEffortPolicy(numaNodes)
+
+	case PolicyRestricted:
+		policy = NewRestrictedPolicy(numaNodes)
+
+	case PolicySingleNumaNode:
+		policy = NewSingleNumaNodePolicy(numaNodes)
+
+	default:
+		return nil, fmt.Errorf("unknown policy: \"%s\"", topologyPolicyName)
 	}
 
 	var hp []HintProvider

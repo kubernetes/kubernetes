@@ -39,7 +39,8 @@ func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		policy := NewBestEffortPolicy()
+		numaNodes := []int{0, 1}
+		policy := NewBestEffortPolicy(numaNodes)
 		result := policy.CanAdmitPodResult(&tc.hint)
 
 		if result.Admit != tc.expected {

@@ -20,7 +20,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-type singleNumaNodePolicy struct{}
+type singleNumaNodePolicy struct {
+	//List of NUMA Nodes available on the underlying machine
+	numaNodes []int
+}
 
 var _ Policy = &singleNumaNodePolicy{}
 
@@ -28,8 +31,8 @@ var _ Policy = &singleNumaNodePolicy{}
 const PolicySingleNumaNode string = "single-numa-node"
 
 // NewSingleNumaNodePolicy returns single-numa-node policy.
-func NewSingleNumaNodePolicy() Policy {
-	return &singleNumaNodePolicy{}
+func NewSingleNumaNodePolicy(numaNodes []int) Policy {
+	return &singleNumaNodePolicy{numaNodes: numaNodes}
 }
 
 func (p *singleNumaNodePolicy) Name() string {

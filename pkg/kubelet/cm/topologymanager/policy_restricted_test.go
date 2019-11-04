@@ -39,7 +39,8 @@ func TestPolicyRestrictedCanAdmitPodResult(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		policy := NewRestrictedPolicy()
+		numaNodes := []int{0, 1}
+		policy := NewRestrictedPolicy(numaNodes)
 		result := policy.CanAdmitPodResult(&tc.hint)
 
 		if result.Admit != tc.expected {

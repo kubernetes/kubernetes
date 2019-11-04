@@ -34,7 +34,8 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		policy := NewSingleNumaNodePolicy()
+		numaNodes := []int{0, 1}
+		policy := NewSingleNumaNodePolicy(numaNodes)
 		result := policy.CanAdmitPodResult(&tc.hint)
 
 		if result.Admit != tc.expected {

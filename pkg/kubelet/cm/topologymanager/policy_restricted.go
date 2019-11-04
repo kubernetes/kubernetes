@@ -30,8 +30,8 @@ var _ Policy = &restrictedPolicy{}
 const PolicyRestricted string = "restricted"
 
 // NewRestrictedPolicy returns restricted policy.
-func NewRestrictedPolicy() Policy {
-	return &restrictedPolicy{bestEffortPolicy{}}
+func NewRestrictedPolicy(numaNodes []int) Policy {
+	return &restrictedPolicy{bestEffortPolicy{numaNodes: numaNodes}}
 }
 
 func (p *restrictedPolicy) Name() string {

@@ -20,7 +20,10 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-type bestEffortPolicy struct{}
+type bestEffortPolicy struct {
+	//List of NUMA Nodes available on the underlying machine
+	numaNodes []int
+}
 
 var _ Policy = &bestEffortPolicy{}
 
@@ -28,8 +31,8 @@ var _ Policy = &bestEffortPolicy{}
 const PolicyBestEffort string = "best-effort"
 
 // NewBestEffortPolicy returns best-effort policy.
-func NewBestEffortPolicy() Policy {
-	return &bestEffortPolicy{}
+func NewBestEffortPolicy(numaNodes []int) Policy {
+	return &bestEffortPolicy{numaNodes: numaNodes}
 }
 
 func (p *bestEffortPolicy) Name() string {
