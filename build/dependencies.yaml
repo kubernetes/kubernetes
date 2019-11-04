@@ -27,10 +27,8 @@ dependencies:
   - name: "docker"
     version: 19.03
     refPaths:
-    - path: cmd/kubeadm/app/util/system/docker_validator.go
+    - path: vendor/k8s.io/system-validators/validators/docker_validator.go
       match: latestValidatedDockerVersion
-    - path: cmd/kubeadm/app/util/system/docker_validator_test.go
-      match: ServerVersion
 
 
   - name: "golang"
