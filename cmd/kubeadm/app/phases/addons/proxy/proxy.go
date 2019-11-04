@@ -47,6 +47,11 @@ const (
 
 // EnsureProxyAddon creates the kube-proxy addons
 func EnsureProxyAddon(cfg *kubeadmapi.ClusterConfiguration, localEndpoint *kubeadmapi.APIEndpoint, client clientset.Interface) error {
+	// Do we have to skip kube-proxy?
+	if _, ok := cfg.AddOns[constants.KubeProxy]; !ok {
+		return nil
+	}
+
 	if err := CreateServiceAccount(client); err != nil {
 		return errors.Wrap(err, "error when creating kube-proxy service account")
 	}

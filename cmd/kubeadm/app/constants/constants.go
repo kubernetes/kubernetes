@@ -274,10 +274,14 @@ const (
 	KubeControllerManager = "kube-controller-manager"
 	// KubeScheduler defines variable used internally when referring to kube-scheduler component
 	KubeScheduler = "kube-scheduler"
-	// KubeProxy defines variable used internally when referring to kube-proxy component
-	KubeProxy = "kube-proxy"
 	// HyperKube defines variable used internally when referring to the hyperkube image
 	HyperKube = "hyperkube"
+	// KubeProxy defines variable used when referring to the kube-proxy addon
+	KubeProxy = "kube-proxy"
+	// KubeDNS defines a constant used internally when referring to the kube-dns addon
+	KubeDNS = "kube-dns"
+	// CoreDNS defines a constant used when referring to the CoreDNS addon
+	CoreDNS = "CoreDNS"
 
 	// SelfHostingPrefix describes the prefix workloads that are self-hosted by kubeadm has
 	SelfHostingPrefix = "self-hosted-"
@@ -578,13 +582,31 @@ func GetStaticPodAuditPolicyFile() string {
 	return filepath.Join(KubernetesDir, AuditPolicyDir, AuditPolicyFile)
 }
 
+func GetDNSAddOn(cfg *kubeadmapi.ClusterConfiguration) kubeadmapi.AddOn {
+	if addon, ok := cfg.AddOns[CoreDNS]; ok {
+		return addon
+	}
+
+	if addon, ok := cfg.AddOns[KubeDNS]; ok {
+		return addon
+	}
+
+	return kubeadmapi.AddOn{}
+}
+
 // GetDNSVersion is a handy function that returns the DNS version by DNS type
-func GetDNSVersion(dnsType kubeadmapi.DNSAddOnType) string {
-	switch dnsType {
-	case kubeadmapi.KubeDNS:
+func GetDNSVersion(addon kubeadmapi.AddOn) string {
+	if addon.ImageTag != "" {
+		return addon.ImageTag
+	}
+
+	switch addon.Kind {
+	case CoreDNS:
+		return CoreDNSVersion
+	case KubeDNS:
 		return KubeDNSVersion
 	default:
-		return CoreDNSVersion
+		return ""
 	}
 }
 

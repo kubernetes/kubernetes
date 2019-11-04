@@ -218,8 +218,10 @@ func TestGetAllImages(t *testing.T) {
 		{
 			name: "CoreDNS image is returned",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
+				AddOns: map[string]kubeadmapi.AddOn{
+					constants.CoreDNS: kubeadmapi.AddOn{
+						Kind: constants.CoreDNS,
+					},
 				},
 			},
 			expect: constants.CoreDNSImageName,
@@ -227,8 +229,10 @@ func TestGetAllImages(t *testing.T) {
 		{
 			name: "main kube-dns image is returned",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.KubeDNS,
+				AddOns: map[string]kubeadmapi.AddOn{
+					constants.KubeDNS: kubeadmapi.AddOn{
+						Kind: constants.KubeDNS,
+					},
 				},
 			},
 			expect: constants.KubeDNSKubeDNSImageName,
@@ -236,8 +240,10 @@ func TestGetAllImages(t *testing.T) {
 		{
 			name: "kube-dns sidecar image is returned",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.KubeDNS,
+				AddOns: map[string]kubeadmapi.AddOn{
+					constants.KubeDNS: kubeadmapi.AddOn{
+						Kind: constants.KubeDNS,
+					},
 				},
 			},
 			expect: constants.KubeDNSSidecarImageName,
@@ -245,8 +251,10 @@ func TestGetAllImages(t *testing.T) {
 		{
 			name: "kube-dns dnsmasq-nanny image is returned",
 			cfg: &kubeadmapi.ClusterConfiguration{
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.KubeDNS,
+				AddOns: map[string]kubeadmapi.AddOn{
+					constants.KubeDNS: kubeadmapi.AddOn{
+						Kind: constants.KubeDNS,
+					},
 				},
 			},
 			expect: constants.KubeDNSDnsMasqNannyImageName,

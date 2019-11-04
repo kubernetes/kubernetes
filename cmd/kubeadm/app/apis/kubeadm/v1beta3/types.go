@@ -105,8 +105,10 @@ type ClusterConfiguration struct {
 	// Scheduler contains extra settings for the scheduler control plane component
 	Scheduler ControlPlaneComponent `json:"scheduler,omitempty"`
 
-	// DNS defines the options for the DNS add-on installed in the cluster.
-	DNS DNS `json:"dns,omitempty"`
+	// AddOns defines a list of addons deployed in this cluster
+	// Optional: Defaulted to KubeProxy and CoreDNS, omitempty is intentionally skipped
+	// +optional
+	AddOns []AddOn `json:"addons"`
 
 	// CertificatesDir specifies where to store or look for all required certificates.
 	// Optional: Defaulted to "/etc/kubernetes/pki"
@@ -162,26 +164,6 @@ type APIServer struct {
 	TimeoutForControlPlane *metav1.Duration `json:"timeoutForControlPlane,omitempty"`
 }
 
-// DNSAddOnType defines string identifying DNS add-on types
-type DNSAddOnType string
-
-const (
-	// CoreDNS add-on type
-	CoreDNS DNSAddOnType = "CoreDNS"
-
-	// KubeDNS add-on type
-	KubeDNS DNSAddOnType = "kube-dns"
-)
-
-// DNS defines the DNS addon that should be used in the cluster
-type DNS struct {
-	// Type defines the DNS add-on to be used
-	Type DNSAddOnType `json:"type"`
-
-	// ImageMeta allows to customize the image used for the DNS component
-	ImageMeta `json:",inline"`
-}
-
 // ImageMeta allows to customize the image used for components that are not
 // originated from the Kubernetes/Kubernetes release process
 type ImageMeta struct {
@@ -196,6 +178,15 @@ type ImageMeta struct {
 	ImageTag string `json:"imageTag,omitempty"`
 
 	//TODO: evaluate if we need also a ImageName based on user feedbacks
+}
+
+// AddOn defines settings to be used when deploying a specific addon kind
+type AddOn struct {
+	// Kind defines the addon type
+	Kind string `json:"kind"`
+
+	// ImageMeta allows to customize the image used for the addon
+	ImageMeta `json:",inline"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

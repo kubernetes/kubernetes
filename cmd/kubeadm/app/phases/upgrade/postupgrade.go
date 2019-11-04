@@ -111,17 +111,28 @@ func PerformPostUpgradeTasks(client clientset.Interface, cfg *kubeadmapi.InitCon
 
 func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface, dryRun bool) error {
 	return apiclient.TryRunCommand(func() error {
-		installedDeploymentName := kubeadmconstants.KubeDNSDeploymentName
-		deploymentToDelete := kubeadmconstants.CoreDNSDeploymentName
+		usedDeployment := ""
+		deletedDeployments := []string{}
 
-		if cfg.DNS.Type == kubeadmapi.CoreDNS {
-			installedDeploymentName = kubeadmconstants.CoreDNSDeploymentName
-			deploymentToDelete = kubeadmconstants.KubeDNSDeploymentName
+		if _, ok := cfg.AddOns[kubeadmconstants.CoreDNS]; ok {
+			usedDeployment = kubeadmconstants.CoreDNSDeploymentName
+		} else {
+			deletedDeployments = append(deletedDeployments, kubeadmconstants.CoreDNSDeploymentName)
+		}
+
+		if _, ok := cfg.AddOns[kubeadmconstants.KubeDNS]; ok {
+			if usedDeployment != "" {
+				// This is unlikely to happen - the error must have been caught earlier, but let's have it just in case
+				return errors.New("multiple DNS addons specified in the config")
+			}
+			usedDeployment = kubeadmconstants.KubeDNSDeploymentName
+		} else {
+			deletedDeployments = append(deletedDeployments, kubeadmconstants.KubeDNSDeploymentName)
 		}
 
 		// If we're dry-running, we don't need to wait for the new DNS addon to become ready
-		if !dryRun {
-			dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(installedDeploymentName, metav1.GetOptions{})
+		if !dryRun && usedDeployment != "" {
+			dnsDeployment, err := client.AppsV1().Deployments(metav1.NamespaceSystem).Get(usedDeployment, metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
@@ -130,12 +141,15 @@ func removeOldDNSDeploymentIfAnotherDNSIsUsed(cfg *kubeadmapi.ClusterConfigurati
 			}
 		}
 
-		// We don't want to wait for the DNS deployment above to become ready when dryrunning (as it never will)
-		// but here we should execute the DELETE command against the dryrun clientset, as it will only be logged
-		err := apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, deploymentToDelete)
-		if err != nil && !apierrors.IsNotFound(err) {
-			return err
+		for _, deletedDeployment := range deletedDeployments {
+			// We don't want to wait for the DNS deployment above to become ready when dryrunning (as it never will)
+			// but here we should execute the DELETE command against the dryrun clientset, as it will only be logged
+			err := apiclient.DeleteDeploymentForeground(client, metav1.NamespaceSystem, deletedDeployment)
+			if err != nil && !apierrors.IsNotFound(err) {
+				return err
+			}
 		}
+
 		return nil
 	}, 10)
 }

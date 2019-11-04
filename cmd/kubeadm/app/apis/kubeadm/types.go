@@ -97,8 +97,8 @@ type ClusterConfiguration struct {
 	// Scheduler contains extra settings for the scheduler control plane component
 	Scheduler ControlPlaneComponent
 
-	// DNS defines the options for the DNS add-on installed in the cluster.
-	DNS DNS
+	// AddOns defines a map of addons deployed in this cluster. The key is the addon kind.
+	AddOns map[string]AddOn
 
 	// CertificatesDir specifies where to store or look for all required certificates.
 	CertificatesDir string
@@ -143,26 +143,6 @@ type APIServer struct {
 	TimeoutForControlPlane *metav1.Duration
 }
 
-// DNSAddOnType defines string identifying DNS add-on types
-type DNSAddOnType string
-
-const (
-	// CoreDNS add-on type
-	CoreDNS DNSAddOnType = "CoreDNS"
-
-	// KubeDNS add-on type
-	KubeDNS DNSAddOnType = "kube-dns"
-)
-
-// DNS defines the DNS addon that should be used in the cluster
-type DNS struct {
-	// Type defines the DNS add-on to be used
-	Type DNSAddOnType
-
-	// ImageMeta allows to customize the image used for the DNS component
-	ImageMeta `json:",inline"`
-}
-
 // ImageMeta allows to customize the image used for components that are not
 // originated from the Kubernetes/Kubernetes release process
 type ImageMeta struct {
@@ -175,6 +155,15 @@ type ImageMeta struct {
 	ImageTag string
 
 	//TODO: evaluate if we need also a ImageName based on user feedbacks
+}
+
+// AddOn defines settings to be used when deploying a specific addon kind
+type AddOn struct {
+	// Kind defines the addon type
+	Kind string
+
+	// ImageMeta allows to customize the image used for the addon
+	ImageMeta
 }
 
 // ComponentConfigs holds known internal ComponentConfig types for other components

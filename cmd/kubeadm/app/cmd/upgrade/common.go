@@ -185,9 +185,11 @@ func runPreflightChecks(client clientset.Interface, ignorePreflightErrors sets.S
 	if err != nil {
 		return err
 	}
-	err = upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors, cfg.DNS.Type)
-	if err != nil {
-		return err
+	if _, ok := cfg.AddOns[constants.CoreDNS]; ok {
+		err = upgrade.RunCoreDNSMigrationCheck(client, ignorePreflightErrors)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

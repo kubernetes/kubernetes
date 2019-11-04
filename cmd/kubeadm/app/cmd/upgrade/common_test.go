@@ -172,16 +172,18 @@ func TestPrintConfiguration(t *testing.T) {
 						DataDir: "/some/path",
 					},
 				},
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
+				AddOns: map[string]kubeadmapi.AddOn{
+					constants.CoreDNS: kubeadmapi.AddOn{
+						Kind: constants.CoreDNS,
+					},
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
+	addons:
+	- kind: CoreDNS
 	apiServer: {}
 	apiVersion: kubeadm.k8s.io/v1beta3
 	controllerManager: {}
-	dns:
-	  type: CoreDNS
 	etcd:
 	  local:
 	    dataDir: /some/path
@@ -204,16 +206,18 @@ func TestPrintConfiguration(t *testing.T) {
 						Endpoints: []string{"https://one-etcd-instance:2379"},
 					},
 				},
-				DNS: kubeadmapi.DNS{
-					Type: kubeadmapi.CoreDNS,
+				AddOns: map[string]kubeadmapi.AddOn{
+					constants.CoreDNS: kubeadmapi.AddOn{
+						Kind: constants.CoreDNS,
+					},
 				},
 			},
 			expectedBytes: []byte(`[upgrade/config] Configuration used:
+	addons:
+	- kind: CoreDNS
 	apiServer: {}
 	apiVersion: kubeadm.k8s.io/v1beta3
 	controllerManager: {}
-	dns:
-	  type: CoreDNS
 	etcd:
 	  external:
 	    caFile: ""

@@ -27,7 +27,7 @@ import (
 	"github.com/pkg/errors"
 
 	apps "k8s.io/api/apps/v1"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -55,7 +55,7 @@ const (
 )
 
 // DeployedDNSAddon returns the type of DNS addon currently deployed
-func DeployedDNSAddon(client clientset.Interface) (kubeadmapi.DNSAddOnType, string, error) {
+func DeployedDNSAddon(client clientset.Interface) (string, string, error) {
 	deploymentsClient := client.AppsV1().Deployments(metav1.NamespaceSystem)
 	deployments, err := deploymentsClient.List(metav1.ListOptions{LabelSelector: "k8s-app=kube-dns"})
 	if err != nil {
@@ -67,9 +67,9 @@ func DeployedDNSAddon(client clientset.Interface) (kubeadmapi.DNSAddOnType, stri
 		return "", "", nil
 	case 1:
 		addonName := deployments.Items[0].Name
-		addonType := kubeadmapi.CoreDNS
+		addonType := kubeadmconstants.CoreDNS
 		if addonName == kubeadmconstants.KubeDNSDeploymentName {
-			addonType = kubeadmapi.KubeDNS
+			addonType = kubeadmconstants.KubeDNS
 		}
 		addonImage := deployments.Items[0].Spec.Template.Spec.Containers[0].Image
 		addonImageParts := strings.Split(addonImage, ":")
@@ -82,13 +82,30 @@ func DeployedDNSAddon(client clientset.Interface) (kubeadmapi.DNSAddOnType, stri
 
 // EnsureDNSAddon creates the kube-dns or CoreDNS addon
 func EnsureDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
-	if cfg.DNS.Type == kubeadmapi.CoreDNS {
+	_, coreDNS := cfg.AddOns[kubeadmconstants.CoreDNS]
+	_, kubeDNS := cfg.AddOns[kubeadmconstants.KubeDNS]
+
+	if coreDNS && kubeDNS {
+		return errors.Errorf("multiple DNS addons specified in config")
+	}
+
+	if coreDNS {
 		return coreDNSAddon(cfg, client)
 	}
-	return kubeDNSAddon(cfg, client)
+
+	if kubeDNS {
+		return kubeDNSAddon(cfg, client)
+	}
+
+	return nil
 }
 
 func kubeDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
+	addon, ok := cfg.AddOns[kubeadmconstants.KubeDNS]
+	if !ok {
+		return nil
+	}
+
 	if err := CreateServiceAccount(client); err != nil {
 		return err
 	}
@@ -110,9 +127,9 @@ func kubeDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interfa
 	dnsDeploymentBytes, err := kubeadmutil.ParseTemplate(KubeDNSDeployment,
 		struct{ DeploymentName, KubeDNSImage, DNSMasqImage, SidecarImage, DNSBindAddr, DNSProbeAddr, DNSDomain, ControlPlaneTaintKey string }{
 			DeploymentName:       kubeadmconstants.KubeDNSDeploymentName,
-			KubeDNSImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSKubeDNSImageName),
-			DNSMasqImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSDnsMasqNannyImageName),
-			SidecarImage:         images.GetDNSImage(cfg, kubeadmconstants.KubeDNSSidecarImageName),
+			KubeDNSImage:         images.GetAddOnImage(cfg, addon, kubeadmconstants.KubeDNSKubeDNSImageName, kubeadmconstants.KubeDNSVersion),
+			DNSMasqImage:         images.GetAddOnImage(cfg, addon, kubeadmconstants.KubeDNSDnsMasqNannyImageName, kubeadmconstants.KubeDNSVersion),
+			SidecarImage:         images.GetAddOnImage(cfg, addon, kubeadmconstants.KubeDNSSidecarImageName, kubeadmconstants.KubeDNSVersion),
 			DNSBindAddr:          dnsBindAddr,
 			DNSProbeAddr:         dnsProbeAddr,
 			DNSDomain:            cfg.Networking.DNSDomain,
@@ -163,10 +180,15 @@ func createKubeDNSAddon(deploymentBytes, serviceBytes []byte, client clientset.I
 }
 
 func coreDNSAddon(cfg *kubeadmapi.ClusterConfiguration, client clientset.Interface) error {
+	addon, ok := cfg.AddOns[kubeadmconstants.CoreDNS]
+	if !ok {
+		return nil
+	}
+
 	// Get the YAML manifest
 	coreDNSDeploymentBytes, err := kubeadmutil.ParseTemplate(CoreDNSDeployment, struct{ DeploymentName, Image, ControlPlaneTaintKey string }{
 		DeploymentName:       kubeadmconstants.CoreDNSDeploymentName,
-		Image:                images.GetDNSImage(cfg, kubeadmconstants.CoreDNSImageName),
+		Image:                images.GetAddOnImage(cfg, addon, kubeadmconstants.CoreDNSImageName, kubeadmconstants.CoreDNSVersion),
 		ControlPlaneTaintKey: kubeadmconstants.LabelNodeRoleMaster,
 	})
 	if err != nil {

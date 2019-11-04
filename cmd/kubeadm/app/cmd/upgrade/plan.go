@@ -28,7 +28,7 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/klog"
-	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
+	"k8s.io/kubernetes/cmd/kubeadm/app/constants"
 	"k8s.io/kubernetes/cmd/kubeadm/app/phases/upgrade"
 	etcdutil "k8s.io/kubernetes/cmd/kubeadm/app/util/etcd"
 )
@@ -90,9 +90,12 @@ func runPlan(flags *planFlags, userVersion string) error {
 		return err
 	}
 
+	// Get the DNS addon in use (or an empty addon if none is specified)
+	dnsAddOn := constants.GetDNSAddOn(&cfg.ClusterConfiguration)
+
 	// Compute which upgrade possibilities there are
 	klog.V(1).Infoln("[upgrade/plan] computing upgrade possibilities")
-	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, cfg.DNS.Type, client)
+	availUpgrades, err := upgrade.GetAvailableUpgrades(versionGetter, flags.allowExperimentalUpgrades, flags.allowRCUpgrades, etcdClient, dnsAddOn, client)
 	if err != nil {
 		return errors.Wrap(err, "[upgrade/versions] FATAL")
 	}
@@ -177,20 +180,20 @@ func printAvailableUpgrades(upgrades []upgrade.Upgrade, w io.Writer, isExternalE
 		printCoreDNS, printKubeDNS := false, false
 		coreDNSBeforeVersion, coreDNSAfterVersion, kubeDNSBeforeVersion, kubeDNSAfterVersion := "", "", "", ""
 
-		switch upgrade.Before.DNSType {
-		case kubeadmapi.CoreDNS:
+		switch upgrade.Before.DNSKind {
+		case constants.CoreDNS:
 			printCoreDNS = true
 			coreDNSBeforeVersion = upgrade.Before.DNSVersion
-		case kubeadmapi.KubeDNS:
+		case constants.KubeDNS:
 			printKubeDNS = true
 			kubeDNSBeforeVersion = upgrade.Before.DNSVersion
 		}
 
-		switch upgrade.After.DNSType {
-		case kubeadmapi.CoreDNS:
+		switch upgrade.After.DNSKind {
+		case constants.CoreDNS:
 			printCoreDNS = true
 			coreDNSAfterVersion = upgrade.After.DNSVersion
-		case kubeadmapi.KubeDNS:
+		case constants.KubeDNS:
 			printKubeDNS = true
 			kubeDNSAfterVersion = upgrade.After.DNSVersion
 		}

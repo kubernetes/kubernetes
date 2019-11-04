@@ -42,7 +42,6 @@ go_test(
     srcs = ["constants_test.go"],
     embed = [":go_default_library"],
     deps = [
-        "//cmd/kubeadm/app/apis/kubeadm:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/version:go_default_library",
         "//vendor/github.com/pkg/errors:go_default_library",
     ],

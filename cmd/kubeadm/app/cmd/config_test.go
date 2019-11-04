@@ -168,8 +168,9 @@ func TestConfigImagesListRunWithoutPath(t *testing.T) {
 			name: "kube-dns enabled",
 			cfg: kubeadmapiv1.ClusterConfiguration{
 				KubernetesVersion: dummyKubernetesVersion,
-				DNS: kubeadmapiv1.DNS{
-					Type: kubeadmapiv1.KubeDNS,
+				AddOns: []kubeadmapiv1.AddOn{
+					kubeadmapiv1.AddOn{Kind: constants.KubeProxy},
+					kubeadmapiv1.AddOn{Kind: constants.KubeDNS},
 				},
 			},
 			expectedImages: defaultNumberOfImages + 2,

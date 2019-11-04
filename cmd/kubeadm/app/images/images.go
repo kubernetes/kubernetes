@@ -40,23 +40,22 @@ func GetKubernetesImage(image string, cfg *kubeadmapi.ClusterConfiguration) stri
 	return GetGenericImage(repoPrefix, image, kubernetesImageTag)
 }
 
-// GetDNSImage generates and returns the image for the DNS, that can be CoreDNS or kube-dns.
-// Given that kube-dns uses 3 containers, an additional imageName parameter was added
-func GetDNSImage(cfg *kubeadmapi.ClusterConfiguration, imageName string) string {
-	// DNS uses default image repository by default
-	dnsImageRepository := cfg.ImageRepository
-	// unless an override is specified
-	if cfg.DNS.ImageRepository != "" {
-		dnsImageRepository = cfg.DNS.ImageRepository
-	}
-	// DNS uses an imageTag that corresponds to the DNS version matching the Kubernetes version
-	dnsImageTag := constants.GetDNSVersion(cfg.DNS.Type)
+// GetAddOnImage generates and returns an image for an addon
+func GetAddOnImage(cfg *kubeadmapi.ClusterConfiguration, addon kubeadmapi.AddOn, image, tag string) string {
+	// use the default image repository by default
+	repository := cfg.ImageRepository
 
 	// unless an override is specified
-	if cfg.DNS.ImageTag != "" {
-		dnsImageTag = cfg.DNS.ImageTag
+	if addon.ImageRepository != "" {
+		repository = addon.ImageRepository
 	}
-	return GetGenericImage(dnsImageRepository, imageName, dnsImageTag)
+
+	// the default tag is overwritten if an addon tag is specified
+	if addon.ImageTag != "" {
+		tag = addon.ImageTag
+	}
+
+	return GetGenericImage(repository, image, tag)
 }
 
 // GetEtcdImage generates and returns the image for etcd
@@ -96,7 +95,9 @@ func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 		imgs = append(imgs, GetKubernetesImage(constants.KubeAPIServer, cfg))
 		imgs = append(imgs, GetKubernetesImage(constants.KubeControllerManager, cfg))
 		imgs = append(imgs, GetKubernetesImage(constants.KubeScheduler, cfg))
-		imgs = append(imgs, GetKubernetesImage(constants.KubeProxy, cfg))
+		if _, ok := cfg.AddOns[constants.KubeProxy]; ok {
+			imgs = append(imgs, GetKubernetesImage(constants.KubeProxy, cfg))
+		}
 	}
 
 	// pause is not available on the ci image repository so use the default image repository.
@@ -107,13 +108,16 @@ func GetControlPlaneImages(cfg *kubeadmapi.ClusterConfiguration) []string {
 		imgs = append(imgs, GetEtcdImage(cfg))
 	}
 
-	// Append the appropriate DNS images
-	if cfg.DNS.Type == kubeadmapi.CoreDNS {
-		imgs = append(imgs, GetDNSImage(cfg, constants.CoreDNSImageName))
-	} else {
-		imgs = append(imgs, GetDNSImage(cfg, constants.KubeDNSKubeDNSImageName))
-		imgs = append(imgs, GetDNSImage(cfg, constants.KubeDNSSidecarImageName))
-		imgs = append(imgs, GetDNSImage(cfg, constants.KubeDNSDnsMasqNannyImageName))
+	// CoreDNS images (if used)
+	if addon, ok := cfg.AddOns[constants.CoreDNS]; ok {
+		imgs = append(imgs, GetAddOnImage(cfg, addon, constants.CoreDNSImageName, constants.CoreDNSVersion))
+	}
+
+	// kube-dns images (if used)
+	if addon, ok := cfg.AddOns[constants.KubeDNS]; ok {
+		imgs = append(imgs, GetAddOnImage(cfg, addon, constants.KubeDNSKubeDNSImageName, constants.KubeDNSVersion))
+		imgs = append(imgs, GetAddOnImage(cfg, addon, constants.KubeDNSSidecarImageName, constants.KubeDNSVersion))
+		imgs = append(imgs, GetAddOnImage(cfg, addon, constants.KubeDNSDnsMasqNannyImageName, constants.KubeDNSVersion))
 	}
 
 	return imgs
