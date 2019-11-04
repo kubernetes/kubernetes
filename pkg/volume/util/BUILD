@@ -91,7 +91,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/volume/util/exec:all-srcs",
         "//pkg/volume/util/fs:all-srcs",
         "//pkg/volume/util/fsquota:all-srcs",
         "//pkg/volume/util/hostutil:all-srcs",
