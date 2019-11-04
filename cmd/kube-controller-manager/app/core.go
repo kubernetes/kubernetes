@@ -399,7 +399,7 @@ func startReplicationController(ctx ControllerContext) (http.Handler, bool, erro
 }
 
 func startPodGCController(ctx ControllerContext) (http.Handler, bool, error) {
-	go podgc.NewPodGC(
+	go podgc.NewController(
 		ctx.ClientBuilder.ClientOrDie("pod-garbage-collector"),
 		ctx.InformerFactory.Core().V1().Pods(),
 		ctx.InformerFactory.Core().V1().Nodes(),
