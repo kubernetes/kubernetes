@@ -339,6 +339,9 @@ API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec
 API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,EnvFrom
 API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,VolumeMounts
 API rule violation: list_type_missing,k8s.io/api/settings/v1alpha1,PodPresetSpec,Volumes
+API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeDriver,TopologyKeys
+API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeList,Items
+API rule violation: list_type_missing,k8s.io/api/storage/v1,CSINodeSpec,Drivers
 API rule violation: list_type_missing,k8s.io/api/storage/v1,StorageClass,AllowedTopologies
 API rule violation: list_type_missing,k8s.io/api/storage/v1,StorageClass,MountOptions
 API rule violation: list_type_missing,k8s.io/api/storage/v1,StorageClassList,Items
