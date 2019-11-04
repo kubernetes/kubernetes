@@ -82,13 +82,13 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 	//   podDeviceMapPath/linkName: pods/{podUid}/{DefaultKubeletVolumeDevicesDirName}/{escapeQualifiedPluginName}/{volumeName}
 	//   linkName: {volumeName}
 	if len(devicePath) == 0 {
-		return fmt.Errorf("Failed to map device to map path. devicePath is empty")
+		return fmt.Errorf("failed to map device to map path. devicePath is empty")
 	}
 	if len(mapPath) == 0 {
-		return fmt.Errorf("Failed to map device to map path. mapPath is empty")
+		return fmt.Errorf("failed to map device to map path. mapPath is empty")
 	}
 	if !filepath.IsAbs(mapPath) {
-		return fmt.Errorf("The map path should be absolute: map path: %s", mapPath)
+		return fmt.Errorf("the map path should be absolute: map path: %s", mapPath)
 	}
 	klog.V(5).Infof("MapDevice: devicePath %s", devicePath)
 	klog.V(5).Infof("MapDevice: mapPath %s", mapPath)
@@ -97,11 +97,10 @@ func (v VolumePathHandler) MapDevice(devicePath string, mapPath string, linkName
 	// Check and create mapPath
 	_, err := os.Stat(mapPath)
 	if err != nil && !os.IsNotExist(err) {
-		klog.Errorf("cannot validate map path: %s", mapPath)
-		return err
+		return fmt.Errorf("cannot validate map path: %s: %v", mapPath, err)
 	}
 	if err = os.MkdirAll(mapPath, 0750); err != nil {
-		return fmt.Errorf("Failed to mkdir %s, error %v", mapPath, err)
+		return fmt.Errorf("failed to mkdir %s: %v", mapPath, err)
 	}
 
 	if bindMount {
@@ -117,17 +116,17 @@ func mapBindMountDevice(v VolumePathHandler, devicePath string, mapPath string, 
 	file, err := os.Stat(linkPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return fmt.Errorf("Failed to stat file %s: %v", linkPath, err)
+			return fmt.Errorf("failed to stat file %s: %v", linkPath, err)
 		}
 
 		klog.Warningf("Warning: Path to bind mount %v has not yet been created", linkPath)
 		// Create file
 		newFile, err := os.OpenFile(linkPath, os.O_CREATE|os.O_RDWR, 0750)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to open file %s: %v", linkPath, err)
 		}
 		if err := newFile.Close(); err != nil {
-			return err
+			return fmt.Errorf("failed to close file %s: %v", linkPath, err)
 		}
 	} else {
 		// Check if device file
@@ -143,8 +142,7 @@ func mapBindMountDevice(v VolumePathHandler, devicePath string, mapPath string, 
 	// Bind mount file
 	mounter := &mount.SafeFormatAndMount{Interface: mount.New(""), Exec: mount.NewOSExec()}
 	if err := mounter.Mount(devicePath, linkPath, "" /* fsType */, []string{"bind"}); err != nil {
-		klog.Errorf("Failed to bind mount devicePath: %s to linkPath %s: %v", devicePath, linkPath, err)
-		return err
+		return fmt.Errorf("failed to bind mount devicePath: %s to linkPath %s: %v", devicePath, linkPath, err)
 	}
 
 	return nil
@@ -156,7 +154,7 @@ func mapSymlinkDevice(v VolumePathHandler, devicePath string, mapPath string, li
 	// stale across node reboot.
 	linkPath := filepath.Join(mapPath, string(linkName))
 	if err := os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
-		return err
+		return fmt.Errorf("failed to remove file %s: %v", linkPath, err)
 	}
 	return os.Symlink(devicePath, linkPath)
 }
@@ -164,7 +162,7 @@ func mapSymlinkDevice(v VolumePathHandler, devicePath string, mapPath string, li
 // UnmapDevice removes a symbolic link associated to block device under specified map path
 func (v VolumePathHandler) UnmapDevice(mapPath string, linkName string, bindMount bool) error {
 	if len(mapPath) == 0 {
-		return fmt.Errorf("Failed to unmap device from map path. mapPath is empty")
+		return fmt.Errorf("failed to unmap device from map path. mapPath is empty")
 	}
 	klog.V(5).Infof("UnmapDevice: mapPath %s", mapPath)
 	klog.V(5).Infof("UnmapDevice: linkName %s", linkName)
@@ -189,13 +187,12 @@ func unmapBindMountDevice(v VolumePathHandler, mapPath string, linkName string) 
 	// Unmount file
 	mounter := &mount.SafeFormatAndMount{Interface: mount.New(""), Exec: mount.NewOSExec()}
 	if err := mounter.Unmount(linkPath); err != nil {
-		klog.Errorf("Failed to unmount linkPath %s: %v", linkPath, err)
-		return err
+		return fmt.Errorf("failed to unmount linkPath %s: %v", linkPath, err)
 	}
 
 	// Remove file
 	if err := os.Remove(linkPath); err != nil && !os.IsNotExist(err) {
-		return err
+		return fmt.Errorf("failed to remove file %s: %v", linkPath, err)
 	}
 
 	return nil
@@ -216,12 +213,12 @@ func unmapSymlinkDevice(v VolumePathHandler, mapPath string, linkName string) er
 // RemoveMapPath removes a file or directory on specified map path
 func (v VolumePathHandler) RemoveMapPath(mapPath string) error {
 	if len(mapPath) == 0 {
-		return fmt.Errorf("Failed to remove map path. mapPath is empty")
+		return fmt.Errorf("failed to remove map path. mapPath is empty")
 	}
 	klog.V(5).Infof("RemoveMapPath: mapPath %s", mapPath)
 	err := os.RemoveAll(mapPath)
 	if err != nil && !os.IsNotExist(err) {
-		return err
+		return fmt.Errorf("failed to remove directory %s: %v", mapPath, err)
 	}
 	return nil
 }
@@ -237,7 +234,7 @@ func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 			return false, nil
 		}
 		// Return error from Lstat()
-		return false, err
+		return false, fmt.Errorf("failed to Lstat file %s: %v", mapPath, err)
 	}
 	// If file exits and it's symbolic link, return true and no error
 	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
@@ -259,7 +256,7 @@ func (v VolumePathHandler) IsBindMountExist(mapPath string) (bool, error) {
 		}
 
 		// Return error from Lstat()
-		return false, err
+		return false, fmt.Errorf("failed to Lstat file %s: %v", mapPath, err)
 	}
 	// If file exits and it's device, return true and no error
 	if fi.Mode()&os.ModeDevice == os.ModeDevice {
@@ -274,7 +271,7 @@ func (v VolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string
 	var refs []string
 	files, err := ioutil.ReadDir(mapPath)
 	if err != nil {
-		return nil, fmt.Errorf("Directory cannot read %v", err)
+		return nil, fmt.Errorf("directory cannot read %v", err)
 	}
 	for _, file := range files {
 		if file.Mode()&os.ModeDevice != os.ModeDevice {
