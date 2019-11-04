@@ -115,7 +115,10 @@ controller, and serviceaccounts controller.`,
 				os.Exit(1)
 			}
 
-			if err := Run(c.Complete(), wait.NeverStop); err != nil {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			if err = Run(c.Complete(), ctx); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -156,7 +159,7 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 }
 
 // Run runs the KubeControllerManagerOptions.  This should never exit.
-func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
+func Run(c *config.CompletedConfig, ctx context.Context) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
@@ -181,7 +184,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, &c.Authorization, &c.Authentication)
 		// TODO: handle stoppedCh returned by c.SecureServing.Serve
-		if _, err := c.SecureServing.Serve(handler, 0, stopCh); err != nil {
+		if _, err := c.SecureServing.Serve(handler, 0, ctx.Done()); err != nil {
 			return err
 		}
 	}
@@ -189,7 +192,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		unsecuredMux = genericcontrollermanager.NewBaseHandler(&c.ComponentConfig.Generic.Debugging, checks...)
 		insecureSuperuserAuthn := server.AuthenticationInfo{Authenticator: &server.InsecureSuperuser{}}
 		handler := genericcontrollermanager.BuildHandlerChain(unsecuredMux, nil, &insecureSuperuserAuthn)
-		if err := c.InsecureServing.Serve(handler, 0, stopCh); err != nil {
+		if err := c.InsecureServing.Serve(handler, 0, ctx.Done()); err != nil {
 			return err
 		}
 	}
@@ -243,7 +246,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 	}
 
 	if !c.ComponentConfig.Generic.LeaderElection.LeaderElect {
-		run(context.TODO())
+		run(ctx)
 		panic("unreachable")
 	}
 
@@ -268,7 +271,7 @@ func Run(c *config.CompletedConfig, stopCh <-chan struct{}) error {
 		klog.Fatalf("error creating lock: %v", err)
 	}
 
-	leaderelection.RunOrDie(context.TODO(), leaderelection.LeaderElectionConfig{
+	leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
 		Lock:          rl,
 		LeaseDuration: c.ComponentConfig.Generic.LeaderElection.LeaseDuration.Duration,
 		RenewDeadline: c.ComponentConfig.Generic.LeaderElection.RenewDeadline.Duration,
