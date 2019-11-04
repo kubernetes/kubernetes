@@ -266,11 +266,7 @@ func checkVolumeSatisfyClaim(volume *v1.PersistentVolume, claim *v1.PersistentVo
 		return fmt.Errorf("storageClassName does not match")
 	}
 
-	isMismatch, err := pvutil.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec)
-	if err != nil {
-		return fmt.Errorf("error checking volumeMode: %v", err)
-	}
-	if isMismatch {
+	if pvutil.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
 		return fmt.Errorf("incompatible volumeMode")
 	}
 
@@ -587,7 +583,7 @@ func (ctrl *PersistentVolumeController) syncVolume(volume *v1.PersistentVolume) 
 			}
 			return nil
 		} else if claim.Spec.VolumeName == "" {
-			if isMismatch, err := pvutil.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec); err != nil || isMismatch {
+			if pvutil.CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
 				// Binding for the volume won't be called in syncUnboundClaim,
 				// because findBestMatchForClaim won't return the volume due to volumeMode mismatch.
 				volumeMsg := fmt.Sprintf("Cannot bind PersistentVolume to requested PersistentVolumeClaim %q due to incompatible volumeMode.", claim.Name)

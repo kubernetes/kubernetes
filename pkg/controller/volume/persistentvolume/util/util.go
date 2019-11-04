@@ -19,7 +19,7 @@ package persistentvolume
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -203,13 +203,8 @@ func FindMatchingVolume(
 
 		volumeQty := volume.Spec.Capacity[v1.ResourceStorage]
 
-		// check if volumeModes do not match (feature gate protected)
-		isMismatch, err := CheckVolumeModeMismatches(&claim.Spec, &volume.Spec)
-		if err != nil {
-			return nil, fmt.Errorf("error checking if volumeMode was a mismatch: %v", err)
-		}
 		// filter out mismatching volumeModes
-		if isMismatch {
+		if CheckVolumeModeMismatches(&claim.Spec, &volume.Spec) {
 			continue
 		}
 
@@ -305,9 +300,22 @@ func FindMatchingVolume(
 
 // CheckVolumeModeMismatches is a convenience method that checks volumeMode for PersistentVolume
 // and PersistentVolumeClaims
-func CheckVolumeModeMismatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1.PersistentVolumeSpec) (bool, error) {
+func CheckVolumeModeMismatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1.PersistentVolumeSpec) bool {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.BlockVolume) {
-		return false, nil
+		if pvcSpec.VolumeMode != nil && *pvcSpec.VolumeMode == v1.PersistentVolumeBlock {
+			// Block PVC does not match anything when the feature is off. We explicitly want
+			// to prevent binding block PVC to filesystem PV.
+			// The PVC should be ignored by PV controller.
+			return true
+		}
+		if pvSpec.VolumeMode != nil && *pvSpec.VolumeMode == v1.PersistentVolumeBlock {
+			// Block PV does not match anything when the feature is off. We explicitly want
+			// to prevent binding block PV to filesystem PVC.
+			// The PV should be ignored by PV controller.
+			return true
+		}
+		// Both PV + PVC are not block.
+		return false
 	}
 
 	// In HA upgrades, we cannot guarantee that the apiserver is on a version >= controller-manager.
@@ -320,7 +328,7 @@ func CheckVolumeModeMismatches(pvcSpec *v1.PersistentVolumeClaimSpec, pvSpec *v1
 	if pvSpec.VolumeMode != nil {
 		pvVolumeMode = *pvSpec.VolumeMode
 	}
-	return requestedVolumeMode != pvVolumeMode, nil
+	return requestedVolumeMode != pvVolumeMode
 }
 
 // CheckAccessModes returns true if PV satisfies all the PVC's requested AccessModes
