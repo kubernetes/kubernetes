@@ -18,6 +18,9 @@ package internal
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/base64"
+	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -36,12 +39,41 @@ var EmptyFields metav1.FieldsV1 = func() metav1.FieldsV1 {
 
 // FieldsToSet creates a set paths from an input trie of fields
 func FieldsToSet(f metav1.FieldsV1) (s fieldpath.Set, err error) {
-	err = s.FromJSON(bytes.NewReader(f.Raw))
-	return s, err
+	if len(f.Raw) == 0 {
+		return s, nil
+	}
+	// Remove surrounding d-quotes
+	br := base64.NewDecoder(base64.RawStdEncoding, bytes.NewReader(f.Raw[1:len(f.Raw)-1]))
+	zr, err := gzip.NewReader(br)
+	if err != nil {
+		return fieldpath.Set{}, fmt.Errorf("failed to create gzip reader: %v", err)
+	}
+	if err := s.FromJSON(zr); err != nil {
+		return fieldpath.Set{}, fmt.Errorf("failed to decode json: %v", err)
+	}
+	if err := zr.Close(); err != nil {
+		return fieldpath.Set{}, fmt.Errorf("failed to close gzip reader: %v", err)
+	}
+	return s, nil
 }
 
 // SetToFields creates a trie of fields from an input set of paths
 func SetToFields(s fieldpath.Set) (f metav1.FieldsV1, err error) {
-	f.Raw, err = s.ToJSON()
-	return f, err
+	var buf bytes.Buffer
+	buf.WriteRune('"')
+	bw := base64.NewEncoder(base64.RawStdEncoding, &buf)
+	zw := gzip.NewWriter(bw)
+	b, err := s.ToJSON()
+	if err != nil {
+		return metav1.FieldsV1{}, fmt.Errorf("failed to encode json: %v", err)
+	}
+	if _, err := zw.Write(b); err != nil {
+		return metav1.FieldsV1{}, fmt.Errorf("failed to gzip json: %v", err)
+	}
+	if err := zw.Close(); err != nil {
+		return metav1.FieldsV1{}, fmt.Errorf("failed to close gzip writer: %v", err)
+	}
+	buf.WriteRune('"')
+	f.Raw = buf.Bytes()
+	return f, nil
 }
