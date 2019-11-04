@@ -61,9 +61,9 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 				ResourceName:      "name",
 			},
 		},
-		PodInitialBackoffSeconds: &podInitialBackoffSeconds,
-		PodMaxBackoffSeconds:     &podMaxBackoffSeconds,
-		BindTimeoutSeconds:       &testTimeout,
+		PodInitialBackoffSeconds: podInitialBackoffSeconds,
+		PodMaxBackoffSeconds:     podMaxBackoffSeconds,
+		BindTimeoutSeconds:       testTimeout,
 		PercentageOfNodesToScore: 35,
 	}
 
@@ -94,9 +94,6 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	enableContentProfilingSetWithoutEnableProfiling := validConfig.DeepCopy()
 	enableContentProfilingSetWithoutEnableProfiling.EnableProfiling = false
 	enableContentProfilingSetWithoutEnableProfiling.EnableContentionProfiling = true
-
-	bindTimeoutUnset := validConfig.DeepCopy()
-	bindTimeoutUnset.BindTimeoutSeconds = nil
 
 	percentageOfNodesToScore101 := validConfig.DeepCopy()
 	percentageOfNodesToScore101.PercentageOfNodesToScore = int32(101)
@@ -140,10 +137,6 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		"bad-hard-pod-affinity-symmetric-weight-gt-100": {
 			expectedToFail: true,
 			config:         HardPodAffinitySymmetricWeightLt0,
-		},
-		"bind-timeout-unset": {
-			expectedToFail: true,
-			config:         bindTimeoutUnset,
 		},
 		"bad-percentage-of-nodes-to-score": {
 			expectedToFail: true,
