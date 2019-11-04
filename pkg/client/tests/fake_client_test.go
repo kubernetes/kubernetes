@@ -132,7 +132,7 @@ func TestFakeClientsetInheritsNamespace(t *testing.T) {
 	}
 
 	_, err = tc.CoreV1().Pods("nsA").Create(testPod("", "pod-1"))
-	if err == nil {
+	if err != nil {
 		t.Fatalf("Expected Pods.Create to fail with already exists error")
 	}
 
