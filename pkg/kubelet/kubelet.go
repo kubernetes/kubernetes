@@ -538,8 +538,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		Namespace: "",
 	}
 
-	containerRefManager := kubecontainer.NewRefManager()
-
 	oomWatcher, err := oomwatcher.NewWatcher(kubeDeps.Recorder)
 	if err != nil {
 		return nil, err
@@ -685,7 +683,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.livenessManager,
 		klet.startupManager,
 		seccompProfileRoot,
-		containerRefManager,
 		machineInfo,
 		klet,
 		kubeDeps.OSInterface,
@@ -792,7 +789,6 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 		klet.livenessManager,
 		klet.startupManager,
 		klet.runner,
-		containerRefManager,
 		kubeDeps.Recorder)
 
 	tokenManager := token.NewManager(kubeDeps.KubeClient)

@@ -5,7 +5,6 @@ go_library(
     srcs = [
         "cache.go",
         "container_gc.go",
-        "container_reference_manager.go",
         "helpers.go",
         "os.go",
         "ref.go",
