@@ -24,7 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/utils/integer"
 )
 
@@ -41,7 +40,7 @@ func EnsureLoggingAgentDeployment(f *framework.Framework, appName string) error 
 		agentPerNode[pod.Spec.NodeName]++
 	}
 
-	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	nodeList, err := framework.GetReadySchedulableNodes(f.ClientSet)
 	if err != nil {
 		return fmt.Errorf("failed to get nodes: %v", err)
 	}

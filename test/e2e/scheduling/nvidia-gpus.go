@@ -230,7 +230,7 @@ func testNvidiaGPUsJob(f *framework.Framework) {
 	err = jobutil.WaitForAllJobPodsRunning(f.ClientSet, f.Namespace.Name, job.Name, 1)
 	framework.ExpectNoError(err)
 
-	numNodes, err := e2enode.TotalRegistered(f.ClientSet)
+	numNodes, err := framework.TotalRegistered(f.ClientSet)
 	framework.ExpectNoError(err)
 	nodes, err := e2enode.CheckReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
 	framework.ExpectNoError(err)

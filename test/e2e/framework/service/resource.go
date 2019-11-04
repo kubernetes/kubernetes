@@ -26,7 +26,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 )
 
 // GetServicesProxyRequest returns a request for a service proxy.
@@ -111,7 +110,7 @@ func DescribeSvc(ns string) {
 
 // GetServiceLoadBalancerCreationTimeout returns a timeout value for creating a load balancer of a service.
 func GetServiceLoadBalancerCreationTimeout(cs clientset.Interface) time.Duration {
-	nodes, err := e2enode.GetReadySchedulableNodes(cs)
+	nodes, err := framework.GetReadySchedulableNodes(cs)
 	framework.ExpectNoError(err)
 	if len(nodes.Items) > LargeClusterMinNodesNumber {
 		return LoadBalancerCreateTimeoutLarge

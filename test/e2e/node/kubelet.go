@@ -30,7 +30,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -271,7 +270,7 @@ var _ = SIGDescribe("kubelet", func() {
 			// nodes we observe initially.
 			nodeLabels = make(map[string]string)
 			nodeLabels["kubelet_cleanup"] = "true"
-			nodes, err := e2enode.GetBoundedReadySchedulableNodes(c, maxNodesToCheck)
+			nodes, err := framework.GetBoundedReadySchedulableNodes(c, maxNodesToCheck)
 			numNodes = len(nodes.Items)
 			framework.ExpectNoError(err)
 			nodeNames = sets.NewString()
@@ -287,7 +286,7 @@ var _ = SIGDescribe("kubelet", func() {
 			// While we only use a bounded number of nodes in the test. We need to know
 			// the actual number of nodes in the cluster, to avoid running resourceMonitor
 			// against large clusters.
-			actualNodes, err := e2enode.GetReadySchedulableNodes(c)
+			actualNodes, err := framework.GetReadySchedulableNodes(c)
 			framework.ExpectNoError(err)
 
 			// Start resourceMonitor only in small clusters.

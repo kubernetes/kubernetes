@@ -480,7 +480,7 @@ func (g *gcePDCSIDriver) PrepareTest(f *framework.Framework) (*testsuites.PerTes
 }
 
 func waitForCSIDriverRegistrationOnAllNodes(driverName string, cs clientset.Interface) error {
-	nodes, err := e2enode.GetReadySchedulableNodes(cs)
+	nodes, err := framework.GetReadySchedulableNodes(cs)
 	if err != nil {
 		return err
 	}

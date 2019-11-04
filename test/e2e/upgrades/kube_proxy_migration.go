@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
 )
@@ -119,7 +118,7 @@ func waitForKubeProxyStaticPodsRunning(c clientset.Interface) error {
 			return false, nil
 		}
 
-		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		nodes, err := framework.GetReadySchedulableNodes(c)
 		if err != nil {
 			framework.Logf("Failed to get nodes: %v", err)
 			return false, nil
@@ -183,7 +182,7 @@ func waitForKubeProxyDaemonSetRunning(c clientset.Interface) error {
 			return false, nil
 		}
 
-		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		nodes, err := framework.GetReadySchedulableNodes(c)
 		if err != nil {
 			framework.Logf("Failed to get nodes: %v", err)
 			return false, nil

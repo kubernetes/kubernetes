@@ -51,7 +51,7 @@ var _ = SIGDescribe("Network", func() {
 	fr := framework.NewDefaultFramework("network")
 
 	ginkgo.It("should set TCP CLOSE_WAIT timeout", func() {
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(fr.ClientSet, 2)
+		nodes, err := framework.GetBoundedReadySchedulableNodes(fr.ClientSet, 2)
 		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Skipf(

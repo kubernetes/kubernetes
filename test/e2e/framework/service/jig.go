@@ -263,7 +263,7 @@ func (j *TestJig) CreateLoadBalancerService(timeout time.Duration, tweak func(sv
 // GetEndpointNodes returns a map of nodenames:external-ip on which the
 // endpoints of the Service are running.
 func (j *TestJig) GetEndpointNodes() (map[string][]string, error) {
-	nodes, err := e2enode.GetBoundedReadySchedulableNodes(j.Client, MaxNodesForEndpointsTests)
+	nodes, err := framework.GetBoundedReadySchedulableNodes(j.Client, MaxNodesForEndpointsTests)
 	if err != nil {
 		return nil, err
 	}
@@ -857,7 +857,7 @@ func (j *TestJig) checkNodePortServiceReachability(svc *v1.Service, pod *v1.Pod)
 	servicePorts := svc.Spec.Ports
 
 	// Consider only 2 nodes for testing
-	nodes, err := e2enode.GetBoundedReadySchedulableNodes(j.Client, 2)
+	nodes, err := framework.GetBoundedReadySchedulableNodes(j.Client, 2)
 	if err != nil {
 		return err
 	}

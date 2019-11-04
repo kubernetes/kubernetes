@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	instrumentation "k8s.io/kubernetes/test/e2e/instrumentation/common"
 	"k8s.io/kubernetes/test/e2e/instrumentation/logging/utils"
 
@@ -43,7 +42,7 @@ var _ = instrumentation.SIGDescribe("Cluster level logging implemented by Stackd
 
 	ginkgo.It("should ingest logs from applications running for a prolonged amount of time", func() {
 		withLogProviderForScope(f, podsScope, func(p *sdLogProvider) {
-			nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+			nodes, err := framework.GetReadySchedulableNodes(f.ClientSet)
 			framework.ExpectNoError(err)
 			maxPodCount := 10
 			jobDuration := 30 * time.Minute

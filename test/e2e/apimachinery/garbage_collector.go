@@ -39,7 +39,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 
 	"github.com/onsi/ginkgo"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -49,7 +48,7 @@ import (
 // with some wiggle room, to prevent pods being unable to schedule due
 // to max pod constraints.
 func estimateMaximumPods(c clientset.Interface, min, max int32) int32 {
-	nodes, err := e2enode.GetReadySchedulableNodes(c)
+	nodes, err := framework.GetReadySchedulableNodes(c)
 	framework.ExpectNoError(err)
 
 	availablePods := int32(0)

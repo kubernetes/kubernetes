@@ -24,7 +24,6 @@ import (
 	"github.com/onsi/ginkgo"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -53,7 +52,7 @@ func networkingIPerfTest(isIPv6 bool) {
 	}
 
 	ginkgo.It(fmt.Sprintf("should transfer ~ 1GB onto the service endpoint %v servers (maximum of %v clients)", numServer, numClient), func() {
-		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		nodes, err := framework.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 		totalPods := len(nodes.Items)
 		// for a single service, we expect to divide bandwidth between the network.  Very crude estimate.

@@ -41,7 +41,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -622,7 +621,7 @@ func getVMXFilePath(vmObject *object.VirtualMachine) (vmxPath string) {
 func verifyReadyNodeCount(client clientset.Interface, expectedNodes int) bool {
 	numNodes := 0
 	for i := 0; i < 36; i++ {
-		nodeList, err := e2enode.GetReadySchedulableNodes(client)
+		nodeList, err := framework.GetReadySchedulableNodes(client)
 		framework.ExpectNoError(err)
 
 		numNodes = len(nodeList.Items)
@@ -756,7 +755,7 @@ func getUUIDFromProviderID(providerID string) string {
 
 // GetAllReadySchedulableNodeInfos returns NodeInfo objects for all nodes with Ready and schedulable state
 func GetReadySchedulableNodeInfos() []*NodeInfo {
-	nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+	nodeList, err := framework.GetReadySchedulableNodes(f.ClientSet)
 	framework.ExpectNoError(err)
 	var nodesInfo []*NodeInfo
 	for _, node := range nodeList.Items {

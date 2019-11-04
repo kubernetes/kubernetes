@@ -112,7 +112,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// Create a replication controller for a service that serves its hostname.
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-delete-node"
-			numNodes, err := e2enode.TotalRegistered(c)
+			numNodes, err := framework.TotalRegistered(c)
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil, nil)
@@ -143,7 +143,7 @@ var _ = SIGDescribe("Nodes [Disruptive]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-add-node"
 			common.NewSVCByName(c, ns, name)
-			numNodes, err := e2enode.TotalRegistered(c)
+			numNodes, err := framework.TotalRegistered(c)
 			framework.ExpectNoError(err)
 			originalNodeCount = int32(numNodes)
 			common.NewRCByName(c, ns, name, originalNodeCount, nil, nil)

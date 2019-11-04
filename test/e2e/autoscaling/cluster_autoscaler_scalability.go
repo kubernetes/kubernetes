@@ -89,7 +89,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 
 		framework.ExpectNoError(e2enode.WaitForReadyNodes(c, sum, scaleUpTimeout))
 
-		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		nodes, err := framework.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 		nodeCount = len(nodes.Items)
 		cpu := nodes.Items[0].Status.Capacity[v1.ResourceCPU]
@@ -323,7 +323,7 @@ var _ = framework.KubeDescribe("Cluster size autoscaler scalability [Slow]", fun
 		time.Sleep(scaleDownTimeout)
 
 		ginkgo.By("Checking if the number of nodes is as expected")
-		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		nodes, err := framework.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 		klog.Infof("Nodes: %v, expected: %v", len(nodes.Items), totalNodes)
 		framework.ExpectEqual(len(nodes.Items), totalNodes)

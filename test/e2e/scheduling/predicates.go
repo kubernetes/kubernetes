@@ -96,7 +96,7 @@ var _ = SIGDescribe("SchedulerPredicates [Serial]", func() {
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}
-		nodeList, err = e2enode.GetReadySchedulableNodes(cs)
+		nodeList, err = framework.GetReadySchedulableNodes(cs)
 		if err != nil {
 			framework.Logf("Unexpected error occurred: %v", err)
 		}

@@ -22,7 +22,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -38,7 +37,7 @@ var _ = utils.SIGDescribe("Volume limits", func() {
 	})
 
 	ginkgo.It("should verify that all nodes have volume limits", func() {
-		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		nodeList, err := framework.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 		for _, node := range nodeList.Items {
 			volumeLimits := getVolumeLimit(&node)

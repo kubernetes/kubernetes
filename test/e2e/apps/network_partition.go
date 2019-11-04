@@ -61,7 +61,7 @@ func expectNodeReadiness(isReady bool, newNode chan *v1.Node) {
 	for !expected && !timeout {
 		select {
 		case n := <-newNode:
-			if e2enode.IsConditionSetAsExpected(n, v1.NodeReady, isReady) {
+			if framework.IsConditionSetAsExpected(n, v1.NodeReady, isReady) {
 				expected = true
 			} else {
 				framework.Logf("Observed node ready status is NOT %v as expected", isReady)
@@ -146,8 +146,8 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				nodeOpts := metav1.ListOptions{}
 				nodes, err := c.CoreV1().Nodes().List(nodeOpts)
 				framework.ExpectNoError(err)
-				e2enode.Filter(nodes, func(node v1.Node) bool {
-					if !e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
+				framework.Filter(nodes, func(node v1.Node) bool {
+					if !framework.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
 					}
 					podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}
@@ -245,7 +245,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			// The source for the Docker container kubernetes/serve_hostname is in contrib/for-demos/serve_hostname
 			name := "my-hostname-net"
 			common.NewSVCByName(c, ns, name)
-			numNodes, err := e2enode.TotalRegistered(f.ClientSet)
+			numNodes, err := framework.TotalRegistered(f.ClientSet)
 			framework.ExpectNoError(err)
 			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, nil, nil)
@@ -314,7 +314,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			gracePeriod := int64(30)
 
 			common.NewSVCByName(c, ns, name)
-			numNodes, err := e2enode.TotalRegistered(f.ClientSet)
+			numNodes, err := framework.TotalRegistered(f.ClientSet)
 			framework.ExpectNoError(err)
 			replicas := int32(numNodes)
 			common.NewRCByName(c, ns, name, replicas, &gracePeriod, []string{"serve-hostname"})
@@ -387,7 +387,7 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 			_, err := c.AppsV1().StatefulSets(ns).Create(ps)
 			framework.ExpectNoError(err)
 
-			nn, err := e2enode.TotalRegistered(f.ClientSet)
+			nn, err := framework.TotalRegistered(f.ClientSet)
 			framework.ExpectNoError(err)
 			nodes, err := e2enode.CheckReady(f.ClientSet, nn, framework.NodeReadyInitialTimeout)
 			framework.ExpectNoError(err)
@@ -493,10 +493,10 @@ var _ = SIGDescribe("Network Partition [Disruptive] [Slow]", func() {
 				framework.SkipUnlessSSHKeyPresent()
 				ginkgo.By("choose a node - we will block all network traffic on this node")
 				var podOpts metav1.ListOptions
-				nodes, err := e2enode.GetReadySchedulableNodes(c)
+				nodes, err := framework.GetReadySchedulableNodes(c)
 				framework.ExpectNoError(err)
-				e2enode.Filter(nodes, func(node v1.Node) bool {
-					if !e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
+				framework.Filter(nodes, func(node v1.Node) bool {
+					if !framework.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
 						return false
 					}
 					podOpts = metav1.ListOptions{FieldSelector: fields.OneTermEqualSelector(api.PodHostField, node.Name).String()}

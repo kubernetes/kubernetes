@@ -582,7 +582,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 	ginkgo.By("Getting node addresses")
 	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
-	nodeList, err := e2enode.GetReadySchedulableNodes(config.f.ClientSet)
+	nodeList, err := framework.GetReadySchedulableNodes(config.f.ClientSet)
 	framework.ExpectNoError(err)
 	config.ExternalAddrs = e2enode.FirstAddress(nodeList, v1.NodeExternalIP)
 
@@ -614,7 +614,7 @@ func (config *NetworkingTestConfig) setup(selector map[string]string) {
 
 func (config *NetworkingTestConfig) createNetProxyPods(podName string, selector map[string]string) []*v1.Pod {
 	framework.ExpectNoError(framework.WaitForAllNodesSchedulable(config.f.ClientSet, 10*time.Minute))
-	nodeList, err := e2enode.GetBoundedReadySchedulableNodes(config.f.ClientSet, maxNetProxyPodsCount)
+	nodeList, err := framework.GetBoundedReadySchedulableNodes(config.f.ClientSet, maxNetProxyPodsCount)
 	framework.ExpectNoError(err)
 	nodes := nodeList.Items
 

@@ -25,7 +25,6 @@ import (
 
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
 
@@ -50,7 +49,7 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 
 	ginkgo.It("node unregister", func() {
 		ginkgo.By("Get total Ready nodes")
-		nodeList, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		nodeList, err := framework.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 		gomega.Expect(len(nodeList.Items) > 1).To(gomega.BeTrue(), "At least 2 nodes are required for this test")
 
@@ -81,7 +80,7 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		ginkgo.By("Verifying the ready node counts")
 		gomega.Expect(verifyReadyNodeCount(f.ClientSet, totalNodesCount-1)).To(gomega.BeTrue(), "Unable to verify expected ready node count")
 
-		nodeList, err = e2enode.GetReadySchedulableNodes(client)
+		nodeList, err = framework.GetReadySchedulableNodes(client)
 		framework.ExpectNoError(err)
 
 		var nodeNameList []string
@@ -98,7 +97,7 @@ var _ = utils.SIGDescribe("Node Unregister [Feature:vsphere] [Slow] [Disruptive]
 		ginkgo.By("Verifying the ready node counts")
 		gomega.Expect(verifyReadyNodeCount(f.ClientSet, totalNodesCount)).To(gomega.BeTrue(), "Unable to verify expected ready node count")
 
-		nodeList, err = e2enode.GetReadySchedulableNodes(client)
+		nodeList, err = framework.GetReadySchedulableNodes(client)
 		framework.ExpectNoError(err)
 
 		nodeNameList = nodeNameList[:0]

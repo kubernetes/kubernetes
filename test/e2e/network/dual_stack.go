@@ -49,7 +49,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 	ginkgo.It("should have ipv4 and ipv6 internal node ip", func() {
 		// TODO (aramase) can switch to new function to get all nodes
-		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
+		nodeList, err := framework.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
 
 		for _, node := range nodeList.Items {
@@ -64,7 +64,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 
 	ginkgo.It("should have ipv4 and ipv6 node podCIDRs", func() {
 		// TODO (aramase) can switch to new function to get all nodes
-		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
+		nodeList, err := framework.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
 
 		for _, node := range nodeList.Items {
@@ -127,7 +127,7 @@ var _ = SIGDescribe("[Feature:IPv6DualStackAlphaFeature] [LinuxOnly]", func() {
 		// this is to ensure connectivity from all nodes on cluster
 		// FIXME: tests may be run in large clusters. This test is O(n^2) in the
 		// number of nodes used. It should use GetBoundedReadySchedulableNodes().
-		nodeList, err := e2enode.GetReadySchedulableNodes(cs)
+		nodeList, err := framework.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
 
 		replicas := int32(len(nodeList.Items))

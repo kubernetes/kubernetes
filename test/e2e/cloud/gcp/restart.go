@@ -55,7 +55,7 @@ var _ = SIGDescribe("Restart [Disruptive]", func() {
 		var err error
 		ps, err = testutils.NewPodStore(f.ClientSet, metav1.NamespaceSystem, labels.Everything(), fields.Everything())
 		framework.ExpectNoError(err)
-		numNodes, err = e2enode.TotalRegistered(f.ClientSet)
+		numNodes, err = framework.TotalRegistered(f.ClientSet)
 		framework.ExpectNoError(err)
 		systemNamespace = metav1.NamespaceSystem
 

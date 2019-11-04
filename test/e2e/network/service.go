@@ -287,7 +287,7 @@ var _ = SIGDescribe("Services", func() {
 		framework.Logf("sourceip-test cluster ip: %s", serviceIP)
 
 		ginkgo.By("Picking 2 Nodes to test whether source IP is preserved or not")
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, 2)
+		nodes, err := framework.GetBoundedReadySchedulableNodes(cs, 2)
 		framework.ExpectNoError(err)
 		nodeCounts := len(nodes.Items)
 		if nodeCounts < 2 {
@@ -1963,7 +1963,7 @@ var _ = SIGDescribe("Services", func() {
 		namespace := f.Namespace.Name
 		serviceName := "no-pods"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		nodes, err := framework.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
 		framework.ExpectNoError(err)
 		port := 80
 
@@ -2144,7 +2144,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		namespace := f.Namespace.Name
 		serviceName := "external-local-nodes"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		nodes, err := framework.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
 		framework.ExpectNoError(err)
 
 		svc, err := jig.CreateOnlyLocalLoadBalancerService(loadBalancerCreateTimeout, false,
@@ -2274,7 +2274,7 @@ var _ = SIGDescribe("ESIPP [Slow] [DisabledForLargeClusters]", func() {
 		serviceName := "external-local-update"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
-		nodes, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		nodes, err := framework.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
 		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Failf("Need at least 2 nodes to verify source ip from a node without endpoint")
@@ -2445,7 +2445,7 @@ func execAffinityTestForNonLBServiceWithOptionalTransition(f *framework.Framewor
 	framework.ExpectNoError(err, "failed to fetch service: %s in namespace: %s", serviceName, ns)
 	var svcIP string
 	if serviceType == v1.ServiceTypeNodePort {
-		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		nodes, err := framework.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
 		addrs := e2enode.CollectAddresses(nodes, v1.NodeInternalIP)
 		gomega.Expect(len(addrs)).To(gomega.BeNumerically(">", 0), "ginkgo.Failed to get Node internal IP")

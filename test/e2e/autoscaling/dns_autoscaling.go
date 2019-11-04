@@ -56,7 +56,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		c = f.ClientSet
 
-		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		nodes, err := framework.GetReadySchedulableNodes(c)
 		framework.ExpectNoError(err)
 		nodeCount := len(nodes.Items)
 
@@ -101,7 +101,7 @@ var _ = SIGDescribe("DNS horizontal autoscaling", func() {
 	// This test is separated because it is slow and need to run serially.
 	// Will take around 5 minutes to run on a 4 nodes cluster.
 	ginkgo.It("[Serial] [Slow] kube-dns-autoscaler should scale kube-dns pods when cluster size changed", func() {
-		numNodes, err := e2enode.TotalRegistered(c)
+		numNodes, err := framework.TotalRegistered(c)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Replace the dns autoscaling parameters with testing parameters")
@@ -235,7 +235,7 @@ func getExpectReplicasFuncLinear(c clientset.Interface, params *DNSParamsLinear)
 	return func(c clientset.Interface) int {
 		var replicasFromNodes float64
 		var replicasFromCores float64
-		nodes, err := e2enode.GetReadySchedulableNodes(c)
+		nodes, err := framework.GetReadySchedulableNodes(c)
 		framework.ExpectNoError(err)
 		if params.nodesPerReplica > 0 {
 			replicasFromNodes = math.Ceil(float64(len(nodes.Items)) / params.nodesPerReplica)

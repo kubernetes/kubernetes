@@ -75,7 +75,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 		framework.Logf("Got cluster ID: %v", clusterID)
 
 		jig := e2eservice.NewTestJig(cs, ns, serviceName)
-		nodeList, err := e2enode.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
+		nodeList, err := framework.GetBoundedReadySchedulableNodes(cs, e2eservice.MaxNodesForEndpointsTests)
 		framework.ExpectNoError(err)
 
 		nodesNames := []string{}
@@ -194,7 +194,7 @@ var _ = SIGDescribe("Firewall rule", func() {
 	})
 
 	ginkgo.It("should have correct firewall rules for e2e cluster", func() {
-		nodes, err := e2enode.GetReadySchedulableNodes(cs)
+		nodes, err := framework.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Checking if e2e firewall rules are correct")

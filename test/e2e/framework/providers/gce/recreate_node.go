@@ -49,7 +49,7 @@ var _ = ginkgo.Describe("Recreate [Feature:Recreate]", func() {
 	ginkgo.BeforeEach(func() {
 		framework.SkipUnlessProviderIs("gce", "gke")
 		var err error
-		numNodes, err := e2enode.TotalRegistered(f.ClientSet)
+		numNodes, err := framework.TotalRegistered(f.ClientSet)
 		framework.ExpectNoError(err)
 		originalNodes, err = e2enode.CheckReady(f.ClientSet, numNodes, framework.NodeReadyInitialTimeout)
 		framework.ExpectNoError(err)

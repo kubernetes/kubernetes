@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
 )
@@ -335,7 +334,7 @@ var _ = utils.SIGDescribe("Volume Placement", func() {
 })
 
 func testSetupVolumePlacement(client clientset.Interface, namespace string) (node1Name string, node1KeyValueLabel map[string]string, node2Name string, node2KeyValueLabel map[string]string) {
-	nodes, err := e2enode.GetBoundedReadySchedulableNodes(client, 2)
+	nodes, err := framework.GetBoundedReadySchedulableNodes(client, 2)
 	framework.ExpectNoError(err)
 	if len(nodes.Items) < 2 {
 		framework.Skipf("Requires at least %d nodes (not %d)", 2, len(nodes.Items))

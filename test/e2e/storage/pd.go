@@ -79,7 +79,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 		podClient = cs.CoreV1().Pods(ns)
 		nodeClient = cs.CoreV1().Nodes()
 		var err error
-		nodes, err = e2enode.GetReadySchedulableNodes(cs)
+		nodes, err = framework.GetReadySchedulableNodes(cs)
 		framework.ExpectNoError(err)
 		gomega.Expect(len(nodes.Items)).To(gomega.BeNumerically(">=", minNodes), fmt.Sprintf("Requires at least %d nodes", minNodes))
 		host0Name = types.NodeName(nodes.Items[0].ObjectMeta.Name)
@@ -448,7 +448,7 @@ var _ = utils.SIGDescribe("Pod Disks", func() {
 func countReadyNodes(c clientset.Interface, hostName types.NodeName) int {
 	e2enode.WaitForNodeToBeReady(c, string(hostName), nodeStatusTimeout)
 	framework.WaitForAllNodesSchedulable(c, nodeStatusTimeout)
-	nodes, err := e2enode.GetReadySchedulableNodes(c)
+	nodes, err := framework.GetReadySchedulableNodes(c)
 	framework.ExpectNoError(err)
 	return len(nodes.Items)
 }

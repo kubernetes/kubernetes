@@ -84,7 +84,6 @@ go_library(
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/deployment:go_default_library",
         "//test/e2e/framework/metrics:go_default_library",
-        "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
         "//test/e2e/framework/ssh:go_default_library",
         "//test/utils:go_default_library",

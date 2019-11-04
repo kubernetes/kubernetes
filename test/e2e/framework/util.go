@@ -74,7 +74,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	e2emetrics "k8s.io/kubernetes/test/e2e/framework/metrics"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
@@ -1363,7 +1362,7 @@ func WaitForAllNodesSchedulable(c clientset.Interface, timeout time.Duration) er
 	return wait.PollImmediate(
 		30*time.Second,
 		timeout,
-		e2enode.CheckReadyForTests(c, TestContext.NonblockingTaints, TestContext.AllowedNotReadyNodes, largeClusterThreshold),
+		CheckReadyForTests(c, TestContext.NonblockingTaints, TestContext.AllowedNotReadyNodes, largeClusterThreshold),
 	)
 }
 
@@ -1713,7 +1712,7 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 		}
 		for i := range nodes.Items {
 			node := &nodes.Items[i]
-			if !e2enode.IsConditionSetAsExpected(node, v1.NodeReady, true) {
+			if !IsConditionSetAsExpected(node, v1.NodeReady, true) {
 				notReady = append(notReady, node)
 			}
 		}
@@ -2023,7 +2022,7 @@ func WaitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 		}
 
 		// Filter out nodes that are not master replicas
-		e2enode.Filter(nodes, func(node v1.Node) bool {
+		Filter(nodes, func(node v1.Node) bool {
 			res, err := regexp.Match(GenerateMasterRegexp(masterPrefix), ([]byte)(node.Name))
 			if err != nil {
 				Logf("Failed to match regexp to node name: %v", err)
@@ -2035,8 +2034,8 @@ func WaitForMasters(masterPrefix string, c clientset.Interface, size int, timeou
 		numNodes := len(nodes.Items)
 
 		// Filter out not-ready nodes.
-		e2enode.Filter(nodes, func(node v1.Node) bool {
-			return e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true)
+		Filter(nodes, func(node v1.Node) bool {
+			return IsConditionSetAsExpected(&node, v1.NodeReady, true)
 		})
 
 		numReady := len(nodes.Items)
@@ -2413,7 +2412,7 @@ func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testut
 
 // PrepareNodes prepares nodes in the cluster.
 func (p *E2ETestNodePreparer) PrepareNodes() error {
-	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
+	nodes, err := GetReadySchedulableNodes(p.client)
 	if err != nil {
 		return err
 	}
@@ -2442,7 +2441,7 @@ func (p *E2ETestNodePreparer) PrepareNodes() error {
 // CleanupNodes cleanups nodes in the cluster.
 func (p *E2ETestNodePreparer) CleanupNodes() error {
 	var encounteredError error
-	nodes, err := e2enode.GetReadySchedulableNodes(p.client)
+	nodes, err := GetReadySchedulableNodes(p.client)
 	if err != nil {
 		return err
 	}

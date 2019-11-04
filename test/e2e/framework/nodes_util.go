@@ -26,13 +26,21 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
+	nodectlr "k8s.io/kubernetes/pkg/controller/nodelifecycle"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
 const etcdImage = "3.4.3-0"
+
+const sleepTime = 20 * time.Second
 
 // EtcdUpgrade upgrades etcd on GCE.
 func EtcdUpgrade(targetStorage, targetVersion string) error {
@@ -204,12 +212,12 @@ func waitForNodesReadyAfterUpgrade(f *Framework) error {
 	//
 	// TODO(ihmccreery) We shouldn't have to wait for nodes to be ready in
 	// GKE; the operation shouldn't return until they all are.
-	numNodes, err := e2enode.TotalRegistered(f.ClientSet)
+	numNodes, err := TotalRegistered(f.ClientSet)
 	if err != nil {
 		return fmt.Errorf("couldn't detect number of nodes")
 	}
 	Logf("Waiting up to %v for all %d nodes to be ready after the upgrade", RestartNodeReadyAgainTimeout, numNodes)
-	if _, err := e2enode.CheckReady(f.ClientSet, numNodes, RestartNodeReadyAgainTimeout); err != nil {
+	if _, err := CheckReady(f.ClientSet, numNodes, RestartNodeReadyAgainTimeout); err != nil {
 		return err
 	}
 	return nil
@@ -328,11 +336,11 @@ func (k *NodeKiller) Run(stopCh <-chan struct{}) {
 }
 
 func (k *NodeKiller) pickNodes() []v1.Node {
-	nodes, err := e2enode.GetReadySchedulableNodes(k.client)
+	nodes, err := GetReadySchedulableNodes(k.client)
 	ExpectNoError(err)
 	numNodes := int(k.config.FailureRatio * float64(len(nodes.Items)))
 
-	nodes, err = e2enode.GetBoundedReadySchedulableNodes(k.client, numNodes)
+	nodes, err = GetBoundedReadySchedulableNodes(k.client, numNodes)
 	ExpectNoError(err)
 	return nodes.Items
 }
@@ -363,4 +371,380 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 		}()
 	}
 	wg.Wait()
+}
+
+// DeleteNodeOnCloudProvider deletes the specified node.
+func DeleteNodeOnCloudProvider(node *v1.Node) error {
+	return TestContext.CloudConfig.Provider.DeleteNode(node)
+}
+
+// TotalRegistered returns number of registered Nodes excluding Master Node.
+func TotalRegistered(c clientset.Interface) (int, error) {
+	nodes, err := waitListSchedulableNodes(c)
+	if err != nil {
+		Logf("Failed to list nodes: %v", err)
+		return 0, err
+	}
+	return len(nodes.Items), nil
+}
+
+// GetReadySchedulableNodes addresses the common use case of getting nodes you can do work on.
+// 1) Needs to be schedulable.
+// 2) Needs to be ready.
+// If EITHER 1 or 2 is not true, most tests will want to ignore the node entirely.
+// If there are no nodes that are both ready and schedulable, this will return an error.
+func GetReadySchedulableNodes(c clientset.Interface) (nodes *v1.NodeList, err error) {
+	nodes, err = waitListSchedulableNodes(c)
+	if err != nil {
+		return nil, fmt.Errorf("listing schedulable nodes error: %s", err)
+	}
+	Filter(nodes, func(node v1.Node) bool {
+		return IsNodeSchedulable(&node) && IsNodeUntainted(&node)
+	})
+	if len(nodes.Items) == 0 {
+		return nil, fmt.Errorf("there are currently no ready, schedulable nodes in the cluster")
+	}
+	return nodes, nil
+}
+
+// GetBoundedReadySchedulableNodes is like GetReadySchedulableNodes except that it returns
+// at most maxNodes nodes. Use this to keep your test case from blowing up when run on a
+// large cluster.
+func GetBoundedReadySchedulableNodes(c clientset.Interface, maxNodes int) (nodes *v1.NodeList, err error) {
+	nodes, err = GetReadySchedulableNodes(c)
+	if err != nil {
+		return nil, err
+	}
+	if len(nodes.Items) > maxNodes {
+		shuffled := make([]v1.Node, maxNodes)
+		perm := rand.Perm(len(nodes.Items))
+		for i, j := range perm {
+			if j < len(shuffled) {
+				shuffled[j] = nodes.Items[i]
+			}
+		}
+		nodes.Items = shuffled
+	}
+	return nodes, nil
+}
+
+// IsNodeSchedulable returns true if:
+// 1) doesn't have "unschedulable" field set
+// 2) it also returns true from isNodeReady
+func IsNodeSchedulable(node *v1.Node) bool {
+	if node == nil {
+		return false
+	}
+	return !node.Spec.Unschedulable && isNodeReady(node)
+}
+
+// isNodeReady returns true if:
+// 1) it's Ready condition is set to true
+// 2) doesn't have NetworkUnavailable condition set to true
+func isNodeReady(node *v1.Node) bool {
+	nodeReady := IsConditionSetAsExpected(node, v1.NodeReady, true)
+	networkReady := IsConditionUnset(node, v1.NodeNetworkUnavailable) ||
+		IsConditionSetAsExpectedSilent(node, v1.NodeNetworkUnavailable, false)
+	return nodeReady && networkReady
+}
+
+// IsNodeUntainted tests whether a fake pod can be scheduled on "node", given its current taints.
+// TODO: need to discuss wether to return bool and error type
+func IsNodeUntainted(node *v1.Node) bool {
+	return isNodeUntaintedWithNonblocking(node, "")
+}
+
+// isNodeUntaintedWithNonblocking tests whether a fake pod can be scheduled on "node"
+// but allows for taints in the list of non-blocking taints.
+func isNodeUntaintedWithNonblocking(node *v1.Node, nonblockingTaints string) bool {
+	fakePod := &v1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "Pod",
+			APIVersion: "v1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "fake-not-scheduled",
+			Namespace: "fake-not-scheduled",
+		},
+		Spec: v1.PodSpec{
+			Containers: []v1.Container{
+				{
+					Name:  "fake-not-scheduled",
+					Image: "fake-not-scheduled",
+				},
+			},
+		},
+	}
+
+	nodeInfo := schedulernodeinfo.NewNodeInfo()
+
+	// Simple lookup for nonblocking taints based on comma-delimited list.
+	nonblockingTaintsMap := map[string]struct{}{}
+	for _, t := range strings.Split(nonblockingTaints, ",") {
+		if strings.TrimSpace(t) != "" {
+			nonblockingTaintsMap[strings.TrimSpace(t)] = struct{}{}
+		}
+	}
+
+	if len(nonblockingTaintsMap) > 0 {
+		nodeCopy := node.DeepCopy()
+		nodeCopy.Spec.Taints = []v1.Taint{}
+		for _, v := range node.Spec.Taints {
+			if _, isNonblockingTaint := nonblockingTaintsMap[v.Key]; !isNonblockingTaint {
+				nodeCopy.Spec.Taints = append(nodeCopy.Spec.Taints, v)
+			}
+		}
+		nodeInfo.SetNode(nodeCopy)
+	} else {
+		nodeInfo.SetNode(node)
+	}
+
+	fit, _, err := predicates.PodToleratesNodeTaints(fakePod, nil, nodeInfo)
+	if err != nil {
+		Failf("Can't test predicates for node %s: %v", node.Name, err)
+		return false
+	}
+	return fit
+}
+
+// TODO: better to change to a easy read name
+func isNodeConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue, silent bool) bool {
+	// Check the node readiness condition (logging all).
+	for _, cond := range node.Status.Conditions {
+		// Ensure that the condition type and the status matches as desired.
+		if cond.Type == conditionType {
+			// For NodeReady condition we need to check Taints as well
+			if cond.Type == v1.NodeReady {
+				hasNodeControllerTaints := false
+				// For NodeReady we need to check if Taints are gone as well
+				taints := node.Spec.Taints
+				for _, taint := range taints {
+					if taint.MatchTaint(nodectlr.UnreachableTaintTemplate) || taint.MatchTaint(nodectlr.NotReadyTaintTemplate) {
+						hasNodeControllerTaints = true
+						break
+					}
+				}
+				if wantTrue {
+					if (cond.Status == v1.ConditionTrue) && !hasNodeControllerTaints {
+						return true
+					}
+					msg := ""
+					if !hasNodeControllerTaints {
+						msg = fmt.Sprintf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+							conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+					} else {
+						msg = fmt.Sprintf("Condition %s of node %s is %v, but Node is tainted by NodeController with %v. Failure",
+							conditionType, node.Name, cond.Status == v1.ConditionTrue, taints)
+					}
+					if !silent {
+						Logf(msg)
+					}
+					return false
+				}
+				// TODO: check if the Node is tainted once we enable NC notReady/unreachable taints by default
+				if cond.Status != v1.ConditionTrue {
+					return true
+				}
+				if !silent {
+					Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+						conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+				}
+				return false
+			}
+			if (wantTrue && (cond.Status == v1.ConditionTrue)) || (!wantTrue && (cond.Status != v1.ConditionTrue)) {
+				return true
+			}
+			if !silent {
+				Logf("Condition %s of node %s is %v instead of %t. Reason: %v, message: %v",
+					conditionType, node.Name, cond.Status == v1.ConditionTrue, wantTrue, cond.Reason, cond.Message)
+			}
+			return false
+		}
+
+	}
+	if !silent {
+		Logf("Couldn't find condition %v on node %v", conditionType, node.Name)
+	}
+	return false
+}
+
+// IsConditionSetAsExpected returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue with detailed logging.
+func IsConditionSetAsExpected(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
+	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, false)
+}
+
+// IsConditionSetAsExpectedSilent returns a wantTrue value if the node has a match to the conditionType, otherwise returns an opposite value of the wantTrue.
+func IsConditionSetAsExpectedSilent(node *v1.Node, conditionType v1.NodeConditionType, wantTrue bool) bool {
+	return isNodeConditionSetAsExpected(node, conditionType, wantTrue, true)
+}
+
+// IsConditionUnset returns true if conditions of the given node do not have a match to the given conditionType, otherwise false.
+func IsConditionUnset(node *v1.Node, conditionType v1.NodeConditionType) bool {
+	for _, cond := range node.Status.Conditions {
+		if cond.Type == conditionType {
+			return false
+		}
+	}
+	return true
+}
+
+// waitListSchedulableNodes is a wrapper around listing nodes supporting retries.
+func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
+	var nodes *v1.NodeList
+	var err error
+	if wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
+		nodes, err = c.CoreV1().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
+			"spec.unschedulable": "false",
+		}.AsSelector().String()})
+		if err != nil {
+			if testutils.IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	}) != nil {
+		return nodes, err
+	}
+	return nodes, nil
+}
+
+// Filter filters nodes in NodeList in place, removing nodes that do not
+// satisfy the given condition
+// TODO: consider merging with pkg/client/cache.NodeLister
+func Filter(nodeList *v1.NodeList, fn func(node v1.Node) bool) {
+	var l []v1.Node
+
+	for _, node := range nodeList.Items {
+		if fn(node) {
+			l = append(l, node)
+		}
+	}
+	nodeList.Items = l
+}
+
+// CheckReady waits up to timeout for cluster to has desired size and
+// there is no not-ready nodes in it. By cluster size we mean number of Nodes
+// excluding Master Node.
+func CheckReady(c clientset.Interface, size int, timeout time.Duration) ([]v1.Node, error) {
+	for start := time.Now(); time.Since(start) < timeout; time.Sleep(sleepTime) {
+		nodes, err := waitListSchedulableNodes(c)
+		if err != nil {
+			Logf("Failed to list nodes: %v", err)
+			continue
+		}
+		numNodes := len(nodes.Items)
+
+		// Filter out not-ready nodes.
+		Filter(nodes, func(node v1.Node) bool {
+			nodeReady := IsConditionSetAsExpected(&node, v1.NodeReady, true)
+			networkReady := IsConditionUnset(&node, v1.NodeNetworkUnavailable) || IsConditionSetAsExpected(&node, v1.NodeNetworkUnavailable, false)
+			return nodeReady && networkReady
+		})
+		numReady := len(nodes.Items)
+
+		if numNodes == size && numReady == size {
+			Logf("Cluster has reached the desired number of ready nodes %d", size)
+			return nodes.Items, nil
+		}
+		Logf("Waiting for ready nodes %d, current ready %d, not ready nodes %d", size, numReady, numNodes-numReady)
+	}
+	return nil, fmt.Errorf("timeout waiting %v for number of ready nodes to be %d", timeout, size)
+}
+
+// CheckReadyForTests returns a method usable in polling methods which will check that the nodes are
+// in a testable state based on schedulability.
+func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowedNotReadyNodes, largeClusterThreshold int) func() (bool, error) {
+	attempt := 0
+	var notSchedulable []*v1.Node
+	return func() (bool, error) {
+		attempt++
+		notSchedulable = nil
+		opts := metav1.ListOptions{
+			ResourceVersion: "0",
+			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
+		}
+		nodes, err := c.CoreV1().Nodes().List(opts)
+		if err != nil {
+			Logf("Unexpected error listing nodes: %v", err)
+			if testutils.IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		for i := range nodes.Items {
+			node := &nodes.Items[i]
+			if !readyForTests(node, nonblockingTaints) {
+				notSchedulable = append(notSchedulable, node)
+			}
+		}
+		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
+		// to make it possible e.g. for incorrect deployment of some small percentage
+		// of nodes (which we allow in cluster validation). Some nodes that are not
+		// provisioned correctly at startup will never become ready (e.g. when something
+		// won't install correctly), so we can't expect them to be ready at any point.
+		//
+		// However, we only allow non-ready nodes with some specific reasons.
+		if len(notSchedulable) > 0 {
+			// In large clusters, log them only every 10th pass.
+			if len(nodes.Items) < largeClusterThreshold || attempt%10 == 0 {
+				Logf("Unschedulable nodes:")
+				for i := range notSchedulable {
+					Logf("-> %s Ready=%t Network=%t Taints=%v NonblockingTaints:%v",
+						notSchedulable[i].Name,
+						IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
+						IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false),
+						notSchedulable[i].Spec.Taints,
+						nonblockingTaints,
+					)
+
+				}
+				Logf("================================")
+			}
+		}
+		return len(notSchedulable) <= allowedNotReadyNodes, nil
+	}
+}
+
+// readyForTests determines whether or not we should continue waiting for the nodes
+// to enter a testable state. By default this means it is schedulable, NodeReady, and untainted.
+// Nodes with taints nonblocking taints are permitted to have that taint and
+// also have their node.Spec.Unschedulable field ignored for the purposes of this function.
+func readyForTests(node *v1.Node, nonblockingTaints string) bool {
+	if hasNonblockingTaint(node, nonblockingTaints) {
+		// If the node has one of the nonblockingTaints taints; just check that it is ready
+		// and don't require node.Spec.Unschedulable to be set either way.
+		if !isNodeReady(node) || !isNodeUntaintedWithNonblocking(node, nonblockingTaints) {
+			return false
+		}
+	} else {
+		if !IsNodeSchedulable(node) || !IsNodeUntainted(node) {
+			return false
+		}
+	}
+	return true
+}
+
+// hasNonblockingTaint returns true if the node contains at least
+// one taint with a key matching the regexp.
+func hasNonblockingTaint(node *v1.Node, nonblockingTaints string) bool {
+	if node == nil {
+		return false
+	}
+
+	// Simple lookup for nonblocking taints based on comma-delimited list.
+	nonblockingTaintsMap := map[string]struct{}{}
+	for _, t := range strings.Split(nonblockingTaints, ",") {
+		if strings.TrimSpace(t) != "" {
+			nonblockingTaintsMap[strings.TrimSpace(t)] = struct{}{}
+		}
+	}
+
+	for _, taint := range node.Spec.Taints {
+		if _, hasNonblockingTaint := nonblockingTaintsMap[taint.Key]; hasNonblockingTaint {
+			return true
+		}
+	}
+
+	return false
 }

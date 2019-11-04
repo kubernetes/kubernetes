@@ -27,7 +27,6 @@ import (
 	kubeletstatsv1alpha1 "k8s.io/kubernetes/pkg/kubelet/apis/stats/v1alpha1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2eperf "k8s.io/kubernetes/test/e2e/framework/perf"
 	"k8s.io/kubernetes/test/e2e/perftype"
 	testutils "k8s.io/kubernetes/test/utils"
@@ -199,7 +198,7 @@ var _ = SIGDescribe("Kubelet [Serial] [Slow]", func() {
 	var rm *e2ekubelet.ResourceMonitor
 
 	ginkgo.BeforeEach(func() {
-		nodes, err := e2enode.GetReadySchedulableNodes(f.ClientSet)
+		nodes, err := framework.GetReadySchedulableNodes(f.ClientSet)
 		framework.ExpectNoError(err)
 		nodeNames = sets.NewString()
 		for _, node := range nodes.Items {

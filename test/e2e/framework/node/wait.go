@@ -26,7 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	e2elog "k8s.io/kubernetes/test/e2e/framework/log"
+	"k8s.io/kubernetes/test/e2e/framework"
 	"k8s.io/kubernetes/test/e2e/system"
 	testutils "k8s.io/kubernetes/test/utils"
 )
@@ -49,7 +49,7 @@ func WaitForReadyNodes(c clientset.Interface, size int, timeout time.Duration) e
 
 // WaitForTotalHealthy checks whether all registered nodes are ready and all required Pods are running on them.
 func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
-	e2elog.Logf("Waiting up to %v for all nodes to be ready", timeout)
+	framework.Logf("Waiting up to %v for all nodes to be ready", timeout)
 
 	var notReady []v1.Node
 	var missingPodsPerNode map[string][]string
@@ -64,7 +64,7 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 			return false, err
 		}
 		for _, node := range nodes.Items {
-			if !IsConditionSetAsExpected(&node, v1.NodeReady, true) {
+			if !framework.IsConditionSetAsExpected(&node, v1.NodeReady, true) {
 				notReady = append(notReady, node)
 			}
 		}
@@ -120,19 +120,19 @@ func WaitForTotalHealthy(c clientset.Interface, timeout time.Duration) error {
 // is ConditionTrue; if it's false, it ensures the node condition is in any state
 // other than ConditionTrue (e.g. not true or unknown).
 func WaitConditionToBe(c clientset.Interface, name string, conditionType v1.NodeConditionType, wantTrue bool, timeout time.Duration) bool {
-	e2elog.Logf("Waiting up to %v for node %s condition %s to be %t", timeout, name, conditionType, wantTrue)
+	framework.Logf("Waiting up to %v for node %s condition %s to be %t", timeout, name, conditionType, wantTrue)
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(poll) {
 		node, err := c.CoreV1().Nodes().Get(name, metav1.GetOptions{})
 		if err != nil {
-			e2elog.Logf("Couldn't get node %s", name)
+			framework.Logf("Couldn't get node %s", name)
 			continue
 		}
 
-		if IsConditionSetAsExpected(node, conditionType, wantTrue) {
+		if framework.IsConditionSetAsExpected(node, conditionType, wantTrue) {
 			return true
 		}
 	}
-	e2elog.Logf("Node %s didn't reach desired %s condition status (%t) within %v", name, conditionType, wantTrue, timeout)
+	framework.Logf("Node %s didn't reach desired %s condition status (%t) within %v", name, conditionType, wantTrue, timeout)
 	return false
 }
 
@@ -155,24 +155,24 @@ func CheckReady(c clientset.Interface, size int, timeout time.Duration) ([]v1.No
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(sleepTime) {
 		nodes, err := waitListSchedulableNodes(c)
 		if err != nil {
-			e2elog.Logf("Failed to list nodes: %v", err)
+			framework.Logf("Failed to list nodes: %v", err)
 			continue
 		}
 		numNodes := len(nodes.Items)
 
 		// Filter out not-ready nodes.
-		Filter(nodes, func(node v1.Node) bool {
-			nodeReady := IsConditionSetAsExpected(&node, v1.NodeReady, true)
-			networkReady := IsConditionUnset(&node, v1.NodeNetworkUnavailable) || IsConditionSetAsExpected(&node, v1.NodeNetworkUnavailable, false)
+		framework.Filter(nodes, func(node v1.Node) bool {
+			nodeReady := framework.IsConditionSetAsExpected(&node, v1.NodeReady, true)
+			networkReady := framework.IsConditionUnset(&node, v1.NodeNetworkUnavailable) || framework.IsConditionSetAsExpected(&node, v1.NodeNetworkUnavailable, false)
 			return nodeReady && networkReady
 		})
 		numReady := len(nodes.Items)
 
 		if numNodes == size && numReady == size {
-			e2elog.Logf("Cluster has reached the desired number of ready nodes %d", size)
+			framework.Logf("Cluster has reached the desired number of ready nodes %d", size)
 			return nodes.Items, nil
 		}
-		e2elog.Logf("Waiting for ready nodes %d, current ready %d, not ready nodes %d", size, numReady, numNodes-numReady)
+		framework.Logf("Waiting for ready nodes %d, current ready %d, not ready nodes %d", size, numReady, numNodes-numReady)
 	}
 	return nil, fmt.Errorf("timeout waiting %v for number of ready nodes to be %d", timeout, size)
 }
@@ -205,77 +205,4 @@ func checkWaitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) 
 		return nil, fmt.Errorf("error: %s. Non-retryable failure or timed out while listing nodes for e2e cluster", err)
 	}
 	return nodes, nil
-}
-
-// CheckReadyForTests returns a method usable in polling methods which will check that the nodes are
-// in a testable state based on schedulability.
-func CheckReadyForTests(c clientset.Interface, nonblockingTaints string, allowedNotReadyNodes, largeClusterThreshold int) func() (bool, error) {
-	attempt := 0
-	var notSchedulable []*v1.Node
-	return func() (bool, error) {
-		attempt++
-		notSchedulable = nil
-		opts := metav1.ListOptions{
-			ResourceVersion: "0",
-			FieldSelector:   fields.Set{"spec.unschedulable": "false"}.AsSelector().String(),
-		}
-		nodes, err := c.CoreV1().Nodes().List(opts)
-		if err != nil {
-			e2elog.Logf("Unexpected error listing nodes: %v", err)
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		for i := range nodes.Items {
-			node := &nodes.Items[i]
-			if !readyForTests(node, nonblockingTaints) {
-				notSchedulable = append(notSchedulable, node)
-			}
-		}
-		// Framework allows for <TestContext.AllowedNotReadyNodes> nodes to be non-ready,
-		// to make it possible e.g. for incorrect deployment of some small percentage
-		// of nodes (which we allow in cluster validation). Some nodes that are not
-		// provisioned correctly at startup will never become ready (e.g. when something
-		// won't install correctly), so we can't expect them to be ready at any point.
-		//
-		// However, we only allow non-ready nodes with some specific reasons.
-		if len(notSchedulable) > 0 {
-			// In large clusters, log them only every 10th pass.
-			if len(nodes.Items) < largeClusterThreshold || attempt%10 == 0 {
-				e2elog.Logf("Unschedulable nodes:")
-				for i := range notSchedulable {
-					e2elog.Logf("-> %s Ready=%t Network=%t Taints=%v NonblockingTaints:%v",
-						notSchedulable[i].Name,
-						IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeReady, true),
-						IsConditionSetAsExpectedSilent(notSchedulable[i], v1.NodeNetworkUnavailable, false),
-						notSchedulable[i].Spec.Taints,
-						nonblockingTaints,
-					)
-
-				}
-				e2elog.Logf("================================")
-			}
-		}
-		return len(notSchedulable) <= allowedNotReadyNodes, nil
-	}
-}
-
-// readyForTests determines whether or not we should continue waiting for the nodes
-// to enter a testable state. By default this means it is schedulable, NodeReady, and untainted.
-// Nodes with taints nonblocking taints are permitted to have that taint and
-// also have their node.Spec.Unschedulable field ignored for the purposes of this function.
-func readyForTests(node *v1.Node, nonblockingTaints string) bool {
-	if hasNonblockingTaint(node, nonblockingTaints) {
-		// If the node has one of the nonblockingTaints taints; just check that it is ready
-		// and don't require node.Spec.Unschedulable to be set either way.
-		if !IsNodeReady(node) || !isNodeUntaintedWithNonblocking(node, nonblockingTaints) {
-			return false
-		}
-	} else {
-		if !IsNodeSchedulable(node) || !IsNodeUntainted(node) {
-			return false
-		}
-	}
-	return true
 }

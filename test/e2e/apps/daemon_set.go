@@ -382,7 +382,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 	  rollback of updates to a DaemonSet.
 	*/
 	framework.ConformanceIt("should rollback without unnecessary restarts", func() {
-		schedulableNodes, err := e2enode.GetReadySchedulableNodes(c)
+		schedulableNodes, err := framework.GetReadySchedulableNodes(c)
 		framework.ExpectNoError(err)
 		gomega.Expect(len(schedulableNodes.Items)).To(gomega.BeNumerically(">", 1), "Conformance test suite needs a cluster with at least 2 nodes.")
 		framework.Logf("Create a RollingUpdate DaemonSet")
@@ -422,7 +422,7 @@ var _ = SIGDescribe("Daemon set [Serial]", func() {
 				framework.Failf("unexpected pod found, image = %s", image)
 			}
 		}
-		schedulableNodes, err = e2enode.GetReadySchedulableNodes(c)
+		schedulableNodes, err = framework.GetReadySchedulableNodes(c)
 		framework.ExpectNoError(err)
 		if len(schedulableNodes.Items) < 2 {
 			framework.ExpectEqual(len(existingPods), 0)
@@ -508,7 +508,7 @@ func separateDaemonSetNodeLabels(labels map[string]string) (map[string]string, m
 }
 
 func clearDaemonSetNodeLabels(c clientset.Interface) error {
-	nodeList, err := e2enode.GetReadySchedulableNodes(c)
+	nodeList, err := framework.GetReadySchedulableNodes(c)
 	if err != nil {
 		return err
 	}

@@ -87,7 +87,7 @@ var _ = utils.SIGDescribe("NFSPersistentVolumes[Disruptive][Flaky]", func() {
 		// Get the first ready node IP that is not hosting the NFS pod.
 		if clientNodeIP == "" {
 			framework.Logf("Designating test node")
-			nodes, err := e2enode.GetReadySchedulableNodes(c)
+			nodes, err := framework.GetReadySchedulableNodes(c)
 			framework.ExpectNoError(err)
 			for _, node := range nodes.Items {
 				if node.Name != nfsServerPod.Spec.NodeName {

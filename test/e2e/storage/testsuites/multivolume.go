@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2epv "k8s.io/kubernetes/test/e2e/framework/pv"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
@@ -171,7 +170,7 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		if l.driver.GetDriverInfo().Capabilities[CapSingleNodeVolume] {
 			framework.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, CapSingleNodeVolume)
 		}
-		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
+		nodes, err := framework.GetReadySchedulableNodes(l.cs)
 		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Skipf("Number of available nodes is less than 2 - skipping")
@@ -257,7 +256,7 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		if l.driver.GetDriverInfo().Capabilities[CapSingleNodeVolume] {
 			framework.Skipf("Driver %s only supports %v -- skipping", l.driver.GetDriverInfo().Name, CapSingleNodeVolume)
 		}
-		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
+		nodes, err := framework.GetReadySchedulableNodes(l.cs)
 		framework.ExpectNoError(err)
 		if len(nodes.Items) < 2 {
 			framework.Skipf("Number of available nodes is less than 2 - skipping")
@@ -326,7 +325,7 @@ func (t *multiVolumeTestSuite) defineTests(driver TestDriver, pattern testpatter
 		}
 
 		// Check different-node test requirement
-		nodes, err := e2enode.GetReadySchedulableNodes(l.cs)
+		nodes, err := framework.GetReadySchedulableNodes(l.cs)
 		framework.ExpectNoError(err)
 		if len(nodes.Items) < numPods {
 			framework.Skipf(fmt.Sprintf("Number of available nodes is less than %d - skipping", numPods))
