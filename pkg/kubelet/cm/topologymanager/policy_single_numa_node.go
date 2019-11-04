@@ -39,7 +39,7 @@ func (p *singleNumaNodePolicy) Name() string {
 	return PolicySingleNumaNode
 }
 
-func (p *singleNumaNodePolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
+func (p *singleNumaNodePolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
 	if !hint.Preferred {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
@@ -50,4 +50,10 @@ func (p *singleNumaNodePolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.P
 	return lifecycle.PodAdmitResult{
 		Admit: true,
 	}
+}
+
+func (p *singleNumaNodePolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
+	hint := mergeProvidersHints(p, p.numaNodes, providersHints)
+	admit := p.canAdmitPodResult(&hint)
+	return hint, admit
 }

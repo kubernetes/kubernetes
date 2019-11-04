@@ -24,6 +24,7 @@ import (
 type Policy interface {
 	//Returns Policy Name
 	Name() string
-	//Returns Pod Admit Handler Response based on hints and policy type
-	CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult
+	// Returns a merged TopologyHint based on input from hint providers
+	// and a Pod Admit Handler Response based on hints and policy type
+	Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult)
 }

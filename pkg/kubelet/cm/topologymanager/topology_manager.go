@@ -63,8 +63,6 @@ type manager struct {
 	podMap map[string]string
 	//Topology Manager Policy
 	policy Policy
-	//List of NUMA Nodes available on the underlying machine
-	numaNodes []int
 }
 
 // HintProvider is an interface for components that want to collaborate to
@@ -157,7 +155,6 @@ func NewManager(numaNodeInfo cputopology.NUMANodeInfo, topologyPolicyName string
 		podTopologyHints: pth,
 		podMap:           pm,
 		policy:           policy,
-		numaNodes:        numaNodes,
 	}
 
 	return manager, nil
@@ -325,11 +322,11 @@ func mergeProvidersHints(policy Policy, numaNodes []int, providersHints []map[st
 }
 
 // Collect Hints from hint providers and pass to policy to retrieve the best one.
-func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) TopologyHint {
+func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) (TopologyHint, lifecycle.PodAdmitResult) {
 	providersHints := m.accumulateProvidersHints(pod, container)
-	bestHint := mergeProvidersHints(m.policy, m.numaNodes, providersHints)
+	bestHint, admit := m.policy.Merge(providersHints)
 	klog.Infof("[topologymanager] ContainerTopologyHint: %v", bestHint)
-	return bestHint
+	return bestHint, admit
 }
 
 func (m *manager) AddHintProvider(h HintProvider) {
@@ -361,8 +358,7 @@ func (m *manager) Admit(attrs *lifecycle.PodAdmitAttributes) lifecycle.PodAdmitR
 	c := make(map[string]TopologyHint)
 
 	for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-		result := m.calculateAffinity(*pod, container)
-		admitPod := m.policy.CanAdmitPodResult(&result)
+		result, admitPod := m.calculateAffinity(*pod, container)
 		if !admitPod.Admit {
 			return admitPod
 		}

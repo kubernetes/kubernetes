@@ -114,15 +114,17 @@ func TestCalculateAffinity(t *testing.T) {
 		policy   Policy
 	}{
 		{
-			name: "TopologyHint not set",
-			hp:   []HintProvider{},
+			name:   "TopologyHint not set",
+			policy: NewBestEffortPolicy(numaNodes),
+			hp:     []HintProvider{},
 			expected: TopologyHint{
 				NUMANodeAffinity: NewTestBitMask(numaNodes...),
 				Preferred:        true,
 			},
 		},
 		{
-			name: "HintProvider returns empty non-nil map[string][]TopologyHint",
+			name:   "HintProvider returns empty non-nil map[string][]TopologyHint",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{},
@@ -134,7 +136,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "HintProvider returns -nil map[string][]TopologyHint from provider",
+			name:   "HintProvider returns -nil map[string][]TopologyHint from provider",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -148,7 +151,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "HintProvider returns empty non-nil map[string][]TopologyHint from provider",
+			name:   "HintProvider returns empty non-nil map[string][]TopologyHint from provider",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -162,7 +166,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Single TopologyHint with Preferred as true and NUMANodeAffinity as nil",
+			name:   "Single TopologyHint with Preferred as true and NUMANodeAffinity as nil",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -181,7 +186,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Single TopologyHint with Preferred as false and NUMANodeAffinity as nil",
+			name:   "Single TopologyHint with Preferred as false and NUMANodeAffinity as nil",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -200,7 +206,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 hint each, same mask, both preferred 1/2",
+			name:   "Two providers, 1 hint each, same mask, both preferred 1/2",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -229,7 +236,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 hint each, same mask, both preferred 2/2",
+			name:   "Two providers, 1 hint each, same mask, both preferred 2/2",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -258,7 +266,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 hint each, 1 wider mask, both preferred 1/2",
+			name:   "Two providers, 1 hint each, 1 wider mask, both preferred 1/2",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -287,7 +296,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 hint each, 1 wider mask, both preferred 1/2",
+			name:   "Two providers, 1 hint each, 1 wider mask, both preferred 1/2",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -316,7 +326,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 hint each, no common mask",
+			name:   "Two providers, 1 hint each, no common mask",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -345,7 +356,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 1/2",
+			name:   "Two providers, 1 hint each, same mask, 1 preferred, 1 not 1/2",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -374,7 +386,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 hint each, same mask, 1 preferred, 1 not 2/2",
+			name:   "Two providers, 1 hint each, same mask, 1 preferred, 1 not 2/2",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -403,7 +416,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 no hints, 1 single hint preferred 1/2",
+			name:   "Two providers, 1 no hints, 1 single hint preferred 1/2",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{},
 				&mockHintProvider{
@@ -423,7 +437,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 no hints, 1 single hint preferred 2/2",
+			name:   "Two providers, 1 no hints, 1 single hint preferred 2/2",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{},
 				&mockHintProvider{
@@ -443,7 +458,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 with 2 hints, 1 with single hint matching 1/2",
+			name:   "Two providers, 1 with 2 hints, 1 with single hint matching 1/2",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -476,7 +492,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 with 2 hints, 1 with single hint matching 2/2",
+			name:   "Two providers, 1 with 2 hints, 1 with single hint matching 2/2",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -509,7 +526,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, 1 with 2 hints, 1 with single non-preferred hint matching",
+			name:   "Two providers, 1 with 2 hints, 1 with single non-preferred hint matching",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -542,7 +560,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Two providers, both with 2 hints, matching narrower preferred hint from both",
+			name:   "Two providers, both with 2 hints, matching narrower preferred hint from both",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -579,7 +598,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Ensure less narrow preferred hints are chosen over narrower non-preferred hints",
+			name:   "Ensure less narrow preferred hints are chosen over narrower non-preferred hints",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -620,7 +640,8 @@ func TestCalculateAffinity(t *testing.T) {
 			},
 		},
 		{
-			name: "Multiple resources, same provider",
+			name:   "Multiple resources, same provider",
+			policy: NewBestEffortPolicy(numaNodes),
 			hp: []HintProvider{
 				&mockHintProvider{
 					map[string][]TopologyHint{
@@ -727,9 +748,8 @@ func TestCalculateAffinity(t *testing.T) {
 		mngr := manager{
 			policy:        tc.policy,
 			hintProviders: tc.hp,
-			numaNodes:     numaNodes,
 		}
-		actual := mngr.calculateAffinity(v1.Pod{}, v1.Container{})
+		actual, _ := mngr.calculateAffinity(v1.Pod{}, v1.Container{})
 		if !actual.NUMANodeAffinity.IsEqual(tc.expected.NUMANodeAffinity) {
 			t.Errorf("Expected NUMANodeAffinity in result to be %v, got %v", tc.expected.NUMANodeAffinity, actual.NUMANodeAffinity)
 		}
@@ -1107,7 +1127,6 @@ func TestAdmit(t *testing.T) {
 			policy:           tc.policy,
 			podTopologyHints: make(map[string]map[string]TopologyHint),
 			hintProviders:    tc.hp,
-			numaNodes:        numaNodes,
 		}
 
 		pod := &v1.Pod{

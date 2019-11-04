@@ -39,8 +39,14 @@ func (p *bestEffortPolicy) Name() string {
 	return PolicyBestEffort
 }
 
-func (p *bestEffortPolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
+func (p *bestEffortPolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
 	return lifecycle.PodAdmitResult{
 		Admit: true,
 	}
+}
+
+func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
+	hint := mergeProvidersHints(p, p.numaNodes, providersHints)
+	admit := p.canAdmitPodResult(&hint)
+	return hint, admit
 }

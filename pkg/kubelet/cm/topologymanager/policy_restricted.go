@@ -38,7 +38,7 @@ func (p *restrictedPolicy) Name() string {
 	return PolicyRestricted
 }
 
-func (p *restrictedPolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
+func (p *restrictedPolicy) canAdmitPodResult(hint *TopologyHint) lifecycle.PodAdmitResult {
 	if !hint.Preferred {
 		return lifecycle.PodAdmitResult{
 			Admit:   false,
@@ -49,4 +49,10 @@ func (p *restrictedPolicy) CanAdmitPodResult(hint *TopologyHint) lifecycle.PodAd
 	return lifecycle.PodAdmitResult{
 		Admit: true,
 	}
+}
+
+func (p *restrictedPolicy) Merge(providersHints []map[string][]TopologyHint) (TopologyHint, lifecycle.PodAdmitResult) {
+	hint := mergeProvidersHints(p, p.numaNodes, providersHints)
+	admit := p.canAdmitPodResult(&hint)
+	return hint, admit
 }

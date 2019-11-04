@@ -36,7 +36,7 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 	for _, tc := range tcases {
 		numaNodes := []int{0, 1}
 		policy := NewSingleNumaNodePolicy(numaNodes)
-		result := policy.CanAdmitPodResult(&tc.hint)
+		result := policy.(*singleNumaNodePolicy).canAdmitPodResult(&tc.hint)
 
 		if result.Admit != tc.expected {
 			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
