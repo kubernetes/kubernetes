@@ -228,6 +228,13 @@ func (r *rangeAllocator) occupyCIDRs(node *v1.Node) error {
 		if err != nil {
 			return fmt.Errorf("failed to parse node %s, CIDR %s", node.Name, node.Spec.PodCIDR)
 		}
+		// If node has a pre allocate cidr that does not exist in our cidrs.
+		// This will happen if cluster went from dualstack(multi cidrs) to non-dualstack
+		// then we have now way of locking it
+		if idx >= len(r.cidrSets) {
+			return fmt.Errorf("node:%s has an allocated cidr: %v at index:%v that does not exist in cluster cidrs configuration", node.Name, cidr, idx)
+		}
+
 		if err := r.cidrSets[idx].Occupy(podCIDR); err != nil {
 			return fmt.Errorf("failed to mark cidr[%v] at idx [%v] as occupied for node: %v: %v", podCIDR, idx, node.Name, err)
 		}
@@ -282,6 +289,13 @@ func (r *rangeAllocator) ReleaseCIDR(node *v1.Node) error {
 		_, podCIDR, err := net.ParseCIDR(cidr)
 		if err != nil {
 			return fmt.Errorf("failed to parse CIDR %s on Node %v: %v", cidr, node.Name, err)
+		}
+
+		// If node has a pre allocate cidr that does not exist in our cidrs.
+		// This will happen if cluster went from dualstack(multi cidrs) to non-dualstack
+		// then we have now way of locking it
+		if idx >= len(r.cidrSets) {
+			return fmt.Errorf("node:%s has an allocated cidr: %v at index:%v that does not exist in cluster cidrs configuration", node.Name, cidr, idx)
 		}
 
 		klog.V(4).Infof("release CIDR %s for node:%v", cidr, node.Name)
