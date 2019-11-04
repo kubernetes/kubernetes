@@ -86,14 +86,22 @@ func autoConvert_config_ClientConnectionConfiguration_To_v1alpha1_ClientConnecti
 }
 
 func autoConvert_v1alpha1_DebuggingConfiguration_To_config_DebuggingConfiguration(in *DebuggingConfiguration, out *config.DebuggingConfiguration, s conversion.Scope) error {
-	out.EnableProfiling = in.EnableProfiling
-	out.EnableContentionProfiling = in.EnableContentionProfiling
+	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_Pointer_bool_To_bool(&in.EnableContentionProfiling, &out.EnableContentionProfiling, s); err != nil {
+		return err
+	}
 	return nil
 }
 
 func autoConvert_config_DebuggingConfiguration_To_v1alpha1_DebuggingConfiguration(in *config.DebuggingConfiguration, out *DebuggingConfiguration, s conversion.Scope) error {
-	out.EnableProfiling = in.EnableProfiling
-	out.EnableContentionProfiling = in.EnableContentionProfiling
+	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableProfiling, &out.EnableProfiling, s); err != nil {
+		return err
+	}
+	if err := v1.Convert_bool_To_Pointer_bool(&in.EnableContentionProfiling, &out.EnableContentionProfiling, s); err != nil {
+		return err
+	}
 	return nil
 }
 
