@@ -402,7 +402,7 @@ func startReplicationController(ctx context.Context, controllerContext Controlle
 }
 
 func startPodGCController(ctx context.Context, controllerContext ControllerContext) (controller.Interface, bool, error) {
-	go podgc.NewPodGC(
+	go podgc.NewController(
 		ctx,
 		controllerContext.ClientBuilder.ClientOrDie("pod-garbage-collector"),
 		controllerContext.InformerFactory.Core().V1().Pods(),

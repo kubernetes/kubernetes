@@ -47,7 +47,8 @@ const (
 	quarantineTime = 40 * time.Second
 )
 
-type PodGCController struct {
+// Controller is the controller that manages pod garbage collection.
+type Controller struct {
 	kubeClient clientset.Interface
 
 	podLister        corelisters.PodLister
@@ -61,12 +62,13 @@ type PodGCController struct {
 	terminatedPodThreshold int
 }
 
-func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
-	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *PodGCController {
+// NewController returns a new pod garbage collection controller.
+func NewController(ctx context.Context, kubeClient clientset.Interface, podInformer coreinformers.PodInformer,
+	nodeInformer coreinformers.NodeInformer, terminatedPodThreshold int) *Controller {
 	if kubeClient != nil && kubeClient.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("gc_controller", kubeClient.CoreV1().RESTClient().GetRateLimiter())
 	}
-	gcc := &PodGCController{
+	gcc := &Controller{
 		kubeClient:             kubeClient,
 		terminatedPodThreshold: terminatedPodThreshold,
 		podLister:              podInformer.Lister(),
@@ -83,7 +85,8 @@ func NewPodGC(ctx context.Context, kubeClient clientset.Interface, podInformer c
 	return gcc
 }
 
-func (gcc *PodGCController) Run(ctx context.Context) {
+// Run starts an asynchronous loop that watches for pods and executes garbage collection.
+func (gcc *Controller) Run(ctx context.Context) {
 	defer utilruntime.HandleCrash()
 
 	klog.Infof("Starting GC controller")
@@ -99,7 +102,7 @@ func (gcc *PodGCController) Run(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (gcc *PodGCController) gc(ctx context.Context) {
+func (gcc *Controller) gc(ctx context.Context) {
 	pods, err := gcc.podLister.List(labels.Everything())
 	if err != nil {
 		klog.Errorf("Error while listing all pods: %v", err)
@@ -124,7 +127,7 @@ func isPodTerminated(pod *v1.Pod) bool {
 	return false
 }
 
-func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
+func (gcc *Controller) gcTerminated(pods []*v1.Pod) {
 	terminatedPods := []*v1.Pod{}
 	for _, pod := range pods {
 		if isPodTerminated(pod) {
@@ -157,7 +160,7 @@ func (gcc *PodGCController) gcTerminated(pods []*v1.Pod) {
 }
 
 // gcOrphaned deletes pods that are bound to nodes that don't exist.
-func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, nodes []*v1.Node) {
+func (gcc *Controller) gcOrphaned(ctx context.Context, pods []*v1.Pod, nodes []*v1.Node) {
 	klog.V(4).Infof("GC'ing orphaned")
 	existingNodeNames := sets.NewString()
 	for _, node := range nodes {
@@ -188,7 +191,7 @@ func (gcc *PodGCController) gcOrphaned(ctx context.Context, pods []*v1.Pod, node
 	}
 }
 
-func (gcc *PodGCController) discoverDeletedNodes(ctx context.Context, existingNodeNames sets.String) (sets.String, bool) {
+func (gcc *Controller) discoverDeletedNodes(ctx context.Context, existingNodeNames sets.String) (sets.String, bool) {
 	deletedNodesNames := sets.NewString()
 	for gcc.nodeQueue.Len() > 0 {
 		item, quit := gcc.nodeQueue.Get()
@@ -211,7 +214,7 @@ func (gcc *PodGCController) discoverDeletedNodes(ctx context.Context, existingNo
 	return deletedNodesNames, false
 }
 
-func (gcc *PodGCController) checkIfNodeExists(ctx context.Context, name string) (bool, error) {
+func (gcc *Controller) checkIfNodeExists(ctx context.Context, name string) (bool, error) {
 	_, fetchErr := gcc.kubeClient.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
 	if errors.IsNotFound(fetchErr) {
 		return false, nil
@@ -220,7 +223,7 @@ func (gcc *PodGCController) checkIfNodeExists(ctx context.Context, name string) 
 }
 
 // gcUnscheduledTerminating deletes pods that are terminating and haven't been scheduled to a particular node.
-func (gcc *PodGCController) gcUnscheduledTerminating(pods []*v1.Pod) {
+func (gcc *Controller) gcUnscheduledTerminating(pods []*v1.Pod) {
 	klog.V(4).Infof("GC'ing unscheduled pods which are terminating.")
 
 	for _, pod := range pods {
