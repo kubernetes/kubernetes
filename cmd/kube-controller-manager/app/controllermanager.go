@@ -118,7 +118,7 @@ controller, and serviceaccounts controller.`,
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			if err = Run(c.Complete(), ctx); err != nil {
+			if err = Run(ctx, c.Complete()); err != nil {
 				fmt.Fprintf(os.Stderr, "%v\n", err)
 				os.Exit(1)
 			}
@@ -159,7 +159,7 @@ func ResyncPeriod(c *config.CompletedConfig) func() time.Duration {
 }
 
 // Run runs the KubeControllerManagerOptions.  This should never exit.
-func Run(c *config.CompletedConfig, ctx context.Context) error {
+func Run(ctx context.Context, c *config.CompletedConfig) error {
 	// To help debugging, immediately log version
 	klog.Infof("Version: %+v", version.Get())
 
