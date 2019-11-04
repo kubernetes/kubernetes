@@ -543,17 +543,36 @@ func TestCleanSubPaths(t *testing.T) {
 		{
 			name: "subpath-with-files",
 			prepare: func(base string) ([]mount.MountPoint, error) {
-				path := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1", "0")
-				path2 := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1", "1")
-				if err := os.MkdirAll(filepath.Join(path, "my-dir-1"), defaultPerm); err != nil {
+				containerPath := filepath.Join(base, containerSubPathDirectoryName, testVol, "container1")
+				if err := os.MkdirAll(containerPath, defaultPerm); err != nil {
 					return nil, err
 				}
-				if err := os.MkdirAll(filepath.Join(path2, "my-dir-2"), defaultPerm); err != nil {
+
+				file0 := filepath.Join(containerPath, "0")
+				if err := ioutil.WriteFile(file0, []byte{}, defaultPerm); err != nil {
 					return nil, err
 				}
+
+				dir1 := filepath.Join(containerPath, "1")
+				if err := os.MkdirAll(filepath.Join(dir1, "my-dir-1"), defaultPerm); err != nil {
+					return nil, err
+				}
+
+				dir2 := filepath.Join(containerPath, "2")
+				if err := os.MkdirAll(filepath.Join(dir2, "my-dir-2"), defaultPerm); err != nil {
+					return nil, err
+				}
+
+				file3 := filepath.Join(containerPath, "3")
+				if err := ioutil.WriteFile(file3, []byte{}, defaultPerm); err != nil {
+					return nil, err
+				}
+
 				mounts := []mount.MountPoint{
-					{Device: "/dev/sdb", Path: path},
-					{Device: "/dev/sdc", Path: path2},
+					{Device: "/dev/sdb", Path: file0},
+					{Device: "/dev/sdc", Path: dir1},
+					{Device: "/dev/sdd", Path: dir2},
+					{Device: "/dev/sde", Path: file3},
 				}
 				return mounts, nil
 			},
