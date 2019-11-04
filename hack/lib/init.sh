@@ -103,6 +103,7 @@ settings.k8s.io/v1alpha1 \
 storage.k8s.io/v1beta1 \
 storage.k8s.io/v1 \
 storage.k8s.io/v1alpha1 \
+flowcontrol.apiserver.k8s.io/v1alpha1 \
 }"
 
 # not all group versions are exposed by the server.  This list contains those

@@ -50,12 +50,12 @@ import (
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	"k8s.io/kubernetes/pkg/controller/disruption"
 	"k8s.io/kubernetes/pkg/scheduler"
-	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
-	schedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
+	schedulerapiv1 "k8s.io/kubernetes/pkg/scheduler/apis/config/v1"
 
 	// Register defaults in pkg/scheduler/algorithmprovider.
 	_ "k8s.io/kubernetes/pkg/scheduler/algorithmprovider"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/kubernetes/test/integration/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -72,19 +72,25 @@ type testContext struct {
 	cancelFn        context.CancelFunc
 }
 
-func createAlgorithmSourceFromPolicy(policy *schedulerapi.Policy, clientSet clientset.Interface) schedulerconfig.SchedulerAlgorithmSource {
-	policyString := runtime.EncodeOrDie(latestschedulerapi.Codec, policy)
+func createAlgorithmSourceFromPolicy(policy *schedulerapi.Policy, clientSet clientset.Interface) schedulerapi.SchedulerAlgorithmSource {
+	// Serialize the Policy object into a ConfigMap later.
+	info, ok := runtime.SerializerInfoForMediaType(scheme.Codecs.SupportedMediaTypes(), runtime.ContentTypeJSON)
+	if !ok {
+		panic("could not find json serializer")
+	}
+	encoder := scheme.Codecs.EncoderForVersion(info.Serializer, schedulerapiv1.SchemeGroupVersion)
+	policyString := runtime.EncodeOrDie(encoder, policy)
 	configPolicyName := "scheduler-custom-policy-config"
 	policyConfigMap := v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Namespace: metav1.NamespaceSystem, Name: configPolicyName},
-		Data:       map[string]string{schedulerconfig.SchedulerPolicyConfigMapKey: policyString},
+		Data:       map[string]string{schedulerapi.SchedulerPolicyConfigMapKey: policyString},
 	}
 	policyConfigMap.APIVersion = "v1"
 	clientSet.CoreV1().ConfigMaps(metav1.NamespaceSystem).Create(&policyConfigMap)
 
-	return schedulerconfig.SchedulerAlgorithmSource{
-		Policy: &schedulerconfig.SchedulerPolicySource{
-			ConfigMap: &schedulerconfig.SchedulerPolicyConfigMapSource{
+	return schedulerapi.SchedulerAlgorithmSource{
+		Policy: &schedulerapi.SchedulerPolicySource{
+			ConfigMap: &schedulerapi.SchedulerPolicyConfigMapSource{
 				Namespace: policyConfigMap.Namespace,
 				Name:      policyConfigMap.Name,
 			},
@@ -175,12 +181,12 @@ func initTestSchedulerWithOptions(
 		legacyscheme.Scheme,
 		v1.DefaultSchedulerName,
 	)
-	var algorithmSrc schedulerconfig.SchedulerAlgorithmSource
+	var algorithmSrc schedulerapi.SchedulerAlgorithmSource
 	if policy != nil {
 		algorithmSrc = createAlgorithmSourceFromPolicy(policy, context.clientSet)
 	} else {
-		provider := schedulerconfig.SchedulerDefaultProviderName
-		algorithmSrc = schedulerconfig.SchedulerAlgorithmSource{
+		provider := schedulerapi.SchedulerDefaultProviderName
+		algorithmSrc = schedulerapi.SchedulerAlgorithmSource{
 			Provider: &provider,
 		}
 	}

@@ -1137,6 +1137,7 @@ k8s.io/api/core/v1
 k8s.io/api/discovery/v1alpha1
 k8s.io/api/events/v1beta1
 k8s.io/api/extensions/v1beta1
+k8s.io/api/flowcontrol/v1alpha1
 k8s.io/api/imagepolicy/v1alpha1
 k8s.io/api/networking/v1
 k8s.io/api/networking/v1beta1
@@ -1238,7 +1239,6 @@ k8s.io/apimachinery/pkg/runtime/serializer/protobuf
 k8s.io/apimachinery/pkg/runtime/serializer/recognizer
 k8s.io/apimachinery/pkg/runtime/serializer/streaming
 k8s.io/apimachinery/pkg/runtime/serializer/versioning
-k8s.io/apimachinery/pkg/runtime/serializer/yaml
 k8s.io/apimachinery/pkg/selection
 k8s.io/apimachinery/pkg/types
 k8s.io/apimachinery/pkg/util/cache
@@ -1382,6 +1382,7 @@ k8s.io/apiserver/pkg/util/feature
 k8s.io/apiserver/pkg/util/flushwriter
 k8s.io/apiserver/pkg/util/openapi
 k8s.io/apiserver/pkg/util/proxy
+k8s.io/apiserver/pkg/util/shufflesharding
 k8s.io/apiserver/pkg/util/term
 k8s.io/apiserver/pkg/util/webhook
 k8s.io/apiserver/pkg/util/wsstream
@@ -1449,6 +1450,8 @@ k8s.io/client-go/informers/events
 k8s.io/client-go/informers/events/v1beta1
 k8s.io/client-go/informers/extensions
 k8s.io/client-go/informers/extensions/v1beta1
+k8s.io/client-go/informers/flowcontrol
+k8s.io/client-go/informers/flowcontrol/v1alpha1
 k8s.io/client-go/informers/internalinterfaces
 k8s.io/client-go/informers/networking
 k8s.io/client-go/informers/networking/v1
@@ -1521,6 +1524,8 @@ k8s.io/client-go/kubernetes/typed/events/v1beta1
 k8s.io/client-go/kubernetes/typed/events/v1beta1/fake
 k8s.io/client-go/kubernetes/typed/extensions/v1beta1
 k8s.io/client-go/kubernetes/typed/extensions/v1beta1/fake
+k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1
+k8s.io/client-go/kubernetes/typed/flowcontrol/v1alpha1/fake
 k8s.io/client-go/kubernetes/typed/networking/v1
 k8s.io/client-go/kubernetes/typed/networking/v1/fake
 k8s.io/client-go/kubernetes/typed/networking/v1beta1
@@ -1570,6 +1575,7 @@ k8s.io/client-go/listers/core/v1
 k8s.io/client-go/listers/discovery/v1alpha1
 k8s.io/client-go/listers/events/v1beta1
 k8s.io/client-go/listers/extensions/v1beta1
+k8s.io/client-go/listers/flowcontrol/v1alpha1
 k8s.io/client-go/listers/networking/v1
 k8s.io/client-go/listers/networking/v1beta1
 k8s.io/client-go/listers/node/v1alpha1
@@ -1755,6 +1761,7 @@ k8s.io/kube-openapi/pkg/util/sets
 # k8s.io/kube-proxy v0.0.0 => ./staging/src/k8s.io/kube-proxy
 k8s.io/kube-proxy/config/v1alpha1
 # k8s.io/kube-scheduler v0.0.0 => ./staging/src/k8s.io/kube-scheduler
+k8s.io/kube-scheduler/config/v1
 k8s.io/kube-scheduler/config/v1alpha1
 # k8s.io/kubectl v0.0.0 => ./staging/src/k8s.io/kubectl
 k8s.io/kubectl/pkg/apps
@@ -1899,7 +1906,7 @@ k8s.io/sample-apiserver/pkg/generated/openapi
 k8s.io/sample-apiserver/pkg/registry
 k8s.io/sample-apiserver/pkg/registry/wardle/fischer
 k8s.io/sample-apiserver/pkg/registry/wardle/flunder
-# k8s.io/utils v0.0.0-20191010214722-8d271d903fe4 => k8s.io/utils v0.0.0-20191010214722-8d271d903fe4
+# k8s.io/utils v0.0.0-20191030222137-2b95a09bc58d => k8s.io/utils v0.0.0-20191030222137-2b95a09bc58d
 k8s.io/utils/buffer
 k8s.io/utils/clock
 k8s.io/utils/exec

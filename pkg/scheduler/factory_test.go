@@ -42,9 +42,8 @@ import (
 	apitesting "k8s.io/kubernetes/pkg/api/testing"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
-	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
@@ -101,7 +100,7 @@ func TestCreateFromConfig(t *testing.T) {
 			{"name" : "PriorityOne", "weight" : 2},
 			{"name" : "PriorityTwo", "weight" : 1}		]
 	}`)
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
@@ -139,13 +138,13 @@ func pluginExists(name, extensionPoint string, schedConf *Config) bool {
 	return false
 }
 
-func findPluginConfig(name string, schedConf *Config) config.PluginConfig {
+func findPluginConfig(name string, schedConf *Config) schedulerapi.PluginConfig {
 	for _, c := range schedConf.PluginConfig {
 		if c.Name == name {
 			return c
 		}
 	}
-	return config.PluginConfig{}
+	return schedulerapi.PluginConfig{}
 }
 
 func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
@@ -179,7 +178,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 		],
 		"hardPodAffinitySymmetricWeight" : 10
 	}`)
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 	factory.CreateFromConfig(policy)
@@ -199,7 +198,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	configData = []byte(`{}`)
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
@@ -225,7 +224,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 		"apiVersion" : "v1"
 	}`)
 	var policy schedulerapi.Policy
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Fatalf("Invalid configuration: %v", err)
 	}
 
@@ -262,7 +261,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 		"priorities" : []
 	}`)
 	var policy schedulerapi.Policy
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Fatalf("Invalid configuration: %v", err)
 	}
 
@@ -543,7 +542,7 @@ func newConfigFactoryWithFrameworkRegistry(
 		StopCh:                         stopCh,
 		Registry:                       registry,
 		Plugins:                        nil,
-		PluginConfig:                   []config.PluginConfig{},
+		PluginConfig:                   []schedulerapi.PluginConfig{},
 		PluginConfigProducerRegistry:   pluginConfigProducerRegistry,
 	})
 }
@@ -719,34 +718,34 @@ func TestCreateWithFrameworkPlugins(t *testing.T) {
 		PriorityToConfigProducer:  make(map[string]frameworkplugins.ConfigProducer),
 	}
 	configProducerRegistry.RegisterPredicate(predicateOneName,
-		func(_ frameworkplugins.ConfigProducerArgs) (config.Plugins, []config.PluginConfig) {
-			return config.Plugins{
-				Filter: &config.PluginSet{
-					Enabled: []config.Plugin{
+		func(_ frameworkplugins.ConfigProducerArgs) (schedulerapi.Plugins, []schedulerapi.PluginConfig) {
+			return schedulerapi.Plugins{
+				Filter: &schedulerapi.PluginSet{
+					Enabled: []schedulerapi.Plugin{
 						{Name: filterOneName}}}}, nil
 		})
 
 	configProducerRegistry.RegisterPredicate(predicateTwoName,
-		func(_ frameworkplugins.ConfigProducerArgs) (config.Plugins, []config.PluginConfig) {
-			return config.Plugins{
-				Filter: &config.PluginSet{
-					Enabled: []config.Plugin{
+		func(_ frameworkplugins.ConfigProducerArgs) (schedulerapi.Plugins, []schedulerapi.PluginConfig) {
+			return schedulerapi.Plugins{
+				Filter: &schedulerapi.PluginSet{
+					Enabled: []schedulerapi.Plugin{
 						{Name: filterTwoName}}}}, nil
 		})
 
 	configProducerRegistry.RegisterPriority(priorityOneName,
-		func(args frameworkplugins.ConfigProducerArgs) (config.Plugins, []config.PluginConfig) {
-			return config.Plugins{
-				Score: &config.PluginSet{
-					Enabled: []config.Plugin{
+		func(args frameworkplugins.ConfigProducerArgs) (schedulerapi.Plugins, []schedulerapi.PluginConfig) {
+			return schedulerapi.Plugins{
+				Score: &schedulerapi.PluginSet{
+					Enabled: []schedulerapi.Plugin{
 						{Name: scoreOneName, Weight: args.Weight}}}}, nil
 		})
 
 	configProducerRegistry.RegisterPriority(priorityTwoName,
-		func(args frameworkplugins.ConfigProducerArgs) (config.Plugins, []config.PluginConfig) {
-			return config.Plugins{
-				Score: &config.PluginSet{
-					Enabled: []config.Plugin{
+		func(args frameworkplugins.ConfigProducerArgs) (schedulerapi.Plugins, []schedulerapi.PluginConfig) {
+			return schedulerapi.Plugins{
+				Score: &schedulerapi.PluginSet{
+					Enabled: []schedulerapi.Plugin{
 						{Name: scoreTwoName, Weight: args.Weight}}}}, nil
 		})
 
@@ -791,7 +790,7 @@ func TestCreateWithFrameworkPlugins(t *testing.T) {
 			{"name" : "PriorityTwo", "weight" : 1},
 			{"name" : "PriorityThree", "weight" : 1}		]
 	}`)
-	if err := runtime.DecodeInto(latestschedulerapi.Codec, configData, &policy); err != nil {
+	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
 		t.Errorf("Invalid configuration: %v", err)
 	}
 
@@ -822,32 +821,32 @@ func TestCreateWithFrameworkPlugins(t *testing.T) {
 	}
 
 	// Verify the aggregated configuration.
-	wantPlugins := config.Plugins{
-		QueueSort: &config.PluginSet{},
-		PreFilter: &config.PluginSet{},
-		Filter: &config.PluginSet{
-			Enabled: []config.Plugin{
+	wantPlugins := schedulerapi.Plugins{
+		QueueSort: &schedulerapi.PluginSet{},
+		PreFilter: &schedulerapi.PluginSet{},
+		Filter: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{
 				{Name: filterOneName},
 				{Name: filterTwoName},
 			},
 		},
-		PostFilter: &config.PluginSet{},
-		Score: &config.PluginSet{
-			Enabled: []config.Plugin{
+		PostFilter: &schedulerapi.PluginSet{},
+		Score: &schedulerapi.PluginSet{
+			Enabled: []schedulerapi.Plugin{
 				{Name: scoreOneName, Weight: 2},
 				{Name: scoreTwoName, Weight: 1},
 			},
 		},
-		Reserve:   &config.PluginSet{},
-		Permit:    &config.PluginSet{},
-		PreBind:   &config.PluginSet{},
-		Bind:      &config.PluginSet{},
-		PostBind:  &config.PluginSet{},
-		Unreserve: &config.PluginSet{},
+		Reserve:   &schedulerapi.PluginSet{},
+		Permit:    &schedulerapi.PluginSet{},
+		PreBind:   &schedulerapi.PluginSet{},
+		Bind:      &schedulerapi.PluginSet{},
+		PostBind:  &schedulerapi.PluginSet{},
+		Unreserve: &schedulerapi.PluginSet{},
 	}
 
-	trans := cmp.Transformer("Sort", func(in []config.Plugin) []config.Plugin {
-		out := append([]config.Plugin(nil), in...) // Copy input to avoid mutating it
+	trans := cmp.Transformer("Sort", func(in []schedulerapi.Plugin) []schedulerapi.Plugin {
+		out := append([]schedulerapi.Plugin(nil), in...) // Copy input to avoid mutating it
 		sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 		return out
 	})

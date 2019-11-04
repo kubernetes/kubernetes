@@ -30,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
@@ -2386,6 +2387,149 @@ func TestMonitorNodeHealthMarkPodsNotReady(t *testing.T) {
 		if podStatusUpdated != item.expectedPodStatusUpdate {
 			t.Errorf("Case[%d] expect pod status updated to be %v, but got %v", i, item.expectedPodStatusUpdate, podStatusUpdated)
 		}
+	}
+}
+
+func TestMonitorNodeHealthMarkPodsNotReadyRetry(t *testing.T) {
+	type nodeIteration struct {
+		timeToPass time.Duration
+		newNodes   []*v1.Node
+	}
+	timeNow := metav1.Date(2015, 1, 1, 12, 0, 0, 0, time.UTC)
+	timePlusTwoMinutes := metav1.Date(2015, 1, 1, 12, 0, 2, 0, time.UTC)
+	makeNodes := func(status v1.ConditionStatus, lastHeartbeatTime, lastTransitionTime metav1.Time) []*v1.Node {
+		return []*v1.Node{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:              "node0",
+					CreationTimestamp: timeNow,
+				},
+				Status: v1.NodeStatus{
+					Conditions: []v1.NodeCondition{
+						{
+							Type:               v1.NodeReady,
+							Status:             status,
+							LastHeartbeatTime:  lastHeartbeatTime,
+							LastTransitionTime: lastTransitionTime,
+						},
+					},
+				},
+			},
+		}
+	}
+	table := []struct {
+		desc                     string
+		fakeNodeHandler          *testutil.FakeNodeHandler
+		updateReactor            func(action testcore.Action) (bool, runtime.Object, error)
+		nodeIterations           []nodeIteration
+		expectedPodStatusUpdates int
+	}{
+		// Node created long time ago, with status updated by kubelet exceeds grace period.
+		// First monitorNodeHealth check will update pod status to NotReady.
+		// Second monitorNodeHealth check will do no updates (no retry).
+		{
+			desc: "successful pod status update, no retry required",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			nodeIterations: []nodeIteration{
+				{
+					timeToPass: 0,
+					newNodes:   makeNodes(v1.ConditionTrue, timeNow, timeNow),
+				},
+				{
+					timeToPass: 1 * time.Minute,
+					newNodes:   makeNodes(v1.ConditionTrue, timeNow, timeNow),
+				},
+				{
+					timeToPass: 1 * time.Minute,
+					newNodes:   makeNodes(v1.ConditionFalse, timePlusTwoMinutes, timePlusTwoMinutes),
+				},
+			},
+			expectedPodStatusUpdates: 1,
+		},
+		// Node created long time ago, with status updated by kubelet exceeds grace period.
+		// First monitorNodeHealth check will fail to update pod status to NotReady.
+		// Second monitorNodeHealth check will update pod status to NotReady (retry).
+		{
+			desc: "unsuccessful pod status update, retry required",
+			fakeNodeHandler: &testutil.FakeNodeHandler{
+				Clientset: fake.NewSimpleClientset(&v1.PodList{Items: []v1.Pod{*testutil.NewPod("pod0", "node0")}}),
+			},
+			updateReactor: func() func(action testcore.Action) (bool, runtime.Object, error) {
+				i := 0
+				return func(action testcore.Action) (bool, runtime.Object, error) {
+					if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+						i++
+						switch i {
+						case 1:
+							return true, nil, fmt.Errorf("fake error")
+						default:
+							return true, testutil.NewPod("pod0", "node0"), nil
+						}
+					}
+
+					return true, nil, fmt.Errorf("unsupported action")
+				}
+			}(),
+			nodeIterations: []nodeIteration{
+				{
+					timeToPass: 0,
+					newNodes:   makeNodes(v1.ConditionTrue, timeNow, timeNow),
+				},
+				{
+					timeToPass: 1 * time.Minute,
+					newNodes:   makeNodes(v1.ConditionTrue, timeNow, timeNow),
+				},
+				{
+					timeToPass: 1 * time.Minute,
+					newNodes:   makeNodes(v1.ConditionFalse, timePlusTwoMinutes, timePlusTwoMinutes),
+				},
+			},
+			expectedPodStatusUpdates: 2, // One failed and one retry.
+		},
+	}
+
+	for _, item := range table {
+		t.Run(item.desc, func(t *testing.T) {
+			nodeController, _ := newNodeLifecycleControllerFromClient(
+				item.fakeNodeHandler,
+				5*time.Minute,
+				testRateLimiterQPS,
+				testRateLimiterQPS,
+				testLargeClusterThreshold,
+				testUnhealthyThreshold,
+				testNodeMonitorGracePeriod,
+				testNodeStartupGracePeriod,
+				testNodeMonitorPeriod,
+				false)
+			if item.updateReactor != nil {
+				item.fakeNodeHandler.Clientset.PrependReactor("update", "pods", item.updateReactor)
+			}
+			nodeController.now = func() metav1.Time { return timeNow }
+			nodeController.recorder = testutil.NewFakeRecorder()
+			nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(item.fakeNodeHandler.Clientset)
+			for _, itertion := range item.nodeIterations {
+				nodeController.now = func() metav1.Time { return metav1.Time{Time: timeNow.Add(itertion.timeToPass)} }
+				item.fakeNodeHandler.Existing = itertion.newNodes
+				if err := nodeController.syncNodeStore(item.fakeNodeHandler); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+				if err := nodeController.monitorNodeHealth(); err != nil {
+					t.Errorf("unexpected error: %v", err)
+				}
+			}
+
+			podStatusUpdates := 0
+			for _, action := range item.fakeNodeHandler.Actions() {
+				if action.GetVerb() == "update" && action.GetResource().Resource == "pods" && action.GetSubresource() == "status" {
+					podStatusUpdates++
+				}
+			}
+			if podStatusUpdates != item.expectedPodStatusUpdates {
+				t.Errorf("expect pod status updated to happen %d times, but got %d", item.expectedPodStatusUpdates, podStatusUpdates)
+			}
+		})
 	}
 }
 

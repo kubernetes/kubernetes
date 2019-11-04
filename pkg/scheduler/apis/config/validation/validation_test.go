@@ -17,6 +17,8 @@ limitations under the License.
 package validation
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -157,5 +159,114 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		if len(errs) > 0 && !scenario.expectedToFail {
 			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
 		}
+	}
+}
+
+func TestValidatePolicy(t *testing.T) {
+	tests := []struct {
+		policy   config.Policy
+		expected error
+		name     string
+	}{
+		{
+			name:     "no weight defined in policy",
+			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "NoWeightPriority"}}},
+			expected: errors.New("Priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
+		},
+		{
+			name:     "policy weight is not positive",
+			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "NoWeightPriority", Weight: 0}}},
+			expected: errors.New("Priority NoWeightPriority should have a positive weight applied to it or it has overflown"),
+		},
+		{
+			name:     "valid weight priority",
+			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "WeightPriority", Weight: 2}}},
+			expected: nil,
+		},
+		{
+			name:     "invalid negative weight policy",
+			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "WeightPriority", Weight: -2}}},
+			expected: errors.New("Priority WeightPriority should have a positive weight applied to it or it has overflown"),
+		},
+		{
+			name:     "policy weight exceeds maximum",
+			policy:   config.Policy{Priorities: []config.PriorityPolicy{{Name: "WeightPriority", Weight: config.MaxWeight}}},
+			expected: errors.New("Priority WeightPriority should have a positive weight applied to it or it has overflown"),
+		},
+		{
+			name:     "valid weight in policy extender config",
+			policy:   config.Policy{Extenders: []config.Extender{{URLPrefix: "http://127.0.0.1:8081/extender", PrioritizeVerb: "prioritize", Weight: 2}}},
+			expected: nil,
+		},
+		{
+			name:     "invalid negative weight in policy extender config",
+			policy:   config.Policy{Extenders: []config.Extender{{URLPrefix: "http://127.0.0.1:8081/extender", PrioritizeVerb: "prioritize", Weight: -2}}},
+			expected: errors.New("Priority for extender http://127.0.0.1:8081/extender should have a positive weight applied to it"),
+		},
+		{
+			name:     "valid filter verb and url prefix",
+			policy:   config.Policy{Extenders: []config.Extender{{URLPrefix: "http://127.0.0.1:8081/extender", FilterVerb: "filter"}}},
+			expected: nil,
+		},
+		{
+			name:     "valid preemt verb and urlprefix",
+			policy:   config.Policy{Extenders: []config.Extender{{URLPrefix: "http://127.0.0.1:8081/extender", PreemptVerb: "preempt"}}},
+			expected: nil,
+		},
+		{
+			name: "invalid multiple extenders",
+			policy: config.Policy{
+				Extenders: []config.Extender{
+					{URLPrefix: "http://127.0.0.1:8081/extender", BindVerb: "bind"},
+					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind"},
+				}},
+			expected: errors.New("Only one extender can implement bind, found 2"),
+		},
+		{
+			name: "invalid duplicate extender resource name",
+			policy: config.Policy{
+				Extenders: []config.Extender{
+					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []config.ExtenderManagedResource{{Name: "foo.com/bar"}}},
+					{URLPrefix: "http://127.0.0.1:8082/extender", BindVerb: "bind", ManagedResources: []config.ExtenderManagedResource{{Name: "foo.com/bar"}}},
+				}},
+			expected: errors.New("Duplicate extender managed resource name foo.com/bar"),
+		},
+		{
+			name: "invalid extended resource name",
+			policy: config.Policy{
+				Extenders: []config.Extender{
+					{URLPrefix: "http://127.0.0.1:8081/extender", ManagedResources: []config.ExtenderManagedResource{{Name: "kubernetes.io/foo"}}},
+				}},
+			expected: errors.New("kubernetes.io/foo is an invalid extended resource name"),
+		},
+		{
+			name: "invalid redeclared custom predicate",
+			policy: config.Policy{
+				Predicates: []config.PredicatePolicy{
+					{Name: "customPredicate1", Argument: &config.PredicateArgument{ServiceAffinity: &config.ServiceAffinity{Labels: []string{"label1"}}}},
+					{Name: "customPredicate2", Argument: &config.PredicateArgument{ServiceAffinity: &config.ServiceAffinity{Labels: []string{"label2"}}}},
+				},
+			},
+			expected: errors.New("Predicate 'customPredicate2' redeclares custom predicate 'ServiceAffinity', from:'customPredicate1'"),
+		},
+		{
+			name: "invalid redeclared custom priority",
+			policy: config.Policy{
+				Priorities: []config.PriorityPolicy{
+					{Name: "customPriority1", Weight: 1, Argument: &config.PriorityArgument{ServiceAntiAffinity: &config.ServiceAntiAffinity{Label: "label1"}}},
+					{Name: "customPriority2", Weight: 1, Argument: &config.PriorityArgument{ServiceAntiAffinity: &config.ServiceAntiAffinity{Label: "label2"}}},
+				},
+			},
+			expected: errors.New("Priority 'customPriority2' redeclares custom priority 'ServiceAntiAffinity', from:'customPriority1'"),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			actual := ValidatePolicy(test.policy)
+			if fmt.Sprint(test.expected) != fmt.Sprint(actual) {
+				t.Errorf("expected: %s, actual: %s", test.expected, actual)
+			}
+		})
 	}
 }

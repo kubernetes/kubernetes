@@ -1518,6 +1518,7 @@ func AddOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods
 				ExpectNoError(err)
 			} else {
 				Logf("Conflict when trying to add/update avoidPods %v to %v with error %v", avoidPods, nodeName, err)
+				return false, nil
 			}
 		}
 		return true, nil
@@ -1546,6 +1547,7 @@ func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
 				ExpectNoError(err)
 			} else {
 				Logf("Conflict when trying to remove avoidPods to %v", nodeName)
+				return false, nil
 			}
 		}
 		return true, nil

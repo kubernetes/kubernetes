@@ -296,10 +296,7 @@ func TestDeleteEndpointConnections(t *testing.T) {
 		if tc.protocol == UDP {
 			isIPv6 := func(ip string) bool {
 				netIP := net.ParseIP(ip)
-				if netIP.To4() == nil {
-					return true
-				}
-				return false
+				return netIP.To4() == nil
 			}
 			endpointIP := utilproxy.IPPart(tc.endpoint)
 			expectCommand := fmt.Sprintf("conntrack -D --orig-dst %s --dst-nat %s -p udp", tc.svcIP, endpointIP)
@@ -2353,6 +2350,7 @@ COMMIT
 :KUBE-NODEPORTS - [0:0]
 :KUBE-POSTROUTING - [0:0]
 :KUBE-MARK-MASQ - [0:0]
+:KUBE-MARK-DROP - [0:0]
 :KUBE-SVC-AHZNAGK3SCETOS2T - [0:0]
 :KUBE-SEP-PXD6POUVGD2I37UY - [0:0]
 :KUBE-SEP-SOKZUIT7SCEVIP33 - [0:0]

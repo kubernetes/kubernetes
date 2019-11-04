@@ -28,7 +28,6 @@ import (
 
 	"github.com/spf13/cobra"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
-	"k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	certsphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/certs"
 	kubeconfigphase "k8s.io/kubernetes/cmd/kubeadm/app/phases/kubeconfig"
 	"k8s.io/kubernetes/cmd/kubeadm/app/util/pkiutil"
@@ -266,7 +265,7 @@ func TestRunRenewCommands(t *testing.T) {
 func TestRenewUsingCSR(t *testing.T) {
 	tmpDir := testutil.SetupTempDir(t)
 	defer os.RemoveAll(tmpDir)
-	cert := &certs.KubeadmCertEtcdServer
+	cert := &certsphase.KubeadmCertEtcdServer
 
 	cfg := testutil.GetDefaultInternalConfig(t)
 	cfg.CertificatesDir = tmpDir

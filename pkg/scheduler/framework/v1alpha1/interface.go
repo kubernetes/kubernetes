@@ -91,9 +91,6 @@ const (
 
 	// MaxTotalScore is the maximum total score.
 	MaxTotalScore int64 = math.MaxInt64
-
-	// MaxWeight defines the max weight value.
-	MaxWeight int64 = MaxTotalScore / MaxNodeScore
 )
 
 // Status indicates the result of running a plugin. It consists of a code and a

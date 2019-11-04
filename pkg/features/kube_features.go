@@ -183,12 +183,6 @@ const (
 	// Enable nodes to exclude themselves from network disruption checks
 	NodeDisruptionExclusion featuregate.Feature = "NodeDisruptionExclusion"
 
-	// owner: @jsafrane
-	// alpha: v1.9
-	//
-	// Enable running mount utilities in containers.
-	MountContainers featuregate.Feature = "MountContainers"
-
 	// owner: @saad-ali
 	// alpha: v1.12
 	// beta:  v1.14
@@ -532,7 +526,6 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TopologyManager:                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceNodeExclusion:           {Default: false, PreRelease: featuregate.Alpha},
 	NodeDisruptionExclusion:        {Default: false, PreRelease: featuregate.Alpha},
-	MountContainers:                {Default: false, PreRelease: featuregate.Alpha},
 	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.Beta},
 	CSINodeInfo:                    {Default: true, PreRelease: featuregate.Beta},
 	BlockVolume:                    {Default: true, PreRelease: featuregate.Beta},

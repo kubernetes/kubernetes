@@ -39,9 +39,8 @@ import (
 	"k8s.io/client-go/tools/events"
 	podutil "k8s.io/kubernetes/pkg/api/v1/pod"
 	kubefeatures "k8s.io/kubernetes/pkg/features"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
-	latestschedulerapi "k8s.io/kubernetes/pkg/scheduler/api/latest"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -140,8 +139,8 @@ type schedulerOptions struct {
 	// This registry contains out of tree plugins to be merged with default registry.
 	frameworkOutOfTreeRegistry      framework.Registry
 	frameworkConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry
-	frameworkPlugins                *kubeschedulerconfig.Plugins
-	frameworkPluginConfig           []kubeschedulerconfig.PluginConfig
+	frameworkPlugins                *schedulerapi.Plugins
+	frameworkPluginConfig           []schedulerapi.PluginConfig
 }
 
 // Option configures a Scheduler
@@ -205,14 +204,14 @@ func WithFrameworkConfigProducerRegistry(registry *frameworkplugins.ConfigProduc
 }
 
 // WithFrameworkPlugins sets the plugins that the framework should be configured with.
-func WithFrameworkPlugins(plugins *kubeschedulerconfig.Plugins) Option {
+func WithFrameworkPlugins(plugins *schedulerapi.Plugins) Option {
 	return func(o *schedulerOptions) {
 		o.frameworkPlugins = plugins
 	}
 }
 
 // WithFrameworkPluginConfig sets the PluginConfig slice that the framework should be configured with.
-func WithFrameworkPluginConfig(pluginConfig []kubeschedulerconfig.PluginConfig) Option {
+func WithFrameworkPluginConfig(pluginConfig []schedulerapi.PluginConfig) Option {
 	return func(o *schedulerOptions) {
 		o.frameworkPluginConfig = pluginConfig
 	}
@@ -257,7 +256,7 @@ func New(client clientset.Interface,
 	informerFactory informers.SharedInformerFactory,
 	podInformer coreinformers.PodInformer,
 	recorder events.EventRecorder,
-	schedulerAlgorithmSource kubeschedulerconfig.SchedulerAlgorithmSource,
+	schedulerAlgorithmSource schedulerapi.SchedulerAlgorithmSource,
 	stopCh <-chan struct{},
 	opts ...Option) (*Scheduler, error) {
 
@@ -379,7 +378,7 @@ func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
 	if err != nil {
 		return fmt.Errorf("couldn't read policy config: %v", err)
 	}
-	err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), []byte(data), policy)
 	if err != nil {
 		return fmt.Errorf("invalid policy: %v", err)
 	}
@@ -387,17 +386,17 @@ func initPolicyFromFile(policyFile string, policy *schedulerapi.Policy) error {
 }
 
 // initPolicyFromConfigMap initialize policy from configMap
-func initPolicyFromConfigMap(client clientset.Interface, policyRef *kubeschedulerconfig.SchedulerPolicyConfigMapSource, policy *schedulerapi.Policy) error {
+func initPolicyFromConfigMap(client clientset.Interface, policyRef *schedulerapi.SchedulerPolicyConfigMapSource, policy *schedulerapi.Policy) error {
 	// Use a policy serialized in a config map value.
 	policyConfigMap, err := client.CoreV1().ConfigMaps(policyRef.Namespace).Get(policyRef.Name, metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("couldn't get policy config map %s/%s: %v", policyRef.Namespace, policyRef.Name, err)
 	}
-	data, found := policyConfigMap.Data[kubeschedulerconfig.SchedulerPolicyConfigMapKey]
+	data, found := policyConfigMap.Data[schedulerapi.SchedulerPolicyConfigMapKey]
 	if !found {
-		return fmt.Errorf("missing policy config map value at key %q", kubeschedulerconfig.SchedulerPolicyConfigMapKey)
+		return fmt.Errorf("missing policy config map value at key %q", schedulerapi.SchedulerPolicyConfigMapKey)
 	}
-	err = runtime.DecodeInto(latestschedulerapi.Codec, []byte(data), policy)
+	err = runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), []byte(data), policy)
 	if err != nil {
 		return fmt.Errorf("invalid policy: %v", err)
 	}

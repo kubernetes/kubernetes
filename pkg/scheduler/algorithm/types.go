@@ -23,13 +23,13 @@ import (
 	appslisters "k8s.io/client-go/listers/apps/v1"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/kubernetes/pkg/apis/apps"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
+	legacyapi "k8s.io/kubernetes/pkg/scheduler/api"
 )
 
 // NodeFieldSelectorKeys is a map that: the keys are node field selector keys; the values are
 // the functions to get the value of the node field.
 var NodeFieldSelectorKeys = map[string]func(*v1.Node) string{
-	schedulerapi.NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
+	legacyapi.NodeFieldSelectorKeyNodeName: func(n *v1.Node) string { return n.Name },
 }
 
 var _ corelisters.ReplicationControllerLister = &EmptyControllerLister{}

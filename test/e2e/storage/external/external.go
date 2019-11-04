@@ -34,6 +34,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/testpatterns"
 	"k8s.io/kubernetes/test/e2e/storage/testsuites"
+	"k8s.io/kubernetes/test/e2e/storage/utils"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
@@ -271,11 +272,11 @@ func (d *driverDefinition) GetDynamicProvisionStorageClass(config *testsuites.Pe
 		return testsuites.GetStorageClass(provisioner, parameters, nil, ns, suffix)
 	}
 
-	items, err := f.LoadFromManifests(d.StorageClass.FromFile)
+	items, err := utils.LoadFromManifests(d.StorageClass.FromFile)
 	framework.ExpectNoError(err, "load storage class from %s", d.StorageClass.FromFile)
 	framework.ExpectEqual(len(items), 1, "exactly one item from %s", d.StorageClass.FromFile)
 
-	err = f.PatchItems(items...)
+	err = utils.PatchItems(f, items...)
 	framework.ExpectNoError(err, "patch items")
 
 	sc, ok := items[0].(*storagev1.StorageClass)
