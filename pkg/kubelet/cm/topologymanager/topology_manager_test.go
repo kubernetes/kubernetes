@@ -104,7 +104,7 @@ func TestGetAffinity(t *testing.T) {
 	}
 }
 
-func TestCalculateAffinity(t *testing.T) {
+func TestPolicyMerge(t *testing.T) {
 	numaNodes := []int{0, 1}
 
 	tcases := []struct {
@@ -745,11 +745,13 @@ func TestCalculateAffinity(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		mngr := manager{
-			policy:        tc.policy,
-			hintProviders: tc.hp,
+		var providersHints []map[string][]TopologyHint
+		for _, provider := range tc.hp {
+			hints := provider.GetTopologyHints(v1.Pod{}, v1.Container{})
+			providersHints = append(providersHints, hints)
 		}
-		actual, _ := mngr.calculateAffinity(v1.Pod{}, v1.Container{})
+
+		actual, _ := tc.policy.Merge(providersHints)
 		if !actual.NUMANodeAffinity.IsEqual(tc.expected.NUMANodeAffinity) {
 			t.Errorf("Expected NUMANodeAffinity in result to be %v, got %v", tc.expected.NUMANodeAffinity, actual.NUMANodeAffinity)
 		}
