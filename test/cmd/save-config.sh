@@ -40,7 +40,7 @@ run_save_config_tests() {
   create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
-  ! grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}")"
+  ! grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}")" || exit 1
   # Command: edit the pod "test-pod"
   temp_editor="${KUBE_TEMP}/tmp-editor.sh"
   echo -e "#!/usr/bin/env bash\n${SED} -i \"s/test-pod-label/test-pod-label-edited/g\" \$@" > "${temp_editor}"
@@ -55,7 +55,7 @@ run_save_config_tests() {
   create_and_use_new_namespace
   kube::test::get_object_assert pods "{{range.items}}{{$id_field}}:{{end}}" ''
   kubectl create -f hack/testdata/pod.yaml "${kube_flags[@]}"
-  ! grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}")"
+  ! grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get pods test-pod -o yaml "${kube_flags[@]}")" || exit 1
   # Command: replace the pod "test-pod"
   kubectl replace -f hack/testdata/pod.yaml --save-config "${kube_flags[@]}"
   # Post-Condition: pod "test-pod" has configuration annotation
@@ -82,7 +82,7 @@ run_save_config_tests() {
   # Pre-Condition: no RC exists, then create the rc "frontend", which shouldn't have configuration annotation
   kube::test::get_object_assert rc "{{range.items}}{{$id_field}}:{{end}}" ''
   kubectl create -f hack/testdata/frontend-controller.yaml "${kube_flags[@]}"
-  ! grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get rc frontend -o yaml "${kube_flags[@]}")"
+  ! grep -q "kubectl.kubernetes.io/last-applied-configuration" <<< "$(kubectl get rc frontend -o yaml "${kube_flags[@]}")" || exit 1
   # Command: autoscale rc "frontend"
   kubectl autoscale -f hack/testdata/frontend-controller.yaml --save-config "${kube_flags[@]}" --max=2
   # Post-Condition: hpa "frontend" has configuration annotation
