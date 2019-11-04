@@ -236,6 +236,8 @@ type Controller struct {
 	// workers that are responsible for tainting nodes.
 	zoneNoExecuteTainter map[string]*scheduler.RateLimitedTimedQueue
 
+	nodesToRetry sync.Map
+
 	zoneStates map[string]ZoneState
 
 	daemonSetStore          appsv1listers.DaemonSetLister
@@ -347,6 +349,7 @@ func NewNodeLifecycleController(
 		nodeMonitorGracePeriod:      nodeMonitorGracePeriod,
 		zonePodEvictor:              make(map[string]*scheduler.RateLimitedTimedQueue),
 		zoneNoExecuteTainter:        make(map[string]*scheduler.RateLimitedTimedQueue),
+		nodesToRetry:                sync.Map{},
 		zoneStates:                  make(map[string]ZoneState),
 		podEvictionTimeout:          podEvictionTimeout,
 		evictionLimiterQPS:          evictionLimiterQPS,
@@ -460,6 +463,10 @@ func NewNodeLifecycleController(
 		}),
 		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			nc.nodeUpdateQueue.Add(newNode.Name)
+			return nil
+		}),
+		DeleteFunc: nodeutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+			nc.nodesToRetry.Delete(node.Name)
 			return nil
 		}),
 	})
@@ -780,22 +787,35 @@ func (nc *Controller) monitorNodeHealth() error {
 				nc.processNoTaintBaseEviction(node, &observedReadyCondition, gracePeriod)
 			}
 
-			// Report node event.
-			if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
+			_, needsRetry := nc.nodesToRetry.Load(node.Name)
+			switch {
+			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
+				// Report node event only once when status changed.
 				nodeutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
-				pods, err := listPodsFromNode(nc.kubeClient, node.Name)
-				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("Unable to list pods from node %v: %v", node.Name, err))
+				fallthrough
+			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
+				if err := nc.markPodsNotReady(node.Name); err != nil {
+					utilruntime.HandleError(err)
+					nc.nodesToRetry.Store(node.Name, struct{}{})
 					continue
-				}
-				if err = nodeutil.MarkPodsNotReady(nc.kubeClient, pods, node.Name); err != nil {
-					utilruntime.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
 				}
 			}
 		}
+		nc.nodesToRetry.Delete(node.Name)
 	}
 	nc.handleDisruption(zoneToNodeConditions, nodes)
 
+	return nil
+}
+
+func (nc *Controller) markPodsNotReady(nodeName string) error {
+	pods, err := listPodsFromNode(nc.kubeClient, nodeName)
+	if err != nil {
+		return fmt.Errorf("unable to list pods from node %v: %v", nodeName, err)
+	}
+	if err = nodeutil.MarkPodsNotReady(nc.kubeClient, pods, nodeName); err != nil {
+		return fmt.Errorf("unable to mark all pods NotReady on node %v: %v", nodeName, err)
+	}
 	return nil
 }
 
