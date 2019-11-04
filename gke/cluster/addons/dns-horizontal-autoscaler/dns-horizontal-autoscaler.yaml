@@ -86,7 +86,7 @@ spec:
         kubernetes.io/os: linux
       containers:
       - name: autoscaler
-        image: k8s.gcr.io/cpa/cluster-proportional-autoscaler:1.8.4
+        image: gke.gcr.io/cluster-proportional-autoscaler-amd64:1.8.4-gke.0
         resources:
             requests:
                 cpu: "20m"
