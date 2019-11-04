@@ -79,6 +79,7 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/metrics/collectors"
 	"k8s.io/kubernetes/pkg/kubelet/network/dns"
 	"k8s.io/kubernetes/pkg/kubelet/nodelease"
+	"k8s.io/kubernetes/pkg/kubelet/nodestatusmanager"
 	oomwatcher "k8s.io/kubernetes/pkg/kubelet/oom"
 	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	"k8s.io/kubernetes/pkg/kubelet/pluginmanager"
@@ -885,6 +886,37 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	// Generating the status funcs should be the last thing we do,
 	// since this relies on the rest of the Kubelet having been constructed.
 	klet.setNodeStatusFuncs = klet.defaultNodeStatusFuncs()
+
+	nodeStatusManager, err := nodestatusmanager.NewNodeStatusManager(
+		hostname,
+		nodeName,
+		kubeDeps.HeartbeatClient,
+		kubeDeps.KubeClient,
+		keepTerminatedPodVolumes, // DEPRECATED
+		kubeCfg.EnableControllerAttachDetach,
+		kubeDeps.ContainerManager,
+		evictionManager,
+		imageManager,
+		registerNode,
+		registerWithTaints,
+		registerSchedulable,
+		cloudprovider.IsExternal(cloudProvider),
+		nodeRef,
+		kubeDeps.Recorder,
+		kubeDeps.Cloud,
+		parsedNodeIP,
+		kubeCfg.NodeStatusReportFrequency.Duration,
+		providerID,
+		kubeDeps.OnHeartbeatFailure,
+		nodeLabels,
+		klet.volumePluginMgr,
+		klet.volumeManager,
+		klet.defaultNodeStatusFuncs(),
+		klet.updatePodCIDR,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	return klet, nil
 }
