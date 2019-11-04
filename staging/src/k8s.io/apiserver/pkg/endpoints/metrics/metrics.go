@@ -178,7 +178,7 @@ var (
 		},
 		[]string{"group", "version", "kind"},
 	)
-	// Because of volatality of the base metric this is pre-aggregated one. Instead of reporing current usage all the time
+	// Because of volatility of the base metric this is pre-aggregated one. Instead of reporting current usage all the time
 	// it reports maximal usage during the last second.
 	currentInflightRequests = compbasemetrics.NewGaugeVec(
 		&compbasemetrics.GaugeOpts{
@@ -187,6 +187,15 @@ var (
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"requestKind"},
+	)
+
+	requestTerminationsTotal = compbasemetrics.NewCounterVec(
+		&compbasemetrics.CounterOpts{
+			Name:           "apiserver_request_terminations_total",
+			Help:           "Number of requests which apiserver terminated in self-defense.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"verb", "group", "version", "resource", "subresource", "scope", "component", "code"},
 	)
 	kubectlExeRegexp = regexp.MustCompile(`^.*((?i:kubectl\.exe))`)
 
@@ -204,6 +213,7 @@ var (
 		WatchEvents,
 		WatchEventsSizes,
 		currentInflightRequests,
+		requestTerminationsTotal,
 	}
 )
 
@@ -237,10 +247,11 @@ func UpdateInflightRequestMetrics(nonmutating, mutating int) {
 	currentInflightRequests.WithLabelValues(MutatingKind).Set(float64(mutating))
 }
 
-// Record records a single request to the standard metrics endpoints. For use by handlers that perform their own
-// processing. All API paths should use InstrumentRouteFunc implicitly. Use this instead of MonitorRequest if
-// you already have a RequestInfo object.
-func Record(req *http.Request, requestInfo *request.RequestInfo, component, contentType string, code int, responseSizeInBytes int, elapsed time.Duration) {
+// RecordRequestTermination records that the request was terminated early as part of a resource
+// preservation or apiserver self-defense mechanism (e.g. timeouts, maxinflight throttling,
+// proxyHandler errors). RecordRequestTermination should only be called zero or one times
+// per request.
+func RecordRequestTermination(req *http.Request, requestInfo *request.RequestInfo, component string, code int) {
 	if requestInfo == nil {
 		requestInfo = &request.RequestInfo{Verb: req.Method, Path: req.URL.Path}
 	}
@@ -252,9 +263,9 @@ func Record(req *http.Request, requestInfo *request.RequestInfo, component, cont
 	// However, we need to tweak it e.g. to differentiate GET from LIST.
 	verb := canonicalVerb(strings.ToUpper(req.Method), scope)
 	if requestInfo.IsResourceRequest {
-		MonitorRequest(req, verb, requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, contentType, code, responseSizeInBytes, elapsed)
+		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), requestInfo.APIGroup, requestInfo.APIVersion, requestInfo.Resource, requestInfo.Subresource, scope, component, codeToString(code)).Inc()
 	} else {
-		MonitorRequest(req, verb, "", "", "", requestInfo.Path, scope, component, contentType, code, responseSizeInBytes, elapsed)
+		requestTerminationsTotal.WithLabelValues(cleanVerb(verb, req), "", "", "", requestInfo.Path, scope, component, codeToString(code)).Inc()
 	}
 }
 
