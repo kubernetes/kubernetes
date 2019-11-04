@@ -30,7 +30,7 @@ import (
 	"github.com/blang/semver"
 	dockertypes "github.com/docker/docker/api/types"
 	dockercontainer "github.com/docker/docker/api/types/container"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
@@ -104,13 +104,23 @@ func (ds *dockerService) updateCreateConfig(
 		// TODO: Can we assume the defaults are sane?
 		rOpts := lc.GetResources()
 		if rOpts != nil {
+			hugepageLimits := []dockercontainer.HugepageLimit{}
+
+			for _, hugepageLimit := range rOpts.HugepageLimits {
+				hugepageLimits = append(hugepageLimits, dockercontainer.HugepageLimit{
+					PageSize: hugepageLimit.PageSize,
+					Limit:    hugepageLimit.Limit,
+				})
+			}
+
 			createConfig.HostConfig.Resources = dockercontainer.Resources{
 				// Memory and MemorySwap are set to the same value, this prevents containers from using any swap.
-				Memory:     rOpts.MemoryLimitInBytes,
-				MemorySwap: rOpts.MemoryLimitInBytes,
-				CPUShares:  rOpts.CpuShares,
-				CPUQuota:   rOpts.CpuQuota,
-				CPUPeriod:  rOpts.CpuPeriod,
+				Memory:         rOpts.MemoryLimitInBytes,
+				MemorySwap:     rOpts.MemoryLimitInBytes,
+				CPUShares:      rOpts.CpuShares,
+				CPUQuota:       rOpts.CpuQuota,
+				CPUPeriod:      rOpts.CpuPeriod,
+				HugepageLimits: hugepageLimits,
 			}
 			createConfig.HostConfig.OomScoreAdj = int(rOpts.OomScoreAdj)
 		}
