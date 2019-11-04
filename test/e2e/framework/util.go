@@ -64,6 +64,7 @@ import (
 	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
@@ -881,8 +882,8 @@ func KubectlVersion() (*utilversion.Version, error) {
 	return utilversion.ParseSemantic(matches[1])
 }
 
-// RestclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
-func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
+// restclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
+func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
 	if TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
@@ -901,13 +902,23 @@ func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 // ClientConfigGetter is a func that returns getter to return a config.
 type ClientConfigGetter func() (*restclient.Config, error)
 
-// LoadConfig returns a config for a rest client.
-func LoadConfig() (*restclient.Config, error) {
+// LoadConfig returns a config for a rest client with the UserAgent set to include the current test name.
+func LoadConfig() (config *restclient.Config, err error) {
+	defer func() {
+		if err == nil && config != nil {
+			testDesc := ginkgo.CurrentGinkgoTestDescription()
+			if len(testDesc.ComponentTexts) > 0 {
+				componentTexts := strings.Join(testDesc.ComponentTexts, " ")
+				config.UserAgent = fmt.Sprintf("%s -- %s", rest.DefaultKubernetesUserAgent(), componentTexts)
+			}
+		}
+	}()
+
 	if TestContext.NodeE2E {
 		// This is a node e2e test, apply the node e2e configuration
 		return &restclient.Config{Host: TestContext.Host}, nil
 	}
-	c, err := RestclientConfig(TestContext.KubeContext)
+	c, err := restclientConfig(TestContext.KubeContext)
 	if err != nil {
 		if TestContext.KubeConfig == "" {
 			return restclient.InClusterConfig()
