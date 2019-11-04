@@ -20,7 +20,9 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
 )
 
-type restrictedPolicy struct{}
+type restrictedPolicy struct {
+	bestEffortPolicy
+}
 
 var _ Policy = &restrictedPolicy{}
 
@@ -29,7 +31,7 @@ const PolicyRestricted string = "restricted"
 
 // NewRestrictedPolicy returns restricted policy.
 func NewRestrictedPolicy() Policy {
-	return &restrictedPolicy{}
+	return &restrictedPolicy{bestEffortPolicy{}}
 }
 
 func (p *restrictedPolicy) Name() string {
