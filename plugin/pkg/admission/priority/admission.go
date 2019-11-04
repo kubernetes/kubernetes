@@ -28,10 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apiserver/pkg/admission"
 	genericadmissioninitializers "k8s.io/apiserver/pkg/admission/initializer"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	schedulingv1listers "k8s.io/client-go/listers/scheduling/v1"
+	"k8s.io/component-base/featuregate"
 	"k8s.io/kubernetes/pkg/apis/core"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
@@ -54,12 +54,15 @@ func Register(plugins *admission.Plugins) {
 // Plugin is an implementation of admission.Interface.
 type Plugin struct {
 	*admission.Handler
-	client kubernetes.Interface
-	lister schedulingv1listers.PriorityClassLister
+	client                          kubernetes.Interface
+	lister                          schedulingv1listers.PriorityClassLister
+	resourceQuotaFeatureGateEnabled bool
+	nonPreemptingPriority           bool
 }
 
 var _ admission.MutationInterface = &Plugin{}
 var _ admission.ValidationInterface = &Plugin{}
+var _ genericadmissioninitializers.WantsFeatures = &Plugin{}
 var _ = genericadmissioninitializers.WantsExternalKubeInformerFactory(&Plugin{})
 var _ = genericadmissioninitializers.WantsExternalKubeClientSet(&Plugin{})
 
@@ -79,6 +82,12 @@ func (p *Plugin) ValidateInitialization() error {
 		return fmt.Errorf("%s requires a lister", PluginName)
 	}
 	return nil
+}
+
+// InspectFeatureGates allows setting bools without taking a dep on a global variable
+func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
+	p.nonPreemptingPriority = featureGates.Enabled(features.NonPreemptingPriority)
+	p.resourceQuotaFeatureGateEnabled = featureGates.Enabled(features.ResourceQuotaScopeSelectors)
 }
 
 // SetExternalKubeClientSet implements the WantsInternalKubeClientSet interface.
@@ -106,7 +115,6 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 	if len(a.GetSubresource()) != 0 {
 		return nil
 	}
-
 	switch a.GetResource().GroupResource() {
 	case podResource:
 		if operation == admission.Create || operation == admission.Update {
@@ -189,8 +197,12 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 			pod.Spec.PriorityClassName = pcName
 		} else {
 			pcName := pod.Spec.PriorityClassName
-			if !priorityClassPermittedInNamespace(pcName, a.GetNamespace()) {
-				return admission.NewForbidden(a, fmt.Errorf("pods with %v priorityClass is not permitted in %v namespace", pcName, a.GetNamespace()))
+			// If ResourceQuotaScopeSelectors is enabled, we should let pods with critical priorityClass to be created
+			// any namespace where administrator wants it to be created.
+			if !p.resourceQuotaFeatureGateEnabled {
+				if !priorityClassPermittedInNamespace(pcName, a.GetNamespace()) {
+					return admission.NewForbidden(a, fmt.Errorf("pods with %v priorityClass is not permitted in %v namespace", pcName, a.GetNamespace()))
+				}
 			}
 
 			// Try resolving the priority class name.
@@ -212,7 +224,7 @@ func (p *Plugin) admitPod(a admission.Attributes) error {
 		}
 		pod.Spec.Priority = &priority
 
-		if utilfeature.DefaultFeatureGate.Enabled(features.NonPreemptingPriority) {
+		if p.nonPreemptingPriority {
 			var corePolicy core.PreemptionPolicy
 			if preemptionPolicy != nil {
 				corePolicy = core.PreemptionPolicy(*preemptionPolicy)
