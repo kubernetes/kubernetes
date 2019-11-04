@@ -69,7 +69,7 @@ func (p *bestEffortPolicy) Merge(providersHints []map[string][]TopologyHint) (To
 //                     providerHints[1][j],
 //                     providerHints[2][k],
 //                     ...
-//                     provideryHints[-1][z]
+//                     providerHints[-1][z]
 //                 }
 //                 callback(permutation)
 func iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback func([]TopologyHint)) {
