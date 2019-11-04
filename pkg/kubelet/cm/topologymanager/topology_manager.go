@@ -198,7 +198,7 @@ func (m *manager) accumulateProvidersHints(pod v1.Pod, container v1.Container) (
 //                     provideryHints[-1][z]
 //                 }
 //                 callback(permutation)
-func (m *manager) iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback func([]TopologyHint)) {
+func iterateAllProviderTopologyHints(allProviderHints [][]TopologyHint, callback func([]TopologyHint)) {
 	// Internal helper function to accumulate the permutation before calling the callback.
 	var iterate func(i int, accum []TopologyHint)
 	iterate = func(i int, accum []TopologyHint) {
@@ -218,10 +218,10 @@ func (m *manager) iterateAllProviderTopologyHints(allProviderHints [][]TopologyH
 }
 
 // Merge the hints from all hint providers to find the best one.
-func (m *manager) mergeProvidersHints(providersHints []map[string][]TopologyHint) TopologyHint {
+func mergeProvidersHints(policy Policy, numaNodes []int, providersHints []map[string][]TopologyHint) TopologyHint {
 	// Set the default affinity as an any-numa affinity containing the list
 	// of NUMA Nodes available on this machine.
-	defaultAffinity, _ := bitmask.NewBitMask(m.numaNodes...)
+	defaultAffinity, _ := bitmask.NewBitMask(numaNodes...)
 
 	// Loop through all hint providers and save an accumulated list of the
 	// hints returned by each hint provider. If no hints are provided, assume
@@ -259,7 +259,7 @@ func (m *manager) mergeProvidersHints(providersHints []map[string][]TopologyHint
 	// permutations that have at least one NUMA ID set. If no merged mask can be
 	// found that has at least one NUMA ID set, return the 'defaultAffinity'.
 	bestHint := TopologyHint{defaultAffinity, false}
-	m.iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
+	iterateAllProviderTopologyHints(allProviderHints, func(permutation []TopologyHint) {
 		// Get the NUMANodeAffinity from each hint in the permutation and see if any
 		// of them encode unpreferred allocations.
 		preferred := true
@@ -277,13 +277,13 @@ func (m *manager) mergeProvidersHints(providersHints []map[string][]TopologyHint
 
 			// Special case PolicySingleNumaNode to only prefer hints where
 			// all providers have a single NUMA affinity set.
-			if m.policy != nil && m.policy.Name() == PolicySingleNumaNode && hint.NUMANodeAffinity != nil && hint.NUMANodeAffinity.Count() > 1 {
+			if policy != nil && policy.Name() == PolicySingleNumaNode && hint.NUMANodeAffinity != nil && hint.NUMANodeAffinity.Count() > 1 {
 				preferred = false
 			}
 		}
 
 		// Merge the affinities using a bitwise-and operation.
-		mergedAffinity, _ := bitmask.NewBitMask(m.numaNodes...)
+		mergedAffinity, _ := bitmask.NewBitMask(numaNodes...)
 		mergedAffinity.And(numaAffinities...)
 
 		// Build a mergedHintfrom the merged affinity mask, indicating if an
@@ -327,7 +327,7 @@ func (m *manager) mergeProvidersHints(providersHints []map[string][]TopologyHint
 // Collect Hints from hint providers and pass to policy to retrieve the best one.
 func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) TopologyHint {
 	providersHints := m.accumulateProvidersHints(pod, container)
-	bestHint := m.mergeProvidersHints(providersHints)
+	bestHint := mergeProvidersHints(m.policy, m.numaNodes, providersHints)
 	klog.Infof("[topologymanager] ContainerTopologyHint: %v", bestHint)
 	return bestHint
 }
