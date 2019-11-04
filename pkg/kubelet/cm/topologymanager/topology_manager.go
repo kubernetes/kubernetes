@@ -167,6 +167,18 @@ func (m *manager) GetAffinity(podUID string, containerName string) TopologyHint 
 	return m.podTopologyHints[podUID][containerName]
 }
 
+func (m *manager) accumulateProvidersHints(pod v1.Pod, container v1.Container) (providersHints []map[string][]TopologyHint) {
+	// Loop through all hint providers and save an accumulated list of the
+	// hints returned by each hint provider.
+	for _, provider := range m.hintProviders {
+		// Get the TopologyHints from a provider.
+		hints := provider.GetTopologyHints(pod, container)
+		providersHints = append(providersHints, hints)
+		klog.Infof("[topologymanager] TopologyHints for pod '%v', container '%v': %v", pod.Name, container.Name, hints)
+	}
+	return providersHints
+}
+
 // Iterate over all permutations of hints in 'allProviderHints [][]TopologyHint'.
 //
 // This procedure is implemented as a recursive function over the set of hints
@@ -206,7 +218,7 @@ func (m *manager) iterateAllProviderTopologyHints(allProviderHints [][]TopologyH
 }
 
 // Merge the hints from all hint providers to find the best one.
-func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) TopologyHint {
+func (m *manager) mergeProvidersHints(providersHints []map[string][]TopologyHint) TopologyHint {
 	// Set the default affinity as an any-numa affinity containing the list
 	// of NUMA Nodes available on this machine.
 	defaultAffinity, _ := bitmask.NewBitMask(m.numaNodes...)
@@ -215,10 +227,7 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 	// hints returned by each hint provider. If no hints are provided, assume
 	// that provider has no preference for topology-aware allocation.
 	var allProviderHints [][]TopologyHint
-	for _, provider := range m.hintProviders {
-		// Get the TopologyHints from a provider.
-		hints := provider.GetTopologyHints(pod, container)
-
+	for _, hints := range providersHints {
 		// If hints is nil, insert a single, preferred any-numa hint into allProviderHints.
 		if len(hints) == 0 {
 			klog.Infof("[topologymanager] Hint Provider has no preference for NUMA affinity with any resource")
@@ -312,8 +321,14 @@ func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) Topology
 		bestHint = mergedHint
 	})
 
-	klog.Infof("[topologymanager] ContainerTopologyHint: %v", bestHint)
+	return bestHint
+}
 
+// Collect Hints from hint providers and pass to policy to retrieve the best one.
+func (m *manager) calculateAffinity(pod v1.Pod, container v1.Container) TopologyHint {
+	providersHints := m.accumulateProvidersHints(pod, container)
+	bestHint := m.mergeProvidersHints(providersHints)
+	klog.Infof("[topologymanager] ContainerTopologyHint: %v", bestHint)
 	return bestHint
 }
 
