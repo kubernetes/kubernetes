@@ -94,6 +94,27 @@ type TopologyHint struct {
 	Preferred bool
 }
 
+// IsEqual checks if TopologyHint are equal
+func (th *TopologyHint) IsEqual(topologyHint TopologyHint) bool {
+	if th.Preferred == topologyHint.Preferred {
+		if th.NUMANodeAffinity == nil || topologyHint.NUMANodeAffinity == nil {
+			return th.NUMANodeAffinity == topologyHint.NUMANodeAffinity
+		}
+		return th.NUMANodeAffinity.IsEqual(topologyHint.NUMANodeAffinity)
+	}
+	return false
+}
+
+// LessThan checks if TopologyHint `a` is less than TopologyHint `b`
+// this means that either `a` is a preferred hint and `b` is not
+// or `a` NUMANodeAffinity attribute is narrower than `b` NUMANodeAffinity attribute.
+func (th *TopologyHint) LessThan(other TopologyHint) bool {
+	if th.Preferred != other.Preferred {
+		return th.Preferred == true
+	}
+	return th.NUMANodeAffinity.IsNarrowerThan(other.NUMANodeAffinity)
+}
+
 var _ Manager = &manager{}
 
 //NewManager creates a new TopologyManager based on provided policy
