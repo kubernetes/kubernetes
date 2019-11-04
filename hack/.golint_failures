@@ -103,7 +103,6 @@ pkg/controller/volume/events
 pkg/controller/volume/expand
 pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
-pkg/controller/volume/persistentvolume/options
 pkg/credentialprovider
 pkg/features
 pkg/kubeapiserver
