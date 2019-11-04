@@ -231,20 +231,20 @@ func (v VolumePathHandler) RemoveMapPath(mapPath string) error {
 // On other cases, return false with error from Lstat().
 func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 	fi, err := os.Lstat(mapPath)
-	if err == nil {
-		// If file exits and it's symbolic link, return true and no error
-		if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
-			return true, nil
+	if err != nil {
+		// If file doesn't exist, return false and no error
+		if os.IsNotExist(err) {
+			return false, nil
 		}
-		// If file exits but it's not symbolic link, return fale and no error
-		return false, nil
+		// Return error from Lstat()
+		return false, err
 	}
-	// If file doesn't exist, return false and no error
-	if os.IsNotExist(err) {
-		return false, nil
+	// If file exits and it's symbolic link, return true and no error
+	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
+		return true, nil
 	}
-	// Return error from Lstat()
-	return false, err
+	// If file exits but it's not symbolic link, return fale and no error
+	return false, nil
 }
 
 // IsBindMountExist returns true if specified file exists and the type is device.
@@ -252,20 +252,21 @@ func (v VolumePathHandler) IsSymlinkExist(mapPath string) (bool, error) {
 // On other cases, return false with error from Lstat().
 func (v VolumePathHandler) IsBindMountExist(mapPath string) (bool, error) {
 	fi, err := os.Lstat(mapPath)
-	if err == nil {
-		// If file exits and it's device, return true and no error
-		if fi.Mode()&os.ModeDevice == os.ModeDevice {
-			return true, nil
+	if err != nil {
+		// If file doesn't exist, return false and no error
+		if os.IsNotExist(err) {
+			return false, nil
 		}
-		// If file exits but it's not device, return fale and no error
-		return false, nil
+
+		// Return error from Lstat()
+		return false, err
 	}
-	// If file doesn't exist, return false and no error
-	if os.IsNotExist(err) {
-		return false, nil
+	// If file exits and it's device, return true and no error
+	if fi.Mode()&os.ModeDevice == os.ModeDevice {
+		return true, nil
 	}
-	// Return error from Lstat()
-	return false, err
+	// If file exits but it's not device, return fale and no error
+	return false, nil
 }
 
 // GetDeviceBindMountRefs searches bind mounts under global map path
