@@ -54,6 +54,9 @@ type DockerConfigEntry struct {
 	Password string
 	Email    string
 	Provider DockerConfigProvider
+
+	// +optional
+	HttpHeaders map[string]string `json:"HttpHeaders,omitempty"`
 }
 
 var (

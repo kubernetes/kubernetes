@@ -200,6 +200,7 @@ func (a *acrProvider) Provide(image string) credentialprovider.DockerConfig {
 				Username: a.config.AADClientID,
 				Password: a.config.AADClientSecret,
 				Email:    dummyRegistryEmail,
+				HttpHeaders: map[string]string{metadataSourceClient: azureKubeletHTTPHeaderValue},
 			}
 			cfg[url] = *cred
 		}
@@ -246,6 +247,7 @@ func getACRDockerEntryFromARMToken(a *acrProvider, loginServer string) (*credent
 		Username: dockerTokenLoginUsernameGUID,
 		Password: registryRefreshToken,
 		Email:    dummyRegistryEmail,
+		HttpHeaders: map[string]string{metadataSourceClient: azureKubeletHTTPHeaderValue},
 	}, nil
 }
 

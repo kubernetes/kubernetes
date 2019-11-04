@@ -73,6 +73,9 @@ const userAgent = "kubernetes-credentialprovider-acr"
 
 const dockerTokenLoginUsernameGUID = "00000000-0000-0000-0000-000000000000"
 
+const metadataSourceClient = "X-Meta-Source-Client"
+const azureKubeletHTTPHeaderValue = "azure/kubelet"
+
 var client = &http.Client{}
 
 func receiveChallengeFromLoginServer(serverAddress string) (*authDirective, error) {
