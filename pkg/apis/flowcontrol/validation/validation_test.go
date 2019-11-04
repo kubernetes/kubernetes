@@ -626,3 +626,84 @@ func TestValidatePriorityLevelConfigurationStatus(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateNonResourceURLPath(t *testing.T) {
+	testCases := []struct {
+		name           string
+		path           string
+		expectingError bool
+	}{
+		{
+			name:           "empty string should fail",
+			path:           "",
+			expectingError: true,
+		},
+		{
+			name:           "no slash should fail",
+			path:           "foo",
+			expectingError: true,
+		},
+		{
+			name:           "single slash should work",
+			path:           "/",
+			expectingError: false,
+		},
+		{
+			name:           "continuous slash should fail",
+			path:           "//",
+			expectingError: true,
+		},
+		{
+			name:           "/foo slash should work",
+			path:           "/foo",
+			expectingError: false,
+		},
+		{
+			name:           "multiple continuous slashes should fail",
+			path:           "/////",
+			expectingError: true,
+		},
+		{
+			name:           "ending up with slash should work",
+			path:           "/apis/",
+			expectingError: false,
+		},
+		{
+			name:           "ending up with wildcard should work",
+			path:           "/healthz/*",
+			expectingError: false,
+		},
+		{
+			name:           "single wildcard inside the path should fail",
+			path:           "/healthz/*/foo",
+			expectingError: true,
+		},
+		{
+			name:           "white-space in the path should fail",
+			path:           "/healthz/foo bar",
+			expectingError: true,
+		},
+		{
+			name:           "wildcard plus plain path should fail",
+			path:           "/health*",
+			expectingError: true,
+		},
+		{
+			name:           "wildcard plus plain path should fail 2",
+			path:           "/health*/foo",
+			expectingError: true,
+		},
+		{
+			name:           "multiple wildcard internal and suffix should fail",
+			path:           "/*/*",
+			expectingError: true,
+		},
+	}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := ValidateNonResourceURLPath(testCase.path, field.NewPath(""))
+			assert.Equal(t, testCase.expectingError, err != nil,
+				"actual error: %v", err)
+		})
+	}
+}
