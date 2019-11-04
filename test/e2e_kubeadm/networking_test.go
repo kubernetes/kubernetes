@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_kubeadm
+package kubeadm
 
 import (
 	"net"
@@ -35,7 +35,7 @@ var (
 // Define container for all the test specification aimed at verifying
 // that kubeadm configures the networking as expected.
 // in case you want to skip this test use SKIP=setup-networking
-var _ = KubeadmDescribe("networking [setup-networking]", func() {
+var _ = Describe("networking [setup-networking]", func() {
 
 	// Get an instance of the k8s test framework
 	f := framework.NewDefaultFramework("networking")
