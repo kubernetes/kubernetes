@@ -314,6 +314,17 @@ type LogConfig struct {
 	Config map[string]string
 }
 
+// HugepageLimit corresponds to the file`hugetlb.<hugepagesize>.limit_in_byte` in container level cgroup.
+// For example, `PageSize=1GB`, `Limit=1073741824` means setting `1073741824` bytes to hugetlb.1GB.limit_in_bytes.
+type HugepageLimit struct {
+	// The value of PageSize has the format <size><unit-prefix>B (2MB, 1GB),
+	// and must match the <hugepagesize> of the corresponding control file found in `hugetlb.<hugepagesize>.limit_in_bytes`.
+	// The values of <unit-prefix> are intended to be parsed using base 1024("1KB" = 1024, "1MB" = 1048576, etc).
+	PageSize string
+	// limit in bytes of hugepagesize HugeTLB usage.
+	Limit uint64
+}
+
 // Resources contains container's resources (cgroups config, ulimits...)
 type Resources struct {
 	// Applicable to all platforms
@@ -347,6 +358,7 @@ type Resources struct {
 	OomKillDisable       *bool           // Whether to disable OOM Killer or not
 	PidsLimit            *int64          // Setting PIDs limit for a container; Set `0` or `-1` for unlimited, or `null` to not change.
 	Ulimits              []*units.Ulimit // List of ulimits to be set in the container
+	HugepageLimits       []HugepageLimit // List of hugepage limits to limit the HugeTLB usage of container per page size
 
 	// Applicable to Windows
 	CPUCount           int64  `json:"CpuCount"`   // CPU count
