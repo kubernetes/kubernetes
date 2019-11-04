@@ -63,7 +63,9 @@ data:
   Corefile: |
     .:53 {
         errors
-        health
+        health {
+            lameduck 12s
+        }
         ready
         kubernetes $DNS_DOMAIN in-addr.arpa ip6.arpa {
             pods insecure
@@ -114,9 +116,20 @@ spec:
           operator: "Exists"
       nodeSelector:
         beta.kubernetes.io/os: linux
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: k8s-app
+                  operator: In
+                  values: ["kube-dns"]
+              topologyKey: kubernetes.io/hostname
       containers:
       - name: coredns
-        image: k8s.gcr.io/coredns:1.6.2
+        image: coredns/coredns:1.6.4
         imagePullPolicy: IfNotPresent
         resources:
           limits:
