@@ -386,6 +386,7 @@ github.com/google/cadvisor/watcher
 github.com/google/cadvisor/zfs
 # github.com/google/go-cmp v0.3.0 => github.com/google/go-cmp v0.3.0
 github.com/google/go-cmp/cmp
+github.com/google/go-cmp/cmp/cmpopts
 github.com/google/go-cmp/cmp/internal/diff
 github.com/google/go-cmp/cmp/internal/flags
 github.com/google/go-cmp/cmp/internal/function
