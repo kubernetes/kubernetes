@@ -408,6 +408,10 @@ func (e *TokensController) ensureReferencedToken(serviceAccount *v1.ServiceAccou
 	// Save the secret
 	createdToken, err := e.client.CoreV1().Secrets(serviceAccount.Namespace).Create(secret)
 	if err != nil {
+		// if the namespace is being terminated, create will fail no matter what
+		if apierrors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+			return false, err
+		}
 		// retriable error
 		return true, err
 	}
