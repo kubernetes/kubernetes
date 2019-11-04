@@ -360,8 +360,6 @@ func syncOne(sj *batchv1beta1.CronJob, js []batchv1.Job, now time.Time, jc jobCo
 	if _, err := sjc.UpdateStatus(sj); err != nil {
 		klog.Infof("Unable to update status for %s (rv = %s): %v", nameForLog, sj.ResourceVersion, err)
 	}
-
-	return
 }
 
 // deleteJob reaps a job, deleting the job, the pods and the reference in the active list

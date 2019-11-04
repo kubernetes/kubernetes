@@ -221,7 +221,7 @@ func (e *Signer) signConfigMap() {
 		}
 
 		// Check to see if this signature is changed or new.
-		oldSig, _ := sigs[tokenID]
+		oldSig := sigs[tokenID]
 		if sig != oldSig {
 			needUpdate = true
 		}
