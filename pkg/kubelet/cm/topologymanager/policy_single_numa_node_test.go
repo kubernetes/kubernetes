@@ -52,3 +52,13 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 		}
 	}
 }
+
+func TestSingleNumaNodePolicyMerge(t *testing.T) {
+	numaNodes := []int{0, 1}
+	policy := NewSingleNumaNodePolicy(numaNodes)
+
+	tcases := commonPolicyMergeTestCases(numaNodes)
+	tcases = append(tcases, policy.(*singleNumaNodePolicy).mergeTestCases(numaNodes)...)
+
+	testPolicyMerge(policy, tcases, t)
+}

@@ -48,3 +48,13 @@ func TestPolicyBestEffortCanAdmitPodResult(t *testing.T) {
 		}
 	}
 }
+
+func TestBestEffortPolicyMerge(t *testing.T) {
+	numaNodes := []int{0, 1}
+	policy := NewBestEffortPolicy(numaNodes)
+
+	tcases := commonPolicyMergeTestCases(numaNodes)
+	tcases = append(tcases, policy.(*bestEffortPolicy).mergeTestCases(numaNodes)...)
+
+	testPolicyMerge(policy, tcases, t)
+}
