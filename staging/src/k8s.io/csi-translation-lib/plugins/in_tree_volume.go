@@ -17,7 +17,7 @@ limitations under the License.
 package plugins
 
 import (
-	"fmt"
+	"errors"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -65,26 +65,39 @@ type InTreePlugin interface {
 	RepairVolumeHandle(volumeHandle, nodeID string) (string, error)
 }
 
-// getTopology returns the current topology zones with the given key.
-func getTopology(pv *v1.PersistentVolume, key string) []string {
-	if pv.Spec.NodeAffinity == nil ||
-		pv.Spec.NodeAffinity.Required == nil ||
-		len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) < 1 {
-		return nil
-	}
+// replaceTopology overwrites an existing topology key by a new one.
+func replaceTopology(pv *v1.PersistentVolume, oldKey, newKey string) error {
 	for i := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
-		for _, r := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions {
-			if r.Key == key {
-				return r.Values
+		for j, r := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions {
+			if r.Key == oldKey {
+				pv.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions[j].Key = newKey
 			}
 		}
 	}
 	return nil
 }
 
-// recordTopology writes the topology to the given PV.
-// If topology already exists with the given key, assume the content is already accurate.
-func recordTopology(pv *v1.PersistentVolume, key string, zones []string) error {
+// getTopologyZones returns all topology zones with the given key found in the PV.
+func getTopologyZones(pv *v1.PersistentVolume, key string) []string {
+	if pv.Spec.NodeAffinity == nil ||
+		pv.Spec.NodeAffinity.Required == nil ||
+		len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) < 1 {
+		return nil
+	}
+
+	var values []string
+	for i := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
+		for _, r := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions {
+			if r.Key == key {
+				values = append(values, r.Values...)
+			}
+		}
+	}
+	return values
+}
+
+// addTopology appends the topology to the given PV.
+func addTopology(pv *v1.PersistentVolume, topologyKey string, zones []string) error {
 	// Make sure there are no duplicate or empty strings
 	filteredZones := sets.String{}
 	for i := range zones {
@@ -94,34 +107,26 @@ func recordTopology(pv *v1.PersistentVolume, key string, zones []string) error {
 		}
 	}
 
-	if filteredZones.Len() < 1 {
-		return fmt.Errorf("there are no valid zones for topology")
+	zones = filteredZones.UnsortedList()
+	if len(zones) < 1 {
+		return errors.New("there are no valid zones to add to pv")
 	}
 
 	// Make sure the necessary fields exist
-	if pv.Spec.NodeAffinity == nil {
-		pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+	pv.Spec.NodeAffinity = new(v1.VolumeNodeAffinity)
+	pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
+	pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
+
+	topology := v1.NodeSelectorRequirement{
+		Key:      topologyKey,
+		Operator: v1.NodeSelectorOpIn,
+		Values:   zones,
 	}
 
-	if pv.Spec.NodeAffinity.Required == nil {
-		pv.Spec.NodeAffinity.Required = new(v1.NodeSelector)
-	}
-
-	if len(pv.Spec.NodeAffinity.Required.NodeSelectorTerms) == 0 {
-		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = make([]v1.NodeSelectorTerm, 1)
-	}
-
-	// Don't overwrite if topology is already set
-	if len(getTopology(pv, key)) > 0 {
-		return nil
-	}
-
-	pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = append(pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions,
-		v1.NodeSelectorRequirement{
-			Key:      key,
-			Operator: v1.NodeSelectorOpIn,
-			Values:   filteredZones.List(),
-		})
+	pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions = append(
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions,
+		topology,
+	)
 
 	return nil
 }
@@ -129,15 +134,20 @@ func recordTopology(pv *v1.PersistentVolume, key string, zones []string) error {
 // translateTopology converts existing zone labels or in-tree topology to CSI topology.
 // In-tree topology has precedence over zone labels.
 func translateTopology(pv *v1.PersistentVolume, topologyKey string) error {
-	zones := getTopology(pv, v1.LabelZoneFailureDomain)
+	// If topology is already set, assume the content is accurate
+	if len(getTopologyZones(pv, topologyKey)) > 0 {
+		return nil
+	}
+
+	zones := getTopologyZones(pv, v1.LabelZoneFailureDomain)
 	if len(zones) > 0 {
-		return recordTopology(pv, topologyKey, zones)
+		return replaceTopology(pv, v1.LabelZoneFailureDomain, topologyKey)
 	}
 
 	if label, ok := pv.Labels[v1.LabelZoneFailureDomain]; ok {
 		zones = strings.Split(label, cloudvolume.LabelMultiZoneDelimiter)
 		if len(zones) > 0 {
-			return recordTopology(pv, topologyKey, zones)
+			return addTopology(pv, topologyKey, zones)
 		}
 	}
 

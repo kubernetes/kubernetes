@@ -25,6 +25,16 @@ import (
 	"k8s.io/csi-translation-lib/plugins"
 )
 
+var (
+	defaultZoneLabels = map[string]string{
+		v1.LabelZoneFailureDomain: "us-east-1a",
+		v1.LabelZoneRegion:        "us-east-1",
+	}
+	regionalPDLabels = map[string]string{
+		v1.LabelZoneFailureDomain: "europe-west1-b__europe-west1-c",
+	}
+)
+
 func TestTranslationStability(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -79,83 +89,84 @@ func TestTranslationStability(t *testing.T) {
 	}
 }
 
-func TestZoneTranslation(t *testing.T) {
+func TestTopologyTranslation(t *testing.T) {
 	testCases := []struct {
-		name        string
-		pv          *v1.PersistentVolume
-		topologyKey string
+		name                 string
+		pv                   *v1.PersistentVolume
+		expectedNodeAffinity *v1.VolumeNodeAffinity
 	}{
 		{
-			name: "GCE PD PV Source",
-			pv: &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						v1.LabelZoneFailureDomain: "us-east-1",
-						v1.LabelZoneRegion:        "us-east-1a",
-					},
-				},
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
-							PDName:    "test-disk",
-							FSType:    "ext4",
-							Partition: 0,
-							ReadOnly:  false,
-						},
-					},
-				},
-			},
-			topologyKey: plugins.GCEPDTopologyKey,
+			name:                 "GCE PD with zone labels",
+			pv:                   makeGCEPDPV(defaultZoneLabels, nil /*topology*/),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "us-east-1a"),
 		},
 		{
-			name: "AWS EBS PV Source",
-			pv: &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						v1.LabelZoneFailureDomain: "us-east-1",
-						v1.LabelZoneRegion:        "us-east-1a",
-					},
-				},
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
-							VolumeID:  "vol01",
-							FSType:    "ext3",
-							Partition: 1,
-							ReadOnly:  true,
-						},
-					},
-				},
-			},
-			topologyKey: plugins.AWSEBSTopologyKey,
+			name:                 "GCE PD with existing topology (beta keys)",
+			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(v1.LabelZoneFailureDomain, "us-east-2a")),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "us-east-2a"),
 		},
 		{
-			name: "Cinder PV Source",
-			pv: &v1.PersistentVolume{
-				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{
-						v1.LabelZoneFailureDomain: "us-east-1",
-						v1.LabelZoneRegion:        "us-east-1a",
-					},
-				},
-				Spec: v1.PersistentVolumeSpec{
-					PersistentVolumeSource: v1.PersistentVolumeSource{
-						Cinder: &v1.CinderPersistentVolumeSource{
-							VolumeID: "vol1",
-							FSType:   "ext4",
-							ReadOnly: false,
-						},
-					},
-				},
-			},
-			topologyKey: plugins.CinderTopologyKey,
+			name:                 "GCE PD with existing topology (CSI keys)",
+			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(plugins.GCEPDTopologyKey, "us-east-2a")),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "us-east-2a"),
+		},
+		{
+			name:                 "GCE PD with zone labels and topology",
+			pv:                   makeGCEPDPV(defaultZoneLabels, makeTopology(v1.LabelZoneFailureDomain, "us-east-2a")),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "us-east-2a"),
+		},
+		{
+			name:                 "GCE PD with regional zones",
+			pv:                   makeGCEPDPV(regionalPDLabels, nil /*topology*/),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "europe-west1-b", "europe-west1-c"),
+		},
+		{
+			name:                 "GCE PD with regional topology",
+			pv:                   makeGCEPDPV(nil /*labels*/, makeTopology(v1.LabelZoneFailureDomain, "europe-west1-b", "europe-west1-c")),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "europe-west1-b", "europe-west1-c"),
+		},
+		{
+			name:                 "GCE PD with regional zone and topology",
+			pv:                   makeGCEPDPV(regionalPDLabels, makeTopology(v1.LabelZoneFailureDomain, "europe-west1-f", "europe-west1-g")),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.GCEPDTopologyKey, "europe-west1-f", "europe-west1-g"),
+		},
+		{
+			name: "GCE PD with multiple node selector terms",
+			pv: makeGCEPDPVMultTerms(
+				nil, /*labels*/
+				makeTopology(v1.LabelZoneFailureDomain, "europe-west1-f"),
+				makeTopology(v1.LabelZoneFailureDomain, "europe-west1-g")),
+			expectedNodeAffinity: makeNodeAffinity(
+				true, /*multiTerms*/
+				plugins.GCEPDTopologyKey, "europe-west1-f", "europe-west1-g"),
+		},
+		// EBS test cases: test mostly topology key, i.e., don't repeat testing done with GCE
+		{
+			name:                 "AWS EBS with zone labels",
+			pv:                   makeAWSEBSPV(defaultZoneLabels, nil /*topology*/),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.AWSEBSTopologyKey, "us-east-1a"),
+		},
+		{
+			name:                 "AWS EBS with zone labels and topology",
+			pv:                   makeAWSEBSPV(defaultZoneLabels, makeTopology(v1.LabelZoneFailureDomain, "us-east-2a")),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.AWSEBSTopologyKey, "us-east-2a"),
+		},
+		// Cinder test cases: test mosty topology key, i.e., don't repeat testing done with GCE
+		{
+			name:                 "OpenStack Cinder with zone labels",
+			pv:                   makeCinderPV(defaultZoneLabels, nil /*topology*/),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.CinderTopologyKey, "us-east-1a"),
+		},
+		{
+			name:                 "OpenStack Cinder with zone labels and topology",
+			pv:                   makeCinderPV(defaultZoneLabels, makeTopology(v1.LabelZoneFailureDomain, "us-east-2a")),
+			expectedNodeAffinity: makeNodeAffinity(false /*multiTerms*/, plugins.CinderTopologyKey, "us-east-2a"),
 		},
 	}
+
 	for _, test := range testCases {
 		ctl := New()
 		t.Logf("Testing %v", test.name)
-
-		zone := test.pv.ObjectMeta.Labels[v1.LabelZoneFailureDomain]
 
 		// Translate to CSI PV and check translated node affinity
 		newCSIPV, err := ctl.TranslateInTreePVToCSI(test.pv)
@@ -163,8 +174,9 @@ func TestZoneTranslation(t *testing.T) {
 			t.Errorf("Error when translating to CSI: %v", err)
 		}
 
-		if !isNodeAffinitySet(newCSIPV, test.topologyKey, zone) {
-			t.Errorf("Volume after translation lacks topology: %#v", newCSIPV)
+		nodeAffinity := newCSIPV.Spec.NodeAffinity
+		if !reflect.DeepEqual(nodeAffinity, test.expectedNodeAffinity) {
+			t.Errorf("Expected node affinity %v, got %v", *test.expectedNodeAffinity, *nodeAffinity)
 		}
 
 		// Translate back to in-tree and make sure node affinity is still set
@@ -173,21 +185,131 @@ func TestZoneTranslation(t *testing.T) {
 			t.Errorf("Error when translating to in-tree: %v", err)
 		}
 
-		if !isNodeAffinitySet(newInTreePV, test.topologyKey, zone) {
-			t.Errorf("Volume after translation lacks topology: %#v", newInTreePV)
+		nodeAffinity = newInTreePV.Spec.NodeAffinity
+		if !reflect.DeepEqual(nodeAffinity, test.expectedNodeAffinity) {
+			t.Errorf("Expected node affinity %v, got %v", *test.expectedNodeAffinity, *nodeAffinity)
 		}
 	}
 }
 
-func isNodeAffinitySet(pv *v1.PersistentVolume, topologyKey, zone string) bool {
-	for i := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms {
-		for _, r := range pv.Spec.NodeAffinity.Required.NodeSelectorTerms[i].MatchExpressions {
-			if r.Key == topologyKey && r.Values[0] == zone {
-				return true
-			}
+func makePV(labels map[string]string, topology *v1.NodeSelectorRequirement) *v1.PersistentVolume {
+	pv := &v1.PersistentVolume{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: labels,
+		},
+		Spec: v1.PersistentVolumeSpec{},
+	}
+
+	if topology != nil {
+		pv.Spec.NodeAffinity = &v1.VolumeNodeAffinity{
+			Required: &v1.NodeSelector{
+				NodeSelectorTerms: []v1.NodeSelectorTerm{
+					{MatchExpressions: []v1.NodeSelectorRequirement{*topology}},
+				},
+			},
 		}
 	}
-	return false
+
+	return pv
+}
+
+func makeGCEPDPV(labels map[string]string, topology *v1.NodeSelectorRequirement) *v1.PersistentVolume {
+	pv := makePV(labels, topology)
+	pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
+		GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+			PDName:    "test-disk",
+			FSType:    "ext4",
+			Partition: 0,
+			ReadOnly:  false,
+		},
+	}
+	return pv
+}
+
+func makeGCEPDPVMultTerms(labels map[string]string, topologies ...*v1.NodeSelectorRequirement) *v1.PersistentVolume {
+	pv := makeGCEPDPV(labels, topologies[0])
+	for _, topology := range topologies[1:] {
+		pv.Spec.NodeAffinity.Required.NodeSelectorTerms = append(
+			pv.Spec.NodeAffinity.Required.NodeSelectorTerms,
+			v1.NodeSelectorTerm{
+				MatchExpressions: []v1.NodeSelectorRequirement{*topology},
+			},
+		)
+	}
+	return pv
+}
+
+func makeAWSEBSPV(labels map[string]string, topology *v1.NodeSelectorRequirement) *v1.PersistentVolume {
+	pv := makePV(labels, topology)
+	pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
+		AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+			VolumeID:  "vol01",
+			FSType:    "ext3",
+			Partition: 1,
+			ReadOnly:  true,
+		},
+	}
+	return pv
+}
+
+func makeCinderPV(labels map[string]string, topology *v1.NodeSelectorRequirement) *v1.PersistentVolume {
+	pv := makePV(labels, topology)
+	pv.Spec.PersistentVolumeSource = v1.PersistentVolumeSource{
+		Cinder: &v1.CinderPersistentVolumeSource{
+			VolumeID: "vol1",
+			FSType:   "ext4",
+			ReadOnly: false,
+		},
+	}
+	return pv
+}
+
+func makeNodeAffinity(multiTerms bool, key string, values ...string) *v1.VolumeNodeAffinity {
+	nodeAffinity := &v1.VolumeNodeAffinity{
+		Required: &v1.NodeSelector{
+			NodeSelectorTerms: []v1.NodeSelectorTerm{
+				{
+					MatchExpressions: []v1.NodeSelectorRequirement{
+						{
+							Key:      key,
+							Operator: v1.NodeSelectorOpIn,
+							Values:   values,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	// If multiple terms is NOT requested, return a single term with all values
+	if !multiTerms {
+		return nodeAffinity
+	}
+
+	// Otherwise return multiple terms, each one with a single value
+	nodeAffinity.Required.NodeSelectorTerms[0].MatchExpressions[0].Values = values[:1] // If values=[1,2,3], overwrite with [1]
+	for _, value := range values[1:] {
+		term := v1.NodeSelectorTerm{
+			MatchExpressions: []v1.NodeSelectorRequirement{
+				{
+					Key:      key,
+					Operator: v1.NodeSelectorOpIn,
+					Values:   []string{value},
+				},
+			},
+		}
+		nodeAffinity.Required.NodeSelectorTerms = append(nodeAffinity.Required.NodeSelectorTerms, term)
+	}
+
+	return nodeAffinity
+}
+
+func makeTopology(key string, values ...string) *v1.NodeSelectorRequirement {
+	return &v1.NodeSelectorRequirement{
+		Key:      key,
+		Operator: v1.NodeSelectorOpIn,
+		Values:   values,
+	}
 }
 
 func TestPluginNameMappings(t *testing.T) {
