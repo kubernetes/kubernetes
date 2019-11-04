@@ -23,6 +23,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"math/big"
+	"net/url"
 	"testing"
 	"time"
 
@@ -55,6 +56,11 @@ func TestCertificateAuthority(t *testing.T) {
 		t.Fatal(err)
 	}
 	caCert, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	uri, err := url.Parse("help://me@what:8080/where/when?why=true")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,6 +124,19 @@ func TestCertificateAuthority(t *testing.T) {
 				BasicConstraintsValid: true,
 			},
 		},
+		{
+			name:   "uri sans",
+			policy: PermissiveSigningPolicy{TTL: time.Hour},
+			cr: x509.CertificateRequest{
+				URIs: []*url.URL{uri},
+			},
+			want: x509.Certificate{
+				URIs:                  []*url.URL{uri},
+				NotBefore:             now,
+				NotAfter:              now.Add(1 * time.Hour),
+				BasicConstraintsValid: true,
+			},
+		},
 	}
 
 	crKey, err := ecdsa.GenerateKey(elliptic.P224(), rand.Reader)
@@ -167,6 +186,9 @@ func TestCertificateAuthority(t *testing.T) {
 				diff.IgnoreUnset(),
 				cmp.Transformer("RoundTime", func(x time.Time) time.Time {
 					return x.Truncate(time.Second)
+				}),
+				cmp.Comparer(func(x, y *url.URL) bool {
+					return ((x == nil) && (y == nil)) || x.String() == y.String()
 				}),
 			}
 			if !cmp.Equal(*cert, test.want, opts) {

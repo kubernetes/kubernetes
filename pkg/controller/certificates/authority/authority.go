@@ -68,6 +68,7 @@ func (ca *CertificateAuthority) Sign(crDER []byte, policy SigningPolicy) ([]byte
 		DNSNames:           cr.DNSNames,
 		IPAddresses:        cr.IPAddresses,
 		EmailAddresses:     cr.EmailAddresses,
+		URIs:               cr.URIs,
 		PublicKeyAlgorithm: cr.PublicKeyAlgorithm,
 		PublicKey:          cr.PublicKey,
 		Extensions:         cr.Extensions,

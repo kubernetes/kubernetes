@@ -3261,10 +3261,15 @@ func describeCertificateSigningRequest(csr *certificatesv1beta1.CertificateSigni
 		printListHelper(w, "\t", "StreetAddress", cr.Subject.StreetAddress)
 		printListHelper(w, "\t", "PostalCode", cr.Subject.PostalCode)
 
-		if len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses) > 0 {
+		if len(cr.DNSNames)+len(cr.EmailAddresses)+len(cr.IPAddresses)+len(cr.URIs) > 0 {
 			w.Write(LEVEL_0, "Subject Alternative Names:\n")
 			printListHelper(w, "\t", "DNS Names", cr.DNSNames)
 			printListHelper(w, "\t", "Email Addresses", cr.EmailAddresses)
+			var uris []string
+			for _, uri := range cr.URIs {
+				uris = append(uris, uri.String())
+			}
+			printListHelper(w, "\t", "URIs", uris)
 			var ipaddrs []string
 			for _, ipaddr := range cr.IPAddresses {
 				ipaddrs = append(ipaddrs, ipaddr.String())
