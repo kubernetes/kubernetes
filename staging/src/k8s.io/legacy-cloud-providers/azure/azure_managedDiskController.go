@@ -40,6 +40,8 @@ const (
 	// default IOPS Caps & Throughput Cap (MBps) per https://docs.microsoft.com/en-us/azure/virtual-machines/linux/disks-ultra-ssd
 	defaultDiskIOPSReadWrite = 500
 	defaultDiskMBpsReadWrite = 100
+
+	diskEncryptionSetIDFormat = "/subscriptions/{subs-id}/resourceGroups/{rg-name}/providers/Microsoft.Compute/diskEncryptionSets/{diskEncryptionSet-name}"
 )
 
 //ManagedDiskController : managed disk controller struct
@@ -67,6 +69,8 @@ type ManagedDiskOptions struct {
 	DiskIOPSReadWrite string
 	// Throughput Cap (MBps) for UltraSSD disk
 	DiskMBpsReadWrite string
+	// ResourceId of the disk encryption set to use for enabling encryption at rest.
+	DiskEncryptionSetID string
 }
 
 //CreateManagedDisk : create managed disk
@@ -126,6 +130,16 @@ func (c *ManagedDiskController) CreateManagedDisk(options *ManagedDiskOptions) (
 		}
 		if options.DiskMBpsReadWrite != "" {
 			return "", fmt.Errorf("AzureDisk - DiskMBpsReadWrite parameter is only applicable in UltraSSD_LRS disk type")
+		}
+	}
+
+	if options.DiskEncryptionSetID != "" {
+		if strings.Index(strings.ToLower(options.DiskEncryptionSetID), "/subscriptions/") != 0 {
+			return "", fmt.Errorf("AzureDisk - format of DiskEncryptionSetID(%s) is incorrect, correct format: %s", options.DiskEncryptionSetID, diskEncryptionSetIDFormat)
+		}
+		diskProperties.Encryption = &compute.Encryption{
+			DiskEncryptionSetID: &options.DiskEncryptionSetID,
+			Type:                compute.EncryptionAtRestWithCustomerKey,
 		}
 	}
 

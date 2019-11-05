@@ -30,7 +30,7 @@ import (
 
 // AttachDisk attaches a vhd to vm
 // the vhd must exist, can be identified by diskName, diskURI, and lun.
-func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes) error {
+func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nodeName types.NodeName, lun int32, cachingMode compute.CachingTypes, diskEncryptionSetID string) error {
 	vmName := mapNodeNameToVMName(nodeName)
 	ssName, instanceID, vm, err := ss.getVmssVM(vmName, cacheReadTypeDefault)
 	if err != nil {
@@ -48,15 +48,17 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 		copy(disks, *vm.StorageProfile.DataDisks)
 	}
 	if isManagedDisk {
+		managedDisk := &compute.ManagedDiskParameters{ID: &diskURI}
+		if diskEncryptionSetID != "" {
+			managedDisk.DiskEncryptionSet = &compute.DiskEncryptionSetParameters{ID: &diskEncryptionSetID}
+		}
 		disks = append(disks,
 			compute.DataDisk{
 				Name:         &diskName,
 				Lun:          &lun,
 				Caching:      compute.CachingTypes(cachingMode),
 				CreateOption: "attach",
-				ManagedDisk: &compute.ManagedDiskParameters{
-					ID: &diskURI,
-				},
+				ManagedDisk:  managedDisk,
 			})
 	} else {
 		disks = append(disks,
@@ -90,7 +92,7 @@ func (ss *scaleSet) AttachDisk(isManagedDisk bool, diskName, diskURI string, nod
 		return err
 	}
 
-	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s, %s)", nodeResourceGroup, nodeName, diskName, diskURI)
+	klog.V(2).Infof("azureDisk - update(%s): vm(%s) - attach disk(%s, %s) with DiskEncryptionSetID(%s)", nodeResourceGroup, nodeName, diskName, diskURI, diskEncryptionSetID)
 	_, err = ss.VirtualMachineScaleSetVMsClient.Update(ctx, nodeResourceGroup, ssName, instanceID, newVM, "attach_disk")
 	if err != nil {
 		detail := err.Error()
