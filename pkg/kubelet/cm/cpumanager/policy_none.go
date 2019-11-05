@@ -43,11 +43,11 @@ func (p *nonePolicy) Start(s state.State) {
 	klog.Info("[cpumanager] none policy: Start")
 }
 
-func (p *nonePolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container, containerID string) error {
+func (p *nonePolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Container) error {
 	return nil
 }
 
-func (p *nonePolicy) RemoveContainer(s state.State, containerID string) error {
+func (p *nonePolicy) RemoveContainer(s state.State, podUID string, containerName string) error {
 	return nil
 }
 
