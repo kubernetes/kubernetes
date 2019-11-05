@@ -108,23 +108,23 @@ github.com/aws/aws-sdk-go/service/elb
 github.com/aws/aws-sdk-go/service/elbv2
 github.com/aws/aws-sdk-go/service/kms
 github.com/aws/aws-sdk-go/service/sts
-# github.com/bazelbuild/bazel-gazelle v0.0.0-20181012220611-c728ce9f663e => github.com/bazelbuild/bazel-gazelle v0.0.0-20181012220611-c728ce9f663e
+# github.com/bazelbuild/bazel-gazelle v0.19.1-0.20191105222053-70208cbdc798 => github.com/bazelbuild/bazel-gazelle v0.19.1-0.20191105222053-70208cbdc798
 github.com/bazelbuild/bazel-gazelle/cmd/gazelle
-github.com/bazelbuild/bazel-gazelle/internal/config
-github.com/bazelbuild/bazel-gazelle/internal/flag
-github.com/bazelbuild/bazel-gazelle/internal/label
-github.com/bazelbuild/bazel-gazelle/internal/language
-github.com/bazelbuild/bazel-gazelle/internal/language/go
-github.com/bazelbuild/bazel-gazelle/internal/language/proto
-github.com/bazelbuild/bazel-gazelle/internal/merger
-github.com/bazelbuild/bazel-gazelle/internal/pathtools
-github.com/bazelbuild/bazel-gazelle/internal/repos
-github.com/bazelbuild/bazel-gazelle/internal/resolve
-github.com/bazelbuild/bazel-gazelle/internal/rule
+github.com/bazelbuild/bazel-gazelle/config
+github.com/bazelbuild/bazel-gazelle/flag
 github.com/bazelbuild/bazel-gazelle/internal/version
-github.com/bazelbuild/bazel-gazelle/internal/walk
 github.com/bazelbuild/bazel-gazelle/internal/wspace
-# github.com/bazelbuild/buildtools v0.0.0-20180226164855-80c7f0d45d7e => github.com/bazelbuild/buildtools v0.0.0-20180226164855-80c7f0d45d7e
+github.com/bazelbuild/bazel-gazelle/label
+github.com/bazelbuild/bazel-gazelle/language
+github.com/bazelbuild/bazel-gazelle/language/go
+github.com/bazelbuild/bazel-gazelle/language/proto
+github.com/bazelbuild/bazel-gazelle/merger
+github.com/bazelbuild/bazel-gazelle/pathtools
+github.com/bazelbuild/bazel-gazelle/repo
+github.com/bazelbuild/bazel-gazelle/resolve
+github.com/bazelbuild/bazel-gazelle/rule
+github.com/bazelbuild/bazel-gazelle/walk
+# github.com/bazelbuild/buildtools v0.0.0-20190917191645-69366ca98f89 => github.com/bazelbuild/buildtools v0.0.0-20190917191645-69366ca98f89
 github.com/bazelbuild/buildtools/api_proto
 github.com/bazelbuild/buildtools/build
 github.com/bazelbuild/buildtools/build_proto
@@ -275,7 +275,7 @@ github.com/go-openapi/analysis
 github.com/go-openapi/analysis/internal
 # github.com/go-openapi/errors v0.19.2 => github.com/go-openapi/errors v0.19.2
 github.com/go-openapi/errors
-# github.com/go-openapi/jsonpointer v0.19.2 => github.com/go-openapi/jsonpointer v0.19.2
+# github.com/go-openapi/jsonpointer v0.19.3 => github.com/go-openapi/jsonpointer v0.19.3
 github.com/go-openapi/jsonpointer
 # github.com/go-openapi/jsonreference v0.19.2 => github.com/go-openapi/jsonreference v0.19.2
 github.com/go-openapi/jsonreference
@@ -287,7 +287,7 @@ github.com/go-openapi/runtime
 github.com/go-openapi/spec
 # github.com/go-openapi/strfmt v0.19.0 => github.com/go-openapi/strfmt v0.19.0
 github.com/go-openapi/strfmt
-# github.com/go-openapi/swag v0.19.2 => github.com/go-openapi/swag v0.19.2
+# github.com/go-openapi/swag v0.19.5 => github.com/go-openapi/swag v0.19.5
 github.com/go-openapi/swag
 # github.com/go-openapi/validate v0.19.2 => github.com/go-openapi/validate v0.19.2
 github.com/go-openapi/validate
@@ -433,7 +433,7 @@ github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
 # github.com/gorilla/websocket v1.4.0 => github.com/gorilla/websocket v1.4.0
 github.com/gorilla/websocket
-# github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7 => github.com/gregjones/httpcache v0.0.0-20170728041850-787624de3eb7
+# github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7 => github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7
 github.com/gregjones/httpcache
 github.com/gregjones/httpcache/diskcache
 # github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4 => github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4
@@ -496,13 +496,13 @@ github.com/liggitt/tabwriter
 github.com/lithammer/dedent
 # github.com/magiconair/properties v1.8.1 => github.com/magiconair/properties v1.8.1
 github.com/magiconair/properties
-# github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63 => github.com/mailru/easyjson v0.0.0-20190614124828-94de47d64c63
+# github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e => github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e
 github.com/mailru/easyjson/buffer
 github.com/mailru/easyjson/jlexer
 github.com/mailru/easyjson/jwriter
 # github.com/mattn/go-colorable v0.0.9 => github.com/mattn/go-colorable v0.0.9
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.4 => github.com/mattn/go-isatty v0.0.4
+# github.com/mattn/go-isatty v0.0.9 => github.com/mattn/go-isatty v0.0.9
 github.com/mattn/go-isatty
 # github.com/mattn/go-shellwords v1.0.5 => github.com/mattn/go-shellwords v1.0.5
 github.com/mattn/go-shellwords
@@ -606,7 +606,7 @@ github.com/opencontainers/selinux/go-selinux/label
 github.com/pelletier/go-toml
 # github.com/peterbourgon/diskv v2.0.1+incompatible => github.com/peterbourgon/diskv v2.0.1+incompatible
 github.com/peterbourgon/diskv
-# github.com/pkg/errors v0.8.0 => github.com/pkg/errors v0.8.0
+# github.com/pkg/errors v0.8.1 => github.com/pkg/errors v0.8.1
 github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0 => github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
@@ -653,7 +653,7 @@ github.com/spf13/cobra
 github.com/spf13/cobra/doc
 # github.com/spf13/jwalterweatherman v1.1.0 => github.com/spf13/jwalterweatherman v1.1.0
 github.com/spf13/jwalterweatherman
-# github.com/spf13/pflag v1.0.3 => github.com/spf13/pflag v1.0.3
+# github.com/spf13/pflag v1.0.5 => github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
 # github.com/spf13/viper v1.3.2 => github.com/spf13/viper v1.3.2
 github.com/spf13/viper
@@ -830,7 +830,7 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
 go.uber.org/zap/zapcore
-# golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8 => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
+# golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586 => golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
 golang.org/x/crypto/bcrypt
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/cryptobyte
@@ -848,10 +848,10 @@ golang.org/x/crypto/poly1305
 golang.org/x/crypto/salsa20/salsa
 golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/lint v0.0.0-20190409202823-959b441ac422 => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
+# golang.org/x/lint v0.0.0-20190409202823-959b441ac422 => golang.org/x/lint v0.0.0-20190409202823-959b441ac422
 golang.org/x/lint
 golang.org/x/lint/golint
-# golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7 => golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
+# golang.org/x/net v0.0.0-20191004110552-13f9640d40b9 => golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 golang.org/x/net/bpf
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
@@ -871,21 +871,22 @@ golang.org/x/net/ipv6
 golang.org/x/net/proxy
 golang.org/x/net/trace
 golang.org/x/net/websocket
-# golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 => golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
+# golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 => golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45
 golang.org/x/oauth2
 golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
-# golang.org/x/sync v0.0.0-20190423024810-112230192c58 => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
+# golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e => golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
 golang.org/x/sync/errgroup
-# golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456 => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
+# golang.org/x/sys v0.0.0-20190826190057-c7b8b68b1456 => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
+golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows/svc/mgr
-# golang.org/x/text v0.3.2 => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
+# golang.org/x/text v0.3.2 => golang.org/x/text v0.3.2
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -907,9 +908,9 @@ golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 golang.org/x/text/width
-# golang.org/x/time v0.0.0-20181108054448-85acf8d2951c => golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
+# golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 => golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 golang.org/x/time/rate
-# golang.org/x/tools v0.0.0-20190621195816-6e04913cbbac => golang.org/x/tools v0.0.0-20190621195816-6e04913cbbac
+# golang.org/x/tools v0.0.0-20190920225731-5eefd052ad72 => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
 golang.org/x/tools/benchmark/parse
 golang.org/x/tools/container/intsets
 golang.org/x/tools/go/analysis
@@ -1039,7 +1040,7 @@ gopkg.in/gcfg.v1
 gopkg.in/gcfg.v1/scanner
 gopkg.in/gcfg.v1/token
 gopkg.in/gcfg.v1/types
-# gopkg.in/inf.v0 v0.9.0 => gopkg.in/inf.v0 v0.9.0
+# gopkg.in/inf.v0 v0.9.1 => gopkg.in/inf.v0 v0.9.1
 gopkg.in/inf.v0
 # gopkg.in/natefinch/lumberjack.v2 v2.0.0 => gopkg.in/natefinch/lumberjack.v2 v2.0.0
 gopkg.in/natefinch/lumberjack.v2
@@ -1855,8 +1856,8 @@ k8s.io/metrics/pkg/client/custom_metrics/fake
 k8s.io/metrics/pkg/client/custom_metrics/scheme
 k8s.io/metrics/pkg/client/external_metrics
 k8s.io/metrics/pkg/client/external_metrics/fake
-# k8s.io/repo-infra v0.0.0-20181204233714-00fe14e3d1a3 => k8s.io/repo-infra v0.0.0-20181204233714-00fe14e3d1a3
-k8s.io/repo-infra/kazel
+# k8s.io/repo-infra v0.0.1-alpha.1 => k8s.io/repo-infra v0.0.1-alpha.1
+k8s.io/repo-infra/cmd/kazel
 # k8s.io/sample-apiserver v0.0.0 => ./staging/src/k8s.io/sample-apiserver
 k8s.io/sample-apiserver/pkg/admission/plugin/banflunder
 k8s.io/sample-apiserver/pkg/admission/wardleinitializer
