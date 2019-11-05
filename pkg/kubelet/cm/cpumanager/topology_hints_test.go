@@ -29,13 +29,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/cm/topologymanager/bitmask"
 )
 
-func topologyHintLessThan(a topologymanager.TopologyHint, b topologymanager.TopologyHint) bool {
-	if a.Preferred != b.Preferred {
-		return a.Preferred == true
-	}
-	return a.NUMANodeAffinity.IsNarrowerThan(b.NUMANodeAffinity)
-}
-
 func TestGetTopologyHints(t *testing.T) {
 	testPod1 := makePod("2", "2")
 	testContainer1 := &testPod1.Spec.Containers[0]
@@ -168,10 +161,10 @@ func TestGetTopologyHints(t *testing.T) {
 			continue
 		}
 		sort.SliceStable(hints, func(i, j int) bool {
-			return topologyHintLessThan(hints[i], hints[j])
+			return hints[i].LessThan(hints[j])
 		})
 		sort.SliceStable(tc.expectedHints, func(i, j int) bool {
-			return topologyHintLessThan(tc.expectedHints[i], tc.expectedHints[j])
+			return tc.expectedHints[i].LessThan(tc.expectedHints[j])
 		})
 		if !reflect.DeepEqual(tc.expectedHints, hints) {
 			t.Errorf("Expected in result to be %v , got %v", tc.expectedHints, hints)
