@@ -27,42 +27,71 @@ import (
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
-func TestNodeLabelPresence(t *testing.T) {
-	label := map[string]string{"foo": "bar", "bar": "foo"}
+func TestValidateNodeLabelArgs(t *testing.T) {
+	// "bar" exists in both present and absent labels therefore validatio should fail.
+	args := &runtime.Unknown{Raw: []byte(`{"presentLabels" : ["foo", "bar"], "absentLabels" : ["bar", "baz"]}`)}
+	_, err := New(args, nil)
+	if err == nil {
+		t.Fatal("Plugin initialization should fail.")
+	}
+}
+
+func TestNodeLabelFilter(t *testing.T) {
+	label := map[string]string{"foo": "any value", "bar": "any value"}
+	var pod *v1.Pod
 	tests := []struct {
 		name    string
-		pod     *v1.Pod
 		rawArgs string
 		res     framework.Code
 	}{
 		{
-			name:    "label does not match, presence true",
-			rawArgs: `{"labels" : ["baz"], "presence" : true}`,
+			name:    "present label does not match",
+			rawArgs: `{"presentLabels" : ["baz"]}`,
 			res:     framework.UnschedulableAndUnresolvable,
 		},
 		{
-			name:    "label does not match, presence false",
-			rawArgs: `{"labels" : ["baz"], "presence" : false}`,
+			name:    "absent label does not match",
+			rawArgs: `{"absentLabels" : ["baz"]}`,
 			res:     framework.Success,
 		},
 		{
-			name:    "one label matches, presence true",
-			rawArgs: `{"labels" : ["foo", "baz"], "presence" : true}`,
+			name:    "one of two present labels matches",
+			rawArgs: `{"presentLabels" : ["foo", "baz"]}`,
 			res:     framework.UnschedulableAndUnresolvable,
 		},
 		{
-			name:    "one label matches, presence false",
-			rawArgs: `{"labels" : ["foo", "baz"], "presence" : false}`,
+			name:    "one of two absent labels matches",
+			rawArgs: `{"absentLabels" : ["foo", "baz"]}`,
 			res:     framework.UnschedulableAndUnresolvable,
 		},
 		{
-			name:    "all labels match, presence true",
-			rawArgs: `{"labels" : ["foo", "bar"], "presence" : true}`,
+			name:    "all present abels match",
+			rawArgs: `{"presentLabels" : ["foo", "bar"]}`,
 			res:     framework.Success,
 		},
 		{
-			name:    "all labels match, presence false",
-			rawArgs: `{"labels" : ["foo", "bar"], "presence" : false}`,
+			name:    "all absent labels match",
+			rawArgs: `{"absentLabels" : ["foo", "bar"]}`,
+			res:     framework.UnschedulableAndUnresolvable,
+		},
+		{
+			name:    "both present and absent label matches",
+			rawArgs: `{"presentLabels" : ["foo"], "absentLabels" : ["bar"]}`,
+			res:     framework.UnschedulableAndUnresolvable,
+		},
+		{
+			name:    "neither present nor absent label matches",
+			rawArgs: `{"presentLabels" : ["foz"], "absentLabels" : ["baz"]}`,
+			res:     framework.UnschedulableAndUnresolvable,
+		},
+		{
+			name:    "present label matches and absent label doesn't match",
+			rawArgs: `{"presentLabels" : ["foo"], "absentLabels" : ["baz"]}`,
+			res:     framework.Success,
+		},
+		{
+			name:    "present label doesn't match and absent label matches",
+			rawArgs: `{"presentLabels" : ["foz"], "absentLabels" : ["bar"]}`,
 			res:     framework.UnschedulableAndUnresolvable,
 		},
 	}
@@ -79,7 +108,7 @@ func TestNodeLabelPresence(t *testing.T) {
 				t.Fatalf("Failed to create plugin: %v", err)
 			}
 
-			status := p.(framework.FilterPlugin).Filter(context.TODO(), nil, test.pod, nodeInfo)
+			status := p.(framework.FilterPlugin).Filter(context.TODO(), nil, pod, nodeInfo)
 			if status.Code() != test.res {
 				t.Errorf("Status mismatch. got: %v, want: %v", status.Code(), test.res)
 			}

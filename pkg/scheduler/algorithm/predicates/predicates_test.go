@@ -1658,47 +1658,41 @@ func TestPodFitsSelector(t *testing.T) {
 func TestNodeLabelPresence(t *testing.T) {
 	label := map[string]string{"foo": "bar", "bar": "foo"}
 	tests := []struct {
-		pod      *v1.Pod
-		labels   []string
-		presence bool
-		fits     bool
-		name     string
+		pod           *v1.Pod
+		presentLabels []string
+		absentLabels  []string
+		fits          bool
+		name          string
 	}{
 		{
-			labels:   []string{"baz"},
-			presence: true,
-			fits:     false,
-			name:     "label does not match, presence true",
+			presentLabels: []string{"baz"},
+			fits:          false,
+			name:          "label does not match, presence true",
 		},
 		{
-			labels:   []string{"baz"},
-			presence: false,
-			fits:     true,
-			name:     "label does not match, presence false",
+			absentLabels: []string{"baz"},
+			fits:         true,
+			name:         "label does not match, presence false",
 		},
 		{
-			labels:   []string{"foo", "baz"},
-			presence: true,
-			fits:     false,
-			name:     "one label matches, presence true",
+			presentLabels: []string{"foo", "baz"},
+			fits:          false,
+			name:          "one label matches, presence true",
 		},
 		{
-			labels:   []string{"foo", "baz"},
-			presence: false,
-			fits:     false,
-			name:     "one label matches, presence false",
+			absentLabels: []string{"foo", "baz"},
+			fits:         false,
+			name:         "one label matches, presence false",
 		},
 		{
-			labels:   []string{"foo", "bar"},
-			presence: true,
-			fits:     true,
-			name:     "all labels match, presence true",
+			presentLabels: []string{"foo", "bar"},
+			fits:          true,
+			name:          "all labels match, presence true",
 		},
 		{
-			labels:   []string{"foo", "bar"},
-			presence: false,
-			fits:     false,
-			name:     "all labels match, presence false",
+			absentLabels: []string{"foo", "bar"},
+			fits:         false,
+			name:         "all labels match, presence false",
 		},
 	}
 	expectedFailureReasons := []PredicateFailureReason{ErrNodeLabelPresenceViolated}
@@ -1709,7 +1703,7 @@ func TestNodeLabelPresence(t *testing.T) {
 			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
-			labelChecker := NodeLabelChecker{test.labels, test.presence}
+			labelChecker := NodeLabelChecker{test.presentLabels, test.absentLabels}
 			fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, GetPredicateMetadata(test.pod, nil), nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

@@ -287,17 +287,23 @@ func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, args *plugi
 			}
 		} else if policy.Argument.LabelsPresence != nil {
 			// map LabelPresence policy to ConfigProducerArgs that's used to configure the NodeLabel plugin.
-			args.NodeLabelArgs = &nodelabel.Args{
-				Labels:   policy.Argument.LabelsPresence.Labels,
-				Presence: policy.Argument.LabelsPresence.Presence,
+			if args.NodeLabelArgs == nil {
+				args.NodeLabelArgs = &nodelabel.Args{}
 			}
-			predicateFactory = func(args PluginFactoryArgs) predicates.FitPredicate {
+			if policy.Argument.LabelsPresence.Presence {
+				args.NodeLabelArgs.PresentLabels = append(args.NodeLabelArgs.PresentLabels, policy.Argument.LabelsPresence.Labels...)
+			} else {
+				args.NodeLabelArgs.AbsentLabels = append(args.NodeLabelArgs.AbsentLabels, policy.Argument.LabelsPresence.Labels...)
+			}
+			predicateFactory = func(_ PluginFactoryArgs) predicates.FitPredicate {
 				return predicates.NewNodeLabelPredicate(
-					policy.Argument.LabelsPresence.Labels,
-					policy.Argument.LabelsPresence.Presence,
+					args.NodeLabelArgs.PresentLabels,
+					args.NodeLabelArgs.AbsentLabels,
 				)
 			}
-			// We do not allow specifying the name for custom plugins, see #83472
+			// We use the NodeLabel plugin name for all NodeLabel custom priorities.
+			// It may get called multiple times but we essentially only register one instance of NodeLabel predicate.
+			// This name is then used to find the registered plugin and run the plugin instead of the predicate.
 			name = nodelabel.Name
 		}
 	} else if predicateFactory, ok = fitPredicateMap[policy.Name]; ok {

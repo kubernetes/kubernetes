@@ -940,16 +940,18 @@ func PodFitsHost(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinf
 
 // NodeLabelChecker contains information to check node labels for a predicate.
 type NodeLabelChecker struct {
-	labels   []string
-	presence bool
+	// presentLabels should be present for the node to be considered a fit for hosting the pod
+	presentLabels []string
+	// absentLabels should be absent for the node to be considered a fit for hosting the pod
+	absentLabels []string
 }
 
 // NewNodeLabelPredicate creates a predicate which evaluates whether a pod can fit based on the
 // node labels which match a filter that it requests.
-func NewNodeLabelPredicate(labels []string, presence bool) FitPredicate {
+func NewNodeLabelPredicate(presentLabels []string, absentLabels []string) FitPredicate {
 	labelChecker := &NodeLabelChecker{
-		labels:   labels,
-		presence: presence,
+		presentLabels: presentLabels,
+		absentLabels:  absentLabels,
 	}
 	return labelChecker.CheckNodeLabelPresence
 }
@@ -972,15 +974,21 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *v1.Pod, meta PredicateMet
 		return false, nil, fmt.Errorf("node not found")
 	}
 
-	var exists bool
 	nodeLabels := labels.Set(node.Labels)
-	for _, label := range n.labels {
-		exists = nodeLabels.Has(label)
-		if (exists && !n.presence) || (!exists && n.presence) {
-			return false, []PredicateFailureReason{ErrNodeLabelPresenceViolated}, nil
+	check := func(labels []string, presence bool) bool {
+		for _, label := range labels {
+			exists := nodeLabels.Has(label)
+			if (exists && !presence) || (!exists && presence) {
+				return false
+			}
 		}
+		return true
 	}
-	return true, nil, nil
+	if check(n.presentLabels, true) && check(n.absentLabels, false) {
+		return true, nil, nil
+	}
+
+	return false, []PredicateFailureReason{ErrNodeLabelPresenceViolated}, nil
 }
 
 // ServiceAffinity defines a struct used for creating service affinity predicates.

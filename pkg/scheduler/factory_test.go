@@ -92,6 +92,7 @@ func TestCreateFromConfig(t *testing.T) {
 		"predicates" : [
 			{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["zone"]}}},
 			{"name" : "TestRequireZone", "argument" : {"labelsPresence" : {"labels" : ["zone"], "presence" : true}}},
+			{"name" : "TestNoFooLabel", "argument" : {"labelsPresence" : {"labels" : ["foo"], "presence" : false}}},
 			{"name" : "PredicateOne"},
 			{"name" : "PredicateTwo"}
 		],
@@ -123,7 +124,7 @@ func TestCreateFromConfig(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to marshal %+v: %v", nodeLabelConfig, err)
 	}
-	want := `{"Name":"NodeLabel","Args":{"labels":["zone"],"presence":true}}`
+	want := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"]}}`
 	if string(encoding) != want {
 		t.Errorf("Config for NodeLabel plugin mismatch. got: %v, want: %v", string(encoding), want)
 	}
