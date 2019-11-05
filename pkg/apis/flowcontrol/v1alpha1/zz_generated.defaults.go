@@ -52,8 +52,11 @@ func SetObjectDefaults_FlowSchemaList(in *v1alpha1.FlowSchemaList) {
 }
 
 func SetObjectDefaults_PriorityLevelConfiguration(in *v1alpha1.PriorityLevelConfiguration) {
-	if in.Spec.Queuing != nil {
-		SetDefaults_QueuingConfiguration(in.Spec.Queuing)
+	if in.Spec.Limited != nil {
+		SetDefaults_LimitedPriorityLevelConfiguration(in.Spec.Limited)
+		if in.Spec.Limited.LimitResponse.Queuing != nil {
+			SetDefaults_QueuingConfiguration(in.Spec.Limited.LimitResponse.Queuing)
+		}
 	}
 }
 

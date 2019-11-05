@@ -392,14 +392,16 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						Queues:                   512,
-						HandSize:                 4,
-						QueueLengthLimit:         100,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								Queues:           512,
+								HandSize:         4,
+								QueueLengthLimit: 100,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{},
 		},
@@ -410,7 +412,7 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: flowcontrol.PriorityLevelConfigurationNameExempt,
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeExempt,
+					Type: flowcontrol.PriorityLevelEnablementExempt,
 				},
 			},
 			expectedErrors: field.ErrorList{},
@@ -422,17 +424,19 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						QueueLengthLimit:         100,
-						Queues:                   512,
-						HandSize:                 8,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								QueueLengthLimit: 100,
+								Queues:           512,
+								HandSize:         8,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("queuing").Child("handSize"), int32(8), "required entropy bits of deckSize 512 and handSize 8 should not be greater than 60"),
+				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(8), "required entropy bits of deckSize 512 and handSize 8 should not be greater than 60"),
 			},
 		},
 		{
@@ -442,17 +446,19 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						QueueLengthLimit:         100,
-						Queues:                   128,
-						HandSize:                 10,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								QueueLengthLimit: 100,
+								Queues:           128,
+								HandSize:         10,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("queuing").Child("handSize"), int32(10), "required entropy bits of deckSize 128 and handSize 10 should not be greater than 60"),
+				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(10), "required entropy bits of deckSize 128 and handSize 10 should not be greater than 60"),
 			},
 		},
 		{
@@ -462,18 +468,20 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						QueueLengthLimit:         100,
-						Queues:                   math.MaxInt32,
-						HandSize:                 3,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								QueueLengthLimit: 100,
+								Queues:           math.MaxInt32,
+								HandSize:         3,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("queuing").Child("handSize"), int32(3), "required entropy bits of deckSize 2147483647 and handSize 3 should not be greater than 60"),
-				field.Invalid(field.NewPath("spec").Child("queuing").Child("queues"), int32(math.MaxInt32), "must not be greater than 10000000"),
+				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(3), "required entropy bits of deckSize 2147483647 and handSize 3 should not be greater than 60"),
+				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("queues"), int32(math.MaxInt32), "must not be greater than 10000000"),
 			},
 		},
 		{
@@ -483,14 +491,16 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						QueueLengthLimit:         100,
-						Queues:                   10 * 1000 * 1000, // 10^7
-						HandSize:                 2,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								QueueLengthLimit: 100,
+								Queues:           10 * 1000 * 1000, // 10^7
+								HandSize:         2,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{},
 		},
@@ -501,17 +511,19 @@ func TestPriorityLevelConfigurationValidation(t *testing.T) {
 					Name: "system-foo",
 				},
 				Spec: flowcontrol.PriorityLevelConfigurationSpec{
-					Type: flowcontrol.PriorityLevelQueuingTypeQueueing,
-					Queuing: &flowcontrol.QueuingConfiguration{
+					Type: flowcontrol.PriorityLevelEnablementLimited,
+					Limited: &flowcontrol.LimitedPriorityLevelConfiguration{
 						AssuredConcurrencyShares: 100,
-						QueueLengthLimit:         100,
-						Queues:                   7,
-						HandSize:                 8,
-					},
-				},
+						LimitResponse: flowcontrol.LimitResponse{
+							Type: flowcontrol.LimitResponseTypeQueue,
+							Queuing: &flowcontrol.QueuingConfiguration{
+								QueueLengthLimit: 100,
+								Queues:           7,
+								HandSize:         8,
+							}}}},
 			},
 			expectedErrors: field.ErrorList{
-				field.Invalid(field.NewPath("spec").Child("queuing").Child("handSize"), int32(8), "should not be greater than queues (7)"),
+				field.Invalid(field.NewPath("spec").Child("limited").Child("limitResponse").Child("queuing").Child("handSize"), int32(8), "should not be greater than queues (7)"),
 			},
 		},
 	}
