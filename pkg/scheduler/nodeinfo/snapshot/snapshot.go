@@ -32,7 +32,9 @@ type Snapshot struct {
 	NodeInfoMap map[string]*schedulernodeinfo.NodeInfo
 	// NodeInfoList is the list of nodes as ordered in the cache's nodeTree.
 	NodeInfoList []*schedulernodeinfo.NodeInfo
-	Generation   int64
+	// HavePodsWithAffinityNodeInfoList is the list of nodes with at least one pod declaring affinity terms.
+	HavePodsWithAffinityNodeInfoList []*schedulernodeinfo.NodeInfo
+	Generation                       int64
 }
 
 var _ schedulerlisters.SharedLister = &Snapshot{}
@@ -48,13 +50,18 @@ func NewEmptySnapshot() *Snapshot {
 func NewSnapshot(pods []*v1.Pod, nodes []*v1.Node) *Snapshot {
 	nodeInfoMap := schedulernodeinfo.CreateNodeNameToInfoMap(pods, nodes)
 	nodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodes))
+	havePodsWithAffinityNodeInfoList := make([]*schedulernodeinfo.NodeInfo, 0, len(nodes))
 	for _, v := range nodeInfoMap {
 		nodeInfoList = append(nodeInfoList, v)
+		if len(v.PodsWithAffinity()) > 0 {
+			havePodsWithAffinityNodeInfoList = append(havePodsWithAffinityNodeInfoList, v)
+		}
 	}
 
 	s := NewEmptySnapshot()
 	s.NodeInfoMap = nodeInfoMap
 	s.NodeInfoList = nodeInfoList
+	s.HavePodsWithAffinityNodeInfoList = havePodsWithAffinityNodeInfoList
 
 	return s
 }
@@ -117,6 +124,11 @@ type nodeInfoLister struct {
 // List returns the list of nodes in the snapshot.
 func (n *nodeInfoLister) List() ([]*schedulernodeinfo.NodeInfo, error) {
 	return n.snapshot.NodeInfoList, nil
+}
+
+// HavePodsWithAffinityList returns the list of nodes with at least one pods with inter-pod affinity
+func (n *nodeInfoLister) HavePodsWithAffinityList() ([]*schedulernodeinfo.NodeInfo, error) {
+	return n.snapshot.HavePodsWithAffinityNodeInfoList, nil
 }
 
 // Returns the NodeInfo of the given node name.
