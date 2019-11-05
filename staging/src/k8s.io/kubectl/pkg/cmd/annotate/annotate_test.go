@@ -465,7 +465,7 @@ func TestAnnotateObject(t *testing.T) {
 			case "GET":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -473,7 +473,7 @@ func TestAnnotateObject(t *testing.T) {
 			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -518,7 +518,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 			case "GET":
 				switch req.URL.Path {
 				case "/namespaces/test/replicationcontrollers/cassandra":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -526,7 +526,7 @@ func TestAnnotateObjectFromFile(t *testing.T) {
 			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/replicationcontrollers/cassandra":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -602,7 +602,7 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 			case "GET":
 				switch req.URL.Path {
 				case "/namespaces/test/pods":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, pods)}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil
@@ -610,9 +610,9 @@ func TestAnnotateMultipleObjects(t *testing.T) {
 			case "PATCH":
 				switch req.URL.Path {
 				case "/namespaces/test/pods/foo":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[0])}, nil
 				case "/namespaces/test/pods/bar":
-					return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[1])}, nil
+					return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &pods.Items[1])}, nil
 				default:
 					t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 					return nil, nil

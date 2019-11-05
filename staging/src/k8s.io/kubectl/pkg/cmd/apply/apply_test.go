@@ -709,7 +709,7 @@ func TestApplyNonExistObject(t *testing.T) {
 				return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: ioutil.NopCloser(bytes.NewReader(nil))}, nil
 			case p == pathRC && m == "POST":
 				bodyRC := ioutil.NopCloser(bytes.NewReader(currentRC))
-				return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
@@ -761,7 +761,7 @@ func TestApplyEmptyPatch(t *testing.T) {
 				body, _ = ioutil.ReadAll(req.Body)
 				verifyPost = true
 				bodyRC := ioutil.NopCloser(bytes.NewReader(body))
-				return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
+				return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: bodyRC}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil
