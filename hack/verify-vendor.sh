@@ -85,7 +85,7 @@ pushd "${KUBE_ROOT}" > /dev/null 2>&1
   fi
 
   # Verify we are pinned to matching levels
-  hack/lint-dependencies.sh >&2
+  hack/lint-dependencies.sh
 popd > /dev/null 2>&1
 
 if [[ ${ret} -gt 0 ]]; then
