@@ -18,14 +18,12 @@ package containermap
 
 import (
 	"fmt"
-
-	"k8s.io/api/core/v1"
 )
 
 // ContainerMap maps (containerID)->(*v1.Pod, *v1.Container)
 type ContainerMap map[string]struct {
-	pod       *v1.Pod
-	container *v1.Container
+	podUID        string
+	containerName string
 }
 
 // NewContainerMap creates a new ContainerMap struct
@@ -33,12 +31,12 @@ func NewContainerMap() ContainerMap {
 	return make(ContainerMap)
 }
 
-// Add adds a mapping of (containerID)->(*v1.Pod, *v1.Container) to the ContainerMap
-func (cm ContainerMap) Add(p *v1.Pod, c *v1.Container, containerID string) {
+// Add adds a mapping of (containerID)->(podUID, containerName) to the ContainerMap
+func (cm ContainerMap) Add(podUID, containerName, containerID string) {
 	cm[containerID] = struct {
-		pod       *v1.Pod
-		container *v1.Container
-	}{p, c}
+		podUID        string
+		containerName string
+	}{podUID, containerName}
 }
 
 // Remove removes a mapping of (containerID)->(*v1.Pod, *.v1.Container) from the ContainerMap
@@ -47,19 +45,19 @@ func (cm ContainerMap) Remove(containerID string) {
 }
 
 // GetContainerID retrieves a ContainerID from the ContainerMap
-func (cm ContainerMap) GetContainerID(p *v1.Pod, c *v1.Container) (string, error) {
+func (cm ContainerMap) GetContainerID(podUID, containerName string) (string, error) {
 	for key, val := range cm {
-		if val.pod.UID == p.UID && val.container.Name == c.Name {
+		if val.podUID == podUID && val.containerName == containerName {
 			return key, nil
 		}
 	}
-	return "", fmt.Errorf("container %s not in ContainerMap for pod %s", c.Name, p.UID)
+	return "", fmt.Errorf("container %s not in ContainerMap for pod %s", containerName, podUID)
 }
 
-// GetContainerRef retrieves a (*v1.Pod, *v1.Container) pair from the ContainerMap
-func (cm ContainerMap) GetContainerRef(containerID string) (*v1.Pod, *v1.Container, error) {
+// GetContainerRef retrieves a (podUID, containerName) pair from the ContainerMap
+func (cm ContainerMap) GetContainerRef(containerID string) (string, string, error) {
 	if _, exists := cm[containerID]; !exists {
-		return nil, nil, fmt.Errorf("containerID %s not in ContainerMap", containerID)
+		return "", "", fmt.Errorf("containerID %s not in ContainerMap", containerID)
 	}
-	return cm[containerID].pod, cm[containerID].container, nil
+	return cm[containerID].podUID, cm[containerID].containerName, nil
 }

@@ -193,7 +193,7 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 	// add (pod, container, containerID) to the containerMap.
 	defer func() {
 		if rerr == nil {
-			p.containerMap.Add(pod, container, containerID)
+			p.containerMap.Add(string(pod.UID), container.Name, containerID)
 		}
 	}()
 
@@ -211,7 +211,7 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 		// container is run.
 		for _, initContainer := range pod.Spec.InitContainers {
 			if container.Name != initContainer.Name {
-				initContainerID, err := p.containerMap.GetContainerID(pod, &initContainer)
+				initContainerID, err := p.containerMap.GetContainerID(string(pod.UID), initContainer.Name)
 				if err != nil {
 					continue
 				}
