@@ -290,6 +290,7 @@ func TestAddFlags(t *testing.T) {
 			WebhookConfigFile:           "/webhook-config",
 			WebhookCacheAuthorizedTTL:   180000000000,
 			WebhookCacheUnauthorizedTTL: 60000000000,
+			WebhookVersion:              "v1beta1",
 		},
 		CloudProvider: &kubeoptions.CloudProviderOptions{
 			CloudConfigFile: "/cloud-config",
