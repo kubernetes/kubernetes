@@ -18,7 +18,6 @@ package metrics
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/blang/semver"
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,7 +45,6 @@ type StableCollector interface {
 type BaseStableCollector struct {
 	descriptors []*Desc // stores all Desc collected from DescribeWithStability().
 	registrable []*Desc // stores registrable Desc(not be hidden), is a subset of descriptors.
-	hidden      []*Desc // stores hidden Desc
 	self        StableCollector
 }
 
@@ -59,7 +57,7 @@ func (bsc *BaseStableCollector) DescribeWithStability(ch chan<- *Desc) {
 // Describe sends all descriptors to the provided channel.
 // It intend to be called by prometheus registry.
 func (bsc *BaseStableCollector) Describe(ch chan<- *prometheus.Desc) {
-	for _, d := range bsc.descriptors {
+	for _, d := range bsc.registrable {
 		ch <- d.toPrometheusDesc()
 	}
 }
@@ -80,10 +78,8 @@ func (bsc *BaseStableCollector) Collect(ch chan<- prometheus.Metric) {
 	}()
 
 	for m := range mch {
-		// Hidden metrics should be ignored.
-		// TODO(RainbowMango): There is no convenient method to identify if the metrics should be ignored.
-		// 	Use a temporary solution here. (try to search in hidden list)
-		if strings.Contains(m.Desc().String(), hiddenFlag) {
+		// nil Metric usually means hidden metrics
+		if m == nil {
 			continue
 		}
 
@@ -127,16 +123,16 @@ func (bsc *BaseStableCollector) Create(version *semver.Version, self StableColle
 			d.createLock.Lock()
 			defer d.createLock.Unlock()
 
-			d.isCreated = true
-			if d.IsHidden() { // hidden metrics also needs initialize because user may send them in CollectWithStability method.
-				d.initializeHiddenDesc()
-				bsc.hidden = append(bsc.hidden, d)
+			if d.IsHidden() {
+				// do nothing for hidden metrics
 			} else if d.IsDeprecated() {
 				d.initializeDeprecatedDesc()
 				bsc.registrable = append(bsc.registrable, d)
+				d.isCreated = true
 			} else {
 				d.initialize()
 				bsc.registrable = append(bsc.registrable, d)
+				d.isCreated = true
 			}
 		})
 	}

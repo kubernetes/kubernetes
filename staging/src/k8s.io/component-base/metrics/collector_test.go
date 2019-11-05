@@ -52,25 +52,25 @@ func (tc *testCustomCollector) DescribeWithStability(ch chan<- *Desc) {
 }
 
 func (tc *testCustomCollector) CollectWithStability(ch chan<- Metric) {
-	ch <- MustNewConstMetric(
+	ch <- NewLazyConstMetric(
 		alphaDesc,
 		GaugeValue,
 		1,
 		"value",
 	)
-	ch <- MustNewConstMetric(
+	ch <- NewLazyConstMetric(
 		stableDesc,
 		GaugeValue,
 		1,
 		"value",
 	)
-	ch <- MustNewConstMetric(
+	ch <- NewLazyConstMetric(
 		deprecatedDesc,
 		GaugeValue,
 		1,
 		"value",
 	)
-	ch <- MustNewConstMetric(
+	ch <- NewLazyConstMetric(
 		hiddenDesc,
 		GaugeValue,
 		1,

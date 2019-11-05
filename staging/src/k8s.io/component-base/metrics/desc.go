@@ -26,8 +26,6 @@ import (
 	"k8s.io/klog"
 )
 
-var hiddenFlag = "metricsshouldbehidden"
-
 // Desc is a prometheus.Desc extension.
 //
 // Use NewDesc to create new Desc instances.
@@ -72,20 +70,14 @@ type Desc struct {
 func NewDesc(fqName string, help string, variableLabels []string, constLabels Labels,
 	stabilityLevel StabilityLevel, deprecatedVersion string) *Desc {
 	d := &Desc{
-		fqName:         fqName,
-		help:           help,
-		variableLabels: variableLabels,
-		constLabels:    constLabels,
+		fqName:            fqName,
+		help:              help,
+		variableLabels:    variableLabels,
+		constLabels:       constLabels,
+		stabilityLevel:    stabilityLevel,
+		deprecatedVersion: deprecatedVersion,
 	}
-
-	// TODO(RainbowMango): replace by stabilityLevel.setDefault() after PR(https://github.com/kubernetes/kubernetes/pull/82957) be merged.
-	if stabilityLevel == "" {
-		d.stabilityLevel = ALPHA
-	} else {
-		d.stabilityLevel = stabilityLevel
-	}
-
-	d.deprecatedVersion = deprecatedVersion
+	d.stabilityLevel.setDefaults()
 
 	return d
 }
@@ -148,14 +140,6 @@ func (d *Desc) markDeprecated() {
 	})
 }
 
-// markHidden mark a special flag to 'HELP'.
-// The metrics marked with this flag will be ignored when collecting automatically.
-func (d *Desc) markHidden() {
-	d.hideOnce.Do(func() {
-		d.help = fmt.Sprintf("(%s) %s", hiddenFlag, d.help)
-	})
-}
-
 func (d *Desc) annotateStabilityLevel() {
 	d.annotateOnce.Do(func() {
 		d.help = fmt.Sprintf("[%v] %v", d.stabilityLevel, d.help)
@@ -171,9 +155,4 @@ func (d *Desc) initialize() {
 func (d *Desc) initializeDeprecatedDesc() {
 	d.markDeprecated()
 	d.initialize()
-}
-
-func (d *Desc) initializeHiddenDesc() {
-	d.markHidden()
-	d.initializeDeprecatedDesc()
 }
