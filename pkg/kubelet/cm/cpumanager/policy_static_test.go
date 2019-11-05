@@ -214,6 +214,20 @@ func TestStaticPolicyAdd(t *testing.T) {
 			expCSet:         cpuset.NewCPUSet(1, 5),
 		},
 		{
+			description:     "GuPodMultipleCores, SingleSocketHT, ExpectSameAllocation",
+			topo:            topoSingleSocketHT,
+			numReservedCPUs: 1,
+			containerID:     "fakeID3",
+			stAssignments: state.ContainerCPUAssignments{
+				"fakeID3": cpuset.NewCPUSet(2, 3, 6, 7),
+			},
+			stDefaultCPUSet: cpuset.NewCPUSet(0, 1, 4, 5),
+			pod:             makePod("4000m", "4000m"),
+			expErr:          nil,
+			expCPUAlloc:     true,
+			expCSet:         cpuset.NewCPUSet(2, 3, 6, 7),
+		},
+		{
 			description:     "GuPodMultipleCores, DualSocketHT, ExpectAllocOneSocket",
 			topo:            topoDualSocketHT,
 			numReservedCPUs: 1,

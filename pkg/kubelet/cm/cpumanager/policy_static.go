@@ -320,6 +320,23 @@ func (p *staticPolicy) GetTopologyHints(s state.State, pod v1.Pod, container v1.
 		return nil
 	}
 
+	// Short circuit to regenerate the same hints if there are already
+	// guaranteed CPUs allocated to the Container. This might happen after a
+	// kubelet restart, for example.
+	containerID, _ := findContainerIDByName(&pod.Status, container.Name)
+	if allocated, exists := s.GetCPUSet(containerID); exists {
+		if allocated.Size() != requested {
+			klog.Errorf("[cpumanager] CPUs already allocated to (pod %v, container %v) with different number than request: requested: %d, allocated: %d", string(pod.UID), container.Name, requested, allocated.Size())
+			return map[string][]topologymanager.TopologyHint{
+				string(v1.ResourceCPU): {},
+			}
+		}
+		klog.Infof("[cpumanager] Regenerating TopologyHints for CPUs already allocated to (pod %v, container %v)", string(pod.UID), container.Name)
+		return map[string][]topologymanager.TopologyHint{
+			string(v1.ResourceCPU): p.generateCPUTopologyHints(allocated, requested),
+		}
+	}
+
 	// Get a list of available CPUs.
 	available := p.assignableCPUs(s)
 
