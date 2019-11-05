@@ -202,7 +202,14 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume
 		partition = strconv.Itoa(int(pdSource.Partition))
 	}
 
-	pv := &v1.PersistentVolume{
+	var am v1.PersistentVolumeAccessMode
+	if pdSource.ReadOnly {
+		am = v1.ReadOnlyMany
+	} else {
+		am = v1.ReadWriteOnce
+	}
+
+	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			// A.K.A InnerVolumeSpecName required to match for Unmount
 			Name: volume.Name,
@@ -219,10 +226,9 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume
 					},
 				},
 			},
-			AccessModes: []v1.PersistentVolumeAccessMode{v1.ReadWriteOnce},
+			AccessModes: []v1.PersistentVolumeAccessMode{am},
 		},
-	}
-	return pv, nil
+	}, nil
 }
 
 // TranslateInTreePVToCSI takes a PV with GCEPersistentDisk set from in-tree
