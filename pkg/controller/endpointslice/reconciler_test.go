@@ -17,9 +17,11 @@ limitations under the License.
 package endpointslice
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
+	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
@@ -31,7 +33,9 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	k8stesting "k8s.io/client-go/testing"
+	compmetrics "k8s.io/component-base/metrics"
 	"k8s.io/kubernetes/pkg/controller"
+	"k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	utilpointer "k8s.io/utils/pointer"
 )
 
@@ -40,8 +44,9 @@ var defaultMaxEndpointsPerSlice = int32(100)
 // Even when there are no pods, we want to have a placeholder slice for each service
 func TestReconcileEmpty(t *testing.T) {
 	client := newClientset()
+	setupMetrics()
 	namespace := "test"
-	svc, _ := newServiceAndendpointMeta("foo", namespace)
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
 
 	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
 	reconcileHelper(t, r, &svc, []*corev1.Pod{}, []*discovery.EndpointSlice{}, time.Now())
@@ -54,14 +59,16 @@ func TestReconcileEmpty(t *testing.T) {
 	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
+	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0})
 }
 
 // Given a single pod matching a service selector and no existing endpoint slices,
 // a slice should be created
 func TestReconcile1Pod(t *testing.T) {
 	client := newClientset()
+	setupMetrics()
 	namespace := "test"
-	svc, _ := newServiceAndendpointMeta("foo", namespace)
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
 	pod1 := newPod(1, namespace, true, 1)
 	pod1.Spec.Hostname = "example-hostname"
 	node1 := &corev1.Node{
@@ -100,14 +107,16 @@ func TestReconcile1Pod(t *testing.T) {
 			Name:      "pod1",
 		},
 	}}, slices[0].Endpoints)
+	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 1, addedPerSync: 1, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0})
 }
 
 // given an existing endpoint slice and no pods matching the service, the existing
 // slice should be updated to a placeholder (not deleted)
 func TestReconcile1EndpointSlice(t *testing.T) {
 	client := newClientset()
+	setupMetrics()
 	namespace := "test"
-	svc, endpointMeta := newServiceAndendpointMeta("foo", namespace)
+	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 	endpointSlice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
 
 	_, createErr := client.DiscoveryV1alpha1().EndpointSlices(namespace).Create(endpointSlice1)
@@ -127,14 +136,16 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	assert.Equal(t, svc.Name, slices[0].Labels[discovery.LabelServiceName])
 	assert.EqualValues(t, []discovery.EndpointPort{}, slices[0].Ports)
 	assert.EqualValues(t, []discovery.Endpoint{}, slices[0].Endpoints)
+	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 1, numDeleted: 0})
 }
 
 // a simple use case with 250 pods matching a service and no existing slices
 // reconcile should create 3 slices, completely filling 2 of them
 func TestReconcileManyPods(t *testing.T) {
 	client := newClientset()
+	setupMetrics()
 	namespace := "test"
-	svc, _ := newServiceAndendpointMeta("foo", namespace)
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
 
 	// start with 250 pods
 	pods := []*corev1.Pod{}
@@ -152,6 +163,7 @@ func TestReconcileManyPods(t *testing.T) {
 
 	// Two endpoint slices should be completely full, the remainder should be in another one
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{100, 100, 50})
+	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 250, addedPerSync: 250, removedPerSync: 0, numCreated: 3, numUpdated: 0, numDeleted: 0})
 }
 
 // now with preexisting slices, we have 250 pods matching a service
@@ -164,8 +176,9 @@ func TestReconcileManyPods(t *testing.T) {
 // this approach requires 1 update + 1 create instead of 2 updates + 1 create
 func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	client := newClientset()
+	setupMetrics()
 	namespace := "test"
-	svc, endpointMeta := newServiceAndendpointMeta("foo", namespace)
+	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 
 	// start with 250 pods
 	pods := []*corev1.Pod{}
@@ -200,6 +213,7 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 
 	// 1 new slice (0->100) + 1 updated slice (62->89)
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{89, 61, 100})
+	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 250, addedPerSync: 127, removedPerSync: 0, numCreated: 1, numUpdated: 1, numDeleted: 0})
 }
 
 // now with preexisting slices, we have 300 pods matching a service
@@ -214,8 +228,9 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 // this approach requires 2 creates instead of 2 updates + 1 create
 func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	client := newClientset()
+	setupMetrics()
 	namespace := "test"
-	svc, endpointMeta := newServiceAndendpointMeta("foo", namespace)
+	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 
 	// start with 300 pods
 	pods := []*corev1.Pod{}
@@ -249,6 +264,7 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 
 	// 2 new slices (100, 52) in addition to existing slices (74, 74)
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{74, 74, 100, 52})
+	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 4, desiredEndpoints: 300, addedPerSync: 152, removedPerSync: 0, numCreated: 2, numUpdated: 0, numDeleted: 0})
 }
 
 // In some cases, such as a service port change, all slices for that service will require a change
@@ -256,7 +272,7 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 func TestReconcileEndpointSlicesUpdating(t *testing.T) {
 	client := newClientset()
 	namespace := "test"
-	svc, _ := newServiceAndendpointMeta("foo", namespace)
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
 
 	// start with 250 pods
 	pods := []*corev1.Pod{}
@@ -290,8 +306,9 @@ func TestReconcileEndpointSlicesUpdating(t *testing.T) {
 // reconcile repacks the endpoints into 3 slices, and deletes the extras
 func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 	client := newClientset()
+	setupMetrics()
 	namespace := "test"
-	svc, endpointMeta := newServiceAndendpointMeta("foo", namespace)
+	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 
 	// start with 300 pods
 	pods := []*corev1.Pod{}
@@ -327,6 +344,7 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 
 	// thanks to recycling, we get a free repack of endpoints, resulting in 3 full slices instead of 10 mostly empty slices
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{100, 100, 100})
+	expectMetrics(t, expectedMetrics{desiredSlices: 3, actualSlices: 3, desiredEndpoints: 300, addedPerSync: 300, removedPerSync: 0, numCreated: 0, numUpdated: 3, numDeleted: 7})
 }
 
 // In this test, we want to verify that endpoints are added to a slice that will
@@ -334,8 +352,9 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 // for update.
 func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 	client := newClientset()
+	setupMetrics()
 	namespace := "test"
-	svc, endpointMeta := newServiceAndendpointMeta("foo", namespace)
+	svc, endpointMeta := newServiceAndEndpointMeta("foo", namespace)
 
 	existingSlices := []*discovery.EndpointSlice{}
 	pods := []*corev1.Pod{}
@@ -378,6 +397,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 
 	// ensure that both endpoint slices have been updated
 	expectActions(t, client.Actions(), 2, "update", "endpointslices")
+	expectMetrics(t, expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 115, addedPerSync: 15, removedPerSync: 0, numCreated: 0, numUpdated: 2, numDeleted: 0})
 
 	// additional pods should get added to fuller slice
 	expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), []int{95, 20})
@@ -387,6 +407,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 // This test ensures that EndpointSlices are grouped correctly in that case.
 func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	client := newClientset()
+	setupMetrics()
 	namespace := "test"
 
 	portNameIntStr := intstr.IntOrString{
@@ -425,6 +446,7 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 	// reconcile should create 5 endpoint slices
 	assert.Equal(t, 5, len(client.Actions()), "Expected 5 client actions as part of reconcile")
 	expectActions(t, client.Actions(), 5, "create", "endpointslices")
+	expectMetrics(t, expectedMetrics{desiredSlices: 5, actualSlices: 5, desiredEndpoints: 300, addedPerSync: 300, removedPerSync: 0, numCreated: 5, numUpdated: 0, numDeleted: 0})
 
 	fetchedSlices := fetchEndpointSlices(t, client, namespace)
 
@@ -454,7 +476,7 @@ func TestReconcileEndpointSlicesNamedPorts(t *testing.T) {
 // appropriate endpoints distribution among slices
 func TestReconcileMaxEndpointsPerSlice(t *testing.T) {
 	namespace := "test"
-	svc, _ := newServiceAndendpointMeta("foo", namespace)
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
 
 	// start with 250 pods
 	pods := []*corev1.Pod{}
@@ -466,31 +488,67 @@ func TestReconcileMaxEndpointsPerSlice(t *testing.T) {
 	testCases := []struct {
 		maxEndpointsPerSlice int32
 		expectedSliceLengths []int
+		expectedMetricValues expectedMetrics
 	}{
 		{
 			maxEndpointsPerSlice: int32(50),
 			expectedSliceLengths: []int{50, 50, 50, 50, 50},
+			expectedMetricValues: expectedMetrics{desiredSlices: 5, actualSlices: 5, desiredEndpoints: 250, addedPerSync: 250, numCreated: 5},
 		}, {
 			maxEndpointsPerSlice: int32(80),
 			expectedSliceLengths: []int{80, 80, 80, 10},
+			expectedMetricValues: expectedMetrics{desiredSlices: 4, actualSlices: 4, desiredEndpoints: 250, addedPerSync: 250, numCreated: 4},
 		}, {
 			maxEndpointsPerSlice: int32(150),
 			expectedSliceLengths: []int{150, 100},
+			expectedMetricValues: expectedMetrics{desiredSlices: 2, actualSlices: 2, desiredEndpoints: 250, addedPerSync: 250, numCreated: 2},
 		}, {
 			maxEndpointsPerSlice: int32(250),
 			expectedSliceLengths: []int{250},
+			expectedMetricValues: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 250, addedPerSync: 250, numCreated: 1},
 		}, {
 			maxEndpointsPerSlice: int32(500),
 			expectedSliceLengths: []int{250},
+			expectedMetricValues: expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 250, addedPerSync: 250, numCreated: 1},
 		},
 	}
 
 	for _, testCase := range testCases {
-		client := newClientset()
-		r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, testCase.maxEndpointsPerSlice)
-		reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
-		expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), testCase.expectedSliceLengths)
+		t.Run(fmt.Sprintf("maxEndpointsPerSlice: %d", testCase.maxEndpointsPerSlice), func(t *testing.T) {
+			client := newClientset()
+			setupMetrics()
+			r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, testCase.maxEndpointsPerSlice)
+			reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
+			expectUnorderedSlicesWithLengths(t, fetchEndpointSlices(t, client, namespace), testCase.expectedSliceLengths)
+			expectMetrics(t, testCase.expectedMetricValues)
+		})
 	}
+}
+
+func TestReconcileEndpointSlicesMetrics(t *testing.T) {
+	client := newClientset()
+	setupMetrics()
+	namespace := "test"
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
+
+	// start with 20 pods
+	pods := []*corev1.Pod{}
+	for i := 0; i < 20; i++ {
+		pods = append(pods, newPod(i, namespace, true, 1))
+	}
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
+
+	actions := client.Actions()
+	assert.Equal(t, 1, len(actions), "Expected 1 additional client actions as part of reconcile")
+	assert.True(t, actions[0].Matches("create", "endpointslices"), "First action should be create endpoint slice")
+
+	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 20, addedPerSync: 20, removedPerSync: 0, numCreated: 1, numUpdated: 0, numDeleted: 0})
+
+	fetchedSlices := fetchEndpointSlices(t, client, namespace)
+	reconcileHelper(t, r, &svc, pods[0:10], []*discovery.EndpointSlice{&fetchedSlices[0]}, time.Now())
+	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 10, addedPerSync: 20, removedPerSync: 10, numCreated: 1, numUpdated: 1, numDeleted: 0})
 }
 
 // Test Helpers
@@ -507,6 +565,7 @@ func newReconciler(client *fake.Clientset, nodes []*corev1.Node, maxEndpointsPer
 		client:               client,
 		nodeLister:           corelisters.NewNodeLister(indexer),
 		maxEndpointsPerSlice: maxEndpointsPerSlice,
+		metricsCache:         metrics.NewCache(maxEndpointsPerSlice),
 	}
 }
 
@@ -603,4 +662,100 @@ func reconcileHelper(t *testing.T, r *reconciler, service *corev1.Service, pods 
 	if err != nil {
 		t.Fatalf("Expected no error reconciling Endpoint Slices, got: %v", err)
 	}
+}
+
+// Metrics helpers
+
+type expectedMetrics struct {
+	desiredSlices    int
+	actualSlices     int
+	desiredEndpoints int
+	addedPerSync     int
+	removedPerSync   int
+	numCreated       int
+	numUpdated       int
+	numDeleted       int
+}
+
+func expectMetrics(t *testing.T, em expectedMetrics) {
+	t.Helper()
+
+	actualDesiredSlices := getGaugeMetricValue(t, metrics.DesiredEndpointSlices.WithLabelValues())
+	if actualDesiredSlices != float64(em.desiredSlices) {
+		t.Errorf("Expected desiredEndpointSlices to be %d, got %v", em.desiredSlices, actualDesiredSlices)
+	}
+
+	actualNumSlices := getGaugeMetricValue(t, metrics.NumEndpointSlices.WithLabelValues())
+	if actualDesiredSlices != float64(em.desiredSlices) {
+		t.Errorf("Expected numEndpointSlices to be %d, got %v", em.actualSlices, actualNumSlices)
+	}
+
+	actualEndpointsDesired := getGaugeMetricValue(t, metrics.EndpointsDesired.WithLabelValues())
+	if actualEndpointsDesired != float64(em.desiredEndpoints) {
+		t.Errorf("Expected desiredEndpoints to be %d, got %v", em.desiredEndpoints, actualEndpointsDesired)
+	}
+
+	actualAddedPerSync := getHistogramMetricValue(t, metrics.EndpointsAddedPerSync.WithLabelValues())
+	if actualAddedPerSync != float64(em.addedPerSync) {
+		t.Errorf("Expected endpointsAddedPerSync to be %d, got %v", em.addedPerSync, actualAddedPerSync)
+	}
+
+	actualRemovedPerSync := getHistogramMetricValue(t, metrics.EndpointsRemovedPerSync.WithLabelValues())
+	if actualRemovedPerSync != float64(em.removedPerSync) {
+		t.Errorf("Expected endpointsRemovedPerSync to be %d, got %v", em.removedPerSync, actualRemovedPerSync)
+	}
+
+	actualCreated := getCounterMetricValue(t, metrics.EndpointSliceChanges.WithLabelValues("create"))
+	if actualCreated != float64(em.numCreated) {
+		t.Errorf("Expected endpointSliceChangesCreated to be %d, got %v", em.numCreated, actualCreated)
+	}
+
+	actualUpdated := getCounterMetricValue(t, metrics.EndpointSliceChanges.WithLabelValues("update"))
+	if actualUpdated != float64(em.numUpdated) {
+		t.Errorf("Expected endpointSliceChangesUpdated to be %d, got %v", em.numUpdated, actualUpdated)
+	}
+
+	actualDeleted := getCounterMetricValue(t, metrics.EndpointSliceChanges.WithLabelValues("delete"))
+	if actualDeleted != float64(em.numDeleted) {
+		t.Errorf("Expected endpointSliceChangesDeleted to be %d, got %v", em.numDeleted, actualDeleted)
+	}
+}
+
+func setupMetrics() {
+	metrics.RegisterMetrics()
+	metrics.NumEndpointSlices.Delete(map[string]string{})
+	metrics.DesiredEndpointSlices.Delete(map[string]string{})
+	metrics.EndpointsDesired.Delete(map[string]string{})
+	metrics.EndpointsAddedPerSync.Delete(map[string]string{})
+	metrics.EndpointsRemovedPerSync.Delete(map[string]string{})
+	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "create"})
+	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "update"})
+	metrics.EndpointSliceChanges.Delete(map[string]string{"operation": "delete"})
+}
+
+func getGaugeMetricValue(t *testing.T, metric compmetrics.GaugeMetric) float64 {
+	t.Helper()
+	metricProto := &dto.Metric{}
+	if err := metric.Write(metricProto); err != nil {
+		t.Errorf("Error writing metric: %v", err)
+	}
+	return metricProto.Gauge.GetValue()
+}
+
+func getCounterMetricValue(t *testing.T, metric compmetrics.CounterMetric) float64 {
+	t.Helper()
+	metricProto := &dto.Metric{}
+	if err := metric.(compmetrics.Metric).Write(metricProto); err != nil {
+		t.Errorf("Error writing metric: %v", err)
+	}
+	return metricProto.Counter.GetValue()
+}
+
+func getHistogramMetricValue(t *testing.T, metric compmetrics.ObserverMetric) float64 {
+	t.Helper()
+	metricProto := &dto.Metric{}
+	if err := metric.(compmetrics.Metric).Write(metricProto); err != nil {
+		t.Errorf("Error writing metric: %v", err)
+	}
+	return metricProto.Histogram.GetSampleSum()
 }

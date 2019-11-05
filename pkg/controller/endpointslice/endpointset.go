@@ -20,6 +20,7 @@ import (
 	"sort"
 
 	discovery "k8s.io/api/discovery/v1alpha1"
+	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 )
 
 // endpointHash is used to uniquely identify endpoints. Only including addresses
@@ -38,7 +39,7 @@ func hashEndpoint(endpoint *discovery.Endpoint) endpointHash {
 		hashObj.Hostname = *endpoint.Hostname
 	}
 
-	return endpointHash(deepHashObjectToString(hashObj))
+	return endpointHash(endpointutil.DeepHashObjectToString(hashObj))
 }
 
 // endpointSet provides simple methods for comparing sets of Endpoints.
