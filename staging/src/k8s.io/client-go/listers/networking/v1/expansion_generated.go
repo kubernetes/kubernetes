@@ -18,6 +18,14 @@ limitations under the License.
 
 package v1
 
+// IngressListerExpansion allows custom methods to be added to
+// IngressLister.
+type IngressListerExpansion interface{}
+
+// IngressNamespaceListerExpansion allows custom methods to be added to
+// IngressNamespaceLister.
+type IngressNamespaceListerExpansion interface{}
+
 // NetworkPolicyListerExpansion allows custom methods to be added to
 // NetworkPolicyLister.
 type NetworkPolicyListerExpansion interface{}
