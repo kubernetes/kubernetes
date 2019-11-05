@@ -47,12 +47,24 @@ func TestContainerMap(t *testing.T) {
 			container := v1.Container{Name: tc.containerNames[i]}
 
 			cm.Add(&pod, &container, tc.containerIDs[i])
-			containerID, err := cm.Get(&pod, &container)
+
+			containerID, err := cm.GetContainerID(&pod, &container)
 			if err != nil {
-				t.Errorf("error adding and retrieving container: %v", err)
+				t.Errorf("error adding and retrieving containerID: %v", err)
 			}
 			if containerID != tc.containerIDs[i] {
 				t.Errorf("mismatched containerIDs %v, %v", containerID, tc.containerIDs[i])
+			}
+
+			podRef, containerRef, err := cm.GetContainerRef(containerID)
+			if err != nil {
+				t.Errorf("error retrieving container reference: %v", err)
+			}
+			if podRef != &pod {
+				t.Errorf("mismatched pod reference %v, %v", pod.UID, podRef.UID)
+			}
+			if containerRef != &container {
+				t.Errorf("mismatched container reference %v, %v", container.Name, containerRef.Name)
 			}
 		}
 
@@ -61,7 +73,7 @@ func TestContainerMap(t *testing.T) {
 		for i := range tc.containerNames {
 			container := v1.Container{Name: tc.containerNames[i]}
 			cm.Remove(tc.containerIDs[i])
-			containerID, err := cm.Get(&pod, &container)
+			containerID, err := cm.GetContainerID(&pod, &container)
 			if err == nil {
 				t.Errorf("unexpected retrieval of containerID after removal: %v", containerID)
 			}

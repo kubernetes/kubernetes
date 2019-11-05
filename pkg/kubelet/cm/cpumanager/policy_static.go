@@ -211,7 +211,7 @@ func (p *staticPolicy) AddContainer(s state.State, pod *v1.Pod, container *v1.Co
 		// container is run.
 		for _, initContainer := range pod.Spec.InitContainers {
 			if container.Name != initContainer.Name {
-				initContainerID, err := p.containerMap.Get(pod, &initContainer)
+				initContainerID, err := p.containerMap.GetContainerID(pod, &initContainer)
 				if err != nil {
 					continue
 				}

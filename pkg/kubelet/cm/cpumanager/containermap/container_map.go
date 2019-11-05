@@ -22,51 +22,44 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-// ContainerMap maps (containerID)->(podUID, containerName)
-type ContainerMap map[string]map[string]string
+// ContainerMap maps (containerID)->(*v1.Pod, *v1.Container)
+type ContainerMap map[string]struct {
+	pod       *v1.Pod
+	container *v1.Container
+}
 
 // NewContainerMap creates a new ContainerMap struct
 func NewContainerMap() ContainerMap {
 	return make(ContainerMap)
 }
 
-// Add adds a mapping of (containerID)->(podUID, containerName) to the ContainerMap
+// Add adds a mapping of (containerID)->(*v1.Pod, *v1.Container) to the ContainerMap
 func (cm ContainerMap) Add(p *v1.Pod, c *v1.Container, containerID string) {
-	podUID := string(p.UID)
-	if _, exists := cm[podUID]; !exists {
-		cm[podUID] = make(map[string]string)
-	}
-	cm[podUID][c.Name] = containerID
+	cm[containerID] = struct {
+		pod       *v1.Pod
+		container *v1.Container
+	}{p, c}
 }
 
-// Remove removes a mapping of (containerID)->(podUID, containerName) from the ContainerMap
+// Remove removes a mapping of (containerID)->(*v1.Pod, *.v1.Container) from the ContainerMap
 func (cm ContainerMap) Remove(containerID string) {
-	found := false
-	for podUID := range cm {
-		for containerName := range cm[podUID] {
-			if containerID == cm[podUID][containerName] {
-				delete(cm[podUID], containerName)
-				found = true
-				break
-			}
-		}
-		if len(cm[podUID]) == 0 {
-			delete(cm, podUID)
-		}
-		if found {
-			break
-		}
-	}
+	delete(cm, containerID)
 }
 
-// Get retrieves a ContainerID from the ContainerMap
-func (cm ContainerMap) Get(p *v1.Pod, c *v1.Container) (string, error) {
-	podUID := string(p.UID)
-	if _, exists := cm[podUID]; !exists {
-		return "", fmt.Errorf("pod %s not in ContainerMap", podUID)
+// GetContainerID retrieves a ContainerID from the ContainerMap
+func (cm ContainerMap) GetContainerID(p *v1.Pod, c *v1.Container) (string, error) {
+	for key, val := range cm {
+		if val.pod.UID == p.UID && val.container.Name == c.Name {
+			return key, nil
+		}
 	}
-	if _, exists := cm[podUID][c.Name]; !exists {
-		return "", fmt.Errorf("container %s not in ContainerMap for pod %s", c.Name, podUID)
+	return "", fmt.Errorf("container %s not in ContainerMap for pod %s", c.Name, p.UID)
+}
+
+// GetContainerRef retrieves a (*v1.Pod, *v1.Container) pair from the ContainerMap
+func (cm ContainerMap) GetContainerRef(containerID string) (*v1.Pod, *v1.Container, error) {
+	if _, exists := cm[containerID]; !exists {
+		return nil, nil, fmt.Errorf("containerID %s not in ContainerMap", containerID)
 	}
-	return cm[podUID][c.Name], nil
+	return cm[containerID].pod, cm[containerID].container, nil
 }
