@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 
 	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
@@ -50,7 +50,7 @@ func BenchmarkStripedCache(b *testing.B) {
 func benchmarkCache(cache cache, b *testing.B) {
 	keys := []string{}
 	for i := 0; i < b.N; i++ {
-		key := uuid.NewRandom().String()
+		key := uuid.New().String()
 		keys = append(keys, key)
 	}
 
