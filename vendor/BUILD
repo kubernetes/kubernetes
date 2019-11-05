@@ -262,7 +262,6 @@ filegroup(
         "//vendor/github.com/opencontainers/runc/libcontainer:all-srcs",
         "//vendor/github.com/opencontainers/runtime-spec/specs-go:all-srcs",
         "//vendor/github.com/opencontainers/selinux/go-selinux:all-srcs",
-        "//vendor/github.com/pborman/uuid:all-srcs",
         "//vendor/github.com/pelletier/go-toml:all-srcs",
         "//vendor/github.com/peterbourgon/diskv:all-srcs",
         "//vendor/github.com/pkg/errors:all-srcs",
