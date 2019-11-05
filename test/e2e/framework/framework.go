@@ -531,17 +531,6 @@ func (f *Framework) ReadFileViaContainer(podName, containerName string, path str
 	return string(stdout), err
 }
 
-// CheckFileSizeViaContainer returns the list of file size under the specified path.
-func (f *Framework) CheckFileSizeViaContainer(podName, containerName, path string) (string, error) {
-	ginkgo.By("checking a file size in the container")
-
-	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "ls", "-l", path)
-	if err != nil {
-		Logf("error running kubectl exec to read file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))
-	}
-	return string(stdout), err
-}
-
 // CreateServiceForSimpleAppWithPods is a convenience wrapper to create a service and its matching pods all at once.
 func (f *Framework) CreateServiceForSimpleAppWithPods(contPort int, svcPort int, appName string, podSpec func(n v1.Node) v1.PodSpec, count int, block bool) (*v1.Service, error) {
 	var err error
