@@ -1,3 +1,4 @@
+# Apart from this line, only trailing comments are supported
 cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
@@ -228,7 +229,7 @@ pkg/util/ebtables
 pkg/util/goroutinemap/exponentialbackoff
 pkg/util/iptables
 pkg/util/iptables/testing
-pkg/util/labels
+pkg/util/labels # See previous effort in PR #80685
 pkg/util/mount
 pkg/util/oom
 pkg/util/procfs
