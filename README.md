@@ -52,6 +52,8 @@ cd kubernetes
 make
 ```
 
+*Please note that go 1.13 is not yet supported.*
+
 ##### You have a working [Docker environment].
 
 ```
