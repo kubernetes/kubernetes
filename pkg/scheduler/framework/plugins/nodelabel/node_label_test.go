@@ -25,14 +25,48 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
+	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 )
 
 func TestValidateNodeLabelArgs(t *testing.T) {
-	// "bar" exists in both present and absent labels therefore validatio should fail.
-	args := &runtime.Unknown{Raw: []byte(`{"presentLabels" : ["foo", "bar"], "absentLabels" : ["bar", "baz"]}`)}
-	_, err := New(args, nil)
-	if err == nil {
-		t.Fatal("Plugin initialization should fail.")
+	tests := []struct {
+		name string
+		args string
+		err  bool
+	}{
+		{
+			name: "happy case",
+			args: `{"presentLabels" : ["foo", "bar"], "absentLabels" : ["baz"], "presentLabelsPreference" : ["foo", "bar"], "absentLabelsPreference" : ["baz"]}`,
+		},
+		{
+			name: "label presence conflict",
+			// "bar" exists in both present and absent labels therefore validation should fail.
+			args: `{"presentLabels" : ["foo", "bar"], "absentLabels" : ["bar", "baz"], "presentLabelsPreference" : ["foo", "bar"], "absentLabelsPreference" : ["baz"]}`,
+			err:  true,
+		},
+		{
+			name: "label preference conflict",
+			// "bar" exists in both present and absent labels preferences therefore validation should fail.
+			args: `{"presentLabels" : ["foo", "bar"], "absentLabels" : ["baz"], "presentLabelsPreference" : ["foo", "bar"], "absentLabelsPreference" : ["bar", "baz"]}`,
+			err:  true,
+		},
+		{
+			name: "both label presence and preference conflict",
+			args: `{"presentLabels" : ["foo", "bar"], "absentLabels" : ["bar", "baz"], "presentLabelsPreference" : ["foo", "bar"], "absentLabelsPreference" : ["bar", "baz"]}`,
+			err:  true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			args := &runtime.Unknown{Raw: []byte(test.args)}
+			_, err := New(args, nil)
+			if test.err && err == nil {
+				t.Fatal("Plugin initialization should fail.")
+			}
+			if !test.err && err != nil {
+				t.Fatalf("Plugin initialization shouldn't fail: %v", err)
+			}
+		})
 	}
 }
 
@@ -111,6 +145,101 @@ func TestNodeLabelFilter(t *testing.T) {
 			status := p.(framework.FilterPlugin).Filter(context.TODO(), nil, pod, nodeInfo)
 			if status.Code() != test.res {
 				t.Errorf("Status mismatch. got: %v, want: %v", status.Code(), test.res)
+			}
+		})
+	}
+}
+
+func TestNodeLabelScore(t *testing.T) {
+	tests := []struct {
+		rawArgs string
+		want    int64
+		name    string
+	}{
+		{
+			want:    framework.MaxNodeScore,
+			rawArgs: `{"presentLabelsPreference" : ["foo"]}`,
+			name:    "one present label match",
+		},
+		{
+			want:    0,
+			rawArgs: `{"presentLabelsPreference" : ["somelabel"]}`,
+			name:    "one present label mismatch",
+		},
+		{
+			want:    framework.MaxNodeScore,
+			rawArgs: `{"presentLabelsPreference" : ["foo", "bar"]}`,
+			name:    "two present labels match",
+		},
+		{
+			want:    0,
+			rawArgs: `{"presentLabelsPreference" : ["somelabel1", "somelabel2"]}`,
+			name:    "two present labels mismatch",
+		},
+		{
+			want:    framework.MaxNodeScore / 2,
+			rawArgs: `{"presentLabelsPreference" : ["foo", "somelabel"]}`,
+			name:    "two present labels only one matches",
+		},
+		{
+			want:    0,
+			rawArgs: `{"absentLabelsPreference" : ["foo"]}`,
+			name:    "one absent label match",
+		},
+		{
+			want:    framework.MaxNodeScore,
+			rawArgs: `{"absentLabelsPreference" : ["somelabel"]}`,
+			name:    "one absent label mismatch",
+		},
+		{
+			want:    0,
+			rawArgs: `{"absentLabelsPreference" : ["foo", "bar"]}`,
+			name:    "two absent labels match",
+		},
+		{
+			want:    framework.MaxNodeScore,
+			rawArgs: `{"absentLabelsPreference" : ["somelabel1", "somelabel2"]}`,
+			name:    "two absent labels mismatch",
+		},
+		{
+			want:    framework.MaxNodeScore / 2,
+			rawArgs: `{"absentLabelsPreference" : ["foo", "somelabel"]}`,
+			name:    "two absent labels only one matches",
+		},
+		{
+			want:    framework.MaxNodeScore,
+			rawArgs: `{"presentLabelsPreference" : ["foo", "bar"], "absentLabelsPreference" : ["somelabel1", "somelabel2"]}`,
+			name:    "two present labels match, two absent labels mismatch",
+		},
+		{
+			want:    0,
+			rawArgs: `{"absentLabelsPreference" : ["foo", "bar"], "presentLabelsPreference" : ["somelabel1", "somelabel2"]}`,
+			name:    "two present labels both mismatch, two absent labels both match",
+		},
+		{
+			want:    3 * framework.MaxNodeScore / 4,
+			rawArgs: `{"presentLabelsPreference" : ["foo", "somelabel"], "absentLabelsPreference" : ["somelabel1", "somelabel2"]}`,
+			name:    "two present labels one matches, two absent labels mismatch",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			state := framework.NewCycleState()
+			node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: map[string]string{"foo": "", "bar": ""}}}
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithNodeInfoSnapshot(nodeinfosnapshot.NewSnapshot(nil, []*v1.Node{node})))
+			args := &runtime.Unknown{Raw: []byte(test.rawArgs)}
+			p, err := New(args, fh)
+			if err != nil {
+				t.Fatalf("Failed to create plugin: %+v", err)
+			}
+			nodeName := node.ObjectMeta.Name
+			score, status := p.(framework.ScorePlugin).Score(context.Background(), state, nil, nodeName)
+			if !status.IsSuccess() {
+				t.Errorf("unexpected error: %v", status)
+			}
+			if test.want != score {
+				t.Errorf("Wrong score. got %#v, want %#v", score, test.want)
 			}
 		})
 	}

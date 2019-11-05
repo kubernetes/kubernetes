@@ -23,6 +23,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -37,42 +38,56 @@ type Args struct {
 	PresentLabels []string `json:"presentLabels,omitempty"`
 	// AbsentLabels should be absent for the node to be considered a fit for hosting the pod
 	AbsentLabels []string `json:"absentLabels,omitempty"`
+	// Nodes that have labels in the list will get a higher score.
+	PresentLabelsPreference []string `json:"presentLabelsPreference,omitempty"`
+	// Nodes that don't have labels in the list will get a higher score.
+	AbsentLabelsPreference []string `json:"absentLabelsPreference,omitempty"`
 }
 
-// validateArgs validates that PresentLabels and AbsentLabels do not conflict.
-func validateArgs(args *Args) error {
-	presentLabels := make(map[string]struct{}, len(args.PresentLabels))
-	for _, l := range args.PresentLabels {
-		presentLabels[l] = struct{}{}
+// validateArgs validates that presentLabels and absentLabels do not conflict.
+func validateNoConflict(presentLabels []string, absentLabels []string) error {
+	m := make(map[string]struct{}, len(presentLabels))
+	for _, l := range presentLabels {
+		m[l] = struct{}{}
 	}
-	for _, l := range args.AbsentLabels {
-		if _, ok := presentLabels[l]; ok {
-			return fmt.Errorf("detecting at least one label (e.g., %q) that exist in both the present and absent label list: %+v", l, args)
+	for _, l := range absentLabels {
+		if _, ok := m[l]; ok {
+			return fmt.Errorf("detecting at least one label (e.g., %q) that exist in both the present(%+v) and absent(%+v) label list", l, presentLabels, absentLabels)
 		}
 	}
 	return nil
 }
 
 // New initializes a new plugin and returns it.
-func New(plArgs *runtime.Unknown, _ framework.FrameworkHandle) (framework.Plugin, error) {
+func New(plArgs *runtime.Unknown, handle framework.FrameworkHandle) (framework.Plugin, error) {
 	args := &Args{}
 	if err := framework.DecodeInto(plArgs, args); err != nil {
 		return nil, err
 	}
-	if err := validateArgs(args); err != nil {
+	if err := validateNoConflict(args.PresentLabels, args.AbsentLabels); err != nil {
 		return nil, err
 	}
+	if err := validateNoConflict(args.PresentLabelsPreference, args.AbsentLabelsPreference); err != nil {
+		return nil, err
+	}
+	// Note that the reduce function is always nil therefore it's ignored.
+	prioritize, _ := priorities.NewNodeLabelPriority(args.PresentLabelsPreference, args.AbsentLabelsPreference)
 	return &NodeLabel{
-		predicate: predicates.NewNodeLabelPredicate(args.PresentLabels, args.AbsentLabels),
+		handle:     handle,
+		predicate:  predicates.NewNodeLabelPredicate(args.PresentLabels, args.AbsentLabels),
+		prioritize: prioritize,
 	}, nil
 }
 
 // NodeLabel checks whether a pod can fit based on the node labels which match a filter that it requests.
 type NodeLabel struct {
-	predicate predicates.FitPredicate
+	handle     framework.FrameworkHandle
+	predicate  predicates.FitPredicate
+	prioritize priorities.PriorityMapFunction
 }
 
 var _ framework.FilterPlugin = &NodeLabel{}
+var _ framework.ScorePlugin = &NodeLabel{}
 
 // Name returns name of the plugin. It is used in logs, etc.
 func (pl *NodeLabel) Name() string {
@@ -84,4 +99,20 @@ func (pl *NodeLabel) Filter(ctx context.Context, _ *framework.CycleState, pod *v
 	// Note that NodeLabelPredicate doesn't use predicate metadata, hence passing nil here.
 	_, reasons, err := pl.predicate(pod, nil, nodeInfo)
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
+}
+
+// Score invoked at the score extension point.
+func (pl *NodeLabel) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+	}
+	// Note that node label priority function doesn't use metadata, hence passing nil here.
+	s, err := pl.prioritize(pod, nil, nodeInfo)
+	return s.Score, migration.ErrorToFrameworkStatus(err)
+}
+
+// ScoreExtensions of the Score plugin.
+func (pl *NodeLabel) ScoreExtensions() framework.ScoreExtensions {
+	return nil
 }

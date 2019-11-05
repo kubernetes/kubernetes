@@ -256,6 +256,12 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 			return
 		})
 
+	registry.RegisterPriority(nodelabel.Name,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, nodelabel.Name, &args.Weight)
+			pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			return
+		})
 	return registry
 }
 

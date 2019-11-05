@@ -64,7 +64,6 @@ go_test(
         "metadata_test.go",
         "most_requested_test.go",
         "node_affinity_test.go",
-        "node_label_test.go",
         "node_prefer_avoid_pods_test.go",
         "requested_to_capacity_ratio_test.go",
         "resource_limits_test.go",

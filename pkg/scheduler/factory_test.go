@@ -98,6 +98,8 @@ func TestCreateFromConfig(t *testing.T) {
 		],
 		"priorities" : [
 			{"name" : "RackSpread", "weight" : 3, "argument" : {"serviceAntiAffinity" : {"label" : "rack"}}},
+			{"name" : "LabelPreference1", "weight" : 3, "argument" : {"labelPreference" : {"label" : "l1", "presence": true}}},
+			{"name" : "LabelPreference2", "weight" : 3, "argument" : {"labelPreference" : {"label" : "l2", "presence": false}}},
 			{"name" : "PriorityOne", "weight" : 2},
 			{"name" : "PriorityTwo", "weight" : 1}		]
 	}`)
@@ -114,29 +116,36 @@ func TestCreateFromConfig(t *testing.T) {
 		t.Errorf("Wrong hardPodAffinitySymmetricWeight, ecpected: %d, got: %d", v1.DefaultHardPodAffinitySymmetricWeight, hpa)
 	}
 
-	// Verify that custom predicates are converted to framework plugins.
-	if !pluginExists(nodelabel.Name, "FilterPlugin", conf) {
-		t.Error("NodeLabel plugin not exist in framework.")
+	// Verify that node label predicate/priority are converted to framework plugins.
+	if _, ok := findPlugin(nodelabel.Name, "FilterPlugin", conf); !ok {
+		t.Fatalf("NodeLabel plugin not exist in framework.")
 	}
-	// Verify that the policy config is converted to plugin config for custom predicates.
+	nodeLabelScorePlugin, ok := findPlugin(nodelabel.Name, "ScorePlugin", conf)
+	if !ok {
+		t.Fatalf("NodeLabel plugin not exist in framework.")
+	}
+	if nodeLabelScorePlugin.Weight != 6 {
+		t.Errorf("Wrong weight. Got: %v, want: 6", nodeLabelScorePlugin.Weight)
+	}
+	// Verify that the policy config is converted to plugin config for node label predicate/priority.
 	nodeLabelConfig := findPluginConfig(nodelabel.Name, conf)
 	encoding, err := json.Marshal(nodeLabelConfig)
 	if err != nil {
 		t.Errorf("Failed to marshal %+v: %v", nodeLabelConfig, err)
 	}
-	want := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"]}}`
+	want := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"],"presentLabelsPreference":["l1"],"absentLabelsPreference":["l2"]}}`
 	if string(encoding) != want {
 		t.Errorf("Config for NodeLabel plugin mismatch. got: %v, want: %v", string(encoding), want)
 	}
 }
 
-func pluginExists(name, extensionPoint string, schedConf *Config) bool {
+func findPlugin(name, extensionPoint string, schedConf *Config) (schedulerapi.Plugin, bool) {
 	for _, pl := range schedConf.Framework.ListPlugins()[extensionPoint] {
 		if pl.Name == name {
-			return true
+			return pl, true
 		}
 	}
-	return false
+	return schedulerapi.Plugin{}, false
 }
 
 func findPluginConfig(name string, schedConf *Config) schedulerapi.PluginConfig {

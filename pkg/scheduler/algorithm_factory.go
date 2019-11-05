@@ -400,15 +400,35 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, args *pl
 				Weight: policy.Weight,
 			}
 		} else if policy.Argument.LabelPreference != nil {
+			// We use the NodeLabel plugin name for all NodeLabel custom priorities.
+			// It may get called multiple times but we essentially only register one instance of NodeLabel priority.
+			// This name is then used to find the registered plugin and run the plugin instead of the priority.
+			name = nodelabel.Name
+			if args.NodeLabelArgs == nil {
+				args.NodeLabelArgs = &nodelabel.Args{}
+			}
+			if policy.Argument.LabelPreference.Presence {
+				args.NodeLabelArgs.PresentLabelsPreference = append(args.NodeLabelArgs.PresentLabelsPreference, policy.Argument.LabelPreference.Label)
+			} else {
+				args.NodeLabelArgs.AbsentLabelsPreference = append(args.NodeLabelArgs.AbsentLabelsPreference, policy.Argument.LabelPreference.Label)
+			}
+			schedulerFactoryMutex.RLock()
+			weight := policy.Weight
+			if existing, ok := priorityFunctionMap[name]; ok {
+				// If there are n NodeLabel priority configured in the policy, the weight for the corresponding
+				// priority is n*(weight of each priority in policy).
+				weight += existing.Weight
+			}
 			pcf = &PriorityConfigFactory{
-				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
+				MapReduceFunction: func(_ PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 					return priorities.NewNodeLabelPriority(
-						policy.Argument.LabelPreference.Label,
-						policy.Argument.LabelPreference.Presence,
+						args.NodeLabelArgs.PresentLabelsPreference,
+						args.NodeLabelArgs.AbsentLabelsPreference,
 					)
 				},
-				Weight: policy.Weight,
+				Weight: weight,
 			}
+			schedulerFactoryMutex.RUnlock()
 		} else if policy.Argument.RequestedToCapacityRatioArguments != nil {
 			scoringFunctionShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
 			args.RequestedToCapacityRatioArgs = &requestedtocapacityratio.Args{
