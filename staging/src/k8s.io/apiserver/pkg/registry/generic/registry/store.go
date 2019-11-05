@@ -218,10 +218,12 @@ func NamespaceKeyRootFunc(ctx context.Context, prefix string) string {
 // a resource relative to the given prefix enforcing namespace rules. If the
 // context does not contain a namespace, it errors.
 func NamespaceKeyFunc(ctx context.Context, prefix string, name string) (string, error) {
-	key := NamespaceKeyRootFunc(ctx, prefix)
+	key := prefix
 	ns, ok := genericapirequest.NamespaceFrom(ctx)
 	if !ok || len(ns) == 0 {
 		return "", kubeerr.NewBadRequest("Namespace parameter required.")
+	} else if ok && len(ns) > 0 {
+		key = key + "/" + ns
 	}
 	if len(name) == 0 {
 		return "", kubeerr.NewBadRequest("Name parameter required.")
