@@ -174,6 +174,9 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 		if err != nil {
 			return err
 		}
+		if err := validation.ValidateKubeSchedulerConfiguration(cfg).ToAggregate(); err != nil {
+			return err
+		}
 
 		// use the loaded config file only, with the exception of --address and --port. This means that
 		// none of the deprecated flags in o.Deprecated are taken into consideration. This is the old
