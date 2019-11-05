@@ -30,14 +30,19 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
+var (
+	supportedScheduleActions = sets.NewString(string(v1.DoNotSchedule), string(v1.ScheduleAnyway))
+)
+
 // ValidateKubeSchedulerConfiguration ensures validation of the KubeSchedulerConfiguration struct
 func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, componentbasevalidation.ValidateClientConnectionConfiguration(&cc.ClientConnection, field.NewPath("clientConnection"))...)
-	allErrs = append(allErrs, ValidateKubeSchedulerLeaderElectionConfiguration(&cc.LeaderElection, field.NewPath("leaderElection"))...)
+	allErrs = append(allErrs, validateKubeSchedulerLeaderElectionConfiguration(&cc.LeaderElection, field.NewPath("leaderElection"))...)
 	if len(cc.SchedulerName) == 0 {
 		allErrs = append(allErrs, field.Required(field.NewPath("schedulerName"), ""))
 	}
+	allErrs = append(allErrs, validateTopologySpreadConstraints(cc.TopologySpreadConstraints, field.NewPath("topologySpreadConstraints"))...)
 	for _, msg := range validation.IsValidSocketAddr(cc.HealthzBindAddress) {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("healthzBindAddress"), cc.HealthzBindAddress, msg))
 	}
@@ -62,14 +67,53 @@ func ValidateKubeSchedulerConfiguration(cc *config.KubeSchedulerConfiguration) f
 	return allErrs
 }
 
-// ValidateKubeSchedulerLeaderElectionConfiguration ensures validation of the KubeSchedulerLeaderElectionConfiguration struct
-func ValidateKubeSchedulerLeaderElectionConfiguration(cc *config.KubeSchedulerLeaderElectionConfiguration, fldPath *field.Path) field.ErrorList {
+// validateKubeSchedulerLeaderElectionConfiguration ensures validation of the KubeSchedulerLeaderElectionConfiguration struct
+func validateKubeSchedulerLeaderElectionConfiguration(cc *config.KubeSchedulerLeaderElectionConfiguration, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if !cc.LeaderElectionConfiguration.LeaderElect {
 		return allErrs
 	}
 	allErrs = append(allErrs, componentbasevalidation.ValidateLeaderElectionConfiguration(&cc.LeaderElectionConfiguration, field.NewPath("leaderElectionConfiguration"))...)
 	return allErrs
+}
+
+func validateTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint, fldPath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	for i, c := range constraints {
+		p := fldPath.Index(i)
+		if c.MaxSkew <= 0 {
+			f := p.Child("maxSkew")
+			allErrs = append(allErrs, field.Invalid(f, c.MaxSkew, "must be greater than zero"))
+		}
+		if len(c.TopologyKey) == 0 {
+			f := p.Child("topologyKey")
+			allErrs = append(allErrs, field.Required(f, "can not be empty"))
+		}
+		if !supportedScheduleActions.Has(string(c.WhenUnsatisfiable)) {
+			f := p.Child("whenUnsatisfiable")
+			allErrs = append(allErrs, field.NotSupported(f, c.WhenUnsatisfiable, supportedScheduleActions.List()))
+		}
+		if c.LabelSelector != nil {
+			f := field.Forbidden(p.Child("labelSelector"), "cluster-level constraint must not define a selector")
+			allErrs = append(allErrs, f)
+		}
+		if err := validateSpreadConstraintNotRepeat(p.Child("{topologyKey, whenUnsatisfiable}"), c, constraints[i+1:]); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+	return allErrs
+}
+
+// validateSpreadConstraintNotRepeat tests that if `constraint` duplicates with `existingConstraintPairs`
+// on TopologyKey and WhenUnsatisfiable fields.
+func validateSpreadConstraintNotRepeat(fldPath *field.Path, constraint v1.TopologySpreadConstraint, restingConstraints []v1.TopologySpreadConstraint) *field.Error {
+	for _, restingConstraint := range restingConstraints {
+		if constraint.TopologyKey == restingConstraint.TopologyKey &&
+			constraint.WhenUnsatisfiable == restingConstraint.WhenUnsatisfiable {
+			return field.Duplicate(fldPath, fmt.Sprintf("{%v, %v}", constraint.TopologyKey, constraint.WhenUnsatisfiable))
+		}
+	}
+	return nil
 }
 
 // ValidatePolicy checks for errors in the Config

@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/diff"
@@ -36,6 +36,19 @@ import (
 	componentbaseconfig "k8s.io/component-base/config"
 	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
+
+var defaultTopologySpreadConstraints = []corev1.TopologySpreadConstraint{
+	{
+		MaxSkew:           1,
+		TopologyKey:       corev1.LabelHostname,
+		WhenUnsatisfiable: corev1.ScheduleAnyway,
+	},
+	{
+		MaxSkew:           1,
+		TopologyKey:       corev1.LabelZoneFailureDomain,
+		WhenUnsatisfiable: corev1.ScheduleAnyway,
+	},
+}
 
 func TestSchedulerOptions(t *testing.T) {
 	// temp dir
@@ -76,6 +89,10 @@ apiVersion: kubescheduler.config.k8s.io/v1alpha1
 kind: KubeSchedulerConfiguration
 clientConnection:
   kubeconfig: "%s"
+topologySpreadConstraints:
+- maxSkew: 1
+  topologyKey: example.com/rack
+  whenUnsatisfiable: ScheduleAnyway
 leaderElection:
   leaderElect: true`, configKubeconfig)), os.FileMode(0600)); err != nil {
 		t.Fatal(err)
@@ -258,8 +275,15 @@ pluginConfig:
 				SchedulerName:                  "default-scheduler",
 				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HardPodAffinitySymmetricWeight: 1,
-				HealthzBindAddress:             "0.0.0.0:10251",
-				MetricsBindAddress:             "0.0.0.0:10251",
+				TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+					{
+						MaxSkew:           1,
+						TopologyKey:       "example.com/rack",
+						WhenUnsatisfiable: "ScheduleAnyway",
+					},
+				},
+				HealthzBindAddress: "0.0.0.0:10251",
+				MetricsBindAddress: "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
 					EnableProfiling:           true,
 					EnableContentionProfiling: true,
@@ -345,6 +369,7 @@ pluginConfig:
 				SchedulerName:                  "default-scheduler",
 				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HardPodAffinitySymmetricWeight: 1,
+				TopologySpreadConstraints:      defaultTopologySpreadConstraints,
 				HealthzBindAddress:             "", // defaults empty when not running from config file
 				MetricsBindAddress:             "", // defaults empty when not running from config file
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -410,6 +435,7 @@ pluginConfig:
 				SchedulerName:                  "default-scheduler",
 				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HardPodAffinitySymmetricWeight: 1,
+				TopologySpreadConstraints:      defaultTopologySpreadConstraints,
 				HealthzBindAddress:             "", // defaults empty when not running from config file
 				MetricsBindAddress:             "", // defaults empty when not running from config file
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -450,6 +476,7 @@ pluginConfig:
 				SchedulerName:                  "default-scheduler",
 				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HardPodAffinitySymmetricWeight: 1,
+				TopologySpreadConstraints:      defaultTopologySpreadConstraints,
 				HealthzBindAddress:             "0.0.0.0:10251",
 				MetricsBindAddress:             "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -532,6 +559,7 @@ pluginConfig:
 				SchedulerName:                  "default-scheduler",
 				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HardPodAffinitySymmetricWeight: 1,
+				TopologySpreadConstraints:      defaultTopologySpreadConstraints,
 				HealthzBindAddress:             "0.0.0.0:10251",
 				MetricsBindAddress:             "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
@@ -575,6 +603,7 @@ pluginConfig:
 				SchedulerName:                  "default-scheduler",
 				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
 				HardPodAffinitySymmetricWeight: 1,
+				TopologySpreadConstraints:      defaultTopologySpreadConstraints,
 				HealthzBindAddress:             "0.0.0.0:10251",
 				MetricsBindAddress:             "0.0.0.0:10251",
 				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{

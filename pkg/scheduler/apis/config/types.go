@@ -19,6 +19,7 @@ package config
 import (
 	"math"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	componentbaseconfig "k8s.io/component-base/config"
@@ -54,6 +55,14 @@ type KubeSchedulerConfiguration struct {
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
 	HardPodAffinitySymmetricWeight int32
+
+	// TopologySpreadConstraints is the cluster-level configuration for
+	// topology-based spreading.
+	// Constraints are applied to pods that don't define any in their PodSpec.
+	// Label selectors must be empty, as they are deduced from the pods'
+	// membership in Services, Replication Controllers, Replica sets or Stateful
+	// sets.
+	TopologySpreadConstraints []corev1.TopologySpreadConstraint
 
 	// LeaderElection defines the configuration of leader election client.
 	LeaderElection KubeSchedulerLeaderElectionConfiguration

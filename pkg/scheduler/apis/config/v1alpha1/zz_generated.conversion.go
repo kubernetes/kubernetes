@@ -23,6 +23,7 @@ package v1alpha1
 import (
 	unsafe "unsafe"
 
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	conversion "k8s.io/apimachinery/pkg/conversion"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -151,6 +152,7 @@ func autoConvert_v1alpha1_KubeSchedulerConfiguration_To_config_KubeSchedulerConf
 	if err := v1.Convert_Pointer_int32_To_int32(&in.HardPodAffinitySymmetricWeight, &out.HardPodAffinitySymmetricWeight, s); err != nil {
 		return err
 	}
+	out.TopologySpreadConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
 	if err := Convert_v1alpha1_KubeSchedulerLeaderElectionConfiguration_To_config_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}
@@ -209,6 +211,7 @@ func autoConvert_config_KubeSchedulerConfiguration_To_v1alpha1_KubeSchedulerConf
 	if err := v1.Convert_int32_To_Pointer_int32(&in.HardPodAffinitySymmetricWeight, &out.HardPodAffinitySymmetricWeight, s); err != nil {
 		return err
 	}
+	out.TopologySpreadConstraints = *(*[]corev1.TopologySpreadConstraint)(unsafe.Pointer(&in.TopologySpreadConstraints))
 	if err := Convert_config_KubeSchedulerLeaderElectionConfiguration_To_v1alpha1_KubeSchedulerLeaderElectionConfiguration(&in.LeaderElection, &out.LeaderElection, s); err != nil {
 		return err
 	}

@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	componentbaseconfig "k8s.io/component-base/config"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
@@ -36,6 +37,18 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 		HealthzBindAddress:             "0.0.0.0:10254",
 		MetricsBindAddress:             "0.0.0.0:10254",
 		HardPodAffinitySymmetricWeight: 80,
+		TopologySpreadConstraints: []corev1.TopologySpreadConstraint{
+			{
+				MaxSkew:           1,
+				TopologyKey:       "node",
+				WhenUnsatisfiable: corev1.ScheduleAnyway,
+			},
+			{
+				MaxSkew:           5,
+				TopologyKey:       "zone",
+				WhenUnsatisfiable: corev1.DoNotSchedule,
+			},
+		},
 		ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
 			AcceptContentTypes: "application/json",
 			ContentType:        "application/json",
@@ -98,6 +111,11 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 	percentageOfNodesToScore101 := validConfig.DeepCopy()
 	percentageOfNodesToScore101.PercentageOfNodesToScore = int32(101)
 
+	selectorInTopologySpreadConstraint := validConfig.DeepCopy()
+	selectorInTopologySpreadConstraint.TopologySpreadConstraints[1].LabelSelector = &metav1.LabelSelector{
+		MatchLabels: map[string]string{"key": "value"},
+	}
+
 	scenarios := map[string]struct {
 		expectedToFail bool
 		config         *config.KubeSchedulerConfiguration
@@ -142,16 +160,22 @@ func TestValidateKubeSchedulerConfiguration(t *testing.T) {
 			expectedToFail: true,
 			config:         percentageOfNodesToScore101,
 		},
+		"selector-in-topology-spread-constraint": {
+			expectedToFail: true,
+			config:         selectorInTopologySpreadConstraint,
+		},
 	}
 
 	for name, scenario := range scenarios {
-		errs := ValidateKubeSchedulerConfiguration(scenario.config)
-		if len(errs) == 0 && scenario.expectedToFail {
-			t.Errorf("Unexpected success for scenario: %s", name)
-		}
-		if len(errs) > 0 && !scenario.expectedToFail {
-			t.Errorf("Unexpected failure for scenario: %s - %+v", name, errs)
-		}
+		t.Run(name, func(t *testing.T) {
+			errs := ValidateKubeSchedulerConfiguration(scenario.config)
+			if len(errs) == 0 && scenario.expectedToFail {
+				t.Error("Unexpected success")
+			}
+			if len(errs) > 0 && !scenario.expectedToFail {
+				t.Errorf("Unexpected failure: %+v", errs)
+			}
+		})
 	}
 }
 

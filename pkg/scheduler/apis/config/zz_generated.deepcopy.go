@@ -21,6 +21,7 @@ limitations under the License.
 package config
 
 import (
+	v1 "k8s.io/api/core/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -102,6 +103,13 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	in.AlgorithmSource.DeepCopyInto(&out.AlgorithmSource)
+	if in.TopologySpreadConstraints != nil {
+		in, out := &in.TopologySpreadConstraints, &out.TopologySpreadConstraints
+		*out = make([]v1.TopologySpreadConstraint, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
 	out.LeaderElection = in.LeaderElection
 	out.ClientConnection = in.ClientConnection
 	out.DebuggingConfiguration = in.DebuggingConfiguration
