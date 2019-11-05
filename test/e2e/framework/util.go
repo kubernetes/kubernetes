@@ -1379,16 +1379,6 @@ func AddOrUpdateLabelOnNode(c clientset.Interface, nodeName string, labelKey, la
 	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
 }
 
-// AddOrUpdateLabelOnNodeAndReturnOldValue adds the given label key and value to the given node or updates value and returns the old label value.
-func AddOrUpdateLabelOnNodeAndReturnOldValue(c clientset.Interface, nodeName string, labelKey, labelValue string) string {
-	var oldValue string
-	node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-	ExpectNoError(err)
-	oldValue = node.Labels[labelKey]
-	ExpectNoError(testutils.AddLabelsToNode(c, nodeName, map[string]string{labelKey: labelValue}))
-	return oldValue
-}
-
 // ExpectNodeHasLabel expects that the given node has the given label pair.
 func ExpectNodeHasLabel(c clientset.Interface, nodeName string, labelKey string, labelValue string) {
 	ginkgo.By("verifying the node has the label " + labelKey + " " + labelValue)
@@ -1449,67 +1439,6 @@ func NodeHasTaint(c clientset.Interface, nodeName string, taint *v1.Taint) (bool
 		return false, nil
 	}
 	return true, nil
-}
-
-// AddOrUpdateAvoidPodOnNode adds avoidPods annotations to node, will override if it exists
-func AddOrUpdateAvoidPodOnNode(c clientset.Interface, nodeName string, avoidPods v1.AvoidPods) {
-	err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
-		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-
-		taintsData, err := json.Marshal(avoidPods)
-		ExpectNoError(err)
-
-		if node.Annotations == nil {
-			node.Annotations = make(map[string]string)
-		}
-		node.Annotations[v1.PreferAvoidPodsAnnotationKey] = string(taintsData)
-		_, err = c.CoreV1().Nodes().Update(node)
-		if err != nil {
-			if !apierrs.IsConflict(err) {
-				ExpectNoError(err)
-			} else {
-				Logf("Conflict when trying to add/update avoidPods %v to %v with error %v", avoidPods, nodeName, err)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-	ExpectNoError(err)
-}
-
-// RemoveAvoidPodsOffNode removes AvoidPods annotations from the node. It does not fail if no such annotation exists.
-func RemoveAvoidPodsOffNode(c clientset.Interface, nodeName string) {
-	err := wait.PollImmediate(Poll, SingleCallTimeout, func() (bool, error) {
-		node, err := c.CoreV1().Nodes().Get(nodeName, metav1.GetOptions{})
-		if err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-
-		if node.Annotations == nil {
-			return true, nil
-		}
-		delete(node.Annotations, v1.PreferAvoidPodsAnnotationKey)
-		_, err = c.CoreV1().Nodes().Update(node)
-		if err != nil {
-			if !apierrs.IsConflict(err) {
-				ExpectNoError(err)
-			} else {
-				Logf("Conflict when trying to remove avoidPods to %v", nodeName)
-				return false, nil
-			}
-		}
-		return true, nil
-	})
-	ExpectNoError(err)
 }
 
 // ScaleResource scales resource to the given size.
@@ -1602,35 +1531,6 @@ func DeleteResourceAndWaitForGC(c clientset.Interface, kind schema.GroupKind, ns
 	return nil
 }
 
-type updateDSFunc func(*appsv1.DaemonSet)
-
-// UpdateDaemonSetWithRetries updates daemonsets with the given applyUpdate func
-// until it succeeds or a timeout expires.
-func UpdateDaemonSetWithRetries(c clientset.Interface, namespace, name string, applyUpdate updateDSFunc) (ds *appsv1.DaemonSet, err error) {
-	daemonsets := c.AppsV1().DaemonSets(namespace)
-	var updateErr error
-	pollErr := wait.PollImmediate(10*time.Millisecond, 1*time.Minute, func() (bool, error) {
-		if ds, err = daemonsets.Get(name, metav1.GetOptions{}); err != nil {
-			if testutils.IsRetryableAPIError(err) {
-				return false, nil
-			}
-			return false, err
-		}
-		// Apply the update, then attempt to push it to the apiserver.
-		applyUpdate(ds)
-		if ds, err = daemonsets.Update(ds); err == nil {
-			Logf("Updating DaemonSet %s", name)
-			return true, nil
-		}
-		updateErr = err
-		return false, nil
-	})
-	if pollErr == wait.ErrWaitTimeout {
-		pollErr = fmt.Errorf("couldn't apply the provided updated to DaemonSet %q: %v", name, updateErr)
-	}
-	return ds, pollErr
-}
-
 // RunHostCmd runs the given cmd in the context of the given pod using `kubectl exec`
 // inside of a shell.
 func RunHostCmd(ns, name, cmd string) (string, error) {
@@ -1705,61 +1605,6 @@ func AllNodesReady(c clientset.Interface, timeout time.Duration) error {
 			msg = fmt.Sprintf("%s, %s", msg, node.Name)
 		}
 		return fmt.Errorf("Not ready nodes: %#v", msg)
-	}
-	return nil
-}
-
-// ParseKVLines parses output that looks like lines containing "<key>: <val>"
-// and returns <val> if <key> is found. Otherwise, it returns the empty string.
-func ParseKVLines(output, key string) string {
-	delim := ":"
-	key = key + delim
-	for _, line := range strings.Split(output, "\n") {
-		pieces := strings.SplitAfterN(line, delim, 2)
-		if len(pieces) != 2 {
-			continue
-		}
-		k, v := pieces[0], pieces[1]
-		if k == key {
-			return strings.TrimSpace(v)
-		}
-	}
-	return ""
-}
-
-// RestartKubeProxy restarts kube-proxy on the given host.
-func RestartKubeProxy(host string) error {
-	// TODO: Make it work for all providers.
-	if !ProviderIs("gce", "gke", "aws") {
-		return fmt.Errorf("unsupported provider for RestartKubeProxy: %s", TestContext.Provider)
-	}
-	// kubelet will restart the kube-proxy since it's running in a static pod
-	Logf("Killing kube-proxy on node %v", host)
-	result, err := e2essh.SSH("sudo pkill kube-proxy", host, TestContext.Provider)
-	if err != nil || result.Code != 0 {
-		e2essh.LogResult(result)
-		return fmt.Errorf("couldn't restart kube-proxy: %v", err)
-	}
-	// wait for kube-proxy to come back up
-	sshCmd := "sudo /bin/sh -c 'pgrep kube-proxy | wc -l'"
-	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
-		Logf("Waiting for kubeproxy to come back up with %v on %v", sshCmd, host)
-		result, err := e2essh.SSH(sshCmd, host, TestContext.Provider)
-		if err != nil {
-			return false, err
-		}
-		if result.Code != 0 {
-			e2essh.LogResult(result)
-			return false, fmt.Errorf("failed to run command, exited %d", result.Code)
-		}
-		if result.Stdout == "0\n" {
-			return false, nil
-		}
-		Logf("kube-proxy is back up.")
-		return true, nil
-	})
-	if err != nil {
-		return fmt.Errorf("kube-proxy didn't recover: %v", err)
 	}
 	return nil
 }
@@ -1949,33 +1794,6 @@ func WaitForControllerManagerUp() error {
 		}
 	}
 	return fmt.Errorf("waiting for controller-manager timed out")
-}
-
-// CheckForControllerManagerHealthy checks that the controller manager does not crash within "duration"
-func CheckForControllerManagerHealthy(duration time.Duration) error {
-	var PID string
-	cmd := "pidof kube-controller-manager"
-	for start := time.Now(); time.Since(start) < duration; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
-		if err != nil {
-			// We don't necessarily know that it crashed, pipe could just be broken
-			e2essh.LogResult(result)
-			return fmt.Errorf("master unreachable after %v", time.Since(start))
-		} else if result.Code != 0 {
-			e2essh.LogResult(result)
-			return fmt.Errorf("SSH result code not 0. actually: %v after %v", result.Code, time.Since(start))
-		} else if result.Stdout != PID {
-			if PID == "" {
-				PID = result.Stdout
-			} else {
-				//its dead
-				return fmt.Errorf("controller manager crashed, old PID: %s, new PID: %s", PID, result.Stdout)
-			}
-		} else {
-			Logf("kube-controller-manager still healthy after %v", time.Since(start))
-		}
-	}
-	return nil
 }
 
 // GenerateMasterRegexp returns a regex for matching master node name.
@@ -2189,56 +2007,6 @@ func UnblockNetwork(from string, to string) {
 		Failf("Failed to remove the iptable REJECT rule. Manual intervention is "+
 			"required on host %s: remove rule %s, if exists", from, iptablesRule)
 	}
-}
-
-// CheckConnectivityToHost launches a pod to test connectivity to the specified
-// host. An error will be returned if the host is not reachable from the pod.
-//
-// An empty nodeName will use the schedule to choose where the pod is executed.
-func CheckConnectivityToHost(f *Framework, nodeName, podName, host string, port, timeout int) error {
-	contName := fmt.Sprintf("%s-container", podName)
-
-	command := []string{
-		"nc",
-		"-vz",
-		"-w", strconv.Itoa(timeout),
-		host,
-		strconv.Itoa(port),
-	}
-
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: podName,
-		},
-		Spec: v1.PodSpec{
-			Containers: []v1.Container{
-				{
-					Name:    contName,
-					Image:   AgnHostImage,
-					Command: command,
-				},
-			},
-			NodeName:      nodeName,
-			RestartPolicy: v1.RestartPolicyNever,
-		},
-	}
-	podClient := f.ClientSet.CoreV1().Pods(f.Namespace.Name)
-	_, err := podClient.Create(pod)
-	if err != nil {
-		return err
-	}
-	err = e2epod.WaitForPodSuccessInNamespace(f.ClientSet, podName, f.Namespace.Name)
-
-	if err != nil {
-		logs, logErr := e2epod.GetPodLogs(f.ClientSet, f.Namespace.Name, pod.Name, contName)
-		if logErr != nil {
-			Logf("Warning: Failed to get logs from pod %q: %v", pod.Name, logErr)
-		} else {
-			Logf("pod %s/%s logs:\n%s", f.Namespace.Name, pod.Name, logs)
-		}
-	}
-
-	return err
 }
 
 // CoreDump SSHs to the master and all nodes and dumps their logs into dir.
