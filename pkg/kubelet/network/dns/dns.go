@@ -160,7 +160,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 	f, err := os.Open(c.ResolverConfig)
 	if err != nil {
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
-		klog.V(4).Infof("CheckLimitsForResolvConf: " + err.Error())
+		klog.Warningf("CheckLimitsForResolvConf: " + err.Error())
 		return
 	}
 	defer f.Close()
@@ -168,7 +168,7 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 	_, hostSearch, _, err := parseResolvConf(f)
 	if err != nil {
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", err.Error())
-		klog.V(4).Infof("CheckLimitsForResolvConf: " + err.Error())
+		klog.Warningf("CheckLimitsForResolvConf: " + err.Error())
 		return
 	}
 
@@ -181,14 +181,14 @@ func (c *Configurer) CheckLimitsForResolvConf() {
 	if len(hostSearch) > domainCountLimit {
 		log := fmt.Sprintf("Resolv.conf file '%s' contains search line consisting of more than %d domains!", c.ResolverConfig, domainCountLimit)
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
-		klog.V(4).Infof("CheckLimitsForResolvConf: " + log)
+		klog.Warningf("CheckLimitsForResolvConf: " + log)
 		return
 	}
 
 	if len(strings.Join(hostSearch, " ")) > validation.MaxDNSSearchListChars {
 		log := fmt.Sprintf("Resolv.conf file '%s' contains search line which length is more than allowed %d chars!", c.ResolverConfig, validation.MaxDNSSearchListChars)
 		c.recorder.Event(c.nodeRef, v1.EventTypeWarning, "CheckLimitsForResolvConf", log)
-		klog.V(4).Infof("CheckLimitsForResolvConf: " + log)
+		klog.Warningf("CheckLimitsForResolvConf: " + log)
 		return
 	}
 }
