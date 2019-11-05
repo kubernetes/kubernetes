@@ -31,18 +31,22 @@ func (m *ManagerImpl) GetTopologyHints(pod v1.Pod, container v1.Container) map[s
 	// Garbage collect any stranded device resources before providing TopologyHints
 	m.updateAllocatedDevices(m.activePods())
 
+	// Loop through all device resources and generate TopologyHints for them..
 	deviceHints := make(map[string][]topologymanager.TopologyHint)
 	for resourceObj, requestedObj := range container.Resources.Limits {
 		resource := string(resourceObj)
 		requested := int(requestedObj.Value())
 
+		// Only consider resources associated with a device plugin.
 		if m.isDevicePluginResource(resource) {
+			// Only consider devices that actually container topology information.
 			if aligned := m.deviceHasTopologyAlignment(resource); !aligned {
 				klog.Infof("[devicemanager] Resource '%v' does not have a topology preference", resource)
 				deviceHints[resource] = nil
 				continue
 			}
 
+			// Get the list of available devices, for which TopologyHints should be generated.
 			available := m.getAvailableDevices(resource)
 			if available.Len() < requested {
 				klog.Errorf("[devicemanager] Unable to generate topology hints: requested number of devices unavailable for '%s': requested: %d, available: %d", resource, requested, available.Len())
@@ -50,6 +54,8 @@ func (m *ManagerImpl) GetTopologyHints(pod v1.Pod, container v1.Container) map[s
 				continue
 			}
 
+			// Generate TopologyHints for this resource given the current
+			// request size and the list of available devices.
 			deviceHints[resource] = m.generateDeviceTopologyHints(resource, available, requested)
 		}
 	}
