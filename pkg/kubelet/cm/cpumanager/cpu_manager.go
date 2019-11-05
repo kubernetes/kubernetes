@@ -158,7 +158,7 @@ func NewManager(cpuPolicyName string, reconcilePeriod time.Duration, machineInfo
 		return nil, fmt.Errorf("unknown policy: \"%s\"", cpuPolicyName)
 	}
 
-	stateImpl, err := state.NewCheckpointState(stateFileDirectory, cpuManagerStateFileName, policy.Name())
+	stateImpl, err := state.NewCheckpointState(stateFileDirectory, cpuManagerStateFileName, policy.Name(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize checkpoint manager: %v", err)
 	}
@@ -209,7 +209,7 @@ func (m *manager) AddContainer(p *v1.Pod, c *v1.Container, containerID string) e
 		m.Unlock()
 		return err
 	}
-	cpus := m.state.GetCPUSetOrDefault(containerID)
+	cpus := m.state.GetCPUSetOrDefault(string(p.UID), c.Name)
 	m.Unlock()
 
 	if !cpus.IsEmpty() {
@@ -238,11 +238,12 @@ func (m *manager) RemoveContainer(containerID string) error {
 		klog.Errorf("[cpumanager] RemoveContainer error: %v", err)
 		return err
 	}
+
 	return nil
 }
 
 func (m *manager) policyAddContainer(p *v1.Pod, c *v1.Container, containerID string) error {
-	err := m.policy.AddContainer(m.state, p, c, containerID)
+	err := m.policy.AddContainer(m.state, p, c)
 	if err == nil {
 		m.containerMap.Add(string(p.UID), c.Name, containerID)
 	}
@@ -250,7 +251,12 @@ func (m *manager) policyAddContainer(p *v1.Pod, c *v1.Container, containerID str
 }
 
 func (m *manager) policyRemoveContainerByID(containerID string) error {
-	err := m.policy.RemoveContainer(m.state, containerID)
+	podUID, containerName, err := m.containerMap.GetContainerRef(containerID)
+	if err != nil {
+		return nil
+	}
+
+	err = m.policy.RemoveContainer(m.state, podUID, containerName)
 	if err == nil {
 		m.containerMap.RemoveByContainerID(containerID)
 	}
@@ -259,14 +265,9 @@ func (m *manager) policyRemoveContainerByID(containerID string) error {
 }
 
 func (m *manager) policyRemoveContainerByRef(podUID string, containerName string) error {
-	containerID, err := m.containerMap.GetContainerID(podUID, containerName)
-	if err != nil {
-		return nil
-	}
-
-	err = m.policy.RemoveContainer(m.state, containerID)
+	err := m.policy.RemoveContainer(m.state, podUID, containerName)
 	if err == nil {
-		m.containerMap.RemoveByContainerID(containerID)
+		m.containerMap.RemoveByContainerRef(podUID, containerName)
 	}
 
 	return err
@@ -304,43 +305,35 @@ func (m *manager) removeStaleState() {
 	m.Lock()
 	defer m.Unlock()
 
-	// We remove stale state very conservatively, only removing *any* state
-	// once we know for sure that we wont be accidentally removing state that
-	// is still valid. Since this function is called periodically, we will just
-	// try again next time this function is called.
+	// Get the list of active pods.
 	activePods := m.activePods()
 	if len(activePods) == 0 {
 		// If there are no active pods, skip the removal of stale state.
+		// Since this function is called periodically, we will just try again
+		// next time this function is called.
 		return
 	}
 
-	// Build a list of containerIDs for all containers in all active Pods.
-	activeContainers := make(map[string]struct{})
+	// Build a list of (podUID, containerName) pairs for all containers in all active Pods.
+	activeContainers := make(map[string]map[string]struct{})
 	for _, pod := range activePods {
-		pstatus, ok := m.podStatusProvider.GetPodStatus(pod.UID)
-		if !ok {
-			// If even one pod does not have it's status set, skip state removal.
-			return
-		}
+		activeContainers[string(pod.UID)] = make(map[string]struct{})
 		for _, container := range append(pod.Spec.InitContainers, pod.Spec.Containers...) {
-			containerID, err := findContainerIDByName(&pstatus, container.Name)
-			if err != nil {
-				// If even one container does not have it's containerID set, skip state removal.
-				return
-			}
-			activeContainers[containerID] = struct{}{}
+			activeContainers[string(pod.UID)][container.Name] = struct{}{}
 		}
 	}
 
 	// Loop through the CPUManager state. Remove any state for containers not
-	// in the `activeContainers` list built above. The shortcircuits in place
-	// above ensure that no erroneous state will ever be removed.
-	for containerID := range m.state.GetCPUAssignments() {
-		if _, ok := activeContainers[containerID]; !ok {
-			klog.Errorf("[cpumanager] removeStaleState: removing container: %s)", containerID)
-			err := m.policy.RemoveContainer(m.state, containerID)
-			if err != nil {
-				klog.Errorf("[cpumanager] removeStaleState: failed to remove container %s, error: %v)", containerID, err)
+	// in the `activeContainers` list built above.
+	assignments := m.state.GetCPUAssignments()
+	for podUID := range assignments {
+		for containerName := range assignments[podUID] {
+			if _, ok := activeContainers[podUID][containerName]; !ok {
+				klog.Errorf("[cpumanager] removeStaleState: removing (pod %s, container: %s)", podUID, containerName)
+				err := m.policyRemoveContainerByRef(podUID, containerName)
+				if err != nil {
+					klog.Errorf("[cpumanager] removeStaleState: failed to remove (pod %s, container %s), error: %v)", podUID, containerName, err)
+				}
 			}
 		}
 	}
@@ -373,7 +366,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 			// - policy does not want to track the container
 			// - kubelet has just been restarted - and there is no previous state file
 			// - container has been removed from state by RemoveContainer call (DeletionTimestamp is set)
-			if _, ok := m.state.GetCPUSet(containerID); !ok {
+			if _, ok := m.state.GetCPUSet(string(pod.UID), container.Name); !ok {
 				if status.Phase == v1.PodRunning && pod.DeletionTimestamp == nil {
 					klog.V(4).Infof("[cpumanager] reconcileState: container is not present in state - trying to add (pod: %s, container: %s, container id: %s)", pod.Name, container.Name, containerID)
 					err := m.AddContainer(pod, &container, containerID)
@@ -389,7 +382,7 @@ func (m *manager) reconcileState() (success []reconciledContainer, failure []rec
 				}
 			}
 
-			cset := m.state.GetCPUSetOrDefault(containerID)
+			cset := m.state.GetCPUSetOrDefault(string(pod.UID), container.Name)
 			if cset.IsEmpty() {
 				// NOTE: This should not happen outside of tests.
 				klog.Infof("[cpumanager] reconcileState: skipping container; assigned cpuset is empty (pod: %s, container: %s)", pod.Name, container.Name)

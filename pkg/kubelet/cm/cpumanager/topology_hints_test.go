@@ -156,7 +156,9 @@ func TestGetTopologyHints(t *testing.T) {
 			pod:       *testPod1,
 			container: *testContainer1,
 			assignments: state.ContainerCPUAssignments{
-				"": cpuset.NewCPUSet(0, 6),
+				string(testPod1.UID): map[string]cpuset.CPUSet{
+					testContainer1.Name: cpuset.NewCPUSet(0, 6),
+				},
 			},
 			defaultCPUSet: cpuset.NewCPUSet(),
 			expectedHints: []topologymanager.TopologyHint{
@@ -175,7 +177,9 @@ func TestGetTopologyHints(t *testing.T) {
 			pod:       *testPod1,
 			container: *testContainer1,
 			assignments: state.ContainerCPUAssignments{
-				"": cpuset.NewCPUSet(3, 9),
+				string(testPod1.UID): map[string]cpuset.CPUSet{
+					testContainer1.Name: cpuset.NewCPUSet(3, 9),
+				},
 			},
 			defaultCPUSet: cpuset.NewCPUSet(),
 			expectedHints: []topologymanager.TopologyHint{
@@ -194,7 +198,9 @@ func TestGetTopologyHints(t *testing.T) {
 			pod:       *testPod4,
 			container: *testContainer4,
 			assignments: state.ContainerCPUAssignments{
-				"": cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+				string(testPod4.UID): map[string]cpuset.CPUSet{
+					testContainer4.Name: cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10),
+				},
 			},
 			defaultCPUSet: cpuset.NewCPUSet(),
 			expectedHints: []topologymanager.TopologyHint{
@@ -209,7 +215,9 @@ func TestGetTopologyHints(t *testing.T) {
 			pod:       *testPod1,
 			container: *testContainer1,
 			assignments: state.ContainerCPUAssignments{
-				"": cpuset.NewCPUSet(0, 6, 3, 9),
+				string(testPod1.UID): map[string]cpuset.CPUSet{
+					testContainer1.Name: cpuset.NewCPUSet(0, 6, 3, 9),
+				},
 			},
 			defaultCPUSet: cpuset.NewCPUSet(),
 			expectedHints: []topologymanager.TopologyHint{},
@@ -219,7 +227,9 @@ func TestGetTopologyHints(t *testing.T) {
 			pod:       *testPod4,
 			container: *testContainer4,
 			assignments: state.ContainerCPUAssignments{
-				"": cpuset.NewCPUSet(0, 6, 3, 9),
+				string(testPod4.UID): map[string]cpuset.CPUSet{
+					testContainer4.Name: cpuset.NewCPUSet(0, 6, 3, 9),
+				},
 			},
 			defaultCPUSet: cpuset.NewCPUSet(),
 			expectedHints: []topologymanager.TopologyHint{},
