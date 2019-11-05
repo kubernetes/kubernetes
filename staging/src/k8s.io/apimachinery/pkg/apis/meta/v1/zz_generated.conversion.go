@@ -120,6 +120,11 @@ func RegisterConversions(s *runtime.Scheme) error {
 	}); err != nil {
 		return err
 	}
+	if err := s.AddConversionFunc((*[]string)(nil), (**Time)(nil), func(a, b interface{}, scope conversion.Scope) error {
+		return Convert_Slice_string_To_Pointer_v1_Time(a.(*[]string), b.(**Time), scope)
+	}); err != nil {
+		return err
+	}
 	if err := s.AddConversionFunc((*[]string)(nil), (*[]int32)(nil), func(a, b interface{}, scope conversion.Scope) error {
 		return Convert_Slice_string_To_Slice_int32(a.(*[]string), b.(*[]int32), scope)
 	}); err != nil {
