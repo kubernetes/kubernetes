@@ -229,6 +229,8 @@ func (m *manager) State() state.Reader {
 }
 
 func (m *manager) GetTopologyHints(pod v1.Pod, container v1.Container) map[string][]topologymanager.TopologyHint {
+	// Garbage collect any stranded resources before providing TopologyHints
+	m.removeStaleState()
 	// Delegate to active policy
 	return m.policy.GetTopologyHints(m.state, pod, container)
 }
