@@ -123,22 +123,24 @@ func runCommand(cmd *cobra.Command, args []string, opts *options.Options, regist
 	}
 
 	if errs := opts.Validate(); len(errs) > 0 {
-		fmt.Fprintf(os.Stderr, "%v\n", utilerrors.NewAggregate(errs))
-		os.Exit(1)
+		return utilerrors.NewAggregate(errs)
 	}
 
 	if len(opts.WriteConfigTo) > 0 {
-		if err := options.WriteConfigFile(opts.WriteConfigTo, &opts.ComponentConfig); err != nil {
-			fmt.Fprintf(os.Stderr, "%v\n", err)
-			os.Exit(1)
+		c := &schedulerserverconfig.Config{}
+		if err := opts.ApplyTo(c); err != nil {
+			return err
+		}
+		if err := options.WriteConfigFile(opts.WriteConfigTo, &c.ComponentConfig); err != nil {
+			return err
 		}
 		klog.Infof("Wrote configuration to: %s\n", opts.WriteConfigTo)
+		return nil
 	}
 
 	c, err := opts.Config()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%v\n", err)
-		os.Exit(1)
+		return err
 	}
 
 	// Get the completed config
