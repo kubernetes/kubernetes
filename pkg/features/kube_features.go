@@ -199,6 +199,7 @@ const (
 	// owner: @screeley44
 	// alpha: v1.9
 	// beta: v1.13
+	// ga: v1.17
 	//
 	// Enable Block volume support in containers.
 	BlockVolume featuregate.Feature = "BlockVolume"
@@ -529,7 +530,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	NodeDisruptionExclusion:        {Default: false, PreRelease: featuregate.Alpha},
 	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.Beta},
 	CSINodeInfo:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
-	BlockVolume:                    {Default: true, PreRelease: featuregate.Beta},
+	BlockVolume:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
 	ResourceLimitsPriorityFunction: {Default: false, PreRelease: featuregate.Alpha},
 	SupportIPVSProxyMode:           {Default: true, PreRelease: featuregate.GA},
