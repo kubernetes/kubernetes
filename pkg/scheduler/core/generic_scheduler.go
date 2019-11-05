@@ -131,6 +131,10 @@ type ScheduleAlgorithm interface {
 	// Extenders returns a slice of extender config. This is exposed for
 	// testing.
 	Extenders() []algorithm.SchedulerExtender
+	// GetPredicateMetadataProducer returns the predicate metadata producer. This is needed
+	// for cluster autoscaler integration.
+	// TODO(ahg-g): remove this once CA migrates to creating a Framework instead of a full scheduler.
+	PredicateMetadataProducer() predicates.PredicateMetadataProducer
 }
 
 // ScheduleResult represents the result of one pod scheduled. It will contain
@@ -169,6 +173,13 @@ type genericScheduler struct {
 func (g *genericScheduler) snapshot() error {
 	// Used for all fit and priority funcs.
 	return g.cache.UpdateNodeInfoSnapshot(g.nodeInfoSnapshot)
+}
+
+// GetPredicateMetadataProducer returns the predicate metadata producer. This is needed
+// for cluster autoscaler integration.
+func (g *genericScheduler) PredicateMetadataProducer() predicates.PredicateMetadataProducer {
+	return g.predicateMetaProducer
+
 }
 
 // Schedule tries to schedule the given pod to one of the nodes in the node list.

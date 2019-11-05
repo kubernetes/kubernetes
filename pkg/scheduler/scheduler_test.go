@@ -152,6 +152,11 @@ type mockScheduler struct {
 	err    error
 }
 
+func (es mockScheduler) PredicateMetadataProducer() predicates.PredicateMetadataProducer {
+	return nil
+
+}
+
 func (es mockScheduler) Schedule(ctx context.Context, state *framework.CycleState, pod *v1.Pod) (core.ScheduleResult, error) {
 	return es.result, es.err
 }
