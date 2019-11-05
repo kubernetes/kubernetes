@@ -67,8 +67,9 @@ var _ = SIGDescribe("Pods Extended", func() {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "nginx",
-							Image: imageutils.GetE2EImage(imageutils.Nginx),
+							Name:  "agnhost",
+							Image: imageutils.GetE2EImage(imageutils.Agnhost),
+							Args:  []string{"pause"},
 						},
 					},
 				},
@@ -197,8 +198,9 @@ var _ = SIGDescribe("Pods Extended", func() {
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
-							Name:  "nginx",
-							Image: imageutils.GetE2EImage(imageutils.Nginx),
+							Name:  "agnhost",
+							Image: imageutils.GetE2EImage(imageutils.Agnhost),
+							Args:  []string{"pause"},
 							Resources: v1.ResourceRequirements{
 								Limits: v1.ResourceList{
 									v1.ResourceCPU:    resource.MustParse("100m"),
