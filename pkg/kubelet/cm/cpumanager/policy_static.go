@@ -243,7 +243,7 @@ func (p *staticPolicy) RemoveContainer(s state.State, containerID string) (rerr 
 	// remove containerID from the containerMap.
 	defer func() {
 		if rerr == nil {
-			p.containerMap.Remove(containerID)
+			p.containerMap.RemoveByContainerID(containerID)
 		}
 	}()
 

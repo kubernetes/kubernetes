@@ -39,9 +39,17 @@ func (cm ContainerMap) Add(podUID, containerName, containerID string) {
 	}{podUID, containerName}
 }
 
-// Remove removes a mapping of (containerID)->(*v1.Pod, *.v1.Container) from the ContainerMap
-func (cm ContainerMap) Remove(containerID string) {
+// RemoveByContainerID removes a mapping of (containerID)->(podUID, containerName) from the ContainerMap
+func (cm ContainerMap) RemoveByContainerID(containerID string) {
 	delete(cm, containerID)
+}
+
+// RemoveByContainerRef removes a mapping of (containerID)->(podUID, containerName) from the ContainerMap
+func (cm ContainerMap) RemoveByContainerRef(podUID, containerName string) {
+	containerID, err := cm.GetContainerID(podUID, containerName)
+	if err == nil {
+		cm.RemoveByContainerID(containerID)
+	}
 }
 
 // GetContainerID retrieves a ContainerID from the ContainerMap
