@@ -13,8 +13,8 @@ require (
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/google/go-cmp v0.3.0
 	github.com/google/gofuzz v1.0.0
+	github.com/google/uuid v1.1.1
 	github.com/googleapis/gnostic v0.0.0-20170729233727-0c5108395e2d
-	github.com/pborman/uuid v1.2.0
 	github.com/spf13/cobra v0.0.5
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.3.0

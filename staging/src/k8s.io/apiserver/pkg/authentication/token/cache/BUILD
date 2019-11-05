@@ -18,7 +18,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
-        "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/github.com/google/uuid:go_default_library",
     ],
 )
 

@@ -39,7 +39,7 @@ import (
 	"k8s.io/kubernetes/test/e2e_node/remote"
 	"k8s.io/kubernetes/test/e2e_node/system"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v0.beta"
 	"google.golang.org/api/option"
@@ -300,7 +300,7 @@ func main() {
 		}
 	}
 	if *instanceNamePrefix == "" {
-		*instanceNamePrefix = "tmp-node-e2e-" + uuid.NewUUID().String()[:8]
+		*instanceNamePrefix = "tmp-node-e2e-" + uuid.New().String()[:8]
 	}
 
 	// Setup coloring
@@ -785,7 +785,7 @@ func imageToInstanceName(imageConfig *internalGCEImage) string {
 	}
 	// For benchmark test, node name has the format 'machine-image-uuid' to run
 	// different machine types with the same image in parallel
-	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.NewUUID().String()[:8]
+	return imageConfig.machine + "-" + imageConfig.image + "-" + uuid.New().String()[:8]
 }
 
 func sourceImage(image, imageProject string) string {
