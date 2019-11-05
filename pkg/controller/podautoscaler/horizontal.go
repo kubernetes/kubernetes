@@ -61,6 +61,46 @@ type timestampedRecommendation struct {
 	timestamp      time.Time
 }
 
+type windowedMaxRecommendation struct {
+	inactiveLen int32
+	records     []timestampedRecommendation
+	window      time.Duration
+}
+
+func (a *windowedMaxRecommendation) setWindow(window time.Duration) {
+	a.window = window
+}
+
+func (a *windowedMaxRecommendation) append(recommendation int32) int32 {
+	cutoff, now := time.Now().Add(-a.window), time.Now()
+	n := int32(len(a.records))
+	for ; a.inactiveLen < n; a.inactiveLen++ {
+		if !a.records[a.inactiveLen].timestamp.Before(cutoff) {
+			break
+		}
+	}
+	newLen := n
+	for ; newLen > a.inactiveLen; newLen-- {
+		if a.records[newLen-1].recommendation > recommendation {
+			break
+		}
+	}
+	if newLen <= a.inactiveLen {
+		// current recommendation is higher than any active record, clear old records
+		newLen, a.inactiveLen = 0, 0
+	}
+	a.records = append(a.records[:newLen], timestampedRecommendation{recommendation, now})
+	newLen += 1
+	activeLen := newLen - a.inactiveLen
+	// amortize to remove inactive record only when inactive records count is bigger than active records count
+	if a.inactiveLen > activeLen {
+		copy(a.records[:activeLen], a.records[a.inactiveLen:newLen])
+		a.records = a.records[:activeLen]
+		a.inactiveLen = 0
+	}
+	return a.records[a.inactiveLen].recommendation
+}
+
 // HorizontalController is responsible for the synchronizing HPA objects stored
 // in the system with the actual deployments/replication controllers they
 // control.
@@ -88,7 +128,7 @@ type HorizontalController struct {
 	queue workqueue.RateLimitingInterface
 
 	// Latest unstabilized recommendations for each autoscaler.
-	recommendations map[string][]timestampedRecommendation
+	recommendations map[string]*windowedMaxRecommendation
 }
 
 // NewHorizontalController creates a new HorizontalController.
@@ -119,7 +159,7 @@ func NewHorizontalController(
 		downscaleStabilisationWindow: downscaleStabilisationWindow,
 		queue:                        workqueue.NewNamedRateLimitingQueue(NewDefaultHPARateLimiter(resyncPeriod), "horizontalpodautoscaler"),
 		mapper:                       mapper,
-		recommendations:              map[string][]timestampedRecommendation{},
+		recommendations:              map[string]*windowedMaxRecommendation{},
 	}
 
 	hpaInformer.Informer().AddEventHandlerWithResyncPeriod(
@@ -517,7 +557,10 @@ func (a *HorizontalController) computeStatusForExternalMetric(specReplicas, stat
 
 func (a *HorizontalController) recordInitialRecommendation(currentReplicas int32, key string) {
 	if a.recommendations[key] == nil {
-		a.recommendations[key] = []timestampedRecommendation{{currentReplicas, time.Now()}}
+		a.recommendations[key] = &windowedMaxRecommendation{
+			0, []timestampedRecommendation{{currentReplicas, time.Now()}}, a.downscaleStabilisationWindow,
+		}
+
 	}
 }
 
@@ -656,24 +699,7 @@ func (a *HorizontalController) reconcileAutoscaler(hpav1Shared *autoscalingv1.Ho
 // - replaces old recommendation with the newest recommendation,
 // - returns max of recommendations that are not older than downscaleStabilisationWindow.
 func (a *HorizontalController) stabilizeRecommendation(key string, prenormalizedDesiredReplicas int32) int32 {
-	maxRecommendation := prenormalizedDesiredReplicas
-	foundOldSample := false
-	oldSampleIndex := 0
-	cutoff := time.Now().Add(-a.downscaleStabilisationWindow)
-	for i, rec := range a.recommendations[key] {
-		if rec.timestamp.Before(cutoff) {
-			foundOldSample = true
-			oldSampleIndex = i
-		} else if rec.recommendation > maxRecommendation {
-			maxRecommendation = rec.recommendation
-		}
-	}
-	if foundOldSample {
-		a.recommendations[key][oldSampleIndex] = timestampedRecommendation{prenormalizedDesiredReplicas, time.Now()}
-	} else {
-		a.recommendations[key] = append(a.recommendations[key], timestampedRecommendation{prenormalizedDesiredReplicas, time.Now()})
-	}
-	return maxRecommendation
+	return a.recommendations[key].append(prenormalizedDesiredReplicas)
 }
 
 // normalizeDesiredReplicas takes the metrics desired replicas value and normalizes it based on the appropriate conditions (i.e. < maxReplicas, >
