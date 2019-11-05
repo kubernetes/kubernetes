@@ -72,6 +72,7 @@ func TestStaticPolicyStart(t *testing.T) {
 			numReservedCPUs: 1,
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.NewCPUSet(),
+			expErr:          fmt.Errorf("default cpuset cannot be empty"),
 			expCSet:         cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 		{
@@ -81,6 +82,7 @@ func TestStaticPolicyStart(t *testing.T) {
 			stAssignments:   state.ContainerCPUAssignments{},
 			stDefaultCPUSet: cpuset.NewCPUSet(0, 1),
 			expErr:          fmt.Errorf("not all reserved cpus: \"0,6\" are present in defaultCpuSet: \"0-1\""),
+			expCSet:         cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 		{
 			description: "assigned core 2 is still present in available cpuset",
@@ -92,6 +94,7 @@ func TestStaticPolicyStart(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 			expErr:          fmt.Errorf("pod: fakePod, container: 0 cpuset: \"0-2\" overlaps with default cpuset \"2-11\""),
+			expCSet:         cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 		{
 			description: "core 12 is not present in topology but is in state cpuset",
@@ -104,6 +107,7 @@ func TestStaticPolicyStart(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(5, 6, 7, 8, 9, 10, 11, 12),
 			expErr:          fmt.Errorf("current set of available CPUs \"0-11\" doesn't match with CPUs in state \"0-12\""),
+			expCSet:         cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 		{
 			description: "core 11 is present in topology but is not in state cpuset",
@@ -116,6 +120,7 @@ func TestStaticPolicyStart(t *testing.T) {
 			},
 			stDefaultCPUSet: cpuset.NewCPUSet(5, 6, 7, 8, 9, 10),
 			expErr:          fmt.Errorf("current set of available CPUs \"0-11\" doesn't match with CPUs in state \"0-10\""),
+			expCSet:         cpuset.NewCPUSet(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11),
 		},
 	}
 	for _, testCase := range testCases {
@@ -126,11 +131,14 @@ func TestStaticPolicyStart(t *testing.T) {
 				assignments:   testCase.stAssignments,
 				defaultCPUSet: testCase.stDefaultCPUSet,
 			}
-			err := policy.Start(st)
+
+			err := policy.validateState(st)
 			if !reflect.DeepEqual(err, testCase.expErr) {
-				t.Errorf("StaticPolicy Start() error (%v). expected error: %v but got: %v",
+				t.Errorf("StaticPolicy validateState() error (%v). expected error: %v but got: %v",
 					testCase.description, testCase.expErr, err)
 			}
+
+			err = policy.Start(st)
 			if err != nil {
 				return
 			}
