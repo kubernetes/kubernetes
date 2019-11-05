@@ -46,6 +46,21 @@ func (m *ManagerImpl) GetTopologyHints(pod v1.Pod, container v1.Container) map[s
 				continue
 			}
 
+			// Short circuit to regenerate the same hints if there are already
+			// devices allocated to the Container. This might happen after a
+			// kubelet restart, for example.
+			allocated := m.podDevices.containerDevices(string(pod.UID), container.Name, resource)
+			if allocated.Len() > 0 {
+				if allocated.Len() != requested {
+					klog.Errorf("[devicemanager] Resource '%v' already allocated to (pod %v, container %v) with different number than request: requested: %d, allocated: %d", resource, string(pod.UID), container.Name, requested, allocated.Len())
+					deviceHints[resource] = []topologymanager.TopologyHint{}
+					continue
+				}
+				klog.Infof("[devicemanager] Regenerating TopologyHints for resource '%v' already allocated to (pod %v, container %v)", resource, string(pod.UID), container.Name)
+				deviceHints[resource] = m.generateDeviceTopologyHints(resource, allocated, requested)
+				continue
+			}
+
 			// Get the list of available devices, for which TopologyHints should be generated.
 			available := m.getAvailableDevices(resource)
 			if available.Len() < requested {
