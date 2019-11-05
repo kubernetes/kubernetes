@@ -92,6 +92,18 @@ go_library(
     ],
 )
 
+go_test(
+    name = "go_default_test",
+    srcs = ["log_test.go"],
+    embed = [":go_default_library"],
+    deps = [
+        "//vendor/github.com/onsi/ginkgo:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/config:go_default_library",
+        "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
+        "//vendor/github.com/onsi/gomega:go_default_library",
+    ],
+)
+
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -144,16 +156,4 @@ filegroup(
     ],
     tags = ["automanaged"],
     visibility = ["//visibility:public"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["log_test.go"],
-    embed = [":go_default_library"],
-    deps = [
-        "//vendor/github.com/onsi/ginkgo:go_default_library",
-        "//vendor/github.com/onsi/ginkgo/config:go_default_library",
-        "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
-        "//vendor/github.com/onsi/gomega:go_default_library",
-    ],
 )
