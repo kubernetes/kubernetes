@@ -20,6 +20,7 @@ import (
 	"context"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"k8s.io/apiserver/pkg/storage/names"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
@@ -36,7 +37,7 @@ type podTemplateStrategy struct {
 
 // Strategy is the default logic that applies when creating and updating PodTemplate
 // objects via the REST API.
-var Strategy = podTemplateStrategy{legacyscheme.Scheme, names.SimpleNameGenerator}
+var Strategy = podTemplateStrategy{legacyscheme.Scheme, names.NewSimpleNameGenerator(utilvalidation.DNS1123SubdomainMaxLength)}
 
 // NamespaceScoped is true for pod templates.
 func (podTemplateStrategy) NamespaceScoped() bool {
