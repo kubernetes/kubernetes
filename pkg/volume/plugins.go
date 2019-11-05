@@ -32,6 +32,7 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
+	storagelistersv1 "k8s.io/client-go/listers/storage/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
@@ -350,7 +351,7 @@ type KubeletVolumeHost interface {
 // to access methods on the Attach Detach Controller.
 type AttachDetachVolumeHost interface {
 	// CSINodeLister returns the informer lister for the CSINode API Object
-	CSINodeLister() storagelisters.CSINodeLister
+	CSINodeLister() storagelistersv1.CSINodeLister
 
 	// CSIDriverLister returns the informer lister for the CSIDriver API Object
 	CSIDriverLister() storagelisters.CSIDriverLister

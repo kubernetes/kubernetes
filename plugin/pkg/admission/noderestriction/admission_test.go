@@ -315,8 +315,8 @@ func Test_nodePlugin_Admit(t *testing.T) {
 			},
 		}
 
-		csiNodeResource = storage.Resource("csinodes").WithVersion("v1beta1")
-		csiNodeKind     = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1beta1", Kind: "CSINode"}
+		csiNodeResource = storage.Resource("csinodes").WithVersion("v1")
+		csiNodeKind     = schema.GroupVersionKind{Group: "storage.k8s.io", Version: "v1", Kind: "CSINode"}
 		nodeInfo        = &storage.CSINode{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: "mynode",

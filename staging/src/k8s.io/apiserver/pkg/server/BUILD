@@ -40,6 +40,7 @@ go_test(
         "//vendor/github.com/go-openapi/spec:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/common:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 
@@ -120,6 +121,7 @@ go_library(
         "//vendor/k8s.io/kube-openapi/pkg/handler:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util:go_default_library",
         "//vendor/k8s.io/kube-openapi/pkg/util/proto:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 

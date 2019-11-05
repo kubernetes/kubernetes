@@ -475,7 +475,7 @@ func (dc *DeploymentController) processNextWorkItem() bool {
 }
 
 func (dc *DeploymentController) handleErr(err error, key interface{}) {
-	if err == nil {
+	if err == nil || errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
 		dc.queue.Forget(key)
 		return
 	}

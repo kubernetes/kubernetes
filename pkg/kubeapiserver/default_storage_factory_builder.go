@@ -26,7 +26,6 @@ import (
 	"k8s.io/apiserver/pkg/server/resourceconfig"
 	serverstorage "k8s.io/apiserver/pkg/server/storage"
 	"k8s.io/apiserver/pkg/storage/storagebackend"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	"k8s.io/kubernetes/pkg/apis/apps"
 	"k8s.io/kubernetes/pkg/apis/batch"
@@ -36,7 +35,6 @@ import (
 	"k8s.io/kubernetes/pkg/apis/networking"
 	"k8s.io/kubernetes/pkg/apis/policy"
 	apisstorage "k8s.io/kubernetes/pkg/apis/storage"
-	"k8s.io/kubernetes/pkg/features"
 )
 
 // SpecialDefaultResourcePrefixes are prefixes compiled into Kubernetes.
@@ -56,14 +54,9 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 	resources := []schema.GroupVersionResource{
 		batch.Resource("cronjobs").WithVersion("v1beta1"),
 		networking.Resource("ingresses").WithVersion("v1beta1"),
-	}
-	// add csinodes if CSINodeInfo feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSINodeInfo) {
-		resources = append(resources, apisstorage.Resource("csinodes").WithVersion("v1beta1"))
-	}
-	// add csidrivers if CSIDriverRegistry feature gate is enabled
-	if utilfeature.DefaultFeatureGate.Enabled(features.CSIDriverRegistry) {
-		resources = append(resources, apisstorage.Resource("csidrivers").WithVersion("v1beta1"))
+		// TODO #83513 csinodes override can be removed in 1.18
+		apisstorage.Resource("csinodes").WithVersion("v1beta1"),
+		apisstorage.Resource("csidrivers").WithVersion("v1beta1"),
 	}
 
 	return &StorageFactoryConfig{

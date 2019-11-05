@@ -25,7 +25,7 @@ import (
 	"github.com/onsi/ginkgo"
 
 	v1 "k8s.io/api/core/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -319,12 +319,12 @@ func getCSINodeLimits(cs clientset.Interface, nodeName string, driverInfo *Drive
 	// Wait in a loop, the driver might just have been installed and kubelet takes a while to publish everything.
 	var limit int
 	err := wait.PollImmediate(2*time.Second, csiNodeInfoTimeout, func() (bool, error) {
-		csiNode, err := cs.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
+		csiNode, err := cs.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil {
 			framework.Logf("%s", err)
 			return false, nil
 		}
-		var csiDriver *storagev1beta1.CSINodeDriver
+		var csiDriver *storagev1.CSINodeDriver
 		for _, c := range csiNode.Spec.Drivers {
 			if c.Name == driverInfo.Name {
 				csiDriver = &c

@@ -23,6 +23,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -150,6 +151,10 @@ func (r *reconciler) finalize(
 		addTriggerTimeAnnotation(endpointSlice, triggerTime)
 		_, err := r.client.DiscoveryV1alpha1().EndpointSlices(service.Namespace).Create(endpointSlice)
 		if err != nil {
+			// If the namespace is terminating, creates will continue to fail. Simply drop the item.
+			if errors.HasStatusCause(err, corev1.NamespaceTerminatingCause) {
+				return nil
+			}
 			errs = append(errs, fmt.Errorf("Error creating EndpointSlice for Service %s/%s: %v", service.Namespace, service.Name, err))
 		}
 	}
