@@ -31,7 +31,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/admission"
 	apiserveradmission "k8s.io/apiserver/pkg/admission/initializer"
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	corev1lister "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/featuregate"
@@ -63,7 +62,6 @@ func NewPlugin(nodeIdentifier nodeidentifier.NodeIdentifier) *Plugin {
 	return &Plugin{
 		Handler:        admission.NewHandler(admission.Create, admission.Update, admission.Delete),
 		nodeIdentifier: nodeIdentifier,
-		features:       utilfeature.DefaultFeatureGate,
 	}
 }
 
@@ -72,14 +70,24 @@ type Plugin struct {
 	*admission.Handler
 	nodeIdentifier nodeidentifier.NodeIdentifier
 	podsGetter     corev1lister.PodLister
-	// allows overriding for testing
-	features featuregate.FeatureGate
+
+	tokenRequestEnabled            bool
+	csiNodeInfoEnabled             bool
+	expandPersistentVolumesEnabled bool
 }
 
 var (
-	_ = admission.Interface(&Plugin{})
-	_ = apiserveradmission.WantsExternalKubeInformerFactory(&Plugin{})
+	_ admission.Interface                                 = &Plugin{}
+	_ apiserveradmission.WantsExternalKubeInformerFactory = &Plugin{}
+	_ apiserveradmission.WantsFeatures                    = &Plugin{}
 )
+
+// InspectFeatureGates allows setting bools without taking a dep on a global variable
+func (p *Plugin) InspectFeatureGates(featureGates featuregate.FeatureGate) {
+	p.tokenRequestEnabled = featureGates.Enabled(features.TokenRequest)
+	p.csiNodeInfoEnabled = featureGates.Enabled(features.CSINodeInfo)
+	p.expandPersistentVolumesEnabled = featureGates.Enabled(features.ExpandPersistentVolumes)
+}
 
 // SetExternalKubeInformerFactory registers an informer factory into Plugin
 func (p *Plugin) SetExternalKubeInformerFactory(f informers.SharedInformerFactory) {
@@ -145,7 +153,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		}
 
 	case svcacctResource:
-		if p.features.Enabled(features.TokenRequest) {
+		if p.tokenRequestEnabled {
 			return p.admitServiceAccount(nodeName, a)
 		}
 		return nil
@@ -154,7 +162,7 @@ func (p *Plugin) Admit(ctx context.Context, a admission.Attributes, o admission.
 		return p.admitLease(nodeName, a)
 
 	case csiNodeResource:
-		if p.features.Enabled(features.CSINodeInfo) {
+		if p.csiNodeInfoEnabled {
 			return p.admitCSINode(nodeName, a)
 		}
 		return admission.NewForbidden(a, fmt.Errorf("disabled by feature gates %s", features.CSINodeInfo))
@@ -294,7 +302,7 @@ func (p *Plugin) admitPodEviction(nodeName string, a admission.Attributes) error
 func (p *Plugin) admitPVCStatus(nodeName string, a admission.Attributes) error {
 	switch a.GetOperation() {
 	case admission.Update:
-		if !p.features.Enabled(features.ExpandPersistentVolumes) {
+		if !p.expandPersistentVolumesEnabled {
 			return admission.NewForbidden(a, fmt.Errorf("node %q is not allowed to update persistentvolumeclaim metadata", nodeName))
 		}
 
