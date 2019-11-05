@@ -29,6 +29,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -43,6 +44,7 @@ const (
 	preFilterWithExtensionsPluginName = "prefilter-with-extensions-plugin"
 	duplicatePluginName               = "duplicate-plugin"
 	testPlugin                        = "test-plugin"
+	permitPlugin                      = "permit-plugin"
 )
 
 // TestScoreWithNormalizePlugin implements ScoreWithNormalizePlugin interface.
@@ -247,6 +249,18 @@ var _ PreFilterPlugin = &TestDuplicatePlugin{}
 
 func newDuplicatePlugin(_ *runtime.Unknown, _ FrameworkHandle) (Plugin, error) {
 	return &TestDuplicatePlugin{}, nil
+}
+
+// TestPermitPlugin only implements PermitPlugin interface.
+type TestPermitPlugin struct {
+	PreFilterCalled int
+}
+
+func (pp *TestPermitPlugin) Name() string {
+	return permitPlugin
+}
+func (pp *TestPermitPlugin) Permit(ctx context.Context, state *CycleState, p *v1.Pod, nodeName string) (*Status, time.Duration) {
+	return NewStatus(Wait, ""), time.Duration(10 * time.Second)
 }
 
 var registry Registry = func() Registry {
@@ -770,6 +784,44 @@ func TestPermitWaitingMetric(t *testing.T) {
 
 			collectAndComparePermitWaitDuration(t, tt.wantRes)
 		})
+	}
+}
+
+func TestRejectWaitingPod(t *testing.T) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "pod",
+			UID:  types.UID("pod"),
+		},
+	}
+
+	testPermitPlugin := &TestPermitPlugin{}
+	r := make(Registry)
+	r.Register(permitPlugin,
+		func(_ *runtime.Unknown, fh FrameworkHandle) (Plugin, error) {
+			return testPermitPlugin, nil
+		})
+	plugins := &config.Plugins{
+		Permit: &config.PluginSet{Enabled: []config.Plugin{{Name: permitPlugin, Weight: 1}}},
+	}
+
+	f, err := NewFramework(r, plugins, emptyArgs)
+	if err != nil {
+		t.Fatalf("Failed to create framework for testing: %v", err)
+	}
+
+	go func() {
+		for {
+			waitingPod := f.GetWaitingPod(pod.UID)
+			if waitingPod != nil {
+				break
+			}
+		}
+		f.RejectWaitingPod(pod.UID)
+	}()
+	permitStatus := f.RunPermitPlugins(context.Background(), nil, pod, "")
+	if permitStatus.message != "pod \"pod\" rejected while waiting at permit: removed" {
+		t.Fatalf("RejectWaitingPod failed, permitStatus: %v", permitStatus)
 	}
 }
 
