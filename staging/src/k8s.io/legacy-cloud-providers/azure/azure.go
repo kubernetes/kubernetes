@@ -32,8 +32,10 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 
 	v1 "k8s.io/api/core/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
+	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	"k8s.io/client-go/informers"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -202,6 +204,8 @@ type Cloud struct {
 	metadata                *InstanceMetadataService
 	vmSet                   VMSet
 
+	// ipv6DualStack allows overriding for unit testing.  It's normally initialized from featuregates
+	ipv6DualStackEnabled bool
 	// Lock for access to node caches, includes nodeZones, nodeResourceGroups, and unmanagedNodes.
 	nodeCachesLock sync.Mutex
 	// nodeZones is a mapping from Zone to a sets.String of Node's names in the Zone
@@ -271,6 +275,19 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		unmanagedNodes:     sets.NewString(),
 		routeCIDRs:         map[string]string{},
 	}
+	func() {
+		// this allows the code ot launch without featuregates defined.  It is currently required for unit tests where the
+		// featuregates are not registered.  This is effectively coding by side effect and an explicit register should
+		// be eventually created instead.
+		defer func() {
+			if r := recover(); r != nil {
+				utilruntime.HandleError(fmt.Errorf("%v", r))
+			}
+		}()
+
+		az.ipv6DualStackEnabled = utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack)
+	}()
+
 	err = az.InitializeCloudFromConfig(config, false)
 	if err != nil {
 		return nil, err
