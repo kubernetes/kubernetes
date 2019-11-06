@@ -695,18 +695,6 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 		metrics.SchedulerGoroutines.WithLabelValues("binding").Inc()
 		defer metrics.SchedulerGoroutines.WithLabelValues("binding").Dec()
 
-		// Bind volumes first before Pod
-		if !allBound {
-			err := sched.bindVolumes(assumedPod)
-			if err != nil {
-				sched.recordSchedulingFailure(assumedPodInfo, err, "VolumeBindingFailed", err.Error())
-				metrics.PodScheduleErrors.Inc()
-				// trigger un-reserve plugins to clean up state associated with the reserved Pod
-				fwk.RunUnreservePlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
-				return
-			}
-		}
-
 		// Run "permit" plugins.
 		permitStatus := fwk.RunPermitPlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 		if !permitStatus.IsSuccess() {
@@ -725,6 +713,18 @@ func (sched *Scheduler) scheduleOne(ctx context.Context) {
 			fwk.RunUnreservePlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
 			sched.recordSchedulingFailure(assumedPodInfo, permitStatus.AsError(), reason, permitStatus.Message())
 			return
+		}
+
+		// Bind volumes first before Pod
+		if !allBound {
+			err := sched.bindVolumes(assumedPod)
+			if err != nil {
+				sched.recordSchedulingFailure(assumedPodInfo, err, "VolumeBindingFailed", err.Error())
+				metrics.PodScheduleErrors.Inc()
+				// trigger un-reserve plugins to clean up state associated with the reserved Pod
+				fwk.RunUnreservePlugins(bindingCycleCtx, state, assumedPod, scheduleResult.SuggestedHost)
+				return
+			}
 		}
 
 		// Run "prebind" plugins.
