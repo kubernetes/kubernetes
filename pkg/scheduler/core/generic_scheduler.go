@@ -179,7 +179,6 @@ func (g *genericScheduler) snapshot() error {
 // for cluster autoscaler integration.
 func (g *genericScheduler) PredicateMetadataProducer() predicates.PredicateMetadataProducer {
 	return g.predicateMetaProducer
-
 }
 
 // Schedule tries to schedule the given pod to one of the nodes in the node list.

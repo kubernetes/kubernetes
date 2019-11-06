@@ -38,6 +38,8 @@ type PodLister interface {
 type NodeInfoLister interface {
 	// Returns the list of NodeInfos.
 	List() ([]*schedulernodeinfo.NodeInfo, error)
+	// Returns the list of NodeInfos of nodes with pods with affinity terms.
+	HavePodsWithAffinityList() ([]*schedulernodeinfo.NodeInfo, error)
 	// Returns the NodeInfo of the given node name.
 	Get(nodeName string) (*schedulernodeinfo.NodeInfo, error)
 }
