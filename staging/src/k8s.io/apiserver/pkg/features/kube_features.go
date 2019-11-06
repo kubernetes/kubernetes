@@ -140,6 +140,12 @@ const (
 	//
 	// Deprecates and removes SelfLink from ObjectMeta and ListMeta.
 	RemoveSelfLink featuregate.Feature = "RemoveSelfLink"
+
+	// owner: @shaloulcy
+	// alpha: v1.17
+	//
+	// Allow index labels and fields in apiserver, so that list operations get accelerated.
+	SelectorIndex featuregate.Feature = "SelectorIndex"
 )
 
 func init() {
@@ -165,4 +171,5 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	WatchBookmark:           {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	RequestManagement:       {Default: false, PreRelease: featuregate.Alpha},
 	RemoveSelfLink:          {Default: false, PreRelease: featuregate.Alpha},
+	SelectorIndex:           {Default: false, PreRelease: featuregate.Alpha},
 }

@@ -96,6 +96,10 @@ type Config struct {
 	// GetAttrsFunc is used to get object labels, fields
 	GetAttrsFunc func(runtime.Object) (label labels.Set, field fields.Set, err error)
 
+	// Indexers is used to accelerate the list operations, go back to normal list
+	// operation if there are not indexes found.
+	Indexers *cache.Indexers
+
 	// IndexerFuncs is used for optimizing amount of watchers that
 	// needs to process an incoming event.
 	IndexerFuncs storage.IndexerFuncs
@@ -265,6 +269,10 @@ type Cacher struct {
 	// newFunc is a function that creates new empty object storing a object of type Type.
 	newFunc func() runtime.Object
 
+	// Indexers is used to accelerate the list operations, go back to normal list
+	// operation if there are not indexes found.
+	Indexers *cache.Indexers
+
 	// indexedTrigger is used for optimizing amount of watchers that needs to process
 	// an incoming event.
 	indexedTrigger *indexedTriggerFunc
@@ -367,7 +375,7 @@ func NewCacherFromConfig(config Config) (*Cacher, error) {
 	}
 
 	watchCache := newWatchCache(
-		config.CacheCapacity, config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner)
+		config.CacheCapacity, config.KeyFunc, cacher.processEvent, config.GetAttrsFunc, config.Versioner, config.Indexers)
 	listerWatcher := NewCacherListerWatcher(config.Storage, config.ResourcePrefix, config.NewListFunc)
 	reflectorName := "storage/cacher.go:" + config.ResourcePrefix
 
@@ -701,7 +709,7 @@ func (c *Cacher) List(ctx context.Context, key string, resourceVersion string, p
 	}
 	filter := filterWithAttrsFunction(key, pred)
 
-	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndList(listRV, trace)
+	objs, readResourceVersion, err := c.watchCache.WaitUntilFreshAndListWithIndex(listRV, pred.MatcherIndex(), trace)
 	if err != nil {
 		return err
 	}

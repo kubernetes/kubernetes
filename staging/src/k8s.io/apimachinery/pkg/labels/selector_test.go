@@ -630,3 +630,78 @@ func BenchmarkSelectorFromValidatedSet(b *testing.B) {
 		}
 	}
 }
+
+func TestRequiresExactMatch(t *testing.T) {
+	testCases := []struct {
+		name  string
+		sel   Selector
+		label string
+		found bool
+		value string
+	}{
+		{
+			"keyInOperatorExactMatch",
+			internalSelector{Requirement{"key", selection.In, []string{"value"}}},
+			"key",
+			true,
+			"value",
+		},
+		{
+			"keyInOperatorNotExactMatch",
+			internalSelector{Requirement{"key", selection.In, []string{"value", "value2"}}},
+			"key",
+			false,
+			"",
+		},
+		{
+			"keyInOperatorNotExactMatch",
+			internalSelector{
+				Requirement{"key", selection.In, []string{"value", "value1"}},
+				Requirement{"key2", selection.In, []string{"value2"}},
+			},
+			"key2",
+			true,
+			"value2",
+		},
+		{
+			"keyEqualOperatorExactMatch",
+			internalSelector{Requirement{"key", selection.Equals, []string{"value"}}},
+			"key",
+			true,
+			"value",
+		},
+		{
+			"keyDoubleEqualOperatorExactMatch",
+			internalSelector{Requirement{"key", selection.DoubleEquals, []string{"value"}}},
+			"key",
+			true,
+			"value",
+		},
+		{
+			"keyNotEqualOperatorExactMatch",
+			internalSelector{Requirement{"key", selection.NotEquals, []string{"value"}}},
+			"key",
+			false,
+			"",
+		},
+		{
+			"keyEqualOperatorExactMatchFirst",
+			internalSelector{
+				Requirement{"key", selection.In, []string{"value"}},
+				Requirement{"key2", selection.In, []string{"value2"}},
+			},
+			"key",
+			true,
+			"value",
+		},
+	}
+	for _, ts := range testCases {
+		value, found := ts.sel.RequiresExactMatch(ts.label)
+		if found != ts.found {
+			t.Errorf("%s - Expected match %v found %v", ts.name, ts.found, found)
+		}
+		if found && value != ts.value {
+			t.Errorf("%s - Expected value %v found %v", ts.name, ts.value, value)
+		}
+	}
+}

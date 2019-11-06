@@ -39,17 +39,19 @@ import (
 )
 
 func makeTestPod(name string, resourceVersion uint64) *v1.Pod {
+	return makeTestPodDetails(name, resourceVersion, "some-node", map[string]string{"k8s-app": "my-app"})
+}
+
+func makeTestPodDetails(name string, resourceVersion uint64, node string, labels map[string]string) *v1.Pod {
 	return &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:       "ns",
 			Name:            name,
 			ResourceVersion: strconv.FormatUint(resourceVersion, 10),
-			Labels: map[string]string{
-				"k8s-app": "my-app",
-			},
+			Labels:          labels,
 		},
 		Spec: v1.PodSpec{
-			NodeName: "some-node",
+			NodeName: node,
 		},
 	}
 }
@@ -64,7 +66,7 @@ func makeTestStoreElement(pod *v1.Pod) *storeElement {
 }
 
 // newTestWatchCache just adds a fake clock.
-func newTestWatchCache(capacity int) *watchCache {
+func newTestWatchCache(capacity int, indexers *cache.Indexers) *watchCache {
 	keyFunc := func(obj runtime.Object) (string, error) {
 		return storage.NamespaceKeyFunc("prefix", obj)
 	}
@@ -77,13 +79,13 @@ func newTestWatchCache(capacity int) *watchCache {
 	}
 	versioner := etcd3.APIObjectVersioner{}
 	mockHandler := func(*watchCacheEvent) {}
-	wc := newWatchCache(capacity, keyFunc, mockHandler, getAttrsFunc, versioner)
+	wc := newWatchCache(capacity, keyFunc, mockHandler, getAttrsFunc, versioner, indexers)
 	wc.clock = clock.NewFakeClock(time.Now())
 	return wc
 }
 
 func TestWatchCacheBasic(t *testing.T) {
-	store := newTestWatchCache(2)
+	store := newTestWatchCache(2, &cache.Indexers{})
 
 	// Test Add/Update/Delete.
 	pod1 := makeTestPod("pod", 1)
@@ -160,7 +162,7 @@ func TestWatchCacheBasic(t *testing.T) {
 }
 
 func TestEvents(t *testing.T) {
-	store := newTestWatchCache(5)
+	store := newTestWatchCache(5, &cache.Indexers{})
 
 	store.Add(makeTestPod("pod", 3))
 
@@ -280,7 +282,7 @@ func TestEvents(t *testing.T) {
 }
 
 func TestMarker(t *testing.T) {
-	store := newTestWatchCache(3)
+	store := newTestWatchCache(3, &cache.Indexers{})
 
 	// First thing that is called when propagated from storage is Replace.
 	store.Replace([]interface{}{
@@ -315,7 +317,7 @@ func TestMarker(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndList(t *testing.T) {
-	store := newTestWatchCache(3)
+	store := newTestWatchCache(3, &cache.Indexers{})
 
 	// In background, update the store.
 	go func() {
@@ -336,7 +338,7 @@ func TestWaitUntilFreshAndList(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndGet(t *testing.T) {
-	store := newTestWatchCache(3)
+	store := newTestWatchCache(3, &cache.Indexers{})
 
 	// In background, update the store.
 	go func() {
@@ -361,7 +363,7 @@ func TestWaitUntilFreshAndGet(t *testing.T) {
 }
 
 func TestWaitUntilFreshAndListTimeout(t *testing.T) {
-	store := newTestWatchCache(3)
+	store := newTestWatchCache(3, &cache.Indexers{})
 	fc := store.clock.(*clock.FakeClock)
 
 	// In background, step clock after the below call starts the timer.
@@ -387,6 +389,84 @@ func TestWaitUntilFreshAndListTimeout(t *testing.T) {
 	}
 }
 
+// podLabelIndexFunc returns the label value of given object.
+func podLabelIndexFunc(key string) cache.IndexFunc {
+	return func(obj interface{}) ([]string, error) {
+		pod, ok := obj.(*v1.Pod)
+		if !ok {
+			return nil, fmt.Errorf("not a pod %#v", obj)
+		}
+		if value, ok := pod.Labels[key]; ok {
+			return []string{value}, nil
+		}
+		return nil, nil
+	}
+}
+
+// nodeNameIndexFunc returns value spec.nodename of given object.
+func nodeNameIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*v1.Pod)
+	if !ok {
+		return nil, fmt.Errorf("not a pod")
+	}
+	return []string{pod.Spec.NodeName}, nil
+}
+
+func TestWaitUntilFreshAndListWithIndex(t *testing.T) {
+	store := newTestWatchCache(3, &cache.Indexers{
+		"label":         podLabelIndexFunc("label"),
+		"spec.nodeName": nodeNameIndexFunc,
+	})
+
+	// In background, update the store.
+	go func() {
+		store.Add(makeTestPodDetails("pod1", 2, "node1", map[string]string{"label": "value1"}))
+		store.Add(makeTestPodDetails("pod2", 3, "node1", map[string]string{"label": "value1"}))
+		store.Add(makeTestPodDetails("pod3", 5, "node2", map[string]string{"label": "value2"}))
+	}()
+
+	matchValues := []storage.MatchValue{
+		{IndexName: "label", Value: "value1"},
+		{IndexName: "spec.nodeName", Value: "node2"},
+	}
+	list, resourceVersion, err := store.WaitUntilFreshAndListWithIndex(5, matchValues, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resourceVersion != 5 {
+		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
+	}
+	if len(list) != 2 {
+		t.Errorf("unexpected list returned: %#v", list)
+	}
+
+	matchValues = []storage.MatchValue{
+		{IndexName: "not-exist-label", Value: "whatever"},
+		{IndexName: "spec.nodeName", Value: "node2"},
+	}
+	list, resourceVersion, err = store.WaitUntilFreshAndListWithIndex(5, matchValues, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resourceVersion != 5 {
+		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
+	}
+	if len(list) != 1 {
+		t.Errorf("unexpected list returned: %#v", list)
+	}
+	// list with index not exists
+	matchValues = []storage.MatchValue{
+		{IndexName: "not-exist-label", Value: "whatever"},
+	}
+	list, resourceVersion, err = store.WaitUntilFreshAndListWithIndex(5, matchValues, nil)
+	if resourceVersion != 5 {
+		t.Errorf("unexpected resourceVersion: %v, expected: 5", resourceVersion)
+	}
+	if len(list) != 3 {
+		t.Errorf("unexpected list returned: %#v", list)
+	}
+}
+
 type testLW struct {
 	ListFunc  func(options metav1.ListOptions) (runtime.Object, error)
 	WatchFunc func(options metav1.ListOptions) (watch.Interface, error)
@@ -400,7 +480,7 @@ func (t *testLW) Watch(options metav1.ListOptions) (watch.Interface, error) {
 }
 
 func TestReflectorForWatchCache(t *testing.T) {
-	store := newTestWatchCache(5)
+	store := newTestWatchCache(5, &cache.Indexers{})
 
 	{
 		_, version, err := store.WaitUntilFreshAndList(0, nil)

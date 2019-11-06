@@ -34,10 +34,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/validation/field"
+	genericfeatures "k8s.io/apiserver/pkg/features"
 	"k8s.io/apiserver/pkg/registry/generic"
 	"k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	podutil "k8s.io/kubernetes/pkg/api/pod"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -203,6 +205,39 @@ func MatchPod(label labels.Selector, field fields.Selector) storage.SelectionPre
 		GetAttrs:    GetAttrs,
 		IndexFields: []string{"spec.nodeName"},
 	}
+}
+
+// NodeNameIndexFunc returns value spec.nodename of given object.
+func NodeNameIndexFunc(obj interface{}) ([]string, error) {
+	pod, ok := obj.(*api.Pod)
+	if !ok {
+		return nil, fmt.Errorf("not a pod")
+	}
+	return []string{pod.Spec.NodeName}, nil
+}
+
+// PodLabelIndexFunc returns the label value of given object.
+func PodLabelIndexFunc(key string) cache.IndexFunc {
+	return func(obj interface{}) ([]string, error) {
+		pod, ok := obj.(*api.Pod)
+		if !ok {
+			return nil, fmt.Errorf("not a pod %#v", obj)
+		}
+		if value, ok := pod.Labels[key]; ok {
+			return []string{value}, nil
+		}
+		return nil, nil
+	}
+}
+
+// PodIndexers return the pod indexers.
+func PodIndexers() *cache.Indexers {
+	if utilfeature.DefaultFeatureGate.Enabled(genericfeatures.SelectorIndex) {
+		return &cache.Indexers{
+			"spec.nodeName": NodeNameIndexFunc,
+		}
+	}
+	return nil
 }
 
 // NodeNameTriggerFunc returns value spec.nodename of given object.

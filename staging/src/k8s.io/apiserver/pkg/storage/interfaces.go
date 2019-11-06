@@ -87,6 +87,12 @@ var Everything = SelectionPredicate{
 	Field: fields.Everything(),
 }
 
+// MatchValue defines a pair (<index name>, <value for that index>).
+type MatchValue struct {
+	IndexName string
+	Value     string
+}
+
 // Pass an UpdateFunc to Interface.GuaranteedUpdate to make an update
 // that is guaranteed to succeed.
 // See the comment for GuaranteedUpdate for more details.
