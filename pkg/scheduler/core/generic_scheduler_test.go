@@ -292,11 +292,10 @@ func TestGenericScheduler(t *testing.T) {
 		wErr                          error
 	}{
 		{
-			predicates:   map[string]algorithmpredicates.FitPredicate{"false": falsePredicate},
-			prioritizers: []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
-			nodes:        []string{"machine1", "machine2"},
-			pod:          &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
-			name:         "test 1",
+			predicates: map[string]algorithmpredicates.FitPredicate{"false": falsePredicate},
+			nodes:      []string{"machine1", "machine2"},
+			pod:        &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
+			name:       "test 1",
 			wErr: &FitError{
 				Pod:         &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
 				NumAllNodes: 2,
@@ -309,7 +308,6 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			predicates:    map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
-			prioritizers:  []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:         []string{"machine1", "machine2"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")}},
 			expectedHosts: sets.NewString("machine1", "machine2"),
@@ -319,7 +317,6 @@ func TestGenericScheduler(t *testing.T) {
 		{
 			// Fits on a machine where the pod ID matches the machine name
 			predicates:    map[string]algorithmpredicates.FitPredicate{"matches": matchesPredicate},
-			prioritizers:  []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes:         []string{"machine1", "machine2"},
 			pod:           &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "machine2", UID: types.UID("machine2")}},
 			expectedHosts: sets.NewString("machine2"),
@@ -402,10 +399,9 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			// Pod with existing PVC
-			predicates:   map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
-			nodes:        []string{"machine1", "machine2"},
-			pvcs:         []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC"}}},
+			predicates: map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
+			nodes:      []string{"machine1", "machine2"},
+			pvcs:       []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC"}}},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
 				Spec: v1.PodSpec{
@@ -426,9 +422,8 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			// Pod with non existing PVC
-			predicates:   map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
-			nodes:        []string{"machine1", "machine2"},
+			predicates: map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
+			nodes:      []string{"machine1", "machine2"},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
 				Spec: v1.PodSpec{
@@ -448,10 +443,9 @@ func TestGenericScheduler(t *testing.T) {
 		},
 		{
 			// Pod with deleting PVC
-			predicates:   map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
-			nodes:        []string{"machine1", "machine2"},
-			pvcs:         []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", DeletionTimestamp: &metav1.Time{}}}},
+			predicates: map[string]algorithmpredicates.FitPredicate{"true": truePredicate},
+			nodes:      []string{"machine1", "machine2"},
+			pvcs:       []v1.PersistentVolumeClaim{{ObjectMeta: metav1.ObjectMeta{Name: "existingPVC", DeletionTimestamp: &metav1.Time{}}}},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "ignore", UID: types.UID("ignore")},
 				Spec: v1.PodSpec{
@@ -472,7 +466,6 @@ func TestGenericScheduler(t *testing.T) {
 		{
 			// alwaysCheckAllPredicates is true
 			predicates:               map[string]algorithmpredicates.FitPredicate{"true": truePredicate, "matches": matchesPredicate, "false": falsePredicate},
-			prioritizers:             []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			alwaysCheckAllPredicates: true,
 			nodes:                    []string{"1"},
 			pod:                      &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "2", UID: types.UID("2")}},
@@ -499,7 +492,6 @@ func TestGenericScheduler(t *testing.T) {
 			predicates: map[string]algorithmpredicates.FitPredicate{
 				"matches": algorithmpredicates.EvenPodsSpreadPredicate,
 			},
-			// prioritizers:  []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes: []string{"machine1", "machine2"},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
@@ -541,7 +533,6 @@ func TestGenericScheduler(t *testing.T) {
 			predicates: map[string]algorithmpredicates.FitPredicate{
 				"matches": algorithmpredicates.EvenPodsSpreadPredicate,
 			},
-			// prioritizers:  []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}},
 			nodes: []string{"machine1", "machine2", "machine3"},
 			pod: &v1.Pod{
 				ObjectMeta: metav1.ObjectMeta{Name: "p", UID: types.UID("p"), Labels: map[string]string{"foo": ""}},
@@ -702,14 +693,13 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 	for _, n := range nodes {
 		cache.AddNode(n)
 	}
-	prioritizers := []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}}
 
 	s := NewGenericScheduler(
 		cache,
 		internalqueue.NewSchedulingQueue(nil, nil),
 		predicates,
 		algorithmpredicates.EmptyPredicateMetadataProducer,
-		prioritizers,
+		nil,
 		priorities.EmptyPriorityMetadataProducer,
 		emptyFramework,
 		nil, nil, nil, nil, false, false,
@@ -821,14 +811,14 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 		for _, n := range nodes {
 			cache.AddNode(n)
 		}
-		prioritizers := []priorities.PriorityConfig{{Map: EqualPriorityMap, Weight: 1}}
+
 		queue := internalqueue.NewSchedulingQueue(nil, nil)
 		scheduler := NewGenericScheduler(
 			cache,
 			queue,
 			predicates,
 			algorithmpredicates.EmptyPredicateMetadataProducer,
-			prioritizers,
+			nil,
 			priorities.EmptyPriorityMetadataProducer,
 			emptyFramework,
 			nil, nil, nil, nil, false, false,

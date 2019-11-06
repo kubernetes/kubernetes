@@ -20,7 +20,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	"k8s.io/kubernetes/pkg/scheduler/core"
 )
 
 func init() {
@@ -43,10 +42,6 @@ func init() {
 			Weight: 1,
 		},
 	)
-	// EqualPriority is a prioritizer function that gives an equal weight of one to all nodes
-	// Register the priority function so that its available
-	// but do not include it as part of the default priorities
-	scheduler.RegisterPriorityMapReduceFunction(priorities.EqualPriority, core.EqualPriorityMap, nil, 1)
 	// Optional, cluster-autoscaler friendly priority function - give used nodes higher priority.
 	scheduler.RegisterPriorityMapReduceFunction(priorities.MostRequestedPriority, priorities.MostRequestedPriorityMap, nil, 1)
 	scheduler.RegisterPriorityMapReduceFunction(
