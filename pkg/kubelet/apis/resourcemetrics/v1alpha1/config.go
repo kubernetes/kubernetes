@@ -53,6 +53,30 @@ func Config() stats.ResourceMetricsConfig {
 				},
 			},
 		},
+		PodMetrics: []stats.PodResourceMetric{
+			{
+				Name:        "pod_cpu_usage_seconds_total",
+				Description: "Cumulative cpu time consumed by the pod in core-seconds",
+				ValueFn: func(s summary.PodStats) (*float64, time.Time) {
+					if s.CPU == nil {
+						return nil, time.Time{}
+					}
+					v := float64(*s.CPU.UsageCoreNanoSeconds) / float64(time.Second)
+					return &v, s.CPU.Time.Time
+				},
+			},
+			{
+				Name:        "pod_memory_working_set_bytes",
+				Description: "Current working set of the pod in bytes",
+				ValueFn: func(s summary.PodStats) (*float64, time.Time) {
+					if s.Memory == nil {
+						return nil, time.Time{}
+					}
+					v := float64(*s.Memory.WorkingSetBytes)
+					return &v, s.Memory.Time.Time
+				},
+			},
+		},
 		ContainerMetrics: []stats.ContainerResourceMetric{
 			{
 				Name:        "container_cpu_usage_seconds_total",

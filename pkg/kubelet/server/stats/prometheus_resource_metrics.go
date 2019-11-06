@@ -43,6 +43,17 @@ type ContainerResourceMetric struct {
 	ValueFn     func(stats.ContainerStats) (*float64, time.Time)
 }
 
+// PodResourceMetric describes metrics for a pod
+type PodResourceMetric struct {
+	Name        string
+	Description string
+	ValueFn     func(stats.PodStats) (*float64, time.Time)
+}
+
+func (n *PodResourceMetric) desc() *prometheus.Desc {
+	return prometheus.NewDesc(n.Name, n.Description, []string{"sandbox", "pod", "namespace"}, nil)
+}
+
 func (n *ContainerResourceMetric) desc() *prometheus.Desc {
 	return prometheus.NewDesc(n.Name, n.Description, []string{"container", "pod", "namespace"}, nil)
 }
@@ -51,6 +62,7 @@ func (n *ContainerResourceMetric) desc() *prometheus.Desc {
 type ResourceMetricsConfig struct {
 	NodeMetrics      []NodeResourceMetric
 	ContainerMetrics []ContainerResourceMetric
+	PodMetrics       []PodResourceMetric
 }
 
 // NewPrometheusResourceMetricCollector returns a prometheus.Collector which exports resource metrics
@@ -106,6 +118,13 @@ func (rc *resourceMetricCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	for _, pod := range summary.Pods {
+		for _, metric := range rc.config.PodMetrics {
+			if value, timestamp := metric.ValueFn(pod); value != nil {
+				ch <- prometheus.NewMetricWithTimestamp(timestamp,
+					prometheus.MustNewConstMetric(metric.desc(), prometheus.GaugeValue, *value, pod.PodRef.Name, pod.PodRef.Name, pod.PodRef.Namespace))
+			}
+		}
+
 		for _, container := range pod.Containers {
 			for _, metric := range rc.config.ContainerMetrics {
 				if value, timestamp := metric.ValueFn(container); value != nil {
