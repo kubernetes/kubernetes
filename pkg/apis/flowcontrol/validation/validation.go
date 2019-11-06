@@ -18,6 +18,8 @@ package validation
 
 import (
 	"fmt"
+	"strings"
+
 	"k8s.io/apimachinery/pkg/api/validation"
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -191,8 +193,16 @@ func ValidateFlowSchemaNonResourcePolicyRule(rule *flowcontrol.NonResourcePolicy
 
 	if len(rule.NonResourceURLs) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("nonResourceURLs"), "nonResourceURLs must contain at least one value"))
-	} else if len(rule.NonResourceURLs) > 1 && hasWildcard(rule.NonResourceURLs) {
-		allErrs = append(allErrs, field.Invalid(fldPath.Child("nonResourceURLs"), rule.NonResourceURLs, "if '*' is present, must not specify other non-resource URLs"))
+	} else if hasWildcard(rule.NonResourceURLs) {
+		if len(rule.NonResourceURLs) > 1 {
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("nonResourceURLs"), rule.NonResourceURLs, "if '*' is present, must not specify other non-resource URLs"))
+		}
+	} else {
+		for i, nonResourceURL := range rule.NonResourceURLs {
+			if err := ValidateNonResourceURLPath(nonResourceURL, fldPath.Child("nonResourceURLs").Index(i)); err != nil {
+				allErrs = append(allErrs, err)
+			}
+		}
 	}
 
 	return allErrs
@@ -330,6 +340,35 @@ func ValidatePriorityLevelConfigurationCondition(condition *flowcontrol.Priority
 		allErrs = append(allErrs, field.Required(fldPath.Child("type"), "must not be empty"))
 	}
 	return allErrs
+}
+
+// ValidateNonResourceURLPath validates non-resource-url path by following rules:
+//   1. Slash must be the leading character of the path
+//   2. White-space is forbidden in the path
+//   3. Continuous/double slash is forbidden in the path
+//   4. Wildcard "*" should only do suffix glob matching. Note that wildcard also matches slashes.
+func ValidateNonResourceURLPath(path string, fldPath *field.Path) *field.Error {
+	if len(path) == 0 {
+		return field.Invalid(fldPath, path, "must not be empty")
+	}
+	if path == "/" { // root path
+		return nil
+	}
+
+	if !strings.HasPrefix(path, "/") {
+		return field.Invalid(fldPath, path, "must start with slash")
+	}
+	if strings.Contains(path, " ") {
+		return field.Invalid(fldPath, path, "must not contain white-space")
+	}
+	if strings.Contains(path, "//") {
+		return field.Invalid(fldPath, path, "must not contain double slash")
+	}
+	wildcardCount := strings.Count(path, "*")
+	if wildcardCount > 1 || (wildcardCount == 1 && path[len(path)-2:] != "/*") {
+		return field.Invalid(fldPath, path, "wildcard can only do suffix matching")
+	}
+	return nil
 }
 
 func hasWildcard(operations []string) bool {
