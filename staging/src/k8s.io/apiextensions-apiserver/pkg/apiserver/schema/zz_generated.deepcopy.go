@@ -38,6 +38,16 @@ func (in *Extensions) DeepCopyInto(out *Extensions) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.XImmutability != nil {
+		in, out := &in.XImmutability, &out.XImmutability
+		*out = new(string)
+		**out = **in
+	}
+	if in.XKeyImmutability != nil {
+		in, out := &in.XKeyImmutability, &out.XKeyImmutability
+		*out = new(string)
+		**out = **in
+	}
 	return
 }
 
