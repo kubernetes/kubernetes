@@ -38,6 +38,7 @@ import (
 type validationMatch struct {
 	path      *field.Path
 	errorType field.ErrorType
+	contains  string
 }
 
 func required(path ...string) validationMatch {
@@ -58,9 +59,12 @@ func immutable(path ...string) validationMatch {
 func forbidden(path ...string) validationMatch {
 	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeForbidden}
 }
+func forbiddenContains(contains string, path ...string) validationMatch {
+	return validationMatch{path: field.NewPath(path[0], path[1:]...), errorType: field.ErrorTypeForbidden, contains: contains}
+}
 
 func (v validationMatch) matches(err *field.Error) bool {
-	return err.Type == v.errorType && err.Field == v.path.String()
+	return err.Type == v.errorType && err.Field == v.path.String() && strings.Contains(err.Error(), v.contains)
 }
 
 func strPtr(s string) *string { return &s }
@@ -1641,7 +1645,7 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			requestGV: apiextensionsv1beta1.SchemeGroupVersion,
 			errors: []validationMatch{
-				forbidden("spec", "validation", "openAPIV3Schema", "properties[a]", "default"), // disallowed via v1beta1
+				forbiddenContains("cannot set default values in apiextensions.k8s.io/v1beta1", "spec", "validation", "openAPIV3Schema", "properties[a]", "default"), // disallowed via v1beta1
 			},
 		},
 		{

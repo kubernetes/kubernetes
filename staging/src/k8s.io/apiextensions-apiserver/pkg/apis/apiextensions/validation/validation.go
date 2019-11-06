@@ -55,8 +55,10 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 		return ret
 	}
 
+	allowDefaults, rejectDefaultsReason := allowDefaults(requestGV, nil)
 	opts := validationOptions{
-		allowDefaults:                            allowDefaults(requestGV, nil),
+		allowDefaults:                            allowDefaults,
+		disallowDefaultsReason:                   rejectDefaultsReason,
 		requireRecognizedConversionReviewVersion: true,
 		requireImmutableNames:                    false,
 		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, nil),
@@ -80,6 +82,8 @@ func ValidateCustomResourceDefinition(obj *apiextensions.CustomResourceDefinitio
 type validationOptions struct {
 	// allowDefaults permits the validation schema to contain default attributes
 	allowDefaults bool
+	// disallowDefaultsReason gives a reason as to why allowDefaults is false (for better user feedback)
+	disallowDefaultsReason string
 	// requireRecognizedConversionReviewVersion requires accepted webhook conversion versions to contain a recognized version
 	requireRecognizedConversionReviewVersion bool
 	// requireImmutableNames disables changing spec.names
@@ -102,8 +106,10 @@ type validationOptions struct {
 
 // ValidateCustomResourceDefinitionUpdate statically validates
 func ValidateCustomResourceDefinitionUpdate(obj, oldObj *apiextensions.CustomResourceDefinition, requestGV schema.GroupVersion) field.ErrorList {
+	allowDefaults, rejectDefaultsReason := allowDefaults(requestGV, &oldObj.Spec)
 	opts := validationOptions{
-		allowDefaults:                            allowDefaults(requestGV, &oldObj.Spec),
+		allowDefaults:                            allowDefaults,
+		disallowDefaultsReason:                   rejectDefaultsReason,
 		requireRecognizedConversionReviewVersion: oldObj.Spec.Conversion == nil || hasValidConversionReviewVersionOrEmpty(oldObj.Spec.Conversion.ConversionReviewVersions),
 		requireImmutableNames:                    apiextensions.IsCRDConditionTrue(oldObj, apiextensions.Established),
 		requireOpenAPISchema:                     requireOpenAPISchema(requestGV, &oldObj.Spec),
@@ -661,6 +667,7 @@ func validateCustomResourceDefinitionValidation(customResourceValidation *apiext
 
 		openAPIV3Schema := &specStandardValidatorV3{
 			allowDefaults:            opts.allowDefaults,
+			disallowDefaultsReason:   opts.disallowDefaultsReason,
 			requireValidPropertyType: opts.requireValidPropertyType,
 		}
 
@@ -1110,16 +1117,17 @@ func allVersionsSpecifyOpenAPISchema(spec *apiextensions.CustomResourceDefinitio
 	return true
 }
 
-// allowDefaults returns true if the defaulting feature is enabled and the request group version allows adding defaults
-func allowDefaults(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) bool {
+// allowDefaults returns true if the defaulting feature is enabled and the request group version allows adding defaults,
+// or false and a reason for the user if defaults are not allowed.
+func allowDefaults(requestGV schema.GroupVersion, oldCRDSpec *apiextensions.CustomResourceDefinitionSpec) (bool, string) {
 	if oldCRDSpec != nil && specHasDefaults(oldCRDSpec) {
 		// don't tighten validation on existing persisted data
-		return true
+		return true, ""
 	}
 	if requestGV == apiextensionsv1beta1.SchemeGroupVersion {
-		return false
+		return false, "(cannot set default values in apiextensions.k8s.io/v1beta1 CRDs, must use apiextensions.k8s.io/v1)"
 	}
-	return true
+	return true, ""
 }
 
 func specHasDefaults(spec *apiextensions.CustomResourceDefinitionSpec) bool {
