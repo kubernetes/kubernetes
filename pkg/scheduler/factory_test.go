@@ -100,6 +100,7 @@ func TestCreateFromConfig(t *testing.T) {
 		],
 		"priorities" : [
 			{"name" : "RackSpread", "weight" : 3, "argument" : {"serviceAntiAffinity" : {"label" : "rack"}}},
+			{"name" : "ZoneSpread", "weight" : 3, "argument" : {"serviceAntiAffinity" : {"label" : "zone"}}},
 			{"name" : "LabelPreference1", "weight" : 3, "argument" : {"labelPreference" : {"label" : "l1", "presence": true}}},
 			{"name" : "LabelPreference2", "weight" : 3, "argument" : {"labelPreference" : {"label" : "l2", "presence": false}}},
 			{"name" : "PriorityOne", "weight" : 2},
@@ -119,40 +120,33 @@ func TestCreateFromConfig(t *testing.T) {
 	}
 
 	// Verify that node label predicate/priority are converted to framework plugins.
-	if _, ok := findPlugin(nodelabel.Name, "FilterPlugin", conf); !ok {
-		t.Fatalf("NodeLabel plugin not exist in framework.")
-	}
-	nodeLabelScorePlugin, ok := findPlugin(nodelabel.Name, "ScorePlugin", conf)
-	if !ok {
-		t.Fatalf("NodeLabel plugin not exist in framework.")
-	}
-	if nodeLabelScorePlugin.Weight != 6 {
-		t.Errorf("Wrong weight. Got: %v, want: 6", nodeLabelScorePlugin.Weight)
-	}
-	// Verify that the policy config is converted to plugin config for node label predicate/priority.
-	nodeLabelConfig := findPluginConfig(nodelabel.Name, conf)
-	encoding, err := json.Marshal(nodeLabelConfig)
-	if err != nil {
-		t.Errorf("Failed to marshal %+v: %v", nodeLabelConfig, err)
-	}
-	want := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"],"presentLabelsPreference":["l1"],"absentLabelsPreference":["l2"]}}`
-	if string(encoding) != want {
-		t.Errorf("Config for NodeLabel plugin mismatch. got: %v, want: %v", string(encoding), want)
-	}
+	wantArgs := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"],"presentLabelsPreference":["l1"],"absentLabelsPreference":["l2"]}}`
+	verifyPluginConvertion(t, nodelabel.Name, []string{"FilterPlugin", "ScorePlugin"}, conf, 6, wantArgs)
+	// Verify that service affinity custom predicate/priority is converted to framework plugin.
+	wantArgs = `{"Name":"ServiceAffinity","Args":{"labels":["zone","foo"],"antiAffinityLabelsPreference":["rack","zone"]}}`
+	verifyPluginConvertion(t, serviceaffinity.Name, []string{"FilterPlugin", "ScorePlugin"}, conf, 6, wantArgs)
+}
 
-	// Verify that service affinity predicates are converted to framework plugins.
-	if _, ok := findPlugin(serviceaffinity.Name, "FilterPlugin", conf); !ok {
-		t.Fatalf("ServiceAffinity plugin not exist in framework.")
-	}
-	// Verify that the policy config is converted to plugin config for service affinity predicate.
-	serviceAffinityConfig := findPluginConfig(serviceaffinity.Name, conf)
-	encoding, err = json.Marshal(serviceAffinityConfig)
-	if err != nil {
-		t.Errorf("Failed to marshal %+v: %v", serviceAffinityConfig, err)
-	}
-	want = `{"Name":"ServiceAffinity","Args":{"labels":["zone","foo"]}}`
-	if string(encoding) != want {
-		t.Errorf("Config for ServiceAffinity plugin mismatch. got: %v, want: %v", string(encoding), want)
+func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string, conf *Config, wantWeight int32, wantArgs string) {
+	for _, extensionPoint := range extentionPoints {
+		plugin, ok := findPlugin(name, extensionPoint, conf)
+		if !ok {
+			t.Fatalf("%q plugin does not exist in framework.", name)
+		}
+		if extensionPoint == "ScorePlugin" {
+			if plugin.Weight != wantWeight {
+				t.Errorf("Wrong weight. Got: %v, want: %v", plugin.Weight, wantWeight)
+			}
+		}
+		// Verify that the policy config is converted to plugin config.
+		pluginConfig := findPluginConfig(name, conf)
+		encoding, err := json.Marshal(pluginConfig)
+		if err != nil {
+			t.Errorf("Failed to marshal %+v: %v", pluginConfig, err)
+		}
+		if string(encoding) != wantArgs {
+			t.Errorf("Config for %v plugin mismatch. got: %v, want: %v", name, string(encoding), wantArgs)
+		}
 	}
 }
 

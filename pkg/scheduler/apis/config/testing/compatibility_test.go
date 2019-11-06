@@ -101,7 +101,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"ServiceSpreadingPriority",
-				"TestServiceAntiAffinity",
 			),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
@@ -116,6 +115,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeLabel", Weight: 4},
+					{Name: "ServiceAffinity", Weight: 3},
 				},
 			},
 		},
@@ -144,10 +144,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TestLabelPreference",      "weight": 4, "argument": {"labelPreference": {"label": "bar", "presence":true}}}
 		  ]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"TestServiceAntiAffinity",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -165,6 +163,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeLabel", Weight: 4},
 					{Name: "DefaultPodTopologySpread", Weight: 2},
+					{Name: "ServiceAffinity", Weight: 3},
 				},
 			},
 		},
@@ -198,10 +197,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "TestLabelPreference",      "weight": 4, "argument": {"labelPreference": {"label": "bar", "presence":true}}}
 		  ]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"TestServiceAntiAffinity",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -225,6 +222,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodeLabel", Weight: 4},
 					{Name: "DefaultPodTopologySpread", Weight: 2},
+					{Name: "ServiceAffinity", Weight: 3},
 				},
 			},
 		},
@@ -1241,6 +1239,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		"NodeResourcesMostAllocated":      "MostRequestedPriority",
 		"RequestedToCapacityRatio":        "RequestedToCapacityRatioPriority",
 		"NodeLabel":                       "TestLabelPreference",
+		"ServiceAffinity":                 "TestServiceAntiAffinity",
 	}
 
 	for _, tc := range testcases {
