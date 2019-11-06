@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,7 +30,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/runtime"
+	apiruntime "k8s.io/apimachinery/pkg/runtime"
 	utypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -195,7 +196,7 @@ func LoadPodFromFile(filePath string) (*v1.Pod, error) {
 	pod := &v1.Pod{}
 
 	codec := legacyscheme.Codecs.UniversalDecoder()
-	if err := runtime.DecodeInto(codec, podDef, pod); err != nil {
+	if err := apiruntime.DecodeInto(codec, podDef, pod); err != nil {
 		return nil, fmt.Errorf("failed decoding file: %v", err)
 	}
 	return pod, nil
@@ -547,4 +548,19 @@ func IsLocalEphemeralVolume(volume v1.Volume) bool {
 	return volume.GitRepo != nil ||
 		(volume.EmptyDir != nil && volume.EmptyDir.Medium != v1.StorageMediumMemory) ||
 		volume.ConfigMap != nil || volume.DownwardAPI != nil
+}
+
+//WriteVolumeCache flush disk data given the spcified mount path
+func WriteVolumeCache(deviceMountPath string, exec mount.Exec) error {
+	// If runtime os is windows, execute Write-VolumeCache powershell command on the disk
+	if runtime.GOOS == "windows" {
+		cmd := fmt.Sprintf("Get-Volume -FilePath %s | Write-Volumecache", deviceMountPath)
+		output, err := exec.Run("powershell", "/c", cmd)
+		klog.Infof("command (%q) execeuted: %v, output: %q", cmd, err, string(output))
+		if err != nil {
+			return fmt.Errorf("command (%q) failed: %v, output: %q", cmd, err, string(output))
+		}
+	}
+	// For linux runtime, it skips because unmount will automatically flush disk data
+	return nil
 }
