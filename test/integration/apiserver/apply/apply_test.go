@@ -1248,6 +1248,60 @@ func TestClearManagedFieldsWithUpdate(t *testing.T) {
 	}
 }
 
+// TestResetFieldsBeforeUpdate verifies that fields are being reset based on the resources strategy
+// before an Upate
+func TestResetFieldsBeforeUpdate(t *testing.T) {
+	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, genericfeatures.ServerSideApply, true)()
+
+	_, client, closeFn := setup(t)
+	defer closeFn()
+
+	_, err := client.CoreV1().RESTClient().Patch(types.ApplyPatchType).
+		Namespace("default").
+		Resource("pods").
+		Name("test").
+		Param("fieldManager", "apply_test").
+		Body([]byte(`{
+			"apiVersion": "v1",
+			"kind": "Pod",
+			"metadata": {
+				"name": "test",
+				"namespace": "default"
+			},
+			"spec": {
+				"containers": [
+					{"name": "foo", "image": "none"}
+				]
+			},
+			"status": {
+				"phase": "test"
+			}
+		}`)).
+		Do().
+		Get()
+	if err != nil {
+		t.Fatalf("Failed to create object using Apply patch: %v", err)
+	}
+
+	object, err := client.CoreV1().RESTClient().Get().Namespace("default").Resource("pods").Name("test").Do().Get()
+	if err != nil {
+		t.Fatalf("Failed to retrieve object: %v", err)
+	}
+
+	accessor, err := meta.Accessor(object)
+	if err != nil {
+		t.Fatalf("Failed to get meta accessor: %v", err)
+	}
+
+	if managedFields := accessor.GetManagedFields(); len(managedFields) == 0 {
+		t.Fatalf("Failed to set managedFields, got: %v", managedFields)
+	}
+
+	// fields, _ := accessor.GetManagedFields()[0].Marshal()
+	// t.Logf("obj: %v", object)
+	// t.Fatalf("managed fields: %v", string(fields))
+}
+
 var podBytes = []byte(`
 apiVersion: v1
 kind: Pod

@@ -21,8 +21,8 @@ import (
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apiserver/pkg/endpoints/handlers/fieldmanager/internal"
@@ -30,7 +30,6 @@ import (
 	openapiproto "k8s.io/kube-openapi/pkg/util/proto"
 	"sigs.k8s.io/structured-merge-diff/fieldpath"
 	"sigs.k8s.io/structured-merge-diff/merge"
-	"sigs.k8s.io/yaml"
 )
 
 type structuredMergeManager struct {
@@ -136,22 +135,18 @@ func (f *structuredMergeManager) Update(liveObj, newObj runtime.Object, managed 
 }
 
 // Apply implements Manager.
-func (f *structuredMergeManager) Apply(liveObj runtime.Object, patch []byte, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
-	patchObj := &unstructured.Unstructured{Object: map[string]interface{}{}}
-	if err := yaml.Unmarshal(patch, &patchObj.Object); err != nil {
-		return nil, nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
-	}
-
+func (f *structuredMergeManager) Apply(liveObj, patchObj runtime.Object, managed Managed, manager string, force bool) (runtime.Object, Managed, error) {
 	// Check that the patch object has the same version as the live object
-	if patchObj.GetAPIVersion() != f.groupVersion.String() {
+	if patchObj.GetObjectKind().GroupVersionKind().GroupVersion() != f.groupVersion {
 		return nil, nil,
 			errors.NewBadRequest(
 				fmt.Sprintf("Incorrect version specified in apply patch. "+
 					"Specified patch version: %s, expected: %s",
-					patchObj.GetAPIVersion(), f.groupVersion.String()))
+					patchObj.GetObjectKind().GroupVersionKind().GroupVersion(), f.groupVersion))
 	}
 
-	if patchObj.GetManagedFields() != nil {
+	patchObjMeta, err := meta.Accessor(patchObj)
+	if patchObjMeta.GetManagedFields() != nil {
 		return nil, nil, errors.NewBadRequest(fmt.Sprintf("metadata.managedFields must be nil"))
 	}
 

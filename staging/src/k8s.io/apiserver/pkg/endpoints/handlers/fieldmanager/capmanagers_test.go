@@ -41,7 +41,7 @@ func (*fakeManager) Update(_, newObj runtime.Object, managed fieldmanager.Manage
 	return newObj, managed, nil
 }
 
-func (*fakeManager) Apply(_ runtime.Object, _ []byte, _ fieldmanager.Managed, _ string, force bool) (runtime.Object, fieldmanager.Managed, error) {
+func (*fakeManager) Apply(_, _ runtime.Object, _ fieldmanager.Managed, _ string, force bool) (runtime.Object, fieldmanager.Managed, error) {
 	panic("not implemented")
 	return nil, nil, nil
 }

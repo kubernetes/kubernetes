@@ -436,6 +436,8 @@ type applyPatcher struct {
 	creater      runtime.ObjectCreater
 	kind         schema.GroupVersionKind
 	fieldManager *fieldmanager.FieldManager
+	resetter     rest.ObjectResetter
+	decoder      runtime.Decoder
 }
 
 func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Object, error) {
@@ -446,7 +448,28 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 	if p.fieldManager == nil {
 		panic("FieldManager must be installed to run apply")
 	}
-	return p.fieldManager.Apply(obj, p.patch, p.options.FieldManager, force)
+
+	// patchObj, err := p.creater.New(p.kind)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to create new object (Create for %v): %v", p.kind, err)
+	// }
+
+	// if err := yaml.Unmarshal(p.patch, &patchObj); err != nil {
+	// 	return nil, errors.NewBadRequest(fmt.Sprintf("error decoding YAML: %v", err))
+	// }
+
+	defaultGVK := p.kind
+	original, err := p.creater.New(p.kind)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create new object (Create for %v): %v", p.kind, err)
+	}
+	patchObj, _, err := p.decoder.Decode(p.patch, &defaultGVK, original)
+	if err != nil {
+		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch: %v", err))
+	}
+	//p.resetter.ResetFields(patchObj, obj)
+
+	return p.fieldManager.Apply(obj, patchObj, p.options.FieldManager, force)
 }
 
 func (p *applyPatcher) createNewObject() (runtime.Object, error) {
@@ -572,12 +595,21 @@ func (p *patcher) patchResource(ctx context.Context, scope *RequestScope) (runti
 		}
 	// this case is unreachable if ServerSideApply is not enabled because we will have already rejected the content type
 	case types.ApplyPatchType:
+		var resetter rest.ObjectResetter
+		if store, isGenericStore := p.restPatcher.(registry.GenericStore); isGenericStore {
+			if strategy := store.GetUpdateStrategy(); strategy != nil {
+				resetter = strategy
+			}
+		}
+
 		p.mechanism = &applyPatcher{
 			fieldManager: scope.FieldManager,
 			patch:        p.patchBytes,
 			options:      p.options,
 			creater:      p.creater,
 			kind:         p.kind,
+			resetter:     resetter,
+			decoder:      p.codec,
 		}
 		p.forceAllowCreate = true
 	default:
