@@ -108,7 +108,7 @@ func checkMigration(client clientset.Interface) error {
 
 	_, err = migration.Migrate(currentInstalledCoreDNSversion, kubeadmconstants.CoreDNSVersion, corefile, false)
 	if err != nil {
-		return errors.Wrap(err, "the CoreDNS configuration will not be migrated, and may be incompatible with the upgraded version of CoreDNS")
+		return errors.Wrap(err, "CoreDNS will not be upgraded")
 	}
 	return nil
 }

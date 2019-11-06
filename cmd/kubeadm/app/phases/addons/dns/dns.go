@@ -236,10 +236,13 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 	if err != nil {
 		return errors.Wrap(err, "unable to fetch CoreDNS current installed version and ConfigMap.")
 	}
+
+	var hasCoreDNSMigrationFailed bool
 	if IsCoreDNSConfigMapMigrationRequired(corefile) {
 		if err := migrateCoreDNSCorefile(client, coreDNSConfigMap, corefile, currentInstalledCoreDNSVersion); err != nil {
 			// Errors in Corefile Migration is verified during preflight checks. This part will be executed when a user has chosen
 			// to ignore preflight check errors.
+			hasCoreDNSMigrationFailed = true
 			klog.Warningf("the CoreDNS Configuration was not migrated: %v. The existing CoreDNS Corefile configuration has been retained.", err)
 			if err := apiclient.CreateOrRetainConfigMap(client, coreDNSConfigMap, kubeadmconstants.CoreDNSConfigMap); err != nil {
 				return err
@@ -286,9 +289,16 @@ func createCoreDNSAddon(deploymentBytes, serviceBytes, configBytes []byte, clien
 		return errors.Wrapf(err, "%s Deployment", unableToDecodeCoreDNS)
 	}
 
-	// Create the Deployment for CoreDNS or update it in case it already exists
-	if err := apiclient.CreateOrUpdateDeployment(client, coreDNSDeployment); err != nil {
-		return err
+	// Create the deployment for CoreDNS or retain it in case the CoreDNS migration has failed during upgrade
+	if hasCoreDNSMigrationFailed {
+		if err := apiclient.CreateOrRetainDeployment(client, coreDNSDeployment, kubeadmconstants.CoreDNSDeploymentName); err != nil {
+			return err
+		}
+	} else {
+		// Create the Deployment for CoreDNS or update it in case it already exists
+		if err := apiclient.CreateOrUpdateDeployment(client, coreDNSDeployment); err != nil {
+			return err
+		}
 	}
 
 	coreDNSService := &v1.Service{}
