@@ -428,7 +428,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		pluginConfig,
 		framework.WithClientSet(c.client),
 		framework.WithInformerFactory(c.informerFactory),
-		framework.WithNodeInfoSnapshot(c.nodeInfoSnapshot),
+		framework.WithSnapshotSharedLister(c.nodeInfoSnapshot),
 	)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
@@ -462,6 +462,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		predicateMetaProducer,
 		priorityConfigs,
 		priorityMetaProducer,
+		c.nodeInfoSnapshot,
 		framework,
 		extenders,
 		c.volumeBinder,

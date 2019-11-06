@@ -388,7 +388,7 @@ func TestNodeResourcesBalancedAllocation(t *testing.T) {
 					info.TransientInfo.TransNodeInfo.RequestedVolumes = len(test.pod.Spec.Volumes)
 				}
 			}
-			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithNodeInfoSnapshot(snapshot))
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 			p, _ := NewBalancedAllocation(nil, fh)
 
 			for i := range test.nodes {

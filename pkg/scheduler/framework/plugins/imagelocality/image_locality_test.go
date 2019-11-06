@@ -206,7 +206,7 @@ func TestImageLocalityPriority(t *testing.T) {
 			state := framework.NewCycleState()
 			state.Write(migration.PrioritiesStateKey, &migration.PrioritiesStateData{Reference: meta})
 
-			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithNodeInfoSnapshot(snapshot))
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 
 			p, _ := New(nil, fh)
 			var gotList framework.NodeScoreList

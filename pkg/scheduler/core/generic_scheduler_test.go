@@ -141,9 +141,10 @@ func getNodeReducePriority(pod *v1.Pod, meta interface{}, sharedLister scheduler
 	return nil
 }
 
-// EmptyPluginRegistry is a test plugin set used by the default scheduler.
-var EmptyPluginRegistry = framework.Registry{}
-var emptyFramework, _ = framework.NewFramework(EmptyPluginRegistry, nil, []schedulerapi.PluginConfig{})
+// emptyPluginRegistry is a test plugin set used by the default scheduler.
+var emptyPluginRegistry = framework.Registry{}
+var emptyFramework, _ = framework.NewFramework(emptyPluginRegistry, nil, []schedulerapi.PluginConfig{})
+var emptySnapshot = nodeinfosnapshot.NewEmptySnapshot()
 
 // FakeFilterPlugin is a test filter plugin used by default scheduler.
 type FakeFilterPlugin struct {
@@ -671,6 +672,7 @@ func TestGenericScheduler(t *testing.T) {
 				predMetaProducer,
 				test.prioritizers,
 				priorities.EmptyPriorityMetadataProducer,
+				emptySnapshot,
 				filterFramework,
 				[]algorithm.SchedulerExtender{},
 				nil,
@@ -711,6 +713,7 @@ func makeScheduler(predicates map[string]algorithmpredicates.FitPredicate, nodes
 		algorithmpredicates.EmptyPredicateMetadataProducer,
 		prioritizers,
 		priorities.EmptyPriorityMetadataProducer,
+		emptySnapshot,
 		emptyFramework,
 		nil, nil, nil, nil, false, false,
 		schedulerapi.DefaultPercentageOfNodesToScore, false)
@@ -830,6 +833,7 @@ func TestFindFitPredicateCallCounts(t *testing.T) {
 			algorithmpredicates.EmptyPredicateMetadataProducer,
 			prioritizers,
 			priorities.EmptyPriorityMetadataProducer,
+			emptySnapshot,
 			emptyFramework,
 			nil, nil, nil, nil, false, false,
 			schedulerapi.DefaultPercentageOfNodesToScore, false).(*genericScheduler)
@@ -1016,6 +1020,7 @@ func TestZeroRequest(t *testing.T) {
 				nil,
 				priorityConfigs,
 				metaDataProducer,
+				emptySnapshot,
 				emptyFramework,
 				[]algorithm.SchedulerExtender{},
 				nil,
@@ -1416,6 +1421,7 @@ func TestSelectNodesForPreemption(t *testing.T) {
 				algorithmpredicates.GetPredicateMetadata,
 				nil,
 				priorities.EmptyPriorityMetadataProducer,
+				emptySnapshot,
 				filterFramework,
 				[]algorithm.SchedulerExtender{},
 				nil,
@@ -1672,13 +1678,13 @@ func TestPickOneNodeForPreemption(t *testing.T) {
 				nodes = append(nodes, makeNode(n, priorityutil.DefaultMilliCPURequest*5, priorityutil.DefaultMemoryRequest*5))
 			}
 			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
-			fwk, _ := framework.NewFramework(EmptyPluginRegistry, nil, []schedulerapi.PluginConfig{}, framework.WithNodeInfoSnapshot(snapshot))
+			fwk, _ := framework.NewFramework(emptyPluginRegistry, nil, []schedulerapi.PluginConfig{}, framework.WithSnapshotSharedLister(snapshot))
 
 			g := &genericScheduler{
 				framework:             fwk,
+				nodeInfoSnapshot:      snapshot,
 				predicates:            test.predicates,
 				predicateMetaProducer: algorithmpredicates.GetPredicateMetadata,
-				nodeInfoSnapshot:      snapshot,
 			}
 			assignDefaultStartTime(test.pods)
 
@@ -2161,6 +2167,7 @@ func TestPreempt(t *testing.T) {
 				predMetaProducer,
 				[]priorities.PriorityConfig{{Function: numericPriority, Weight: 1}},
 				priorities.EmptyPriorityMetadataProducer,
+				emptySnapshot,
 				emptyFramework,
 				extenders,
 				nil,
