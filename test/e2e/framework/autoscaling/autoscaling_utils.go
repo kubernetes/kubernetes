@@ -104,6 +104,7 @@ type ResourceConsumer struct {
 	requestSizeCustomMetric  int
 }
 
+// GetResourceConsumerImage is a wrapper to get the fully qualified URI of the ResourceConsumer image
 func GetResourceConsumerImage() string {
 	return resourceConsumerImage
 }
@@ -185,7 +186,7 @@ func (rc *ResourceConsumer) ConsumeMem(megabytes int) {
 	rc.mem <- megabytes
 }
 
-// ConsumeMem consumes given number of custom metric
+// ConsumeCustomMetric consumes given number of custom metric
 func (rc *ResourceConsumer) ConsumeCustomMetric(amount int) {
 	framework.Logf("RC %s: consume custom metric %v in total", rc.name, amount)
 	rc.customMetric <- amount
@@ -364,11 +365,12 @@ func (rc *ResourceConsumer) GetReplicas() int {
 	return 0
 }
 
-// GetReplicas get the corresponding horizontalPodAutoscaler object
+// GetHpa get the corresponding horizontalPodAutoscaler object
 func (rc *ResourceConsumer) GetHpa(name string) (*autoscalingv1.HorizontalPodAutoscaler, error) {
 	return rc.clientSet.AutoscalingV1().HorizontalPodAutoscalers(rc.nsName).Get(name, metav1.GetOptions{})
 }
 
+// WaitForReplicas wait for the desired replicas
 func (rc *ResourceConsumer) WaitForReplicas(desiredReplicas int, duration time.Duration) {
 	interval := 20 * time.Second
 	err := wait.PollImmediate(interval, duration, func() (bool, error) {
