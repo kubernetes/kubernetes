@@ -211,8 +211,9 @@ func (g *gcePersistentDiskCSITranslator) TranslateInTreeInlineVolumeToCSI(volume
 
 	return &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
-			// A.K.A InnerVolumeSpecName required to match for Unmount
-			Name: volume.Name,
+			// Must be unique per disk as it is used as the unique part of the
+			// staging path
+			Name: fmt.Sprintf("%s-%s", GCEPDDriverName, pdSource.PDName),
 		},
 		Spec: v1.PersistentVolumeSpec{
 			PersistentVolumeSource: v1.PersistentVolumeSource{

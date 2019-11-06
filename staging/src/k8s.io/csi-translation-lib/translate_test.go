@@ -17,11 +17,13 @@ limitations under the License.
 package csitranslation
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/csi-translation-lib/plugins"
 )
 
@@ -309,6 +311,81 @@ func makeTopology(key string, values ...string) *v1.NodeSelectorRequirement {
 		Key:      key,
 		Operator: v1.NodeSelectorOpIn,
 		Values:   values,
+	}
+}
+
+func TestTranslateInTreeInlineVolumeToCSINameUniqueness(t *testing.T) {
+	for driverName := range inTreePlugins {
+		t.Run(driverName, func(t *testing.T) {
+			ctl := New()
+			vs1, err := generateUniqueVolumeSource(driverName)
+			if err != nil {
+				t.Fatalf("Couldn't generate random source: %v", err)
+			}
+			pv1, err := ctl.TranslateInTreeInlineVolumeToCSI(&v1.Volume{
+				VolumeSource: vs1,
+			})
+			if err != nil {
+				t.Fatalf("Error when translating to CSI: %v", err)
+			}
+			vs2, err := generateUniqueVolumeSource(driverName)
+			if err != nil {
+				t.Fatalf("Couldn't generate random source: %v", err)
+			}
+			pv2, err := ctl.TranslateInTreeInlineVolumeToCSI(&v1.Volume{
+				VolumeSource: vs2,
+			})
+			if err != nil {
+				t.Fatalf("Error when translating to CSI: %v", err)
+			}
+			if pv1 == nil || pv2 == nil {
+				t.Fatalf("Did not expect either pv1: %v or pv2: %v to be nil", pv1, pv2)
+			}
+			if pv1.Name == pv2.Name {
+				t.Errorf("PV name %s not sufficiently unique for different volumes", pv1.Name)
+			}
+		})
+
+	}
+}
+
+func generateUniqueVolumeSource(driverName string) (v1.VolumeSource, error) {
+	switch driverName {
+	case plugins.GCEPDDriverName:
+		return v1.VolumeSource{
+			GCEPersistentDisk: &v1.GCEPersistentDiskVolumeSource{
+				PDName: string(uuid.NewUUID()),
+			},
+		}, nil
+	case plugins.AWSEBSDriverName:
+		return v1.VolumeSource{
+			AWSElasticBlockStore: &v1.AWSElasticBlockStoreVolumeSource{
+				VolumeID: string(uuid.NewUUID()),
+			},
+		}, nil
+
+	case plugins.CinderDriverName:
+		return v1.VolumeSource{
+			Cinder: &v1.CinderVolumeSource{
+				VolumeID: string(uuid.NewUUID()),
+			},
+		}, nil
+	case plugins.AzureDiskDriverName:
+		return v1.VolumeSource{
+			AzureDisk: &v1.AzureDiskVolumeSource{
+				DiskName:    string(uuid.NewUUID()),
+				DataDiskURI: string(uuid.NewUUID()),
+			},
+		}, nil
+	case plugins.AzureFileDriverName:
+		return v1.VolumeSource{
+			AzureFile: &v1.AzureFileVolumeSource{
+				SecretName: string(uuid.NewUUID()),
+				ShareName:  string(uuid.NewUUID()),
+			},
+		}, nil
+	default:
+		return v1.VolumeSource{}, fmt.Errorf("couldn't find logic for driver: %v", driverName)
 	}
 }
 
