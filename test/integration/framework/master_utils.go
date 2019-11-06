@@ -278,7 +278,7 @@ func NewMasterConfigWithOptions(opts *MasterConfigOptions) *master.Config {
 	}
 
 	storageConfig := kubeapiserver.NewStorageFactoryConfig()
-	storageConfig.ApiResourceConfig = serverstorage.NewResourceConfig()
+	storageConfig.APIResourceConfig = serverstorage.NewResourceConfig()
 	completedStorageConfig, err := storageConfig.Complete(etcdOptions)
 	if err != nil {
 		panic(err)
