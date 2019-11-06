@@ -3,7 +3,9 @@ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "go_default_library",
     srcs = [
+        "collector.go",
         "counter.go",
+        "desc.go",
         "gauge.go",
         "histogram.go",
         "http.go",
@@ -13,6 +15,7 @@ go_library(
         "processstarttime.go",
         "registry.go",
         "summary.go",
+        "value.go",
         "version.go",
         "version_parser.go",
         "wrappers.go",
@@ -35,6 +38,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "collector_test.go",
         "counter_test.go",
         "gauge_test.go",
         "histogram_test.go",
@@ -49,6 +53,7 @@ go_test(
         "//vendor/github.com/blang/semver:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus:go_default_library",
         "//vendor/github.com/prometheus/client_golang/prometheus/testutil:go_default_library",
+        "//vendor/github.com/prometheus/client_model/go:go_default_library",
         "//vendor/github.com/prometheus/common/expfmt:go_default_library",
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
     ],
