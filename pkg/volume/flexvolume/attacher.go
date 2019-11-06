@@ -71,36 +71,34 @@ func (a *flexVolumeAttacher) GetDeviceMountPath(spec *volume.Spec) (string, erro
 }
 
 // MountDevice is part of the volume.Attacher interface
-func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	// Mount only once.
-	alreadyMounted, err := prepareForMount(a.plugin.host.GetMounter(a.plugin.GetPluginName()), deviceMountPath)
-	if err != nil {
+func (a *flexVolumeAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	mountInternal := func() error {
+		// Mount only once.
+		alreadyMounted, err := prepareForMount(a.plugin.host.GetMounter(a.plugin.GetPluginName()), deviceMountPath)
+		if err != nil {
+			return err
+		}
+		if alreadyMounted {
+			return nil
+		}
+
+		call := a.plugin.NewDriverCall(mountDeviceCmd)
+		call.Append(deviceMountPath)
+		call.Append(devicePath)
+		call.AppendSpec(spec, a.plugin.host, nil)
+
+		_, err = call.Run()
+		if isCmdNotSupportedErr(err) {
+			// Devicepath is empty if the plugin does not support attach calls. Ignore mountDevice calls if the
+			// plugin does not implement attach interface.
+			if devicePath != "" {
+				return (*attacherDefaults)(a).MountDevice(spec, devicePath, deviceMountPath, a.plugin.host.GetMounter(a.plugin.GetPluginName()))
+			}
+			return nil
+		}
 		return err
 	}
-	if alreadyMounted {
-		return nil
-	}
-
-	call := a.plugin.NewDriverCall(mountDeviceCmd)
-	call.Append(deviceMountPath)
-	call.Append(devicePath)
-	call.AppendSpec(spec, a.plugin.host, nil)
-
-	_, err = call.Run()
-	if isCmdNotSupportedErr(err) {
-		// Devicepath is empty if the plugin does not support attach calls. Ignore mountDevice calls if the
-		// plugin does not implement attach interface.
-		if devicePath != "" {
-			return (*attacherDefaults)(a).MountDevice(spec, devicePath, deviceMountPath, a.plugin.host.GetMounter(a.plugin.GetPluginName()))
-		}
-		return nil
-	}
-	return err
-}
-
-func (a *flexVolumeAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := a.MountDevice(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
+	return volumetypes.OperationFinished, mountInternal()
 }
 
 func (a *flexVolumeAttacher) VolumesAreAttached(specs []*volume.Spec, nodeName types.NodeName) (map[*volume.Spec]bool, error) {

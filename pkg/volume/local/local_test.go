@@ -231,7 +231,7 @@ func TestBlockDeviceGlobalPathAndMountDevice(t *testing.T) {
 
 	fmt.Println("expected global path is:", expectedGlobalPath)
 
-	err = dm.MountDevice(pvSpec, tmpBlockDir, expectedGlobalPath)
+	_, err = dm.MountDevice(pvSpec, tmpBlockDir, expectedGlobalPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +276,7 @@ func TestFSGlobalPathAndMountDevice(t *testing.T) {
 	}
 
 	// Actually, we will do nothing if the local path is FS type
-	err = dm.MountDevice(pvSpec, tmpFSDir, expectedGlobalPath)
+	_, err = dm.MountDevice(pvSpec, tmpFSDir, expectedGlobalPath)
 	if err != nil {
 		t.Fatal(err)
 	}

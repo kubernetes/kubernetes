@@ -144,10 +144,7 @@ func (attacher *rbdAttacher) GetDeviceMountPath(spec *volume.Spec) (string, erro
 	return makePDNameInternal(attacher.plugin.host, pool, img), nil
 }
 
-// MountDevice implements Attacher.MountDevice. It is called by the kubelet to
-// mount device at the given mount path.
-// This method is idempotent, callers are responsible for retrying on failure.
-func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *rbdAttacher) mountDeviceInternal(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	klog.V(4).Infof("rbd: mouting device %s to %s", devicePath, deviceMountPath)
 	notMnt, err := attacher.mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -185,8 +182,11 @@ func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, d
 	return nil
 }
 
-func (attacher *rbdAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.MountDevice(spec, devicePath, deviceMountPath)
+// MountDevice implements Attacher.MountDevice. It is called by the kubelet to
+// mount device at the given mount path.
+// This method is idempotent, callers are responsible for retrying on failure.
+func (attacher *rbdAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := attacher.mountDeviceInternal(spec, devicePath, deviceMountPath)
 	return volumetypes.OperationFinished, err
 }
 

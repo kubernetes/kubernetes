@@ -253,10 +253,7 @@ type DeviceMounter interface {
 	// MountDevice mounts the disk to a global path which
 	// individual pods can then bind mount
 	// Note that devicePath can be empty if the volume plugin does not implement any of Attach and WaitForAttach methods.
-	MountDevice(spec *Spec, devicePath string, deviceMountPath string) error
-
-	// MountDeviceWithStatusTracking is same as MountDevice except status of mount operation is also returned
-	MountDeviceWithStatusTracking(spec *Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error)
+	MountDevice(spec *Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error)
 }
 
 type BulkVolumeVerifier interface {

@@ -349,31 +349,29 @@ func (dm *deviceMounter) mountLocalBlockDevice(spec *volume.Spec, devicePath str
 	return nil
 }
 
-func (dm *deviceMounter) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	if spec.PersistentVolume.Spec.Local == nil || len(spec.PersistentVolume.Spec.Local.Path) == 0 {
-		return fmt.Errorf("local volume source is nil or local path is not set")
-	}
-	fileType, err := dm.hostUtil.GetFileType(spec.PersistentVolume.Spec.Local.Path)
-	if err != nil {
-		return err
-	}
+func (dm *deviceMounter) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	mountInternal := func() error {
+		if spec.PersistentVolume.Spec.Local == nil || len(spec.PersistentVolume.Spec.Local.Path) == 0 {
+			return fmt.Errorf("local volume source is nil or local path is not set")
+		}
+		fileType, err := dm.hostUtil.GetFileType(spec.PersistentVolume.Spec.Local.Path)
+		if err != nil {
+			return err
+		}
 
-	switch fileType {
-	case hostutil.FileTypeBlockDev:
-		// local volume plugin does not implement AttachableVolumePlugin interface, so set devicePath to Path in PV spec directly
-		devicePath = spec.PersistentVolume.Spec.Local.Path
-		return dm.mountLocalBlockDevice(spec, devicePath, deviceMountPath)
-	case hostutil.FileTypeDirectory:
-		// if the given local volume path is of already filesystem directory, return directly
-		return nil
-	default:
-		return fmt.Errorf("only directory and block device are supported")
+		switch fileType {
+		case hostutil.FileTypeBlockDev:
+			// local volume plugin does not implement AttachableVolumePlugin interface, so set devicePath to Path in PV spec directly
+			devicePath = spec.PersistentVolume.Spec.Local.Path
+			return dm.mountLocalBlockDevice(spec, devicePath, deviceMountPath)
+		case hostutil.FileTypeDirectory:
+			// if the given local volume path is of already filesystem directory, return directly
+			return nil
+		default:
+			return fmt.Errorf("only directory and block device are supported")
+		}
 	}
-}
-
-func (dm *deviceMounter) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := dm.MountDevice(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
+	return volumetypes.OperationFinished, mountInternal()
 }
 
 func getVolumeSourceFSType(spec *volume.Spec) (string, error) {

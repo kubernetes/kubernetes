@@ -97,44 +97,42 @@ func (attacher *fcAttacher) GetDeviceMountPath(
 	return attacher.manager.MakeGlobalPDName(*mounter.fcDisk), nil
 }
 
-func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	mounter := attacher.host.GetMounter(fcPluginName)
-	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
+func (attacher *fcAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	mountInternal := func() error {
+		mounter := attacher.host.GetMounter(fcPluginName)
+		notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				if err := os.MkdirAll(deviceMountPath, 0750); err != nil {
+					return err
+				}
+				notMnt = true
+			} else {
 				return err
 			}
-			notMnt = true
-		} else {
-			return err
 		}
-	}
 
-	volumeSource, readOnly, err := getVolumeSource(spec)
-	if err != nil {
-		return err
-	}
-
-	options := []string{}
-	if readOnly {
-		options = append(options, "ro")
-	}
-	if notMnt {
-		diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec(fcPluginName)}
-		mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
-		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
+		volumeSource, readOnly, err := getVolumeSource(spec)
 		if err != nil {
-			os.Remove(deviceMountPath)
 			return err
 		}
-	}
-	return nil
-}
 
-func (attacher *fcAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.MountDevice(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
+		options := []string{}
+		if readOnly {
+			options = append(options, "ro")
+		}
+		if notMnt {
+			diskMounter := &mount.SafeFormatAndMount{Interface: mounter, Exec: attacher.host.GetExec(fcPluginName)}
+			mountOptions := volumeutil.MountOptionFromSpec(spec, options...)
+			err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
+			if err != nil {
+				os.Remove(deviceMountPath)
+				return err
+			}
+		}
+		return nil
+	}
+	return volumetypes.OperationFinished, mountInternal()
 }
 
 type fcDetacher struct {

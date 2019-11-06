@@ -287,7 +287,7 @@ func (attacher *gcePersistentDiskAttacher) GetDeviceMountPath(
 	return makeGlobalPDName(attacher.host, volumeSource.PDName), nil
 }
 
-func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *gcePersistentDiskAttacher) mountDeviceInternal(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	// Only mount the PD globally once.
 	mounter := attacher.host.GetMounter(gcePersistentDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
@@ -329,8 +329,8 @@ func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, device
 	return nil
 }
 
-func (attacher *gcePersistentDiskAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.MountDevice(spec, devicePath, deviceMountPath)
+func (attacher *gcePersistentDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := attacher.mountDeviceInternal(spec, devicePath, deviceMountPath)
 	return volumetypes.OperationFinished, err
 }
 

@@ -199,7 +199,11 @@ func (a *azureDiskAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error
 	return makeGlobalPDPath(a.plugin.host, volumeSource.DataDiskURI, isManagedDisk)
 }
 
-func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	return volumetypes.OperationFinished, attacher.mountDeviceInternal(spec, devicePath, deviceMountPath)
+}
+
+func (attacher *azureDiskAttacher) mountDeviceInternal(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	mounter := attacher.plugin.host.GetMounter(azureDataDiskPluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 
@@ -258,11 +262,6 @@ func (attacher *azureDiskAttacher) MountDevice(spec *volume.Spec, devicePath str
 		}
 	}
 	return nil
-}
-
-func (d *azureDiskAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := d.MountDevice(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
 }
 
 // Detach detaches disk from Azure VM.

@@ -575,7 +575,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			}
 
 			// Mount device to global mount path
-			operationState, err := volumeDeviceMounter.MountDeviceWithStatusTracking(
+			operationState, err := volumeDeviceMounter.MountDevice(
 				volumeToMount.VolumeSpec,
 				devicePath,
 				deviceMountPath)

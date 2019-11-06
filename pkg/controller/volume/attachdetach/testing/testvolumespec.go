@@ -441,14 +441,9 @@ func (attacher *testPluginAttacher) MountDevice(spec *volume.Spec, devicePath st
 	if spec == nil {
 		*attacher.ErrorEncountered = true
 		klog.Errorf("MountDevice called with nil volume spec")
-		return fmt.Errorf("MountDevice called with nil volume spec")
+		return volumetypes.OperationFinished, fmt.Errorf("MountDevice called with nil volume spec")
 	}
-	return nil
-}
-
-func (attacher *testPluginAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.MountDevice(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
+	return volumetypes.OperationFinished, nil
 }
 
 // Detacher

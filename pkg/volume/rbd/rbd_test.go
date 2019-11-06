@@ -281,7 +281,7 @@ func doTestPlugin(t *testing.T, c *testcase) {
 	if deviceMountPath != c.expectedDeviceMountPath {
 		t.Errorf("Unexpected mount path, expected %q, not: %q", c.expectedDeviceMountPath, deviceMountPath)
 	}
-	err = attacher.MountDevice(c.spec, devicePath, deviceMountPath)
+	_, err = attacher.MountDevice(c.spec, devicePath, deviceMountPath)
 	if err != nil {
 		t.Fatal(err)
 	}

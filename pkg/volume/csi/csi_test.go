@@ -360,7 +360,7 @@ func TestCSI_VolumeAll(t *testing.T) {
 				if err != nil {
 					t.Fatalf("csiTest.VolumeAll deviceMounter.GetdeviceMountPath failed %s", err)
 				}
-				if err := csiDevMounter.MountDevice(volSpec, devicePath, devMountPath); err != nil {
+				if _, err := csiDevMounter.MountDevice(volSpec, devicePath, devMountPath); err != nil {
 					t.Fatalf("csiTest.VolumeAll deviceMounter.MountDevice failed: %v", err)
 				}
 				t.Log("csiTest.VolumeAll device mounted at path:", devMountPath)

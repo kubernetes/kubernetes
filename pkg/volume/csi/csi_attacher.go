@@ -220,12 +220,7 @@ func (c *csiAttacher) GetDeviceMountPath(spec *volume.Spec) (string, error) {
 	return deviceMountPath, nil
 }
 
-func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
-	_, err := c.MountDeviceWithStatusTracking(spec, devicePath, deviceMountPath)
-	return err
-}
-
-func (c *csiAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+func (c *csiAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
 	klog.V(4).Infof(log("attacher.MountDevice(%s, %s)", devicePath, deviceMountPath))
 	// lets default to operation as finished state
 	opExitStatus := volumetypes.OperationFinished

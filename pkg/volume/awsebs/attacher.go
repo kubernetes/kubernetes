@@ -207,7 +207,7 @@ func (attacher *awsElasticBlockStoreAttacher) GetDeviceMountPath(
 }
 
 // FIXME: this method can be further pruned.
-func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
 	mounter := attacher.host.GetMounter(awsElasticBlockStorePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
 	if err != nil {
@@ -222,17 +222,17 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 				dir = filepath.Dir(deviceMountPath)
 			}
 			if err := os.MkdirAll(dir, 0750); err != nil {
-				return fmt.Errorf("making dir %s failed with %s", dir, err)
+				return volumetypes.OperationFinished, fmt.Errorf("making dir %s failed with %s", dir, err)
 			}
 			notMnt = true
 		} else {
-			return err
+			return volumetypes.OperationFinished, err
 		}
 	}
 
 	volumeSource, readOnly, err := getVolumeSource(spec)
 	if err != nil {
-		return err
+		return volumetypes.OperationFinished, err
 	}
 
 	options := []string{}
@@ -245,15 +245,10 @@ func (attacher *awsElasticBlockStoreAttacher) MountDevice(spec *volume.Spec, dev
 		err = diskMounter.FormatAndMount(devicePath, deviceMountPath, volumeSource.FSType, mountOptions)
 		if err != nil {
 			os.Remove(deviceMountPath)
-			return err
+			return volumetypes.OperationFinished, err
 		}
 	}
-	return nil
-}
-
-func (attacher *awsElasticBlockStoreAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.MountDevice(spec, devicePath, deviceMountPath)
-	return volumetypes.OperationFinished, err
+	return volumetypes.OperationFinished, nil
 }
 
 type awsElasticBlockStoreDetacher struct {

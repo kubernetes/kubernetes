@@ -208,8 +208,7 @@ func (plugin *vsphereVolumePlugin) GetDeviceMountRefs(deviceMountPath string) ([
 	return mounter.GetMountRefs(deviceMountPath)
 }
 
-// MountDevice mounts device to global mount point.
-func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) error {
+func (attacher *vsphereVMDKAttacher) mountDeviceInternal(spec *volume.Spec, devicePath string, deviceMountPath string) error {
 	klog.Info("vsphere MountDevice", devicePath, deviceMountPath)
 	mounter := attacher.host.GetMounter(vsphereVolumePluginName)
 	notMnt, err := mounter.IsLikelyNotMountPoint(deviceMountPath)
@@ -249,8 +248,9 @@ func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath s
 	return nil
 }
 
-func (attacher *vsphereVMDKAttacher) MountDeviceWithStatusTracking(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
-	err := attacher.MountDevice(spec, devicePath, deviceMountPath)
+// MountDevice mounts device to global mount point.
+func (attacher *vsphereVMDKAttacher) MountDevice(spec *volume.Spec, devicePath string, deviceMountPath string) (volumetypes.OperationStatus, error) {
+	err := attacher.mountDeviceInternal(spec, devicePath, deviceMountPath)
 	return volumetypes.OperationFinished, err
 }
 

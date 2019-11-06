@@ -1348,7 +1348,7 @@ func TestAttacherMountDeviceWithInline(t *testing.T) {
 			}()
 
 			// Run
-			err = csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
+			_, err = csiAttacher.MountDevice(tc.spec, tc.devicePath, tc.deviceMountPath)
 
 			// Verify
 			if err != nil {
