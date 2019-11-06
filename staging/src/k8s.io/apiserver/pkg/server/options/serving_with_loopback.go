@@ -19,7 +19,7 @@ package options
 import (
 	"fmt"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 
 	"k8s.io/apiserver/pkg/server"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
@@ -60,7 +60,7 @@ func (s *SecureServingOptionsWithLoopback) ApplyTo(secureServingInfo **server.Se
 		return fmt.Errorf("failed to generate self-signed certificate for loopback connection: %v", err)
 	}
 
-	secureLoopbackClientConfig, err := (*secureServingInfo).NewLoopbackClientConfig(uuid.NewRandom().String(), certPem)
+	secureLoopbackClientConfig, err := (*secureServingInfo).NewLoopbackClientConfig(uuid.New().String(), certPem)
 	switch {
 	// if we failed and there's no fallback loopback client config, we need to fail
 	case err != nil && *loopbackClientConfig == nil:

@@ -71,7 +71,7 @@ go_test(
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
         "//staging/src/k8s.io/kubectl/pkg/cmd/util:go_default_library",
         "//test/integration/framework:go_default_library",
-        "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/github.com/google/uuid:go_default_library",
         "//vendor/k8s.io/gengo/examples/set-gen/sets:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
     ],

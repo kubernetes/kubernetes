@@ -27,15 +27,15 @@ import (
 
 // NodeLabelPrioritizer contains information to calculate node label priority.
 type NodeLabelPrioritizer struct {
-	label    string
-	presence bool
+	presentLabelsPreference []string
+	absentLabelsPreference  []string
 }
 
 // NewNodeLabelPriority creates a NodeLabelPrioritizer.
-func NewNodeLabelPriority(label string, presence bool) (PriorityMapFunction, PriorityReduceFunction) {
+func NewNodeLabelPriority(presentLabelsPreference []string, absentLabelsPreference []string) (PriorityMapFunction, PriorityReduceFunction) {
 	labelPrioritizer := &NodeLabelPrioritizer{
-		label:    label,
-		presence: presence,
+		presentLabelsPreference: presentLabelsPreference,
+		absentLabelsPreference:  absentLabelsPreference,
 	}
 	return labelPrioritizer.CalculateNodeLabelPriorityMap, nil
 }
@@ -49,11 +49,20 @@ func (n *NodeLabelPrioritizer) CalculateNodeLabelPriorityMap(pod *v1.Pod, meta i
 		return framework.NodeScore{}, fmt.Errorf("node not found")
 	}
 
-	exists := labels.Set(node.Labels).Has(n.label)
 	score := int64(0)
-	if (exists && n.presence) || (!exists && !n.presence) {
-		score = framework.MaxNodeScore
+	for _, label := range n.presentLabelsPreference {
+		if labels.Set(node.Labels).Has(label) {
+			score += framework.MaxNodeScore
+		}
 	}
+	for _, label := range n.absentLabelsPreference {
+		if !labels.Set(node.Labels).Has(label) {
+			score += framework.MaxNodeScore
+		}
+	}
+	// Take average score for each label to ensure the score doesn't exceed MaxNodeScore.
+	score /= int64(len(n.presentLabelsPreference) + len(n.absentLabelsPreference))
+
 	return framework.NodeScore{
 		Name:  node.Name,
 		Score: score,

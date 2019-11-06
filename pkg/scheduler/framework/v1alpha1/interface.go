@@ -471,6 +471,9 @@ type FrameworkHandle interface {
 	// GetWaitingPod returns a waiting pod given its UID.
 	GetWaitingPod(uid types.UID) WaitingPod
 
+	// RejectWaitingPod rejects a waiting pod given its UID.
+	RejectWaitingPod(uid types.UID)
+
 	// ClientSet returns a kubernetes clientSet.
 	ClientSet() clientset.Interface
 

@@ -39,6 +39,7 @@ import (
 	"k8s.io/component-base/metrics/prometheus/ratelimiter"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/controller"
+	endpointslicemetrics "k8s.io/kubernetes/pkg/controller/endpointslice/metrics"
 	endpointutil "k8s.io/kubernetes/pkg/controller/util/endpoint"
 )
 
@@ -71,6 +72,8 @@ func NewController(podInformer coreinformers.PodInformer,
 	if client != nil && client.CoreV1().RESTClient().GetRateLimiter() != nil {
 		ratelimiter.RegisterMetricAndTrackRateLimiterUsage("endpoint_slice_controller", client.DiscoveryV1alpha1().RESTClient().GetRateLimiter())
 	}
+
+	endpointslicemetrics.RegisterMetrics()
 
 	c := &Controller{
 		client:           client,
@@ -108,6 +111,7 @@ func NewController(podInformer coreinformers.PodInformer,
 		client:               c.client,
 		nodeLister:           c.nodeLister,
 		maxEndpointsPerSlice: c.maxEndpointsPerSlice,
+		metricsCache:         endpointslicemetrics.NewCache(maxEndpointsPerSlice),
 	}
 	c.triggerTimeTracker = endpointutil.NewTriggerTimeTracker()
 
@@ -251,6 +255,7 @@ func (c *Controller) syncService(key string) error {
 	if err != nil {
 		if apierrors.IsNotFound(err) {
 			c.triggerTimeTracker.DeleteService(namespace, name)
+			c.reconciler.deleteService(namespace, name)
 			// The service has been deleted, return nil so that it won't be retried.
 			return nil
 		}

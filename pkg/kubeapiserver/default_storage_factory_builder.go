@@ -49,6 +49,7 @@ var SpecialDefaultResourcePrefixes = map[schema.GroupResource]string{
 	{Group: "policy", Resource: "podsecuritypolicies"}:     "podsecuritypolicy",
 }
 
+// NewStorageFactoryConfig returns a new StorageFactoryConfig set up with necessary resource overrides.
 func NewStorageFactoryConfig() *StorageFactoryConfig {
 
 	resources := []schema.GroupVersionResource{
@@ -66,9 +67,10 @@ func NewStorageFactoryConfig() *StorageFactoryConfig {
 	}
 }
 
+// StorageFactoryConfig is a configuration for creating storage factory.
 type StorageFactoryConfig struct {
 	StorageConfig                    storagebackend.Config
-	ApiResourceConfig                *serverstorage.ResourceConfig
+	APIResourceConfig                *serverstorage.ResourceConfig
 	DefaultResourceEncoding          *serverstorage.DefaultResourceEncodingConfig
 	DefaultStorageMediaType          string
 	Serializer                       runtime.StorageSerializer
@@ -77,6 +79,7 @@ type StorageFactoryConfig struct {
 	EncryptionProviderConfigFilepath string
 }
 
+// Complete completes the StorageFactoryConfig with provided etcdOptions returning completedStorageFactoryConfig.
 func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) (*completedStorageFactoryConfig, error) {
 	c.StorageConfig = etcdOptions.StorageConfig
 	c.DefaultStorageMediaType = etcdOptions.DefaultStorageMediaType
@@ -85,10 +88,15 @@ func (c *StorageFactoryConfig) Complete(etcdOptions *serveroptions.EtcdOptions) 
 	return &completedStorageFactoryConfig{c}, nil
 }
 
+// completedStorageFactoryConfig is a wrapper around StorageFactoryConfig completed with etcd options.
+//
+// Note: this struct is intentionally unexported so that it can only be constructed via a StorageFactoryConfig.Complete
+// call. The implied consequence is that this does not comply with golint.
 type completedStorageFactoryConfig struct {
 	*StorageFactoryConfig
 }
 
+// New returns a new storage factory created from the completed storage factory configuration.
 func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFactory, error) {
 	resourceEncodingConfig := resourceconfig.MergeResourceEncodingConfigs(c.DefaultResourceEncoding, c.ResourceEncodingOverrides)
 	storageFactory := serverstorage.NewDefaultStorageFactory(
@@ -96,7 +104,7 @@ func (c *completedStorageFactoryConfig) New() (*serverstorage.DefaultStorageFact
 		c.DefaultStorageMediaType,
 		c.Serializer,
 		resourceEncodingConfig,
-		c.ApiResourceConfig,
+		c.APIResourceConfig,
 		SpecialDefaultResourcePrefixes)
 
 	storageFactory.AddCohabitatingResources(networking.Resource("networkpolicies"), extensions.Resource("networkpolicies"))

@@ -41,13 +41,13 @@ type KubeSchedulerConfiguration struct {
 
 	// SchedulerName is name of the scheduler, used to select which pods
 	// will be processed by this scheduler, based on pod's "spec.SchedulerName".
-	SchedulerName string `json:"schedulerName"`
+	SchedulerName *string `json:"schedulerName,omitempty"`
 	// AlgorithmSource specifies the scheduler algorithm source.
 	AlgorithmSource SchedulerAlgorithmSource `json:"algorithmSource"`
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
 	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
-	HardPodAffinitySymmetricWeight int32 `json:"hardPodAffinitySymmetricWeight"`
+	HardPodAffinitySymmetricWeight *int32 `json:"hardPodAffinitySymmetricWeight,omitempty"`
 
 	// LeaderElection defines the configuration of leader election client.
 	LeaderElection KubeSchedulerLeaderElectionConfiguration `json:"leaderElection"`
@@ -57,17 +57,17 @@ type KubeSchedulerConfiguration struct {
 	ClientConnection componentbaseconfigv1alpha1.ClientConnectionConfiguration `json:"clientConnection"`
 	// HealthzBindAddress is the IP address and port for the health check server to serve on,
 	// defaulting to 0.0.0.0:10251
-	HealthzBindAddress string `json:"healthzBindAddress"`
+	HealthzBindAddress *string `json:"healthzBindAddress,omitempty"`
 	// MetricsBindAddress is the IP address and port for the metrics server to
 	// serve on, defaulting to 0.0.0.0:10251.
-	MetricsBindAddress string `json:"metricsBindAddress"`
+	MetricsBindAddress *string `json:"metricsBindAddress,omitempty"`
 
 	// DebuggingConfiguration holds configuration for Debugging related features
 	// TODO: We might wanna make this a substruct like Debugging componentbaseconfigv1alpha1.DebuggingConfiguration
 	componentbaseconfigv1alpha1.DebuggingConfiguration `json:",inline"`
 
 	// DisablePreemption disables the pod preemption feature.
-	DisablePreemption bool `json:"disablePreemption"`
+	DisablePreemption *bool `json:"disablePreemption,omitempty"`
 
 	// PercentageOfNodeToScore is the percentage of all nodes that once found feasible
 	// for running a pod, the scheduler stops its search for more feasible nodes in
@@ -77,7 +77,7 @@ type KubeSchedulerConfiguration struct {
 	// then scheduler stops finding further feasible nodes once it finds 150 feasible ones.
 	// When the value is 0, default percentage (5%--50% based on the size of the cluster) of the
 	// nodes will be scored.
-	PercentageOfNodesToScore int32 `json:"percentageOfNodesToScore"`
+	PercentageOfNodesToScore *int32 `json:"percentageOfNodesToScore,omitempty"`
 
 	// Duration to wait for a binding operation to complete before timing out
 	// Value must be non-negative integer. The value zero indicates no waiting.
@@ -209,7 +209,7 @@ type Plugin struct {
 	// Name defines the name of plugin
 	Name string `json:"name"`
 	// Weight defines the weight of plugin, only used for Score plugins.
-	Weight int32 `json:"weight,omitempty"`
+	Weight *int32 `json:"weight,omitempty"`
 }
 
 // PluginConfig specifies arguments that should be passed to a plugin at the time of initialization.

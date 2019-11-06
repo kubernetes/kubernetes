@@ -239,10 +239,14 @@ func (cache *schedulerCache) UpdateNodeInfoSnapshot(nodeSnapshot *nodeinfosnapsh
 
 	// Take a snapshot of the nodes order in the tree
 	nodeSnapshot.NodeInfoList = make([]*schedulernodeinfo.NodeInfo, 0, cache.nodeTree.numNodes)
+	nodeSnapshot.HavePodsWithAffinityNodeInfoList = make([]*schedulernodeinfo.NodeInfo, 0, cache.nodeTree.numNodes)
 	for i := 0; i < cache.nodeTree.numNodes; i++ {
 		nodeName := cache.nodeTree.next()
 		if n := nodeSnapshot.NodeInfoMap[nodeName]; n != nil {
 			nodeSnapshot.NodeInfoList = append(nodeSnapshot.NodeInfoList, n)
+			if len(n.PodsWithAffinity()) > 0 {
+				nodeSnapshot.HavePodsWithAffinityNodeInfoList = append(nodeSnapshot.HavePodsWithAffinityNodeInfoList, n)
+			}
 		} else {
 			klog.Errorf("node %q exist in nodeTree but not in NodeInfoMap, this should not happen.", nodeName)
 		}

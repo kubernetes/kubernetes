@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	gostrings "strings"
 
-	"github.com/pborman/uuid"
+	"github.com/google/uuid"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -408,7 +408,7 @@ func (provisioner *quobyteVolumeProvisioner) Provision(selectedNode *v1.Node, al
 	}
 
 	// create random image name
-	provisioner.volume = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.NewUUID())
+	provisioner.volume = fmt.Sprintf("kubernetes-dynamic-pvc-%s", uuid.New().String())
 
 	manager := &quobyteVolumeManager{
 		config: cfg,

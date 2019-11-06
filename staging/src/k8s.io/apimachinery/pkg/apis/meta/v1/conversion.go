@@ -45,6 +45,7 @@ func AddConversionFuncs(scheme *runtime.Scheme) error {
 		Convert_v1_Duration_To_Pointer_v1_Duration,
 
 		Convert_Slice_string_To_v1_Time,
+		Convert_Slice_string_To_Pointer_v1_Time,
 
 		Convert_v1_Time_To_v1_Time,
 		Convert_v1_MicroTime_To_v1_MicroTime,
@@ -261,6 +262,22 @@ func Convert_Slice_string_To_v1_Time(in *[]string, out *Time, s conversion.Scope
 		str = (*in)[0]
 	}
 	return out.UnmarshalQueryParameter(str)
+}
+
+func Convert_Slice_string_To_Pointer_v1_Time(in *[]string, out **Time, s conversion.Scope) error {
+	if in == nil {
+		return nil
+	}
+	str := ""
+	if len(*in) > 0 {
+		str = (*in)[0]
+	}
+	temp := Time{}
+	if err := temp.UnmarshalQueryParameter(str); err != nil {
+		return err
+	}
+	*out = &temp
+	return nil
 }
 
 func Convert_string_To_labels_Selector(in *string, out *labels.Selector, s conversion.Scope) error {

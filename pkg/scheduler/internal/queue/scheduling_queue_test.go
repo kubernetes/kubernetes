@@ -243,6 +243,9 @@ func (*fakeFramework) GetWaitingPod(uid types.UID) framework.WaitingPod {
 	return nil
 }
 
+func (*fakeFramework) RejectWaitingPod(uid types.UID) {
+}
+
 func (*fakeFramework) ClientSet() clientset.Interface {
 	return nil
 }

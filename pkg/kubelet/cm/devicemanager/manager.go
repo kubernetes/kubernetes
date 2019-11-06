@@ -231,7 +231,7 @@ func (m *ManagerImpl) Start(activePods ActivePodsFunc, sourcesReady config.Sourc
 	}
 
 	socketPath := filepath.Join(m.socketdir, m.socketname)
-	os.MkdirAll(m.socketdir, 0755)
+	os.MkdirAll(m.socketdir, 0750)
 	if selinux.SELinuxEnabled() {
 		if err := selinux.SetFileLabel(m.socketdir, config.KubeletPluginsDirSELinuxLabel); err != nil {
 			klog.Warningf("Unprivileged containerized plugins might not work. Could not set selinux context on %s: %v", m.socketdir, err)

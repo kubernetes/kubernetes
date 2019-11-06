@@ -180,7 +180,7 @@ func TestPodToEndpoint(t *testing.T) {
 	}
 }
 
-func TestPodChangedWithpodEndpointChanged(t *testing.T) {
+func TestPodChangedWithPodEndpointChanged(t *testing.T) {
 	podStore := cache.NewStore(cache.DeletionHandlingMetaNamespaceKeyFunc)
 	ns := "test"
 	podStore.Add(newPod(1, ns, true, 1))
@@ -287,7 +287,7 @@ func newClientset() *fake.Clientset {
 	return client
 }
 
-func newServiceAndendpointMeta(name, namespace string) (v1.Service, endpointMeta) {
+func newServiceAndEndpointMeta(name, namespace string) (v1.Service, endpointMeta) {
 	portNum := int32(80)
 	portNameIntStr := intstr.IntOrString{
 		Type:   intstr.Int,

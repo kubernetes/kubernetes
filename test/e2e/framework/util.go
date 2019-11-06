@@ -62,6 +62,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	scaleclient "k8s.io/client-go/scale"
 	"k8s.io/client-go/tools/clientcmd"
@@ -77,11 +78,9 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
 	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
-	"k8s.io/kubernetes/test/e2e/manifest"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
-	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -228,57 +227,6 @@ func RunIfSystemSpecNameIs(names ...string) {
 	skipInternalf(1, "Skipped because system spec name %q is not in %v", TestContext.SystemSpecName, names)
 }
 
-// Run a test container to try and contact the Kubernetes api-server from a pod, wait for it
-// to flip to Ready, log its output and delete it.
-func runKubernetesServiceTestContainer(c clientset.Interface, ns string) {
-	path := "test/images/clusterapi-tester/pod.yaml"
-	Logf("Parsing pod from %v", path)
-	p, err := manifest.PodFromManifest(path)
-	if err != nil {
-		Logf("Failed to parse clusterapi-tester from manifest %v: %v", path, err)
-		return
-	}
-	p.Namespace = ns
-	if _, err := c.CoreV1().Pods(ns).Create(p); err != nil {
-		Logf("Failed to create %v: %v", p.Name, err)
-		return
-	}
-	defer func() {
-		if err := c.CoreV1().Pods(ns).Delete(p.Name, nil); err != nil {
-			Logf("Failed to delete pod %v: %v", p.Name, err)
-		}
-	}()
-	timeout := 5 * time.Minute
-	if err := e2epod.WaitForPodCondition(c, ns, p.Name, "clusterapi-tester", timeout, testutils.PodRunningReady); err != nil {
-		Logf("Pod %v took longer than %v to enter running/ready: %v", p.Name, timeout, err)
-		return
-	}
-	logs, err := e2epod.GetPodLogs(c, ns, p.Name, p.Spec.Containers[0].Name)
-	if err != nil {
-		Logf("Failed to retrieve logs from %v: %v", p.Name, err)
-	} else {
-		Logf("Output of clusterapi-tester:\n%v", logs)
-	}
-}
-
-// getDefaultClusterIPFamily obtains the default IP family of the cluster
-// using the Cluster IP address of the kubernetes service created in the default namespace
-// This unequivocally identifies the default IP family because services are single family
-// TODO: dual-stack may support multiple families per service
-// but we can detect if a cluster is dual stack because pods have two addresses (one per family)
-func getDefaultClusterIPFamily(c clientset.Interface) string {
-	// Get the ClusterIP of the kubernetes service created in the default namespace
-	svc, err := c.CoreV1().Services(metav1.NamespaceDefault).Get("kubernetes", metav1.GetOptions{})
-	if err != nil {
-		Failf("Failed to get kubernetes service ClusterIP: %v", err)
-	}
-
-	if utilnet.IsIPv6String(svc.Spec.ClusterIP) {
-		return "ipv6"
-	}
-	return "ipv4"
-}
-
 // ProviderIs returns true if the provider is included is the providers. Otherwise false.
 func ProviderIs(providers ...string) bool {
 	for _, provider := range providers {
@@ -307,36 +255,6 @@ func NodeOSDistroIs(supportedNodeOsDistros ...string) bool {
 		}
 	}
 	return false
-}
-
-// ProxyMode returns a proxyMode of a kube-proxy.
-func ProxyMode(f *Framework) (string, error) {
-	pod := &v1.Pod{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "kube-proxy-mode-detector",
-			Namespace: f.Namespace.Name,
-		},
-		Spec: v1.PodSpec{
-			HostNetwork: true,
-			Containers: []v1.Container{
-				{
-					Name:  "detector",
-					Image: AgnHostImage,
-					Args:  []string{"pause"},
-				},
-			},
-		},
-	}
-	f.PodClient().CreateSync(pod)
-	defer f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, DefaultPodDeletionTimeout)
-
-	cmd := "curl -q -s --connect-timeout 1 http://localhost:10249/proxyMode"
-	stdout, err := RunHostCmd(pod.Namespace, pod.Name, cmd)
-	if err != nil {
-		return "", err
-	}
-	Logf("ProxyMode: %s", stdout)
-	return stdout, nil
 }
 
 // WaitForDaemonSets for all daemonsets in the given namespace to be ready
@@ -841,8 +759,8 @@ func KubectlVersion() (*utilversion.Version, error) {
 	return utilversion.ParseSemantic(matches[1])
 }
 
-// RestclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
-func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
+// restclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
+func restclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 	Logf(">>> kubeConfig: %s", TestContext.KubeConfig)
 	if TestContext.KubeConfig == "" {
 		return nil, fmt.Errorf("KubeConfig must be specified to load client config")
@@ -861,13 +779,23 @@ func RestclientConfig(kubeContext string) (*clientcmdapi.Config, error) {
 // ClientConfigGetter is a func that returns getter to return a config.
 type ClientConfigGetter func() (*restclient.Config, error)
 
-// LoadConfig returns a config for a rest client.
-func LoadConfig() (*restclient.Config, error) {
+// LoadConfig returns a config for a rest client with the UserAgent set to include the current test name.
+func LoadConfig() (config *restclient.Config, err error) {
+	defer func() {
+		if err == nil && config != nil {
+			testDesc := ginkgo.CurrentGinkgoTestDescription()
+			if len(testDesc.ComponentTexts) > 0 {
+				componentTexts := strings.Join(testDesc.ComponentTexts, " ")
+				config.UserAgent = fmt.Sprintf("%s -- %s", rest.DefaultKubernetesUserAgent(), componentTexts)
+			}
+		}
+	}()
+
 	if TestContext.NodeE2E {
 		// This is a node e2e test, apply the node e2e configuration
 		return &restclient.Config{Host: TestContext.Host}, nil
 	}
-	c, err := RestclientConfig(TestContext.KubeContext)
+	c, err := restclientConfig(TestContext.KubeContext)
 	if err != nil {
 		if TestContext.KubeConfig == "" {
 			return restclient.InClusterConfig()
@@ -2421,18 +2349,6 @@ func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
 	return len(scheduledPods)
 }
 
-// ListNamespaceEvents lists the events in the given namespace.
-func ListNamespaceEvents(c clientset.Interface, ns string) error {
-	ls, err := c.CoreV1().Events(ns).List(metav1.ListOptions{})
-	if err != nil {
-		return err
-	}
-	for _, event := range ls.Items {
-		klog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
-	}
-	return nil
-}
-
 // E2ETestNodePreparer implements testutils.TestNodePreparer interface, which is used
 // to create/modify Nodes before running a test.
 type E2ETestNodePreparer struct {
@@ -2442,15 +2358,6 @@ type E2ETestNodePreparer struct {
 	// be at least <sum_of_keys> Nodes in the cluster.
 	countToStrategy       []testutils.CountToStrategy
 	nodeToAppliedStrategy map[string]testutils.PrepareNodeStrategy
-}
-
-// NewE2ETestNodePreparer returns a new instance of E2ETestNodePreparer.
-func NewE2ETestNodePreparer(client clientset.Interface, countToStrategy []testutils.CountToStrategy) testutils.TestNodePreparer {
-	return &E2ETestNodePreparer{
-		client:                client,
-		countToStrategy:       countToStrategy,
-		nodeToAppliedStrategy: make(map[string]testutils.PrepareNodeStrategy),
-	}
 }
 
 // PrepareNodes prepares nodes in the cluster.
@@ -2552,51 +2459,6 @@ func GetAllMasterAddresses(c clientset.Interface) []string {
 		Failf("This test is not supported for provider %s and should be disabled", TestContext.Provider)
 	}
 	return ips.List()
-}
-
-// SimpleGET executes a get on the given url, returns error if non-200 returned.
-func SimpleGET(c *http.Client, url, host string) (string, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return "", err
-	}
-	req.Host = host
-	res, err := c.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	rawBody, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-	body := string(rawBody)
-	if res.StatusCode != http.StatusOK {
-		err = fmt.Errorf(
-			"GET returned http error %v", res.StatusCode)
-	}
-	return body, err
-}
-
-// PollURL polls till the url responds with a healthy http code. If
-// expectUnreachable is true, it breaks on first non-healthy http code instead.
-func PollURL(route, host string, timeout time.Duration, interval time.Duration, httpClient *http.Client, expectUnreachable bool) error {
-	var lastBody string
-	pollErr := wait.PollImmediate(interval, timeout, func() (bool, error) {
-		var err error
-		lastBody, err = SimpleGET(httpClient, route, host)
-		if err != nil {
-			Logf("host %v path %v: %v unreachable", host, route, err)
-			return expectUnreachable, nil
-		}
-		Logf("host %v path %v: reached", host, route)
-		return !expectUnreachable, nil
-	})
-	if pollErr != nil {
-		return fmt.Errorf("Failed to execute a successful GET within %v, Last response body for %v, host %v:\n%v\n\n%v",
-			timeout, route, host, lastBody, pollErr)
-	}
-	return nil
 }
 
 // DescribeIng describes information of ingress by running kubectl describe ing.

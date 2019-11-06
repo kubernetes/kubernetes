@@ -193,12 +193,12 @@ func Run(ctx context.Context, cc schedulerserverconfig.CompletedConfig, outOfTre
 		scheduler.WithHardPodAffinitySymmetricWeight(cc.ComponentConfig.HardPodAffinitySymmetricWeight),
 		scheduler.WithPreemptionDisabled(cc.ComponentConfig.DisablePreemption),
 		scheduler.WithPercentageOfNodesToScore(cc.ComponentConfig.PercentageOfNodesToScore),
-		scheduler.WithBindTimeoutSeconds(*cc.ComponentConfig.BindTimeoutSeconds),
+		scheduler.WithBindTimeoutSeconds(cc.ComponentConfig.BindTimeoutSeconds),
 		scheduler.WithFrameworkOutOfTreeRegistry(outOfTreeRegistry),
 		scheduler.WithFrameworkPlugins(cc.ComponentConfig.Plugins),
 		scheduler.WithFrameworkPluginConfig(cc.ComponentConfig.PluginConfig),
-		scheduler.WithPodMaxBackoffSeconds(*cc.ComponentConfig.PodMaxBackoffSeconds),
-		scheduler.WithPodInitialBackoffSeconds(*cc.ComponentConfig.PodInitialBackoffSeconds),
+		scheduler.WithPodMaxBackoffSeconds(cc.ComponentConfig.PodMaxBackoffSeconds),
+		scheduler.WithPodInitialBackoffSeconds(cc.ComponentConfig.PodInitialBackoffSeconds),
 	)
 	if err != nil {
 		return err

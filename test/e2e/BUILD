@@ -61,6 +61,7 @@ go_library(
         "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/client-go/plugin/pkg/client/auth:go_default_library",
         "//staging/src/k8s.io/component-base/logs:go_default_library",
+        "//staging/src/k8s.io/component-base/version:go_default_library",
         "//test/e2e/common:go_default_library",
         "//test/e2e/framework:go_default_library",
         "//test/e2e/framework/auth:go_default_library",
@@ -74,11 +75,14 @@ go_library(
         "//test/e2e/framework/providers/openstack:go_default_library",
         "//test/e2e/framework/providers/vsphere:go_default_library",
         "//test/e2e/framework/testfiles:go_default_library",
+        "//test/e2e/manifest:go_default_library",
+        "//test/utils:go_default_library",
         "//vendor/github.com/onsi/ginkgo:go_default_library",
         "//vendor/github.com/onsi/ginkgo/config:go_default_library",
         "//vendor/github.com/onsi/ginkgo/reporters:go_default_library",
         "//vendor/github.com/onsi/gomega:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",
+        "//vendor/k8s.io/utils/net:go_default_library",
     ],
 )
 
