@@ -26,7 +26,7 @@
     "command": [
               "/bin/sh",
               "-c",
-              "set -o errexit; if [ -e /usr/local/bin/migrate-if-needed.sh ]; then /usr/local/bin/migrate-if-needed.sh 1>>/var/log/etcd{{ suffix }}.log 2>&1; fi; exec /usr/local/bin/etcd --name etcd-{{ hostname }} --listen-peer-urls {{ etcd_protocol }}://{{ host_ip }}:{{ server_port }} --initial-advertise-peer-urls {{ etcd_protocol }}://{{ hostname }}:{{ server_port }} --advertise-client-urls {{ etcd_apiserver_protocol }}://127.0.0.1:{{ port }} --listen-client-urls {{ etcd_apiserver_protocol }}://{{ listen_client_ip }}:{{ port }} {{ quota_bytes }} --data-dir /var/etcd/data{{ suffix }} --initial-cluster-state {{ cluster_state }} --initial-cluster {{ etcd_cluster }} {{ etcd_creds }} {{ etcd_apiserver_creds }} {{ etcd_extra_args }} 1>>/var/log/etcd{{ suffix }}.log 2>&1"
+              "set -o errexit; exec 1>>${ETCD_LOG_FILE} 2>&1; ETCD_FLAGS=( --name=etcd-${ETCD_HOSTNAME} --listen-peer-urls=${LISTEN_PEER_URLS} --initial-advertise-peer-urls=${INITIAL_ADVERTISE_PEER_URLS} --advertise-client-urls=${ADVERTISE_CLIENT_URLS} --listen-client-urls=${LISTEN_CLIENT_URLS} ${QUOTA_BYTES} --data-dir=${DATA_DIRECTORY} --initial-cluster-state=${INITIAL_CLUSTER_STATE} --initial-cluster=${INITIAL_CLUSTER} ${ETCD_EXTRA_ARGS}); if [ -e /usr/local/bin/etcd-main.sh ]; then source /usr/local/bin/etcd-main.sh; main \"${ETCD_FLAGS[@]}\"; else set -x; declare -x; echo 'DEPRECATED: Starting etcd legacy scripts...'; if [ -e /usr/local/bin/backup-before-start.sh ]; then /bin/sh /usr/local/bin/backup-before-start.sh; fi; if [ -e /usr/local/bin/migrate-if-needed.sh ]; then /bin/sh /usr/local/bin/migrate-if-needed.sh; fi; exec /usr/local/bin/etcd \"${ETCD_FLAGS[@]}\"; fi;"
             ],
     "env": [
       { "name": "TARGET_STORAGE",
@@ -58,6 +58,25 @@
       },
       { "name": "ETCD_HOSTNAME",
         "value": "{{ hostname }}"
+      },
+      { "name": "LISTEN_CLIENT_URLS",
+        "value": "{{ etcd_apiserver_protocol }}://{{ listen_client_ip }}:{{ port }}"
+      },
+      { "name": "ADVERTISE_CLIENT_URLS",
+        "value": "{{ etcd_apiserver_protocol }}://127.0.0.1:{{ port }}"
+      },
+      { "name": "QUOTA_BYTES",
+        "value": "{{ quota_bytes }}"
+      },
+      { "name": "INITIAL_CLUSTER_STATE",
+        "value": "{{ cluster_state }}"
+      },
+      { "name": "ETCD_EXTRA_ARGS",
+        "value": "{{ etcd_creds }} {{ etcd_apiserver_creds }} {{ etcd_extra_args }}"
+      },
+      {
+        "name": "ETCD_LOG_FILE",
+        "value": "/var/log/etcd{{ suffix }}.log"
       }
         ],
     "livenessProbe": {
