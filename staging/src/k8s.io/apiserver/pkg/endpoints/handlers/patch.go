@@ -467,7 +467,8 @@ func (p *applyPatcher) applyPatchToCurrentObject(obj runtime.Object) (runtime.Ob
 	if err != nil {
 		return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch: %v", err))
 	}
-	//p.resetter.ResetFields(patchObj, obj)
+
+	p.resetter.ResetFields(patchObj, obj)
 
 	return p.fieldManager.Apply(obj, patchObj, p.options.FieldManager, force)
 }
