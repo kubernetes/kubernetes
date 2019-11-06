@@ -50,15 +50,6 @@ func SkipUnlessAtLeast(value int, minValue int, message string) {
 	}
 }
 
-// SkipIfContainerRuntimeIs skips if the container runtime is included in the runtimes.
-func SkipIfContainerRuntimeIs(runtimes ...string) {
-	for _, containerRuntime := range runtimes {
-		if containerRuntime == TestContext.ContainerRuntime {
-			skipInternalf(1, "Not supported under container runtime %s", containerRuntime)
-		}
-	}
-}
-
 // SkipUnlessLocalEphemeralStorageEnabled skips if the LocalStorageCapacityIsolation is not enabled.
 func SkipUnlessLocalEphemeralStorageEnabled() {
 	if !utilfeature.DefaultFeatureGate.Enabled(features.LocalStorageCapacityIsolation) {
@@ -165,13 +156,6 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 func SkipUnlessSSHKeyPresent() {
 	if _, err := e2essh.GetSigner(TestContext.Provider); err != nil {
 		skipInternalf(1, "No SSH Key for provider %s: '%v'", TestContext.Provider, err)
-	}
-}
-
-// SkipUnlessTaintBasedEvictionsEnabled skips if the TaintBasedEvictions is not enabled.
-func SkipUnlessTaintBasedEvictionsEnabled() {
-	if !utilfeature.DefaultFeatureGate.Enabled(features.TaintBasedEvictions) {
-		skipInternalf(1, "Only supported when %v feature is enabled", features.TaintBasedEvictions)
 	}
 }
 
