@@ -740,8 +740,8 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, allNodes []*schedulernode
 
 	appendTopologyPairsMaps := func(toAppend *topologyPairsMaps) {
 		lock.Lock()
-		defer lock.Unlock()
 		topologyMaps.appendMaps(toAppend)
+		lock.Unlock()
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -787,13 +787,13 @@ func getTPMapMatchingIncomingAffinityAntiAffinity(pod *v1.Pod, allNodes []*sched
 	topologyPairsAntiAffinityPodsMaps = newTopologyPairsMaps()
 	appendResult := func(nodeName string, nodeTopologyPairsAffinityPodsMaps, nodeTopologyPairsAntiAffinityPodsMaps *topologyPairsMaps) {
 		lock.Lock()
-		defer lock.Unlock()
 		if len(nodeTopologyPairsAffinityPodsMaps.topologyPairToPods) > 0 {
 			topologyPairsAffinityPodsMaps.appendMaps(nodeTopologyPairsAffinityPodsMaps)
 		}
 		if len(nodeTopologyPairsAntiAffinityPodsMaps.topologyPairToPods) > 0 {
 			topologyPairsAntiAffinityPodsMaps.appendMaps(nodeTopologyPairsAntiAffinityPodsMaps)
 		}
+		lock.Unlock()
 	}
 
 	affinityTerms := GetPodAffinityTerms(affinity.PodAffinity)

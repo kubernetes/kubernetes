@@ -399,7 +399,6 @@ func (p *PriorityQueue) flushBackoffQCompleted() {
 // to activeQ.
 func (p *PriorityQueue) flushUnschedulableQLeftover() {
 	p.lock.Lock()
-	defer p.lock.Unlock()
 
 	var podsToMove []*framework.PodInfo
 	currentTime := p.clock.Now()
@@ -413,6 +412,7 @@ func (p *PriorityQueue) flushUnschedulableQLeftover() {
 	if len(podsToMove) > 0 {
 		p.movePodsToActiveOrBackoffQueue(podsToMove, UnschedulableTimeout)
 	}
+	p.lock.Unlock()
 }
 
 // Pop removes the head of the active queue and returns it. It blocks if the
@@ -545,7 +545,6 @@ func (p *PriorityQueue) AssignedPodUpdated(pod *v1.Pod) {
 // queue and the head is the highest priority pod.
 func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string) {
 	p.lock.Lock()
-	defer p.lock.Unlock()
 	unschedulablePods := make([]*framework.PodInfo, 0, len(p.unschedulableQ.podInfoMap))
 	for _, pInfo := range p.unschedulableQ.podInfoMap {
 		unschedulablePods = append(unschedulablePods, pInfo)
@@ -553,6 +552,7 @@ func (p *PriorityQueue) MoveAllToActiveOrBackoffQueue(event string) {
 	p.movePodsToActiveOrBackoffQueue(unschedulablePods, event)
 	p.moveRequestCycle = p.schedulingCycle
 	p.cond.Broadcast()
+	p.lock.Unlock()
 }
 
 // NOTE: this function assumes lock has been acquired in caller
@@ -635,9 +635,9 @@ func (p *PriorityQueue) PendingPods() []*v1.Pod {
 // Close closes the priority queue.
 func (p *PriorityQueue) Close() {
 	p.lock.Lock()
-	defer p.lock.Unlock()
 	p.closed = true
 	p.cond.Broadcast()
+	p.lock.Unlock()
 }
 
 // DeleteNominatedPodIfExists deletes pod nominatedPods.

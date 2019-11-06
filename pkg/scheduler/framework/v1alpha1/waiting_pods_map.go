@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -41,15 +41,15 @@ func newWaitingPodsMap() *waitingPodsMap {
 // add a new WaitingPod to the map.
 func (m *waitingPodsMap) add(wp WaitingPod) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	m.pods[wp.GetPod().UID] = wp
+	m.mu.Unlock()
 }
 
 // remove a WaitingPod from the map.
 func (m *waitingPodsMap) remove(uid types.UID) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	delete(m.pods, uid)
+	m.mu.Unlock()
 }
 
 // get a WaitingPod from the map.

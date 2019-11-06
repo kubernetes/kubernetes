@@ -133,10 +133,10 @@ func NewTransientSchedulerInfo() *TransientSchedulerInfo {
 // ResetTransientSchedulerInfo resets the TransientSchedulerInfo.
 func (transientSchedInfo *TransientSchedulerInfo) ResetTransientSchedulerInfo() {
 	transientSchedInfo.TransientLock.Lock()
-	defer transientSchedInfo.TransientLock.Unlock()
 	// Reset TransientNodeInfo.
 	transientSchedInfo.TransNodeInfo.AllocatableVolumesCount = 0
 	transientSchedInfo.TransNodeInfo.RequestedVolumes = 0
+	transientSchedInfo.TransientLock.Unlock()
 }
 
 // Resource is a collection of compute resource.
