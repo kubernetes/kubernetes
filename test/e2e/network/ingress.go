@@ -831,10 +831,10 @@ func executeStaticIPHttpsOnlyTest(f *framework.Framework, jig *ingress.TestJig, 
 
 	ginkgo.By("waiting for Ingress to come up with ip: " + ip)
 	httpClient := ingress.BuildInsecureClient(ingress.IngressReqTimeout)
-	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("https://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
+	framework.ExpectNoError(ingress.PollURL(fmt.Sprintf("https://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, false))
 
 	ginkgo.By("should reject HTTP traffic")
-	framework.ExpectNoError(framework.PollURL(fmt.Sprintf("http://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
+	framework.ExpectNoError(ingress.PollURL(fmt.Sprintf("http://%s/", ip), "", e2eservice.LoadBalancerPollTimeout, jig.PollInterval, httpClient, true))
 }
 
 func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJig, staticIPName string) {
@@ -855,7 +855,7 @@ func executeBacksideBacksideHTTPSTest(f *framework.Framework, jig *ingress.TestJ
 	ginkgo.By(fmt.Sprintf("Polling on address %s and verify the backend is serving HTTPS", ingIP))
 	timeoutClient := &http.Client{Timeout: ingress.IngressReqTimeout}
 	err = wait.PollImmediate(e2eservice.LoadBalancerPollInterval, e2eservice.LoadBalancerPollTimeout, func() (bool, error) {
-		resp, err := framework.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
+		resp, err := ingress.SimpleGET(timeoutClient, fmt.Sprintf("http://%s", ingIP), "")
 		if err != nil {
 			framework.Logf("SimpleGET failed: %v", err)
 			return false, nil

@@ -262,7 +262,7 @@ var _ = SIGDescribe("Services", func() {
 
 		// This behavior is not supported if Kube-proxy is in "userspace" mode.
 		// So we check the kube-proxy mode and skip this test if that's the case.
-		if proxyMode, err := framework.ProxyMode(f); err == nil {
+		if proxyMode, err := proxyMode(f); err == nil {
 			if proxyMode == "userspace" {
 				framework.Skipf("The test doesn't work with kube-proxy in userspace mode")
 			}
@@ -2617,4 +2617,34 @@ func checkReachabilityFromPod(expectToBeReachable bool, timeout time.Duration, n
 		return true, nil
 	})
 	framework.ExpectNoError(err)
+}
+
+// proxyMode returns a proxyMode of a kube-proxy.
+func proxyMode(f *framework.Framework) (string, error) {
+	pod := &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "kube-proxy-mode-detector",
+			Namespace: f.Namespace.Name,
+		},
+		Spec: v1.PodSpec{
+			HostNetwork: true,
+			Containers: []v1.Container{
+				{
+					Name:  "detector",
+					Image: framework.AgnHostImage,
+					Args:  []string{"pause"},
+				},
+			},
+		},
+	}
+	f.PodClient().CreateSync(pod)
+	defer f.PodClient().DeleteSync(pod.Name, &metav1.DeleteOptions{}, framework.DefaultPodDeletionTimeout)
+
+	cmd := "curl -q -s --connect-timeout 1 http://localhost:10249/proxyMode"
+	stdout, err := framework.RunHostCmd(pod.Namespace, pod.Name, cmd)
+	if err != nil {
+		return "", err
+	}
+	framework.Logf("proxyMode: %s", stdout)
+	return stdout, nil
 }
