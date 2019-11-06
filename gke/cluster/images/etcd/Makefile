@@ -87,6 +87,8 @@ RUNNERIMAGE?=gcr.io/distroless/static:latest
 build:
 	# Explicitly copy files to the temp directory
 	$(BIN_INSTALL) migrate-if-needed.sh $(TEMP_DIR)
+	$(BIN_INSTALL) backup-before-start.sh $(TEMP_DIR)
+	$(BIN_INSTALL) etcd-main.sh $(TEMP_DIR)
 	install Dockerfile $(TEMP_DIR)
 
 	# Compile migrate
@@ -97,6 +99,18 @@ build:
 	docker run --rm --interactive -v $(shell pwd)/../../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${migrate_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
 		/bin/bash -c "CGO_ENABLED=0 go build -o /build/cp k8s.io/kubernetes/gke/cluster/images/etcd/cp"; \
 	$(BIN_INSTALL) $${migrate_tmp_dir}/cp $(TEMP_DIR);
+
+	# Compile backup which is used by backup-before-start script
+	backup_tmp_dir=$(shell mktemp -d); \
+	docker run --interactive -v $(shell pwd)/../../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${backup_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+                /bin/bash -c "CGO_ENABLED=0 go build -o /build/backup k8s.io/kubernetes/gke/cluster/images/etcd/backup"; \
+        $(BIN_INSTALL) $${backup_tmp_dir}/backup $(TEMP_DIR);
+
+	# Compile restore which is used for recovering etcd from snapshot
+	restore_tmp_dir=$(shell mktemp -d); \
+	docker run --interactive -v $(shell pwd)/../../../../:/go/src/k8s.io/kubernetes$(DOCKER_VOL_OPTS) -v $${restore_tmp_dir}:/build$(DOCKER_VOL_OPTS) -e GOARCH=$(ARCH) golang:$(GOLANG_VERSION) \
+                /bin/bash -c "CGO_ENABLED=0 go build -o /build/restore k8s.io/kubernetes/gke/cluster/images/etcd/restore"; \
+        $(BIN_INSTALL) $${restore_tmp_dir}/restore $(TEMP_DIR);
 
 ifeq ($(ARCH),amd64)
 
