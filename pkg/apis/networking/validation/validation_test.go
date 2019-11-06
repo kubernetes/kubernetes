@@ -24,6 +24,7 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -895,6 +896,8 @@ func TestValidateIngress(t *testing.T) {
 		ServiceName: "default-backend",
 		ServicePort: intstr.FromInt(80),
 	}
+	pathTypePrefix := networking.PathTypePrefix
+	pathTypeFoo := networking.PathType("foo")
 
 	newValid := func() networking.Ingress {
 		return networking.Ingress{
@@ -914,8 +917,9 @@ func TestValidateIngress(t *testing.T) {
 							HTTP: &networking.HTTPIngressRuleValue{
 								Paths: []networking.HTTPIngressPath{
 									{
-										Path:    "/foo",
-										Backend: defaultBackend,
+										Path:     "/foo",
+										PathType: &pathTypePrefix,
+										Backend:  defaultBackend,
 									},
 								},
 							},
@@ -945,19 +949,13 @@ func TestValidateIngress(t *testing.T) {
 			Backend: defaultBackend,
 		},
 	}
+	badPathType := newValid()
+	badPathType.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].PathType = &pathTypeFoo
+
 	noPaths := newValid()
 	noPaths.Spec.Rules[0].IngressRuleValue.HTTP.Paths = []networking.HTTPIngressPath{}
 	badHost := newValid()
 	badHost.Spec.Rules[0].Host = "foobar:80"
-	badRegexPath := newValid()
-	badPathExpr := "/invalid["
-	badRegexPath.Spec.Rules[0].IngressRuleValue.HTTP.Paths = []networking.HTTPIngressPath{
-		{
-			Path:    badPathExpr,
-			Backend: defaultBackend,
-		},
-	}
-	badPathErr := fmt.Sprintf("spec.rules[0].http.paths[0].path: Invalid value: '%v'", badPathExpr)
 	hostIP := "127.0.0.1"
 	badHostIP := newValid()
 	badHostIP.Spec.Rules[0].Host = hostIP
@@ -970,8 +968,8 @@ func TestValidateIngress(t *testing.T) {
 		"spec.rules[0].host: Invalid value":               badHost,
 		"spec.rules[0].http.paths: Required value":        noPaths,
 		"spec.rules[0].http.paths[0].path: Invalid value": noForwardSlashPath,
+		"spec.rules[0].http.paths[0].pathType: Unsupported value: \"foo\": supported values: \"ImplementationSpecific\", \"Prefix\", \"exact\"": badPathType,
 	}
-	errorCases[badPathErr] = badRegexPath
 	errorCases[badHostIPErr] = badHostIP
 
 	wildcardHost := "foo.*.bar.com"
@@ -991,6 +989,107 @@ func TestValidateIngress(t *testing.T) {
 				t.Errorf("unexpected error: %q, expected: %q", err, k)
 			}
 		}
+	}
+}
+
+func TestValidateIngressRuleValue(t *testing.T) {
+	fldPath := field.NewPath("testing.http.paths[0].path")
+	testCases := map[string]struct {
+		pathType     networking.PathType
+		path         string
+		expectedErrs field.ErrorList
+	}{
+		"implementation specific: no leading slash": {
+			pathType:     networking.PathTypeImplementationSpecific,
+			path:         "foo",
+			expectedErrs: field.ErrorList{field.Invalid(fldPath, "foo", "must be an absolute path")},
+		},
+		"implementation specific: leading slash": {
+			pathType:     networking.PathTypeImplementationSpecific,
+			path:         "/foo",
+			expectedErrs: field.ErrorList{},
+		},
+		"implementation specific: many slashes": {
+			pathType:     networking.PathTypeImplementationSpecific,
+			path:         "/foo/bar/foo",
+			expectedErrs: field.ErrorList{},
+		},
+		"implementation specific: repeating slashes": {
+			pathType:     networking.PathTypeImplementationSpecific,
+			path:         "/foo//bar/foo",
+			expectedErrs: field.ErrorList{},
+		},
+		"prefix: no leading slash": {
+			pathType:     networking.PathTypePrefix,
+			path:         "foo",
+			expectedErrs: field.ErrorList{field.Invalid(fldPath, "foo", "must be an absolute path")},
+		},
+		"prefix: leading slash": {
+			pathType:     networking.PathTypePrefix,
+			path:         "/foo",
+			expectedErrs: field.ErrorList{},
+		},
+		"prefix: many slashes": {
+			pathType:     networking.PathTypePrefix,
+			path:         "/foo/bar/foo",
+			expectedErrs: field.ErrorList{},
+		},
+		"prefix: repeating slashes": {
+			pathType:     networking.PathTypePrefix,
+			path:         "/foo//bar/foo",
+			expectedErrs: field.ErrorList{field.Invalid(fldPath, "/foo//bar/foo", "must not contain repeating '/' characters")},
+		},
+		"exact: no leading slash": {
+			pathType:     networking.PathTypeExact,
+			path:         "foo",
+			expectedErrs: field.ErrorList{field.Invalid(fldPath, "foo", "must be an absolute path")},
+		},
+		"exact: leading slash": {
+			pathType:     networking.PathTypeExact,
+			path:         "/foo",
+			expectedErrs: field.ErrorList{},
+		},
+		"exact: many slashes": {
+			pathType:     networking.PathTypeExact,
+			path:         "/foo/bar/foo",
+			expectedErrs: field.ErrorList{},
+		},
+		"exact: repeating slashes": {
+			pathType:     networking.PathTypeExact,
+			path:         "/foo//bar/foo",
+			expectedErrs: field.ErrorList{field.Invalid(fldPath, "/foo//bar/foo", "must not contain repeating '/' characters")},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			irv := &networking.IngressRuleValue{
+				HTTP: &networking.HTTPIngressRuleValue{
+					Paths: []networking.HTTPIngressPath{
+						{
+							Path:     testCase.path,
+							PathType: &testCase.pathType,
+							Backend: networking.IngressBackend{
+								ServiceName: "default-backend",
+								ServicePort: intstr.FromInt(80),
+							},
+						},
+					},
+				},
+			}
+
+			errs := validateIngressRuleValue(irv, field.NewPath("testing"))
+
+			if len(errs) != len(testCase.expectedErrs) {
+				t.Fatalf("Expected %d errors, got %d (%+v)", len(testCase.expectedErrs), len(errs), errs)
+			}
+
+			for i, err := range errs {
+				if err.Error() != testCase.expectedErrs[i].Error() {
+					t.Fatalf("Expected error: %v, got %v", testCase.expectedErrs[i], err)
+				}
+			}
+		})
 	}
 }
 

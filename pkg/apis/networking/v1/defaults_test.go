@@ -235,6 +235,64 @@ func TestSetDefaultNetworkPolicy(t *testing.T) {
 	}
 }
 
+func TestSetIngressPathDefaults(t *testing.T) {
+	pathTypeImplementationSpecific := networkingv1.PathTypeImplementationSpecific
+	pathTypeExact := networkingv1.PathTypeExact
+
+	testCases := map[string]struct {
+		original *networkingv1.HTTPIngressPath
+		expected *networkingv1.HTTPIngressPath
+	}{
+		"empty pathType should default to ImplementationSpecific": {
+			original: &networkingv1.HTTPIngressPath{},
+			expected: &networkingv1.HTTPIngressPath{PathType: &pathTypeImplementationSpecific},
+		},
+		"ImplementationSpecific pathType should not change": {
+			original: &networkingv1.HTTPIngressPath{PathType: &pathTypeImplementationSpecific},
+			expected: &networkingv1.HTTPIngressPath{PathType: &pathTypeImplementationSpecific},
+		},
+		"Exact pathType should not change": {
+			original: &networkingv1.HTTPIngressPath{PathType: &pathTypeExact},
+			expected: &networkingv1.HTTPIngressPath{PathType: &pathTypeExact},
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			ingressOriginal := &networkingv1.Ingress{
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{{
+						IngressRuleValue: networkingv1.IngressRuleValue{
+							HTTP: &networkingv1.HTTPIngressRuleValue{
+								Paths: []networkingv1.HTTPIngressPath{*testCase.original},
+							},
+						},
+					}},
+				},
+			}
+			ingressExpected := &networkingv1.Ingress{
+				Spec: networkingv1.IngressSpec{
+					Rules: []networkingv1.IngressRule{{
+						IngressRuleValue: networkingv1.IngressRuleValue{
+							HTTP: &networkingv1.HTTPIngressRuleValue{
+								Paths: []networkingv1.HTTPIngressPath{*testCase.expected},
+							},
+						},
+					}},
+				},
+			}
+			runtimeObj := roundTrip(t, runtime.Object(ingressOriginal))
+			ingressActual, ok := runtimeObj.(*networkingv1.Ingress)
+			if !ok {
+				t.Fatalf("Unexpected object: %v", ingressActual)
+			}
+			if !apiequality.Semantic.DeepEqual(ingressActual.Spec, ingressExpected.Spec) {
+				t.Errorf("Expected: %+v, got: %+v", ingressExpected.Spec, ingressActual.Spec)
+			}
+		})
+	}
+}
+
 func roundTrip(t *testing.T, obj runtime.Object) runtime.Object {
 	data, err := runtime.Encode(legacyscheme.Codecs.LegacyCodec(SchemeGroupVersion), obj)
 	if err != nil {

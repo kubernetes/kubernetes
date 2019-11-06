@@ -22,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+var defaultPathType = networkingv1.PathTypeImplementationSpecific
+
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
@@ -41,5 +43,11 @@ func SetDefaults_NetworkPolicy(obj *networkingv1.NetworkPolicy) {
 		if len(obj.Spec.Egress) != 0 {
 			obj.Spec.PolicyTypes = append(obj.Spec.PolicyTypes, networkingv1.PolicyTypeEgress)
 		}
+	}
+}
+
+func SetDefaults_HTTPIngressPath(obj *networkingv1.HTTPIngressPath) {
+	if obj.PathType == nil {
+		obj.PathType = &defaultPathType
 	}
 }

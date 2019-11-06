@@ -39,8 +39,9 @@ spec:
       paths:
       - backend:
           serviceName: "25"
-          servicePort: "26"
+          servicePort: -783752440
         path: "24"
+        pathType: ""
   tls:
   - hosts:
     - "21"
@@ -48,5 +49,5 @@ spec:
 status:
   loadBalancer:
     ingress:
-    - hostname: "28"
-      ip: "27"
+    - hostname: "27"
+      ip: "26"

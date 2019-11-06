@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"net"
-	"regexp"
 	"strings"
 
 	apimachineryvalidation "k8s.io/apimachinery/pkg/api/validation"
@@ -34,6 +33,12 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 	apivalidation "k8s.io/kubernetes/pkg/apis/core/validation"
 	"k8s.io/kubernetes/pkg/apis/networking"
+)
+
+var supportedPathTypes = sets.NewString(
+	string(networking.PathTypeExact),
+	string(networking.PathTypePrefix),
+	string(networking.PathTypeImplementationSpecific),
 )
 
 // ValidateNetworkPolicyName can be used to check whether the given networkpolicy
@@ -285,26 +290,24 @@ func validateHTTPIngressRuleValue(httpIngressRuleValue *networking.HTTPIngressRu
 	if len(httpIngressRuleValue.Paths) == 0 {
 		allErrs = append(allErrs, field.Required(fldPath.Child("paths"), ""))
 	}
-	for i, rule := range httpIngressRuleValue.Paths {
-		if len(rule.Path) > 0 {
-			if !strings.HasPrefix(rule.Path, "/") {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("paths").Index(i).Child("path"), rule.Path, "must be an absolute path"))
-			}
-			// TODO: More draconian path regex validation.
-			// Path must be a valid regex. This is the basic requirement.
-			// In addition to this any characters not allowed in a path per
-			// RFC 3986 section-3.3 cannot appear as a literal in the regex.
-			// Consider the example: http://host/valid?#bar, everything after
-			// the last '/' is a valid regex that matches valid#bar, which
-			// isn't a valid path, because the path terminates at the first ?
-			// or #. A more sophisticated form of validation would detect that
-			// the user is confusing url regexes with path regexes.
-			_, err := regexp.CompilePOSIX(rule.Path)
-			if err != nil {
-				allErrs = append(allErrs, field.Invalid(fldPath.Child("paths").Index(i).Child("path"), rule.Path, "must be a valid regex"))
-			}
+	for i, path := range httpIngressRuleValue.Paths {
+		idxPath := fldPath.Child("paths").Index(i)
+		if !strings.HasPrefix(path.Path, "/") {
+			allErrs = append(allErrs, field.Invalid(idxPath.Child("path"), path.Path, "must be an absolute path"))
 		}
-		allErrs = append(allErrs, validateIngressBackend(&rule.Backend, fldPath.Child("backend"))...)
+
+		if path.PathType != nil {
+			if !supportedPathTypes.Has(string(*path.PathType)) {
+				allErrs = append(allErrs, field.NotSupported(idxPath.Child("pathType"), path.PathType, supportedPathTypes.List()))
+			}
+
+			if *path.PathType == networking.PathTypeExact || *path.PathType == networking.PathTypePrefix {
+				if len(path.Path) > 0 && strings.Contains(path.Path, "//") {
+					allErrs = append(allErrs, field.Invalid(idxPath.Child("path"), path.Path, "must not contain repeating '/' characters"))
+				}
+			} // else ImplementationSpecific and no additional validation
+		}
+		allErrs = append(allErrs, validateIngressBackend(&path.Backend, fldPath.Child("backend"))...)
 	}
 	return allErrs
 }

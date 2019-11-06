@@ -1161,6 +1161,7 @@ func Convert_policy_FSGroupStrategyOptions_To_v1beta1_FSGroupStrategyOptions(in 
 
 func autoConvert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1beta1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
+	out.PathType = (*networking.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_v1beta1_IngressBackend_To_networking_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}
@@ -1174,6 +1175,7 @@ func Convert_v1beta1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1beta1.H
 
 func autoConvert_networking_HTTPIngressPath_To_v1beta1_HTTPIngressPath(in *networking.HTTPIngressPath, out *v1beta1.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
+	out.PathType = (*v1beta1.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_networking_IngressBackend_To_v1beta1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}

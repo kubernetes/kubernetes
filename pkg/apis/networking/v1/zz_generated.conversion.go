@@ -226,6 +226,7 @@ func RegisterConversions(s *runtime.Scheme) error {
 
 func autoConvert_v1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1.HTTPIngressPath, out *networking.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
+	out.PathType = (*networking.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_v1_IngressBackend_To_networking_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}
@@ -239,6 +240,7 @@ func Convert_v1_HTTPIngressPath_To_networking_HTTPIngressPath(in *v1.HTTPIngress
 
 func autoConvert_networking_HTTPIngressPath_To_v1_HTTPIngressPath(in *networking.HTTPIngressPath, out *v1.HTTPIngressPath, s conversion.Scope) error {
 	out.Path = in.Path
+	out.PathType = (*v1.PathType)(unsafe.Pointer(in.PathType))
 	if err := Convert_networking_IngressBackend_To_v1_IngressBackend(&in.Backend, &out.Backend, s); err != nil {
 		return err
 	}
