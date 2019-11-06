@@ -281,7 +281,10 @@ func New(client clientset.Interface,
 			VolumeBinder: volumeBinder,
 		})
 	}
-	registry.Merge(options.frameworkOutOfTreeRegistry)
+	err := registry.Merge(options.frameworkOutOfTreeRegistry)
+	if err != nil {
+		klog.Warningf("Registry merge found err: %v", err)
+	}
 
 	var pdbInformer policyv1beta1informers.PodDisruptionBudgetInformer
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.PodDisruptionBudget) {
