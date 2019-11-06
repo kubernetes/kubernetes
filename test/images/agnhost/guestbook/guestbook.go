@@ -98,7 +98,6 @@ func registerNode(registerTo, port string) {
 			log.Fatalf("Error while unmarshaling master's response: %v", err)
 		}
 
-		responseJSON["data"] = "something"
 		var ok bool
 		store, ok = responseJSON["data"].(map[string]interface{})
 		if !ok {
