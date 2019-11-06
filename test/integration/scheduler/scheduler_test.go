@@ -132,7 +132,6 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 			}`,
 			expectedPrioritizers: sets.NewString(
 				"InterPodAffinityPriority",
-				"SelectorSpreadPriority",
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -157,6 +156,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeAffinity", Weight: 1},
 					{Name: "NodePreferAvoidPods", Weight: 10000},
+					{Name: "DefaultPodTopologySpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
 				},
 			},
@@ -210,7 +210,6 @@ kind: Policy
 `,
 			expectedPrioritizers: sets.NewString(
 				"InterPodAffinityPriority",
-				"SelectorSpreadPriority",
 			),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
@@ -235,6 +234,7 @@ kind: Policy
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeAffinity", Weight: 1},
 					{Name: "NodePreferAvoidPods", Weight: 10000},
+					{Name: "DefaultPodTopologySpread", Weight: 1},
 					{Name: "TaintToleration", Weight: 1},
 				},
 			},
