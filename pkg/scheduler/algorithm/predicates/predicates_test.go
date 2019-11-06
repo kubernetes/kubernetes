@@ -31,9 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	legacyapi "k8s.io/kubernetes/pkg/scheduler/api"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -1447,7 +1447,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1473,7 +1473,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1499,7 +1499,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1535,7 +1535,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1569,7 +1569,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1603,7 +1603,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -4684,7 +4684,7 @@ func TestCheckNodeUnschedulablePredicate(t *testing.T) {
 				Spec: v1.PodSpec{
 					Tolerations: []v1.Toleration{
 						{
-							Key:    legacyapi.TaintNodeUnschedulable,
+							Key:    v1.TaintNodeUnschedulable,
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
