@@ -61,6 +61,8 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	cleanSecretReferences(obj.(*api.ServiceAccount))
 }
 
+func (strategy) ResetFields(new, old runtime.Object) {}
+
 func cleanSecretReferences(serviceAccount *api.ServiceAccount) {
 	for i, secret := range serviceAccount.Secrets {
 		serviceAccount.Secrets[i] = api.ObjectReference{Name: secret.Name}

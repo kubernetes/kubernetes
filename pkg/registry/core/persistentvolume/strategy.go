@@ -70,6 +70,9 @@ func (persistentvolumeStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+// ResetFields .
+func (persistentvolumeStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
 func (persistentvolumeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newPv := obj.(*api.PersistentVolume)
@@ -95,6 +98,9 @@ type persistentvolumeStatusStrategy struct {
 }
 
 var StatusStrategy = persistentvolumeStatusStrategy{Strategy}
+
+// ResetFields .
+func (persistentvolumeStatusStrategy) ResetFields(new, old runtime.Object) {}
 
 // PrepareForUpdate sets the Spec field which is not allowed to be changed when updating a PV's Status
 func (persistentvolumeStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

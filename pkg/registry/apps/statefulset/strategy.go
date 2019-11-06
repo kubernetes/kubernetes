@@ -76,6 +76,9 @@ func (statefulSetStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obj
 	pod.DropDisabledTemplateFields(&statefulSet.Spec.Template, nil)
 }
 
+// ResetFields .
+func (statefulSetStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (statefulSetStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newStatefulSet := obj.(*apps.StatefulSet)
@@ -132,6 +135,9 @@ type statefulSetStatusStrategy struct {
 
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = statefulSetStatusStrategy{Strategy}
+
+// ResetFields .
+func (statefulSetStatusStrategy) ResetFields(new, old runtime.Object) {}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
 func (statefulSetStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

@@ -72,6 +72,9 @@ func (cronJobStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object)
 	pod.DropDisabledTemplateFields(&cronJob.Spec.JobTemplate.Spec.Template, nil)
 }
 
+// ResetFields .
+func (cronJobStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (cronJobStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newCronJob := obj.(*batch.CronJob)

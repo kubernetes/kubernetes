@@ -50,6 +50,9 @@ func (mutatingWebhookConfigurationStrategy) PrepareForCreate(ctx context.Context
 	ic.Generation = 1
 }
 
+// ResetFields .
+func (mutatingWebhookConfigurationStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (mutatingWebhookConfigurationStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newIC := obj.(*admissionregistration.MutatingWebhookConfiguration)

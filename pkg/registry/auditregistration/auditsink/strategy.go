@@ -48,6 +48,9 @@ func (auditSinkStrategy) PrepareForCreate(ctx context.Context, obj runtime.Objec
 	ic.Generation = 1
 }
 
+// ResetFields .
+func (auditSinkStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (auditSinkStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newIC := obj.(*audit.AuditSink)

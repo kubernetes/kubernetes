@@ -88,6 +88,8 @@ func (csrStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object
 	newCSR.Status = oldCSR.Status
 }
 
+func (csrStrategy) ResetFields(new, old runtime.Object) {}
+
 // Validate validates a new CSR. Validation must check for a correct signature.
 func (csrStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	csr := obj.(*certificates.CertificateSigningRequest)

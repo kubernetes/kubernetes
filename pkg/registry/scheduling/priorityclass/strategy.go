@@ -49,6 +49,9 @@ func (priorityClassStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 	schedulingutil.DropDisabledFields(pc, nil)
 }
 
+// ResetFields .
+func (priorityClassStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (priorityClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newClass := obj.(*scheduling.PriorityClass)

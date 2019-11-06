@@ -99,6 +99,9 @@ func (volumeAttachmentStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+// ResetFields .
+func (volumeAttachmentStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a VolumeAttachment
 func (volumeAttachmentStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	var groupVersion schema.GroupVersion
@@ -142,6 +145,9 @@ type volumeAttachmentStatusStrategy struct {
 // StatusStrategy is the default logic that applies when creating and updating
 // VolumeAttachmentStatus subresource via the REST API.
 var StatusStrategy = volumeAttachmentStatusStrategy{Strategy}
+
+// ResetFields .
+func (volumeAttachmentStatusStrategy) ResetFields(new, old runtime.Object) {}
 
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a VolumeAttachment
 func (volumeAttachmentStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

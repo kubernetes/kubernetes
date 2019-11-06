@@ -70,6 +70,8 @@ func (strategy) PrepareForUpdate(ctx context.Context, newObj, oldObj runtime.Obj
 	_ = newObj.(*apps.ControllerRevision)
 }
 
+func (strategy) ResetFields(new, old runtime.Object) {}
+
 func (strategy) AllowUnconditionalUpdate() bool {
 	return true
 }

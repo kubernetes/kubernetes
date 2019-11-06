@@ -50,6 +50,9 @@ func (eventStrategy) NamespaceScoped() bool {
 func (eventStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 }
 
+// ResetFields .
+func (eventStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (eventStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }

@@ -156,6 +156,9 @@ type deploymentStatusStrategy struct {
 // StatusStrategy is the default logic invoked when updating object status.
 var StatusStrategy = deploymentStatusStrategy{Strategy}
 
+// ResetFields .
+func (deploymentStatusStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
 func (deploymentStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newDeployment := obj.(*apps.Deployment)

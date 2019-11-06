@@ -48,6 +48,9 @@ func (networkPolicyStrategy) PrepareForCreate(ctx context.Context, obj runtime.O
 	networkPolicy.Generation = 1
 }
 
+// ResetFields .
+func (networkPolicyStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (networkPolicyStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNetworkPolicy := obj.(*networking.NetworkPolicy)

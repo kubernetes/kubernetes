@@ -60,6 +60,9 @@ func (strategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	_ = obj.(*rbac.ClusterRoleBinding)
 }
 
+// ResetFields .
+func (strategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newClusterRoleBinding := obj.(*rbac.ClusterRoleBinding)

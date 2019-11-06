@@ -65,6 +65,9 @@ func (autoscalerStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+// ResetFields .
+func (autoscalerStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (autoscalerStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newHPA := obj.(*autoscaling.HorizontalPodAutoscaler)

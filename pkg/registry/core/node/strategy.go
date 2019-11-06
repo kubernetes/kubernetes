@@ -69,6 +69,9 @@ func (nodeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	dropDisabledFields(node, nil)
 }
 
+// ResetFields .
+func (nodeStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (nodeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newNode := obj.(*api.Node)

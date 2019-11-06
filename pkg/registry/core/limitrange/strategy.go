@@ -51,6 +51,8 @@ func (limitrangeStrategy) PrepareForCreate(ctx context.Context, obj runtime.Obje
 func (limitrangeStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
+func (limitrangeStrategy) ResetFields(new, old runtime.Object) {}
+
 func (limitrangeStrategy) Validate(ctx context.Context, obj runtime.Object) field.ErrorList {
 	limitRange := obj.(*api.LimitRange)
 	return validation.ValidateLimitRange(limitRange)

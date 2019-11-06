@@ -69,6 +69,8 @@ func (strategy) AllowCreateOnUpdate() bool {
 func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 }
 
+func (strategy) ResetFields(new, old runtime.Object) {}
+
 func (strategy) ValidateUpdate(ctx context.Context, obj, old runtime.Object) field.ErrorList {
 	return validation.ValidateSecretUpdate(obj.(*api.Secret), old.(*api.Secret))
 }

@@ -64,23 +64,29 @@ func (podStrategy) NamespaceScoped() bool {
 }
 
 // PrepareForCreate clears fields that are not allowed to be set by end users on creation.
-func (podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
-	pod := obj.(*api.Pod)
-	pod.Status = api.PodStatus{
-		Phase:    api.PodPending,
-		QOSClass: qos.GetPodQOS(pod),
-	}
+func (s podStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
+	s.ResetFields(obj, nil)
+}
 
-	podutil.DropDisabledPodFields(pod, nil)
+// ResetFields .
+func (podStrategy) ResetFields(new, old runtime.Object) {
+	newPod := new.(*api.Pod)
+	if old != nil {
+		oldPod := old.(*api.Pod)
+		newPod.Status = oldPod.Status
+		podutil.DropDisabledPodFields(newPod, oldPod)
+	} else {
+		newPod.Status = api.PodStatus{
+			Phase:    api.PodPending,
+			QOSClass: qos.GetPodQOS(newPod),
+		}
+		podutil.DropDisabledPodFields(newPod, nil)
+	}
 }
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
-func (podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
-	newPod := obj.(*api.Pod)
-	oldPod := old.(*api.Pod)
-	newPod.Status = oldPod.Status
-
-	podutil.DropDisabledPodFields(newPod, oldPod)
+func (s podStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
+	s.ResetFields(obj, old)
 }
 
 // Validate validates a new pod.

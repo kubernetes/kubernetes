@@ -53,6 +53,9 @@ func (svcStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	dropServiceDisabledFields(service, nil)
 }
 
+// ResetFields .
+func (svcStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (svcStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newService := obj.(*api.Service)
@@ -151,6 +154,9 @@ type serviceStatusStrategy struct {
 
 // StatusStrategy is the default logic invoked when updating service status.
 var StatusStrategy = serviceStatusStrategy{Strategy}
+
+// ResetFields .
+func (serviceStatusStrategy) ResetFields(new, old runtime.Object) {}
 
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update of status
 func (serviceStatusStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {

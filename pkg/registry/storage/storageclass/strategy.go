@@ -62,6 +62,9 @@ func (storageClassStrategy) AllowCreateOnUpdate() bool {
 	return false
 }
 
+// ResetFields .
+func (storageClassStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate sets the Status fields which is not allowed to be set by an end user updating a PV
 func (storageClassStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newClass := obj.(*storage.StorageClass)

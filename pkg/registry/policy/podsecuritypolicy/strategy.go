@@ -68,6 +68,8 @@ func (strategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	psputil.DropDisabledFields(&newPsp.Spec, &oldPsp.Spec)
 }
 
+func (strategy) ResetFields(new, old runtime.Object) {}
+
 func (strategy) Canonicalize(obj runtime.Object) {
 }
 

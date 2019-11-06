@@ -84,6 +84,9 @@ func (rsStrategy) PrepareForCreate(ctx context.Context, obj runtime.Object) {
 	pod.DropDisabledTemplateFields(&rs.Spec.Template, nil)
 }
 
+// ResetFields .
+func (rsStrategy) ResetFields(new, old runtime.Object) {}
+
 // PrepareForUpdate clears fields that are not allowed to be set by end users on update.
 func (rsStrategy) PrepareForUpdate(ctx context.Context, obj, old runtime.Object) {
 	newRS := obj.(*apps.ReplicaSet)
