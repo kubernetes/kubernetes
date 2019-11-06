@@ -327,7 +327,7 @@ func TestLifeCycleHook(t *testing.T) {
 		// Now try to create a container, which should in turn invoke PostStart Hook
 		_, err := m.startContainer(fakeSandBox.Id, fakeSandBoxConfig, testContainer, testPod, fakePodStatus, nil, "")
 		if err != nil {
-			t.Errorf("startContainer erro =%v", err)
+			t.Errorf("startContainer error =%v", err)
 		}
 		if fakeRunner.Cmd[0] != cmdPostStart.PostStart.Exec.Command[0] {
 			t.Errorf("CMD PostStart hook was not invoked")

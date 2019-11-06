@@ -47,7 +47,7 @@ type PermissiveSigningPolicy struct {
 	// TTL is the certificate TTL. It's used to calculate the NotAfter value of
 	// the certificate.
 	TTL time.Duration
-	// Usages are the allowed usages of a certficate.
+	// Usages are the allowed usages of a certificate.
 	Usages []capi.KeyUsage
 }
 

@@ -719,7 +719,7 @@ func TestComputePodActions(t *testing.T) {
 	_, _, m, err := createTestRuntimeManager()
 	require.NoError(t, err)
 
-	// Createing a pair reference pod and status for the test cases to refer
+	// Creating a pair reference pod and status for the test cases to refer
 	// the specific fields.
 	basePod, baseStatus := makeBasePodAndStatus()
 	noAction := podActions{

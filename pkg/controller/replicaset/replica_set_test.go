@@ -1081,7 +1081,7 @@ func TestDeleteControllerAndExpectations(t *testing.T) {
 	manager.syncReplicaSet(GetKey(rs, t))
 
 	if _, exists, err = manager.expectations.GetExpectations(rsKey); exists {
-		t.Errorf("Found expectaions, expected none since the ReplicaSet has been deleted.")
+		t.Errorf("Found expectations, expected none since the ReplicaSet has been deleted.")
 	}
 
 	// This should have no effect, since we've deleted the ReplicaSet.

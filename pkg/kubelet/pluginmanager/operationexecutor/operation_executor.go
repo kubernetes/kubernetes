@@ -63,7 +63,7 @@ func NewOperationExecutor(
 }
 
 // ActualStateOfWorldUpdater defines a set of operations updating the actual
-// state of the world cache after successful registeration/deregistration.
+// state of the world cache after successful registration/deregistration.
 type ActualStateOfWorldUpdater interface {
 	// AddPlugin add the given plugin in the cache if no existing plugin
 	// in the cache has the same socket path.
