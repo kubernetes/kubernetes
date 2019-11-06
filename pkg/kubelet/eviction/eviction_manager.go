@@ -292,7 +292,7 @@ func (m *managerImpl) synchronize(diskInfoProvider DiskInfoProvider, podFunc Act
 
 	// determine the set of thresholds we need to drive eviction behavior (i.e. all grace periods are met)
 	thresholds = thresholdsMetGracePeriod(thresholdsFirstObservedAt, now)
-	debugLogThresholdsWithObservation("thresholds - grace periods satisified", thresholds, observations)
+	debugLogThresholdsWithObservation("thresholds - grace periods satisfied", thresholds, observations)
 
 	// update internal state
 	m.Lock()

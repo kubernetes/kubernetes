@@ -672,7 +672,7 @@ func (p *criStatsProvider) getAndUpdateContainerUsageNanoCores(stats *runtimeapi
 	}()
 
 	if err != nil {
-		// This should not happen. Log now to raise visiblity
+		// This should not happen. Log now to raise visibility
 		klog.Errorf("failed updating cpu usage nano core: %v", err)
 	}
 	return usage

@@ -23,7 +23,7 @@ import (
 
 	"k8s.io/klog"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -61,7 +61,7 @@ type rangeAllocator struct {
 	// This increases a throughput of CIDR assignment by not blocking on long operations.
 	nodeCIDRUpdateChannel chan nodeReservedCIDRs
 	recorder              record.EventRecorder
-	// Keep a set of nodes that are currectly being processed to avoid races in CIDR allocation
+	// Keep a set of nodes that are currently being processed to avoid races in CIDR allocation
 	lock              sync.Mutex
 	nodesInProcessing sets.String
 }

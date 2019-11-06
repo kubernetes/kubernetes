@@ -56,7 +56,7 @@ func DeletePods(kubeClient clientset.Interface, pods []*v1.Pod, recorder record.
 			continue
 		}
 
-		// Pod will be modified, so making copy is requiered.
+		// Pod will be modified, so making copy is required.
 		pod := pods[i].DeepCopy()
 		// Set reason and message in the pod object.
 		if _, err := SetPodTerminationReason(kubeClient, pod, nodeName); err != nil {
@@ -122,7 +122,7 @@ func MarkPodsNotReady(kubeClient clientset.Interface, pods []*v1.Pod, nodeName s
 			continue
 		}
 
-		// Pod will be modified, so making copy is requiered.
+		// Pod will be modified, so making copy is required.
 		pod := pods[i].DeepCopy()
 		for _, cond := range pod.Status.Conditions {
 			if cond.Type == v1.PodReady {

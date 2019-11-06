@@ -152,7 +152,7 @@ func (podStrategyWithoutGraceful) CheckGracefulDelete(ctx context.Context, obj r
 	return false
 }
 
-// StrategyWithoutGraceful implements the legacy instant delele behavior.
+// StrategyWithoutGraceful implements the legacy instant delete behavior.
 var StrategyWithoutGraceful = podStrategyWithoutGraceful{Strategy}
 
 type podStatusStrategy struct {
