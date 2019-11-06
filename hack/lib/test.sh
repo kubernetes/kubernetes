@@ -138,6 +138,8 @@ kube::test::describe_object_assert() {
 
   for match in "${matches[@]}"; do
     if grep -q "${match}" <<< "${result}"; then
+      echo "matched ${match}"
+    else
       echo "${bold}${red}"
       echo "$(kube::test::get_caller): FAIL!"
       echo "Describe ${resource} ${object}"
@@ -204,6 +206,8 @@ kube::test::describe_resource_assert() {
 
   for match in "${matches[@]}"; do
     if grep -q "${match}" <<< "${result}"; then
+      echo "matched ${match}"
+    else
       echo "${bold}${red}"
       echo "FAIL!"
       echo "Describe ${resource}"
