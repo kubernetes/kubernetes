@@ -378,7 +378,7 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 				PodConfig: pausePodConfig{
 					Name:         podLabel,
 					Namespace:    ns,
-					Labels:       map[string]string{podLabel: ""},
+					Labels:       map[string]string{podLabel: "foo"},
 					NodeSelector: map[string]string{topologyKey: nodeNames[0]},
 				},
 			}
@@ -388,7 +388,9 @@ var _ = SIGDescribe("SchedulerPriorities [Serial]", func() {
 			podCfg := pausePodConfig{
 				Name:      "test-pod",
 				Namespace: ns,
-				Labels:    map[string]string{podLabel: ""},
+				// The labels shouldn't match the preceding ReplicaSet, otherwise it will
+				// be claimed as orphan of the ReplicaSet.
+				Labels: map[string]string{podLabel: "bar"},
 				Affinity: &v1.Affinity{
 					NodeAffinity: &v1.NodeAffinity{
 						RequiredDuringSchedulingIgnoredDuringExecution: &v1.NodeSelector{
