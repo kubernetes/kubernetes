@@ -156,4 +156,16 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 		val := int64(10)
 		obj.PodMaxBackoffSeconds = &val
 	}
+
+	// Enable profiling by default in the scheduler
+	if obj.EnableProfiling == nil {
+		enableProfiling := true
+		obj.EnableProfiling = &enableProfiling
+	}
+
+	// Enable contention profiling by default if profiling is enabled
+	if *obj.EnableProfiling && obj.EnableContentionProfiling == nil {
+		enableContentionProfiling := true
+		obj.EnableContentionProfiling = &enableContentionProfiling
+	}
 }
