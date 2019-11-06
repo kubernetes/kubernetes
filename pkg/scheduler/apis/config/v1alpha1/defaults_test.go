@@ -28,6 +28,7 @@ import (
 )
 
 func TestSchedulerDefaults(t *testing.T) {
+	enable := true
 	tests := []struct {
 		name     string
 		config   *kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration
@@ -42,6 +43,10 @@ func TestSchedulerDefaults(t *testing.T) {
 				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(1),
 				HealthzBindAddress:             pointer.StringPtr("0.0.0.0:10251"),
 				MetricsBindAddress:             pointer.StringPtr("0.0.0.0:10251"),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
 				LeaderElection: kubeschedulerconfigv1alpha1.KubeSchedulerLeaderElectionConfiguration{
 					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
 						LeaderElect:       pointer.BoolPtr(true),
@@ -80,6 +85,10 @@ func TestSchedulerDefaults(t *testing.T) {
 				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(1),
 				HealthzBindAddress:             pointer.StringPtr("1.2.3.4:10251"),
 				MetricsBindAddress:             pointer.StringPtr("1.2.3.4:10251"),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
 				LeaderElection: kubeschedulerconfigv1alpha1.KubeSchedulerLeaderElectionConfiguration{
 					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
 						LeaderElect:       pointer.BoolPtr(true),
@@ -118,6 +127,10 @@ func TestSchedulerDefaults(t *testing.T) {
 				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(1),
 				HealthzBindAddress:             pointer.StringPtr("0.0.0.0:12345"),
 				MetricsBindAddress:             pointer.StringPtr("0.0.0.0:12345"),
+				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
+					EnableProfiling:           &enable,
+					EnableContentionProfiling: &enable,
+				},
 				LeaderElection: kubeschedulerconfigv1alpha1.KubeSchedulerLeaderElectionConfiguration{
 					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
 						LeaderElect:       pointer.BoolPtr(true),
