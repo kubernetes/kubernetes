@@ -59,9 +59,9 @@ func TestCloneAndAddLabel(t *testing.T) {
 			t.Errorf("[Add] got %v, want %v", got, tc.want)
 		}
 		// now test the inverse.
-		got_rm := CloneAndRemoveLabel(got, tc.labelKey)
-		if !reflect.DeepEqual(got_rm, tc.labels) {
-			t.Errorf("[RM] got %v, want %v", got_rm, tc.labels)
+		gotRm := CloneAndRemoveLabel(got, tc.labelKey)
+		if !reflect.DeepEqual(gotRm, tc.labels) {
+			t.Errorf("[RM] got %v, want %v", gotRm, tc.labels)
 		}
 	}
 }
@@ -151,11 +151,11 @@ func TestCloneSelectorAndAddLabel(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		ls_in := metav1.LabelSelector{MatchLabels: tc.labels}
-		ls_out := metav1.LabelSelector{MatchLabels: tc.want}
+		lsIn := metav1.LabelSelector{MatchLabels: tc.labels}
+		lsOut := metav1.LabelSelector{MatchLabels: tc.want}
 
-		got := CloneSelectorAndAddLabel(&ls_in, tc.labelKey, tc.labelValue)
-		if !reflect.DeepEqual(got, &ls_out) {
+		got := CloneSelectorAndAddLabel(&lsIn, tc.labelKey, tc.labelValue)
+		if !reflect.DeepEqual(got, &lsOut) {
 			t.Errorf("got %v, want %v", got, tc.want)
 		}
 	}
@@ -200,11 +200,11 @@ func TestAddLabelToSelector(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		ls_in := metav1.LabelSelector{MatchLabels: tc.labels}
-		ls_out := metav1.LabelSelector{MatchLabels: tc.want}
+		lsIn := metav1.LabelSelector{MatchLabels: tc.labels}
+		lsOut := metav1.LabelSelector{MatchLabels: tc.want}
 
-		got := AddLabelToSelector(&ls_in, tc.labelKey, tc.labelValue)
-		if !reflect.DeepEqual(got, &ls_out) {
+		got := AddLabelToSelector(&lsIn, tc.labelKey, tc.labelValue)
+		if !reflect.DeepEqual(got, &lsOut) {
 			t.Errorf("got %v, want %v", got, tc.want)
 		}
 	}
