@@ -1137,15 +1137,16 @@ func (f *Framework) MatchContainerOutput(
 
 	if podErr != nil {
 		// Pod failed. Dump all logs from all containers to see what's wrong
-		for _, container := range podStatus.Spec.Containers {
-			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, container.Name)
+		_ = podutil.VisitContainers(&podStatus.Spec, func(c *v1.Container) bool {
+			logs, err := e2epod.GetPodLogs(f.ClientSet, ns, podStatus.Name, c.Name)
 			if err != nil {
 				Logf("Failed to get logs from node %q pod %q container %q: %v",
-					podStatus.Spec.NodeName, podStatus.Name, container.Name, err)
-				continue
+					podStatus.Spec.NodeName, podStatus.Name, c.Name, err)
+			} else {
+				Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, c.Name, logs)
 			}
-			Logf("Output of node %q pod %q container %q: %s", podStatus.Spec.NodeName, podStatus.Name, container.Name, logs)
-		}
+			return true
+		})
 		return fmt.Errorf("expected pod %q success: %v", createdPod.Name, podErr)
 	}
 
