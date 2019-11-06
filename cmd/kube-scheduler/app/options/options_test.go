@@ -277,9 +277,10 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
-				PodInitialBackoffSeconds: &defaultPodInitialBackoffSeconds,
-				PodMaxBackoffSeconds:     &defaultPodMaxBackoffSeconds,
+				PercentageOfNodesToScore: 50,
+				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 				Plugins:                  nil,
 			},
 		},
@@ -359,14 +360,20 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
-				PodInitialBackoffSeconds: &defaultPodInitialBackoffSeconds,
-				PodMaxBackoffSeconds:     &defaultPodMaxBackoffSeconds,
+				PercentageOfNodesToScore: 50,
+				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 			},
 		},
 		{
 			name: "overridden master",
 			options: &Options{
+				ComponentConfig: func() kubeschedulerconfig.KubeSchedulerConfiguration {
+					cfg, _ := newDefaultComponentConfig()
+					cfg.ClientConnection.Kubeconfig = flagKubeconfig
+					return *cfg
+				}(),
 				Master: insecureserver.URL,
 				SecureServing: (&apiserveroptions.SecureServingOptions{
 					ServerCert: apiserveroptions.GeneratableKeyCert{
@@ -390,6 +397,34 @@ pluginConfig:
 					RemoteKubeConfigFileOptional: true,
 					AlwaysAllowPaths:             []string{"/healthz"}, // note: this does not match /healthz/ or /healthz/*
 				},
+			},
+			expectedConfig: kubeschedulerconfig.KubeSchedulerConfiguration{
+				SchedulerName:                  "default-scheduler",
+				AlgorithmSource:                kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &defaultSource},
+				HardPodAffinitySymmetricWeight: 1,
+				HealthzBindAddress:             "", // defaults empty when not running from config file
+				MetricsBindAddress:             "", // defaults empty when not running from config file
+				LeaderElection: kubeschedulerconfig.KubeSchedulerLeaderElectionConfiguration{
+					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
+						LeaderElect:       true,
+						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
+						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
+						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
+						ResourceLock:      "endpointsleases",
+						ResourceNamespace: "kube-system",
+						ResourceName:      "kube-scheduler",
+					},
+				},
+				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
+					Kubeconfig:  flagKubeconfig,
+					QPS:         50,
+					Burst:       100,
+					ContentType: "application/vnd.kubernetes.protobuf",
+				},
+				PercentageOfNodesToScore: 50,
+				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 			},
 			expectedUsername: "none, http",
 		},
@@ -422,9 +457,10 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
-				PodInitialBackoffSeconds: &defaultPodInitialBackoffSeconds,
-				PodMaxBackoffSeconds:     &defaultPodMaxBackoffSeconds,
+				PercentageOfNodesToScore: 50,
+				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 				Plugins: &kubeschedulerconfig.Plugins{
 					Reserve: &kubeschedulerconfig.PluginSet{
 						Enabled: []kubeschedulerconfig.Plugin{
@@ -499,9 +535,10 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
-				PodInitialBackoffSeconds: &defaultPodInitialBackoffSeconds,
-				PodMaxBackoffSeconds:     &defaultPodMaxBackoffSeconds,
+				PercentageOfNodesToScore: 50,
+				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 				Plugins:                  nil,
 			},
 		},
@@ -537,9 +574,10 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				BindTimeoutSeconds:       &defaultBindTimeoutSeconds,
-				PodInitialBackoffSeconds: &defaultPodInitialBackoffSeconds,
-				PodMaxBackoffSeconds:     &defaultPodMaxBackoffSeconds,
+				PercentageOfNodesToScore: 50,
+				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
+				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
+				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
 				Plugins:                  nil,
 			},
 		},

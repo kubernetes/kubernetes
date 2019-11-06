@@ -105,21 +105,6 @@ func (in *KubeSchedulerConfiguration) DeepCopyInto(out *KubeSchedulerConfigurati
 	out.LeaderElection = in.LeaderElection
 	out.ClientConnection = in.ClientConnection
 	out.DebuggingConfiguration = in.DebuggingConfiguration
-	if in.BindTimeoutSeconds != nil {
-		in, out := &in.BindTimeoutSeconds, &out.BindTimeoutSeconds
-		*out = new(int64)
-		**out = **in
-	}
-	if in.PodInitialBackoffSeconds != nil {
-		in, out := &in.PodInitialBackoffSeconds, &out.PodInitialBackoffSeconds
-		*out = new(int64)
-		**out = **in
-	}
-	if in.PodMaxBackoffSeconds != nil {
-		in, out := &in.PodMaxBackoffSeconds, &out.PodMaxBackoffSeconds
-		*out = new(int64)
-		**out = **in
-	}
 	if in.Plugins != nil {
 		in, out := &in.Plugins, &out.Plugins
 		*out = new(Plugins)

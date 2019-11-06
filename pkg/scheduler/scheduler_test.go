@@ -46,7 +46,6 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
-	kubeschedulerconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	"k8s.io/kubernetes/pkg/scheduler/core"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
@@ -192,7 +191,7 @@ func TestSchedulerCreation(t *testing.T) {
 		informerFactory,
 		NewPodInformer(client, 0),
 		eventBroadcaster.NewRecorder(scheme.Scheme, "scheduler"),
-		kubeschedulerconfig.SchedulerAlgorithmSource{Provider: &testSource},
+		schedulerapi.SchedulerAlgorithmSource{Provider: &testSource},
 		stopCh,
 		WithPodInitialBackoffSeconds(1),
 		WithPodMaxBackoffSeconds(10),
@@ -693,7 +692,7 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 }
 
 func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, scache internalcache.Cache, informerFactory informers.SharedInformerFactory, predicateMap map[string]predicates.FitPredicate, stop chan struct{}, bindingTime time.Duration) (*Scheduler, chan *v1.Binding) {
-	fwk, _ := framework.NewFramework(emptyPluginRegistry, nil, []kubeschedulerconfig.PluginConfig{})
+	fwk, _ := framework.NewFramework(emptyPluginRegistry, nil, []schedulerapi.PluginConfig{})
 	algo := core.NewGenericScheduler(
 		scache,
 		internalqueue.NewSchedulingQueue(nil, nil),
