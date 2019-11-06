@@ -55,7 +55,12 @@ func (c unionCAContent) CurrentCABundleContent() []byte {
 }
 
 // CurrentCABundleContent provides ca bundle byte content
-func (c unionCAContent) VerifyOptions() x509.VerifyOptions {
+func (c unionCAContent) VerifyOptions() (x509.VerifyOptions, bool) {
+	currCABundle := c.CurrentCABundleContent()
+	if len(currCABundle) == 0 {
+		return x509.VerifyOptions{}, false
+	}
+
 	// TODO make more efficient.  This isn't actually used in any of our mainline paths.  It's called to build the TLSConfig
 	// TODO on file changes, but the actual authentication runs against the individual items, not the union.
 	ret, err := newCABundleAndVerifier(c.Name(), c.CurrentCABundleContent())
@@ -64,7 +69,7 @@ func (c unionCAContent) VerifyOptions() x509.VerifyOptions {
 		panic(err)
 	}
 
-	return ret.verifyOptions
+	return ret.verifyOptions, true
 }
 
 // AddListener adds a listener to be notified when the CA content changes.
