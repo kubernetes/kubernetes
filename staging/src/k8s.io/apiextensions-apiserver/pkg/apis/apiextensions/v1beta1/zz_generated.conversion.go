@@ -931,6 +931,8 @@ func autoConvert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(in *JS
 	out.XListMapKeys = *(*[]string)(unsafe.Pointer(&in.XListMapKeys))
 	out.XListType = (*string)(unsafe.Pointer(in.XListType))
 	out.XMapType = (*string)(unsafe.Pointer(in.XMapType))
+	out.XImmutability = (*string)(unsafe.Pointer(in.XImmutability))
+	out.XKeyImmutability = (*string)(unsafe.Pointer(in.XKeyImmutability))
 	return nil
 }
 
@@ -1119,6 +1121,8 @@ func autoConvert_apiextensions_JSONSchemaProps_To_v1beta1_JSONSchemaProps(in *ap
 	out.XListMapKeys = *(*[]string)(unsafe.Pointer(&in.XListMapKeys))
 	out.XListType = (*string)(unsafe.Pointer(in.XListType))
 	out.XMapType = (*string)(unsafe.Pointer(in.XMapType))
+	out.XImmutability = (*string)(unsafe.Pointer(in.XImmutability))
+	out.XKeyImmutability = (*string)(unsafe.Pointer(in.XKeyImmutability))
 	return nil
 }
 

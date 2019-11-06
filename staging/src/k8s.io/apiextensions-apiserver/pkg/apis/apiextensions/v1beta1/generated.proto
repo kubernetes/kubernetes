@@ -548,6 +548,18 @@ message JSONSchemaProps {
   //      Atomic maps will be entirely replaced when updated.
   // +optional
   optional string xKubernetesMapType = 43;
+
+  // x-kubernetes-immutability
+  // 1) `immutable`:
+  // 2) `addOnly`:
+  // 3) `removeOnly`:
+  optional string xKubernetesImmutability = 44;
+
+  // x-kubernetes-key-immutability
+  // 1) `immutable`:
+  // 2) `addOnly`:
+  // 3) `removeOnly`:
+  optional string xKubernetesKeyImmutability = 45;
 }
 
 // JSONSchemaPropsOrArray represents a value that can either be a JSONSchemaProps
