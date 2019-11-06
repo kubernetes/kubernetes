@@ -193,7 +193,7 @@ func (ts *tokenSourceImpl) Token() (*oauth2.Token, error) {
 		return nil, fmt.Errorf("nil pointer of expiration in token request")
 	}
 
-	lifetime := retTokenRequest.Status.ExpirationTimestamp.Time.Sub(time.Now())
+	lifetime := time.Until(retTokenRequest.Status.ExpirationTimestamp.Time)
 	if lifetime < time.Minute*10 {
 		// possible clock skew issue, pin to minimum token lifetime
 		lifetime = time.Minute * 10
