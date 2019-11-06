@@ -49,6 +49,8 @@ spec:
         version: v0.3.1
     spec:
       serviceAccountName: event-exporter-sa
+      nodeSelector:
+        beta.kubernetes.io/os: linux
       containers:
       - name: event-exporter
         image: k8s.gcr.io/event-exporter:v0.3.1
