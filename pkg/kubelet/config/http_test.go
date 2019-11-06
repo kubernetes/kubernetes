@@ -112,7 +112,7 @@ func TestExtractInvalidPods(t *testing.T) {
 			t.Fatalf("%s: Some weird json problem: %v", testCase.desc, err)
 		}
 		fakeHandler := utiltesting.FakeHandler{
-			StatusCode:   200,
+			StatusCode:   http.StatusOK,
 			ResponseBody: string(data),
 		}
 		testServer := httptest.NewServer(&fakeHandler)
@@ -303,7 +303,7 @@ func TestExtractPodsFromHTTP(t *testing.T) {
 			t.Fatalf("%s: error in encoding the pod: %v", testCase.desc, err)
 		}
 		fakeHandler := utiltesting.FakeHandler{
-			StatusCode:   200,
+			StatusCode:   http.StatusOK,
 			ResponseBody: string(data),
 		}
 		testServer := httptest.NewServer(&fakeHandler)
@@ -353,7 +353,7 @@ func TestURLWithHeader(t *testing.T) {
 		t.Fatalf("Unexpected json marshalling error: %v", err)
 	}
 	fakeHandler := utiltesting.FakeHandler{
-		StatusCode:   200,
+		StatusCode:   http.StatusOK,
 		ResponseBody: string(data),
 	}
 	testServer := httptest.NewServer(&fakeHandler)

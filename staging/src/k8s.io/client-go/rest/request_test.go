@@ -515,17 +515,17 @@ func TestTransformResponse(t *testing.T) {
 		Error    bool
 		ErrFn    func(err error) bool
 	}{
-		{Response: &http.Response{StatusCode: 200}, Data: []byte{}},
-		{Response: &http.Response{StatusCode: 201}, Data: []byte{}, Created: true},
+		{Response: &http.Response{StatusCode: http.StatusOK}, Data: []byte{}},
+		{Response: &http.Response{StatusCode: http.StatusCreated}, Data: []byte{}, Created: true},
 		{Response: &http.Response{StatusCode: 199}, Error: true},
-		{Response: &http.Response{StatusCode: 500}, Error: true},
-		{Response: &http.Response{StatusCode: 422}, Error: true},
-		{Response: &http.Response{StatusCode: 409}, Error: true},
-		{Response: &http.Response{StatusCode: 404}, Error: true},
-		{Response: &http.Response{StatusCode: 401}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusInternalServerError}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusUnprocessableEntity}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusConflict}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusNotFound}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusUnauthorized}, Error: true},
 		{
 			Response: &http.Response{
-				StatusCode: 401,
+				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
@@ -536,7 +536,7 @@ func TestTransformResponse(t *testing.T) {
 		},
 		{
 			Response: &http.Response{
-				StatusCode: 401,
+				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"text/any"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
@@ -545,9 +545,9 @@ func TestTransformResponse(t *testing.T) {
 				return strings.Contains(err.Error(), "server has asked for the client to provide") && apierrors.IsUnauthorized(err)
 			},
 		},
-		{Response: &http.Response{StatusCode: 403}, Error: true},
-		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
-		{Response: &http.Response{StatusCode: 200, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
+		{Response: &http.Response{StatusCode: http.StatusForbidden}, Error: true},
+		{Response: &http.Response{StatusCode: http.StatusOK, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
+		{Response: &http.Response{StatusCode: http.StatusOK, Body: ioutil.NopCloser(bytes.NewReader(invalid))}, Data: invalid},
 	}
 	for i, test := range testCases {
 		r := NewRequest(nil, "", uri, "", defaultContentConfig(), defaultSerializers(t), nil, nil, 0)
@@ -615,7 +615,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		{
 			ContentType: "application/json",
 			Response: &http.Response{
-				StatusCode: 401,
+				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
@@ -627,7 +627,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		{
 			ContentType: "application/json",
 			Response: &http.Response{
-				StatusCode: 401,
+				StatusCode: http.StatusUnauthorized,
 				Header:     http.Header{"Content-Type": []string{"application/protobuf"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
@@ -644,7 +644,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		{
 			ContentType: "application/json",
 			Response: &http.Response{
-				StatusCode: 500,
+				StatusCode: http.StatusInternalServerError,
 				Header:     http.Header{"Content-Type": []string{"application/,others"}},
 			},
 			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
@@ -657,7 +657,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 		{
 			// no negotiation when no content type specified
 			Response: &http.Response{
-				StatusCode: 200,
+				StatusCode: http.StatusOK,
 				Header:     http.Header{"Content-Type": []string{"text/any"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
@@ -667,7 +667,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 			// no negotiation when no response content type specified
 			ContentType: "text/any",
 			Response: &http.Response{
-				StatusCode: 200,
+				StatusCode: http.StatusOK,
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
 			Decoder: scheme.Codecs.LegacyCodec(v1.SchemeGroupVersion),
@@ -676,7 +676,7 @@ func TestTransformResponseNegotiate(t *testing.T) {
 			// unrecognized content type is not handled
 			ContentType: "application/json",
 			Response: &http.Response{
-				StatusCode: 404,
+				StatusCode: http.StatusNotFound,
 				Header:     http.Header{"Content-Type": []string{"application/unrecognized"}},
 				Body:       ioutil.NopCloser(bytes.NewReader(invalid)),
 			},
@@ -1178,7 +1178,7 @@ func (f *fakeUpgradeRoundTripper) RoundTrip(req *http.Request) (*http.Response, 
 	b := []byte{}
 	body := ioutil.NopCloser(bytes.NewReader(b))
 	resp := &http.Response{
-		StatusCode: 101,
+		StatusCode: http.StatusSwitchingProtocols,
 		Body:       body,
 	}
 	return resp, nil
@@ -1367,7 +1367,7 @@ func TestConnectionResetByPeerIsRetried(t *testing.T) {
 			count++
 			if count >= 3 {
 				return &http.Response{
-					StatusCode: 200,
+					StatusCode: http.StatusOK,
 					Body:       ioutil.NopCloser(bytes.NewReader([]byte{})),
 				}, nil
 			}
