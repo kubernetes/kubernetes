@@ -170,6 +170,9 @@ type TestContextType struct {
 
 	// SriovdpConfigMapFile is the path to the ConfigMap to configure the SRIOV device plugin on this host.
 	SriovdpConfigMapFile string
+
+	// SpecSummaryOutput is the file to write ginkgo.SpecSummary objects to as tests complete. Useful for debugging and test introspection.
+	SpecSummaryOutput string
 }
 
 // NodeKillerConfig describes configuration of NodeKiller -- a utility to
@@ -298,6 +301,7 @@ func RegisterCommonFlags(flags *flag.FlagSet) {
 	flags.StringVar(&TestContext.KubectlPath, "kubectl-path", "kubectl", "The kubectl binary to use. For development, you might use 'cluster/kubectl.sh' here.")
 
 	flags.StringVar(&TestContext.ProgressReportURL, "progress-report-url", "", "The URL to POST progress updates to as the suite runs to assist in aiding integrations. If empty, no messages sent.")
+	flags.StringVar(&TestContext.SpecSummaryOutput, "spec-dump", "", "The file to dump all ginkgo.SpecSummary to after tests run. If empty, no objects are saved/printed.")
 }
 
 // RegisterClusterFlags registers flags specific to the cluster e2e test suite.
