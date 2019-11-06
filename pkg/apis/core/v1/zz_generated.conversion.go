@@ -7489,6 +7489,7 @@ func autoConvert_v1_ServiceSpec_To_core_ServiceSpec(in *v1.ServiceSpec, out *cor
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	out.SessionAffinityConfig = (*core.SessionAffinityConfig)(unsafe.Pointer(in.SessionAffinityConfig))
 	out.IPFamily = (*core.IPFamily)(unsafe.Pointer(in.IPFamily))
+	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
 	return nil
 }
 
@@ -7512,6 +7513,7 @@ func autoConvert_core_ServiceSpec_To_v1_ServiceSpec(in *core.ServiceSpec, out *v
 	out.HealthCheckNodePort = in.HealthCheckNodePort
 	out.PublishNotReadyAddresses = in.PublishNotReadyAddresses
 	out.IPFamily = (*v1.IPFamily)(unsafe.Pointer(in.IPFamily))
+	out.TopologyKeys = *(*[]string)(unsafe.Pointer(&in.TopologyKeys))
 	return nil
 }
 

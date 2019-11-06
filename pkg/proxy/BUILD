@@ -13,6 +13,7 @@ go_library(
         "endpoints.go",
         "endpointslicecache.go",
         "service.go",
+        "topology.go",
         "types.go",
     ],
     importpath = "k8s.io/kubernetes/pkg/proxy",
@@ -62,6 +63,7 @@ go_test(
         "endpoints_test.go",
         "endpointslicecache_test.go",
         "service_test.go",
+        "topology_test.go",
     ],
     embed = [":go_default_library"],
     deps = [
