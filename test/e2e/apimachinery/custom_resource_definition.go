@@ -264,7 +264,7 @@ var _ = SIGDescribe("CustomResourceDefinition resources [Privileged:ClusterAdmin
 		the default is applied. Create another CR. Remove default, add default for another field and read CR until
 		new field is defaulted, but old default stays.
 	*/
-	ginkgo.It("custom resource defaulting for requests and from storage works ", func() {
+	framework.ConformanceIt("custom resource defaulting for requests and from storage works ", func() {
 		config, err := framework.LoadConfig()
 		framework.ExpectNoError(err, "loading config")
 		apiExtensionClient, err := clientset.NewForConfig(config)
