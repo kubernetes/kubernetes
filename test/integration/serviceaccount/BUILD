@@ -26,6 +26,7 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatortest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/bearertoken:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/union:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/serviceaccount:go_default_library",

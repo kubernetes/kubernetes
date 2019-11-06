@@ -29,6 +29,11 @@ type AuthenticatedGroupAdder struct {
 	Authenticator authenticator.Request
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Request interface.
+func (g *AuthenticatedGroupAdder) AuthenticatorID() string {
+	return g.Authenticator.AuthenticatorID()
+}
+
 // NewAuthenticatedGroupAdder wraps a request authenticator, and adds the system:authenticated group when appropriate.
 // Authentication must succeed, the user must not be system:anonymous, the groups system:authenticated or system:unauthenticated must
 // not be present

@@ -25,10 +25,15 @@ import (
 
 // GroupAdder adds groups to an authenticated user.Info
 type GroupAdder struct {
-	// Authenticator is delegated to make the authentication decision
-	Authenticator authenticator.Request
+	// authenticator is delegated to make the authentication decision
+	authenticator authenticator.Request
 	// Groups are additional groups to add to the user.Info from a successful authentication
 	Groups []string
+}
+
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Request interface.
+func (g *GroupAdder) AuthenticatorID() string {
+	return g.authenticator.AuthenticatorID()
 }
 
 // NewGroupAdder wraps a request authenticator, and adds the specified groups to the returned user when authentication succeeds
@@ -37,7 +42,7 @@ func NewGroupAdder(auth authenticator.Request, groups []string) authenticator.Re
 }
 
 func (g *GroupAdder) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
-	r, ok, err := g.Authenticator.AuthenticateRequest(req)
+	r, ok, err := g.authenticator.AuthenticateRequest(req)
 	if err != nil || !ok {
 		return nil, ok, err
 	}

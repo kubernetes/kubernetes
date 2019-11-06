@@ -26,6 +26,7 @@ import (
 	authorizationapi "k8s.io/api/authorization/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatortest"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 	clientset "k8s.io/client-go/kubernetes"
@@ -57,7 +58,7 @@ func alwaysAlice(req *http.Request) (*authenticator.Response, bool, error) {
 
 func TestSubjectAccessReview(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+	masterConfig.GenericConfig.Authentication.Authenticator = authenticatortest.NewRequestAuth(alwaysAlice)
 	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()
@@ -148,7 +149,7 @@ func TestSubjectAccessReview(t *testing.T) {
 func TestSelfSubjectAccessReview(t *testing.T) {
 	username := "alice"
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+	masterConfig.GenericConfig.Authentication.Authenticator = authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
 		return &authenticator.Response{
 			User: &user.DefaultInfo{Name: username},
 		}, true, nil
@@ -231,7 +232,7 @@ func TestSelfSubjectAccessReview(t *testing.T) {
 
 func TestLocalSubjectAccessReview(t *testing.T) {
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(alwaysAlice)
+	masterConfig.GenericConfig.Authentication.Authenticator = authenticatortest.NewRequestAuth(alwaysAlice)
 	masterConfig.GenericConfig.Authorization.Authorizer = sarAuthorizer{}
 	_, s, closeFn := framework.RunAMaster(masterConfig)
 	defer closeFn()

@@ -52,6 +52,11 @@ type audAgnosticRequestAuthenticator struct {
 
 var _ = Request(&audAgnosticRequestAuthenticator{})
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Request interface.
+func (a *audAgnosticRequestAuthenticator) AuthenticatorID() string {
+	return a.delegate.AuthenticatorID()
+}
+
 func (a *audAgnosticRequestAuthenticator) AuthenticateRequest(req *http.Request) (*Response, bool, error) {
 	return authenticate(req.Context(), a.implicit, func() (*Response, bool, error) {
 		return a.delegate.AuthenticateRequest(req)
@@ -73,6 +78,11 @@ type audAgnosticTokenAuthenticator struct {
 }
 
 var _ = Token(&audAgnosticTokenAuthenticator{})
+
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Request interface.
+func (a *audAgnosticTokenAuthenticator) AuthenticatorID() string {
+	return a.delegate.AuthenticatorID()
+}
 
 func (a *audAgnosticTokenAuthenticator) AuthenticateToken(ctx context.Context, tok string) (*Response, bool, error) {
 	return authenticate(ctx, a.implicit, func() (*Response, bool, error) {

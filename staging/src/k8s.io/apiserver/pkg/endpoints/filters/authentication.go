@@ -54,7 +54,7 @@ var (
 			Help:           "Counter of authenticated requests broken out by username.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"username"},
+		[]string{"username", "authenticator"},
 	)
 
 	authenticatedAttemptsCounter = metrics.NewCounterVec(
@@ -63,7 +63,7 @@ var (
 			Help:           "Counter of authenticated attempts.",
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"result"},
+		[]string{"result", "authenticator"},
 	)
 
 	authenticationLatency = metrics.NewHistogramVec(
@@ -73,7 +73,7 @@ var (
 			Buckets:        metrics.ExponentialBuckets(0.001, 2, 15),
 			StabilityLevel: metrics.ALPHA,
 		},
-		[]string{"result"},
+		[]string{"result", "authenticator"},
 	)
 )
 
@@ -102,11 +102,11 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 		if err != nil || !ok {
 			if err != nil {
 				klog.Errorf("Unable to authenticate the request due to an error: %v", err)
-				authenticatedAttemptsCounter.WithLabelValues(errorLabel).Inc()
-				authenticationLatency.WithLabelValues(errorLabel).Observe(time.Since(authenticationStart).Seconds())
+				authenticatedAttemptsCounter.WithLabelValues(errorLabel, auth.AuthenticatorID()).Inc()
+				authenticationLatency.WithLabelValues(errorLabel, auth.AuthenticatorID()).Observe(time.Since(authenticationStart).Seconds())
 			} else if !ok {
-				authenticatedAttemptsCounter.WithLabelValues(failureLabel).Inc()
-				authenticationLatency.WithLabelValues(failureLabel).Observe(time.Since(authenticationStart).Seconds())
+				authenticatedAttemptsCounter.WithLabelValues(failureLabel, auth.AuthenticatorID()).Inc()
+				authenticationLatency.WithLabelValues(failureLabel, auth.AuthenticatorID()).Observe(time.Since(authenticationStart).Seconds())
 			}
 
 			failed.ServeHTTP(w, req)
@@ -124,9 +124,9 @@ func WithAuthentication(handler http.Handler, auth authenticator.Request, failed
 
 		req = req.WithContext(genericapirequest.WithUser(req.Context(), resp.User))
 
-		authenticatedUserCounter.WithLabelValues(compressUsername(resp.User.GetName())).Inc()
-		authenticatedAttemptsCounter.WithLabelValues(successLabel).Inc()
-		authenticationLatency.WithLabelValues(successLabel).Observe(time.Since(authenticationStart).Seconds())
+		authenticatedUserCounter.WithLabelValues(compressUsername(resp.User.GetName()), auth.AuthenticatorID()).Inc()
+		authenticatedAttemptsCounter.WithLabelValues(successLabel, auth.AuthenticatorID()).Inc()
+		authenticationLatency.WithLabelValues(successLabel, auth.AuthenticatorID()).Observe(time.Since(authenticationStart).Seconds())
 
 		handler.ServeHTTP(w, req)
 	})

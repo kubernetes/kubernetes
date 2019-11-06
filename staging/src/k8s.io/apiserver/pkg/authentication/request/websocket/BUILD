@@ -23,6 +23,7 @@ go_test(
     embed = [":go_default_library"],
     deps = [
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:go_default_library",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatortest:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/authentication/user:go_default_library",
     ],
 )

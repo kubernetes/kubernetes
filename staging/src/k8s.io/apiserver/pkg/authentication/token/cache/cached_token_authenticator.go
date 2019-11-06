@@ -96,6 +96,11 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 	}
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Request interface.
+func (a *cachedTokenAuthenticator) AuthenticatorID() string {
+	return a.authenticator.AuthenticatorID()
+}
+
 // AuthenticateToken implements authenticator.Token
 func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	auds, _ := authenticator.AudiencesFrom(ctx)

@@ -81,6 +81,11 @@ func NewCSV(path string) (*PasswordAuthenticator, error) {
 	return &PasswordAuthenticator{users}, nil
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Password interface.
+func (a *PasswordAuthenticator) AuthenticatorID() string {
+	return "password-file"
+}
+
 func (a *PasswordAuthenticator) AuthenticatePassword(ctx context.Context, username, password string) (*authenticator.Response, bool, error) {
 	user, ok := a.users[username]
 	if !ok {

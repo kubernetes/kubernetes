@@ -36,6 +36,10 @@ type testPassword struct {
 	Err  error
 }
 
+func (t *testPassword) AuthenticatorID() string {
+	return "testPasswordAuthenticator"
+}
+
 func (t *testPassword) AuthenticatePassword(ctx context.Context, user, password string) (*authenticator.Response, bool, error) {
 	t.Called = true
 	t.Username = user

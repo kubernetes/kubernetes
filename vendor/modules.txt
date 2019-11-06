@@ -1287,6 +1287,7 @@ k8s.io/apiserver/pkg/audit/policy
 k8s.io/apiserver/pkg/audit/util
 k8s.io/apiserver/pkg/authentication/authenticator
 k8s.io/apiserver/pkg/authentication/authenticatorfactory
+k8s.io/apiserver/pkg/authentication/authenticatortest
 k8s.io/apiserver/pkg/authentication/group
 k8s.io/apiserver/pkg/authentication/request/anonymous
 k8s.io/apiserver/pkg/authentication/request/bearertoken

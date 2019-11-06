@@ -90,6 +90,11 @@ func NewCSV(path string) (*TokenAuthenticator, error) {
 	}, nil
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Token interface.
+func (a *TokenAuthenticator) AuthenticatorID() string {
+	return "token-file"
+}
+
 func (a *TokenAuthenticator) AuthenticateToken(ctx context.Context, value string) (*authenticator.Response, bool, error) {
 	user, ok := a.tokens[value]
 	if !ok {

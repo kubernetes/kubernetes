@@ -45,6 +45,11 @@ func NewProtocolAuthenticator(auth authenticator.Token) *ProtocolAuthenticator {
 	return &ProtocolAuthenticator{auth}
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Token interface.
+func (a *ProtocolAuthenticator) AuthenticatorID() string {
+	return a.auth.AuthenticatorID()
+}
+
 func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	// Only accept websocket connections
 	if !wsstream.IsWebSocketRequest(req) {

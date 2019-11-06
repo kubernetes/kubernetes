@@ -33,6 +33,10 @@ func New() *TokenAuthenticator {
 	}
 }
 
+func (a *TokenAuthenticator) AuthenticatorID() string {
+	return "token-test"
+}
+
 func (a *TokenAuthenticator) AuthenticateToken(ctx context.Context, value string) (*authenticator.Response, bool, error) {
 	user, ok := a.Tokens[value]
 	if !ok {

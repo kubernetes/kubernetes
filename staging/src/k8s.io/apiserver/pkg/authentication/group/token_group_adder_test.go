@@ -22,13 +22,14 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatortest"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 func TestTokenGroupAdder(t *testing.T) {
 	adder := authenticator.Token(
 		NewTokenGroupAdder(
-			authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+			authenticatortest.NewTokenAuth(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 				return &authenticator.Response{User: &user.DefaultInfo{Name: "user", Groups: []string{"original"}}}, true, nil
 			}),
 			[]string{"added"},

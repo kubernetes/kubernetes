@@ -29,6 +29,16 @@ type unionAuthRequestHandler struct {
 	Handlers []authenticator.Request
 	// FailOnError determines whether an error returns short-circuits the chain
 	FailOnError bool
+	// authenticatedBy holds the authenticator that was successful in authenticating the request.
+	authenticatedBy authenticator.Request
+}
+
+func (authHandler *unionAuthRequestHandler) AuthenticatorID() string {
+	if authHandler.authenticatedBy == nil {
+		return "union"
+	}
+
+	return authHandler.authenticatedBy.AuthenticatorID()
 }
 
 // New returns a request authenticator that validates credentials using a chain of authenticator.Request objects.
@@ -63,6 +73,7 @@ func (authHandler *unionAuthRequestHandler) AuthenticateRequest(req *http.Reques
 		}
 
 		if ok {
+			authHandler.authenticatedBy = currAuthRequestHandler
 			return resp, ok, err
 		}
 	}

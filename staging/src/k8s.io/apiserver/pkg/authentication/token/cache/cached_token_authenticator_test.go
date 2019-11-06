@@ -31,6 +31,7 @@ import (
 	utilclock "k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatortest"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -42,7 +43,7 @@ func TestCachedTokenAuthenticator(t *testing.T) {
 		resultOk    bool
 		resultErr   error
 	)
-	fakeAuth := authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	fakeAuth := authenticatortest.NewTokenAuth(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		calledWithToken = append(calledWithToken, token)
 		return &authenticator.Response{User: resultUsers[token]}, resultOk, resultErr
 	})
@@ -116,7 +117,7 @@ func TestCachedTokenAuthenticator(t *testing.T) {
 
 func TestCachedTokenAuthenticatorWithAudiences(t *testing.T) {
 	resultUsers := make(map[string]user.Info)
-	fakeAuth := authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	fakeAuth := authenticatortest.NewTokenAuth(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		auds, _ := authenticator.AudiencesFrom(ctx)
 		return &authenticator.Response{User: resultUsers[auds[0]+token]}, true, nil
 	})
@@ -299,7 +300,7 @@ func (s *singleBenchmark) doAuthForTokenN(n int, a authenticator.Token) {
 func (s *singleBenchmark) bench(b *testing.B) {
 	s.b = b
 	a := newWithClock(
-		authenticator.TokenFunc(s.lookup),
+		authenticatortest.NewTokenAuth(s.lookup),
 		true,
 		4*time.Second,
 		500*time.Millisecond,

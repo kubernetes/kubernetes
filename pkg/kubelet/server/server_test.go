@@ -38,7 +38,7 @@ import (
 	cadvisorapi "github.com/google/cadvisor/info/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/httpstream"
@@ -276,6 +276,10 @@ type fakeAuth struct {
 	authenticateFunc func(*http.Request) (*authenticator.Response, bool, error)
 	attributesFunc   func(user.Info, *http.Request) authorizer.Attributes
 	authorizeFunc    func(authorizer.Attributes) (authorized authorizer.Decision, reason string, err error)
+}
+
+func (f *fakeAuth) AuthenticatorID() string {
+	return "fake-authenticator"
 }
 
 func (f *fakeAuth) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {

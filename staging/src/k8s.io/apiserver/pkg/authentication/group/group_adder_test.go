@@ -22,13 +22,14 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatortest"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 func TestGroupAdder(t *testing.T) {
 	adder := authenticator.Request(
 		NewGroupAdder(
-			authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
 				return &authenticator.Response{User: &user.DefaultInfo{Name: "user", Groups: []string{"original"}}}, true, nil
 			}),
 			[]string{"added"},
@@ -93,18 +94,18 @@ func TestAuthenticatedGroupAdder(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
+	for _, tc := range tests {
 		adder := authenticator.Request(
 			NewAuthenticatedGroupAdder(
-				authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-					return &authenticator.Response{User: test.inputUser}, true, nil
+				authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+					return &authenticator.Response{User: tc.inputUser}, true, nil
 				}),
 			),
 		)
 
 		r, _, _ := adder.AuthenticateRequest(nil)
-		if !reflect.DeepEqual(r.User, test.expectedUser) {
-			t.Errorf("Unexpected user\ngot:\t%#v\nwant:\t%#v", r.User, test.expectedUser)
+		if !reflect.DeepEqual(r.User, tc.expectedUser) {
+			t.Errorf("Unexpected user\ngot:\t%#v\nwant:\t%#v", r.User, tc.expectedUser)
 		}
 	}
 

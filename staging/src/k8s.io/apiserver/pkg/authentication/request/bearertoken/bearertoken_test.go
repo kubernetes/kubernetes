@@ -24,11 +24,12 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatortest"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
 func TestAuthenticateRequest(t *testing.T) {
-	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	auth := New(authenticatortest.NewTokenAuth(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		if token != "token" {
 			t.Errorf("unexpected token: %s", token)
 		}
@@ -43,7 +44,7 @@ func TestAuthenticateRequest(t *testing.T) {
 }
 
 func TestAuthenticateRequestTokenInvalid(t *testing.T) {
-	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	auth := New(authenticatortest.NewTokenAuth(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		return nil, false, nil
 	}))
 	resp, ok, err := auth.AuthenticateRequest(&http.Request{
@@ -59,7 +60,7 @@ func TestAuthenticateRequestTokenInvalid(t *testing.T) {
 
 func TestAuthenticateRequestTokenInvalidCustomError(t *testing.T) {
 	customError := errors.New("custom")
-	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	auth := New(authenticatortest.NewTokenAuth(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		return nil, false, customError
 	}))
 	resp, ok, err := auth.AuthenticateRequest(&http.Request{
@@ -74,7 +75,7 @@ func TestAuthenticateRequestTokenInvalidCustomError(t *testing.T) {
 }
 
 func TestAuthenticateRequestTokenError(t *testing.T) {
-	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	auth := New(authenticatortest.NewTokenAuth(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		return nil, false, errors.New("error")
 	}))
 	resp, ok, err := auth.AuthenticateRequest(&http.Request{
@@ -95,7 +96,7 @@ func TestAuthenticateRequestBadValue(t *testing.T) {
 		{Req: &http.Request{Header: http.Header{"Authorization": []string{"Bearer: token"}}}},
 	}
 	for i, testCase := range testCases {
-		auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+		auth := New(authenticatortest.NewTokenAuth(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 			t.Errorf("authentication should not have been called")
 			return nil, false, nil
 		}))
@@ -146,7 +147,7 @@ func TestBearerToken(t *testing.T) {
 		},
 		"valid bearer token removing header": {
 			AuthorizationHeaders: []string{"Bearer 123"},
-			TokenAuth: authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, error) {
+			TokenAuth: authenticatortest.NewTokenAuth(func(ctx context.Context, t string) (*authenticator.Response, bool, error) {
 				return &authenticator.Response{User: &user.DefaultInfo{Name: "myuser"}}, true, nil
 			}),
 			ExpectedUserName:             "myuser",
@@ -156,7 +157,7 @@ func TestBearerToken(t *testing.T) {
 		},
 		"invalid bearer token": {
 			AuthorizationHeaders:         []string{"Bearer 123"},
-			TokenAuth:                    authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, error) { return nil, false, nil }),
+			TokenAuth:                    authenticatortest.NewTokenAuth(func(ctx context.Context, t string) (*authenticator.Response, bool, error) { return nil, false, nil }),
 			ExpectedUserName:             "",
 			ExpectedOK:                   false,
 			ExpectedErr:                  true,
@@ -164,7 +165,7 @@ func TestBearerToken(t *testing.T) {
 		},
 		"error bearer token": {
 			AuthorizationHeaders: []string{"Bearer 123"},
-			TokenAuth: authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, error) {
+			TokenAuth: authenticatortest.NewTokenAuth(func(ctx context.Context, t string) (*authenticator.Response, bool, error) {
 				return nil, false, errors.New("error")
 			}),
 			ExpectedUserName:             "",

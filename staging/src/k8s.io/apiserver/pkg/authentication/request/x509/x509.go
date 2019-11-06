@@ -104,6 +104,11 @@ func NewDynamic(verifyOptionsFn VerifyOptionFunc, user UserConversion) *Authenti
 	return &Authenticator{verifyOptionsFn, user}
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Request interface.
+func (a *Authenticator) AuthenticatorID() string {
+	return "x509"
+}
+
 // AuthenticateRequest authenticates the request using presented client certificates
 func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	if req.TLS == nil || len(req.TLS.PeerCertificates) == 0 {
@@ -149,6 +154,11 @@ type Verifier struct {
 	// allowedCommonNames contains the common names which a verified certificate is allowed to have.
 	// If empty, all verified certificates are allowed.
 	allowedCommonNames StringSliceProvider
+}
+
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Request interface.
+func (a *Verifier) AuthenticatorID() string {
+	return a.auth.AuthenticatorID()
 }
 
 // NewVerifier create a request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth

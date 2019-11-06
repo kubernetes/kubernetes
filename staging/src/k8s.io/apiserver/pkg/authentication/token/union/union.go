@@ -29,6 +29,9 @@ type unionAuthTokenHandler struct {
 	Handlers []authenticator.Token
 	// FailOnError determines whether an error returns short-circuits the chain
 	FailOnError bool
+
+	// authenticatedBy holds the authenticator that was successful in authenticating the request.
+	authenticatedBy authenticator.Token
 }
 
 // New returns a token authenticator that validates credentials using a chain of authenticator.Token objects.
@@ -49,6 +52,14 @@ func NewFailOnError(authTokenHandlers ...authenticator.Token) authenticator.Toke
 	return &unionAuthTokenHandler{Handlers: authTokenHandlers, FailOnError: true}
 }
 
+func (authHandler *unionAuthTokenHandler) AuthenticatorID() string {
+	if authHandler == nil {
+		return "union-token"
+	}
+
+	return authHandler.authenticatedBy.AuthenticatorID()
+}
+
 // AuthenticateToken authenticates the token using a chain of authenticator.Token objects.
 func (authHandler *unionAuthTokenHandler) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	var errlist []error
@@ -63,6 +74,7 @@ func (authHandler *unionAuthTokenHandler) AuthenticateToken(ctx context.Context,
 		}
 
 		if ok {
+			authHandler.authenticatedBy = currAuthRequestHandler
 			return info, ok, err
 		}
 	}

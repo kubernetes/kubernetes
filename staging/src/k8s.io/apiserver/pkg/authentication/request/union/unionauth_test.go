@@ -24,6 +24,7 @@ import (
 	"testing"
 
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatortest"
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
@@ -43,8 +44,13 @@ func (mock *mockAuthRequestHandler) AuthenticateRequest(req *http.Request) (*aut
 }
 
 func TestAuthenticateRequestSecondPasses(t *testing.T) {
-	handler1 := &mockAuthRequestHandler{returnUser: user1}
-	handler2 := &mockAuthRequestHandler{returnUser: user2, isAuthenticated: true}
+	handler1 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return &authenticator.Response{User: user1}, false, nil
+	})
+	handler2 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return &authenticator.Response{User: user2}, true, nil
+	})
+
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
@@ -61,8 +67,13 @@ func TestAuthenticateRequestSecondPasses(t *testing.T) {
 }
 
 func TestAuthenticateRequestFirstPasses(t *testing.T) {
-	handler1 := &mockAuthRequestHandler{returnUser: user1, isAuthenticated: true}
-	handler2 := &mockAuthRequestHandler{returnUser: user2}
+	handler1 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return &authenticator.Response{User: user1}, true, nil
+	})
+	handler2 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return &authenticator.Response{User: user2}, false, nil
+	})
+
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
@@ -79,8 +90,13 @@ func TestAuthenticateRequestFirstPasses(t *testing.T) {
 }
 
 func TestAuthenticateRequestSuppressUnnecessaryErrors(t *testing.T) {
-	handler1 := &mockAuthRequestHandler{err: errors.New("first")}
-	handler2 := &mockAuthRequestHandler{isAuthenticated: true}
+	handler1 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return nil, false, errors.New("first")
+	})
+	handler2 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return nil, true, nil
+	})
+
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
@@ -110,8 +126,13 @@ func TestAuthenticateRequestNoAuthenticators(t *testing.T) {
 }
 
 func TestAuthenticateRequestNonePass(t *testing.T) {
-	handler1 := &mockAuthRequestHandler{}
-	handler2 := &mockAuthRequestHandler{}
+	handler1 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return nil, false, nil
+	})
+	handler2 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return nil, false, nil
+	})
+
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
@@ -125,8 +146,12 @@ func TestAuthenticateRequestNonePass(t *testing.T) {
 }
 
 func TestAuthenticateRequestAdditiveErrors(t *testing.T) {
-	handler1 := &mockAuthRequestHandler{err: errors.New("first")}
-	handler2 := &mockAuthRequestHandler{err: errors.New("second")}
+	handler1 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return nil, false, errors.New("first")
+	})
+	handler2 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return nil, true, errors.New("second")
+	})
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
@@ -146,8 +171,12 @@ func TestAuthenticateRequestAdditiveErrors(t *testing.T) {
 }
 
 func TestAuthenticateRequestFailEarly(t *testing.T) {
-	handler1 := &mockAuthRequestHandler{err: errors.New("first")}
-	handler2 := &mockAuthRequestHandler{err: errors.New("second")}
+	handler1 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return nil, false, errors.New("first")
+	})
+	handler2 := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
+		return nil, false, errors.New("second")
+	})
 	authRequestHandler := NewFailOnError(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 

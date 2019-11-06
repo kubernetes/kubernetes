@@ -36,6 +36,11 @@ func NewTokenGroupAdder(auth authenticator.Token, groups []string) authenticator
 	return &TokenGroupAdder{auth, groups}
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Token interface.
+func (g *TokenGroupAdder) AuthenticatorID() string {
+	return g.Authenticator.AuthenticatorID()
+}
+
 func (g *TokenGroupAdder) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	r, ok, err := g.Authenticator.AuthenticateToken(ctx, token)
 	if err != nil || !ok {

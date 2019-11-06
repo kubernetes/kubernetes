@@ -28,6 +28,8 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apiserver/pkg/authentication/authenticatortest"
+
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -808,7 +810,7 @@ func TestX509Verifier(t *testing.T) {
 		}
 
 		authCall := false
-		auth := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+		auth := authenticatortest.NewRequestAuth(func(req *http.Request) (*authenticator.Response, bool, error) {
 			authCall = true
 			return &authenticator.Response{User: &user.DefaultInfo{Name: "innerauth"}}, true, nil
 		})

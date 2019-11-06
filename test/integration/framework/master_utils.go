@@ -26,6 +26,8 @@ import (
 	"strconv"
 	"time"
 
+	"k8s.io/apiserver/pkg/authentication/authenticatortest"
+
 	"github.com/go-openapi/spec"
 	"github.com/google/uuid"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -168,7 +170,7 @@ func startMasterOrDie(masterConfig *master.Config, incomingServer *httptest.Serv
 
 	tokenAuthenticator := authenticatorfactory.NewFromTokens(tokens)
 	if masterConfig.GenericConfig.Authentication.Authenticator == nil {
-		masterConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authauthenticator.RequestFunc(alwaysEmpty))
+		masterConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, authenticatortest.NewRequestAuth(alwaysEmpty))
 	} else {
 		masterConfig.GenericConfig.Authentication.Authenticator = authenticatorunion.New(tokenAuthenticator, masterConfig.GenericConfig.Authentication.Authenticator)
 	}

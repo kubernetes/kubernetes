@@ -48,6 +48,12 @@ type WebhookTokenAuthenticator struct {
 	implicitAuds   authenticator.Audiences
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Request interface.
+func (w *WebhookTokenAuthenticator) AuthenticatorID() string {
+	// TODO Identify the webhook.
+	return "webhook"
+}
+
 // NewFromInterface creates a webhook authenticator using the given tokenReview
 // client. It is recommend to wrap this authenticator with the token cache
 // authenticator implemented in

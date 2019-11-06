@@ -541,6 +541,11 @@ func (r *claimResolver) resolve(endpoint endpoint, allClaims claims) error {
 	return nil
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Token interface.
+func (a *Authenticator) AuthenticatorID() string {
+	return "oidc"
+}
+
 func (a *Authenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	if reqAuds, ok := authenticator.AudiencesFrom(ctx); ok {
 		if len(reqAuds.Intersect(a.clientIDs)) == 0 && len(reqAuds.Intersect(a.apiAudiences)) == 0 {

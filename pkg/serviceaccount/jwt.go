@@ -249,6 +249,11 @@ type Validator interface {
 	NewPrivateClaims() interface{}
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Token interface.
+func (j *jwtTokenAuthenticator) AuthenticatorID() string {
+	return "jwt-token"
+}
+
 func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
 	if !j.hasCorrectIssuer(tokenData) {
 		return nil, false, nil

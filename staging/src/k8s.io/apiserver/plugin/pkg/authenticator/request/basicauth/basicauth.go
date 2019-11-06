@@ -35,6 +35,11 @@ func New(auth authenticator.Password) *Authenticator {
 
 var errInvalidAuth = errors.New("invalid username/password combination")
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Request interface.
+func (a *Authenticator) AuthenticatorID() string {
+	return a.auth.AuthenticatorID()
+}
+
 // AuthenticateRequest authenticates the request using the "Authorization: Basic" header in the request
 func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	username, password, found := req.BasicAuth()

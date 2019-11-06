@@ -64,6 +64,11 @@ type requestHeaderAuthRequestHandler struct {
 	extraHeaderPrefixes StringSliceProvider
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Request interface.
+func (a *requestHeaderAuthRequestHandler) AuthenticatorID() string {
+	return "request-header"
+}
+
 func New(nameHeaders, groupHeaders, extraHeaderPrefixes []string) (authenticator.Request, error) {
 	trimmedNameHeaders, err := trimHeaders(nameHeaders...)
 	if err != nil {

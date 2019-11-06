@@ -34,6 +34,11 @@ func New(auth authenticator.Token) *Authenticator {
 
 var invalidToken = errors.New("invalid bearer token")
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Request interface.
+func (a *Authenticator) AuthenticatorID() string {
+	return "bearer-token"
+}
+
 func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
 	auth := strings.TrimSpace(req.Header.Get("Authorization"))
 	if auth == "" {

@@ -18,6 +18,7 @@ filegroup(
         "//staging/src/k8s.io/apiserver/pkg/audit:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticator:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatorfactory:all-srcs",
+        "//staging/src/k8s.io/apiserver/pkg/authentication/authenticatortest:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/group:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/anonymous:all-srcs",
         "//staging/src/k8s.io/apiserver/pkg/authentication/request/bearertoken:all-srcs",

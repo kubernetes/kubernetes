@@ -38,6 +38,10 @@ var (
 	user2 = &user.DefaultInfo{Name: "elegant_sheep", UID: "bravo"}
 )
 
+func (mock *mockAuthRequestHandler) AuthenticatorID() string {
+	return "unionauthtest"
+}
+
 func (mock *mockAuthRequestHandler) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 	return &authenticator.Response{User: mock.returnUser}, mock.isAuthenticated, mock.err
 }

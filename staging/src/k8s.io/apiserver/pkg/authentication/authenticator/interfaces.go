@@ -23,15 +23,22 @@ import (
 	"k8s.io/apiserver/pkg/authentication/user"
 )
 
+// Authenticator is the umbrella interface for all authenticators.
+type Authenticator interface {
+	AuthenticatorID() string
+}
+
 // Token checks a string value against a backing authentication store and
 // returns a Response or an error if the token could not be checked.
 type Token interface {
+	Authenticator
 	AuthenticateToken(ctx context.Context, token string) (*Response, bool, error)
 }
 
 // Request attempts to extract authentication information from a request and
 // returns a Response or an error if the request could not be checked.
 type Request interface {
+	Authenticator
 	AuthenticateRequest(req *http.Request) (*Response, bool, error)
 }
 
@@ -39,31 +46,8 @@ type Request interface {
 // store and returns a Response or an error if the password could not be
 // checked.
 type Password interface {
+	Authenticator
 	AuthenticatePassword(ctx context.Context, user, password string) (*Response, bool, error)
-}
-
-// TokenFunc is a function that implements the Token interface.
-type TokenFunc func(ctx context.Context, token string) (*Response, bool, error)
-
-// AuthenticateToken implements authenticator.Token.
-func (f TokenFunc) AuthenticateToken(ctx context.Context, token string) (*Response, bool, error) {
-	return f(ctx, token)
-}
-
-// RequestFunc is a function that implements the Request interface.
-type RequestFunc func(req *http.Request) (*Response, bool, error)
-
-// AuthenticateRequest implements authenticator.Request.
-func (f RequestFunc) AuthenticateRequest(req *http.Request) (*Response, bool, error) {
-	return f(req)
-}
-
-// PasswordFunc is a function that implements the Password interface.
-type PasswordFunc func(ctx context.Context, user, password string) (*Response, bool, error)
-
-// AuthenticatePassword implements authenticator.Password.
-func (f PasswordFunc) AuthenticatePassword(ctx context.Context, user, password string) (*Response, bool, error) {
-	return f(ctx, user, password)
 }
 
 // Response is the struct returned by authenticator interfaces upon successful

@@ -63,6 +63,11 @@ func tokenErrorf(s *corev1.Secret, format string, i ...interface{}) {
 	klog.V(3).Infof(format, i...)
 }
 
+// AuthenticatorID implements the AuthenticatorID of the authenticator.Token interface.
+func (t *TokenAuthenticator) AuthenticatorID() string {
+	return "bootstrap-token"
+}
+
 // AuthenticateToken tries to match the provided token to a bootstrap token secret
 // in a given namespace. If found, it authenticates the token in the
 // "system:bootstrappers" group and with the "system:bootstrap:(token-id)" username.

@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	apiequality "k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +38,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
+	"k8s.io/apiserver/pkg/authentication/authenticatortest"
 	"k8s.io/apiserver/pkg/authentication/request/bearertoken"
 	"k8s.io/apiserver/pkg/authentication/request/union"
 	serviceaccountapiserver "k8s.io/apiserver/pkg/authentication/serviceaccount"
@@ -382,7 +383,7 @@ func startServiceAccountTestServer(t *testing.T) (*clientset.Clientset, restclie
 	// Set up two authenticators:
 	// 1. A token authenticator that maps the rootToken to the "root" user
 	// 2. A ServiceAccountToken authenticator that validates ServiceAccount tokens
-	rootTokenAuth := authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	rootTokenAuth := authenticatortest.NewTokenAuth(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
 		if token == rootToken {
 			return &authenticator.Response{User: &user.DefaultInfo{Name: rootUserName}}, true, nil
 		}
