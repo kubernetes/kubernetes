@@ -717,7 +717,13 @@ func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinRep
 	var possibleLimitingReason string
 
 	minimumAllowedReplicas = hpaMinReplicas
-	possibleLimitingReason = "the desired replica count is less than the minimum replica count"
+
+	if desiredReplicas < minimumAllowedReplicas {
+		possibleLimitingCondition = "TooFewReplicas"
+		possibleLimitingReason = "the desired replica count is less than the minimum replica count"
+
+		return minimumAllowedReplicas, possibleLimitingCondition, possibleLimitingReason
+	}
 
 	// Do not upscale too much to prevent incorrect rapid increase of the number of master replicas caused by
 	// bogus CPU usage report from heapster/kubelet (like in issue #32304).
@@ -725,7 +731,6 @@ func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinRep
 
 	if hpaMaxReplicas > scaleUpLimit {
 		maximumAllowedReplicas = scaleUpLimit
-
 		possibleLimitingCondition = "ScaleUpLimit"
 		possibleLimitingReason = "the desired replica count is increasing faster than the maximum scale rate"
 	} else {
@@ -734,12 +739,7 @@ func convertDesiredReplicasWithRules(currentReplicas, desiredReplicas, hpaMinRep
 		possibleLimitingReason = "the desired replica count is more than the maximum replica count"
 	}
 
-	if desiredReplicas < minimumAllowedReplicas {
-		possibleLimitingCondition = "TooFewReplicas"
-		possibleLimitingReason = "the desired replica count is less than the minimum replica count"
-
-		return minimumAllowedReplicas, possibleLimitingCondition, possibleLimitingReason
-	} else if desiredReplicas > maximumAllowedReplicas {
+	if desiredReplicas > maximumAllowedReplicas {
 		return maximumAllowedReplicas, possibleLimitingCondition, possibleLimitingReason
 	}
 
