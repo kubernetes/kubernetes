@@ -38,6 +38,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodevolumelimits"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/podtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/requestedtocapacityratio"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/tainttoleration"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumebinding"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/volumerestrictions"
@@ -82,6 +83,7 @@ func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 		interpodaffinity.Name:          interpodaffinity.New,
 		nodelabel.Name:                 nodelabel.New,
 		requestedtocapacityratio.Name:  requestedtocapacityratio.New,
+		serviceaffinity.Name:           serviceaffinity.New,
 	}
 }
 
@@ -95,6 +97,8 @@ type ConfigProducerArgs struct {
 	NodeLabelArgs *nodelabel.Args
 	// RequestedToCapacityRatioArgs is the args for the RequestedToCapacityRatio plugin.
 	RequestedToCapacityRatioArgs *requestedtocapacityratio.Args
+	// ServiceAffinityArgs is the args for the ServiceAffinity plugin.
+	ServiceAffinityArgs *serviceaffinity.Args
 }
 
 // ConfigProducer produces a framework's configuration.
@@ -203,10 +207,16 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 			plugins.Filter = appendToPluginSet(plugins.Filter, podtopologyspread.Name, nil)
 			return
 		})
-	registry.RegisterPredicate(nodelabel.Name,
+	registry.RegisterPredicate(predicates.CheckNodeLabelPresencePred,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Filter = appendToPluginSet(plugins.Filter, nodelabel.Name, nil)
 			pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
+			return
+		})
+	registry.RegisterPredicate(predicates.CheckServiceAffinityPred,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Filter = appendToPluginSet(plugins.Filter, serviceaffinity.Name, nil)
+			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
 			return
 		})
 

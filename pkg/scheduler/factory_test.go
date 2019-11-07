@@ -47,6 +47,7 @@ import (
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
@@ -91,6 +92,7 @@ func TestCreateFromConfig(t *testing.T) {
 		"apiVersion" : "v1",
 		"predicates" : [
 			{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["zone"]}}},
+			{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["foo"]}}},
 			{"name" : "TestRequireZone", "argument" : {"labelsPresence" : {"labels" : ["zone"], "presence" : true}}},
 			{"name" : "TestNoFooLabel", "argument" : {"labelsPresence" : {"labels" : ["foo"], "presence" : false}}},
 			{"name" : "PredicateOne"},
@@ -136,6 +138,21 @@ func TestCreateFromConfig(t *testing.T) {
 	want := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"],"presentLabelsPreference":["l1"],"absentLabelsPreference":["l2"]}}`
 	if string(encoding) != want {
 		t.Errorf("Config for NodeLabel plugin mismatch. got: %v, want: %v", string(encoding), want)
+	}
+
+	// Verify that service affinity predicates are converted to framework plugins.
+	if _, ok := findPlugin(serviceaffinity.Name, "FilterPlugin", conf); !ok {
+		t.Fatalf("ServiceAffinity plugin not exist in framework.")
+	}
+	// Verify that the policy config is converted to plugin config for service affinity predicate.
+	serviceAffinityConfig := findPluginConfig(serviceaffinity.Name, conf)
+	encoding, err = json.Marshal(serviceAffinityConfig)
+	if err != nil {
+		t.Errorf("Failed to marshal %+v: %v", serviceAffinityConfig, err)
+	}
+	want = `{"Name":"ServiceAffinity","Args":{"labels":["zone","foo"]}}`
+	if string(encoding) != want {
+		t.Errorf("Config for ServiceAffinity plugin mismatch. got: %v, want: %v", string(encoding), want)
 	}
 }
 
