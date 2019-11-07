@@ -19,12 +19,22 @@ set -e
 # Detect whether the base system is using iptables-legacy or
 # iptables-nft. This assumes that some non-containerized process (eg
 # kubelet) has already created some iptables rules.
+
+# Bugs in iptables-nft 1.8.3 may cause it to get stuck in a loop in
+# some circumstances, so we have to run the nft check in a timeout. To
+# avoid hitting that timeout, we only bother to even check nft if
+# legacy iptables was empty / mostly empty.
+
 num_legacy_lines=$( (iptables-legacy-save || true; ip6tables-legacy-save || true) 2>/dev/null | grep '^-' | wc -l)
-num_nft_lines=$( (iptables-nft-save || true; ip6tables-nft-save || true) 2>/dev/null | grep '^-' | wc -l)
-if [ "${num_legacy_lines}" -ge "${num_nft_lines}" ]; then
+if [ "${num_legacy_lines}" -ge 10 ]; then
     mode=legacy
 else
-    mode=nft
+    num_nft_lines=$( (timeout 5 sh -c "iptables-nft-save; ip6tables-nft-save" || true) 2>/dev/null | grep '^-' | wc -l)
+    if [ "${num_legacy_lines}" -ge "${num_nft_lines}" ]; then
+	mode=legacy
+    else
+	mode=nft
+    fi
 fi
 
 update-alternatives --set iptables "/usr/sbin/iptables-${mode}" > /dev/null
