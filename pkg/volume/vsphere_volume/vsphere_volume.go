@@ -213,13 +213,8 @@ func (b *vsphereVolumeMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *vsphereVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
-}
-
-// SetUp attaches the disk and bind mounts to the volume path.
-func (b *vsphereVolumeMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := b.SetUp(mounterArgs)
+func (b *vsphereVolumeMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := b.SetUpAt(b.GetPath(), mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

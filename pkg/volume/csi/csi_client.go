@@ -632,18 +632,18 @@ func isFinalError(err error) bool {
 	if !ok {
 		// This is not gRPC error. The operation must have failed before gRPC
 		// method was called, otherwise we would get gRPC error.
-		// We don't know if any previous CreateVolume is in progress, be on the safe side.
+		// We don't know if any previous volume operation is in progress, be on the safe side.
 		return false
 	}
 	switch st.Code() {
 	case codes.Canceled, // gRPC: Client Application cancelled the request
 		codes.DeadlineExceeded,  // gRPC: Timeout
-		codes.Unavailable,       // gRPC: Server shutting down, TCP connection broken - previous CreateVolume() may be still in progress.
-		codes.ResourceExhausted, // gRPC: Server temporarily out of resources - previous Publish operation may be still in progress.
+		codes.Unavailable,       // gRPC: Server shutting down, TCP connection broken - previous volume operation may be still in progress.
+		codes.ResourceExhausted, // gRPC: Server temporarily out of resources - previous volume operation may be still in progress.
 		codes.Aborted:           // CSI: Operation pending for volume
 		return false
 	}
-	// All other errors mean that provisioning either did not
+	// All other errors mean that operation either did not
 	// even start or failed. It is for sure not in progress.
 	return true
 }

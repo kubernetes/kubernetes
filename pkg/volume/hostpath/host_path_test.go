@@ -219,7 +219,7 @@ func TestInvalidHostPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = mounter.SetUp(volume.MounterArgs{})
+	_, err = mounter.SetUp(volume.MounterArgs{})
 	expectedMsg := "invalid HostPath `/no/backsteps/allowed/..`: must not contain '..'"
 	if err.Error() != expectedMsg {
 		t.Fatalf("expected error `%s` but got `%s`", expectedMsg, err)
@@ -255,7 +255,7 @@ func TestPlugin(t *testing.T) {
 		t.Errorf("Got unexpected path: %s", path)
 	}
 
-	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {
+	if _, err := mounter.SetUp(volume.MounterArgs{}); err != nil {
 		t.Errorf("Expected success, got: %v", err)
 	}
 

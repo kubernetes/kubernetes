@@ -344,42 +344,40 @@ func (b *storageosMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (b *storageosMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	// Need a namespace to find the volume, try pod's namespace if not set.
-	if b.volNamespace == "" {
-		klog.V(2).Infof("Setting StorageOS volume namespace to pod namespace: %s", b.podNamespace)
-		b.volNamespace = b.podNamespace
+func (b *storageosMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	internalSetup := func() error {
+		// Need a namespace to find the volume, try pod's namespace if not set.
+		if b.volNamespace == "" {
+			klog.V(2).Infof("Setting StorageOS volume namespace to pod namespace: %s", b.podNamespace)
+			b.volNamespace = b.podNamespace
+		}
+
+		targetPath := makeGlobalPDName(b.plugin.host, b.pvName, b.volNamespace, b.volName)
+
+		// Attach the device to the host.
+		if err := b.manager.AttachDevice(b, targetPath); err != nil {
+			klog.Errorf("Failed to attach device at %s: %s", targetPath, err.Error())
+			return err
+		}
+
+		// Attach the StorageOS volume as a block device
+		devicePath, err := b.manager.AttachVolume(b)
+		if err != nil {
+			klog.Errorf("Failed to attach StorageOS volume %s: %s", b.volName, err.Error())
+			return err
+		}
+
+		// Mount the loop device into the plugin's disk global mount dir.
+		err = b.manager.MountVolume(b, devicePath, targetPath)
+		if err != nil {
+			return err
+		}
+		klog.V(4).Infof("Successfully mounted StorageOS volume %s into global mount directory", b.volName)
+
+		// Bind mount the volume into the pod
+		return b.SetUpAt(b.GetPath(), mounterArgs)
 	}
-
-	targetPath := makeGlobalPDName(b.plugin.host, b.pvName, b.volNamespace, b.volName)
-
-	// Attach the device to the host.
-	if err := b.manager.AttachDevice(b, targetPath); err != nil {
-		klog.Errorf("Failed to attach device at %s: %s", targetPath, err.Error())
-		return err
-	}
-
-	// Attach the StorageOS volume as a block device
-	devicePath, err := b.manager.AttachVolume(b)
-	if err != nil {
-		klog.Errorf("Failed to attach StorageOS volume %s: %s", b.volName, err.Error())
-		return err
-	}
-
-	// Mount the loop device into the plugin's disk global mount dir.
-	err = b.manager.MountVolume(b, devicePath, targetPath)
-	if err != nil {
-		return err
-	}
-	klog.V(4).Infof("Successfully mounted StorageOS volume %s into global mount directory", b.volName)
-
-	// Bind mount the volume into the pod
-	return b.SetUpAt(b.GetPath(), mounterArgs)
-}
-
-func (b *storageosMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := b.SetUp(mounterArgs)
-	return volumetypes.OperationFinished, err
+	return volumetypes.OperationFinished, internalSetup()
 }
 
 // SetUp bind mounts the disk global mount to the give volume path.

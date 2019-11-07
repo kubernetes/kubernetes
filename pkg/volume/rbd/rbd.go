@@ -837,12 +837,8 @@ func (b *rbdMounter) CanMount() error {
 	return nil
 }
 
-func (b *rbdMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
-}
-
-func (b *rbdMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := b.SetUp(mounterArgs)
+func (b *rbdMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := b.SetUpAt(b.GetPath(), mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

@@ -221,7 +221,7 @@ func MounterSetUpTests(t *testing.T, podInfoEnabled bool) {
 			var mounterArgs volume.MounterArgs
 			fsGroup := int64(2000)
 			mounterArgs.FsGroup = &fsGroup
-			if err := csiMounter.SetUp(mounterArgs); err != nil {
+			if _, err := csiMounter.SetUp(mounterArgs); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -361,7 +361,7 @@ func TestMounterSetUpSimple(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
+			if _, err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -488,7 +488,7 @@ func TestMounterSetupWithStatusTracking(t *testing.T) {
 				}
 			}
 
-			opExistStatus, err := csiMounter.SetUpWithStatusTracking(volume.MounterArgs{})
+			opExistStatus, err := csiMounter.SetUp(volume.MounterArgs{})
 
 			if opExistStatus != tc.exitStatus {
 				t.Fatalf("expected exitStatus: %v but got %v", tc.exitStatus, opExistStatus)
@@ -604,7 +604,7 @@ func TestMounterSetUpWithInline(t *testing.T) {
 			}
 
 			// Mounter.SetUp()
-			if err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
+			if _, err := csiMounter.SetUp(volume.MounterArgs{}); err != nil {
 				t.Fatalf("mounter.Setup failed: %v", err)
 			}
 
@@ -757,7 +757,7 @@ func TestMounterSetUpWithFSGroup(t *testing.T) {
 			fsGroupPtr = &fsGroup
 		}
 		mounterArgs.FsGroup = fsGroupPtr
-		if err := csiMounter.SetUp(mounterArgs); err != nil {
+		if _, err := csiMounter.SetUp(mounterArgs); err != nil {
 			t.Fatalf("mounter.Setup failed: %v", err)
 		}
 

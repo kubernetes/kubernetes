@@ -176,13 +176,8 @@ func (b *gitRepoVolumeMounter) CanMount() error {
 }
 
 // SetUp creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
-}
-
-// SetUp creates new directory and clones a git repo.
-func (b *gitRepoVolumeMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := b.SetUp(mounterArgs)
+func (b *gitRepoVolumeMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := b.SetUpAt(b.GetPath(), mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

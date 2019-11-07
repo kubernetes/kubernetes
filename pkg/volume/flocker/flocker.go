@@ -232,12 +232,8 @@ func (b *flockerVolumeMounter) GetPath() string {
 }
 
 // SetUp bind mounts the disk global mount to the volume path.
-func (b *flockerVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
-}
-
-func (b *flockerVolumeMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := b.SetUp(mounterArgs)
+func (b *flockerVolumeMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := b.SetUpAt(b.GetPath(), mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

@@ -99,11 +99,7 @@ func (c *csiMountMgr) CanMount() error {
 	return nil
 }
 
-func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) error {
-	return c.SetUpAt(c.GetPath(), mounterArgs)
-}
-
-func (c *csiMountMgr) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+func (c *csiMountMgr) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
 	opExitStatus, err := c.setupUtil(c.GetPath(), mounterArgs)
 	return opExitStatus, err
 }

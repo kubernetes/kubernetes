@@ -79,12 +79,8 @@ func (v *sioVolume) CanMount() error {
 	return nil
 }
 
-func (v *sioVolume) SetUp(mounterArgs volume.MounterArgs) error {
-	return v.SetUpAt(v.GetPath(), mounterArgs)
-}
-
-func (v *sioVolume) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := v.SetUp(mounterArgs)
+func (v *sioVolume) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := v.SetUpAt(v.GetPath(), mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

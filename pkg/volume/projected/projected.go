@@ -185,12 +185,8 @@ func (s *projectedVolumeMounter) CanMount() error {
 	return nil
 }
 
-func (s *projectedVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return s.SetUpAt(s.GetPath(), mounterArgs)
-}
-
-func (s *projectedVolumeMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := s.SetUp(mounterArgs)
+func (s *projectedVolumeMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := s.SetUpAt(s.GetPath(), mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

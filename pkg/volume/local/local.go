@@ -473,13 +473,8 @@ func (m *localVolumeMounter) CanMount() error {
 }
 
 // SetUp bind mounts the directory to the volume path
-func (m *localVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return m.SetUpAt(m.GetPath(), mounterArgs)
-}
-
-// SetUp bind mounts the directory to the volume path
-func (m *localVolumeMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := m.SetUp(mounterArgs)
+func (m *localVolumeMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := m.SetUpAt(m.GetPath(), mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

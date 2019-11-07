@@ -629,7 +629,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 		}
 
 		// Execute mount
-		opExitStatus, mountErr := volumeMounter.SetUpWithStatusTracking(volume.MounterArgs{
+		opExitStatus, mountErr := volumeMounter.SetUp(volume.MounterArgs{
 			FsGroup:     fsGroup,
 			DesiredSize: volumeToMount.DesiredSizeLimit,
 		})

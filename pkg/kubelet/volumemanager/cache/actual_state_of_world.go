@@ -173,7 +173,8 @@ type AttachedVolume struct {
 	DeviceMountState operationexecutor.DeviceMountState
 }
 
-// DeviceMayBeMounted returns true if device may be mounted in global path.
+// DeviceMayBeMounted returns true if device is mounted in global path or is in
+// uncertain state.
 func (av AttachedVolume) DeviceMayBeMounted() bool {
 	return av.DeviceMountState == operationexecutor.DeviceGloballyMounted ||
 		av.DeviceMountState == operationexecutor.DeviceMountUncertain

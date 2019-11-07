@@ -235,14 +235,9 @@ func (mounter *quobyteMounter) CanMount() error {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (mounter *quobyteMounter) SetUp(mounterArgs volume.MounterArgs) error {
+func (mounter *quobyteMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
 	pluginDir := mounter.plugin.host.GetPluginDir(utilstrings.EscapeQualifiedName(quobytePluginName))
-	return mounter.SetUpAt(pluginDir, mounterArgs)
-}
-
-// SetUpWithStatusTracking attaches the disk and bind mounts to the volume path.
-func (mounter *quobyteMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := mounter.SetUp(mounterArgs)
+	err := mounter.SetUpAt(pluginDir, mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

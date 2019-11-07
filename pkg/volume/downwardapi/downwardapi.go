@@ -171,12 +171,8 @@ func (b *downwardAPIVolumeMounter) CanMount() error {
 // This function is not idempotent by design. We want the data to be refreshed periodically.
 // The internal sync interval of kubelet will drive the refresh of data.
 // TODO: Add volume specific ticker and refresh loop
-func (b *downwardAPIVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return b.SetUpAt(b.GetPath(), mounterArgs)
-}
-
-func (b *downwardAPIVolumeMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := b.SetUp(mounterArgs)
+func (b *downwardAPIVolumeMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := b.SetUpAt(b.GetPath(), mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

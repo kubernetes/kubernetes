@@ -238,12 +238,8 @@ func (nfsMounter *nfsMounter) GetAttributes() volume.Attributes {
 }
 
 // SetUp attaches the disk and bind mounts to the volume path.
-func (nfsMounter *nfsMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return nfsMounter.SetUpAt(nfsMounter.GetPath(), mounterArgs)
-}
-
-func (nfsMounter *nfsMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := nfsMounter.SetUp(mounterArgs)
+func (nfsMounter *nfsMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := nfsMounter.SetUpAt(nfsMounter.GetPath(), mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

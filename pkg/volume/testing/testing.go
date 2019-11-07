@@ -843,18 +843,17 @@ func (fv *FakeVolume) CanMount() error {
 	return nil
 }
 
-func (fv *FakeVolume) SetUp(mounterArgs MounterArgs) error {
-	fv.Lock()
-	defer fv.Unlock()
-	if fv.VolName == TimeoutOnSetupVolumeName {
-		return volumetypes.NewOperationTimedOutError("time out on setup")
+func (fv *FakeVolume) SetUp(mounterArgs MounterArgs) (volumetypes.OperationStatus, error) {
+	internalSetup := func() error {
+		fv.Lock()
+		defer fv.Unlock()
+		if fv.VolName == TimeoutOnSetupVolumeName {
+			return volumetypes.NewOperationTimedOutError("time out on setup")
+		}
+		fv.SetUpCallCount++
+		return fv.SetUpAt(fv.getPath(), mounterArgs)
 	}
-	fv.SetUpCallCount++
-	return fv.SetUpAt(fv.getPath(), mounterArgs)
-}
-
-func (fv *FakeVolume) SetUpWithStatusTracking(mounterArgs MounterArgs) (volumetypes.OperationStatus, error) {
-	err := fv.SetUp(mounterArgs)
+	err := internalSetup()
 	if volumetypes.IsOperationTimeOutError(err) {
 		return volumetypes.OperationInProgress, err
 	}

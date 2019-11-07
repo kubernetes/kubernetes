@@ -40,13 +40,8 @@ var _ volume.Mounter = &flexVolumeMounter{}
 // Mounter interface
 
 // SetUp creates new directory.
-func (f *flexVolumeMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	return f.SetUpAt(f.GetPath(), mounterArgs)
-}
-
-// SetUp creates new directory.
-func (f *flexVolumeMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := f.SetUp(mounterArgs)
+func (f *flexVolumeMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := f.SetUpAt(f.GetPath(), mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

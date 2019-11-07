@@ -193,12 +193,8 @@ func (ed *emptyDir) CanMount() error {
 }
 
 // SetUp creates new directory.
-func (ed *emptyDir) SetUp(mounterArgs volume.MounterArgs) error {
-	return ed.SetUpAt(ed.GetPath(), mounterArgs)
-}
-
-func (ed *emptyDir) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := ed.SetUp(mounterArgs)
+func (ed *emptyDir) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	err := ed.SetUpAt(ed.GetPath(), mounterArgs)
 	return volumetypes.OperationFinished, err
 }
 

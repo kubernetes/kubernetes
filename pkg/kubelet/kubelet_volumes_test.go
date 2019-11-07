@@ -531,16 +531,12 @@ func (f *stubVolume) CanMount() error {
 	return nil
 }
 
-func (f *stubVolume) SetUp(mounterArgs volume.MounterArgs) error {
-	return nil
+func (f *stubVolume) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	return volumetypes.OperationFinished, nil
 }
 
 func (f *stubVolume) SetUpAt(dir string, mounterArgs volume.MounterArgs) error {
 	return nil
-}
-
-func (f *stubVolume) SetUpWithStatusTracking(mountArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	return volumetypes.OperationFinished, nil
 }
 
 type stubBlockVolume struct {

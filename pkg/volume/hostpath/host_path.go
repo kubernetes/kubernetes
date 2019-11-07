@@ -227,22 +227,20 @@ func (b *hostPathMounter) CanMount() error {
 }
 
 // SetUp does nothing.
-func (b *hostPathMounter) SetUp(mounterArgs volume.MounterArgs) error {
-	err := validation.ValidatePathNoBacksteps(b.GetPath())
-	if err != nil {
-		return fmt.Errorf("invalid HostPath `%s`: %v", b.GetPath(), err)
-	}
+func (b *hostPathMounter) SetUp(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
+	internalSetup := func() error {
+		err := validation.ValidatePathNoBacksteps(b.GetPath())
+		if err != nil {
+			return fmt.Errorf("invalid HostPath `%s`: %v", b.GetPath(), err)
+		}
 
-	if *b.pathType == v1.HostPathUnset {
-		return nil
+		if *b.pathType == v1.HostPathUnset {
+			return nil
+		}
+		return checkType(b.GetPath(), b.pathType, b.hu)
 	}
-	return checkType(b.GetPath(), b.pathType, b.hu)
-}
+	return volumetypes.OperationFinished, internalSetup()
 
-// SetUpWithStatusTracking calls setup and returns additional information about operation state
-func (b *hostPathMounter) SetUpWithStatusTracking(mounterArgs volume.MounterArgs) (volumetypes.OperationStatus, error) {
-	err := b.SetUp(mounterArgs)
-	return volumetypes.OperationFinished, err
 }
 
 // SetUpAt does not make sense for host paths - probably programmer error.
