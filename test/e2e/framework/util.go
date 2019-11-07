@@ -2301,38 +2301,6 @@ func retryCmd(command string, args ...string) (string, string, error) {
 	return stdout, stderr, err
 }
 
-// WaitForStableCluster waits until all existing pods are scheduled and returns their amount.
-func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
-	timeout := 10 * time.Minute
-	startTime := time.Now()
-
-	allPods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
-	ExpectNoError(err)
-	// API server returns also Pods that succeeded. We need to filter them out.
-	currentPods := make([]v1.Pod, 0, len(allPods.Items))
-	for _, pod := range allPods.Items {
-		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-			currentPods = append(currentPods, pod)
-		}
-
-	}
-	allPods.Items = currentPods
-	scheduledPods, currentlyNotScheduledPods := e2epod.GetPodsScheduled(masterNodes, allPods)
-	for len(currentlyNotScheduledPods) != 0 {
-		time.Sleep(2 * time.Second)
-
-		allPods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
-		ExpectNoError(err)
-		scheduledPods, currentlyNotScheduledPods = e2epod.GetPodsScheduled(masterNodes, allPods)
-
-		if startTime.Add(timeout).Before(time.Now()) {
-			Failf("Timed out after %v waiting for stable cluster.", timeout)
-			break
-		}
-	}
-	return len(scheduledPods)
-}
-
 // E2ETestNodePreparer implements testutils.TestNodePreparer interface, which is used
 // to create/modify Nodes before running a test.
 type E2ETestNodePreparer struct {
