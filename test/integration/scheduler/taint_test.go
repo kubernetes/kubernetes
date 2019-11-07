@@ -19,11 +19,13 @@ package scheduler
 // This file tests the Taint feature.
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -40,7 +42,7 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/admission/defaulttolerationseconds"
 	"k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction"
 	pluginapi "k8s.io/kubernetes/plugin/pkg/admission/podtolerationrestriction/apis/podtolerationrestriction"
-	"k8s.io/kubernetes/test/e2e/framework/pod"
+	"k8s.io/kubernetes/test/e2e/framework"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 )
 
@@ -582,6 +584,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 	nodeCount := 3
 	zero := int64(0)
 	gracePeriod := int64(1)
+	heartbeatInternal := time.Second * 2
 	testPod := &v1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Name: "testpod1", DeletionGracePeriodSeconds: &zero},
 		Spec: v1.PodSpec{
@@ -643,8 +646,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 
 	// Enable TaintBasedEvictions
 	defer featuregatetesting.SetFeatureGateDuringTest(t, utilfeature.DefaultFeatureGate, features.TaintBasedEvictions, true)()
-	// ApplyFeatureGates() is called to ensure TaintNodesByCondition related logic is applied/restored properly.
-	defer algorithmprovider.ApplyFeatureGates()()
+	algorithmprovider.ApplyFeatureGates()
 
 	// Build admission chain handler.
 	podTolerations := podtolerationrestriction.NewPodTolerationsPlugin(&pluginapi.Configuration{})
@@ -655,6 +657,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			context := initTestMaster(t, "taint-based-evictions", admission)
+
 			// Build clientset and informers for controllers.
 			externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
 				QPS:           -1,
@@ -665,6 +668,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			podTolerations.SetExternalKubeInformerFactory(externalInformers)
 
 			context = initTestScheduler(t, context, true, nil)
+			defer cleanupTest(t, context)
 			cs := context.clientSet
 			informers := context.informerFactory
 			_, err := cs.CoreV1().Namespaces().Create(context.ns)
@@ -723,8 +727,9 @@ func TestTaintBasedEvictions(t *testing.T) {
 						Allocatable: nodeRes,
 						Conditions: []v1.NodeCondition{
 							{
-								Type:   v1.NodeReady,
-								Status: v1.ConditionTrue,
+								Type:              v1.NodeReady,
+								Status:            v1.ConditionTrue,
+								LastHeartbeatTime: metav1.Now(),
 							},
 						},
 					},
@@ -732,33 +737,6 @@ func TestTaintBasedEvictions(t *testing.T) {
 				if _, err := cs.CoreV1().Nodes().Create(nodes[i]); err != nil {
 					t.Errorf("Failed to create node, err: %v", err)
 				}
-			}
-
-			// Regularly send heartbeat event to APIServer so that the cluster doesn't enter fullyDisruption mode.
-			// TODO(Huang-Wei): use "NodeDisruptionExclusion" feature to simply the below logic when it's beta.
-			var heartbeatChans []chan struct{}
-			for i := 0; i < nodeCount; i++ {
-				heartbeatChans = append(heartbeatChans, make(chan struct{}))
-			}
-			for i := 0; i < nodeCount; i++ {
-				// Spin up <nodeCount> goroutines to send heartbeat event to APIServer periodically.
-				go func(i int) {
-					for {
-						select {
-						case <-heartbeatChans[i]:
-							return
-						case <-time.Tick(2 * time.Second):
-							nodes[i].Status.Conditions = []v1.NodeCondition{
-								{
-									Type:              v1.NodeReady,
-									Status:            v1.ConditionTrue,
-									LastHeartbeatTime: metav1.Now(),
-								},
-							}
-							updateNodeStatus(cs, nodes[i])
-						}
-					}
-				}(i)
 			}
 
 			neededNode := nodes[1]
@@ -787,18 +765,53 @@ func TestTaintBasedEvictions(t *testing.T) {
 				}
 			}
 
+			// Regularly send heartbeat event to APIServer so that the cluster doesn't enter fullyDisruption mode.
+			// TODO(Huang-Wei): use "NodeDisruptionExclusion" feature to simply the below logic when it's beta.
 			for i := 0; i < nodeCount; i++ {
-				// Stop the neededNode's heartbeat goroutine.
-				if neededNode.Name == fmt.Sprintf("node-%d", i) {
-					heartbeatChans[i] <- struct{}{}
-					break
+				var conditions []v1.NodeCondition
+				// If current node is not <neededNode>
+				if neededNode.Name != nodes[i].Name {
+					conditions = []v1.NodeCondition{
+						{
+							Type:   v1.NodeReady,
+							Status: v1.ConditionTrue,
+						},
+					}
+				} else {
+					c, err := nodeReadyStatus(test.nodeConditions)
+					if err != nil {
+						t.Error(err)
+					}
+					// Need to distinguish NodeReady/False and NodeReady/Unknown.
+					// If we try to update the node with condition NotReady/False, i.e. expect a NotReady:NoExecute taint
+					// we need to keep sending the update event to keep it alive, rather than just sending once.
+					if c == v1.ConditionFalse {
+						conditions = test.nodeConditions
+					} else if c == v1.ConditionUnknown {
+						// If it's expected to update the node with condition NotReady/Unknown,
+						// i.e. expect a Unreachable:NoExecute taint,
+						// we need to only send the update event once to simulate the network unreachable scenario.
+						nodeCopy := nodeCopyWithConditions(nodes[i], test.nodeConditions)
+						if err := updateNodeStatus(cs, nodeCopy); err != nil && !apierrors.IsNotFound(err) {
+							t.Errorf("Cannot update node: %v", err)
+						}
+						continue
+					}
 				}
-			}
-			neededNode.Status.Conditions = test.nodeConditions
-			// Update node condition.
-			err = updateNodeStatus(cs, neededNode)
-			if err != nil {
-				t.Fatalf("Cannot update node: %v", err)
+				// Keeping sending NodeReady/True or NodeReady/False events.
+				go func(i int) {
+					for {
+						select {
+						case <-context.stopCh:
+							return
+						case <-time.Tick(heartbeatInternal):
+							nodeCopy := nodeCopyWithConditions(nodes[i], conditions)
+							if err := updateNodeStatus(cs, nodeCopy); err != nil && !apierrors.IsNotFound(err) {
+								t.Errorf("Cannot update node: %v", err)
+							}
+						}
+					}
+				}(i)
 			}
 
 			if err := waitForNodeTaints(cs, neededNode, test.nodeTaints); err != nil {
@@ -806,7 +819,7 @@ func TestTaintBasedEvictions(t *testing.T) {
 			}
 
 			if test.pod != nil {
-				err = pod.WaitForPodCondition(cs, context.ns.Name, test.pod.Name, test.waitForPodCondition, time.Second*15, func(pod *v1.Pod) (bool, error) {
+				err = framework.WaitForPodCondition(cs, context.ns.Name, test.pod.Name, test.waitForPodCondition, time.Second*15, func(pod *v1.Pod) (bool, error) {
 					// as node is unreachable, pod0 is expected to be in Terminating status
 					// rather than getting deleted
 					if tolerationSeconds[i] == 0 {
@@ -823,10 +836,6 @@ func TestTaintBasedEvictions(t *testing.T) {
 				}
 				cleanupPods(cs, t, []*v1.Pod{test.pod})
 			}
-			// Close all heartbeat channels.
-			for i := 0; i < nodeCount; i++ {
-				close(heartbeatChans[i])
-			}
 			cleanupNodes(cs, t)
 			waitForSchedulerCacheCleanup(context.scheduler, t)
 		})
@@ -840,4 +849,27 @@ func getTolerationSeconds(tolerations []v1.Toleration) (int64, error) {
 		}
 	}
 	return 0, fmt.Errorf("cannot find toleration")
+}
+
+// nodeReadyStatus returns the status of first condition with type NodeReady.
+// If none of the condition is of type NodeReady, returns an error.
+func nodeReadyStatus(conditions []v1.NodeCondition) (v1.ConditionStatus, error) {
+	for _, c := range conditions {
+		if c.Type != v1.NodeReady {
+			continue
+		}
+		// Just return the first condition with type NodeReady
+		return c.Status, nil
+	}
+	return v1.ConditionFalse, errors.New("None of the conditions is of type NodeReady")
+}
+
+func nodeCopyWithConditions(node *v1.Node, conditions []v1.NodeCondition) *v1.Node {
+	copy := node.DeepCopy()
+	copy.ResourceVersion = "0"
+	copy.Status.Conditions = conditions
+	for i := range copy.Status.Conditions {
+		copy.Status.Conditions[i].LastHeartbeatTime = metav1.Now()
+	}
+	return copy
 }
