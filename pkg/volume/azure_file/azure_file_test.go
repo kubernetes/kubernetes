@@ -87,13 +87,9 @@ func getAzureTestCloud(t *testing.T) *azure.Cloud {
                 "aadClientSecret": "--aad-client-secret--"
         }`
 	configReader := strings.NewReader(config)
-	cloud, err := azure.NewCloud(configReader)
+	azureCloud, err := azure.NewCloudWithoutFeatureGates(configReader)
 	if err != nil {
 		t.Error(err)
-	}
-	azureCloud, ok := cloud.(*azure.Cloud)
-	if !ok {
-		t.Error("NewCloud returned incorrect type")
 	}
 	return azureCloud
 }

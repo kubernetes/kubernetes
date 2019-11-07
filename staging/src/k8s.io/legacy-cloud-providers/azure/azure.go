@@ -32,7 +32,6 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 
 	v1 "k8s.io/api/core/v1"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
@@ -264,6 +263,18 @@ func init() {
 
 // NewCloud returns a Cloud with initialized clients
 func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
+	az, err := NewCloudWithoutFeatureGates(configReader)
+	if err != nil {
+		return nil, err
+	}
+	az.ipv6DualStackEnabled = utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack)
+
+	return az, nil
+}
+
+// NewCloudWithoutFeatureGates returns a Cloud without trying to wire the feature gates.  This is used by the unit tests
+// that don't load the actual features being used in the cluster.
+func NewCloudWithoutFeatureGates(configReader io.Reader) (*Cloud, error) {
 	config, err := parseConfig(configReader)
 	if err != nil {
 		return nil, err
@@ -275,18 +286,6 @@ func NewCloud(configReader io.Reader) (cloudprovider.Interface, error) {
 		unmanagedNodes:     sets.NewString(),
 		routeCIDRs:         map[string]string{},
 	}
-	func() {
-		// this allows the code ot launch without featuregates defined.  It is currently required for unit tests where the
-		// featuregates are not registered.  This is effectively coding by side effect and an explicit register should
-		// be eventually created instead.
-		defer func() {
-			if r := recover(); r != nil {
-				utilruntime.HandleError(fmt.Errorf("%v", r))
-			}
-		}()
-
-		az.ipv6DualStackEnabled = utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack)
-	}()
 
 	err = az.InitializeCloudFromConfig(config, false)
 	if err != nil {
