@@ -26,8 +26,10 @@ const (
 	ResourceAll    = "*"
 	VerbAll        = "*"
 	NonResourceAll = "*"
+	NameAll        = "*"
 
-	NameAll = "*"
+	NamespaceEvery        = "*"             // matches every particular namespace
+	NamespaceClusterScope = "Cluster Scope" // matches absence of namespace
 )
 
 // System preset priority level names
@@ -210,28 +212,59 @@ type ServiceAccountSubject struct {
 	Name string `json:"name" protobuf:"bytes,2,opt,name=name"`
 }
 
-// ResourcePolicyRule is a predicate that matches some resource requests, testing the request's verb and the target
-// resource. A ResourcePolicyRule matches a request if and only if: (a) at least one member
-// of verbs matches the request, (b) at least one member of apiGroups matches the request, and (c) at least one member
-// of resources matches the request.
+// ResourcePolicyRule is a predicate that matches some resource
+// requests, testing the request's verb and the target resource. A
+// ResourcePolicyRule matches a resource request if and only if: (a)
+// at least one member of verbs matches the request, (b) at least one
+// member of apiGroups matches the request, (c) at least one member of
+// resources matches the request, and (d) least one member of
+// namespaces matches the request.
 type ResourcePolicyRule struct {
 	// `verbs` is a list of matching verbs and may not be empty.
-	// "*" matches all verbs. if it is present, it must be the only entry.
+	// "*" matches all verbs and, if present, must be the only entry.
 	// +listType=set
 	// Required.
 	Verbs []string `json:"verbs" protobuf:"bytes,1,rep,name=verbs"`
+
 	// `apiGroups` is a list of matching API groups and may not be empty.
-	// "*" matches all api-groups. if it is present, it must be the only entry.
+	// "*" matches all API groups and, if present, must be the only entry.
 	// +listType=set
 	// Required.
 	APIGroups []string `json:"apiGroups" protobuf:"bytes,2,rep,name=apiGroups"`
-	// `resources` is a list of matching resources (i.e., lowercase and plural) with, if desired, subresource.
-	// For example, [ "services", "nodes/status" ].
-	// This list may not be empty.
-	// "*" matches all resources. if it is present, it must be the only entry.
-	// +listType=set
+
+	// `resources` is a list of matching resources (i.e., lowercase
+	// and plural) with, if desired, subresource.  For example, [
+	// "services", "nodes/status" ].  This list may not be empty.
+	// "*" matches all resources and, if present, must be the only entry.
 	// Required.
+	// +listType=set
 	Resources []string `json:"resources" protobuf:"bytes,3,rep,name=resources"`
+
+	// `namespaces` is a list of target namespaces that restricts
+	// matches.  A request that does not specify a target namespace
+	// (which happens both when the resource is not namespaced and
+	// when the resource is namespaced and the request is for all
+	// namespaces) matches only if this list includes "Cluster Scope"
+	// (this string is not a valid namespace and thus can not be
+	// confused with an actual namespace).  A request that specifies a
+	// target namespace matches only if either (a) this list contains
+	// that target namespace or (b) this list contains "*".
+	//
+	// This list may not be omitted or empty.  If the list contains
+	// "*" then the only other allowed member is "Cluster Scope".
+	// Without "*", it is allowed to list "Cluster Scope" along with
+	// particular namespaces.
+	//
+	// Requests will match only if the values in this list are
+	// appropriate for the resource(s) involved.  For example: for a
+	// cluster scoped resource (i.e., one not namespaced) a request
+	// can match only if this list contains "Cluster Scope".  It is
+	// entirely up to the client to populate this list with
+	// appropriate values; the server-performed validation does not
+	// (at least in this alpha) address this issue.
+	//
+	// +listType=set
+	Namespaces []string `json:"namespaces" protobuf:"bytes,4,rep,name=namespaces"`
 }
 
 // NonResourcePolicyRule is a predicate that matches non-resource requests according to their verb and the

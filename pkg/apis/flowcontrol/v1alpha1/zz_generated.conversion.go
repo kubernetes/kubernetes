@@ -697,6 +697,7 @@ func autoConvert_v1alpha1_ResourcePolicyRule_To_flowcontrol_ResourcePolicyRule(i
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
+	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	return nil
 }
 
@@ -709,6 +710,7 @@ func autoConvert_flowcontrol_ResourcePolicyRule_To_v1alpha1_ResourcePolicyRule(i
 	out.Verbs = *(*[]string)(unsafe.Pointer(&in.Verbs))
 	out.APIGroups = *(*[]string)(unsafe.Pointer(&in.APIGroups))
 	out.Resources = *(*[]string)(unsafe.Pointer(&in.Resources))
+	out.Namespaces = *(*[]string)(unsafe.Pointer(&in.Namespaces))
 	return nil
 }
 
