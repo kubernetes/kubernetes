@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"bytes"
@@ -64,6 +64,8 @@ var (
 	systemContainers map[string]string
 )
 
+// ResourceCollector is a collector object which collects
+// resource usage periodically from Cadvisor.
 type ResourceCollector struct {
 	client  *cadvisorclient.Client
 	request *cadvisorapiv2.RequestOptions
@@ -439,7 +441,7 @@ func newTestPods(numPods int, volume bool, imageName, podType string) []*v1.Pod 
 	return pods
 }
 
-// GetResourceSeriesWithLabels gets the time series of resource usage of each container.
+// GetResourceTimeSeries gets the time series of resource usage of each container.
 func (r *ResourceCollector) GetResourceTimeSeries() map[string]*perftype.ResourceSeries {
 	resourceSeries := make(map[string]*perftype.ResourceSeries)
 	for key, name := range systemContainers {
@@ -461,12 +463,12 @@ const kubeletProcessName = "kubelet"
 
 func getPidsForProcess(name, pidFile string) ([]int, error) {
 	if len(pidFile) > 0 {
-		if pid, err := getPidFromPidFile(pidFile); err == nil {
+		pid, err := getPidFromPidFile(pidFile)
+		if err == nil {
 			return []int{pid}, nil
-		} else {
-			// log the error and fall back to pidof
-			runtime.HandleError(err)
 		}
+		// log the error and fall back to pidof
+		runtime.HandleError(err)
 	}
 	return procfs.PidOf(name)
 }
