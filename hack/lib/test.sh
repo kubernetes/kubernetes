@@ -138,6 +138,8 @@ kube::test::describe_object_assert() {
 
   for match in "${matches[@]}"; do
     if grep -q "${match}" <<< "${result}"; then
+      echo "matched ${match}"
+    else
       echo "${bold}${red}"
       echo "$(kube::test::get_caller): FAIL!"
       echo "Describe ${resource} ${object}"
@@ -204,6 +206,8 @@ kube::test::describe_resource_assert() {
 
   for match in "${matches[@]}"; do
     if grep -q "${match}" <<< "${result}"; then
+      echo "matched ${match}"
+    else
       echo "${bold}${red}"
       echo "FAIL!"
       echo "Describe ${resource}"
@@ -256,14 +260,10 @@ kube::test::describe_resource_events_assert() {
     fi
 }
 
-# Compare sort-by resource name output with expected order specify in the last parameter
+# Compare sort-by resource name output (first column, skipping first line) with expected order specify in the last parameter
 kube::test::if_sort_by_has_correct_order() {
-  IFS=" " read -r -a array <<< "$(echo "$1" |awk '{if(NR!=1) print $1}')"
   local var
-  for i in "${array[@]}"; do
-    var+="${i}:"
-  done
-
+  var="$(echo "$1" | awk '{if(NR!=1) print $1}' | tr '\n' ':')"
   kube::test::if_has_string "${var}" "${@:$#}"
 }
 
