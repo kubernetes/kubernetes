@@ -36,7 +36,7 @@ import (
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
 	genericregistrytest "k8s.io/apiserver/pkg/registry/generic/testing"
 	"k8s.io/apiserver/pkg/registry/rest"
-	"k8s.io/apiserver/pkg/storage"
+	apiserverstorage "k8s.io/apiserver/pkg/storage"
 	storeerr "k8s.io/apiserver/pkg/storage/errors"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 	api "k8s.io/kubernetes/pkg/apis/core"
@@ -155,13 +155,13 @@ func TestDelete(t *testing.T) {
 }
 
 type FailDeletionStorage struct {
-	storage.Interface
+	apiserverstorage.Interface
 	Called *bool
 }
 
-func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime.Object, precondition *storage.Preconditions, _ storage.ValidateObjectFunc) error {
+func (f FailDeletionStorage) Delete(ctx context.Context, key string, out runtime.Object, precondition *apiserverstorage.Preconditions, _ apiserverstorage.ValidateObjectFunc) error {
 	*f.Called = true
-	return storage.NewKeyNotFoundError(key, 0)
+	return apiserverstorage.NewKeyNotFoundError(key, 0)
 }
 
 func newFailDeleteStorage(t *testing.T, called *bool) (*REST, *etcd3testing.EtcdTestServer) {
