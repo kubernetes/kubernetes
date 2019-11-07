@@ -139,6 +139,40 @@ func TestReconcile1EndpointSlice(t *testing.T) {
 	expectMetrics(t, expectedMetrics{desiredSlices: 1, actualSlices: 1, desiredEndpoints: 0, addedPerSync: 0, removedPerSync: 0, numCreated: 0, numUpdated: 1, numDeleted: 0})
 }
 
+// when a Service has PublishNotReadyAddresses set to true, corresponding
+// Endpoints should be considered ready, even if the backing Pod is not.
+func TestReconcile1EndpointSlicePublishNotReadyAddresses(t *testing.T) {
+	client := newClientset()
+	namespace := "test"
+	svc, _ := newServiceAndEndpointMeta("foo", namespace)
+	svc.Spec.PublishNotReadyAddresses = true
+
+	// start with 50 pods, 1/3 not ready
+	pods := []*corev1.Pod{}
+	for i := 0; i < 50; i++ {
+		ready := !(i%3 == 0)
+		pods = append(pods, newPod(i, namespace, ready, 1))
+	}
+
+	r := newReconciler(client, []*corev1.Node{{ObjectMeta: metav1.ObjectMeta{Name: "node-1"}}}, defaultMaxEndpointsPerSlice)
+	reconcileHelper(t, r, &svc, pods, []*discovery.EndpointSlice{}, time.Now())
+
+	// Only 1 action, an EndpointSlice create
+	assert.Len(t, client.Actions(), 1, "Expected 1 additional clientset action")
+	expectActions(t, client.Actions(), 1, "create", "endpointslices")
+
+	// Two endpoint slices should be completely full, the remainder should be in another one
+	endpointSlices := fetchEndpointSlices(t, client, namespace)
+	for _, endpointSlice := range endpointSlices {
+		for i, endpoint := range endpointSlice.Endpoints {
+			if !*endpoint.Conditions.Ready {
+				t.Errorf("Expected endpoints[%d] to be ready", i)
+			}
+		}
+	}
+	expectUnorderedSlicesWithLengths(t, endpointSlices, []int{50})
+}
+
 // a simple use case with 250 pods matching a service and no existing slices
 // reconcile should create 3 slices, completely filling 2 of them
 func TestReconcileManyPods(t *testing.T) {
@@ -190,13 +224,13 @@ func TestReconcileEndpointSlicesSomePreexisting(t *testing.T) {
 	// have approximately 1/4 in first slice
 	endpointSlice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
 	for i := 1; i < len(pods)-4; i += 4 {
-		endpointSlice1.Endpoints = append(endpointSlice1.Endpoints, podToEndpoint(pods[i], &corev1.Node{}))
+		endpointSlice1.Endpoints = append(endpointSlice1.Endpoints, podToEndpoint(pods[i], &corev1.Node{}, false))
 	}
 
 	// have approximately 1/4 in second slice
 	endpointSlice2 := newEmptyEndpointSlice(2, namespace, endpointMeta, svc)
 	for i := 3; i < len(pods)-4; i += 4 {
-		endpointSlice2.Endpoints = append(endpointSlice2.Endpoints, podToEndpoint(pods[i], &corev1.Node{}))
+		endpointSlice2.Endpoints = append(endpointSlice2.Endpoints, podToEndpoint(pods[i], &corev1.Node{}, false))
 	}
 
 	existingSlices := []*discovery.EndpointSlice{endpointSlice1, endpointSlice2}
@@ -242,13 +276,13 @@ func TestReconcileEndpointSlicesSomePreexistingWorseAllocation(t *testing.T) {
 	// have approximately 1/4 in first slice
 	endpointSlice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
 	for i := 1; i < len(pods)-4; i += 4 {
-		endpointSlice1.Endpoints = append(endpointSlice1.Endpoints, podToEndpoint(pods[i], &corev1.Node{}))
+		endpointSlice1.Endpoints = append(endpointSlice1.Endpoints, podToEndpoint(pods[i], &corev1.Node{}, false))
 	}
 
 	// have approximately 1/4 in second slice
 	endpointSlice2 := newEmptyEndpointSlice(2, namespace, endpointMeta, svc)
 	for i := 3; i < len(pods)-4; i += 4 {
-		endpointSlice2.Endpoints = append(endpointSlice2.Endpoints, podToEndpoint(pods[i], &corev1.Node{}))
+		endpointSlice2.Endpoints = append(endpointSlice2.Endpoints, podToEndpoint(pods[i], &corev1.Node{}, false))
 	}
 
 	existingSlices := []*discovery.EndpointSlice{endpointSlice1, endpointSlice2}
@@ -324,7 +358,7 @@ func TestReconcileEndpointSlicesRecycling(t *testing.T) {
 		if i%30 == 0 {
 			existingSlices = append(existingSlices, newEmptyEndpointSlice(sliceNum, namespace, endpointMeta, svc))
 		}
-		existingSlices[sliceNum].Endpoints = append(existingSlices[sliceNum].Endpoints, podToEndpoint(pod, &corev1.Node{}))
+		existingSlices[sliceNum].Endpoints = append(existingSlices[sliceNum].Endpoints, podToEndpoint(pod, &corev1.Node{}, false))
 	}
 
 	createEndpointSlices(t, client, namespace, existingSlices)
@@ -362,7 +396,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 	slice1 := newEmptyEndpointSlice(1, namespace, endpointMeta, svc)
 	for i := 0; i < 80; i++ {
 		pod := newPod(i, namespace, true, 1)
-		slice1.Endpoints = append(slice1.Endpoints, podToEndpoint(pod, &corev1.Node{}))
+		slice1.Endpoints = append(slice1.Endpoints, podToEndpoint(pod, &corev1.Node{}, false))
 		pods = append(pods, pod)
 	}
 	existingSlices = append(existingSlices, slice1)
@@ -370,7 +404,7 @@ func TestReconcileEndpointSlicesUpdatePacking(t *testing.T) {
 	slice2 := newEmptyEndpointSlice(2, namespace, endpointMeta, svc)
 	for i := 100; i < 120; i++ {
 		pod := newPod(i, namespace, true, 1)
-		slice2.Endpoints = append(slice2.Endpoints, podToEndpoint(pod, &corev1.Node{}))
+		slice2.Endpoints = append(slice2.Endpoints, podToEndpoint(pod, &corev1.Node{}, false))
 		pods = append(pods, pod)
 	}
 	existingSlices = append(existingSlices, slice2)

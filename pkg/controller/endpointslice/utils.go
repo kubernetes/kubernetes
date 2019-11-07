@@ -35,8 +35,8 @@ import (
 // podEndpointChanged returns true if the results of podToEndpoint are different
 // for the pods passed to this function.
 func podEndpointChanged(pod1, pod2 *corev1.Pod) bool {
-	endpoint1 := podToEndpoint(pod1, &corev1.Node{})
-	endpoint2 := podToEndpoint(pod2, &corev1.Node{})
+	endpoint1 := podToEndpoint(pod1, &corev1.Node{}, false)
+	endpoint2 := podToEndpoint(pod2, &corev1.Node{}, false)
 
 	endpoint1.TargetRef.ResourceVersion = ""
 	endpoint2.TargetRef.ResourceVersion = ""
@@ -45,7 +45,7 @@ func podEndpointChanged(pod1, pod2 *corev1.Pod) bool {
 }
 
 // podToEndpoint returns an Endpoint object generated from a Pod and Node.
-func podToEndpoint(pod *corev1.Pod, node *corev1.Node) discovery.Endpoint {
+func podToEndpoint(pod *corev1.Pod, node *corev1.Node, publishNotReadyAddresses bool) discovery.Endpoint {
 	// Build out topology information. This is currently limited to hostname,
 	// zone, and region, but this will be expanded in the future.
 	topology := map[string]string{}
@@ -67,7 +67,7 @@ func podToEndpoint(pod *corev1.Pod, node *corev1.Node) discovery.Endpoint {
 		}
 	}
 
-	ready := podutil.IsPodReady(pod)
+	ready := publishNotReadyAddresses || podutil.IsPodReady(pod)
 	return discovery.Endpoint{
 		Addresses: getEndpointAddresses(pod.Status),
 		Conditions: discovery.EndpointConditions{
