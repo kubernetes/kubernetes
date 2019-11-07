@@ -52,7 +52,7 @@ import (
 )
 
 // These tests need privileged containers, which are disabled by default.  Run
-// the test with "go run hack/e2e.go ... --ginkgo.focus=[Feature:Volumes]"
+// tests with "--ginkgo.focus=[Feature:Volumes]"
 var _ = ginkgo.Describe("[sig-storage] GCP Volumes", func() {
 	f := framework.NewDefaultFramework("gcp-volume")
 

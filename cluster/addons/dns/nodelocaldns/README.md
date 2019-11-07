@@ -11,8 +11,6 @@ This feature is graduating to Beta in release 1.15.
 
 This directory contains the addon config yaml - `nodelocaldns.yaml`
 The variables will be substituted by the configure scripts when the yaml is copied into master.
-To create a GCE cluster with nodelocaldns enabled, use  the command:
-`KUBE_ENABLE_NODELOCAL_DNS=true go run hack/e2e.go -v --up`
 
 We have the following variables in the yaml:  
 `__PILLAR__DNS__SERVER__` - set to kube-dns service IP.   
