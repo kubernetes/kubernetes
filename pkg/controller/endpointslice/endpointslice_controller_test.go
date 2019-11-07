@@ -198,6 +198,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 				discovery.LabelManagedBy:   controllerName,
 			},
 		},
+		AddressType: discovery.AddressTypeIPv4,
 	}, {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "matching-2",
@@ -207,6 +208,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 				discovery.LabelManagedBy:   controllerName,
 			},
 		},
+		AddressType: discovery.AddressTypeIPv4,
 	}, {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "partially-matching-1",
@@ -215,6 +217,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 				discovery.LabelServiceName: serviceName,
 			},
 		},
+		AddressType: discovery.AddressTypeIPv4,
 	}, {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "not-matching-1",
@@ -224,6 +227,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 				discovery.LabelManagedBy:   controllerName,
 			},
 		},
+		AddressType: discovery.AddressTypeIPv4,
 	}, {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "not-matching-2",
@@ -233,6 +237,7 @@ func TestSyncServiceEndpointSliceLabelSelection(t *testing.T) {
 				discovery.LabelManagedBy:   "something-else",
 			},
 		},
+		AddressType: discovery.AddressTypeIPv4,
 	}}
 
 	// need to add them to both store and fake clientset
@@ -272,16 +277,13 @@ func TestSyncServiceFull(t *testing.T) {
 	client, esController := newController([]string{"node-1"})
 	namespace := metav1.NamespaceDefault
 	serviceName := "all-the-protocols"
+	ipv6Family := v1.IPv6Protocol
 
-	// pod 1 only uses PodIP status attr
 	pod1 := newPod(1, namespace, true, 0)
-	pod1.Status.PodIP = "1.2.3.4"
-	pod1.Status.PodIPs = []v1.PodIP{}
+	pod1.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}}
 	esController.podStore.Add(pod1)
 
-	// pod 2 only uses PodIPs status attr
 	pod2 := newPod(2, namespace, true, 0)
-	pod2.Status.PodIP = ""
 	pod2.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.5"}, {IP: "1234::5678:0000:0000:9abc:def0"}}
 	esController.podStore.Add(pod2)
 
@@ -300,6 +302,7 @@ func TestSyncServiceFull(t *testing.T) {
 				{Name: "sctp-example", TargetPort: intstr.FromInt(3456), Protocol: v1.ProtocolSCTP},
 			},
 			Selector: map[string]string{"foo": "bar"},
+			IPFamily: &ipv6Family,
 		},
 	}
 	esController.serviceStore.Add(service)
@@ -318,7 +321,7 @@ func TestSyncServiceFull(t *testing.T) {
 
 	// ensure all attributes of endpoint slice match expected state
 	slice := sliceList.Items[0]
-	assert.Len(t, slice.Endpoints, 2, "Expected 2 endpoints in first slice")
+	assert.Len(t, slice.Endpoints, 1, "Expected 1 endpoints in first slice")
 	assert.Equal(t, slice.Annotations["endpoints.kubernetes.io/last-change-trigger-time"], serviceCreateTime.Format(time.RFC3339Nano))
 	assert.ElementsMatch(t, []discovery.EndpointPort{{
 		Name:     strPtr("tcp-example"),
@@ -336,12 +339,7 @@ func TestSyncServiceFull(t *testing.T) {
 
 	assert.ElementsMatch(t, []discovery.Endpoint{{
 		Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-		Addresses:  []string{"1.2.3.4"},
-		TargetRef:  &v1.ObjectReference{Kind: "Pod", Namespace: namespace, Name: pod1.Name},
-		Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
-	}, {
-		Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
-		Addresses:  []string{"1.2.3.5", "1234::5678:0000:0000:9abc:def0"},
+		Addresses:  []string{"1234::5678:0000:0000:9abc:def0"},
 		TargetRef:  &v1.ObjectReference{Kind: "Pod", Namespace: namespace, Name: pod2.Name},
 		Topology:   map[string]string{"kubernetes.io/hostname": "node-1"},
 	}}, slice.Endpoints)

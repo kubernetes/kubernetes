@@ -1173,11 +1173,7 @@ func printEndpointSlice(obj *discovery.EndpointSlice, options printers.GenerateO
 	row := metav1beta1.TableRow{
 		Object: runtime.RawExtension{Object: obj},
 	}
-	addressType := "<unset>"
-	if obj.AddressType != nil {
-		addressType = string(*obj.AddressType)
-	}
-	row.Cells = append(row.Cells, obj.Name, addressType, formatDiscoveryPorts(obj.Ports), formatDiscoveryEndpoints(obj.Endpoints), translateTimestampSince(obj.CreationTimestamp))
+	row.Cells = append(row.Cells, obj.Name, string(obj.AddressType), formatDiscoveryPorts(obj.Ports), formatDiscoveryEndpoints(obj.Endpoints), translateTimestampSince(obj.CreationTimestamp))
 	return []metav1beta1.TableRow{row}, nil
 }
 

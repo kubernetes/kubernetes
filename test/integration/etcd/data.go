@@ -239,7 +239,7 @@ func GetEtcdStorageDataForNamespace(namespace string) map[schema.GroupVersionRes
 
 		// k8s.io/kubernetes/pkg/apis/discovery/v1alpha1
 		gvr("discovery.k8s.io", "v1alpha1", "endpointslices"): {
-			Stub:             `{"metadata": {"name": "slice1"}, "protocol": "TCP", "ports": [], "endpoints": []}`,
+			Stub:             `{"metadata": {"name": "slice1"}, "addressType": "IPv4", "protocol": "TCP", "ports": [], "endpoints": []}`,
 			ExpectedEtcdPath: "/registry/endpointslices/" + namespace + "/slice1",
 		},
 		// --

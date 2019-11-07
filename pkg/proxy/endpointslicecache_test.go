@@ -336,7 +336,6 @@ func TestEsInfoChanged(t *testing.T) {
 }
 
 func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, offset, numEndpoints, unreadyMod int, hosts []string, portNums []*int32) *discovery.EndpointSlice {
-	ipAddressType := discovery.AddressTypeIP
 	tcpProtocol := v1.ProtocolTCP
 
 	endpointSlice := &discovery.EndpointSlice{
@@ -346,7 +345,7 @@ func generateEndpointSliceWithOffset(serviceName, namespace string, sliceNum, of
 			Labels:    map[string]string{discovery.LabelServiceName: serviceName},
 		},
 		Ports:       []discovery.EndpointPort{},
-		AddressType: &ipAddressType,
+		AddressType: discovery.AddressTypeIPv4,
 		Endpoints:   []discovery.Endpoint{},
 	}
 

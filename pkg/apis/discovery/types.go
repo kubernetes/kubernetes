@@ -32,13 +32,13 @@ type EndpointSlice struct {
 	// +optional
 	metav1.ObjectMeta
 	// addressType specifies the type of address carried by this EndpointSlice.
-	// All addresses in this slice must be the same type. The following address
-	// types are currently supported:
-	// * IP:   Represents an IP Address. This can include both IPv4 and IPv6
-	//         addresses.
+	// All addresses in this slice must be the same type. This field is
+	// immutable after creation. The following address types are currently
+	// supported:
+	// * IPv4: Represents an IPv4 Address.
+	// * IPv6: Represents an IPv6 Address.
 	// * FQDN: Represents a Fully Qualified Domain Name.
-	// +optional
-	AddressType *AddressType
+	AddressType AddressType
 	// endpoints is a list of unique endpoints in this slice. Each slice may
 	// include a maximum of 1000 endpoints.
 	// +listType=atomic
@@ -57,22 +57,27 @@ type EndpointSlice struct {
 type AddressType string
 
 const (
-	// AddressTypeIP represents an IP Address. Inclusive of IPv4 and IPv6
-	// addresses.
+	// AddressTypeIP represents an IP Address.
+	// This address type has been deprecated and has been replaced by the IPv4
+	// and IPv6 adddress types. New resources with this address type will be
+	// considered invalid. This will be fully removed in 1.18.
+	// +deprecated
 	AddressTypeIP = AddressType("IP")
-	// AddressTypeFQDN represents a Fully Qualified Domain Name.
+	// AddressTypeIPv4 represents an IPv4 Address.
+	AddressTypeIPv4 = AddressType(api.IPv4Protocol)
+	// AddressTypeIPv6 represents an IPv6 Address.
+	AddressTypeIPv6 = AddressType(api.IPv6Protocol)
+	// AddressTypeFQDN represents a FQDN.
 	AddressTypeFQDN = AddressType("FQDN")
 )
 
 // Endpoint represents a single logical "backend" implementing a service.
 type Endpoint struct {
 	// addresses of this endpoint. The contents of this field are interpreted
-	// according to the corresponding EndpointSlice addressType field. This
-	// allows for cases like dual-stack networking where both IPv4 and IPv6
-	// addresses would be included with the IP addressType. Consumers (e.g.
-	// kube-proxy) must handle different types of addresses in the context of
-	// their own capabilities. This must contain at least one address but no
-	// more than 100.
+	// according to the corresponding EndpointSlice addressType field. Consumers
+	// must handle different types of addresses in the context of their own
+	// capabilities. This must contain at least one address but no more than
+	// 100.
 	// +listType=set
 	Addresses []string
 	// conditions contains information about the current status of the endpoint.

@@ -38,12 +38,12 @@ import (
 )
 
 func TestNewEndpointSlice(t *testing.T) {
-	ipAddressType := discovery.AddressTypeIP
+	ipAddressType := discovery.AddressTypeIPv4
 	portName := "foo"
 	protocol := v1.ProtocolTCP
 	endpointMeta := endpointMeta{
 		Ports:       []discovery.EndpointPort{{Name: &portName, Protocol: &protocol}},
-		AddressType: &ipAddressType,
+		AddressType: ipAddressType,
 	}
 	service := v1.Service{
 		ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "test"},
@@ -204,7 +204,7 @@ func TestPodToEndpoint(t *testing.T) {
 			node: node1,
 			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
-				Addresses:  []string{"1.2.3.4", "1234::5678:0000:0000:9abc:def0"},
+				Addresses:  []string{"1.2.3.4"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 				Topology: map[string]string{
 					"kubernetes.io/hostname":        "node-1",
@@ -283,11 +283,11 @@ func TestPodChangedWithPodEndpointChanged(t *testing.T) {
 	}
 	newPod.ObjectMeta.ResourceVersion = oldPod.ObjectMeta.ResourceVersion
 
-	newPod.Status.PodIP = "1.2.3.1"
+	newPod.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.1"}}
 	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
 		t.Errorf("Expected pod to be changed with pod IP address change")
 	}
-	newPod.Status.PodIP = oldPod.Status.PodIP
+	newPod.Status.PodIPs = oldPod.Status.PodIPs
 
 	newPod.ObjectMeta.Name = "wrong-name"
 	if !podChangedHelper(oldPod, newPod, podEndpointChanged) {
@@ -333,6 +333,9 @@ func newPod(n int, namespace string, ready bool, nPorts int) *v1.Pod {
 		},
 		Status: v1.PodStatus{
 			PodIP: fmt.Sprintf("1.2.3.%d", 4+n),
+			PodIPs: []v1.PodIP{{
+				IP: fmt.Sprintf("1.2.3.%d", 4+n),
+			}},
 			Conditions: []v1.PodCondition{
 				{
 					Type:   v1.PodReady,
@@ -381,10 +384,10 @@ func newServiceAndEndpointMeta(name, namespace string) (v1.Service, endpointMeta
 		},
 	}
 
-	ipAddressType := discovery.AddressTypeIP
+	addressType := discovery.AddressTypeIPv4
 	protocol := v1.ProtocolTCP
 	endpointMeta := endpointMeta{
-		AddressType: &ipAddressType,
+		AddressType: addressType,
 		Ports:       []discovery.EndpointPort{{Name: &name, Port: &portNum, Protocol: &protocol}},
 	}
 
