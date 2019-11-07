@@ -31,7 +31,7 @@ import (
 // ListRoutes lists all managed routes that belong to the specified clusterName
 func (az *Cloud) ListRoutes(ctx context.Context, clusterName string) ([]*cloudprovider.Route, error) {
 	klog.V(10).Infof("ListRoutes: START clusterName=%q", clusterName)
-	routeTable, existsRouteTable, err := az.getRouteTable()
+	routeTable, existsRouteTable, err := az.getRouteTable(cacheReadTypeDefault)
 	routes, err := processRoutes(routeTable, existsRouteTable, err)
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func processRoutes(routeTable network.RouteTable, exists bool, err error) ([]*cl
 }
 
 func (az *Cloud) createRouteTableIfNotExists(clusterName string, kubeRoute *cloudprovider.Route) error {
-	if _, existsRouteTable, err := az.getRouteTable(); err != nil {
+	if _, existsRouteTable, err := az.getRouteTable(cacheReadTypeDefault); err != nil {
 		klog.V(2).Infof("createRouteTableIfNotExists error: couldn't get routetable. clusterName=%q instance=%q cidr=%q", clusterName, kubeRoute.TargetNode, kubeRoute.DestinationCIDR)
 		return err
 	} else if existsRouteTable {
