@@ -132,7 +132,7 @@ func (flags *WaitFlags) AddFlags(cmd *cobra.Command) {
 	flags.PrintFlags.AddFlags(cmd)
 	flags.ResourceBuilderFlags.AddFlags(cmd.Flags())
 
-	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait before giving up.  Zero means check once and don't wait, negative means wait for a week.")
+	cmd.Flags().DurationVar(&flags.Timeout, "timeout", flags.Timeout, "The length of time to wait for every single resource before giving up.  Zero means check once and don't wait, negative means wait for a week.")
 	cmd.Flags().StringVar(&flags.ForCondition, "for", flags.ForCondition, "The condition to wait on: [delete|condition=condition-name].")
 }
 
