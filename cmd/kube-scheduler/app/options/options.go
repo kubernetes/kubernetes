@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/tools/record"
 	cliflag "k8s.io/component-base/cli/flag"
 	componentbaseconfig "k8s.io/component-base/config"
+	"k8s.io/component-base/metrics"
 	"k8s.io/klog"
 	kubeschedulerconfigv1alpha2 "k8s.io/kube-scheduler/config/v1alpha2"
 	schedulerappconfig "k8s.io/kubernetes/cmd/kube-scheduler/app/config"
@@ -68,6 +69,8 @@ type Options struct {
 	WriteConfigTo string
 
 	Master string
+
+	ShowHiddenMetricsForVersion string
 }
 
 // NewOptions returns default scheduler app options.
@@ -154,6 +157,15 @@ func (o *Options) Flags() (nfs cliflag.NamedFlagSets) {
 	leaderelectionconfig.BindFlags(&o.ComponentConfig.LeaderElection.LeaderElectionConfiguration, nfs.FlagSet("leader election"))
 	utilfeature.DefaultMutableFeatureGate.AddFlag(nfs.FlagSet("feature gate"))
 
+	// TODO(RainbowMango): move it to genericoptions before next flag comes.
+	mfs := nfs.FlagSet("metrics")
+	mfs.StringVar(&o.ShowHiddenMetricsForVersion, "show-hidden-metrics-for-version", o.ShowHiddenMetricsForVersion,
+		"The previous version for which you want to show hidden metrics. "+
+			"Only the previous minor version is meaningful, other values will not be allowed. "+
+			"Accepted format of version is <major>.<minor>, e.g.: '1.16'. "+
+			"The purpose of this format is make sure you have the opportunity to notice if the next release hides additional metrics, "+
+			"rather than being surprised when they are permanently removed in the release after that.")
+
 	return nfs
 }
 
@@ -199,6 +211,9 @@ func (o *Options) ApplyTo(c *schedulerappconfig.Config) error {
 			return err
 		}
 	}
+	if len(o.ShowHiddenMetricsForVersion) > 0 {
+		metrics.SetShowHidden()
+	}
 
 	return nil
 }
@@ -215,6 +230,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, o.Authentication.Validate()...)
 	errs = append(errs, o.Authorization.Validate()...)
 	errs = append(errs, o.Deprecated.Validate()...)
+	errs = append(errs, metrics.ValidateShowHiddenMetricsVersion(o.ShowHiddenMetricsForVersion)...)
 
 	return errs
 }
