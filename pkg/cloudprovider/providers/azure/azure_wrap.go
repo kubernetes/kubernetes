@@ -87,9 +87,9 @@ func ignoreStatusForbiddenFromError(err error) error {
 /// getVirtualMachine calls 'VirtualMachinesClient.Get' with a timed cache
 /// The service side has throttling control that delays responses if there're multiple requests onto certain vm
 /// resource request in short period.
-func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualMachine, err error) {
+func (az *Cloud) getVirtualMachine(nodeName types.NodeName, crt cacheReadType) (vm compute.VirtualMachine, err error) {
 	vmName := string(nodeName)
-	cachedVM, err := az.vmCache.Get(vmName)
+	cachedVM, err := az.vmCache.Get(vmName, crt)
 	if err != nil {
 		return vm, err
 	}
@@ -101,8 +101,8 @@ func (az *Cloud) getVirtualMachine(nodeName types.NodeName) (vm compute.VirtualM
 	return *(cachedVM.(*compute.VirtualMachine)), nil
 }
 
-func (az *Cloud) getRouteTable() (routeTable network.RouteTable, exists bool, err error) {
-	cachedRt, err := az.rtCache.Get(az.RouteTableName)
+func (az *Cloud) getRouteTable(crt cacheReadType) (routeTable network.RouteTable, exists bool, err error) {
+	cachedRt, err := az.rtCache.Get(az.RouteTableName, crt)
 	if err != nil {
 		return routeTable, false, err
 	}
@@ -165,8 +165,8 @@ func (az *Cloud) getSubnet(virtualNetworkName string, subnetName string) (subnet
 	return subnet, exists, err
 }
 
-func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exists bool, err error) {
-	cachedLB, err := az.lbCache.Get(name)
+func (az *Cloud) getAzureLoadBalancer(name string, crt cacheReadType) (lb network.LoadBalancer, exists bool, err error) {
+	cachedLB, err := az.lbCache.Get(name, crt)
 	if err != nil {
 		return lb, false, err
 	}
@@ -178,12 +178,12 @@ func (az *Cloud) getAzureLoadBalancer(name string) (lb network.LoadBalancer, exi
 	return *(cachedLB.(*network.LoadBalancer)), true, nil
 }
 
-func (az *Cloud) getSecurityGroup() (nsg network.SecurityGroup, err error) {
+func (az *Cloud) getSecurityGroup(crt cacheReadType) (nsg network.SecurityGroup, err error) {
 	if az.SecurityGroupName == "" {
 		return nsg, fmt.Errorf("securityGroupName is not configured")
 	}
 
-	securityGroup, err := az.nsgCache.Get(az.SecurityGroupName)
+	securityGroup, err := az.nsgCache.Get(az.SecurityGroupName, crt)
 	if err != nil {
 		return nsg, err
 	}

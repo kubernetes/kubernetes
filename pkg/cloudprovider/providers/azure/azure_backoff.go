@@ -54,11 +54,11 @@ func (az *Cloud) Event(obj runtime.Object, eventtype, reason, message string) {
 }
 
 // GetVirtualMachineWithRetry invokes az.getVirtualMachine with exponential backoff retry
-func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName) (compute.VirtualMachine, error) {
+func (az *Cloud) GetVirtualMachineWithRetry(name types.NodeName, crt cacheReadType) (compute.VirtualMachine, error) {
 	var machine compute.VirtualMachine
 	var retryErr error
 	err := wait.ExponentialBackoff(az.requestBackoff(), func() (bool, error) {
-		machine, retryErr = az.getVirtualMachine(name)
+		machine, retryErr = az.getVirtualMachine(name, crt)
 		if retryErr == cloudprovider.InstanceNotFound {
 			return true, cloudprovider.InstanceNotFound
 		}
