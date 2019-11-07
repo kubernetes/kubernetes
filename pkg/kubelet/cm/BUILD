@@ -28,6 +28,7 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/kubelet/apis/podresources/v1alpha1:go_default_library",
         "//pkg/kubelet/cm/cpumanager:go_default_library",
+        "//pkg/kubelet/cm/cpuset:go_default_library",
         "//pkg/kubelet/cm/topologymanager:go_default_library",
         "//pkg/kubelet/config:go_default_library",
         "//pkg/kubelet/container:go_default_library",
