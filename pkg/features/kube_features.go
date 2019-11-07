@@ -593,7 +593,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	apiextensionsfeatures.CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.Beta},
+	apiextensionsfeatures.CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // TODO: remove in 1.18
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

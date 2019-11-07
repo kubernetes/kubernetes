@@ -927,7 +927,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 	// no image gc should have occurred
 	if diskGC.imageGCInvoked || diskGC.containerGCInvoked {
-		t.Errorf("Manager chose to perform image gc when it was not neeed")
+		t.Errorf("Manager chose to perform image gc when it was not needed")
 	}
 
 	// no pod should have been killed
@@ -950,7 +950,7 @@ func TestNodeReclaimFuncs(t *testing.T) {
 
 	// no image gc should have occurred
 	if diskGC.imageGCInvoked || diskGC.containerGCInvoked {
-		t.Errorf("Manager chose to perform image gc when it was not neeed")
+		t.Errorf("Manager chose to perform image gc when it was not needed")
 	}
 
 	// no pod should have been killed

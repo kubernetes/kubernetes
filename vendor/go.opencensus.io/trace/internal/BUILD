@@ -5,7 +5,7 @@ go_library(
     srcs = ["internal.go"],
     importmap = "k8s.io/kubernetes/vendor/go.opencensus.io/trace/internal",
     importpath = "go.opencensus.io/trace/internal",
-    visibility = ["//visibility:public"],
+    visibility = ["//vendor/go.opencensus.io/trace:__subpackages__"],
 )
 
 filegroup(

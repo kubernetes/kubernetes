@@ -414,6 +414,14 @@ aliases:
     - derekwaynecarr
     - tallclair
     - yujuhong
+
+  sig-scalability-approvers:
+    - mm4tt
+    - wojtek-t
+
+  sig-scalability-reviewers:
+    - mm4tt
+    - wojtek-t
   
   sig-scheduling-api-reviewers:
       - bsalamat

@@ -486,7 +486,7 @@ var (
 
 // wrapTestWithPluginCalls returns a testCall that:
 // - configures controller with a volume plugin that implements recycler,
-//   deleter and provisioner. The plugin retunrs provided errors when a volume
+//   deleter and provisioner. The plugin returns provided errors when a volume
 //   is deleted, recycled or provisioned.
 // - calls given testCall
 func wrapTestWithPluginCalls(expectedRecycleCalls, expectedDeleteCalls []error, expectedProvisionCalls []provisionCall, toWrap testCall) testCall {

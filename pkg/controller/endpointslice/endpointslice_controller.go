@@ -82,11 +82,11 @@ func NewController(podInformer coreinformers.PodInformer,
 	}
 
 	serviceInformer.Informer().AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: c.enqueueService,
+		AddFunc: c.onServiceUpdate,
 		UpdateFunc: func(old, cur interface{}) {
-			c.enqueueService(cur)
+			c.onServiceUpdate(cur)
 		},
-		DeleteFunc: c.enqueueService,
+		DeleteFunc: c.onServiceDelete,
 	})
 	c.serviceLister = serviceInformer.Lister()
 	c.servicesSynced = serviceInformer.Informer().HasSynced
@@ -117,6 +117,8 @@ func NewController(podInformer coreinformers.PodInformer,
 
 	c.eventBroadcaster = broadcaster
 	c.eventRecorder = recorder
+
+	c.serviceSelectorCache = endpointutil.NewServiceSelectorCache()
 
 	return c
 }
@@ -176,6 +178,10 @@ type Controller struct {
 	// workerLoopPeriod is the time between worker runs. The workers
 	// process the queue of service and pod changes
 	workerLoopPeriod time.Duration
+
+	// serviceSelectorCache is a cache of service selectors to avoid high CPU consumption caused by frequent calls
+	// to AsSelectorPreValidated (see #73527)
+	serviceSelectorCache *endpointutil.ServiceSelectorCache
 }
 
 // Run will not return until stopCh is closed.
@@ -307,20 +313,33 @@ func (c *Controller) syncService(key string) error {
 	return nil
 }
 
-// obj could be a *v1.Service or a DeletionalFinalStateUnknown marker item
-func (c *Controller) enqueueService(obj interface{}) {
+// onServiceUpdate updates the Service Selector in the cache and queues the Service for processing.
+func (c *Controller) onServiceUpdate(obj interface{}) {
 	key, err := controller.KeyFunc(obj)
 	if err != nil {
-		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object"))
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
 		return
 	}
 
+	_ = c.serviceSelectorCache.Update(key, obj.(*v1.Service).Spec.Selector)
+	c.queue.Add(key)
+}
+
+// onServiceDelete removes the Service Selector from the cache and queues the Service for processing.
+func (c *Controller) onServiceDelete(obj interface{}) {
+	key, err := controller.KeyFunc(obj)
+	if err != nil {
+		utilruntime.HandleError(fmt.Errorf("Couldn't get key for object %+v: %v", obj, err))
+		return
+	}
+
+	c.serviceSelectorCache.Delete(key)
 	c.queue.Add(key)
 }
 
 func (c *Controller) addPod(obj interface{}) {
 	pod := obj.(*v1.Pod)
-	services, err := endpointutil.GetPodServiceMemberships(c.serviceLister, pod)
+	services, err := c.serviceSelectorCache.GetPodServiceMemberships(c.serviceLister, pod)
 	if err != nil {
 		utilruntime.HandleError(fmt.Errorf("Unable to get pod %s/%s's service memberships: %v", pod.Namespace, pod.Name, err))
 		return
@@ -331,7 +350,7 @@ func (c *Controller) addPod(obj interface{}) {
 }
 
 func (c *Controller) updatePod(old, cur interface{}) {
-	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, old, cur, podEndpointChanged)
+	services := endpointutil.GetServicesToUpdateOnPodChange(c.serviceLister, c.serviceSelectorCache, old, cur, podEndpointChanged)
 	for key := range services {
 		c.queue.Add(key)
 	}

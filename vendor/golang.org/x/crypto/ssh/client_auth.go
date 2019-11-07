@@ -523,3 +523,117 @@ func (r *retryableAuthMethod) method() string {
 func RetryableAuthMethod(auth AuthMethod, maxTries int) AuthMethod {
 	return &retryableAuthMethod{authMethod: auth, maxTries: maxTries}
 }
+
+// GSSAPIWithMICAuthMethod is an AuthMethod with "gssapi-with-mic" authentication.
+// See RFC 4462 section 3
+// gssAPIClient is implementation of the GSSAPIClient interface, see the definition of the interface for details.
+// target is the server host you want to log in to.
+func GSSAPIWithMICAuthMethod(gssAPIClient GSSAPIClient, target string) AuthMethod {
+	if gssAPIClient == nil {
+		panic("gss-api client must be not nil with enable gssapi-with-mic")
+	}
+	return &gssAPIWithMICCallback{gssAPIClient: gssAPIClient, target: target}
+}
+
+type gssAPIWithMICCallback struct {
+	gssAPIClient GSSAPIClient
+	target       string
+}
+
+func (g *gssAPIWithMICCallback) auth(session []byte, user string, c packetConn, rand io.Reader) (authResult, []string, error) {
+	m := &userAuthRequestMsg{
+		User:    user,
+		Service: serviceSSH,
+		Method:  g.method(),
+	}
+	// The GSS-API authentication method is initiated when the client sends an SSH_MSG_USERAUTH_REQUEST.
+	// See RFC 4462 section 3.2.
+	m.Payload = appendU32(m.Payload, 1)
+	m.Payload = appendString(m.Payload, string(krb5OID))
+	if err := c.writePacket(Marshal(m)); err != nil {
+		return authFailure, nil, err
+	}
+	// The server responds to the SSH_MSG_USERAUTH_REQUEST with either an
+	// SSH_MSG_USERAUTH_FAILURE if none of the mechanisms are supported or
+	// with an SSH_MSG_USERAUTH_GSSAPI_RESPONSE.
+	// See RFC 4462 section 3.3.
+	// OpenSSH supports Kerberos V5 mechanism only for GSS-API authentication,so I don't want to check
+	// selected mech if it is valid.
+	packet, err := c.readPacket()
+	if err != nil {
+		return authFailure, nil, err
+	}
+	userAuthGSSAPIResp := &userAuthGSSAPIResponse{}
+	if err := Unmarshal(packet, userAuthGSSAPIResp); err != nil {
+		return authFailure, nil, err
+	}
+	// Start the loop into the exchange token.
+	// See RFC 4462 section 3.4.
+	var token []byte
+	defer g.gssAPIClient.DeleteSecContext()
+	for {
+		// Initiates the establishment of a security context between the application and a remote peer.
+		nextToken, needContinue, err := g.gssAPIClient.InitSecContext("host@"+g.target, token, false)
+		if err != nil {
+			return authFailure, nil, err
+		}
+		if len(nextToken) > 0 {
+			if err := c.writePacket(Marshal(&userAuthGSSAPIToken{
+				Token: nextToken,
+			})); err != nil {
+				return authFailure, nil, err
+			}
+		}
+		if !needContinue {
+			break
+		}
+		packet, err = c.readPacket()
+		if err != nil {
+			return authFailure, nil, err
+		}
+		switch packet[0] {
+		case msgUserAuthFailure:
+			var msg userAuthFailureMsg
+			if err := Unmarshal(packet, &msg); err != nil {
+				return authFailure, nil, err
+			}
+			if msg.PartialSuccess {
+				return authPartialSuccess, msg.Methods, nil
+			}
+			return authFailure, msg.Methods, nil
+		case msgUserAuthGSSAPIError:
+			userAuthGSSAPIErrorResp := &userAuthGSSAPIError{}
+			if err := Unmarshal(packet, userAuthGSSAPIErrorResp); err != nil {
+				return authFailure, nil, err
+			}
+			return authFailure, nil, fmt.Errorf("GSS-API Error:\n"+
+				"Major Status: %d\n"+
+				"Minor Status: %d\n"+
+				"Error Message: %s\n", userAuthGSSAPIErrorResp.MajorStatus, userAuthGSSAPIErrorResp.MinorStatus,
+				userAuthGSSAPIErrorResp.Message)
+		case msgUserAuthGSSAPIToken:
+			userAuthGSSAPITokenReq := &userAuthGSSAPIToken{}
+			if err := Unmarshal(packet, userAuthGSSAPITokenReq); err != nil {
+				return authFailure, nil, err
+			}
+			token = userAuthGSSAPITokenReq.Token
+		}
+	}
+	// Binding Encryption Keys.
+	// See RFC 4462 section 3.5.
+	micField := buildMIC(string(session), user, "ssh-connection", "gssapi-with-mic")
+	micToken, err := g.gssAPIClient.GetMIC(micField)
+	if err != nil {
+		return authFailure, nil, err
+	}
+	if err := c.writePacket(Marshal(&userAuthGSSAPIMIC{
+		MIC: micToken,
+	})); err != nil {
+		return authFailure, nil, err
+	}
+	return handleAuthResponse(c)
+}
+
+func (g *gssAPIWithMICCallback) method() string {
+	return "gssapi-with-mic"
+}

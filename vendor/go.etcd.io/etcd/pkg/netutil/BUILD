@@ -17,6 +17,9 @@ go_library(
         "//vendor/go.etcd.io/etcd/pkg/types:go_default_library",
         "//vendor/go.uber.org/zap:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/go.etcd.io/etcd/pkg/cpuutil:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/go.etcd.io/etcd/pkg/cpuutil:go_default_library",
         ],

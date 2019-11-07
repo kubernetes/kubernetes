@@ -782,7 +782,7 @@ func TestWaitsForAllInformersToBeSynced2(t *testing.T) {
 				},
 			}
 			endpoints.serviceStore.Add(service)
-			endpoints.enqueueService(service)
+			endpoints.onServiceUpdate(service)
 			endpoints.podsSynced = test.podsSynced
 			endpoints.servicesSynced = test.servicesSynced
 			endpoints.endpointsSynced = test.endpointsSynced

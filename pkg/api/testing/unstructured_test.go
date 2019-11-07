@@ -52,7 +52,7 @@ func doRoundTrip(t *testing.T, internalVersion schema.GroupVersion, externalVers
 	fuzzer.FuzzerFor(FuzzerFuncs, rand.NewSource(seed), legacyscheme.Codecs).
 		// We are explicitly overwriting custom fuzzing functions, to ensure
 		// that InitContainers and their statuses are not generated. This is
-		// because in thise test we are simply doing json operations, in which
+		// because in this test we are simply doing json operations, in which
 		// those disappear.
 		Funcs(
 			func(s *api.PodSpec, c fuzz.Continue) {

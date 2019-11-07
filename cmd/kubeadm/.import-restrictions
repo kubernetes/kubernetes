@@ -64,6 +64,7 @@
 				"k8s.io/kubernetes/pkg/features",
 				"k8s.io/kubernetes/pkg/fieldpath",
 				"k8s.io/kubernetes/pkg/kubelet/apis",
+				"k8s.io/kubernetes/pkg/kubelet/cm/cpuset",
 				"k8s.io/kubernetes/pkg/kubelet/qos",
 				"k8s.io/kubernetes/pkg/kubelet/types",
 				"k8s.io/kubernetes/pkg/master/ports",

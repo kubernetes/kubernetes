@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	legacyapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -1037,7 +1036,7 @@ func NewServiceAffinityPredicate(nodeInfoLister schedulerlisters.NodeInfoLister,
 }
 
 // checkServiceAffinity is a predicate which matches nodes in such a way to force that
-// ServiceAffinity.labels are homogenous for pods that are scheduled to a node.
+// ServiceAffinity.labels are homogeneous for pods that are scheduled to a node.
 // (i.e. it returns true IFF this pod can be added to this node such that all other pods in
 // the same service are running on nodes with the exact same ServiceAffinity.label values).
 //
@@ -1528,7 +1527,7 @@ func CheckNodeUnschedulablePredicate(pod *v1.Pod, meta PredicateMetadata, nodeIn
 
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
 	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
-		Key:    legacyapi.TaintNodeUnschedulable,
+		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	})
 

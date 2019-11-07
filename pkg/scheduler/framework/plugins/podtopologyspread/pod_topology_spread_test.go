@@ -77,7 +77,7 @@ func TestPodTopologySpread_Filter_SingleConstraint(t *testing.T) {
 			},
 		},
 		{
-			name: "existing pods with mis-matched namespace doens't count",
+			name: "existing pods with mis-matched namespace doesn't count",
 			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
 				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
 			).Obj(),

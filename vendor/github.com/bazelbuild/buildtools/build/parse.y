@@ -25,17 +25,15 @@ package build
 	// partial syntax trees
 	expr      Expr
 	exprs     []Expr
-	forc      *ForClause
-	ifs       []*IfClause
-	forifs    *ForClauseWithIfClausesOpt
-	forsifs   []*ForClauseWithIfClausesOpt
 	string    *StringExpr
 	strings   []*StringExpr
-	block     CodeBlock
+	ifstmt    *IfStmt
+	loadarg   *struct{from Ident; to Ident}
+	loadargs  []*struct{from Ident; to Ident}
 
 	// supporting information
 	comma     Position   // position of trailing comma in list, if present
-	lastRule  Expr  // most recent rule, to attach line comments to
+	lastStmt  Expr  // most recent rule, to attach line comments to
 }
 
 // These declarations set the type for a $ reference ($$, $1, $2, ...)
@@ -65,6 +63,10 @@ package build
 %token	<pos>	']'
 %token	<pos>	'{'
 %token	<pos>	'}'
+%token	<pos>	'|'
+%token	<pos>	'&'
+%token	<pos>	'^'
+%token	<pos>	'~'
 
 // By convention, yacc token names are all caps.
 // However, we do not want to export them from the Go package
@@ -77,7 +79,8 @@ package build
 %token	<pos>	_EQ      // operator ==
 %token	<pos>	_FOR     // keyword for
 %token	<pos>	_GE      // operator >=
-%token	<pos>	_IDENT   // non-keyword identifier or number
+%token	<pos>	_IDENT   // non-keyword identifier
+%token	<pos>	_NUMBER  // number
 %token	<pos>	_IF      // keyword if
 %token	<pos>	_ELSE    // keyword else
 %token	<pos>	_ELIF    // keyword elif
@@ -87,31 +90,49 @@ package build
 %token	<pos>	_LOAD    // keyword load
 %token	<pos>	_LE      // operator <=
 %token	<pos>	_NE      // operator !=
+%token	<pos>	_STAR_STAR // operator **
+%token	<pos>	_INT_DIV // operator //
+%token	<pos>	_BIT_LSH // bitwise operator <<
+%token	<pos>	_BIT_RSH // bitwise operator >>
 %token	<pos>	_NOT     // keyword not
 %token	<pos>	_OR      // keyword or
-%token	<pos>	_PYTHON  // uninterpreted Python block
 %token	<pos>	_STRING  // quoted string
 %token	<pos>	_DEF     // keyword def
 %token	<pos>	_RETURN  // keyword return
+%token	<pos>	_PASS    // keyword pass
+%token	<pos>	_BREAK   // keyword break
+%token	<pos>	_CONTINUE // keyword continue
 %token	<pos>	_INDENT  // indentation
 %token	<pos>	_UNINDENT // unindentation
 
 %type	<pos>		comma_opt
+%type	<expr>		argument
+%type	<exprs>		arguments
+%type	<exprs>		arguments_opt
+%type	<expr>		parameter
+%type	<exprs>		parameters
+%type	<exprs>		parameters_opt
+%type	<expr>		test
+%type	<expr>		test_opt
+%type	<exprs>		tests_opt
+%type	<expr>		primary_expr
 %type	<expr>		expr
 %type	<expr>		expr_opt
-%type	<expr>		primary_expr
+%type <exprs>		tests
 %type	<exprs>		exprs
 %type	<exprs>		exprs_opt
-%type	<exprs>		primary_exprs
-%type	<forc>		for_clause
-%type	<forifs>	for_clause_with_if_clauses_opt
-%type	<forsifs>	for_clauses_with_if_clauses_opt
+%type	<expr>		loop_vars
+%type	<expr>		for_clause
+%type	<exprs>		for_clause_with_if_clauses_opt
+%type	<exprs>		for_clauses_with_if_clauses_opt
 %type	<expr>		ident
-%type	<ifs>		if_clauses_opt
+%type	<expr>		number
 %type	<exprs>		stmts
 %type	<exprs>		stmt          // a simple_stmt or a for/if/def block
 %type	<expr>		block_stmt    // a single for/if/def statement
-%type	<expr>		if_else_block // a single if-else statement
+%type	<ifstmt>	if_else_block // a complete if-elif-else block
+%type	<ifstmt>	if_chain      // an elif-elif-else chain
+%type <pos>		elif          // `elif` or `else if` token(s)
 %type	<exprs>		simple_stmt   // One or many small_stmts on one line, e.g. 'a = f(x); return str(a)'
 %type	<expr>		small_stmt    // A single statement, e.g. 'a = f(x)'
 %type <exprs>		small_stmts_continuation  // A sequence of `';' small_stmt`
@@ -120,7 +141,10 @@ package build
 %type	<exprs>		keyvalues_no_comma
 %type	<string>	string
 %type	<strings>	strings
-%type	<block>		suite
+%type	<exprs>		suite
+%type	<exprs>		comments
+%type	<loadarg>	load_argument
+%type	<loadargs>	load_arguments
 
 // Operator precedence.
 // Operators listed lower in the table bind tighter.
@@ -144,12 +168,16 @@ package build
 %left  _IF _ELSE _ELIF
 %left  ','
 %left  ':'
-%left  _IN _NOT _IS
+%left  _IS
 %left  _OR
 %left  _AND
-%left  '<' '>' _EQ _NE _LE _GE
+%left  '<' '>' _EQ _NE _LE _GE _NOT _IN
+%left  '|'
+%left  '^'
+%left  '&'
+%left  _BIT_LSH _BIT_RSH
 %left  '+' '-'
-%left  '*' '/' '%'
+%left  '*' '/' '%' _INT_DIV
 %left  '.' '[' '('
 %right _UNARY
 %left  _STRING
@@ -170,45 +198,76 @@ file:
 	}
 
 suite:
-	'\n' _INDENT stmts _UNINDENT
+	'\n' comments _INDENT stmts _UNINDENT
 	{
-		$$ = CodeBlock{
-			Start: $2,
-			Statements: $3,
-			End: End{Pos: $4},
+		statements := $4
+		if $2 != nil {
+			// $2 can only contain *CommentBlock objects, each of them contains a non-empty After slice
+			cb := $2[len($2)-1].(*CommentBlock)
+			// $4 can't be empty and can't start with a comment
+			stmt := $4[0]
+			start, _ := stmt.Span()
+			if start.Line - cb.After[len(cb.After)-1].Start.Line == 1 {
+				// The first statement of $4 starts on the next line after the last comment of $2.
+				// Attach the last comment to the first statement
+				stmt.Comment().Before = cb.After
+				$2 = $2[:len($2)-1]
+			}
+			statements = append($2, $4...)
 		}
+		$$ = statements
+		$<lastStmt>$ = $<lastStmt>4
 	}
-| simple_stmt
+|	simple_stmt linebreaks_opt
 	{
-		// simple_stmt is never empty
-		start, _ := $1[0].Span()
-		_, end := $1[len($1)-1].Span()
-		$$ = CodeBlock{
-			Start: start,
-			Statements: $1,
-			End: End{Pos: end},
+		$$ = $1
+	}
+
+linebreaks_opt:
+| linebreaks_opt '\n'
+
+comments:
+	{
+		$$ = nil
+		$<lastStmt>$ = nil
+	}
+|	comments _COMMENT '\n'
+	{
+		$$ = $1
+		$<lastStmt>$ = $<lastStmt>1
+		if $<lastStmt>$ == nil {
+			cb := &CommentBlock{Start: $2}
+			$$ = append($$, cb)
+			$<lastStmt>$ = cb
 		}
+		com := $<lastStmt>$.Comment()
+		com.After = append(com.After, Comment{Start: $2, Token: $<tok>2})
+	}
+|	comments '\n'
+	{
+		$$ = $1
+		$<lastStmt>$ = nil
 	}
 
 stmts:
 	{
 		$$ = nil
-		$<lastRule>$ = nil
+		$<lastStmt>$ = nil
 	}
 |	stmts stmt
 	{
 		// If this statement follows a comment block,
 		// attach the comments to the statement.
-		if cb, ok := $<lastRule>1.(*CommentBlock); ok {
+		if cb, ok := $<lastStmt>1.(*CommentBlock); ok {
 			$$ = append($1[:len($1)-1], $2...)
 			$2[0].Comment().Before = cb.After
-			$<lastRule>$ = $2[len($2)-1]
+			$<lastStmt>$ = $<lastStmt>2
 			break
 		}
 
 		// Otherwise add to list.
 		$$ = append($1, $2...)
-		$<lastRule>$ = $2[len($2)-1]
+		$<lastStmt>$ = $<lastStmt>2
 
 		// Consider this input:
 		//
@@ -219,7 +278,7 @@ stmts:
 		// If we've just parsed baz(), the # bar is attached to
 		// foo() as an After comment. Make it a Before comment
 		// for baz() instead.
-		if x := $<lastRule>1; x != nil {
+		if x := $<lastStmt>1; x != nil {
 			com := x.Comment()
 			// stmt is never empty
 			$2[0].Comment().Before = com.After
@@ -230,18 +289,18 @@ stmts:
 	{
 		// Blank line; sever last rule from future comments.
 		$$ = $1
-		$<lastRule>$ = nil
+		$<lastStmt>$ = nil
 	}
 |	stmts _COMMENT '\n'
 	{
 		$$ = $1
-		$<lastRule>$ = $<lastRule>1
-		if $<lastRule>$ == nil {
+		$<lastStmt>$ = $<lastStmt>1
+		if $<lastStmt>$ == nil {
 			cb := &CommentBlock{Start: $2}
 			$$ = append($$, cb)
-			$<lastRule>$ = cb
+			$<lastStmt>$ = cb
 		}
-		com := $<lastRule>$.Comment()
+		com := $<lastStmt>$.Comment()
 		com.After = append(com.After, Comment{Start: $2, Token: $<tok>2})
 	}
 
@@ -249,73 +308,95 @@ stmt:
 	simple_stmt
 	{
 		$$ = $1
+		$<lastStmt>$ = $1[len($1)-1]
 	}
 |	block_stmt
 	{
 		$$ = []Expr{$1}
+		$<lastStmt>$ = $1
+		if cbs := extractTrailingComments($1); len(cbs) > 0 {
+			$$ = append($$, cbs...)
+			$<lastStmt>$ = cbs[len(cbs)-1]
+			if $<lastStmt>1 == nil {
+				$<lastStmt>$ = nil
+			}
+		}
 	}
 
 block_stmt:
-	_DEF _IDENT '(' exprs_opt ')' ':' suite
+	_DEF _IDENT '(' parameters_opt ')' ':' suite
 	{
-		$$ = &FuncDef{
-			Start: $1,
+		$$ = &DefStmt{
+			Function: Function{
+				StartPos: $1,
+				Params: $4,
+				Body: $7,
+			},
 			Name: $<tok>2,
-			ListStart: $3,
-			Args: $4,
-			Body: $7,
-			End: $7.End,
+			ColonPos: $6,
 			ForceCompact: forceCompact($3, $4, $5),
 			ForceMultiLine: forceMultiLine($3, $4, $5),
 		}
+		$<lastStmt>$ = $<lastStmt>7
 	}
-|	_FOR primary_exprs _IN expr ':' suite
+|	_FOR loop_vars _IN expr ':' suite
 	{
-		$$ = &ForLoop{
-			Start: $1,
-			LoopVars: $2,
-			Iterable: $4,
+		$$ = &ForStmt{
+			For: $1,
+			Vars: $2,
+			X: $4,
 			Body: $6,
-			End: $6.End,
 		}
+		$<lastStmt>$ = $<lastStmt>6
 	}
-| if_else_block
+|	if_else_block
 	{
 		$$ = $1
+		$<lastStmt>$ = $<lastStmt>1
 	}
 
-if_else_block:
+// One or several if-elif-elif statements
+if_chain:
 	_IF expr ':' suite
 	{
-		$$ = &IfElse{
-			Start: $1,
-			Conditions: []Condition{
-				Condition{
-					If: $2,
-					Then: $4,
-				},
-			},
-			End: $4.End,
+		$$ = &IfStmt{
+			If: $1,
+			Cond: $2,
+			True: $4,
 		}
+		$<lastStmt>$ = $<lastStmt>4
 	}
-| if_else_block elif expr ':' suite
+|	if_chain elif expr ':' suite
 	{
-		block := $1.(*IfElse)
-		block.Conditions = append(block.Conditions, Condition{
-			If: $3,
-			Then: $5,
-		})
-		block.End = $5.End
-		$$ = block
+		$$ = $1
+		inner := $1
+		for len(inner.False) == 1 {
+			inner = inner.False[0].(*IfStmt)
+		}
+		inner.ElsePos = End{Pos: $2}
+		inner.False = []Expr{
+			&IfStmt{
+				If: $2,
+				Cond: $3,
+				True: $5,
+			},
+		}
+		$<lastStmt>$ = $<lastStmt>5
 	}
-| if_else_block _ELSE ':' suite
+
+// A complete if-elif-elif-else chain
+if_else_block:
+	if_chain
+|	if_chain _ELSE ':' suite
 	{
-		block := $1.(*IfElse)
-		block.Conditions = append(block.Conditions, Condition{
-			Then: $4,
-		})
-		block.End = $4.End
-		$$ = block
+		$$ = $1
+		inner := $1
+		for len(inner.False) == 1 {
+			inner = inner.False[0].(*IfStmt)
+		}
+		inner.ElsePos = End{Pos: $2}
+		inner.False = $4
+		$<lastStmt>$ = $<lastStmt>4
 	}
 
 elif:
@@ -326,14 +407,14 @@ simple_stmt:
 	small_stmt small_stmts_continuation semi_opt '\n'
 	{
 		$$ = append([]Expr{$1}, $2...)
-		$<lastRule>$ = $$[len($$)-1]
+		$<lastStmt>$ = $$[len($$)-1]
 	}
 
 small_stmts_continuation:
 	{
 		$$ = []Expr{}
 	}
-| small_stmts_continuation ';' small_stmt
+|	small_stmts_continuation ';' small_stmt
 	{
 		$$ = append($1, $3)
 	}
@@ -342,19 +423,39 @@ small_stmt:
 	expr %prec ShiftInstead
 |	_RETURN expr
 	{
-		_, end := $2.Span()
-		$$ = &ReturnExpr{
-			X: $2,
-			End: end,
+		$$ = &ReturnStmt{
+			Return: $1,
+			Result: $2,
 		}
 	}
 |	_RETURN
 	{
-		$$ = &ReturnExpr{End: $1}
+		$$ = &ReturnStmt{
+			Return: $1,
+		}
 	}
-|	_PYTHON
+|	expr '=' expr      { $$ = binary($1, $2, $<tok>2, $3) }
+|	expr _AUGM expr    { $$ = binary($1, $2, $<tok>2, $3) }
+|	_PASS
 	{
-		$$ = &PythonBlock{Start: $1, Token: $<tok>1}
+		$$ = &BranchStmt{
+			Token: $<tok>1,
+			TokenPos: $1,
+		}
+	}
+|	_BREAK
+	{
+		$$ = &BranchStmt{
+			Token: $<tok>1,
+			TokenPos: $1,
+		}
+	}
+|	_CONTINUE
+	{
+		$$ = &BranchStmt{
+			Token: $<tok>1,
+			TokenPos: $1,
+		}
 	}
 
 semi_opt:
@@ -362,6 +463,7 @@ semi_opt:
 
 primary_expr:
 	ident
+|	number
 |	primary_expr '.' _IDENT
 	{
 		$$ = &DotExpr{
@@ -371,18 +473,21 @@ primary_expr:
 			Name: $<tok>3,
 		}
 	}
-|	_LOAD '(' exprs_opt ')'
+|	_LOAD '(' string ',' load_arguments comma_opt ')'
 	{
-		$$ = &CallExpr{
-                        X: &LiteralExpr{Start: $1, Token: "load"},
-			ListStart: $2,
-			List: $3,
-			End: End{Pos: $4},
-			ForceCompact: forceCompact($2, $3, $4),
-			ForceMultiLine: forceMultiLine($2, $3, $4),
+		load := &LoadStmt{
+			Load: $1,
+			Module: $3,
+			Rparen: End{Pos: $7},
+			ForceCompact: $1.Line == $7.Line,
 		}
+		for _, arg := range $5 {
+			load.From = append(load.From, &arg.from)
+			load.To = append(load.To, &arg.to)
+		}
+		$$ = load
 	}
-|	primary_expr '(' exprs_opt ')'
+|	primary_expr '(' arguments_opt ')'
 	{
 		$$ = &CallExpr{
 			X: $1,
@@ -402,7 +507,7 @@ primary_expr:
 			End: $4,
 		}
 	}
-|	primary_expr '[' expr_opt ':' expr_opt ']'
+|	primary_expr '[' expr_opt ':' test_opt ']'
 	{
 		$$ = &SliceExpr{
 			X: $1,
@@ -413,7 +518,7 @@ primary_expr:
 			End: $6,
 		}
 	}
-|	primary_expr '[' expr_opt ':' expr_opt ':' expr_opt ']'
+|	primary_expr '[' expr_opt ':' test_opt ':' test_opt ']'
 	{
 		$$ = &SliceExpr{
 			X: $1,
@@ -424,23 +529,6 @@ primary_expr:
 			SecondColon: $6,
 			Step: $7,
 			End: $8,
-		}
-	}
-|	primary_expr '(' expr for_clauses_with_if_clauses_opt ')'
-	{
-		$$ = &CallExpr{
-			X: $1,
-			ListStart: $2,
-			List: []Expr{
-				&ListForExpr{
-					Brack: "",
-					Start: $2,
-					X: $3,
-					For: $4,
-					End: End{Pos: $5},
-				},
-			},
-			End: End{Pos: $5},
 		}
 	}
 |	strings %prec ShiftInstead
@@ -455,50 +543,35 @@ primary_expr:
 			$$ = binary($$, end, "+", x)
 		}
 	}
-|	'[' exprs_opt ']'
+|	'[' tests_opt ']'
 	{
 		$$ = &ListExpr{
 			Start: $1,
 			List: $2,
-			Comma: $<comma>2,
 			End: End{Pos: $3},
 			ForceMultiLine: forceMultiLine($1, $2, $3),
 		}
 	}
-|	'[' expr for_clauses_with_if_clauses_opt ']'
+|	'[' test for_clauses_with_if_clauses_opt ']'
 	{
-		exprStart, _ := $2.Span()
-		$$ = &ListForExpr{
-			Brack: "[]",
-			Start: $1,
-			X: $2,
-			For: $3,
+		$$ = &Comprehension{
+			Curly: false,
+			Lbrack: $1,
+			Body: $2,
+			Clauses: $3,
 			End: End{Pos: $4},
-			ForceMultiLine: $1.Line != exprStart.Line,
-		}
-	}
-|	'(' expr for_clauses_with_if_clauses_opt ')'
-	{
-		exprStart, _ := $2.Span()
-		$$ = &ListForExpr{
-			Brack: "()",
-			Start: $1,
-			X: $2,
-			For: $3,
-			End: End{Pos: $4},
-			ForceMultiLine: $1.Line != exprStart.Line,
+			ForceMultiLine: forceMultiLineComprehension($1, $2, $3, $4),
 		}
 	}
 |	'{' keyvalue for_clauses_with_if_clauses_opt '}'
 	{
-		exprStart, _ := $2.Span()
-		$$ = &ListForExpr{
-			Brack: "{}",
-			Start: $1,
-			X: $2,
-			For: $3,
+		$$ = &Comprehension{
+			Curly: true,
+			Lbrack: $1,
+			Body: $2,
+			Clauses: $3,
 			End: End{Pos: $4},
-			ForceMultiLine: $1.Line != exprStart.Line,
+			ForceMultiLine: forceMultiLineComprehension($1, $2, $3, $4),
 		}
 	}
 |	'{' keyvalues '}'
@@ -506,22 +579,20 @@ primary_expr:
 		$$ = &DictExpr{
 			Start: $1,
 			List: $2,
-			Comma: $<comma>2,
 			End: End{Pos: $3},
 			ForceMultiLine: forceMultiLine($1, $2, $3),
 		}
 	}
-|	'{' exprs_opt '}'
+|	'{' tests comma_opt '}'  // TODO: remove, not supported
 	{
 		$$ = &SetExpr{
 			Start: $1,
 			List: $2,
-			Comma: $<comma>2,
-			End: End{Pos: $3},
-			ForceMultiLine: forceMultiLine($1, $2, $3),
+			End: End{Pos: $4},
+			ForceMultiLine: forceMultiLine($1, $2, $4),
 		}
 	}
-|	'(' exprs_opt ')'
+|	'(' tests_opt ')'
 	{
 		if len($2) == 1 && $<comma>2.Line == 0 {
 			// Just a parenthesized expression, not a tuple.
@@ -535,46 +606,207 @@ primary_expr:
 			$$ = &TupleExpr{
 				Start: $1,
 				List: $2,
-				Comma: $<comma>2,
 				End: End{Pos: $3},
 				ForceCompact: forceCompact($1, $2, $3),
 				ForceMultiLine: forceMultiLine($1, $2, $3),
 			}
 		}
 	}
-|	'-' primary_expr  %prec _UNARY { $$ = unary($1, $<tok>1, $2) }
 
-expr:
-	primary_expr
-|	_LAMBDA exprs ':' expr
+arguments_opt:
 	{
-		$$ = &LambdaExpr{
-			Lambda: $1,
-			Var: $2,
-			Colon: $3,
-			Expr: $4,
+		$$ = nil
+	}
+|	arguments comma_opt
+	{
+		$$ = $1
+	}
+
+arguments:
+	argument
+	{
+		$$ = []Expr{$1}
+	}
+|	arguments ',' argument
+	{
+		$$ = append($1, $3)
+	}
+
+argument:
+	test
+|	ident '=' test
+	{
+		$$ = binary($1, $2, $<tok>2, $3)
+	}
+|	'*' test
+	{
+		$$ = unary($1, $<tok>1, $2)
+	}
+|	_STAR_STAR test
+	{
+		$$ = unary($1, $<tok>1, $2)
+	}
+
+load_arguments:
+	load_argument {
+		$$ = []*struct{from Ident; to Ident}{$1}
+	}
+| load_arguments ',' load_argument
+	{
+		$1 = append($1, $3)
+		$$ = $1
+	}
+
+load_argument:
+	string {
+		start := $1.Start.add("'")
+		if $1.TripleQuote {
+			start = start.add("''")
+		}
+		$$ = &struct{from Ident; to Ident}{
+			from: Ident{
+				Name: $1.Value,
+				NamePos: start,
+			},
+			to: Ident{
+				Name: $1.Value,
+				NamePos: start,
+			},
 		}
 	}
-|	_NOT expr %prec _UNARY { $$ = unary($1, $<tok>1, $2) }
-|	'*' expr  %prec _UNARY { $$ = unary($1, $<tok>1, $2) }
-|	expr '*' expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr '%' expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr '/' expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr '+' expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr '-' expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr '<' expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr '>' expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr _EQ expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr _LE expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr _NE expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr _GE expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr '=' expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr _AUGM expr    { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr _IN expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr _NOT _IN expr { $$ = binary($1, $2, "not in", $4) }
-|	expr _OR expr      { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr _AND expr     { $$ = binary($1, $2, $<tok>2, $3) }
-|	expr _IS expr
+| ident '=' string
+	{
+		start := $3.Start.add("'")
+		if $3.TripleQuote {
+			start = start.add("''")
+		}
+		$$ = &struct{from Ident; to Ident}{
+			from: Ident{
+				Name: $3.Value,
+				NamePos: start,
+			},
+			to: *$1.(*Ident),
+		}
+	}
+
+parameters_opt:
+	{
+		$$ = nil
+	}
+|	parameters comma_opt
+	{
+		$$ = $1
+	}
+
+parameters:
+	parameter
+	{
+		$$ = []Expr{$1}
+	}
+|	parameters ',' parameter
+	{
+		$$ = append($1, $3)
+	}
+
+parameter:
+	ident
+|	ident '=' test
+	{
+		$$ = binary($1, $2, $<tok>2, $3)
+	}
+|	'*' ident
+	{
+		$$ = unary($1, $<tok>1, $2)
+	}
+|	'*'
+	{
+		$$ = unary($1, $<tok>1, nil)
+	}
+|	_STAR_STAR ident
+	{
+		$$ = unary($1, $<tok>1, $2)
+	}
+
+expr:
+	test
+|	expr ',' test
+	{
+		tuple, ok := $1.(*TupleExpr)
+		if !ok || !tuple.NoBrackets {
+			tuple = &TupleExpr{
+				List: []Expr{$1},
+				NoBrackets: true,
+				ForceCompact: true,
+				ForceMultiLine: false,
+			}
+		}
+		tuple.List = append(tuple.List, $3)
+		$$ = tuple
+	}
+
+expr_opt:
+	{
+		$$ = nil
+	}
+|	expr
+
+exprs:
+	expr
+	{
+		$$ = []Expr{$1}
+	}
+|	exprs ',' expr
+	{
+		$$ = append($1, $3)
+	}
+
+exprs_opt:
+	{
+		$$ = nil
+	}
+|	exprs comma_opt
+	{
+		$$ = $1
+	}
+
+test:
+	primary_expr
+|	_LAMBDA exprs_opt ':' expr  // TODO: remove, not supported
+	{
+		$$ = &LambdaExpr{
+			Function: Function{
+				StartPos: $1,
+				Params: $2,
+				Body: []Expr{$4},
+			},
+		}
+	}
+|	_NOT test %prec _UNARY { $$ = unary($1, $<tok>1, $2) }
+|	'-' test  %prec _UNARY { $$ = unary($1, $<tok>1, $2) }
+|	'+' test  %prec _UNARY { $$ = unary($1, $<tok>1, $2) }
+|	'~' test  %prec _UNARY { $$ = unary($1, $<tok>1, $2) }
+|	test '*' test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test '%' test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test '/' test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test _INT_DIV test { $$ = binary($1, $2, $<tok>2, $3) }
+|	test '+' test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test '-' test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test '<' test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test '>' test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test _EQ test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test _LE test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test _NE test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test _GE test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test _IN test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test _NOT _IN test { $$ = binary($1, $2, "not in", $4) }
+|	test _OR test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test _AND test     { $$ = binary($1, $2, $<tok>2, $3) }
+|	test '|' test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test '&' test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test '^' test      { $$ = binary($1, $2, $<tok>2, $3) }
+|	test _BIT_LSH test { $$ = binary($1, $2, $<tok>2, $3) }
+|	test _BIT_RSH test { $$ = binary($1, $2, $<tok>2, $3) }
+|	test _IS test
 	{
 		if b, ok := $3.(*UnaryExpr); ok && b.Op == "not" {
 			$$ = binary($1, $2, "is not", b.X)
@@ -582,7 +814,7 @@ expr:
 			$$ = binary($1, $2, $<tok>2, $3)
 		}
 	}
-| expr _IF expr _ELSE expr
+|	test _IF test _ELSE test
 	{
 		$$ = &ConditionalExpr{
 			Then: $1,
@@ -593,11 +825,30 @@ expr:
 		}
 	}
 
-expr_opt:
+tests:
+	test
+	{
+		$$ = []Expr{$1}
+	}
+|	tests ',' test
+	{
+		$$ = append($1, $3)
+	}
+
+test_opt:
 	{
 		$$ = nil
 	}
-|	expr
+|	test
+
+tests_opt:
+	{
+		$$, $<comma>$ = nil, Position{}
+	}
+|	tests comma_opt
+	{
+		$$, $<comma>$ = $1, $2
+	}
 
 // comma_opt is an optional comma. If the comma is present,
 // the rule's value is the position of the comma. Otherwise
@@ -610,7 +861,7 @@ comma_opt:
 |	','
 
 keyvalue:
-	expr ':' expr  {
+	test ':' test  {
 		$$ = &KeyValueExpr{
 			Key: $1,
 			Colon: $2,
@@ -629,7 +880,10 @@ keyvalues_no_comma:
 	}
 
 keyvalues:
-	keyvalues_no_comma
+	{
+		$$ = nil
+	}
+|	keyvalues_no_comma
 	{
 		$$ = $1
 	}
@@ -638,33 +892,21 @@ keyvalues:
 		$$ = $1
 	}
 
-exprs:
-	expr
-	{
-		$$ = []Expr{$1}
-	}
-|	exprs ',' expr
-	{
-		$$ = append($1, $3)
-	}
-
-exprs_opt:
-	{
-		$$, $<comma>$ = nil, Position{}
-	}
-|	exprs comma_opt
-	{
-		$$, $<comma>$ = $1, $2
-	}
-
-primary_exprs:
+loop_vars:
 	primary_expr
+|	loop_vars ',' primary_expr
 	{
-		$$ = []Expr{$1}
-	}
-|	primary_exprs ',' primary_expr
-	{
-		$$ = append($1, $3)
+		tuple, ok := $1.(*TupleExpr)
+		if !ok || !tuple.NoBrackets {
+			tuple = &TupleExpr{
+				List: []Expr{$1},
+				NoBrackets: true,
+				ForceCompact: true,
+				ForceMultiLine: false,
+			}
+		}
+		tuple.List = append(tuple.List, $3)
+		$$ = tuple
 	}
 
 string:
@@ -692,47 +934,44 @@ strings:
 ident:
 	_IDENT
 	{
+		$$ = &Ident{NamePos: $1, Name: $<tok>1}
+	}
+
+number:
+	_NUMBER
+	{
 		$$ = &LiteralExpr{Start: $1, Token: $<tok>1}
 	}
 
 for_clause:
-	_FOR primary_exprs _IN expr
+	_FOR loop_vars _IN test
 	{
 		$$ = &ForClause{
 			For: $1,
-			Var: $2,
+			Vars: $2,
 			In: $3,
-			Expr: $4,
+			X: $4,
 		}
 	}
 
 for_clause_with_if_clauses_opt:
-	for_clause if_clauses_opt {
-		$$ = &ForClauseWithIfClausesOpt{
-			For: $1,
-			Ifs: $2,
-		}
+	for_clause {
+		$$ = []Expr{$1}
+	}
+|	for_clause_with_if_clauses_opt _IF test {
+		$$ = append($1, &IfClause{
+			If: $2,
+			Cond: $3,
+		})
 	}
 
 for_clauses_with_if_clauses_opt:
 	for_clause_with_if_clauses_opt
 	{
-		$$ = []*ForClauseWithIfClausesOpt{$1}
+		$$ = $1
 	}
-| for_clauses_with_if_clauses_opt for_clause_with_if_clauses_opt {
-		$$ = append($1, $2)
-	}
-
-if_clauses_opt:
-	{
-		$$ = nil
-	}
-|	if_clauses_opt _IF expr
-	{
-		$$ = append($1, &IfClause{
-			If: $2,
-			Cond: $3,
-		})
+|	for_clauses_with_if_clauses_opt for_clause_with_if_clauses_opt {
+		$$ = append($1, $2...)
 	}
 
 %%
@@ -754,12 +993,24 @@ func unary(pos Position, op string, x Expr) Expr {
 func binary(x Expr, pos Position, op string, y Expr) Expr {
 	_, xend := x.Span()
 	ystart, _ := y.Span()
+
+	switch op {
+	case "=", "+=", "-=", "*=", "/=", "//=", "%=", "|=":
+		return &AssignExpr{
+			LHS:       x,
+			OpPos:     pos,
+			Op:        op,
+			LineBreak: xend.Line < ystart.Line,
+			RHS:       y,
+		}
+	}
+
 	return &BinaryExpr{
-		X:       x,
-		OpStart: pos,
-		Op:      op,
+		X:         x,
+		OpStart:   pos,
+		Op:        op,
 		LineBreak: xend.Line < ystart.Line,
-		Y:       y,
+		Y:         y,
 	}
 }
 
@@ -769,11 +1020,12 @@ func binary(x Expr, pos Position, op string, y Expr) Expr {
 // a literal (variable, string or a number), a literal with a unary operator or an empty sequence.
 func isSimpleExpression(expr *Expr) bool {
 	switch x := (*expr).(type) {
-	case *LiteralExpr, *StringExpr:
+	case *LiteralExpr, *StringExpr, *Ident:
 		return true
 	case *UnaryExpr:
-		_, ok := x.X.(*LiteralExpr)
-		return ok
+		_, literal := x.X.(*LiteralExpr)
+		_, ident := x.X.(*Ident)
+		return literal || ident
 	case *ListExpr:
 		return len(x.List) == 0
 	case *TupleExpr:
@@ -859,4 +1111,107 @@ func forceMultiLine(start Position, list []Expr, end Position) bool {
 	// element, or closing bracket is on different line than end of element.
 	elemStart, elemEnd := list[0].Span()
 	return start.Line != elemStart.Line || end.Line != elemEnd.Line
+}
+
+// forceMultiLineComprehension returns the setting for the ForceMultiLine field for a comprehension.
+func forceMultiLineComprehension(start Position, expr Expr, clauses []Expr, end Position) bool {
+	// Return true if there's at least one line break between start, expr, each clause, and end
+	exprStart, exprEnd := expr.Span()
+	if start.Line != exprStart.Line {
+		return true
+	}
+	previousEnd := exprEnd
+	for _, clause := range clauses {
+		clauseStart, clauseEnd := clause.Span()
+		if previousEnd.Line != clauseStart.Line {
+			return true
+		}
+		previousEnd = clauseEnd
+	}
+	return previousEnd.Line != end.Line
+}
+
+// extractTrailingComments extracts trailing comments of an indented block starting with the first
+// comment line with indentation less than the block indentation.
+// The comments can either belong to CommentBlock statements or to the last non-comment statement
+// as After-comments.
+func extractTrailingComments(stmt Expr) []Expr {
+	body := getLastBody(stmt)
+	var comments []Expr
+	if body != nil && len(*body) > 0 {
+		// Get the current indentation level
+		start, _ := (*body)[0].Span()
+		indentation := start.LineRune
+
+		// Find the last non-comment statement
+		lastNonCommentIndex := -1
+		for i, stmt := range *body {
+			if _, ok := stmt.(*CommentBlock); !ok {
+				lastNonCommentIndex = i
+			}
+		}
+		if lastNonCommentIndex == -1 {
+			return comments
+		}
+
+		// Iterate over the trailing comments, find the first comment line that's not indented enough,
+		// dedent it and all the following comments.
+		for i := lastNonCommentIndex; i < len(*body); i++ {
+			stmt := (*body)[i]
+			if comment := extractDedentedComment(stmt, indentation); comment != nil {
+				// This comment and all the following CommentBlock statements are to be extracted.
+				comments = append(comments, comment)
+				comments = append(comments, (*body)[i+1:]...)
+				*body = (*body)[:i+1]
+				// If the current statement is a CommentBlock statement without any comment lines
+				// it should be removed too.
+				if i > lastNonCommentIndex && len(stmt.Comment().After) == 0 {
+					*body = (*body)[:i]
+				}
+			}
+		}
+  }
+  return comments
+}
+
+// extractDedentedComment extract the first comment line from `stmt` which indentation is smaller
+// than `indentation`, and all following comment lines, and returns them in a newly created
+// CommentBlock statement.
+func extractDedentedComment(stmt Expr, indentation int) Expr {
+	for i, line := range stmt.Comment().After {
+		// line.Start.LineRune == 0 can't exist in parsed files, it indicates that the comment line
+		// has been added by an AST modification. Don't take such lines into account.
+		if line.Start.LineRune > 0 && line.Start.LineRune < indentation {
+			// This and all the following lines should be dedented
+			cb := &CommentBlock{
+				Start: line.Start,
+				Comments: Comments{After: stmt.Comment().After[i:]},
+			}
+			stmt.Comment().After = stmt.Comment().After[:i]
+			return cb
+		}
+	}
+	return nil
+}
+
+// getLastBody returns the last body of a block statement (the only body for For- and DefStmt
+// objects, the last in a if-elif-else chain
+func getLastBody(stmt Expr) *[]Expr {
+	switch block := stmt.(type) {
+	case *DefStmt:
+		return &block.Body
+	case *ForStmt:
+		return &block.Body
+	case *IfStmt:
+		if len(block.False) == 0 {
+			return &block.True
+		} else if len(block.False) == 1 {
+			if next, ok := block.False[0].(*IfStmt); ok {
+				// Recursively find the last block of the chain
+				return getLastBody(next)
+			}
+		}
+		return &block.False
+	}
+	return nil
 }

@@ -9,7 +9,6 @@ go_library(
     name = "go_default_library",
     srcs = ["well_known_labels.go"],
     importpath = "k8s.io/kubernetes/pkg/scheduler/api",
-    deps = ["//pkg/apis/core:go_default_library"],
 )
 
 filegroup(

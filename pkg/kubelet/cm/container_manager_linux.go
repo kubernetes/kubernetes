@@ -297,7 +297,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			return nil, err
 		}
 
-		klog.Infof("[topologymanager] Initilizing Topology Manager with %s policy", nodeConfig.ExperimentalTopologyManagerPolicy)
+		klog.Infof("[topologymanager] Initializing Topology Manager with %s policy", nodeConfig.ExperimentalTopologyManagerPolicy)
 	} else {
 		cm.topologyManager = topologymanager.NewFakeManager()
 	}
@@ -320,6 +320,7 @@ func NewContainerManager(mountUtil mount.Interface, cadvisorInterface cadvisor.I
 			nodeConfig.ExperimentalCPUManagerReconcilePeriod,
 			machineInfo,
 			numaNodeInfo,
+			nodeConfig.NodeAllocatableConfig.ReservedSystemCPUs,
 			cm.GetNodeAllocatableReservation(),
 			nodeConfig.KubeletRootDir,
 			cm.topologyManager,

@@ -1096,8 +1096,9 @@ func (az *Cloud) reconcileLoadBalancerRule(
 				expectedRule.LoadBalancingRulePropertiesFormat.IdleTimeoutInMinutes = lbIdleTimeout
 			}
 
-			// we didn't construct the probe objects for UDP or SCTP because they're not used/needed/allowed
-			if protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP {
+			// we didn't construct the probe objects for UDP or SCTP because they're not allowed on Azure.
+			// However, when externalTrafficPolicy is Local, Kubernetes HTTP health check would be used for probing.
+			if servicehelpers.NeedsHealthCheck(service) || (protocol != v1.ProtocolUDP && protocol != v1.ProtocolSCTP) {
 				expectedRule.Probe = &network.SubResource{
 					ID: to.StringPtr(az.getLoadBalancerProbeID(lbName, lbRuleName)),
 				}

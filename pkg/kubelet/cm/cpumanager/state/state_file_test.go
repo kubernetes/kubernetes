@@ -465,11 +465,11 @@ func TestClearStateStateFile(t *testing.T) {
 
 			state.ClearState()
 			if !cpuset.NewCPUSet().Equals(state.GetDefaultCPUSet()) {
-				t.Error("cleared state shoudn't has got information about available cpuset")
+				t.Error("cleared state shouldn't has got information about available cpuset")
 			}
 			for containerName := range testCase.containers {
 				if !cpuset.NewCPUSet().Equals(state.GetCPUSetOrDefault(containerName)) {
-					t.Error("cleared state shoudn't has got information about containers")
+					t.Error("cleared state shouldn't has got information about containers")
 				}
 			}
 		})

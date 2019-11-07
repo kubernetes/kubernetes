@@ -5,7 +5,7 @@ go_library(
     srcs = ["stream_chunk.pb.go"],
     importmap = "k8s.io/kubernetes/vendor/github.com/grpc-ecosystem/grpc-gateway/internal",
     importpath = "github.com/grpc-ecosystem/grpc-gateway/internal",
-    visibility = ["//visibility:public"],
+    visibility = ["//vendor/github.com/grpc-ecosystem/grpc-gateway:__subpackages__"],
     deps = [
         "//vendor/github.com/golang/protobuf/proto:go_default_library",
         "//vendor/github.com/golang/protobuf/ptypes/any:go_default_library",

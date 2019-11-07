@@ -209,7 +209,7 @@
 // LeaveSourceSpecificGroup for the operation known as "include" mode,
 //
 //	ssmgroup := net.UDPAddr{IP: net.IPv4(232, 7, 8, 9)}
-//	ssmsource := net.UDPAddr{IP: net.IPv4(192, 168, 0, 1)})
+//	ssmsource := net.UDPAddr{IP: net.IPv4(192, 168, 0, 1)}
 //	if err := p.JoinSourceSpecificGroup(en0, &ssmgroup, &ssmsource); err != nil {
 //		// error handling
 //	}
@@ -241,5 +241,4 @@
 // IncludeSourceSpecificGroup may return an error.
 package ipv4 // import "golang.org/x/net/ipv4"
 
-// BUG(mikio): This package is not implemented on AIX, JS, NaCl and
-// Plan 9.
+// BUG(mikio): This package is not implemented on JS, NaCl and Plan 9.

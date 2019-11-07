@@ -205,7 +205,6 @@ go_test(
         "//pkg/kubelet/util/queue:go_default_library",
         "//pkg/kubelet/util/sliceutils:go_default_library",
         "//pkg/kubelet/volumemanager:go_default_library",
-        "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/taints:go_default_library",
@@ -250,6 +249,9 @@ go_test(
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         ],

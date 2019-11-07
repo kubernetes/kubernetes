@@ -47,7 +47,6 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	"k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 	"k8s.io/utils/pointer"
@@ -2879,15 +2878,15 @@ func TestTaintsNodeByCondition(t *testing.T) {
 	nodeController.getPodsAssignedToNode = fakeGetPodsAssignedToNode(fakeNodeHandler.Clientset)
 
 	networkUnavailableTaint := &v1.Taint{
-		Key:    schedulerapi.TaintNodeNetworkUnavailable,
+		Key:    v1.TaintNodeNetworkUnavailable,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 	notReadyTaint := &v1.Taint{
-		Key:    schedulerapi.TaintNodeNotReady,
+		Key:    v1.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 	unreachableTaint := &v1.Taint{
-		Key:    schedulerapi.TaintNodeUnreachable,
+		Key:    v1.TaintNodeUnreachable,
 		Effect: v1.TaintEffectNoSchedule,
 	}
 

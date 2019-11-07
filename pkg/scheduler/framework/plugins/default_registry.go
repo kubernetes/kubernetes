@@ -25,6 +25,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/defaultpodtopologyspread"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/imagelocality"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodeaffinity"
@@ -55,6 +56,7 @@ type RegistryArgs struct {
 // plugins can register additional plugins through the WithFrameworkOutOfTreeRegistry option.
 func NewDefaultRegistry(args *RegistryArgs) framework.Registry {
 	return framework.Registry{
+		defaultpodtopologyspread.Name:        defaultpodtopologyspread.New,
 		imagelocality.Name:                   imagelocality.New,
 		tainttoleration.Name:                 tainttoleration.New,
 		nodename.Name:                        nodename.New,
@@ -209,6 +211,11 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 		})
 
 	// Register Priorities.
+	registry.RegisterPriority(priorities.SelectorSpreadPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, defaultpodtopologyspread.Name, &args.Weight)
+			return
+		})
 	registry.RegisterPriority(priorities.TaintTolerationPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, tainttoleration.Name, &args.Weight)

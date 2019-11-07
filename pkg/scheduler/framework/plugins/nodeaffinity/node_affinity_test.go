@@ -23,8 +23,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -508,7 +508,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -533,7 +533,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -559,7 +559,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -594,7 +594,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -628,7 +628,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -661,7 +661,7 @@ func TestNodeAffinity(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      schedulerapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},

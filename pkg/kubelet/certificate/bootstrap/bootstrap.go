@@ -356,7 +356,7 @@ func requestNodeCertificate(client certificatesv1beta1.CertificateSigningRequest
 }
 
 // This digest should include all the relevant pieces of the CSR we care about.
-// We can't direcly hash the serialized CSR because of random padding that we
+// We can't directly hash the serialized CSR because of random padding that we
 // regenerate every loop and we include usages which are not contained in the
 // CSR. This needs to be kept up to date as we add new fields to the node
 // certificates and with ensureCompatible.

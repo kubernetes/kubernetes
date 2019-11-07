@@ -306,7 +306,7 @@ function kube::build::has_ip() {
 # Detect if a specific image exists
 #
 # $1 - image repo name
-# #2 - image tag
+# $2 - image tag
 function kube::build::docker_image_exists() {
   [[ -n $1 && -n $2 ]] || {
     kube::log::error "Internal error. Image not specified in docker_image_exists."

@@ -16,11 +16,11 @@ go_test(
     deps = [
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/api/v1/pod:go_default_library",
+        "//pkg/apis/core:go_default_library",
         "//pkg/controller:go_default_library",
         "//pkg/controller/daemon:go_default_library",
         "//pkg/scheduler:go_default_library",
         "//pkg/scheduler/algorithmprovider:go_default_library",
-        "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/apis/config:go_default_library",
         "//pkg/util/labels:go_default_library",
         "//staging/src/k8s.io/api/apps/v1:go_default_library",

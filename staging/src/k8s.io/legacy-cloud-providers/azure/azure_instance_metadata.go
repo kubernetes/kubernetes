@@ -125,7 +125,7 @@ func (ims *InstanceMetadataService) getInstanceMetadata(key string) (interface{}
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failure of getting instance metadata with response %q", resp.Status)
 	}
 
