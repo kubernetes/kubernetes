@@ -262,10 +262,12 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 	buf := &bytes.Buffer{}
 	streamBuf := &bytes.Buffer{}
 	ch := s.Watching.ResultChan()
+
+	defer s.Watching.Stop()
+
 	for {
 		select {
 		case <-done:
-			s.Watching.Stop()
 			return
 		case event, ok := <-ch:
 			if !ok {
@@ -295,25 +297,21 @@ func (s *WatchServer) HandleWS(ws *websocket.Conn) {
 			if err != nil {
 				utilruntime.HandleError(fmt.Errorf("unable to convert watch object: %v", err))
 				// client disconnect.
-				s.Watching.Stop()
 				return
 			}
 			if err := s.Encoder.Encode(outEvent, streamBuf); err != nil {
 				// encoding error
 				utilruntime.HandleError(fmt.Errorf("unable to encode event: %v", err))
-				s.Watching.Stop()
 				return
 			}
 			if s.UseTextFraming {
 				if err := websocket.Message.Send(ws, streamBuf.String()); err != nil {
 					// Client disconnect.
-					s.Watching.Stop()
 					return
 				}
 			} else {
 				if err := websocket.Message.Send(ws, streamBuf.Bytes()); err != nil {
 					// Client disconnect.
-					s.Watching.Stop()
 					return
 				}
 			}
