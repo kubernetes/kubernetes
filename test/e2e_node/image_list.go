@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"fmt"
@@ -133,7 +133,7 @@ func getPuller() (puller, error) {
 	return nil, fmt.Errorf("can't prepull images, unknown container runtime %q", runtime)
 }
 
-// Pre-fetch all images tests depend on so that we don't fail in an actual test.
+// PrePullAllImages pre-fetches all images tests depend on so that we don't fail in an actual test.
 func PrePullAllImages() error {
 	puller, err := getPuller()
 	if err != nil {

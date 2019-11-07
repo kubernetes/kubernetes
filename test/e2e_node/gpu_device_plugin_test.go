@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e_node
+package e2enode
 
 import (
 	"os/exec"
@@ -79,7 +79,7 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			p1 := f.PodClient().CreateSync(makeBusyboxPod(gpu.NVIDIAGPUResourceName, podRECMD))
 
 			deviceIDRE := "gpu devices: (nvidia[0-9]+)"
-			devId1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
+			devID1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
 			p1, err := f.PodClient().Get(p1.Name, metav1.GetOptions{})
 			framework.ExpectNoError(err)
 
@@ -88,8 +88,8 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 
 			ginkgo.By("Confirming that after a kubelet and pod restart, GPU assignment is kept")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
-			devIdRestart1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			framework.ExpectEqual(devIdRestart1, devId1)
+			devIDRestart1 := parseLog(f, p1.Name, p1.Name, deviceIDRE)
+			framework.ExpectEqual(devIDRestart1, devID1)
 
 			ginkgo.By("Restarting Kubelet and creating another pod")
 			restartKubelet()
@@ -100,9 +100,9 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			p2 := f.PodClient().CreateSync(makeBusyboxPod(gpu.NVIDIAGPUResourceName, podRECMD))
 
 			ginkgo.By("Checking that pods got a different GPU")
-			devId2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
+			devID2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
 
-			framework.ExpectEqual(devId1, devId2)
+			framework.ExpectEqual(devID1, devID2)
 
 			ginkgo.By("Deleting device plugin.")
 			f.ClientSet.CoreV1().Pods(metav1.NamespaceSystem).Delete(devicePluginPod.Name, &metav1.DeleteOptions{})
@@ -114,21 +114,21 @@ var _ = framework.KubeDescribe("NVIDIA GPU Device Plugin [Feature:GPUDevicePlugi
 			}, 10*time.Minute, framework.Poll).Should(gomega.BeTrue())
 			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin.")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
-			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			framework.ExpectEqual(devIdRestart1, devId1)
+			devIDRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
+			framework.ExpectEqual(devIDRestart1, devID1)
 
 			ensurePodContainerRestart(f, p2.Name, p2.Name)
-			devIdRestart2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
-			framework.ExpectEqual(devIdRestart2, devId2)
+			devIDRestart2 := parseLog(f, p2.Name, p2.Name, deviceIDRE)
+			framework.ExpectEqual(devIDRestart2, devID2)
 			ginkgo.By("Restarting Kubelet.")
 			restartKubelet()
 			ginkgo.By("Checking that scheduled pods can continue to run even after we delete device plugin and restart Kubelet.")
 			ensurePodContainerRestart(f, p1.Name, p1.Name)
-			devIdRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
-			framework.ExpectEqual(devIdRestart1, devId1)
+			devIDRestart1 = parseLog(f, p1.Name, p1.Name, deviceIDRE)
+			framework.ExpectEqual(devIDRestart1, devID1)
 			ensurePodContainerRestart(f, p2.Name, p2.Name)
-			devIdRestart2 = parseLog(f, p2.Name, p2.Name, deviceIDRE)
-			framework.ExpectEqual(devIdRestart2, devId2)
+			devIDRestart2 = parseLog(f, p2.Name, p2.Name, deviceIDRE)
+			framework.ExpectEqual(devIDRestart2, devID2)
 			logDevicePluginMetrics()
 
 			// Cleanup
