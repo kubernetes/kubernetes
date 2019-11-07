@@ -17,11 +17,6 @@ limitations under the License.
 package phases
 
 import (
-	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-
 	"github.com/pkg/errors"
 
 	clientset "k8s.io/client-go/kubernetes"
@@ -31,9 +26,8 @@ import (
 	cmdutil "k8s.io/kubernetes/cmd/kubeadm/app/cmd/util"
 	"k8s.io/kubernetes/cmd/kubeadm/app/features"
 	dnsaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/dns"
+	installeraddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/installer"
 	proxyaddon "k8s.io/kubernetes/cmd/kubeadm/app/phases/addons/proxy"
-
-	addoninstall "sigs.k8s.io/addon-operators/installer/install"
 )
 
 var (
@@ -130,6 +124,18 @@ func runKubeProxyAddon(c workflow.RunData) error {
 	return proxyaddon.EnsureProxyAddon(&cfg.ClusterConfiguration, &cfg.LocalAPIEndpoint, client)
 }
 
+// runAddonInstaller executes the addon-installer
+func runAddonInstaller(c workflow.RunData) error {
+	cfg, _, dryRun, err := getInitData(c)
+	if err != nil {
+		return err
+	}
+	if features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.AddonInstaller) {
+		return installeraddon.ApplyAddonConfiguration(cfg, dryRun)
+	}
+	return nil
+}
+
 func getAddonPhaseFlags(name string) []string {
 	flags := []string{
 		options.CfgPath,
@@ -151,69 +157,15 @@ func getAddonPhaseFlags(name string) []string {
 			options.NetworkingServiceSubnet,
 		)
 	}
-	if name == "coredns" || name == "installer" {
+	if name == "all" || name == "coredns" || name == "installer" {
 		flags = append(flags,
 			options.FeatureGatesString,
 		)
 	}
-	if name == "installer" {
+	if name == "all" || name == "installer" {
 		flags = append(flags,
 			options.DryRun,
 		)
 	}
 	return flags
-}
-
-// runAddonInstaller executes the addon-installer
-func runAddonInstaller(c workflow.RunData) error {
-	cfg, _, dryRun, err := getInitData(c)
-	if err != nil {
-		return err
-	}
-	if features.Enabled(cfg.ClusterConfiguration.FeatureGates, features.AddonInstaller) {
-		installCfg := cfg.ClusterConfiguration.ComponentConfigs.AddonInstaller
-		if installCfg == nil {
-			return errors.New("addoninstaller phase invoked with nil AddonInstaller ComponentConfig")
-		}
-
-		// Override the AddonInstallerConfiguration dryRun field with the kubeadm dryRun runtime value.
-		// Note that this makes the dryRun field of any user-specified ComponentConfig file meaningless when used /w kubeadm.
-		// It's possible to make kubeadm dry-run different from the addon-installer dry-run with legacyFlag style logic,
-		// but that requires more work and my not make sense.
-		if installCfg.DryRun != dryRun {
-			fmt.Fprintf(os.Stderr, "[addon installer] WARNING: overriding AddonInstallerConfiguration with dryRun: %t\n", dryRun)
-			installCfg.DryRun = dryRun
-		}
-
-		// TODO: getAddonInstallerFromConfigMap
-		// TODO: diff addons and prune ones that are no longer declared
-
-		r := addoninstall.Runtime{
-			Config: installCfg,
-			Stdout: os.Stdout,
-			Stderr: os.Stderr,
-		}
-		sigs := make(chan os.Signal, 1)
-		signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-		go func() {
-			errs := r.HandleSignal(<-sigs)
-			for _, err := range errs {
-				fmt.Fprintf(os.Stderr, "[addon installer] ERROR: %v\n", err)
-			}
-		}()
-
-		err = r.CheckDeps()
-		if err != nil {
-			return err
-		}
-		err = r.CheckConfig()
-		if err != nil {
-			return err
-		}
-		err = r.InstallAddons()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
