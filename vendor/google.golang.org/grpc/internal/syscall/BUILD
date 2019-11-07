@@ -11,6 +11,7 @@ go_library(
     visibility = ["//vendor/google.golang.org/grpc:__subpackages__"],
     deps = select({
         "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
             "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:darwin": [
@@ -20,6 +21,9 @@ go_library(
             "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
+            "//vendor/google.golang.org/grpc/grpclog:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
             "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [

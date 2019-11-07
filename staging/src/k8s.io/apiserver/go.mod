@@ -15,6 +15,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/emicklei/go-restful v2.9.5+incompatible
 	github.com/evanphx/json-patch v4.2.0+incompatible
+	github.com/go-openapi/jsonpointer v0.19.3 // indirect
 	github.com/go-openapi/spec v0.19.2
 	github.com/gogo/protobuf v1.2.2-0.20190723190241-65acae22fc9d
 	github.com/google/go-cmp v0.3.0
@@ -25,15 +26,16 @@ require (
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/hashicorp/golang-lru v0.5.1
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822
+	github.com/pkg/errors v0.8.1 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20171018203845-0dec1b30a021 // indirect
 	github.com/prometheus/client_model v0.0.0-20190129233127-fd36f4220a90
 	github.com/sirupsen/logrus v1.4.2 // indirect
-	github.com/spf13/pflag v1.0.3
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.3.0
 	go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738
 	go.uber.org/zap v1.10.0
-	golang.org/x/crypto v0.0.0-20190611184440-5c40567a22f8
-	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7
+	golang.org/x/crypto v0.0.0-20190820162420-60c769a6c586
+	golang.org/x/net v0.0.0-20191004110552-13f9640d40b9
 	google.golang.org/genproto v0.0.0-20190502173448-54afdca5d873 // indirect
 	google.golang.org/grpc v1.23.1
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
@@ -52,14 +54,8 @@ require (
 )
 
 replace (
-	golang.org/x/crypto => golang.org/x/crypto v0.0.0-20181025213731-e84da0312774
-	golang.org/x/lint => golang.org/x/lint v0.0.0-20181217174547-8f45f776aaf1
-	golang.org/x/net => golang.org/x/net v0.0.0-20190812203447-cdfb69ac37fc
-	golang.org/x/oauth2 => golang.org/x/oauth2 v0.0.0-20190402181905-9f3314589c9a
-	golang.org/x/sync => golang.org/x/sync v0.0.0-20181108010431-42b317875d0f
-	golang.org/x/sys => golang.org/x/sys v0.0.0-20190209173611-3b5209105503
-	golang.org/x/text => golang.org/x/text v0.3.1-0.20181227161524-e6919f6577db
-	golang.org/x/time => golang.org/x/time v0.0.0-20161028155119-f51c12702a4d
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20190813064441-fde4db37ae7a
+	golang.org/x/tools => golang.org/x/tools v0.0.0-20190821162956-65e3620a7ae7
 	k8s.io/api => ../api
 	k8s.io/apimachinery => ../apimachinery
 	k8s.io/apiserver => ../apiserver

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// +build darwin freebsd linux solaris
+// +build aix darwin freebsd linux solaris
 
 package ipv6
 
@@ -13,7 +13,7 @@ import (
 	"golang.org/x/net/internal/socket"
 )
 
-var freebsd32o64 bool
+var compatFreeBSD32 bool // 386 emulation on amd64
 
 func (so *sockOpt) setGroupReq(c *socket.Conn, ifi *net.Interface, grp net.IP) error {
 	var gr groupReq
@@ -22,7 +22,7 @@ func (so *sockOpt) setGroupReq(c *socket.Conn, ifi *net.Interface, grp net.IP) e
 	}
 	gr.setGroup(grp)
 	var b []byte
-	if freebsd32o64 {
+	if compatFreeBSD32 {
 		var d [sizeofGroupReq + 4]byte
 		s := (*[sizeofGroupReq]byte)(unsafe.Pointer(&gr))
 		copy(d[:4], s[:4])
@@ -41,7 +41,7 @@ func (so *sockOpt) setGroupSourceReq(c *socket.Conn, ifi *net.Interface, grp, sr
 	}
 	gsr.setSourceGroup(grp, src)
 	var b []byte
-	if freebsd32o64 {
+	if compatFreeBSD32 {
 		var d [sizeofGroupSourceReq + 4]byte
 		s := (*[sizeofGroupSourceReq]byte)(unsafe.Pointer(&gsr))
 		copy(d[:4], s[:4])
