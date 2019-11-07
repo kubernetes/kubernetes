@@ -1005,6 +1005,7 @@ func TestZeroRequest(t *testing.T) {
 				informerFactory.Core().V1().ReplicationControllers().Lister(),
 				informerFactory.Apps().V1().ReplicaSets().Lister(),
 				informerFactory.Apps().V1().StatefulSets().Lister(),
+				1,
 			)
 
 			metaData := metaDataProducer(test.pod, test.nodes, snapshot)

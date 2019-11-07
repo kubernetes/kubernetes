@@ -514,16 +514,25 @@ func TestInterPodAffinityPriority(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			allNodes := append([]*v1.Node{}, test.nodes...)
 			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
-			interPodAffinity := InterPodAffinity{
-				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+
+			meta := &priorityMetadata{
+				topologyScore: buildTopologyPairToScore(test.pod, snapshot, allNodes, v1.DefaultHardPodAffinitySymmetricWeight),
 			}
-			list, err := interPodAffinity.CalculateInterPodAffinityPriority(test.pod, snapshot, test.nodes)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+			var gotList framework.NodeScoreList
+			for _, n := range test.nodes {
+				nodeName := n.Name
+				nodeScore, err := CalculateInterPodAffinityPriorityMap(test.pod, meta, snapshot.NodeInfoMap[nodeName])
+				if err != nil {
+					t.Error(err)
+				}
+				gotList = append(gotList, nodeScore)
 			}
-			if !reflect.DeepEqual(test.expectedList, list) {
-				t.Errorf("expected \n\t%#v, \ngot \n\t%#v\n", test.expectedList, list)
+
+			CalculateInterPodAffinityPriorityReduce(test.pod, meta, snapshot, gotList)
+			if !reflect.DeepEqual(gotList, test.expectedList) {
+				t.Errorf("CalculateInterPodAffinityPriority() = %#v, want %#v", gotList, test.expectedList)
 			}
 		})
 	}
@@ -601,16 +610,25 @@ func TestHardPodAffinitySymmetricWeight(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			allNodes := append([]*v1.Node{}, test.nodes...)
 			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, test.nodes)
-			ipa := InterPodAffinity{
-				hardPodAffinityWeight: test.hardPodAffinityWeight,
+
+			meta := &priorityMetadata{
+				topologyScore: buildTopologyPairToScore(test.pod, snapshot, allNodes, test.hardPodAffinityWeight),
 			}
-			list, err := ipa.CalculateInterPodAffinityPriority(test.pod, snapshot, test.nodes)
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
+			var gotList framework.NodeScoreList
+			for _, n := range test.nodes {
+				nodeName := n.Name
+				nodeScore, err := CalculateInterPodAffinityPriorityMap(test.pod, meta, snapshot.NodeInfoMap[nodeName])
+				if err != nil {
+					t.Error(err)
+				}
+				gotList = append(gotList, nodeScore)
 			}
-			if !reflect.DeepEqual(test.expectedList, list) {
-				t.Errorf("expected \n\t%#v, \ngot \n\t%#v\n", test.expectedList, list)
+
+			CalculateInterPodAffinityPriorityReduce(test.pod, meta, snapshot, gotList)
+			if !reflect.DeepEqual(gotList, test.expectedList) {
+				t.Errorf("CalculateInterPodAffinityPriority() = %#v, want %#v", gotList, test.expectedList)
 			}
 		})
 	}
@@ -654,16 +672,24 @@ func BenchmarkInterPodAffinityPriority(b *testing.B) {
 		},
 	}
 
-	for _, tt := range tests {
-		b.Run(tt.name, func(b *testing.B) {
-			existingPods, allNodes := tt.prepFunc(tt.existingPodsNum, tt.allNodesNum)
+	for _, test := range tests {
+		b.Run(test.name, func(b *testing.B) {
+			existingPods, allNodes := test.prepFunc(test.existingPodsNum, test.allNodesNum)
 			snapshot := nodeinfosnapshot.NewSnapshot(existingPods, allNodes)
-			interPodAffinity := InterPodAffinity{
-				hardPodAffinityWeight: v1.DefaultHardPodAffinitySymmetricWeight,
+
+			meta := &priorityMetadata{
+				topologyScore: buildTopologyPairToScore(test.pod, snapshot, allNodes, v1.DefaultHardPodAffinitySymmetricWeight),
 			}
 			b.ResetTimer()
+
 			for i := 0; i < b.N; i++ {
-				interPodAffinity.CalculateInterPodAffinityPriority(tt.pod, snapshot, allNodes)
+				var gotList framework.NodeScoreList
+				for _, n := range allNodes {
+					nodeName := n.Name
+					nodeScore, _ := CalculateInterPodAffinityPriorityMap(test.pod, meta, snapshot.NodeInfoMap[nodeName])
+					gotList = append(gotList, nodeScore)
+				}
+				CalculateInterPodAffinityPriorityReduce(test.pod, meta, snapshot, gotList)
 			}
 		})
 	}

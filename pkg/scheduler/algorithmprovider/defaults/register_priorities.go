@@ -27,7 +27,7 @@ func init() {
 	// Register functions that extract metadata used by priorities computations.
 	scheduler.RegisterPriorityMetadataProducerFactory(
 		func(args scheduler.PluginFactoryArgs) priorities.PriorityMetadataProducer {
-			return priorities.NewPriorityMetadataFactory(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister)
+			return priorities.NewPriorityMetadataFactory(args.ServiceLister, args.ControllerLister, args.ReplicaSetLister, args.StatefulSetLister, args.HardPodAffinitySymmetricWeight)
 		})
 
 	// ServiceSpreadingPriority is a priority config factory that spreads pods by minimizing
@@ -66,15 +66,7 @@ func init() {
 	)
 	// pods should be placed in the same topological domain (e.g. same node, same rack, same zone, same power domain, etc.)
 	// as some other pods, or, conversely, should not be placed in the same topological domain as some other pods.
-	scheduler.RegisterPriorityConfigFactory(
-		priorities.InterPodAffinityPriority,
-		scheduler.PriorityConfigFactory{
-			Function: func(args scheduler.PluginFactoryArgs) priorities.PriorityFunction {
-				return priorities.NewInterPodAffinityPriority(args.HardPodAffinitySymmetricWeight)
-			},
-			Weight: 1,
-		},
-	)
+	scheduler.RegisterPriorityMapReduceFunction(priorities.InterPodAffinityPriority, priorities.CalculateInterPodAffinityPriorityMap, priorities.CalculateInterPodAffinityPriorityReduce, 1)
 
 	// Prioritize nodes by least requested utilization.
 	scheduler.RegisterPriorityMapReduceFunction(priorities.LeastRequestedPriority, priorities.LeastRequestedPriorityMap, nil, 1)

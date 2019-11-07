@@ -356,7 +356,9 @@ func TestDefaultPodTopologySpreadScore(t *testing.T) {
 				fakelisters.ServiceLister(test.services),
 				fakelisters.ControllerLister(test.rcs),
 				fakelisters.ReplicaSetLister(test.rss),
-				fakelisters.StatefulSetLister(test.sss))
+				fakelisters.StatefulSetLister(test.sss),
+				1,
+			)
 			metaData := metaDataProducer(test.pod, nodes, snapshot)
 
 			state := framework.NewCycleState()
@@ -612,7 +614,9 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				fakelisters.ServiceLister(test.services),
 				fakelisters.ControllerLister(test.rcs),
 				fakelisters.ReplicaSetLister(test.rss),
-				fakelisters.StatefulSetLister(test.sss))
+				fakelisters.StatefulSetLister(test.sss),
+				1,
+			)
 			metaData := metaDataProducer(test.pod, nodes, snapshot)
 
 			plugin := &DefaultPodTopologySpread{
