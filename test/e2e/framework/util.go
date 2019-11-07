@@ -56,7 +56,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/uuid"
-	utilversion "k8s.io/apimachinery/pkg/util/version"
 	"k8s.io/apimachinery/pkg/util/wait"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/apimachinery/pkg/watch"
@@ -182,9 +181,6 @@ var (
 
 	// AgnHostImage is the image URI of AgnHost
 	AgnHostImage = imageutils.GetE2EImage(imageutils.Agnhost)
-
-	// For parsing Kubectl version for version-skewed testing.
-	gitVersionRegexp = regexp.MustCompile("GitVersion:\"(v.+?)\"")
 
 	// ProvidersWithSSH are those providers where each node is accessible with SSH
 	ProvidersWithSSH = []string{"gce", "gke", "aws", "local"}
@@ -744,19 +740,6 @@ func countEndpointsNum(e *v1.Endpoints) int {
 		num += len(sub.Addresses)
 	}
 	return num
-}
-
-// KubectlVersion gets the version of kubectl that's currently being used (see
-// --kubectl-path in e2e.go to use an alternate kubectl).
-func KubectlVersion() (*utilversion.Version, error) {
-	output := RunKubectlOrDie("version", "--client")
-	matches := gitVersionRegexp.FindStringSubmatch(output)
-	if len(matches) != 2 {
-		return nil, fmt.Errorf("Could not find kubectl version in output %v", output)
-	}
-	// Don't use the full match, as it contains "GitVersion:\"" and a
-	// trailing "\"".  Just use the submatch.
-	return utilversion.ParseSemantic(matches[1])
 }
 
 // restclientConfig returns a config holds the information needed to build connection to kubernetes clusters.
