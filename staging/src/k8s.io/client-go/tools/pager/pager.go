@@ -87,7 +87,11 @@ func (p *ListPager) List(ctx context.Context, options metav1.ListOptions) (runti
 
 		obj, err := p.PageFn(ctx, options)
 		if err != nil {
-			if !errors.IsResourceExpired(err) || !p.FullListIfExpired {
+			// Only fallback to full list if an "Expired" errors is returned, FullListIfExpired is true, and
+			// the "Expired" error occurred in page 2 or later (since full list is intended to prevent a pager.List from
+			// failing when the resource versions is established by the first page request falls out of the compaction
+			// during the subsequent list requests).
+			if !errors.IsResourceExpired(err) || !p.FullListIfExpired || options.Continue == "" {
 				return nil, err
 			}
 			// the list expired while we were processing, fall back to a full list
