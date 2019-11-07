@@ -19,13 +19,13 @@ entries="aarch64 aarch64_be alpha arm armeb hppa m68k microblaze microblazeel mi
 if [ "${1}" = "--reset" ]; then
     shift
     (
-    cd /proc/sys/fs/binfmt_misc
+    cd /proc/sys/fs/binfmt_misc || exit
     for file in $entries; do
-        if [ -f qemu-${file} ]; then
-            echo -1 > qemu-${file}
+        if [ -f "qemu-${file}" ]; then
+            echo -1 > "qemu-${file}"
         fi
     done
     )
 fi
 
-exec $(dirname "${BASH_SOURCE}")/qemu-binfmt-conf.sh --qemu-path="${QEMU_BIN_DIR}" $@
+exec $(dirname "${BASH_SOURCE[0]}")/qemu-binfmt-conf.sh --qemu-path="${QEMU_BIN_DIR}" "$@"
