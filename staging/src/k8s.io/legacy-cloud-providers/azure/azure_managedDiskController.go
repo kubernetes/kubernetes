@@ -185,6 +185,10 @@ func (c *ManagedDiskController) DeleteManagedDisk(diskURI string) error {
 	ctx, cancel := getContextWithCancel()
 	defer cancel()
 
+	if _, ok := c.common.diskAttachDetachMap.Load(strings.ToLower(diskURI)); ok {
+		return fmt.Errorf("failed to delete disk(%s) since it's in attaching or detaching state", diskURI)
+	}
+
 	_, err = c.common.cloud.DisksClient.Delete(ctx, resourceGroup, diskName)
 	if err != nil {
 		return err
