@@ -1143,7 +1143,7 @@ func (nc *Controller) tryUpdateNodeHealth(node *v1.Node) (time.Duration, v1.Node
 					LastTransitionTime: nowTimestamp,
 				})
 			} else {
-				klog.V(4).Infof("node %v hasn't been updated for %+v. Last %v is: %+v",
+				klog.V(2).Infof("node %v hasn't been updated for %+v. Last %v is: %+v",
 					node.Name, nc.now().Time.Sub(nodeHealth.probeTimestamp.Time), nodeConditionType, currentCondition)
 				if currentCondition.Status != v1.ConditionUnknown {
 					currentCondition.Status = v1.ConditionUnknown
