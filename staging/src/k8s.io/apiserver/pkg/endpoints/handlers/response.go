@@ -94,7 +94,7 @@ func optionsForTransform(mediaType negotiation.MediaTypeOptions, req *http.Reque
 	case target == nil:
 	case target.Kind == "Table" && (target.GroupVersion() == metav1beta1.SchemeGroupVersion || target.GroupVersion() == metav1.SchemeGroupVersion):
 		opts := &metav1beta1.TableOptions{}
-		if err := metav1beta1.ParameterCodec.DecodeParameters(req.URL.Query(), metav1beta1.SchemeGroupVersion, opts); err != nil {
+		if err := metainternalversionscheme.ParameterCodec.DecodeParameters(req.URL.Query(), metav1beta1.SchemeGroupVersion, opts); err != nil {
 			return nil, err
 		}
 		switch errs := validation.ValidateTableOptions(opts); len(errs) {
