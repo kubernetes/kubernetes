@@ -148,7 +148,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"TestServiceAntiAffinity",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -204,7 +203,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"TestServiceAntiAffinity",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -269,7 +267,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -337,7 +334,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -416,7 +412,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -506,7 +501,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -597,7 +591,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -692,7 +685,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -799,7 +791,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -908,7 +899,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -1017,7 +1007,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -1131,7 +1120,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"TestServiceAffinity",
 			),
 			wantPrioritizers: sets.NewString(
-				"EqualPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{

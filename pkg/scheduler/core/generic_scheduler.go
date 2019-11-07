@@ -718,16 +718,15 @@ func (g *genericScheduler) prioritizeNodes(
 	meta interface{},
 	nodes []*v1.Node,
 ) (framework.NodeScoreList, error) {
-	// If no priority configs are provided, then the EqualPriority function is applied
+	// If no priority configs are provided, then all nodes will have a score of one.
 	// This is required to generate the priority list in the required format
 	if len(g.prioritizers) == 0 && len(g.extenders) == 0 && !g.framework.HasScorePlugins() {
 		result := make(framework.NodeScoreList, 0, len(nodes))
 		for i := range nodes {
-			hostPriority, err := EqualPriorityMap(pod, meta, g.nodeInfoSnapshot.NodeInfoMap[nodes[i].Name])
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, hostPriority)
+			result = append(result, framework.NodeScore{
+				Name:  nodes[i].Name,
+				Score: 1,
+			})
 		}
 		return result, nil
 	}
@@ -875,18 +874,6 @@ func (g *genericScheduler) prioritizeNodes(
 		}
 	}
 	return result, nil
-}
-
-// EqualPriorityMap is a prioritizer function that gives an equal weight of one to all nodes
-func EqualPriorityMap(_ *v1.Pod, _ interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
-	node := nodeInfo.Node()
-	if node == nil {
-		return framework.NodeScore{}, fmt.Errorf("node not found")
-	}
-	return framework.NodeScore{
-		Name:  node.Name,
-		Score: 1,
-	}, nil
 }
 
 // pickOneNodeForPreemption chooses one node among the given nodes. It assumes
