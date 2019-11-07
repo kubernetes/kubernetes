@@ -130,61 +130,6 @@ func LogClusterImageSources() {
 	}
 }
 
-// CreateManagedInstanceGroup creates a Compute Engine managed instance group.
-func CreateManagedInstanceGroup(size int64, zone, template string) error {
-	// TODO(verult): make this hit the compute API directly instead of
-	// shelling out to gcloud.
-	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
-		"create",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		fmt.Sprintf("--zone=%s", zone),
-		TestContext.CloudConfig.NodeInstanceGroup,
-		fmt.Sprintf("--size=%d", size),
-		fmt.Sprintf("--template=%s", template))
-	if err != nil {
-		return fmt.Errorf("gcloud compute instance-groups managed create call failed with err: %v", err)
-	}
-	return nil
-}
-
-// GetManagedInstanceGroupTemplateName returns the list of Google Compute Engine managed instance groups.
-func GetManagedInstanceGroupTemplateName(zone string) (string, error) {
-	// TODO(verult): make this hit the compute API directly instead of
-	// shelling out to gcloud. Use InstanceGroupManager to get Instance Template name.
-
-	stdout, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
-		"list",
-		fmt.Sprintf("--filter=name:%s", TestContext.CloudConfig.NodeInstanceGroup),
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		fmt.Sprintf("--zones=%s", zone),
-	)
-
-	if err != nil {
-		return "", fmt.Errorf("gcloud compute instance-groups managed list call failed with err: %v", err)
-	}
-
-	templateName, err := parseInstanceTemplateName(stdout)
-	if err != nil {
-		return "", fmt.Errorf("error parsing gcloud output: %v", err)
-	}
-	return templateName, nil
-}
-
-// DeleteManagedInstanceGroup deletes Google Compute Engine managed instance group.
-func DeleteManagedInstanceGroup(zone string) error {
-	// TODO(verult): make this hit the compute API directly instead of
-	// shelling out to gcloud.
-	_, _, err := retryCmd("gcloud", "compute", "instance-groups", "managed",
-		"delete",
-		fmt.Sprintf("--project=%s", TestContext.CloudConfig.ProjectID),
-		fmt.Sprintf("--zone=%s", zone),
-		TestContext.CloudConfig.NodeInstanceGroup)
-	if err != nil {
-		return fmt.Errorf("gcloud compute instance-groups managed delete call failed with err: %v", err)
-	}
-	return nil
-}
-
 func parseInstanceTemplateName(gcloudOutput string) (string, error) {
 	const templateNameField = "INSTANCE_TEMPLATE"
 
