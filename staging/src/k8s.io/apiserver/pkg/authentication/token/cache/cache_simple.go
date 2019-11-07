@@ -17,22 +17,25 @@ limitations under the License.
 package cache
 
 import (
+	"context"
 	"time"
 
-	lrucache "k8s.io/apimachinery/pkg/util/cache"
+	utilcache "k8s.io/apimachinery/pkg/util/cache"
 	"k8s.io/apimachinery/pkg/util/clock"
 )
 
 type simpleCache struct {
-	lru *lrucache.LRUExpireCache
+	cache *utilcache.Expiring
 }
 
-func newSimpleCache(size int, clock clock.Clock) cache {
-	return &simpleCache{lru: lrucache.NewLRUExpireCacheWithClock(size, clock)}
+func newSimpleCache(ctx context.Context, clock clock.Clock) cache {
+	c := &simpleCache{cache: utilcache.NewExpiringWithClock(clock)}
+	go c.cache.Run(ctx)
+	return c
 }
 
 func (c *simpleCache) get(key string) (*cacheRecord, bool) {
-	record, ok := c.lru.Get(key)
+	record, ok := c.cache.Get(key)
 	if !ok {
 		return nil, false
 	}
@@ -41,9 +44,9 @@ func (c *simpleCache) get(key string) (*cacheRecord, bool) {
 }
 
 func (c *simpleCache) set(key string, value *cacheRecord, ttl time.Duration) {
-	c.lru.Add(key, value, ttl)
+	c.cache.Set(key, value, ttl)
 }
 
 func (c *simpleCache) remove(key string) {
-	c.lru.Remove(key)
+	c.cache.Delete(key)
 }

@@ -170,7 +170,7 @@ func (m *mockV1Service) HTTPStatusCode() int { return m.statusCode }
 
 // newV1TokenAuthenticator creates a temporary kubeconfig file from the provided
 // arguments and attempts to load a new WebhookTokenAuthenticator from it.
-func newV1TokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, implicitAuds authenticator.Audiences) (authenticator.Token, error) {
+func newV1TokenAuthenticator(ctx context.Context, serverURL string, clientCert, clientKey, ca []byte, cacheTime time.Duration, implicitAuds authenticator.Audiences) (authenticator.Token, error) {
 	tempfile, err := ioutil.TempFile("", "")
 	if err != nil {
 		return nil, err
@@ -203,7 +203,7 @@ func newV1TokenAuthenticator(serverURL string, clientCert, clientKey, ca []byte,
 		return nil, err
 	}
 
-	return cache.New(authn, false, cacheTime, cacheTime), nil
+	return cache.New(ctx, authn, false, cacheTime, cacheTime), nil
 }
 
 func TestV1TLSConfig(t *testing.T) {
@@ -259,7 +259,10 @@ func TestV1TLSConfig(t *testing.T) {
 			}
 			defer server.Close()
 
-			wh, err := newV1TokenAuthenticator(server.URL, tt.clientCert, tt.clientKey, tt.clientCA, 0, nil)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			wh, err := newV1TokenAuthenticator(ctx, server.URL, tt.clientCert, tt.clientKey, tt.clientCA, 0, nil)
 			if err != nil {
 				t.Errorf("%s: failed to create client: %v", tt.test, err)
 				return
@@ -482,12 +485,14 @@ func TestV1WebhookTokenAuthenticator(t *testing.T) {
 	token := "my-s3cr3t-t0ken"
 	for _, tt := range tests {
 		t.Run(tt.description, func(t *testing.T) {
-			wh, err := newV1TokenAuthenticator(s.URL, clientCert, clientKey, caCert, 0, tt.implicitAuds)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			wh, err := newV1TokenAuthenticator(ctx, s.URL, clientCert, clientKey, caCert, 0, tt.implicitAuds)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ctx := context.Background()
 			if tt.reqAuds != nil {
 				ctx = authenticator.WithAudiences(ctx, tt.reqAuds)
 			}
@@ -554,8 +559,11 @@ func TestV1WebhookCacheAndRetry(t *testing.T) {
 	}
 	defer s.Close()
 
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// Create an authenticator that caches successful responses "forever" (100 days).
-	wh, err := newV1TokenAuthenticator(s.URL, clientCert, clientKey, caCert, 2400*time.Hour, nil)
+	wh, err := newV1TokenAuthenticator(ctx, s.URL, clientCert, clientKey, caCert, 2400*time.Hour, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
