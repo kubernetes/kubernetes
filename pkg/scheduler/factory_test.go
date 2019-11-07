@@ -50,7 +50,6 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -83,8 +82,8 @@ func TestCreateFromConfig(t *testing.T) {
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
 	RegisterFitPredicate("PredicateTwo", PredicateFunc)
-	RegisterPriorityFunction("PriorityOne", PriorityFunc, 1)
-	RegisterPriorityFunction("PriorityTwo", PriorityFunc, 1)
+	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
+	RegisterPriorityMapReduceFunction("PriorityTwo", PriorityFunc, nil, 1)
 
 	configData = []byte(`{
 		"kind" : "Policy",
@@ -169,8 +168,8 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
 	RegisterFitPredicate("PredicateTwo", PredicateFunc)
-	RegisterPriorityFunction("PriorityOne", PriorityFunc, 1)
-	RegisterPriorityFunction("PriorityTwo", PriorityFunc, 1)
+	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
+	RegisterPriorityMapReduceFunction("PriorityTwo", PriorityFunc, nil, 1)
 
 	configData = []byte(`{
 		"kind" : "Policy",
@@ -225,7 +224,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
-	RegisterPriorityFunction("PriorityOne", PriorityFunc, 1)
+	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
 
 	RegisterAlgorithmProvider(DefaultProvider, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
@@ -260,7 +259,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
-	RegisterPriorityFunction("PriorityOne", PriorityFunc, 1)
+	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
 
 	RegisterAlgorithmProvider(DefaultProvider, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
@@ -291,8 +290,8 @@ func PredicateFunc(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *sch
 	return true, nil, nil
 }
 
-func PriorityFunc(pod *v1.Pod, sharedLister schedulerlisters.SharedLister, nodes []*v1.Node) (framework.NodeScoreList, error) {
-	return []framework.NodeScore{}, nil
+func PriorityFunc(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
+	return framework.NodeScore{}, nil
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
@@ -782,9 +781,9 @@ func TestCreateWithFrameworkPlugins(t *testing.T) {
 	RegisterFitPredicate(predicateTwoName, PredicateFunc)
 	RegisterFitPredicate(predicateThreeName, PredicateFunc)
 	RegisterMandatoryFitPredicate(predicateFourName, PredicateFunc)
-	RegisterPriorityFunction(priorityOneName, PriorityFunc, 1)
-	RegisterPriorityFunction(priorityTwoName, PriorityFunc, 1)
-	RegisterPriorityFunction(priorityThreeName, PriorityFunc, 1)
+	RegisterPriorityMapReduceFunction(priorityOneName, PriorityFunc, nil, 1)
+	RegisterPriorityMapReduceFunction(priorityTwoName, PriorityFunc, nil, 1)
+	RegisterPriorityMapReduceFunction(priorityThreeName, PriorityFunc, nil, 1)
 
 	configData = []byte(`{
 		"kind" : "Policy",

@@ -744,35 +744,13 @@ func (g *genericScheduler) prioritizeNodes(
 
 	results := make([]framework.NodeScoreList, len(g.prioritizers))
 
-	// DEPRECATED: we can remove this when all priorityConfigs implement the
-	// Map-Reduce pattern.
 	for i := range g.prioritizers {
-		if g.prioritizers[i].Function != nil {
-			wg.Add(1)
-			go func(index int) {
-				metrics.SchedulerGoroutines.WithLabelValues("prioritizing_legacy").Inc()
-				defer func() {
-					metrics.SchedulerGoroutines.WithLabelValues("prioritizing_legacy").Dec()
-					wg.Done()
-				}()
-				var err error
-				results[index], err = g.prioritizers[index].Function(pod, g.nodeInfoSnapshot, nodes)
-				if err != nil {
-					appendError(err)
-				}
-			}(i)
-		} else {
-			results[i] = make(framework.NodeScoreList, len(nodes))
-		}
+		results[i] = make(framework.NodeScoreList, len(nodes))
 	}
 
 	workqueue.ParallelizeUntil(context.TODO(), 16, len(nodes), func(index int) {
 		nodeInfo := g.nodeInfoSnapshot.NodeInfoMap[nodes[index].Name]
 		for i := range g.prioritizers {
-			if g.prioritizers[i].Function != nil {
-				continue
-			}
-
 			var err error
 			results[i][index], err = g.prioritizers[i].Map(pod, meta, nodeInfo)
 			if err != nil {
