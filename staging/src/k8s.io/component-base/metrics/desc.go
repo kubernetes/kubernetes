@@ -18,6 +18,7 @@ package metrics
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/blang/semver"
@@ -155,4 +156,17 @@ func (d *Desc) initialize() {
 func (d *Desc) initializeDeprecatedDesc() {
 	d.markDeprecated()
 	d.initialize()
+}
+
+// GetRawDesc will returns a new *Desc with original parameters provided to NewDesc().
+//
+// It will be useful in testing scenario that the same Desc be registered to different registry.
+//   1. Desc `D` is registered to registry 'A' in TestA (Note: `D` maybe created)
+//   2. Desc `D` is registered to registry 'B' in TestB (Note: since 'D' has been created once, thus will be ignored by registry 'B')
+func (d *Desc) GetRawDesc() *Desc {
+	// remove stability from help if any
+	stabilityStr := fmt.Sprintf("[%v] ", d.stabilityLevel)
+	rawHelp := strings.Replace(d.help, stabilityStr, "", -1)
+
+	return NewDesc(d.fqName, rawHelp, d.variableLabels, d.constLabels, d.stabilityLevel, d.deprecatedVersion)
 }
