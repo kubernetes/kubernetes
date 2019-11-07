@@ -58,7 +58,6 @@ import (
 	"k8s.io/kubernetes/pkg/controller/nodelifecycle/scheduler"
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
-	kubefeatures "k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
@@ -884,12 +883,12 @@ const labelNodeDisruptionExclusion = "node.kubernetes.io/exclude-disruption"
 
 func isNodeExcludedFromDisruptionChecks(node *v1.Node) bool {
 	// DEPRECATED: will be removed in 1.19
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.LegacyNodeRoleBehavior) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.LegacyNodeRoleBehavior) {
 		if legacyIsMasterNode(node.Name) {
 			return true
 		}
 	}
-	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.NodeDisruptionExclusion) {
+	if utilfeature.DefaultFeatureGate.Enabled(features.NodeDisruptionExclusion) {
 		if _, ok := node.Labels[labelNodeDisruptionExclusion]; ok {
 			return true
 		}

@@ -65,8 +65,6 @@ type Controller struct {
 	nodeInformerSynced cache.InformerSynced
 
 	cidrAllocator ipam.CIDRAllocator
-
-	forcefullyDeletePod func(*v1.Pod) error
 }
 
 // NewNodeIpamController returns a new node IP Address Management controller to
