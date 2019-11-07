@@ -36,7 +36,7 @@ func New(auth authenticator.Password) *Authenticator {
 var errInvalidAuth = errors.New("invalid username/password combination")
 
 // AuthenticateRequest authenticates the request using the "Authorization: Basic" header in the request
-func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 	username, password, found := req.BasicAuth()
 	if !found {
 		return nil, false, nil
@@ -46,7 +46,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 
 	// If the password authenticator didn't error, provide a default error
 	if !ok && err == nil {
-		err = errInvalidAuth
+		err = &authenticator.AuthError{AuthenticatorID: "basic-auth", Err: errInvalidAuth}
 	}
 
 	return resp, ok, err

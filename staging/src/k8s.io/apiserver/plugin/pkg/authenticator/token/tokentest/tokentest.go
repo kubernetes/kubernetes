@@ -33,7 +33,7 @@ func New() *TokenAuthenticator {
 	}
 }
 
-func (a *TokenAuthenticator) AuthenticateToken(ctx context.Context, value string) (*authenticator.Response, bool, error) {
+func (a *TokenAuthenticator) AuthenticateToken(ctx context.Context, value string) (*authenticator.Response, bool, *authenticator.AuthError) {
 	user, ok := a.Tokens[value]
 	if !ok {
 		return nil, false, nil

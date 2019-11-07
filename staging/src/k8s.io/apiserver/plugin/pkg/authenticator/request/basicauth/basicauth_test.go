@@ -33,10 +33,10 @@ type testPassword struct {
 
 	User user.Info
 	OK   bool
-	Err  error
+	Err  *authenticator.AuthError
 }
 
-func (t *testPassword) AuthenticatePassword(ctx context.Context, user, password string) (*authenticator.Response, bool, error) {
+func (t *testPassword) AuthenticatePassword(ctx context.Context, user, password string) (*authenticator.Response, bool, *authenticator.AuthError) {
 	t.Called = true
 	t.Username = user
 	t.Password = password
@@ -78,7 +78,7 @@ func TestBasicAuth(t *testing.T) {
 			ExpectedOK:       true,
 		},
 		"password auth returned error": {
-			Password:         testPassword{Err: errors.New("auth error")},
+			Password:         testPassword{Err: &authenticator.AuthError{AuthenticatorID: "basic-aith", Err: errors.New("auth error")}},
 			ExpectedCalled:   true,
 			ExpectedUsername: "myuser",
 			ExpectedPassword: "mypw",

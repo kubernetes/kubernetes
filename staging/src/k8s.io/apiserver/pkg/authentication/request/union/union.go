@@ -50,7 +50,7 @@ func NewFailOnError(authRequestHandlers ...authenticator.Request) authenticator.
 }
 
 // AuthenticateRequest authenticates the request using a chain of authenticator.Request objects.
-func (authHandler *unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+func (authHandler *unionAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 	var errlist []error
 	for _, currAuthRequestHandler := range authHandler.Handlers {
 		resp, ok, err := currAuthRequestHandler.AuthenticateRequest(req)
@@ -67,5 +67,5 @@ func (authHandler *unionAuthRequestHandler) AuthenticateRequest(req *http.Reques
 		}
 	}
 
-	return nil, false, utilerrors.NewAggregate(errlist)
+	return nil, false, &authenticator.AuthError{AuthenticatorID: "union", Err: utilerrors.NewAggregate(errlist)}
 }

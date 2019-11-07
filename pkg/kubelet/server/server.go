@@ -247,9 +247,9 @@ func NewServer(
 func (s *Server) InstallAuthFilter() {
 	s.restfulCont.Filter(func(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
 		// Authenticate
-		info, ok, err := s.auth.AuthenticateRequest(req.Request)
-		if err != nil {
-			klog.Errorf("Unable to authenticate the request due to an error: %v", err)
+		info, ok, authErr := s.auth.AuthenticateRequest(req.Request)
+		if authErr != nil {
+			klog.Errorf("Unable to authenticate the request due to an error: %v", authErr)
 			resp.WriteErrorString(http.StatusUnauthorized, "Unauthorized")
 			return
 		}
@@ -262,10 +262,10 @@ func (s *Server) InstallAuthFilter() {
 		attrs := s.auth.GetRequestAttributes(info.User, req.Request)
 
 		// Authorize
-		decision, _, err := s.auth.Authorize(req.Request.Context(), attrs)
-		if err != nil {
+		decision, _, authzErr := s.auth.Authorize(req.Request.Context(), attrs)
+		if authzErr != nil {
 			msg := fmt.Sprintf("Authorization error (user=%s, verb=%s, resource=%s, subresource=%s)", attrs.GetUser().GetName(), attrs.GetVerb(), attrs.GetResource(), attrs.GetSubresource())
-			klog.Errorf(msg, err)
+			klog.Errorf(msg, authzErr)
 			resp.WriteErrorString(http.StatusInternalServerError, msg)
 			return
 		}

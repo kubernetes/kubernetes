@@ -28,7 +28,7 @@ import (
 )
 
 func TestAuthenticateRequest(t *testing.T) {
-	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 		if token != "token" {
 			t.Errorf("unexpected token: %s", token)
 		}
@@ -43,7 +43,7 @@ func TestAuthenticateRequest(t *testing.T) {
 }
 
 func TestAuthenticateRequestTokenInvalid(t *testing.T) {
-	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 		return nil, false, nil
 	}))
 	resp, ok, err := auth.AuthenticateRequest(&http.Request{
@@ -58,8 +58,8 @@ func TestAuthenticateRequestTokenInvalid(t *testing.T) {
 }
 
 func TestAuthenticateRequestTokenInvalidCustomError(t *testing.T) {
-	customError := errors.New("custom")
-	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	customError := &authenticator.AuthError{AuthenticatorID: "bearer-token", Err: errors.New("custom")}
+	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 		return nil, false, customError
 	}))
 	resp, ok, err := auth.AuthenticateRequest(&http.Request{
@@ -74,8 +74,8 @@ func TestAuthenticateRequestTokenInvalidCustomError(t *testing.T) {
 }
 
 func TestAuthenticateRequestTokenError(t *testing.T) {
-	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
-		return nil, false, errors.New("error")
+	auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
+		return nil, false, &authenticator.AuthError{AuthenticatorID: "bearer-token", Err: errors.New("error")}
 	}))
 	resp, ok, err := auth.AuthenticateRequest(&http.Request{
 		Header: http.Header{"Authorization": []string{"Bearer token"}},
@@ -95,7 +95,7 @@ func TestAuthenticateRequestBadValue(t *testing.T) {
 		{Req: &http.Request{Header: http.Header{"Authorization": []string{"Bearer: token"}}}},
 	}
 	for i, testCase := range testCases {
-		auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+		auth := New(authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 			t.Errorf("authentication should not have been called")
 			return nil, false, nil
 		}))
@@ -146,7 +146,7 @@ func TestBearerToken(t *testing.T) {
 		},
 		"valid bearer token removing header": {
 			AuthorizationHeaders: []string{"Bearer 123"},
-			TokenAuth: authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, error) {
+			TokenAuth: authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, *authenticator.AuthError) {
 				return &authenticator.Response{User: &user.DefaultInfo{Name: "myuser"}}, true, nil
 			}),
 			ExpectedUserName:             "myuser",
@@ -155,8 +155,10 @@ func TestBearerToken(t *testing.T) {
 			ExpectedAuthorizationHeaders: nil,
 		},
 		"invalid bearer token": {
-			AuthorizationHeaders:         []string{"Bearer 123"},
-			TokenAuth:                    authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, error) { return nil, false, nil }),
+			AuthorizationHeaders: []string{"Bearer 123"},
+			TokenAuth: authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, *authenticator.AuthError) {
+				return nil, false, nil
+			}),
 			ExpectedUserName:             "",
 			ExpectedOK:                   false,
 			ExpectedErr:                  true,
@@ -164,8 +166,8 @@ func TestBearerToken(t *testing.T) {
 		},
 		"error bearer token": {
 			AuthorizationHeaders: []string{"Bearer 123"},
-			TokenAuth: authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, error) {
-				return nil, false, errors.New("error")
+			TokenAuth: authenticator.TokenFunc(func(ctx context.Context, t string) (*authenticator.Response, bool, *authenticator.AuthError) {
+				return nil, false, &authenticator.AuthError{AuthenticatorID: "bearer-token", Err: errors.New("error")}
 			}),
 			ExpectedUserName:             "",
 			ExpectedOK:                   false,

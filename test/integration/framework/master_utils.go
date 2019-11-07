@@ -75,7 +75,7 @@ func (alwaysAllow) Authorize(ctx context.Context, requestAttributes authorizer.A
 }
 
 // alwaysEmpty simulates "no authentication" for old tests
-func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, error) {
+func alwaysEmpty(req *http.Request) (*authauthenticator.Response, bool, *authauthenticator.AuthError) {
 	return &authauthenticator.Response{
 		User: &user.DefaultInfo{
 			Name: "",

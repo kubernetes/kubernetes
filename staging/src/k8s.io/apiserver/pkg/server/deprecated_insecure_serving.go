@@ -82,7 +82,7 @@ func (s *DeprecatedInsecureServingInfo) NewLoopbackClientConfig() (*rest.Config,
 // but allows apiserver code to stop special-casing a nil user to skip authorization checks.
 type InsecureSuperuser struct{}
 
-func (InsecureSuperuser) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+func (InsecureSuperuser) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 	auds, _ := authenticator.AudiencesFrom(req.Context())
 	return &authenticator.Response{
 		User: &user.DefaultInfo{

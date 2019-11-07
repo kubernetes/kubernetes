@@ -74,7 +74,7 @@ func newWithBackoff(tokenReview authenticationclient.TokenReviewInterface, initi
 }
 
 // AuthenticateToken implements the authenticator.Token interface.
-func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 	// We take implicit audiences of the API server at WebhookTokenAuthenticator
 	// construction time. The outline of how we validate audience here is:
 	//
@@ -105,7 +105,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 	if err != nil {
 		// An error here indicates bad configuration or an outage. Log for debugging.
 		klog.Errorf("Failed to make webhook authenticator request: %v", err)
-		return nil, false, err
+		return nil, false, &authenticator.AuthError{AuthenticatorID: "webhook", Err: err}
 	}
 
 	if checkAuds {
@@ -125,7 +125,7 @@ func (w *WebhookTokenAuthenticator) AuthenticateToken(ctx context.Context, token
 		if len(r.Status.Error) != 0 {
 			err = errors.New(r.Status.Error)
 		}
-		return nil, false, err
+		return nil, false, &authenticator.AuthError{AuthenticatorID: "webhook", Err: err}
 	}
 
 	var extra map[string][]string

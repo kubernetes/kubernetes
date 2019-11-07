@@ -18,6 +18,7 @@ package authenticator
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"k8s.io/apiserver/pkg/authentication/user"
@@ -26,43 +27,43 @@ import (
 // Token checks a string value against a backing authentication store and
 // returns a Response or an error if the token could not be checked.
 type Token interface {
-	AuthenticateToken(ctx context.Context, token string) (*Response, bool, error)
+	AuthenticateToken(ctx context.Context, token string) (*Response, bool, *AuthError)
 }
 
 // Request attempts to extract authentication information from a request and
 // returns a Response or an error if the request could not be checked.
 type Request interface {
-	AuthenticateRequest(req *http.Request) (*Response, bool, error)
+	AuthenticateRequest(req *http.Request) (*Response, bool, *AuthError)
 }
 
 // Password checks a username and password against a backing authentication
 // store and returns a Response or an error if the password could not be
 // checked.
 type Password interface {
-	AuthenticatePassword(ctx context.Context, user, password string) (*Response, bool, error)
+	AuthenticatePassword(ctx context.Context, user, password string) (*Response, bool, *AuthError)
 }
 
 // TokenFunc is a function that implements the Token interface.
-type TokenFunc func(ctx context.Context, token string) (*Response, bool, error)
+type TokenFunc func(ctx context.Context, token string) (*Response, bool, *AuthError)
 
 // AuthenticateToken implements authenticator.Token.
-func (f TokenFunc) AuthenticateToken(ctx context.Context, token string) (*Response, bool, error) {
+func (f TokenFunc) AuthenticateToken(ctx context.Context, token string) (*Response, bool, *AuthError) {
 	return f(ctx, token)
 }
 
 // RequestFunc is a function that implements the Request interface.
-type RequestFunc func(req *http.Request) (*Response, bool, error)
+type RequestFunc func(req *http.Request) (*Response, bool, *AuthError)
 
 // AuthenticateRequest implements authenticator.Request.
-func (f RequestFunc) AuthenticateRequest(req *http.Request) (*Response, bool, error) {
+func (f RequestFunc) AuthenticateRequest(req *http.Request) (*Response, bool, *AuthError) {
 	return f(req)
 }
 
 // PasswordFunc is a function that implements the Password interface.
-type PasswordFunc func(ctx context.Context, user, password string) (*Response, bool, error)
+type PasswordFunc func(ctx context.Context, user, password string) (*Response, bool, *AuthError)
 
 // AuthenticatePassword implements authenticator.Password.
-func (f PasswordFunc) AuthenticatePassword(ctx context.Context, user, password string) (*Response, bool, error) {
+func (f PasswordFunc) AuthenticatePassword(ctx context.Context, user, password string) (*Response, bool, *AuthError) {
 	return f(ctx, user, password)
 }
 
@@ -77,4 +78,17 @@ type Response struct {
 	Audiences Audiences
 	// User is the UserInfo associated with the authentication context.
 	User user.Info
+}
+
+// AuthError is the error returned by an authenticator upon failures.
+type AuthError struct {
+	// Err is the error produced by an authenticator.
+	Err error
+	// AuthenticatorID identifies the authenticator that failed an authentication request.
+	AuthenticatorID string
+}
+
+// Error implements the Error interface.
+func (a *AuthError) Error() string {
+	return fmt.Sprintf("authenticator: %q failed to process authentication request: err: %v", a.AuthenticatorID, a.Err)
 }

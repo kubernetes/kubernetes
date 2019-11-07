@@ -47,7 +47,7 @@ func (sarAuthorizer) Authorize(ctx context.Context, a authorizer.Attributes) (au
 	return authorizer.DecisionAllow, "you're not dave", nil
 }
 
-func alwaysAlice(req *http.Request) (*authenticator.Response, bool, error) {
+func alwaysAlice(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 	return &authenticator.Response{
 		User: &user.DefaultInfo{
 			Name: "alice",
@@ -148,7 +148,7 @@ func TestSubjectAccessReview(t *testing.T) {
 func TestSelfSubjectAccessReview(t *testing.T) {
 	username := "alice"
 	masterConfig := framework.NewIntegrationTestMasterConfig()
-	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+	masterConfig.GenericConfig.Authentication.Authenticator = authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 		return &authenticator.Response{
 			User: &user.DefaultInfo{Name: username},
 		}, true, nil

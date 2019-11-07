@@ -71,14 +71,14 @@ func init() {
 
 // UserConversion defines an interface for extracting user info from a client certificate chain
 type UserConversion interface {
-	User(chain []*x509.Certificate) (*authenticator.Response, bool, error)
+	User(chain []*x509.Certificate) (*authenticator.Response, bool, *authenticator.AuthError)
 }
 
 // UserConversionFunc is a function that implements the UserConversion interface.
-type UserConversionFunc func(chain []*x509.Certificate) (*authenticator.Response, bool, error)
+type UserConversionFunc func(chain []*x509.Certificate) (*authenticator.Response, bool, *authenticator.AuthError)
 
 // User implements x509.UserConversion
-func (f UserConversionFunc) User(chain []*x509.Certificate) (*authenticator.Response, bool, error) {
+func (f UserConversionFunc) User(chain []*x509.Certificate) (*authenticator.Response, bool, *authenticator.AuthError) {
 	return f(chain)
 }
 
@@ -105,7 +105,7 @@ func NewDynamic(verifyOptionsFn VerifyOptionFunc, user UserConversion) *Authenti
 }
 
 // AuthenticateRequest authenticates the request using presented client certificates
-func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 	if req.TLS == nil || len(req.TLS.PeerCertificates) == 0 {
 		return nil, false, nil
 	}
@@ -123,7 +123,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 	clientCertificateExpirationHistogram.Observe(remaining.Seconds())
 	chains, err := req.TLS.PeerCertificates[0].Verify(optsCopy)
 	if err != nil {
-		return nil, false, err
+		return nil, false, &authenticator.AuthError{AuthenticatorID: "x509", Err: err}
 	}
 
 	var errlist []error
@@ -138,7 +138,7 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 			return user, ok, err
 		}
 	}
-	return nil, false, utilerrors.NewAggregate(errlist)
+	return nil, false, &authenticator.AuthError{AuthenticatorID: "x509", Err: utilerrors.NewAggregate(errlist)}
 }
 
 // Verifier implements request.Authenticator by verifying a client cert on the request, then delegating to the wrapped auth
@@ -163,7 +163,7 @@ func NewDynamicCAVerifier(verifyOptionsFn VerifyOptionFunc, auth authenticator.R
 }
 
 // AuthenticateRequest verifies the presented client certificate, then delegates to the wrapped auth
-func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 	if req.TLS == nil || len(req.TLS.PeerCertificates) == 0 {
 		return nil, false, nil
 	}
@@ -178,10 +178,10 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 	}
 
 	if _, err := req.TLS.PeerCertificates[0].Verify(optsCopy); err != nil {
-		return nil, false, err
+		return nil, false, &authenticator.AuthError{AuthenticatorID: "x509", Err: err}
 	}
 	if err := a.verifySubject(req.TLS.PeerCertificates[0].Subject); err != nil {
-		return nil, false, err
+		return nil, false, &authenticator.AuthError{AuthenticatorID: "x509", Err: err}
 	}
 	return a.auth.AuthenticateRequest(req)
 }
@@ -209,7 +209,7 @@ func DefaultVerifyOptions() x509.VerifyOptions {
 }
 
 // CommonNameUserConversion builds user info from a certificate chain using the subject's CommonName
-var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate) (*authenticator.Response, bool, error) {
+var CommonNameUserConversion = UserConversionFunc(func(chain []*x509.Certificate) (*authenticator.Response, bool, *authenticator.AuthError) {
 	if len(chain[0].Subject.CommonName) == 0 {
 		return nil, false, nil
 	}

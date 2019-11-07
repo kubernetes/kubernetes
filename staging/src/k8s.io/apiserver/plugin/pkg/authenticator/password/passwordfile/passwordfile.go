@@ -81,7 +81,7 @@ func NewCSV(path string) (*PasswordAuthenticator, error) {
 	return &PasswordAuthenticator{users}, nil
 }
 
-func (a *PasswordAuthenticator) AuthenticatePassword(ctx context.Context, username, password string) (*authenticator.Response, bool, error) {
+func (a *PasswordAuthenticator) AuthenticatePassword(ctx context.Context, username, password string) (*authenticator.Response, bool, *authenticator.AuthError) {
 	user, ok := a.users[username]
 	if !ok {
 		return nil, false, nil

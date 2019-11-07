@@ -42,9 +42,9 @@ func TestCachedTokenAuthenticator(t *testing.T) {
 		resultOk    bool
 		resultErr   error
 	)
-	fakeAuth := authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	fakeAuth := authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 		calledWithToken = append(calledWithToken, token)
-		return &authenticator.Response{User: resultUsers[token]}, resultOk, resultErr
+		return &authenticator.Response{User: resultUsers[token]}, resultOk, &authenticator.AuthError{AuthenticatorID: "cached-token", Err: resultErr}
 	})
 	fakeClock := utilclock.NewFakeClock(time.Now())
 
@@ -116,7 +116,7 @@ func TestCachedTokenAuthenticator(t *testing.T) {
 
 func TestCachedTokenAuthenticatorWithAudiences(t *testing.T) {
 	resultUsers := make(map[string]user.Info)
-	fakeAuth := authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+	fakeAuth := authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 		auds, _ := authenticator.AudiencesFrom(ctx)
 		return &authenticator.Response{User: resultUsers[auds[0]+token]}, true, nil
 	})
@@ -242,7 +242,7 @@ func (s *singleBenchmark) makeTokens(count int) {
 	}
 }
 
-func (s *singleBenchmark) lookup(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+func (s *singleBenchmark) lookup(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 	<-s.chokepoint
 	defer func() { s.chokepoint <- struct{}{} }()
 	time.Sleep(1 * time.Millisecond)
@@ -250,7 +250,7 @@ func (s *singleBenchmark) lookup(ctx context.Context, token string) (*authentica
 	if !ok {
 		panic("test setup problem")
 	}
-	return r.resp, r.ok, r.err
+	return r.resp, r.ok, &authenticator.AuthError{AuthenticatorID: "cached-token", Err: r.err}
 }
 
 // To prevent contention over a channel, and to minimize the case where some

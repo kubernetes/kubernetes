@@ -89,7 +89,7 @@ func tokenErrorf(s *corev1.Secret, format string, i ...interface{}) {
 //
 //     ( token-id ).( token-secret )
 //
-func (t *TokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+func (t *TokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 	tokenID, tokenSecret, err := bootstraptokenutil.ParseToken(token)
 	if err != nil {
 		// Token isn't of the correct form, ignore it.
@@ -103,7 +103,7 @@ func (t *TokenAuthenticator) AuthenticateToken(ctx context.Context, token string
 			klog.V(3).Infof("No secret of name %s to match bootstrap bearer token", secretName)
 			return nil, false, nil
 		}
-		return nil, false, err
+		return nil, false, &authenticator.AuthError{AuthenticatorID: "bootstrap", Err: err}
 	}
 
 	if secret.DeletionTimestamp != nil {

@@ -590,8 +590,8 @@ func TestX509(t *testing.T) {
 		"custom conversion error": {
 			Opts:  getDefaultVerifyOptions(t),
 			Certs: getCerts(t, clientCNCert),
-			User: UserConversionFunc(func(chain []*x509.Certificate) (*authenticator.Response, bool, error) {
-				return nil, false, errors.New("custom error")
+			User: UserConversionFunc(func(chain []*x509.Certificate) (*authenticator.Response, bool, *authenticator.AuthError) {
+				return nil, false, &authenticator.AuthError{AuthenticatorID: "x509", Err: errors.New("custom error")}
 			}),
 
 			ExpectOK:  false,
@@ -600,7 +600,7 @@ func TestX509(t *testing.T) {
 		"custom conversion success": {
 			Opts:  getDefaultVerifyOptions(t),
 			Certs: getCerts(t, clientCNCert),
-			User: UserConversionFunc(func(chain []*x509.Certificate) (*authenticator.Response, bool, error) {
+			User: UserConversionFunc(func(chain []*x509.Certificate) (*authenticator.Response, bool, *authenticator.AuthError) {
 				return &authenticator.Response{User: &user.DefaultInfo{Name: "custom"}}, true, nil
 			}),
 
@@ -808,7 +808,7 @@ func TestX509Verifier(t *testing.T) {
 		}
 
 		authCall := false
-		auth := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+		auth := authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 			authCall = true
 			return &authenticator.Response{User: &user.DefaultInfo{Name: "innerauth"}}, true, nil
 		})

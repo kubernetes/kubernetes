@@ -30,7 +30,7 @@ const (
 )
 
 func NewAuthenticator() authenticator.Request {
-	return authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+	return authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 		auds, _ := authenticator.AudiencesFrom(req.Context())
 		return &authenticator.Response{
 			User: &user.DefaultInfo{

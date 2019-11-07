@@ -154,7 +154,7 @@ func NewDynamicVerifyOptionsSecure(verifyOptionFn x509request.VerifyOptionFunc, 
 	return x509request.NewDynamicCAVerifier(verifyOptionFn, headerAuthenticator, proxyClientNames)
 }
 
-func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+func (a *requestHeaderAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 	name := headerValue(req.Header, a.nameHeaders.Value())
 	if len(name) == 0 {
 		return nil, false, nil

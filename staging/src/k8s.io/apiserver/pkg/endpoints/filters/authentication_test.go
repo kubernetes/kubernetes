@@ -18,13 +18,14 @@ package filters
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apiserver/pkg/authentication/authenticator"
 	"k8s.io/apiserver/pkg/authentication/user"
 	genericapirequest "k8s.io/apiserver/pkg/endpoints/request"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestAuthenticateRequestWithAud(t *testing.T) {
@@ -77,11 +78,11 @@ func TestAuthenticateRequestWithAud(t *testing.T) {
 						t.Errorf("unexpected call to handler")
 					}
 				}),
-				authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+				authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 					if req.Header.Get("Authorization") == "Something" {
 						return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}, Audiences: authenticator.Audiences(tc.respAuds)}, true, nil
 					}
-					return nil, false, errors.New("Authorization header is missing.")
+					return nil, false, &authenticator.AuthError{AuthenticatorID: "bearer-token", Err: errors.New("Authorization header is missing.")}
 				}),
 				http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 					if tc.expectSuccess {
@@ -118,11 +119,11 @@ func TestAuthenticateRequest(t *testing.T) {
 			}
 			close(success)
 		}),
-		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 			if req.Header.Get("Authorization") == "Something" {
 				return &authenticator.Response{User: &user.DefaultInfo{Name: "user"}}, true, nil
 			}
-			return nil, false, errors.New("Authorization header is missing.")
+			return nil, false, &authenticator.AuthError{AuthenticatorID: "basic-auth", Err: errors.New("Authorization header is missing.")}
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			t.Errorf("unexpected call to failed")
@@ -141,7 +142,7 @@ func TestAuthenticateRequestFailed(t *testing.T) {
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			t.Errorf("unexpected call to handler")
 		}),
-		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 			return nil, false, nil
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
@@ -161,8 +162,8 @@ func TestAuthenticateRequestError(t *testing.T) {
 		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			t.Errorf("unexpected call to handler")
 		}),
-		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
-			return nil, false, errors.New("failure")
+		authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
+			return nil, false, &authenticator.AuthError{AuthenticatorID: "basic-auth", Err: errors.New("failure")}
 		}),
 		http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 			close(failed)

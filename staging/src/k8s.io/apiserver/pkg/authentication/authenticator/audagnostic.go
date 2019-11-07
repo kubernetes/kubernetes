@@ -22,7 +22,7 @@ import (
 	"net/http"
 )
 
-func authenticate(ctx context.Context, implicitAuds Audiences, authenticate func() (*Response, bool, error)) (*Response, bool, error) {
+func authenticate(ctx context.Context, implicitAuds Audiences, authenticate func() (*Response, bool, *AuthError)) (*Response, bool, *AuthError) {
 	targetAuds, ok := AudiencesFrom(ctx)
 	// We can remove this once api audiences is never empty. That will probably
 	// be N releases after TokenRequest is GA.
@@ -39,7 +39,7 @@ func authenticate(ctx context.Context, implicitAuds Audiences, authenticate func
 	}
 	if len(resp.Audiences) > 0 {
 		// maybe the authenticator was audience aware after all.
-		return nil, false, fmt.Errorf("audience agnostic authenticator wrapped an authenticator that returned audiences: %q", resp.Audiences)
+		return nil, false, &AuthError{AuthenticatorID: "audience-agnostic", Err: fmt.Errorf("audience agnostic authenticator wrapped an authenticator that returned audiences: %q", resp.Audiences)}
 	}
 	resp.Audiences = auds
 	return resp, true, nil
@@ -52,8 +52,8 @@ type audAgnosticRequestAuthenticator struct {
 
 var _ = Request(&audAgnosticRequestAuthenticator{})
 
-func (a *audAgnosticRequestAuthenticator) AuthenticateRequest(req *http.Request) (*Response, bool, error) {
-	return authenticate(req.Context(), a.implicit, func() (*Response, bool, error) {
+func (a *audAgnosticRequestAuthenticator) AuthenticateRequest(req *http.Request) (*Response, bool, *AuthError) {
+	return authenticate(req.Context(), a.implicit, func() (*Response, bool, *AuthError) {
 		return a.delegate.AuthenticateRequest(req)
 	})
 }
@@ -74,8 +74,8 @@ type audAgnosticTokenAuthenticator struct {
 
 var _ = Token(&audAgnosticTokenAuthenticator{})
 
-func (a *audAgnosticTokenAuthenticator) AuthenticateToken(ctx context.Context, tok string) (*Response, bool, error) {
-	return authenticate(ctx, a.implicit, func() (*Response, bool, error) {
+func (a *audAgnosticTokenAuthenticator) AuthenticateToken(ctx context.Context, tok string) (*Response, bool, *AuthError) {
+	return authenticate(ctx, a.implicit, func() (*Response, bool, *AuthError) {
 		return a.delegate.AuthenticateToken(ctx, tok)
 	})
 }

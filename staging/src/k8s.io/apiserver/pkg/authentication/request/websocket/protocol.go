@@ -45,7 +45,7 @@ func NewProtocolAuthenticator(auth authenticator.Token) *ProtocolAuthenticator {
 	return &ProtocolAuthenticator{auth}
 }
 
-func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 	// Only accept websocket connections
 	if !wsstream.IsWebSocketRequest(req) {
 		return nil, false, nil
@@ -64,17 +64,17 @@ func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (*authent
 			}
 
 			if sawTokenProtocol {
-				return nil, false, errors.New("multiple base64.bearer.authorization tokens specified")
+				return nil, false, &authenticator.AuthError{AuthenticatorID: "webhook", Err: errors.New("multiple base64.bearer.authorization tokens specified")}
 			}
 			sawTokenProtocol = true
 
 			encodedToken := strings.TrimPrefix(protocol, bearerProtocolPrefix)
 			decodedToken, err := base64.RawURLEncoding.DecodeString(encodedToken)
 			if err != nil {
-				return nil, false, errors.New("invalid base64.bearer.authorization token encoding")
+				return nil, false, &authenticator.AuthError{AuthenticatorID: "webhook", Err: errors.New("invalid base64.bearer.authorization token encoding")}
 			}
 			if !utf8.Valid(decodedToken) {
-				return nil, false, errors.New("invalid base64.bearer.authorization token")
+				return nil, false, &authenticator.AuthError{AuthenticatorID: "webhook", Err: errors.New("invalid base64.bearer.authorization token")}
 			}
 			token = string(decodedToken)
 		}
@@ -83,7 +83,7 @@ func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (*authent
 	// Must pass at least one other subprotocol so that we can remove the one containing the bearer token,
 	// and there is at least one to echo back to the client
 	if len(token) > 0 && len(filteredProtocols) == 0 {
-		return nil, false, errors.New("missing additional subprotocol")
+		return nil, false, &authenticator.AuthError{AuthenticatorID: "webhook", Err: errors.New("missing additional subprotocol")}
 	}
 
 	if len(token) == 0 {
@@ -101,7 +101,7 @@ func (a *ProtocolAuthenticator) AuthenticateRequest(req *http.Request) (*authent
 
 	// If the token authenticator didn't error, provide a default error
 	if !ok && err == nil {
-		err = errInvalidToken
+		err = &authenticator.AuthError{AuthenticatorID: "websocket", Err: errInvalidToken}
 	}
 
 	return resp, ok, err

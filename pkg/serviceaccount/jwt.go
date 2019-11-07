@@ -249,7 +249,7 @@ type Validator interface {
 	NewPrivateClaims() interface{}
 }
 
-func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, error) {
+func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData string) (*authenticator.Response, bool, *authenticator.AuthError) {
 	if !j.hasCorrectIssuer(tokenData) {
 		return nil, false, nil
 	}
@@ -277,7 +277,7 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 	}
 
 	if !found {
-		return nil, false, utilerrors.NewAggregate(errlist)
+		return nil, false, &authenticator.AuthError{AuthenticatorID: "jwt", Err: utilerrors.NewAggregate(errlist)}
 	}
 
 	tokenAudiences := authenticator.Audiences(public.Audience)
@@ -294,14 +294,14 @@ func (j *jwtTokenAuthenticator) AuthenticateToken(ctx context.Context, tokenData
 
 	auds := authenticator.Audiences(tokenAudiences).Intersect(requestedAudiences)
 	if len(auds) == 0 && len(j.implicitAuds) != 0 {
-		return nil, false, fmt.Errorf("token audiences %q is invalid for the target audiences %q", tokenAudiences, requestedAudiences)
+		return nil, false, &authenticator.AuthError{AuthenticatorID: "jwt", Err: fmt.Errorf("token audiences %q is invalid for the target audiences %q", tokenAudiences, requestedAudiences)}
 	}
 
 	// If we get here, we have a token with a recognized signature and
 	// issuer string.
 	sa, err := j.validator.Validate(tokenData, public, private)
 	if err != nil {
-		return nil, false, err
+		return nil, false, &authenticator.AuthError{AuthenticatorID: "jwt", Err: err}
 	}
 
 	return &authenticator.Response{

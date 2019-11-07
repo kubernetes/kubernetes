@@ -28,7 +28,7 @@ import (
 func TestGroupAdder(t *testing.T) {
 	adder := authenticator.Request(
 		NewGroupAdder(
-			authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+			authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 				return &authenticator.Response{User: &user.DefaultInfo{Name: "user", Groups: []string{"original"}}}, true, nil
 			}),
 			[]string{"added"},
@@ -96,7 +96,7 @@ func TestAuthenticatedGroupAdder(t *testing.T) {
 	for _, test := range tests {
 		adder := authenticator.Request(
 			NewAuthenticatedGroupAdder(
-				authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, error) {
+				authenticator.RequestFunc(func(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 					return &authenticator.Response{User: test.inputUser}, true, nil
 				}),
 			),

@@ -28,7 +28,7 @@ import (
 func TestTokenGroupAdder(t *testing.T) {
 	adder := authenticator.Token(
 		NewTokenGroupAdder(
-			authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+			authenticator.TokenFunc(func(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 				return &authenticator.Response{User: &user.DefaultInfo{Name: "user", Groups: []string{"original"}}}, true, nil
 			}),
 			[]string{"added"},

@@ -32,9 +32,9 @@ func New(auth authenticator.Token) *Authenticator {
 	return &Authenticator{auth}
 }
 
-var invalidToken = errors.New("invalid bearer token")
+var invalidToken = &authenticator.AuthError{AuthenticatorID: "bearer-token", Err: errors.New("invalid bearer token")}
 
-func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 	auth := strings.TrimSpace(req.Header.Get("Authorization"))
 	if auth == "" {
 		return nil, false, nil

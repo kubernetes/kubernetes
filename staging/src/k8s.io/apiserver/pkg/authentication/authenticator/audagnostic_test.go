@@ -31,7 +31,7 @@ func TestAuthenticate(t *testing.T) {
 	type treq struct {
 		resp          *Response
 		authenticated bool
-		err           error
+		err           *AuthError
 
 		wantResp          *Response
 		wantAuthenticated bool
@@ -87,7 +87,7 @@ func TestAuthenticate(t *testing.T) {
 					wantAuthenticated: true,
 				},
 				{
-					err:     errors.New("uhoh"),
+					err:     &AuthError{AuthenticatorID: "foo", Err: errors.New("uhoh")},
 					wantErr: true,
 				},
 				{
@@ -136,7 +136,7 @@ func TestAuthenticate(t *testing.T) {
 					wantAuthenticated: true,
 				},
 				{
-					err: errors.New("uhoh"),
+					err: &AuthError{AuthenticatorID: "foo", Err: errors.New("uhoh")},
 
 					wantErr: true,
 				},
@@ -185,7 +185,7 @@ func TestAuthenticate(t *testing.T) {
 					wantAuthenticated: false,
 				},
 				{
-					err: errors.New("uhoh"),
+					err: &AuthError{AuthenticatorID: "foo", Err: errors.New("uhoh")},
 
 					wantAuthenticated: false,
 				},
@@ -205,7 +205,7 @@ func TestAuthenticate(t *testing.T) {
 					t.Run(fmt.Sprintf("auds=%q,implicit=%q", taudcfg.auds, taudcfg.implicitAuds), func(t *testing.T) {
 						ctx := context.Background()
 						ctx = WithAudiences(ctx, taudcfg.auds)
-						resp, ok, err := authenticate(ctx, taudcfg.implicitAuds, func() (*Response, bool, error) {
+						resp, ok, err := authenticate(ctx, taudcfg.implicitAuds, func() (*Response, bool, *AuthError) {
 							if treq.resp != nil {
 								resp := *treq.resp
 								return &resp, treq.authenticated, treq.err

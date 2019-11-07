@@ -50,7 +50,7 @@ func NewFailOnError(authTokenHandlers ...authenticator.Token) authenticator.Toke
 }
 
 // AuthenticateToken authenticates the token using a chain of authenticator.Token objects.
-func (authHandler *unionAuthTokenHandler) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+func (authHandler *unionAuthTokenHandler) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 	var errlist []error
 	for _, currAuthRequestHandler := range authHandler.Handlers {
 		info, ok, err := currAuthRequestHandler.AuthenticateToken(ctx, token)
@@ -67,5 +67,5 @@ func (authHandler *unionAuthTokenHandler) AuthenticateToken(ctx context.Context,
 		}
 	}
 
-	return nil, false, utilerrors.NewAggregate(errlist)
+	return nil, false, &authenticator.AuthError{AuthenticatorID: "union", Err: utilerrors.NewAggregate(errlist)}
 }

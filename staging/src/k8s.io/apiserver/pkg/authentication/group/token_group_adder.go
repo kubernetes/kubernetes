@@ -36,7 +36,7 @@ func NewTokenGroupAdder(auth authenticator.Token, groups []string) authenticator
 	return &TokenGroupAdder{auth, groups}
 }
 
-func (g *TokenGroupAdder) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+func (g *TokenGroupAdder) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 	r, ok, err := g.Authenticator.AuthenticateToken(ctx, token)
 	if err != nil || !ok {
 		return nil, ok, err

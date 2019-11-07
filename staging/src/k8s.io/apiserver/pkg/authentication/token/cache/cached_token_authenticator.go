@@ -97,12 +97,12 @@ func newWithClock(authenticator authenticator.Token, cacheErrs bool, successTTL,
 }
 
 // AuthenticateToken implements authenticator.Token
-func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, error) {
+func (a *cachedTokenAuthenticator) AuthenticateToken(ctx context.Context, token string) (*authenticator.Response, bool, *authenticator.AuthError) {
 	auds, _ := authenticator.AudiencesFrom(ctx)
 
 	key := keyFunc(a.hashPool, auds, token)
 	if record, ok := a.cache.get(key); ok {
-		return record.resp, record.ok, record.err
+		return record.resp, record.ok, &authenticator.AuthError{AuthenticatorID: "cached-token", Err: record.err}
 	}
 
 	resp, ok, err := a.authenticator.AuthenticateToken(ctx, token)

@@ -30,7 +30,7 @@ import (
 type mockAuthRequestHandler struct {
 	returnUser      user.Info
 	isAuthenticated bool
-	err             error
+	err             *authenticator.AuthError
 }
 
 var (
@@ -38,7 +38,7 @@ var (
 	user2 = &user.DefaultInfo{Name: "elegant_sheep", UID: "bravo"}
 )
 
-func (mock *mockAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, error) {
+func (mock *mockAuthRequestHandler) AuthenticateRequest(req *http.Request) (*authenticator.Response, bool, *authenticator.AuthError) {
 	return &authenticator.Response{User: mock.returnUser}, mock.isAuthenticated, mock.err
 }
 
@@ -79,7 +79,7 @@ func TestAuthenticateRequestFirstPasses(t *testing.T) {
 }
 
 func TestAuthenticateRequestSuppressUnnecessaryErrors(t *testing.T) {
-	handler1 := &mockAuthRequestHandler{err: errors.New("first")}
+	handler1 := &mockAuthRequestHandler{err: &authenticator.AuthError{AuthenticatorID: "union", Err: errors.New("first")}}
 	handler2 := &mockAuthRequestHandler{isAuthenticated: true}
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
@@ -125,8 +125,8 @@ func TestAuthenticateRequestNonePass(t *testing.T) {
 }
 
 func TestAuthenticateRequestAdditiveErrors(t *testing.T) {
-	handler1 := &mockAuthRequestHandler{err: errors.New("first")}
-	handler2 := &mockAuthRequestHandler{err: errors.New("second")}
+	handler1 := &mockAuthRequestHandler{err: &authenticator.AuthError{AuthenticatorID: "union", Err: errors.New("first")}}
+	handler2 := &mockAuthRequestHandler{err: &authenticator.AuthError{AuthenticatorID: "union", Err: errors.New("second")}}
 	authRequestHandler := New(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
@@ -146,8 +146,8 @@ func TestAuthenticateRequestAdditiveErrors(t *testing.T) {
 }
 
 func TestAuthenticateRequestFailEarly(t *testing.T) {
-	handler1 := &mockAuthRequestHandler{err: errors.New("first")}
-	handler2 := &mockAuthRequestHandler{err: errors.New("second")}
+	handler1 := &mockAuthRequestHandler{err: &authenticator.AuthError{AuthenticatorID: "union", Err: errors.New("first")}}
+	handler2 := &mockAuthRequestHandler{err: &authenticator.AuthError{AuthenticatorID: "union", Err: errors.New("second")}}
 	authRequestHandler := NewFailOnError(handler1, handler2)
 	req, _ := http.NewRequest("GET", "http://example.org", nil)
 
