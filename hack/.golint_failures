@@ -113,7 +113,6 @@ pkg/kubelet/apis/config
 pkg/kubelet/apis/config/v1beta1
 pkg/kubelet/checkpointmanager/testing/example_checkpoint_formats/v1
 pkg/kubelet/cm
-pkg/kubelet/config
 pkg/kubelet/container
 pkg/kubelet/container/testing
 pkg/kubelet/dockershim

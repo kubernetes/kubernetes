@@ -34,6 +34,7 @@ import (
 	// api.Registry.GroupOrDie(v1.GroupName).GroupVersion.String() is changed
 	// to "v1"?
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
+	// Ensure that core apis are installed
 	_ "k8s.io/kubernetes/pkg/apis/core/install"
 	k8s_api_v1 "k8s.io/kubernetes/pkg/apis/core/v1"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
