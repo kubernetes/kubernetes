@@ -438,13 +438,9 @@ var _ = SIGDescribe("Kubectl client", func() {
 				"BackendConfig":         true,
 				"NodeMetrics":           true,
 				"PodMetrics":            true,
-				"ScalingPolicy":         true,
 				"VolumeSnapshotClass":   true,
 				"VolumeSnapshotContent": true,
 				"VolumeSnapshot":        true,
-
-				// A CRD created by other e2e tests without any test data.
-				"Noxu": true,
 			}
 
 			apiGroups, err := c.Discovery().ServerPreferredResources()
@@ -453,6 +449,13 @@ var _ = SIGDescribe("Kubectl client", func() {
 			testableResources := etcd.GetEtcdStorageDataForNamespace(f.Namespace.Name)
 
 			for _, group := range apiGroups {
+				// This limits the scope of this test to exclude CRDs. This
+				// assumes that CRDs will not have a .k8s.io group and will have
+				// a . in their name.
+				if !strings.Contains(group.GroupVersion, ".k8s.io") && strings.Contains(group.GroupVersion, ".") {
+					continue
+				}
+
 				for _, resource := range group.APIResources {
 					if !verbsContain(resource.Verbs, "get") || ignoredResources[resource.Kind] || strings.HasPrefix(resource.Name, "e2e-test") {
 						continue
