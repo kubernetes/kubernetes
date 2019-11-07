@@ -207,8 +207,6 @@ func (w *WebhookAuthorizer) Authorize(ctx context.Context, attr authorizer.Attri
 		}
 	}
 	switch {
-	case r.Status.Denied && r.Status.Allowed:
-		return authorizer.DecisionDeny, r.Status.Reason, fmt.Errorf("webhook subject access review returned both allow and deny response")
 	case r.Status.Denied:
 		return authorizer.DecisionDeny, r.Status.Reason, nil
 	case r.Status.Allowed:
