@@ -29,7 +29,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	"k8s.io/kubernetes/test/e2e/storage/utils"
@@ -134,8 +133,8 @@ func getFlexDir(c clientset.Interface, node *v1.Node, vendor, driver string) str
 }
 
 func sshAndLog(cmd, host string, failOnError bool) {
-	result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
-	e2essh.LogResult(result)
+	result, err := framework.SSH(cmd, host, framework.TestContext.Provider)
+	framework.LogResult(result)
 	framework.ExpectNoError(err)
 	if result.Code != 0 && failOnError {
 		framework.Failf("%s returned non-zero, stderr: %s", cmd, result.Stderr)

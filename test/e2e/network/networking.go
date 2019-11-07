@@ -27,7 +27,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enetwork "k8s.io/kubernetes/test/e2e/framework/network"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/onsi/ginkgo"
 )
@@ -247,7 +246,7 @@ var _ = SIGDescribe("Networking", func() {
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		framework.SkipUnlessSSHKeyPresent()
 
-		hosts, err := e2essh.NodeSSHHosts(f.ClientSet)
+		hosts, err := framework.NodeSSHHosts(f.ClientSet)
 		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -270,9 +269,9 @@ var _ = SIGDescribe("Networking", func() {
 		// chains.
 
 		ginkgo.By("dumping iptables rules on a node")
-		result, err := e2essh.SSH("sudo iptables-save", host, framework.TestContext.Provider)
+		result, err := framework.SSH("sudo iptables-save", host, framework.TestContext.Provider)
 		if err != nil || result.Code != 0 {
-			e2essh.LogResult(result)
+			framework.LogResult(result)
 			framework.Failf("couldn't dump iptable rules: %v", err)
 		}
 
@@ -302,9 +301,9 @@ var _ = SIGDescribe("Networking", func() {
 		cmd := strings.Join(append(deleteRuleCmds, deleteChainCmds...), "\n")
 
 		ginkgo.By("deleting all KUBE-* iptables chains")
-		result, err = e2essh.SSH(cmd, host, framework.TestContext.Provider)
+		result, err = framework.SSH(cmd, host, framework.TestContext.Provider)
 		if err != nil || result.Code != 0 {
-			e2essh.LogResult(result)
+			framework.LogResult(result)
 			framework.Failf("couldn't delete iptable rules: %v", err)
 		}
 
@@ -313,9 +312,9 @@ var _ = SIGDescribe("Networking", func() {
 
 		ginkgo.By("verifying that kubelet rules are eventually recreated")
 		err = utilwait.PollImmediate(framework.Poll, framework.RestartNodeReadyAgainTimeout, func() (bool, error) {
-			result, err = e2essh.SSH("sudo iptables-save -t nat", host, framework.TestContext.Provider)
+			result, err = framework.SSH("sudo iptables-save -t nat", host, framework.TestContext.Provider)
 			if err != nil || result.Code != 0 {
-				e2essh.LogResult(result)
+				framework.LogResult(result)
 				return false, err
 			}
 

@@ -29,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 const etcdImage = "3.4.3-0"
@@ -346,7 +345,7 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 			defer wg.Done()
 
 			Logf("Stopping docker and kubelet on %q to simulate failure", node.Name)
-			err := e2essh.IssueSSHCommand("sudo systemctl stop docker kubelet", k.provider, &node)
+			err := IssueSSHCommand("sudo systemctl stop docker kubelet", k.provider, &node)
 			if err != nil {
 				Logf("ERROR while stopping node %q: %v", node.Name, err)
 				return
@@ -355,7 +354,7 @@ func (k *NodeKiller) kill(nodes []v1.Node) {
 			time.Sleep(k.config.SimulatedDowntime)
 
 			Logf("Rebooting %q to repair the node", node.Name)
-			err = e2essh.IssueSSHCommand("sudo reboot", k.provider, &node)
+			err = IssueSSHCommand("sudo reboot", k.provider, &node)
 			if err != nil {
 				Logf("ERROR while rebooting node %q: %v", node.Name, err)
 				return

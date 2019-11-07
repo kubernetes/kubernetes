@@ -38,7 +38,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
 )
@@ -104,7 +103,7 @@ func VerifyExecInPodFail(pod *v1.Pod, bashExec string, exitCode int) {
 
 func isSudoPresent(nodeIP string, provider string) bool {
 	framework.Logf("Checking if sudo command is present")
-	sshResult, err := e2essh.SSH("sudo --version", nodeIP, provider)
+	sshResult, err := framework.SSH("sudo --version", nodeIP, provider)
 	framework.ExpectNoError(err, "SSH to %q errored.", nodeIP)
 	if !strings.Contains(sshResult.Stderr, "command not found") {
 		return true
@@ -128,7 +127,7 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	nodeIP = nodeIP + ":22"
 
 	framework.Logf("Checking if systemctl command is present")
-	sshResult, err := e2essh.SSH("systemctl --version", nodeIP, framework.TestContext.Provider)
+	sshResult, err := framework.SSH("systemctl --version", nodeIP, framework.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
 	if !strings.Contains(sshResult.Stderr, "command not found") {
 		command = fmt.Sprintf("systemctl %s kubelet", string(kOp))
@@ -147,9 +146,9 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	}
 
 	framework.Logf("Attempting `%s`", command)
-	sshResult, err = e2essh.SSH(command, nodeIP, framework.TestContext.Provider)
+	sshResult, err = framework.SSH(command, nodeIP, framework.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", pod.Spec.NodeName))
-	e2essh.LogResult(sshResult)
+	framework.LogResult(sshResult)
 	gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to [%s] kubelet:\n%#v", string(kOp), sshResult)
 
 	if kOp == KStop {
@@ -191,9 +190,9 @@ func getKubeletMainPid(nodeIP string, sudoPresent bool, systemctlPresent bool) s
 		command = fmt.Sprintf("sudo %s", command)
 	}
 	framework.Logf("Attempting `%s`", command)
-	sshResult, err := e2essh.SSH(command, nodeIP, framework.TestContext.Provider)
+	sshResult, err := framework.SSH(command, nodeIP, framework.TestContext.Provider)
 	framework.ExpectNoError(err, fmt.Sprintf("SSH to Node %q errored.", nodeIP))
-	e2essh.LogResult(sshResult)
+	framework.LogResult(sshResult)
 	gomega.Expect(sshResult.Code).To(gomega.BeZero(), "Failed to get kubelet PID")
 	gomega.Expect(sshResult.Stdout).NotTo(gomega.BeEmpty(), "Kubelet Main PID should not be Empty")
 	return sshResult.Stdout
@@ -244,15 +243,15 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 	nodeIP = nodeIP + ":22"
 
 	ginkgo.By("Expecting the volume mount to be found.")
-	result, err := e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
-	e2essh.LogResult(result)
+	result, err := framework.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+	framework.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Code).To(gomega.BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 
 	if checkSubpath {
 		ginkgo.By("Expecting the volume subpath mount to be found.")
-		result, err := e2essh.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
-		e2essh.LogResult(result)
+		result, err := framework.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+		framework.LogResult(result)
 		framework.ExpectNoError(err, "Encountered SSH error.")
 		gomega.Expect(result.Code).To(gomega.BeZero(), fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 	}
@@ -286,16 +285,16 @@ func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *f
 	}
 
 	ginkgo.By("Expecting the volume mount not to be found.")
-	result, err = e2essh.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
-	e2essh.LogResult(result)
+	result, err = framework.SSH(fmt.Sprintf("mount | grep %s | grep -v volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+	framework.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty (i.e. no mount found).")
 	framework.Logf("Volume unmounted on node %s", clientPod.Spec.NodeName)
 
 	if checkSubpath {
 		ginkgo.By("Expecting the volume subpath mount not to be found.")
-		result, err = e2essh.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
-		e2essh.LogResult(result)
+		result, err = framework.SSH(fmt.Sprintf("cat /proc/self/mountinfo | grep %s | grep volume-subpaths", clientPod.UID), nodeIP, framework.TestContext.Provider)
+		framework.LogResult(result)
 		framework.ExpectNoError(err, "Encountered SSH error.")
 		gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty (i.e. no subpath mount found).")
 		framework.Logf("Subpath volume unmounted on node %s", clientPod.Spec.NodeName)
@@ -332,14 +331,14 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 	}
 
 	ginkgo.By("Expecting the symlinks from PodDeviceMapPath to be found.")
-	result, err := e2essh.SSH(podDirectoryCmd, nodeIP, framework.TestContext.Provider)
-	e2essh.LogResult(result)
+	result, err := framework.SSH(podDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	framework.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected grep exit code of 0, got %d", result.Code))
 
 	ginkgo.By("Expecting the symlinks from global map path to be found.")
-	result, err = e2essh.SSH(globalBlockDirectoryCmd, nodeIP, framework.TestContext.Provider)
-	e2essh.LogResult(result)
+	result, err = framework.SSH(globalBlockDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	framework.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	framework.ExpectEqual(result.Code, 0, fmt.Sprintf("Expected find exit code of 0, got %d", result.Code))
 
@@ -370,14 +369,14 @@ func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *fra
 	}
 
 	ginkgo.By("Expecting the symlink from PodDeviceMapPath not to be found.")
-	result, err = e2essh.SSH(podDirectoryCmd, nodeIP, framework.TestContext.Provider)
-	e2essh.LogResult(result)
+	result, err = framework.SSH(podDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	framework.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected grep stdout to be empty.")
 
 	ginkgo.By("Expecting the symlinks from global map path not to be found.")
-	result, err = e2essh.SSH(globalBlockDirectoryCmd, nodeIP, framework.TestContext.Provider)
-	e2essh.LogResult(result)
+	result, err = framework.SSH(globalBlockDirectoryCmd, nodeIP, framework.TestContext.Provider)
+	framework.LogResult(result)
 	framework.ExpectNoError(err, "Encountered SSH error.")
 	gomega.Expect(result.Stdout).To(gomega.BeEmpty(), "Expected find stdout to be empty.")
 

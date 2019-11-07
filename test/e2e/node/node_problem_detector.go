@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 
 	"github.com/onsi/ginkgo"
@@ -84,7 +83,7 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 			workingSetStats[host] = []float64{}
 
 			cmd := "systemctl status node-problem-detector.service"
-			result, err := e2essh.SSH(cmd, host, framework.TestContext.Provider)
+			result, err := framework.SSH(cmd, host, framework.TestContext.Provider)
 			isStandaloneMode[host] = (err == nil && result.Code == 0)
 
 			ginkgo.By(fmt.Sprintf("Check node %q has node-problem-detector process", host))
@@ -92,14 +91,14 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 			// showing up, because string text "[n]ode-problem-detector" does not
 			// match regular expression "[n]ode-problem-detector".
 			psCmd := "ps aux | grep [n]ode-problem-detector"
-			result, err = e2essh.SSH(psCmd, host, framework.TestContext.Provider)
+			result, err = framework.SSH(psCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(result.Code, 0)
 			gomega.Expect(result.Stdout).To(gomega.ContainSubstring("node-problem-detector"))
 
 			ginkgo.By(fmt.Sprintf("Check node-problem-detector is running fine on node %q", host))
 			journalctlCmd := "sudo journalctl -u node-problem-detector"
-			result, err = e2essh.SSH(journalctlCmd, host, framework.TestContext.Provider)
+			result, err = framework.SSH(journalctlCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(result.Code, 0)
 			gomega.Expect(result.Stdout).NotTo(gomega.ContainSubstring("node-problem-detector.service: Failed"))
@@ -113,7 +112,7 @@ var _ = SIGDescribe("NodeProblemDetector [DisabledForLargeClusters]", func() {
 			ginkgo.By(fmt.Sprintf("Inject log to trigger AUFSUmountHung on node %q", host))
 			log := "INFO: task umount.aufs:21568 blocked for more than 120 seconds."
 			injectLogCmd := "sudo sh -c \"echo 'kernel: " + log + "' >> /dev/kmsg\""
-			_, err = e2essh.SSH(injectLogCmd, host, framework.TestContext.Provider)
+			_, err = framework.SSH(injectLogCmd, host, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(result.Code, 0)
 		}
@@ -239,7 +238,7 @@ func verifyNodeCondition(f *framework.Framework, condition v1.NodeConditionType,
 
 func getMemoryStat(f *framework.Framework, host string) (rss, workingSet float64) {
 	memCmd := "cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.usage_in_bytes && cat /sys/fs/cgroup/memory/system.slice/node-problem-detector.service/memory.stat"
-	result, err := e2essh.SSH(memCmd, host, framework.TestContext.Provider)
+	result, err := framework.SSH(memCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(result.Code, 0)
 	lines := strings.Split(result.Stdout, "\n")
@@ -275,7 +274,7 @@ func getMemoryStat(f *framework.Framework, host string) (rss, workingSet float64
 
 func getCPUStat(f *framework.Framework, host string) (usage, uptime float64) {
 	cpuCmd := "cat /sys/fs/cgroup/cpu/system.slice/node-problem-detector.service/cpuacct.usage && cat /proc/uptime | awk '{print $1}'"
-	result, err := e2essh.SSH(cpuCmd, host, framework.TestContext.Provider)
+	result, err := framework.SSH(cpuCmd, host, framework.TestContext.Provider)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(result.Code, 0)
 	lines := strings.Split(result.Stdout, "\n")

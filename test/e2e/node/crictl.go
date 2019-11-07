@@ -21,7 +21,6 @@ import (
 	"strings"
 
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 
 	"github.com/onsi/ginkgo"
 )
@@ -39,7 +38,7 @@ var _ = SIGDescribe("crictl", func() {
 	ginkgo.It("should be able to run crictl on the node", func() {
 		// Get all nodes' external IPs.
 		ginkgo.By("Getting all nodes' SSH-able IP addresses")
-		hosts, err := e2essh.NodeSSHHosts(f.ClientSet)
+		hosts, err := framework.NodeSSHHosts(f.ClientSet)
 		if err != nil {
 			framework.Failf("Error getting node hostnames: %v", err)
 		}
@@ -56,7 +55,7 @@ var _ = SIGDescribe("crictl", func() {
 			host := hosts[0]
 			ginkgo.By(fmt.Sprintf("SSH'ing to node %q to run %q", host, testCase.cmd))
 
-			result, err := e2essh.SSH(testCase.cmd, host, framework.TestContext.Provider)
+			result, err := framework.SSH(testCase.cmd, host, framework.TestContext.Provider)
 			stdout, stderr := strings.TrimSpace(result.Stdout), strings.TrimSpace(result.Stderr)
 			if err != nil {
 				framework.Failf("Ran %q on %q, got error %v", testCase.cmd, host, err)

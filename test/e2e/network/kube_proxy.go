@@ -30,7 +30,6 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/images/agnhost/net/nat"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -82,7 +81,7 @@ var _ = SIGDescribe("Network", func() {
 		zero := int64(0)
 
 		// Some distributions (Ubuntu 16.04 etc.) don't support the proc file.
-		_, err = e2essh.IssueSSHCommandWithResult(
+		_, err = framework.IssueSSHCommandWithResult(
 			"ls /proc/net/nf_conntrack",
 			framework.TestContext.Provider,
 			clientNodeInfo.node)
@@ -184,7 +183,7 @@ var _ = SIGDescribe("Network", func() {
 		ginkgo.By("Checking /proc/net/nf_conntrack for the timeout")
 		// If test flakes occur here, then this check should be performed
 		// in a loop as there may be a race with the client connecting.
-		e2essh.IssueSSHCommandWithResult(
+		framework.IssueSSHCommandWithResult(
 			fmt.Sprintf("sudo cat /proc/net/nf_conntrack | grep 'dport=%v'",
 				testDaemonTCPPort),
 			framework.TestContext.Provider,
@@ -192,7 +191,7 @@ var _ = SIGDescribe("Network", func() {
 
 		// Timeout in seconds is available as the fifth column from
 		// /proc/net/nf_conntrack.
-		result, err := e2essh.IssueSSHCommandWithResult(
+		result, err := framework.IssueSSHCommandWithResult(
 			fmt.Sprintf(
 				"sudo cat /proc/net/nf_conntrack "+
 					"| grep 'CLOSE_WAIT.*dst=%v.*dport=%v' "+

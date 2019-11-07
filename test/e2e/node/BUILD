@@ -45,7 +45,6 @@ go_library(
         "//test/e2e/framework/node:go_default_library",
         "//test/e2e/framework/perf:go_default_library",
         "//test/e2e/framework/pod:go_default_library",
-        "//test/e2e/framework/ssh:go_default_library",
         "//test/e2e/framework/volume:go_default_library",
         "//test/e2e/perftype:go_default_library",
         "//test/e2e/scheduling:go_default_library",

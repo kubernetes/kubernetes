@@ -45,7 +45,6 @@ import (
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	"k8s.io/kubernetes/test/e2e/framework/providers/gce"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	gcecloud "k8s.io/legacy-cloud-providers/gce"
 
@@ -371,7 +370,7 @@ var _ = SIGDescribe("Services", func() {
 
 	ginkgo.It("should be able to up and down services", func() {
 		// TODO: use the ServiceTestJig here
-		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		// this test uses framework.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		// this test does not work if the Node does not support SSH Key
 		framework.SkipUnlessSSHKeyPresent()
@@ -390,7 +389,7 @@ var _ = SIGDescribe("Services", func() {
 		podNames2, svc2IP, err := e2eservice.StartServeHostnameService(cs, getServeHostnameService(svc2), ns, numPods)
 		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc2, ns)
 
-		hosts, err := e2essh.NodeSSHHosts(cs)
+		hosts, err := framework.NodeSSHHosts(cs)
 		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -455,7 +454,7 @@ var _ = SIGDescribe("Services", func() {
 			framework.Failf("VIPs conflict: %v", svc1IP)
 		}
 
-		hosts, err := e2essh.NodeSSHHosts(cs)
+		hosts, err := framework.NodeSSHHosts(cs)
 		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -490,7 +489,7 @@ var _ = SIGDescribe("Services", func() {
 		podNames1, svc1IP, err := e2eservice.StartServeHostnameService(cs, getServeHostnameService(svc1), ns, numPods)
 		framework.ExpectNoError(err, "failed to create replication controller with service: %s in the namespace: %s", svc1, ns)
 
-		hosts, err := e2essh.NodeSSHHosts(cs)
+		hosts, err := framework.NodeSSHHosts(cs)
 		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -1833,7 +1832,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should implement service.kubernetes.io/service-proxy-name", func() {
-		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		// this test uses framework.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		// this test does not work if the Node does not support SSH Key
 		framework.SkipUnlessSSHKeyPresent()
@@ -1860,7 +1859,7 @@ var _ = SIGDescribe("Services", func() {
 
 		jig := e2eservice.NewTestJig(cs, ns, svcToggled.ObjectMeta.Name)
 
-		hosts, err := e2essh.NodeSSHHosts(cs)
+		hosts, err := framework.NodeSSHHosts(cs)
 		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")
@@ -1896,7 +1895,7 @@ var _ = SIGDescribe("Services", func() {
 	})
 
 	ginkgo.It("should implement service.kubernetes.io/headless", func() {
-		// this test uses e2essh.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
+		// this test uses framework.NodeSSHHosts that does not work if a Node only reports LegacyHostIP
 		framework.SkipUnlessProviderIs(framework.ProvidersWithSSH...)
 		// this test does not work if the Node does not support SSH Key
 		framework.SkipUnlessSSHKeyPresent()
@@ -1924,7 +1923,7 @@ var _ = SIGDescribe("Services", func() {
 
 		jig := e2eservice.NewTestJig(cs, ns, svcHeadlessToggled.ObjectMeta.Name)
 
-		hosts, err := e2essh.NodeSSHHosts(cs)
+		hosts, err := framework.NodeSSHHosts(cs)
 		framework.ExpectNoError(err, "failed to find external/internal IPs for every node")
 		if len(hosts) == 0 {
 			framework.Failf("No ssh-able nodes")

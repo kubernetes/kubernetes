@@ -34,7 +34,6 @@ import (
 	"k8s.io/kubernetes/pkg/master/ports"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 
@@ -95,7 +94,7 @@ func (r *RestartDaemonConfig) waitUp() {
 		"curl -s -o /dev/null -I -w \"%%{http_code}\" http://localhost:%v/healthz", r.healthzPort)
 
 	err := wait.Poll(r.pollInterval, r.pollTimeout, func() (bool, error) {
-		result, err := e2essh.NodeExec(r.nodeName, healthzCheck, framework.TestContext.Provider)
+		result, err := framework.NodeExec(r.nodeName, healthzCheck, framework.TestContext.Provider)
 		framework.ExpectNoError(err)
 		if result.Code == 0 {
 			httpCode, err := strconv.Atoi(result.Stdout)
@@ -115,7 +114,7 @@ func (r *RestartDaemonConfig) waitUp() {
 // kill sends a SIGTERM to the daemon
 func (r *RestartDaemonConfig) kill() {
 	framework.Logf("Killing %v", r)
-	_, err := e2essh.NodeExec(r.nodeName, fmt.Sprintf("pgrep %v | xargs -I {} sudo kill {}", r.daemonName), framework.TestContext.Provider)
+	_, err := framework.NodeExec(r.nodeName, fmt.Sprintf("pgrep %v | xargs -I {} sudo kill {}", r.daemonName), framework.TestContext.Provider)
 	framework.ExpectNoError(err)
 }
 

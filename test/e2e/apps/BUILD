@@ -70,7 +70,6 @@ go_library(
         "//test/e2e/framework/pv:go_default_library",
         "//test/e2e/framework/replicaset:go_default_library",
         "//test/e2e/framework/service:go_default_library",
-        "//test/e2e/framework/ssh:go_default_library",
         "//test/e2e/framework/statefulset:go_default_library",
         "//test/utils:go_default_library",
         "//test/utils/image:go_default_library",

@@ -14,29 +14,35 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package ssh
+package framework
 
 import (
 	"bytes"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 	sshutil "k8s.io/kubernetes/pkg/ssh"
+	testutils "k8s.io/kubernetes/test/utils"
 )
 
-// Result holds the execution result of SSH command
-type Result struct {
-	User   string
-	Host   string
-	Cmd    string
-	Stdout string
-	Stderr string
-	Code   int
-}
+const (
+	// pollNodeInterval is how often to Poll pods.
+	pollNodeInterval = 2 * time.Second
+
+	// singleCallTimeout is how long to try single API calls (like 'get' or 'list'). Used to prevent
+	// transient failures from failing tests.
+	// TODO: client should not apply this timeout to Watch calls. Increased from 30s until that is fixed.
+	singleCallTimeout = 5 * time.Minute
+)
 
 // GetSigner returns an ssh.Signer for the provider ("gce", etc.) that can be
 // used to SSH to their nodes.
@@ -83,6 +89,52 @@ func GetSigner(provider string) (ssh.Signer, error) {
 	}
 
 	return sshutil.MakePrivateKeySignerFromFile(keyfile)
+}
+
+// NodeSSHHosts returns SSH-able host names for all schedulable nodes - this
+// excludes master node. If it can't find any external IPs, it falls back to
+// looking for internal IPs. If it can't find an internal IP for every node it
+// returns an error, though it still returns all hosts that it found in that
+// case.
+func NodeSSHHosts(c clientset.Interface) ([]string, error) {
+	nodelist := waitListSchedulableNodesOrDie(c)
+
+	hosts := nodeAddresses(nodelist, v1.NodeExternalIP)
+	// If  ExternalIPs aren't available for all nodes, try falling back to the InternalIPs.
+	if len(hosts) < len(nodelist.Items) {
+		Logf("No external IP address on nodes, falling back to internal IPs")
+		hosts = nodeAddresses(nodelist, v1.NodeInternalIP)
+	}
+
+	// Error if neither External nor Internal IPs weren't available for all nodes.
+	if len(hosts) != len(nodelist.Items) {
+		return hosts, fmt.Errorf(
+			"only found %d IPs on nodes, but found %d nodes. Nodelist: %v",
+			len(hosts), len(nodelist.Items), nodelist)
+	}
+
+	sshHosts := make([]string, 0, len(hosts))
+	for _, h := range hosts {
+		sshHosts = append(sshHosts, net.JoinHostPort(h, sshPort))
+	}
+	return sshHosts, nil
+}
+
+// Result holds the execution result of SSH command
+type Result struct {
+	User   string
+	Host   string
+	Cmd    string
+	Stdout string
+	Stderr string
+	Code   int
+}
+
+// NodeExec execs the given cmd on node via SSH. Note that the nodeName is an sshable name,
+// eg: the name returned by framework.GetMasterHost(). This is also not guaranteed to work across
+// cloud providers since it involves ssh.
+func NodeExec(nodeName, cmd, provider string) (Result, error) {
+	return SSH(cmd, net.JoinHostPort(nodeName, sshPort), provider)
 }
 
 // SSH synchronously SSHs to a node running on provider and runs cmd. If there
@@ -186,4 +238,104 @@ func runSSHCommandViaBastion(cmd, user, bastion, host string, signer ssh.Signer)
 		}
 	}
 	return bout.String(), berr.String(), code, err
+}
+
+// LogResult records result log
+func LogResult(result Result) {
+	remote := fmt.Sprintf("%s@%s", result.User, result.Host)
+	Logf("ssh %s: command:   %s", remote, result.Cmd)
+	Logf("ssh %s: stdout:    %q", remote, result.Stdout)
+	Logf("ssh %s: stderr:    %q", remote, result.Stderr)
+	Logf("ssh %s: exit code: %d", remote, result.Code)
+}
+
+// IssueSSHCommandWithResult tries to execute a SSH command and returns the execution result
+func IssueSSHCommandWithResult(cmd, provider string, node *v1.Node) (*Result, error) {
+	Logf("Getting external IP address for %s", node.Name)
+	host := ""
+	for _, a := range node.Status.Addresses {
+		if a.Type == v1.NodeExternalIP && a.Address != "" {
+			host = net.JoinHostPort(a.Address, sshPort)
+			break
+		}
+	}
+
+	if host == "" {
+		// No external IPs were found, let's try to use internal as plan B
+		for _, a := range node.Status.Addresses {
+			if a.Type == v1.NodeInternalIP && a.Address != "" {
+				host = net.JoinHostPort(a.Address, sshPort)
+				break
+			}
+		}
+	}
+
+	if host == "" {
+		return nil, fmt.Errorf("couldn't find any IP address for node %s", node.Name)
+	}
+
+	Logf("SSH %q on %s(%s)", cmd, node.Name, host)
+	result, err := SSH(cmd, host, provider)
+	LogResult(result)
+
+	if result.Code != 0 || err != nil {
+		return nil, fmt.Errorf("failed running %q: %v (exit code %d, stderr %v)",
+			cmd, err, result.Code, result.Stderr)
+	}
+
+	return &result, nil
+}
+
+// IssueSSHCommand tries to execute a SSH command
+func IssueSSHCommand(cmd, provider string, node *v1.Node) error {
+	_, err := IssueSSHCommandWithResult(cmd, provider, node)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// nodeAddresses returns the first address of the given type of each node.
+func nodeAddresses(nodelist *v1.NodeList, addrType v1.NodeAddressType) []string {
+	hosts := []string{}
+	for _, n := range nodelist.Items {
+		for _, addr := range n.Status.Addresses {
+			if addr.Type == addrType && addr.Address != "" {
+				hosts = append(hosts, addr.Address)
+				break
+			}
+		}
+	}
+	return hosts
+}
+
+// waitListSchedulableNodes is a wrapper around listing nodes supporting retries.
+func waitListSchedulableNodes(c clientset.Interface) (*v1.NodeList, error) {
+	var nodes *v1.NodeList
+	var err error
+	if wait.PollImmediate(pollNodeInterval, singleCallTimeout, func() (bool, error) {
+		nodes, err = c.CoreV1().Nodes().List(metav1.ListOptions{FieldSelector: fields.Set{
+			"spec.unschedulable": "false",
+		}.AsSelector().String()})
+		if err != nil {
+			if testutils.IsRetryableAPIError(err) {
+				return false, nil
+			}
+			return false, err
+		}
+		return true, nil
+	}) != nil {
+		return nodes, err
+	}
+	return nodes, nil
+}
+
+// waitListSchedulableNodesOrDie is a wrapper around listing nodes supporting retries.
+func waitListSchedulableNodesOrDie(c clientset.Interface) *v1.NodeList {
+	nodes, err := waitListSchedulableNodes(c)
+	if err != nil {
+		Logf("Unexpected error occurred: %v", err)
+		ExpectNoErrorWithOffset(1, err, "Non-retryable failure or timed out while listing nodes for e2e cluster.")
+	}
+	return nodes
 }

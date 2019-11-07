@@ -29,7 +29,6 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/test/e2e/framework/ginkgowrapper"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 )
 
 func skipInternalf(caller int, format string, args ...interface{}) {
@@ -163,7 +162,7 @@ func SkipUnlessServerVersionGTE(v *utilversion.Version, c discovery.ServerVersio
 
 // SkipUnlessSSHKeyPresent skips if no SSH key is found.
 func SkipUnlessSSHKeyPresent() {
-	if _, err := e2essh.GetSigner(TestContext.Provider); err != nil {
+	if _, err := GetSigner(TestContext.Provider); err != nil {
 		skipInternalf(1, "No SSH Key for provider %s: '%v'", TestContext.Provider, err)
 	}
 }

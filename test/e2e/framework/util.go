@@ -77,7 +77,6 @@ import (
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
 	e2eresource "k8s.io/kubernetes/test/e2e/framework/resource"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
 	uexec "k8s.io/utils/exec"
@@ -1765,21 +1764,21 @@ func RestartKubeProxy(host string) error {
 	}
 	// kubelet will restart the kube-proxy since it's running in a static pod
 	Logf("Killing kube-proxy on node %v", host)
-	result, err := e2essh.SSH("sudo pkill kube-proxy", host, TestContext.Provider)
+	result, err := SSH("sudo pkill kube-proxy", host, TestContext.Provider)
 	if err != nil || result.Code != 0 {
-		e2essh.LogResult(result)
+		LogResult(result)
 		return fmt.Errorf("couldn't restart kube-proxy: %v", err)
 	}
 	// wait for kube-proxy to come back up
 	sshCmd := "sudo /bin/sh -c 'pgrep kube-proxy | wc -l'"
 	err = wait.Poll(5*time.Second, 60*time.Second, func() (bool, error) {
 		Logf("Waiting for kubeproxy to come back up with %v on %v", sshCmd, host)
-		result, err := e2essh.SSH(sshCmd, host, TestContext.Provider)
+		result, err := SSH(sshCmd, host, TestContext.Provider)
 		if err != nil {
 			return false, err
 		}
 		if result.Code != 0 {
-			e2essh.LogResult(result)
+			LogResult(result)
 			return false, fmt.Errorf("failed to run command, exited %d", result.Code)
 		}
 		if result.Stdout == "0\n" {
@@ -1810,14 +1809,14 @@ func RestartKubelet(host string) error {
 		cmd = "sudo /etc/init.d/kubelet restart"
 	} else if ProviderIs("vsphere") {
 		var sudoPresent bool
-		sshResult, err := e2essh.SSH("sudo --version", host, TestContext.Provider)
+		sshResult, err := SSH("sudo --version", host, TestContext.Provider)
 		if err != nil {
 			return fmt.Errorf("Unable to ssh to host %s with error %v", host, err)
 		}
 		if !strings.Contains(sshResult.Stderr, "command not found") {
 			sudoPresent = true
 		}
-		sshResult, err = e2essh.SSH("systemctl --version", host, TestContext.Provider)
+		sshResult, err = SSH("systemctl --version", host, TestContext.Provider)
 		if err != nil {
 			return fmt.Errorf("Failed to execute command 'systemctl' on host %s with error %v", host, err)
 		}
@@ -1833,9 +1832,9 @@ func RestartKubelet(host string) error {
 		cmd = "sudo systemctl restart kubelet"
 	}
 	Logf("Restarting kubelet via ssh on host %s with command %s", host, cmd)
-	result, err := e2essh.SSH(cmd, host, TestContext.Provider)
+	result, err := SSH(cmd, host, TestContext.Provider)
 	if err != nil || result.Code != 0 {
-		e2essh.LogResult(result)
+		LogResult(result)
 		return fmt.Errorf("couldn't restart kubelet: %v", err)
 	}
 	return nil
@@ -1845,9 +1844,9 @@ func RestartKubelet(host string) error {
 func WaitForKubeletUp(host string) error {
 	cmd := "curl http://localhost:" + strconv.Itoa(ports.KubeletReadOnlyPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, host, TestContext.Provider)
+		result, err := SSH(cmd, host, TestContext.Provider)
 		if err != nil || result.Code != 0 {
-			e2essh.LogResult(result)
+			LogResult(result)
 		}
 		if result.Stdout == "ok" {
 			return nil
@@ -1892,9 +1891,9 @@ func sshRestartMaster() error {
 		command = "sudo /etc/init.d/kube-apiserver restart"
 	}
 	Logf("Restarting master via ssh, running: %v", command)
-	result, err := e2essh.SSH(command, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
+	result, err := SSH(command, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 	if err != nil || result.Code != 0 {
-		e2essh.LogResult(result)
+		LogResult(result)
 		return fmt.Errorf("couldn't restart apiserver: %v", err)
 	}
 	return nil
@@ -1958,9 +1957,9 @@ func RestartControllerManager() error {
 	}
 	cmd := "pidof kube-controller-manager | xargs sudo kill"
 	Logf("Restarting controller-manager via ssh, running: %v", cmd)
-	result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
+	result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 	if err != nil || result.Code != 0 {
-		e2essh.LogResult(result)
+		LogResult(result)
 		return fmt.Errorf("couldn't restart controller-manager: %v", err)
 	}
 	return nil
@@ -1970,9 +1969,9 @@ func RestartControllerManager() error {
 func WaitForControllerManagerUp() error {
 	cmd := "curl http://localhost:" + strconv.Itoa(ports.InsecureKubeControllerManagerPort) + "/healthz"
 	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
+		result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil || result.Code != 0 {
-			e2essh.LogResult(result)
+			LogResult(result)
 		}
 		if result.Stdout == "ok" {
 			return nil
@@ -1986,13 +1985,13 @@ func CheckForControllerManagerHealthy(duration time.Duration) error {
 	var PID string
 	cmd := "pidof kube-controller-manager"
 	for start := time.Now(); time.Since(start) < duration; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
+		result, err := SSH(cmd, net.JoinHostPort(GetMasterHost(), sshPort), TestContext.Provider)
 		if err != nil {
 			// We don't necessarily know that it crashed, pipe could just be broken
-			e2essh.LogResult(result)
+			LogResult(result)
 			return fmt.Errorf("master unreachable after %v", time.Since(start))
 		} else if result.Code != 0 {
-			e2essh.LogResult(result)
+			LogResult(result)
 			return fmt.Errorf("SSH result code not 0. actually: %v after %v", result.Code, time.Since(start))
 		} else if result.Stdout != PID {
 			if PID == "" {
@@ -2187,8 +2186,8 @@ func BlockNetwork(from string, to string) {
 	Logf("block network traffic from %s to %s", from, to)
 	iptablesRule := fmt.Sprintf("OUTPUT --destination %s --jump REJECT", to)
 	dropCmd := fmt.Sprintf("sudo iptables --insert %s", iptablesRule)
-	if result, err := e2essh.SSH(dropCmd, from, TestContext.Provider); result.Code != 0 || err != nil {
-		e2essh.LogResult(result)
+	if result, err := SSH(dropCmd, from, TestContext.Provider); result.Code != 0 || err != nil {
+		LogResult(result)
 		Failf("Unexpected error: %v", err)
 	}
 }
@@ -2205,11 +2204,11 @@ func UnblockNetwork(from string, to string) {
 	// may fail). Manual intervention is required in such case (recreating the
 	// cluster solves the problem too).
 	err := wait.Poll(time.Millisecond*100, time.Second*30, func() (bool, error) {
-		result, err := e2essh.SSH(undropCmd, from, TestContext.Provider)
+		result, err := SSH(undropCmd, from, TestContext.Provider)
 		if result.Code == 0 && err == nil {
 			return true, nil
 		}
-		e2essh.LogResult(result)
+		LogResult(result)
 		if err != nil {
 			Logf("Unexpected error: %v", err)
 		}

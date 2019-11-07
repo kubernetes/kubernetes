@@ -32,7 +32,6 @@ import (
 	e2ekubelet "k8s.io/kubernetes/test/e2e/framework/kubelet"
 	e2enode "k8s.io/kubernetes/test/e2e/framework/node"
 	e2epod "k8s.io/kubernetes/test/e2e/framework/pod"
-	e2essh "k8s.io/kubernetes/test/e2e/framework/ssh"
 	"k8s.io/kubernetes/test/e2e/framework/volume"
 	testutils "k8s.io/kubernetes/test/utils"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -216,9 +215,9 @@ func checkPodCleanup(c clientset.Interface, pod *v1.Pod, expectClean bool) {
 	for _, test := range tests {
 		framework.Logf("Wait up to %v for host's (%v) %q to be %v", timeout, nodeIP, test.feature, condMsg)
 		err = wait.Poll(poll, timeout, func() (bool, error) {
-			result, err := e2essh.NodeExec(nodeIP, test.cmd, framework.TestContext.Provider)
+			result, err := framework.NodeExec(nodeIP, test.cmd, framework.TestContext.Provider)
 			framework.ExpectNoError(err)
-			e2essh.LogResult(result)
+			framework.LogResult(result)
 			ok := (result.Code == 0 && len(result.Stdout) > 0 && len(result.Stderr) == 0)
 			if expectClean && ok { // keep trying
 				return false, nil
