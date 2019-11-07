@@ -81,7 +81,7 @@ type VolumeSource struct {
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#secret
 	// +optional
 	Secret *SecretVolumeSource `json:"secret,omitempty" protobuf:"bytes,6,opt,name=secret"`
-	// NFS represents an NFS mount on the host that shares a pod's lifetime
+	// NFS represents an NFS mount on the host that shares a pod's lifetime.
 	// More info: https://kubernetes.io/docs/concepts/storage/volumes#nfs
 	// +optional
 	NFS *NFSVolumeSource `json:"nfs,omitempty" protobuf:"bytes,7,opt,name=nfs"`
@@ -111,13 +111,13 @@ type VolumeSource struct {
 	// More info: https://examples.k8s.io/mysql-cinder-pd/README.md
 	// +optional
 	Cinder *CinderVolumeSource `json:"cinder,omitempty" protobuf:"bytes,13,opt,name=cinder"`
-	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
+	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime.
 	// +optional
 	CephFS *CephFSVolumeSource `json:"cephfs,omitempty" protobuf:"bytes,14,opt,name=cephfs"`
-	// Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running
+	// Flocker represents a Flocker volume attached to a kubelet's host machine. This depends on the Flocker control service being running.
 	// +optional
 	Flocker *FlockerVolumeSource `json:"flocker,omitempty" protobuf:"bytes,15,opt,name=flocker"`
-	// DownwardAPI represents downward API about the pod that should populate this volume
+	// DownwardAPI represents downward API about the pod that should populate this volume.
 	// +optional
 	DownwardAPI *DownwardAPIVolumeSource `json:"downwardAPI,omitempty" protobuf:"bytes,16,opt,name=downwardAPI"`
 	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
@@ -126,23 +126,25 @@ type VolumeSource struct {
 	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 	// +optional
 	AzureFile *AzureFileVolumeSource `json:"azureFile,omitempty" protobuf:"bytes,18,opt,name=azureFile"`
-	// ConfigMap represents a configMap that should populate this volume
+	// ConfigMap represents a configMap that should populate this volume.
 	// +optional
 	ConfigMap *ConfigMapVolumeSource `json:"configMap,omitempty" protobuf:"bytes,19,opt,name=configMap"`
-	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
+	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine.
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,20,opt,name=vsphereVolume"`
-	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
 	// +optional
 	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty" protobuf:"bytes,21,opt,name=quobyte"`
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,22,opt,name=azureDisk"`
-	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
+	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
+	// +optional
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,23,opt,name=photonPersistentDisk"`
-	// Items for all in one resources secrets, configmaps, and downward API
+	// Items for all in one resources secrets, configmaps, and downward API.
+	// +optional
 	Projected *ProjectedVolumeSource `json:"projected,omitempty" protobuf:"bytes,26,opt,name=projected"`
-	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine.
 	// +optional
 	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty" protobuf:"bytes,24,opt,name=portworxVolume"`
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
@@ -211,13 +213,13 @@ type PersistentVolumeSource struct {
 	// More info: https://examples.k8s.io/mysql-cinder-pd/README.md
 	// +optional
 	Cinder *CinderPersistentVolumeSource `json:"cinder,omitempty" protobuf:"bytes,8,opt,name=cinder"`
-	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime
+	// CephFS represents a Ceph FS mount on the host that shares a pod's lifetime.
 	// +optional
 	CephFS *CephFSPersistentVolumeSource `json:"cephfs,omitempty" protobuf:"bytes,9,opt,name=cephfs"`
 	// FC represents a Fibre Channel resource that is attached to a kubelet's host machine and then exposed to the pod.
 	// +optional
 	FC *FCVolumeSource `json:"fc,omitempty" protobuf:"bytes,10,opt,name=fc"`
-	// Flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running
+	// Flocker represents a Flocker volume attached to a kubelet's host machine and exposed to the pod for its usage. This depends on the Flocker control service being running.
 	// +optional
 	Flocker *FlockerVolumeSource `json:"flocker,omitempty" protobuf:"bytes,11,opt,name=flocker"`
 	// FlexVolume represents a generic volume resource that is
@@ -227,27 +229,27 @@ type PersistentVolumeSource struct {
 	// AzureFile represents an Azure File Service mount on the host and bind mount to the pod.
 	// +optional
 	AzureFile *AzureFilePersistentVolumeSource `json:"azureFile,omitempty" protobuf:"bytes,13,opt,name=azureFile"`
-	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine
+	// VsphereVolume represents a vSphere volume attached and mounted on kubelets host machine.
 	// +optional
 	VsphereVolume *VsphereVirtualDiskVolumeSource `json:"vsphereVolume,omitempty" protobuf:"bytes,14,opt,name=vsphereVolume"`
-	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime
+	// Quobyte represents a Quobyte mount on the host that shares a pod's lifetime.
 	// +optional
 	Quobyte *QuobyteVolumeSource `json:"quobyte,omitempty" protobuf:"bytes,15,opt,name=quobyte"`
 	// AzureDisk represents an Azure Data Disk mount on the host and bind mount to the pod.
 	// +optional
 	AzureDisk *AzureDiskVolumeSource `json:"azureDisk,omitempty" protobuf:"bytes,16,opt,name=azureDisk"`
-	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine
+	// PhotonPersistentDisk represents a PhotonController persistent disk attached and mounted on kubelets host machine.
 	PhotonPersistentDisk *PhotonPersistentDiskVolumeSource `json:"photonPersistentDisk,omitempty" protobuf:"bytes,17,opt,name=photonPersistentDisk"`
-	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine
+	// PortworxVolume represents a portworx volume attached and mounted on kubelets host machine.
 	// +optional
 	PortworxVolume *PortworxVolumeSource `json:"portworxVolume,omitempty" protobuf:"bytes,18,opt,name=portworxVolume"`
 	// ScaleIO represents a ScaleIO persistent volume attached and mounted on Kubernetes nodes.
 	// +optional
 	ScaleIO *ScaleIOPersistentVolumeSource `json:"scaleIO,omitempty" protobuf:"bytes,19,opt,name=scaleIO"`
-	// Local represents directly-attached storage with node affinity
+	// Local represents directly-attached storage with node affinity.
 	// +optional
 	Local *LocalVolumeSource `json:"local,omitempty" protobuf:"bytes,20,opt,name=local"`
-	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod
+	// StorageOS represents a StorageOS volume that is attached to the kubelet's host machine and mounted into the pod.
 	// More info: https://examples.k8s.io/volumes/storageos/README.md
 	// +optional
 	StorageOS *StorageOSPersistentVolumeSource `json:"storageos,omitempty" protobuf:"bytes,21,opt,name=storageos"`
