@@ -899,7 +899,7 @@ func (kl *Kubelet) IsPodDeleted(uid types.UID) bool {
 // been reclaimed by the kubelet.  Reclaiming resources is a prerequisite to deleting a pod from the API server.
 func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bool {
 	if !notRunning(status.ContainerStatuses) {
-		// We shouldnt delete pods that still have running containers
+		// We shouldn't delete pods that still have running containers
 		klog.V(3).Infof("Pod %q is terminated, but some containers are still running", format.Pod(pod))
 		return false
 	}
@@ -918,7 +918,7 @@ func (kl *Kubelet) PodResourcesAreReclaimed(pod *v1.Pod, status v1.PodStatus) bo
 		return false
 	}
 	if kl.podVolumesExist(pod.UID) && !kl.keepTerminatedPodVolumes {
-		// We shouldnt delete pods whose volumes have not been cleaned up if we are not keeping terminated pod volumes
+		// We shouldn't delete pods whose volumes have not been cleaned up if we are not keeping terminated pod volumes
 		klog.V(3).Infof("Pod %q is terminated, but some volumes have not been cleaned up", format.Pod(pod))
 		return false
 	}

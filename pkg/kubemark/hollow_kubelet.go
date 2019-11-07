@@ -177,7 +177,7 @@ func GetHollowKubeletConfig(opt *HollowKubletOptions) (*options.KubeletFlags, *k
 	c.FileCheckFrequency.Duration = 20 * time.Second
 	c.HTTPCheckFrequency.Duration = 20 * time.Second
 	c.NodeStatusUpdateFrequency.Duration = 10 * time.Second
-	c.NodeStatusReportFrequency.Duration = time.Minute
+	c.NodeStatusReportFrequency.Duration = 5 * time.Minute
 	c.SyncFrequency.Duration = 10 * time.Second
 	c.EvictionPressureTransitionPeriod.Duration = 5 * time.Minute
 	c.MaxPods = int32(opt.MaxPods)

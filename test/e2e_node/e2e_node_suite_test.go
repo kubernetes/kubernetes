@@ -63,6 +63,16 @@ var systemValidateMode = flag.Bool("system-validate-mode", false, "If true, only
 var systemSpecFile = flag.String("system-spec-file", "", "The name of the system spec file that will be used for node conformance test. If it's unspecified or empty, the default system spec (system.DefaultSysSpec) will be used.")
 
 func init() {
+	// Enable bindata file lookup as fallback.
+	testfiles.AddFileSource(testfiles.BindataFileSource{
+		Asset:      generated.Asset,
+		AssetNames: generated.AssetNames,
+	})
+
+}
+
+func TestMain(m *testing.M) {
+	// Copy go flags in TestMain, to ensure go test flags are registered (no longer available in init() as of go1.13)
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
 	framework.RegisterNodeFlags(flag.CommandLine)
@@ -75,15 +85,6 @@ func init() {
 	// into TestContext.
 	// TODO(pohly): remove RegisterNodeFlags from test_context.go enable Viper config support here?
 
-	// Enable bindata file lookup as fallback.
-	testfiles.AddFileSource(testfiles.BindataFileSource{
-		Asset:      generated.Asset,
-		AssetNames: generated.AssetNames,
-	})
-
-}
-
-func TestMain(m *testing.M) {
 	rand.Seed(time.Now().UnixNano())
 	pflag.Parse()
 	framework.AfterReadingAllFlags(&framework.TestContext)

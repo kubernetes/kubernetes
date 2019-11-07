@@ -348,7 +348,7 @@ func (tc *testCase) prepareTestClient(t *testing.T) (*fake.Clientset, *metricsfa
 			if err := json.Unmarshal([]byte(obj.ObjectMeta.Annotations[autoscaling.HorizontalPodAutoscalerConditionsAnnotation]), &actualConditions); err != nil {
 				return true, nil, err
 			}
-			// TODO: it's ok not to sort these becaues statusOk
+			// TODO: it's ok not to sort these because statusOk
 			// contains all the conditions, so we'll never be appending.
 			// Default to statusOk when missing any specific conditions
 			if tc.expectedConditions == nil {

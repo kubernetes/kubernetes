@@ -85,7 +85,7 @@ func TestNodeAddressesUsesLastSuccess(t *testing.T) {
 	cloud := &fake.Cloud{}
 	manager := NewSyncManager(cloud, "defaultNode", 0).(*cloudResourceSyncManager)
 
-	// These tests are stateful and order dependant.
+	// These tests are stateful and order dependent.
 	tests := []struct {
 		name      string
 		addrs     []v1.NodeAddress

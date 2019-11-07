@@ -34,8 +34,9 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 	}
 
 	for _, tc := range tcases {
-		policy := NewSingleNumaNodePolicy()
-		result := policy.CanAdmitPodResult(&tc.hint)
+		numaNodes := []int{0, 1}
+		policy := NewSingleNumaNodePolicy(numaNodes)
+		result := policy.(*singleNumaNodePolicy).canAdmitPodResult(&tc.hint)
 
 		if result.Admit != tc.expected {
 			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)
@@ -50,4 +51,14 @@ func TestPolicySingleNumaNodeCanAdmitPodResult(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestSingleNumaNodePolicyMerge(t *testing.T) {
+	numaNodes := []int{0, 1}
+	policy := NewSingleNumaNodePolicy(numaNodes)
+
+	tcases := commonPolicyMergeTestCases(numaNodes)
+	tcases = append(tcases, policy.(*singleNumaNodePolicy).mergeTestCases(numaNodes)...)
+
+	testPolicyMerge(policy, tcases, t)
 }

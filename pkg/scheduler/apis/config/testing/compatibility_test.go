@@ -103,7 +103,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			wantPrioritizers: sets.NewString(
 				"ServiceSpreadingPriority",
 				"TestServiceAntiAffinity",
-				"TestLabelPreference",
 			),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
@@ -116,6 +115,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				},
 				"ScorePlugin": {
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
+					{Name: "NodeLabel", Weight: 4},
 				},
 			},
 		},
@@ -149,9 +149,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"TestServiceAntiAffinity",
-				"TestLabelPreference",
 			),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
@@ -167,6 +165,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
+					{Name: "NodeLabel", Weight: 4},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 				},
 			},
 		},
@@ -205,9 +205,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"TestServiceAntiAffinity",
-				"TestLabelPreference",
 			),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
@@ -229,6 +227,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "ImageLocality", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
+					{Name: "NodeLabel", Weight: 4},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 				},
 			},
 		},
@@ -270,7 +270,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -294,6 +293,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "ImageLocality", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -338,7 +338,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -364,6 +363,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -417,7 +417,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -443,6 +442,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -507,7 +507,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -533,6 +532,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -598,7 +598,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -625,6 +624,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -693,7 +693,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -720,6 +719,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -800,7 +800,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -828,6 +827,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "RequestedToCapacityRatio", Weight: 2},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -909,7 +909,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -938,6 +937,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "RequestedToCapacityRatio", Weight: 2},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -1018,7 +1018,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -1048,6 +1047,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "RequestedToCapacityRatio", Weight: 2},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -1132,7 +1132,6 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			),
 			wantPrioritizers: sets.NewString(
 				"EqualPriority",
-				"SelectorSpreadPriority",
 				"InterPodAffinityPriority",
 			),
 			wantPlugins: map[string][]config.Plugin{
@@ -1162,6 +1161,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "NodePreferAvoidPods", Weight: 2},
 					{Name: "RequestedToCapacityRatio", Weight: 2},
+					{Name: "DefaultPodTopologySpread", Weight: 2},
 					{Name: "TaintToleration", Weight: 2},
 				},
 			},
@@ -1255,6 +1255,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		"PodTopologySpread":  "EvenPodsSpread",
 	}
 	scoreToPriorityMap := map[string]string{
+		"DefaultPodTopologySpread":        "SelectorSpreadPriority",
 		"ImageLocality":                   "ImageLocalityPriority",
 		"NodeAffinity":                    "NodeAffinityPriority",
 		"NodePreferAvoidPods":             "NodePreferAvoidPodsPriority",
@@ -1263,6 +1264,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 		"NodeResourcesBalancedAllocation": "BalancedResourceAllocation",
 		"NodeResourcesMostAllocated":      "MostRequestedPriority",
 		"RequestedToCapacityRatio":        "RequestedToCapacityRatioPriority",
+		"NodeLabel":                       "TestLabelPreference",
 	}
 
 	for _, tc := range testcases {

@@ -27,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	apiextensionsv1beta1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -399,18 +398,18 @@ func TestNodeAuthorizer(t *testing.T) {
 
 	getNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
-			_, err := client.StorageV1beta1().CSINodes().Get("node1", metav1.GetOptions{})
+			_, err := client.StorageV1().CSINodes().Get("node1", metav1.GetOptions{})
 			return err
 		}
 	}
 	createNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
-			nodeInfo := &storagev1beta1.CSINode{
+			nodeInfo := &storagev1.CSINode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "node1",
 				},
-				Spec: storagev1beta1.CSINodeSpec{
-					Drivers: []storagev1beta1.CSINodeDriver{
+				Spec: storagev1.CSINodeSpec{
+					Drivers: []storagev1.CSINodeDriver{
 						{
 							Name:         "com.example.csi.driver1",
 							NodeID:       "com.example.csi/node1",
@@ -419,24 +418,24 @@ func TestNodeAuthorizer(t *testing.T) {
 					},
 				},
 			}
-			_, err := client.StorageV1beta1().CSINodes().Create(nodeInfo)
+			_, err := client.StorageV1().CSINodes().Create(nodeInfo)
 			return err
 		}
 	}
 	updateNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
-			nodeInfo, err := client.StorageV1beta1().CSINodes().Get("node1", metav1.GetOptions{})
+			nodeInfo, err := client.StorageV1().CSINodes().Get("node1", metav1.GetOptions{})
 			if err != nil {
 				return err
 			}
-			nodeInfo.Spec.Drivers = []storagev1beta1.CSINodeDriver{
+			nodeInfo.Spec.Drivers = []storagev1.CSINodeDriver{
 				{
 					Name:         "com.example.csi.driver2",
 					NodeID:       "com.example.csi/node1",
 					TopologyKeys: []string{"com.example.csi/rack"},
 				},
 			}
-			_, err = client.StorageV1beta1().CSINodes().Update(nodeInfo)
+			_, err = client.StorageV1().CSINodes().Update(nodeInfo)
 			return err
 		}
 	}
@@ -444,13 +443,13 @@ func TestNodeAuthorizer(t *testing.T) {
 		return func() error {
 			bs := []byte(fmt.Sprintf(`{"csiDrivers": [ { "driver": "net.example.storage.driver2", "nodeID": "net.example.storage/node1", "topologyKeys": [ "net.example.storage/region" ] } ] }`))
 			// StrategicMergePatch is unsupported by CRs. Falling back to MergePatch
-			_, err := client.StorageV1beta1().CSINodes().Patch("node1", types.MergePatchType, bs)
+			_, err := client.StorageV1().CSINodes().Patch("node1", types.MergePatchType, bs)
 			return err
 		}
 	}
 	deleteNode1CSINode := func(client clientset.Interface) func() error {
 		return func() error {
-			return client.StorageV1beta1().CSINodes().Delete("node1", &metav1.DeleteOptions{})
+			return client.StorageV1().CSINodes().Delete("node1", &metav1.DeleteOptions{})
 		}
 	}
 

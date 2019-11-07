@@ -62,7 +62,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// setUp is a convience function for setting up for (most) tests.
+// setUp is a convenience function for setting up for (most) tests.
 func setUp(t *testing.T) (*etcd3testing.EtcdTestServer, Config, *assert.Assertions) {
 	server, storageConfig := etcd3testing.NewUnsecuredEtcd3TestClientServer(t)
 

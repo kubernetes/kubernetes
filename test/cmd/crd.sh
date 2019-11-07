@@ -243,7 +243,7 @@ run_non_native_resource_tests() {
   kubectl "${kube_flags[@]}" get foos/test -o json > "${CRD_RESOURCE_FILE}"
   # cannot apply strategic patch locally
   CRD_PATCH_ERROR_FILE="${KUBE_TEMP}/crd-foos-test-error"
-  ! kubectl "${kube_flags[@]}" patch --local -f "${CRD_RESOURCE_FILE}" -p '{"patched":"value3"}' 2> "${CRD_PATCH_ERROR_FILE}"
+  ! kubectl "${kube_flags[@]}" patch --local -f "${CRD_RESOURCE_FILE}" -p '{"patched":"value3"}' 2> "${CRD_PATCH_ERROR_FILE}" || exit 1
   if grep -q "try --type merge" "${CRD_PATCH_ERROR_FILE}"; then
     kube::log::status "\"kubectl patch --local\" returns error as expected for CustomResource: $(cat "${CRD_PATCH_ERROR_FILE}")"
   else

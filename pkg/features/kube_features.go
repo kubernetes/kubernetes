@@ -183,12 +183,6 @@ const (
 	// Enable nodes to exclude themselves from network disruption checks
 	NodeDisruptionExclusion featuregate.Feature = "NodeDisruptionExclusion"
 
-	// owner: @jsafrane
-	// alpha: v1.9
-	//
-	// Enable running mount utilities in containers.
-	MountContainers featuregate.Feature = "MountContainers"
-
 	// owner: @saad-ali
 	// alpha: v1.12
 	// beta:  v1.14
@@ -198,6 +192,7 @@ const (
 	// owner: @verult
 	// alpha: v1.12
 	// beta:  v1.14
+	// ga:    v1.17
 	// Enable all logic related to the CSINode API object in storage.k8s.io
 	CSINodeInfo featuregate.Feature = "CSINodeInfo"
 
@@ -532,9 +527,8 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	TopologyManager:                {Default: false, PreRelease: featuregate.Alpha},
 	ServiceNodeExclusion:           {Default: false, PreRelease: featuregate.Alpha},
 	NodeDisruptionExclusion:        {Default: false, PreRelease: featuregate.Alpha},
-	MountContainers:                {Default: false, PreRelease: featuregate.Alpha},
 	CSIDriverRegistry:              {Default: true, PreRelease: featuregate.Beta},
-	CSINodeInfo:                    {Default: true, PreRelease: featuregate.Beta},
+	CSINodeInfo:                    {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // remove in 1.19
 	BlockVolume:                    {Default: true, PreRelease: featuregate.Beta},
 	StorageObjectInUseProtection:   {Default: true, PreRelease: featuregate.GA},
 	ResourceLimitsPriorityFunction: {Default: false, PreRelease: featuregate.Alpha},
@@ -599,7 +593,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	apiextensionsfeatures.CustomResourceSubresources:      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	apiextensionsfeatures.CustomResourceWebhookConversion: {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	apiextensionsfeatures.CustomResourcePublishOpenAPI:    {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
-	apiextensionsfeatures.CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.Beta},
+	apiextensionsfeatures.CustomResourceDefaulting:        {Default: true, PreRelease: featuregate.GA, LockToDefault: true}, // TODO: remove in 1.18
 
 	// features that enable backwards compatibility but are scheduled to be removed
 	// ...

@@ -204,6 +204,7 @@ func (sched *Scheduler) deletePodFromSchedulingQueue(obj interface{}) {
 		// Volume binder only wants to keep unassigned pods
 		sched.VolumeBinder.DeletePodBindings(pod)
 	}
+	sched.Framework.RejectWaitingPod(pod.UID)
 }
 
 func (sched *Scheduler) addPodToCache(obj interface{}) {

@@ -338,13 +338,20 @@ func GetPredicateMetadata(pod *v1.Pod, sharedLister schedulerlisters.SharedListe
 	}
 
 	var allNodes []*schedulernodeinfo.NodeInfo
+	var havePodsWithAffinityNodes []*schedulernodeinfo.NodeInfo
 	if sharedLister != nil {
-		n, err := sharedLister.NodeInfos().List()
+		var err error
+		allNodes, err = sharedLister.NodeInfos().List()
 		if err != nil {
 			klog.Errorf("failed to list NodeInfos: %v", err)
 			return nil
 		}
-		allNodes = n
+		havePodsWithAffinityNodes, err = sharedLister.NodeInfos().HavePodsWithAffinityList()
+		if err != nil {
+			klog.Errorf("failed to list NodeInfos: %v", err)
+			return nil
+		}
+
 	}
 
 	// evenPodsSpreadMetadata represents how existing pods match "pod"
@@ -355,7 +362,7 @@ func GetPredicateMetadata(pod *v1.Pod, sharedLister schedulerlisters.SharedListe
 		return nil
 	}
 
-	podAffinityMetadata, err := getPodAffinityMetadata(pod, allNodes)
+	podAffinityMetadata, err := getPodAffinityMetadata(pod, allNodes, havePodsWithAffinityNodes)
 	if err != nil {
 		klog.Errorf("Error calculating podAffinityMetadata: %v", err)
 		return nil
@@ -387,9 +394,9 @@ func getPodFitsResourcesMetedata(pod *v1.Pod) *podFitsResourcesMetadata {
 	}
 }
 
-func getPodAffinityMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo) (*podAffinityMetadata, error) {
+func getPodAffinityMetadata(pod *v1.Pod, allNodes []*schedulernodeinfo.NodeInfo, havePodsWithAffinityNodes []*schedulernodeinfo.NodeInfo) (*podAffinityMetadata, error) {
 	// existingPodAntiAffinityMap will be used later for efficient check on existing pods' anti-affinity
-	existingPodAntiAffinityMap, err := getTPMapMatchingExistingAntiAffinity(pod, allNodes)
+	existingPodAntiAffinityMap, err := getTPMapMatchingExistingAntiAffinity(pod, havePodsWithAffinityNodes)
 	if err != nil {
 		return nil, err
 	}
@@ -759,7 +766,9 @@ func getTPMapMatchingExistingAntiAffinity(pod *v1.Pod, allNodes []*schedulernode
 				errCh.SendErrorWithCancel(err, cancel)
 				return
 			}
-			appendTopologyPairsMaps(existingPodTopologyMaps)
+			if existingPodTopologyMaps != nil {
+				appendTopologyPairsMaps(existingPodTopologyMaps)
+			}
 		}
 	}
 	workqueue.ParallelizeUntil(ctx, 16, len(allNodes), processNode)

@@ -31,9 +31,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	featuregatetesting "k8s.io/component-base/featuregate/testing"
+	api "k8s.io/kubernetes/pkg/apis/core"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
 	"k8s.io/kubernetes/pkg/features"
-	legacyapi "k8s.io/kubernetes/pkg/scheduler/api"
 	fakelisters "k8s.io/kubernetes/pkg/scheduler/listers/fake"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
@@ -1447,7 +1447,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1473,7 +1473,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1499,7 +1499,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1535,7 +1535,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1569,7 +1569,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1603,7 +1603,7 @@ func TestPodFitsSelector(t *testing.T) {
 									{
 										MatchFields: []v1.NodeSelectorRequirement{
 											{
-												Key:      legacyapi.NodeFieldSelectorKeyNodeName,
+												Key:      api.ObjectNameField,
 												Operator: v1.NodeSelectorOpIn,
 												Values:   []string{"node_1"},
 											},
@@ -1658,47 +1658,41 @@ func TestPodFitsSelector(t *testing.T) {
 func TestNodeLabelPresence(t *testing.T) {
 	label := map[string]string{"foo": "bar", "bar": "foo"}
 	tests := []struct {
-		pod      *v1.Pod
-		labels   []string
-		presence bool
-		fits     bool
-		name     string
+		pod           *v1.Pod
+		presentLabels []string
+		absentLabels  []string
+		fits          bool
+		name          string
 	}{
 		{
-			labels:   []string{"baz"},
-			presence: true,
-			fits:     false,
-			name:     "label does not match, presence true",
+			presentLabels: []string{"baz"},
+			fits:          false,
+			name:          "label does not match, presence true",
 		},
 		{
-			labels:   []string{"baz"},
-			presence: false,
-			fits:     true,
-			name:     "label does not match, presence false",
+			absentLabels: []string{"baz"},
+			fits:         true,
+			name:         "label does not match, presence false",
 		},
 		{
-			labels:   []string{"foo", "baz"},
-			presence: true,
-			fits:     false,
-			name:     "one label matches, presence true",
+			presentLabels: []string{"foo", "baz"},
+			fits:          false,
+			name:          "one label matches, presence true",
 		},
 		{
-			labels:   []string{"foo", "baz"},
-			presence: false,
-			fits:     false,
-			name:     "one label matches, presence false",
+			absentLabels: []string{"foo", "baz"},
+			fits:         false,
+			name:         "one label matches, presence false",
 		},
 		{
-			labels:   []string{"foo", "bar"},
-			presence: true,
-			fits:     true,
-			name:     "all labels match, presence true",
+			presentLabels: []string{"foo", "bar"},
+			fits:          true,
+			name:          "all labels match, presence true",
 		},
 		{
-			labels:   []string{"foo", "bar"},
-			presence: false,
-			fits:     false,
-			name:     "all labels match, presence false",
+			absentLabels: []string{"foo", "bar"},
+			fits:         false,
+			name:         "all labels match, presence false",
 		},
 	}
 	expectedFailureReasons := []PredicateFailureReason{ErrNodeLabelPresenceViolated}
@@ -1709,7 +1703,7 @@ func TestNodeLabelPresence(t *testing.T) {
 			nodeInfo := schedulernodeinfo.NewNodeInfo()
 			nodeInfo.SetNode(&node)
 
-			labelChecker := NodeLabelChecker{test.labels, test.presence}
+			labelChecker := NodeLabelChecker{test.presentLabels, test.absentLabels}
 			fits, reasons, err := labelChecker.CheckNodeLabelPresence(test.pod, GetPredicateMetadata(test.pod, nil), nodeInfo)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
@@ -4011,7 +4005,7 @@ func TestInterPodAffinityWithMultipleNodes(t *testing.T) {
 				"nodeA": false,
 				"nodeB": false,
 			},
-			name: "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satified on the same pod",
+			name: "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satisfied on the same pod",
 		},
 	}
 
@@ -4690,7 +4684,7 @@ func TestCheckNodeUnschedulablePredicate(t *testing.T) {
 				Spec: v1.PodSpec{
 					Tolerations: []v1.Toleration{
 						{
-							Key:    legacyapi.TaintNodeUnschedulable,
+							Key:    v1.TaintNodeUnschedulable,
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},
@@ -4764,7 +4758,7 @@ func TestEvenPodsSpreadPredicate_SingleConstraint(t *testing.T) {
 			},
 		},
 		{
-			name: "existing pods with mis-matched namespace doens't count",
+			name: "existing pods with mis-matched namespace doesn't count",
 			pod: st.MakePod().Name("p").Label("foo", "").SpreadConstraint(
 				1, "zone", hardSpread, st.MakeLabelSelector().Exists("foo").Obj(),
 			).Obj(),

@@ -27,7 +27,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
-	storagev1beta1 "k8s.io/api/storage/v1beta1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -276,7 +275,7 @@ var _ = utils.SIGDescribe("CSI mock volume", func() {
 				handle := getVolumeHandle(m.cs, claim)
 				attachmentHash := sha256.Sum256([]byte(fmt.Sprintf("%s%s%s", handle, m.provisioner, m.config.ClientNodeName)))
 				attachmentName := fmt.Sprintf("csi-%x", attachmentHash)
-				_, err = m.cs.StorageV1beta1().VolumeAttachments().Get(attachmentName, metav1.GetOptions{})
+				_, err = m.cs.StorageV1().VolumeAttachments().Get(attachmentName, metav1.GetOptions{})
 				if err != nil {
 					if errors.IsNotFound(err) {
 						if !test.disableAttach {
@@ -616,7 +615,7 @@ func checkCSINodeForLimits(nodeName string, driverName string, cs clientset.Inte
 	var attachLimit int32
 
 	waitErr := wait.PollImmediate(10*time.Second, csiNodeLimitUpdateTimeout, func() (bool, error) {
-		csiNode, err := cs.StorageV1beta1().CSINodes().Get(nodeName, metav1.GetOptions{})
+		csiNode, err := cs.StorageV1().CSINodes().Get(nodeName, metav1.GetOptions{})
 		if err != nil && !errors.IsNotFound(err) {
 			return false, err
 		}
@@ -841,7 +840,7 @@ func getVolumeHandle(cs clientset.Interface, claim *v1.PersistentVolumeClaim) st
 	return pv.Spec.CSI.VolumeHandle
 }
 
-func getVolumeLimitFromCSINode(csiNode *storagev1beta1.CSINode, driverName string) int32 {
+func getVolumeLimitFromCSINode(csiNode *storagev1.CSINode, driverName string) int32 {
 	for _, d := range csiNode.Spec.Drivers {
 		if d.Name != driverName {
 			continue

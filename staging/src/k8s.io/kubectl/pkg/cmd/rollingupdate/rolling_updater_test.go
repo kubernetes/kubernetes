@@ -1488,13 +1488,13 @@ func TestUpdateRcWithRetries(t *testing.T) {
 	header := http.Header{}
 	header.Set("Content-Type", runtime.ContentTypeJSON)
 	updates := []*http.Response{
-		{StatusCode: 409, Header: header, Body: objBody(codec, &corev1.ReplicationController{})}, // conflict
-		{StatusCode: 409, Header: header, Body: objBody(codec, &corev1.ReplicationController{})}, // conflict
-		{StatusCode: 200, Header: header, Body: objBody(codec, &newRc)},
+		{StatusCode: http.StatusConflict, Header: header, Body: objBody(codec, &corev1.ReplicationController{})}, // conflict
+		{StatusCode: http.StatusConflict, Header: header, Body: objBody(codec, &corev1.ReplicationController{})}, // conflict
+		{StatusCode: http.StatusOK, Header: header, Body: objBody(codec, &newRc)},
 	}
 	gets := []*http.Response{
-		{StatusCode: 500, Header: header, Body: objBody(codec, &corev1.ReplicationController{})},
-		{StatusCode: 200, Header: header, Body: objBody(codec, rc)},
+		{StatusCode: http.StatusInternalServerError, Header: header, Body: objBody(codec, &corev1.ReplicationController{})},
+		{StatusCode: http.StatusOK, Header: header, Body: objBody(codec, rc)},
 	}
 	fakeClient := &manualfake.RESTClient{
 		GroupVersion:         corev1.SchemeGroupVersion,
@@ -1609,25 +1609,25 @@ func TestAddDeploymentHash(t *testing.T) {
 				if req.URL.RawQuery != "labelSelector=foo%3Dbar" {
 					t.Errorf("Unexpected query string: %s", req.URL.RawQuery)
 				}
-				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, podList)}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: header, Body: objBody(codec, podList)}, nil
 			case p == "/api/v1/namespaces/default/pods/foo" && m == "PUT":
 				seen.Insert("foo")
 				obj := readOrDie(t, req, codec)
 				podList.Items[0] = *(obj.(*corev1.Pod))
-				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, &podList.Items[0])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: header, Body: objBody(codec, &podList.Items[0])}, nil
 			case p == "/api/v1/namespaces/default/pods/bar" && m == "PUT":
 				seen.Insert("bar")
 				obj := readOrDie(t, req, codec)
 				podList.Items[1] = *(obj.(*corev1.Pod))
-				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, &podList.Items[1])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: header, Body: objBody(codec, &podList.Items[1])}, nil
 			case p == "/api/v1/namespaces/default/pods/baz" && m == "PUT":
 				seen.Insert("baz")
 				obj := readOrDie(t, req, codec)
 				podList.Items[2] = *(obj.(*corev1.Pod))
-				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, &podList.Items[2])}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: header, Body: objBody(codec, &podList.Items[2])}, nil
 			case p == "/api/v1/namespaces/default/replicationcontrollers/rc" && m == "PUT":
 				updatedRc = true
-				return &http.Response{StatusCode: 200, Header: header, Body: objBody(codec, rc)}, nil
+				return &http.Response{StatusCode: http.StatusOK, Header: header, Body: objBody(codec, rc)}, nil
 			default:
 				t.Fatalf("unexpected request: %#v\n%#v", req.URL, req)
 				return nil, nil

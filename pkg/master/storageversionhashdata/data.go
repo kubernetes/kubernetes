@@ -81,6 +81,7 @@ var GVRToStorageVersionHash = map[string]string{
 	"rbac.authorization.k8s.io/v1beta1/roles":                              "7FuwZcIIItM=",
 	"scheduling.k8s.io/v1beta1/priorityclasses":                            "1QwjyaZjj3Y=",
 	"scheduling.k8s.io/v1/priorityclasses":                                 "1QwjyaZjj3Y=",
+	"storage.k8s.io/v1/csinodes":                                           "Pe62DkZtjuo=",
 	"storage.k8s.io/v1/storageclasses":                                     "K+m6uJwbjGY=",
 	"storage.k8s.io/v1/volumeattachments":                                  "vQAqD28V4AY=",
 	"storage.k8s.io/v1beta1/csidrivers":                                    "hL6j/rwBV5w=",

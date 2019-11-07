@@ -73,6 +73,9 @@ go_test(
         "//staging/src/k8s.io/apiserver/pkg/util/feature:go_default_library",
         "//staging/src/k8s.io/component-base/featuregate/testing:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//staging/src/k8s.io/client-go/util/testing:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         ],
@@ -91,7 +94,6 @@ filegroup(
     name = "all-srcs",
     srcs = [
         ":package-srcs",
-        "//pkg/volume/util/exec:all-srcs",
         "//pkg/volume/util/fs:all-srcs",
         "//pkg/volume/util/fsquota:all-srcs",
         "//pkg/volume/util/hostutil:all-srcs",

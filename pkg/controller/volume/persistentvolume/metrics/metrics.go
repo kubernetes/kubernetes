@@ -98,7 +98,7 @@ var (
 	volumeOperationErrorsMetric = metrics.NewCounterVec(
 		&metrics.CounterOpts{
 			Name:           "volume_operation_total_errors",
-			Help:           "Total volume operation erros",
+			Help:           "Total volume operation errors",
 			StabilityLevel: metrics.ALPHA,
 		},
 		[]string{"plugin_name", "operation_name"})

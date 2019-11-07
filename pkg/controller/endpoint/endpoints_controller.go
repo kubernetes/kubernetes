@@ -506,6 +506,11 @@ func (e *EndpointController) syncService(key string) error {
 			// 2. policy is misconfigured, in which case no service would function anywhere.
 			// Given the frequency of 1, we log at a lower level.
 			klog.V(5).Infof("Forbidden from creating endpoints: %v", err)
+
+			// If the namespace is terminating, creates will continue to fail. Simply drop the item.
+			if errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+				return nil
+			}
 		}
 
 		if createEndpoints {

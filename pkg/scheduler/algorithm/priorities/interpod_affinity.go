@@ -106,9 +106,16 @@ func (ipa *InterPodAffinity) CalculateInterPodAffinityPriority(pod *v1.Pod, shar
 
 	// pm stores (1) all nodes that should be considered and (2) the so-far computed score for each node.
 	pm := newPodAffinityPriorityMap(nodes)
-	allNodes, err := sharedLister.NodeInfos().List()
+
+	allNodes, err := sharedLister.NodeInfos().HavePodsWithAffinityList()
 	if err != nil {
 		return nil, err
+	}
+	if hasAffinityConstraints || hasAntiAffinityConstraints {
+		allNodes, err = sharedLister.NodeInfos().List()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// convert the topology key based weights to the node name based weights

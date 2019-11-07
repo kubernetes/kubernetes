@@ -21,7 +21,6 @@ go_library(
         "//pkg/features:go_default_library",
         "//pkg/scheduler/algorithm:go_default_library",
         "//pkg/scheduler/algorithm/priorities/util:go_default_library",
-        "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/listers:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/util:go_default_library",
@@ -58,9 +57,9 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/v1/helper:go_default_library",
         "//pkg/features:go_default_library",
-        "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/listers/fake:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/scheduler/nodeinfo/snapshot:go_default_library",

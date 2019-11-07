@@ -627,6 +627,14 @@ func (f *framework) GetWaitingPod(uid types.UID) WaitingPod {
 	return f.waitingPods.get(uid)
 }
 
+// RejectWaitingPod rejects a WaitingPod given its UID.
+func (f *framework) RejectWaitingPod(uid types.UID) {
+	waitingPod := f.waitingPods.get(uid)
+	if waitingPod != nil {
+		waitingPod.Reject("removed")
+	}
+}
+
 // HasFilterPlugins returns true if at least one filter plugin is defined.
 func (f *framework) HasFilterPlugins() bool {
 	return len(f.filterPlugins) > 0

@@ -159,14 +159,6 @@ func (f *Framework) BeforeEach() {
 		ginkgo.By("Creating a kubernetes client")
 		config, err := LoadConfig()
 		ExpectNoError(err)
-		testDesc := ginkgo.CurrentGinkgoTestDescription()
-		if len(testDesc.ComponentTexts) > 0 {
-			componentTexts := strings.Join(testDesc.ComponentTexts, " ")
-			config.UserAgent = fmt.Sprintf(
-				"%v -- %v",
-				rest.DefaultKubernetesUserAgent(),
-				componentTexts)
-		}
 
 		config.QPS = f.Options.ClientQPS
 		config.Burst = f.Options.ClientBurst
@@ -478,7 +470,7 @@ func (f *Framework) WriteFileViaContainer(podName, containerName string, path st
 			return fmt.Errorf("Unsupported character in string to write: %v", c)
 		}
 	}
-	command := fmt.Sprintf("\"echo '%s' > '%s'; sync\"", contents, path)
+	command := fmt.Sprintf("echo '%s' > '%s'; sync", contents, path)
 	stdout, stderr, err := kubectlExecWithRetry(f.Namespace.Name, podName, containerName, "--", "/bin/sh", "-c", command)
 	if err != nil {
 		Logf("error running kubectl exec to write file: %v\nstdout=%v\nstderr=%v)", err, string(stdout), string(stderr))

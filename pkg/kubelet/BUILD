@@ -63,7 +63,6 @@ go_library(
         "//pkg/kubelet/logs:go_default_library",
         "//pkg/kubelet/metrics:go_default_library",
         "//pkg/kubelet/metrics/collectors:go_default_library",
-        "//pkg/kubelet/mountpod:go_default_library",
         "//pkg/kubelet/network/dns:go_default_library",
         "//pkg/kubelet/nodelease:go_default_library",
         "//pkg/kubelet/nodestatus:go_default_library",
@@ -108,7 +107,6 @@ go_library(
         "//pkg/volume:go_default_library",
         "//pkg/volume/csi:go_default_library",
         "//pkg/volume/util:go_default_library",
-        "//pkg/volume/util/exec:go_default_library",
         "//pkg/volume/util/hostutil:go_default_library",
         "//pkg/volume/util/subpath:go_default_library",
         "//pkg/volume/util/types:go_default_library",
@@ -207,7 +205,6 @@ go_test(
         "//pkg/kubelet/util/queue:go_default_library",
         "//pkg/kubelet/util/sliceutils:go_default_library",
         "//pkg/kubelet/volumemanager:go_default_library",
-        "//pkg/scheduler/api:go_default_library",
         "//pkg/scheduler/nodeinfo:go_default_library",
         "//pkg/util/mount:go_default_library",
         "//pkg/util/taints:go_default_library",
@@ -252,6 +249,9 @@ go_test(
         "//vendor/github.com/stretchr/testify/assert:go_default_library",
         "//vendor/github.com/stretchr/testify/require:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/cri-api/pkg/apis/runtime/v1alpha2:go_default_library",
         ],
@@ -293,7 +293,6 @@ filegroup(
         "//pkg/kubelet/lifecycle:all-srcs",
         "//pkg/kubelet/logs:all-srcs",
         "//pkg/kubelet/metrics:all-srcs",
-        "//pkg/kubelet/mountpod:all-srcs",
         "//pkg/kubelet/network:all-srcs",
         "//pkg/kubelet/nodelease:all-srcs",
         "//pkg/kubelet/nodestatus:all-srcs",

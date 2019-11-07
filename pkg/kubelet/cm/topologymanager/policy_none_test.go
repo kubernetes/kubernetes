@@ -58,7 +58,7 @@ func TestPolicyNoneCanAdmitPodResult(t *testing.T) {
 
 	for _, tc := range tcases {
 		policy := NewNonePolicy()
-		result := policy.CanAdmitPodResult(&tc.hint)
+		result := policy.(*nonePolicy).canAdmitPodResult(&tc.hint)
 
 		if result.Admit != tc.expected {
 			t.Errorf("Expected Admit field in result to be %t, got %t", tc.expected, result.Admit)

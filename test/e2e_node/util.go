@@ -34,6 +34,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/component-base/featuregate"
 	internalapi "k8s.io/cri-api/pkg/apis"
@@ -332,15 +333,27 @@ func newKubeletConfigMap(name string, internalKC *kubeletconfig.KubeletConfigura
 	return cmap
 }
 
+// listNamespaceEvents lists the events in the given namespace.
+func listNamespaceEvents(c clientset.Interface, ns string) error {
+	ls, err := c.CoreV1().Events(ns).List(metav1.ListOptions{})
+	if err != nil {
+		return err
+	}
+	for _, event := range ls.Items {
+		klog.Infof("Event(%#v): type: '%v' reason: '%v' %v", event.InvolvedObject, event.Type, event.Reason, event.Message)
+	}
+	return nil
+}
+
 func logPodEvents(f *framework.Framework) {
 	framework.Logf("Summary of pod events during the test:")
-	err := framework.ListNamespaceEvents(f.ClientSet, f.Namespace.Name)
+	err := listNamespaceEvents(f.ClientSet, f.Namespace.Name)
 	framework.ExpectNoError(err)
 }
 
 func logNodeEvents(f *framework.Framework) {
 	framework.Logf("Summary of node events during the test:")
-	err := framework.ListNamespaceEvents(f.ClientSet, "")
+	err := listNamespaceEvents(f.ClientSet, "")
 	framework.ExpectNoError(err)
 }
 

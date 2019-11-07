@@ -81,7 +81,7 @@ const (
 
 	// serviceLoadBalancerFinalizerFeature is the feature gate name that
 	// enables Finalizer Protection for Service LoadBalancers.
-	// orginated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L433
+	// originated from: https://github.com/kubernetes/kubernetes/blob/28e800245e/pkg/features/kube_features.go#L433
 	serviceLoadBalancerFinalizerFeature = "ServiceLoadBalancerFinalizer"
 
 	// legacyNodeRoleBehaviro is the feature gate name that enables legacy

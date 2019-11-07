@@ -85,3 +85,22 @@ func RawRegister(c prometheus.Collector) error {
 	prometheus.Register(c)
 	return err
 }
+
+// CustomRegister registers a custom collector but uses the global registry.
+func CustomRegister(c metrics.StableCollector) error {
+	err := defaultRegistry.CustomRegister(c)
+
+	//TODO(RainbowMango): Maybe we can wrap this error by error wrapping.(Golang 1.13)
+	_ = prometheus.Register(c)
+
+	return err
+}
+
+// CustomMustRegister registers custom collectors but uses the global registry.
+func CustomMustRegister(cs ...metrics.StableCollector) {
+	defaultRegistry.CustomMustRegister(cs...)
+
+	for _, c := range cs {
+		prometheus.MustRegister(c)
+	}
+}

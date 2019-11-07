@@ -1093,7 +1093,7 @@ func TestVolumeModeCheck(t *testing.T) {
 			pvc:                makeVolumeModePVC("8G", &filesystemMode, nil),
 			enableBlock:        true,
 		},
-		"feature enabled - pvc nil and pv filesytem": {
+		"feature enabled - pvc nil and pv filesystem": {
 			isExpectedMismatch: false,
 			vol:                createVolumeModeFilesystemTestVolume(),
 			pvc:                makeVolumeModePVC("8G", nil, nil),

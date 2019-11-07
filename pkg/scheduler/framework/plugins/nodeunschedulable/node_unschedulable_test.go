@@ -23,7 +23,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
@@ -60,7 +59,7 @@ func TestNodeUnschedulable(t *testing.T) {
 				Spec: v1.PodSpec{
 					Tolerations: []v1.Toleration{
 						{
-							Key:    schedulerapi.TaintNodeUnschedulable,
+							Key:    v1.TaintNodeUnschedulable,
 							Effect: v1.TaintEffectNoSchedule,
 						},
 					},

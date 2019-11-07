@@ -11,7 +11,9 @@ go_library(
     deps = [
         "//pkg/api/v1/pod:go_default_library",
         "//pkg/controller:go_default_library",
+        "//pkg/util/hash:go_default_library",
         "//staging/src/k8s.io/api/core/v1:go_default_library",
+        "//staging/src/k8s.io/api/discovery/v1alpha1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/util/sets:go_default_library",
         "//staging/src/k8s.io/client-go/listers/core/v1:go_default_library",

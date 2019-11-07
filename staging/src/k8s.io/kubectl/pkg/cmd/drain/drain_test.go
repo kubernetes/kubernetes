@@ -175,9 +175,9 @@ func TestCordon(t *testing.T) {
 					case m.isFor("GET", "/nodes/node2"):
 						fallthrough
 					case m.isFor("GET", "/nodes/node"):
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
 					case m.isFor("GET", "/nodes/bar"):
-						return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("nope")}, nil
+						return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.StringBody("nope")}, nil
 					case m.isFor("PATCH", "/nodes/node1"):
 						fallthrough
 					case m.isFor("PATCH", "/nodes/node2"):
@@ -203,7 +203,7 @@ func TestCordon(t *testing.T) {
 							t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec.Unschedulable, newNode.Spec.Unschedulable)
 						}
 						updated = true
-						return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
+						return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
 					default:
 						t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 						return nil, nil
@@ -777,19 +777,19 @@ func TestDrain(t *testing.T) {
 							}
 							return cmdtesting.GenResponseWithJsonEncodedBody(resourceList)
 						case m.isFor("GET", "/nodes/node"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, test.node)}, nil
 						case m.isFor("GET", "/namespaces/default/replicationcontrollers/rc"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.rcs[0])}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.rcs[0])}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/ds"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &ds)}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &ds)}, nil
 						case m.isFor("GET", "/namespaces/default/daemonsets/missing-ds"):
-							return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.DaemonSet{})}, nil
+							return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &appsv1.DaemonSet{})}, nil
 						case m.isFor("GET", "/namespaces/default/jobs/job"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &job)}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &job)}, nil
 						case m.isFor("GET", "/namespaces/default/replicasets/rs"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.replicaSets[0])}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.replicaSets[0])}, nil
 						case m.isFor("GET", "/namespaces/default/pods/bar"):
-							return &http.Response{StatusCode: 404, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.Pod{})}, nil
+							return &http.Response{StatusCode: http.StatusNotFound, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.Pod{})}, nil
 						case m.isFor("GET", "/pods"):
 							if test.failUponEvictionOrDeletion && atomic.LoadInt32(&evictions) > 0 || atomic.LoadInt32(&deletions) > 0 {
 								return nil, errors.New("request failed")
@@ -803,9 +803,9 @@ func TestDrain(t *testing.T) {
 							if !reflect.DeepEqual(getParams, values) {
 								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, getParams, values)
 							}
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.PodList{Items: test.pods})}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.PodList{Items: test.pods})}, nil
 						case m.isFor("GET", "/replicationcontrollers"):
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.ReplicationControllerList{Items: test.rcs})}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &corev1.ReplicationControllerList{Items: test.rcs})}, nil
 						case m.isFor("PATCH", "/nodes/node"):
 							data, err := ioutil.ReadAll(req.Body)
 							if err != nil {
@@ -826,19 +826,19 @@ func TestDrain(t *testing.T) {
 							if !reflect.DeepEqual(test.expected.Spec, newNode.Spec) {
 								t.Fatalf("%s: expected:\n%v\nsaw:\n%v\n", test.description, test.expected.Spec, newNode.Spec)
 							}
-							return &http.Response{StatusCode: 200, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
+							return &http.Response{StatusCode: http.StatusOK, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, newNode)}, nil
 						case m.isFor("DELETE", "/namespaces/default/pods/bar"):
 							atomic.AddInt32(&deletions, 1)
 							if test.failUponEvictionOrDeletion {
 								return nil, errors.New("request failed")
 							}
-							return &http.Response{StatusCode: 204, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.pods[0])}, nil
+							return &http.Response{StatusCode: http.StatusNoContent, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &test.pods[0])}, nil
 						case m.isFor("POST", "/namespaces/default/pods/bar/eviction"):
 							atomic.AddInt32(&evictions, 1)
 							if test.failUponEvictionOrDeletion {
 								return nil, errors.New("request failed")
 							}
-							return &http.Response{StatusCode: 201, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &policyv1beta1.Eviction{})}, nil
+							return &http.Response{StatusCode: http.StatusCreated, Header: cmdtesting.DefaultHeader(), Body: cmdtesting.ObjBody(codec, &policyv1beta1.Eviction{})}, nil
 						default:
 							t.Fatalf("%s: unexpected request: %v %#v\n%#v", test.description, req.Method, req.URL, req)
 							return nil, nil

@@ -357,7 +357,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: 0}, {Name: "machine2", Score: framework.MaxNodeScore}, {Name: "machine3", Score: 0}},
-			name:         "Affinity symmetry: considred only the preferredDuringSchedulingIgnoredDuringExecution in pod affinity symmetry",
+			name:         "Affinity symmetry: considered only the preferredDuringSchedulingIgnoredDuringExecution in pod affinity symmetry",
 		},
 		{
 			pod: &v1.Pod{Spec: v1.PodSpec{NodeName: ""}, ObjectMeta: metav1.ObjectMeta{Labels: podLabelSecurityS1}},
@@ -371,7 +371,7 @@ func TestInterPodAffinityPriority(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "machine3", Labels: labelAzAz1}},
 			},
 			expectedList: []framework.NodeScore{{Name: "machine1", Score: framework.MaxNodeScore}, {Name: "machine2", Score: framework.MaxNodeScore}, {Name: "machine3", Score: 0}},
-			name:         "Affinity symmetry: considred RequiredDuringSchedulingIgnoredDuringExecution in pod affinity symmetry",
+			name:         "Affinity symmetry: considered RequiredDuringSchedulingIgnoredDuringExecution in pod affinity symmetry",
 		},
 
 		// The pod to schedule prefer to stay away from some existing pods at node level using the pod anti affinity.

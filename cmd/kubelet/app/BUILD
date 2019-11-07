@@ -14,15 +14,14 @@ go_test(
     ],
     embed = [":go_default_library"],
     deps = [
+        "//pkg/apis/certificates/v1beta1:go_default_library",
+        "//pkg/controller/certificates/authority:go_default_library",
         "//staging/src/k8s.io/api/certificates/v1beta1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/runtime:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/client-go/rest:go_default_library",
         "//staging/src/k8s.io/client-go/util/cert:go_default_library",
-        "//vendor/github.com/cloudflare/cfssl/config:go_default_library",
-        "//vendor/github.com/cloudflare/cfssl/signer:go_default_library",
-        "//vendor/github.com/cloudflare/cfssl/signer/local:go_default_library",
     ],
 )
 
@@ -147,6 +146,9 @@ go_library(
         "//vendor/k8s.io/klog:go_default_library",
         "//vendor/k8s.io/utils/exec:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/k8s.io/utils/inotify:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/k8s.io/utils/inotify:go_default_library",
         ],

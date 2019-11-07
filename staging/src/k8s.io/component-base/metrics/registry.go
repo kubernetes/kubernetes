@@ -78,6 +78,8 @@ type KubeRegistry interface {
 	RawRegister(prometheus.Collector) error
 	// Deprecated
 	RawMustRegister(...prometheus.Collector)
+	CustomRegister(c StableCollector) error
+	CustomMustRegister(cs ...StableCollector)
 	Register(Registerable) error
 	MustRegister(...Registerable)
 	Unregister(Registerable) bool
@@ -115,6 +117,29 @@ func (kr *kubeRegistry) MustRegister(cs ...Registerable) {
 		}
 	}
 	kr.PromRegistry.MustRegister(metrics...)
+}
+
+// CustomRegister registers a new custom collector.
+func (kr *kubeRegistry) CustomRegister(c StableCollector) error {
+	if c.Create(&kr.version, c) {
+		return kr.PromRegistry.Register(c)
+	}
+
+	return nil
+}
+
+// CustomMustRegister works like CustomRegister but registers any number of
+// StableCollectors and panics upon the first registration that causes an
+// error.
+func (kr *kubeRegistry) CustomMustRegister(cs ...StableCollector) {
+	collectors := make([]prometheus.Collector, 0, len(cs))
+	for _, c := range cs {
+		if c.Create(&kr.version, c) {
+			collectors = append(collectors, c)
+		}
+	}
+
+	kr.PromRegistry.MustRegister(collectors...)
 }
 
 // RawRegister takes a native prometheus.Collector and registers the collector

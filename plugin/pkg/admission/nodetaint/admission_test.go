@@ -22,6 +22,7 @@ import (
 
 	"testing"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apiserver/pkg/admission"
@@ -33,7 +34,7 @@ func Test_nodeTaints(t *testing.T) {
 	var (
 		mynode            = &user.DefaultInfo{Name: "system:node:mynode", Groups: []string{"system:nodes"}}
 		resource          = api.Resource("nodes").WithVersion("v1")
-		notReadyTaint     = api.Taint{Key: TaintNodeNotReady, Effect: api.TaintEffectNoSchedule}
+		notReadyTaint     = api.Taint{Key: v1.TaintNodeNotReady, Effect: api.TaintEffectNoSchedule}
 		notReadyCondition = api.NodeCondition{Type: api.NodeReady, Status: api.ConditionFalse}
 		myNodeObjMeta     = metav1.ObjectMeta{Name: "mynode"}
 		myNodeObj         = api.Node{ObjectMeta: myNodeObjMeta}

@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# shellcheck disable=SC2034 # Variables sourced in other scripts.
+
 # The golang package that we are building.
 readonly KUBE_GO_PACKAGE=k8s.io/kubernetes
 readonly KUBE_GOPATH="${KUBE_OUTPUT}/go"
@@ -466,7 +468,7 @@ EOF
   local go_version
   IFS=" " read -ra go_version <<< "$(go version)"
   local minimum_go_version
-  minimum_go_version=go1.12.4
+  minimum_go_version=go1.13.4
   if [[ "${minimum_go_version}" != $(echo -e "${minimum_go_version}\n${go_version[2]}" | sort -s -t. -k 1,1 -k 2,2n -k 3,3n | head -n1) && "${go_version[2]}" != "devel" ]]; then
     kube::log::usage_from_stdin <<EOF
 Detected go version: ${go_version[*]}.

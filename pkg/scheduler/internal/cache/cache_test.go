@@ -37,7 +37,7 @@ import (
 
 func deepEqualWithoutGeneration(t *testing.T, testcase int, actual *nodeInfoListItem, expected *schedulernodeinfo.NodeInfo) {
 	if (actual == nil) != (expected == nil) {
-		t.Error("One of the actual or expeted is nil and the other is not!")
+		t.Error("One of the actual or expected is nil and the other is not!")
 	}
 	// Ignore generation field.
 	if actual != nil {
@@ -386,7 +386,7 @@ func TestSnapshot(t *testing.T) {
 
 		snapshot := cache.Snapshot()
 		if len(snapshot.Nodes) != len(cache.nodes) {
-			t.Errorf("Unequal number of nodes in the cache and its snapshot. expeted: %v, got: %v", len(cache.nodes), len(snapshot.Nodes))
+			t.Errorf("Unequal number of nodes in the cache and its snapshot. expected: %v, got: %v", len(cache.nodes), len(snapshot.Nodes))
 		}
 		for name, ni := range snapshot.Nodes {
 			nItem := cache.nodes[name]

@@ -34,16 +34,14 @@ import (
 	"testing"
 	"time"
 
-	cfsslconfig "github.com/cloudflare/cfssl/config"
-	cfsslsigner "github.com/cloudflare/cfssl/signer"
-	cfssllocal "github.com/cloudflare/cfssl/signer/local"
-
 	certapi "k8s.io/api/certificates/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	restclient "k8s.io/client-go/rest"
 	certutil "k8s.io/client-go/util/cert"
+	capihelper "k8s.io/kubernetes/pkg/apis/certificates/v1beta1"
+	"k8s.io/kubernetes/pkg/controller/certificates/authority"
 )
 
 // Test_buildClientCertificateManager validates that we can build a local client cert
@@ -297,28 +295,22 @@ func (s *csrSimulator) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		csr = csr.DeepCopy()
 		csr.ResourceVersion = "2"
-		var usages []string
-		for _, usage := range csr.Spec.Usages {
-			usages = append(usages, string(usage))
+		ca := &authority.CertificateAuthority{
+			Certificate: s.serverCA,
+			PrivateKey:  s.serverPrivateKey,
+			Backdate:    s.backdate,
 		}
-		policy := &cfsslconfig.Signing{
-			Default: &cfsslconfig.SigningProfile{
-				Usage:        usages,
-				Expiry:       time.Hour,
-				ExpiryString: time.Hour.String(),
-				Backdate:     s.backdate,
-			},
-		}
-		cfs, err := cfssllocal.NewSigner(s.serverPrivateKey, s.serverCA, cfsslsigner.DefaultSigAlgo(s.serverPrivateKey), policy)
+		cr, err := capihelper.ParseCSR(csr)
 		if err != nil {
 			t.Fatal(err)
 		}
-		csr.Status.Certificate, err = cfs.Sign(cfsslsigner.SignRequest{
-			Request: string(csr.Spec.Request),
+		der, err := ca.Sign(cr.Raw, authority.PermissiveSigningPolicy{
+			TTL: time.Hour,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
+		csr.Status.Certificate = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
 		csr.Status.Conditions = []certapi.CertificateSigningRequestCondition{
 			{Type: certapi.CertificateApproved},
 		}

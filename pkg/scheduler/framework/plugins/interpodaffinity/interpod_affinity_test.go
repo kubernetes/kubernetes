@@ -1426,7 +1426,7 @@ func TestMultipleNodes(t *testing.T) {
 				{ObjectMeta: metav1.ObjectMeta{Name: "nodeB", Labels: map[string]string{"region": "r1", "zone": "z2", "hostname": "nodeB"}}},
 			},
 			wantStatuses: []*framework.Status{unschedulableAndUnresolvable, unschedulableAndUnresolvable},
-			name:         "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satified on the same pod",
+			name:         "Test incoming pod's affinity: firstly check if all affinityTerms match, and then check if all topologyKeys match, and the match logic should be satisfied on the same pod",
 		},
 	}
 

@@ -42,7 +42,7 @@ import (
 
 const (
 	// TODO (k82cn): Figure out a reasonable number of workers/channels and propagate
-	// the number of workers up making it a paramater of Run() function.
+	// the number of workers up making it a parameter of Run() function.
 
 	// NodeUpdateChannelSize defines the size of channel for node update events.
 	NodeUpdateChannelSize = 10

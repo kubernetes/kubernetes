@@ -70,7 +70,7 @@ go_library(
         "//test/e2e/framework/node:go_default_library",
         "//test/utils:go_default_library",
         "//vendor/github.com/go-openapi/spec:go_default_library",
-        "//vendor/github.com/pborman/uuid:go_default_library",
+        "//vendor/github.com/google/uuid:go_default_library",
         "//vendor/go.etcd.io/etcd/clientv3:go_default_library",
         "//vendor/google.golang.org/grpc/grpclog:go_default_library",
         "//vendor/k8s.io/klog:go_default_library",

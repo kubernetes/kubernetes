@@ -43,7 +43,6 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm"
 	priorityutil "k8s.io/kubernetes/pkg/scheduler/algorithm/priorities/util"
-	legacyapi "k8s.io/kubernetes/pkg/scheduler/api"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
@@ -940,16 +939,18 @@ func PodFitsHost(pod *v1.Pod, meta PredicateMetadata, nodeInfo *schedulernodeinf
 
 // NodeLabelChecker contains information to check node labels for a predicate.
 type NodeLabelChecker struct {
-	labels   []string
-	presence bool
+	// presentLabels should be present for the node to be considered a fit for hosting the pod
+	presentLabels []string
+	// absentLabels should be absent for the node to be considered a fit for hosting the pod
+	absentLabels []string
 }
 
 // NewNodeLabelPredicate creates a predicate which evaluates whether a pod can fit based on the
 // node labels which match a filter that it requests.
-func NewNodeLabelPredicate(labels []string, presence bool) FitPredicate {
+func NewNodeLabelPredicate(presentLabels []string, absentLabels []string) FitPredicate {
 	labelChecker := &NodeLabelChecker{
-		labels:   labels,
-		presence: presence,
+		presentLabels: presentLabels,
+		absentLabels:  absentLabels,
 	}
 	return labelChecker.CheckNodeLabelPresence
 }
@@ -972,15 +973,21 @@ func (n *NodeLabelChecker) CheckNodeLabelPresence(pod *v1.Pod, meta PredicateMet
 		return false, nil, fmt.Errorf("node not found")
 	}
 
-	var exists bool
 	nodeLabels := labels.Set(node.Labels)
-	for _, label := range n.labels {
-		exists = nodeLabels.Has(label)
-		if (exists && !n.presence) || (!exists && n.presence) {
-			return false, []PredicateFailureReason{ErrNodeLabelPresenceViolated}, nil
+	check := func(labels []string, presence bool) bool {
+		for _, label := range labels {
+			exists := nodeLabels.Has(label)
+			if (exists && !presence) || (!exists && presence) {
+				return false
+			}
 		}
+		return true
 	}
-	return true, nil, nil
+	if check(n.presentLabels, true) && check(n.absentLabels, false) {
+		return true, nil, nil
+	}
+
+	return false, []PredicateFailureReason{ErrNodeLabelPresenceViolated}, nil
 }
 
 // ServiceAffinity defines a struct used for creating service affinity predicates.
@@ -1029,7 +1036,7 @@ func NewServiceAffinityPredicate(nodeInfoLister schedulerlisters.NodeInfoLister,
 }
 
 // checkServiceAffinity is a predicate which matches nodes in such a way to force that
-// ServiceAffinity.labels are homogenous for pods that are scheduled to a node.
+// ServiceAffinity.labels are homogeneous for pods that are scheduled to a node.
 // (i.e. it returns true IFF this pod can be added to this node such that all other pods in
 // the same service are running on nodes with the exact same ServiceAffinity.label values).
 //
@@ -1520,7 +1527,7 @@ func CheckNodeUnschedulablePredicate(pod *v1.Pod, meta PredicateMetadata, nodeIn
 
 	// If pod tolerate unschedulable taint, it's also tolerate `node.Spec.Unschedulable`.
 	podToleratesUnschedulable := v1helper.TolerationsTolerateTaint(pod.Spec.Tolerations, &v1.Taint{
-		Key:    legacyapi.TaintNodeUnschedulable,
+		Key:    v1.TaintNodeUnschedulable,
 		Effect: v1.TaintEffectNoSchedule,
 	})
 

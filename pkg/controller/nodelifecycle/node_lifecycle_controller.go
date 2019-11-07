@@ -59,7 +59,6 @@ import (
 	nodeutil "k8s.io/kubernetes/pkg/controller/util/node"
 	"k8s.io/kubernetes/pkg/features"
 	kubeletapis "k8s.io/kubernetes/pkg/kubelet/apis"
-	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	utilnode "k8s.io/kubernetes/pkg/util/node"
 	taintutils "k8s.io/kubernetes/pkg/util/taints"
 )
@@ -72,14 +71,14 @@ func init() {
 var (
 	// UnreachableTaintTemplate is the taint for when a node becomes unreachable.
 	UnreachableTaintTemplate = &v1.Taint{
-		Key:    schedulerapi.TaintNodeUnreachable,
+		Key:    v1.TaintNodeUnreachable,
 		Effect: v1.TaintEffectNoExecute,
 	}
 
 	// NotReadyTaintTemplate is the taint for when a node is not ready for
 	// executing pods
 	NotReadyTaintTemplate = &v1.Taint{
-		Key:    schedulerapi.TaintNodeNotReady,
+		Key:    v1.TaintNodeNotReady,
 		Effect: v1.TaintEffectNoExecute,
 	}
 
@@ -89,30 +88,30 @@ var (
 	// for certain NodeConditionType, there are multiple {ConditionStatus,TaintKey} pairs
 	nodeConditionToTaintKeyStatusMap = map[v1.NodeConditionType]map[v1.ConditionStatus]string{
 		v1.NodeReady: {
-			v1.ConditionFalse:   schedulerapi.TaintNodeNotReady,
-			v1.ConditionUnknown: schedulerapi.TaintNodeUnreachable,
+			v1.ConditionFalse:   v1.TaintNodeNotReady,
+			v1.ConditionUnknown: v1.TaintNodeUnreachable,
 		},
 		v1.NodeMemoryPressure: {
-			v1.ConditionTrue: schedulerapi.TaintNodeMemoryPressure,
+			v1.ConditionTrue: v1.TaintNodeMemoryPressure,
 		},
 		v1.NodeDiskPressure: {
-			v1.ConditionTrue: schedulerapi.TaintNodeDiskPressure,
+			v1.ConditionTrue: v1.TaintNodeDiskPressure,
 		},
 		v1.NodeNetworkUnavailable: {
-			v1.ConditionTrue: schedulerapi.TaintNodeNetworkUnavailable,
+			v1.ConditionTrue: v1.TaintNodeNetworkUnavailable,
 		},
 		v1.NodePIDPressure: {
-			v1.ConditionTrue: schedulerapi.TaintNodePIDPressure,
+			v1.ConditionTrue: v1.TaintNodePIDPressure,
 		},
 	}
 
 	taintKeyToNodeConditionMap = map[string]v1.NodeConditionType{
-		schedulerapi.TaintNodeNotReady:           v1.NodeReady,
-		schedulerapi.TaintNodeUnreachable:        v1.NodeReady,
-		schedulerapi.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
-		schedulerapi.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
-		schedulerapi.TaintNodeDiskPressure:       v1.NodeDiskPressure,
-		schedulerapi.TaintNodePIDPressure:        v1.NodePIDPressure,
+		v1.TaintNodeNotReady:           v1.NodeReady,
+		v1.TaintNodeUnreachable:        v1.NodeReady,
+		v1.TaintNodeNetworkUnavailable: v1.NodeNetworkUnavailable,
+		v1.TaintNodeMemoryPressure:     v1.NodeMemoryPressure,
+		v1.TaintNodeDiskPressure:       v1.NodeDiskPressure,
+		v1.TaintNodePIDPressure:        v1.NodePIDPressure,
 	}
 )
 
@@ -235,6 +234,8 @@ type Controller struct {
 	// workers that are responsible for tainting nodes.
 	zoneNoExecuteTainter map[string]*scheduler.RateLimitedTimedQueue
 
+	nodesToRetry sync.Map
+
 	zoneStates map[string]ZoneState
 
 	daemonSetStore          appsv1listers.DaemonSetLister
@@ -346,6 +347,7 @@ func NewNodeLifecycleController(
 		nodeMonitorGracePeriod:      nodeMonitorGracePeriod,
 		zonePodEvictor:              make(map[string]*scheduler.RateLimitedTimedQueue),
 		zoneNoExecuteTainter:        make(map[string]*scheduler.RateLimitedTimedQueue),
+		nodesToRetry:                sync.Map{},
 		zoneStates:                  make(map[string]ZoneState),
 		podEvictionTimeout:          podEvictionTimeout,
 		evictionLimiterQPS:          evictionLimiterQPS,
@@ -459,6 +461,10 @@ func NewNodeLifecycleController(
 		}),
 		UpdateFunc: nodeutil.CreateUpdateNodeHandler(func(_, newNode *v1.Node) error {
 			nc.nodeUpdateQueue.Add(newNode.Name)
+			return nil
+		}),
+		DeleteFunc: nodeutil.CreateDeleteNodeHandler(func(node *v1.Node) error {
+			nc.nodesToRetry.Delete(node.Name)
 			return nil
 		}),
 	})
@@ -576,7 +582,7 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 	if node.Spec.Unschedulable {
 		// If unschedulable, append related taint.
 		taints = append(taints, v1.Taint{
-			Key:    schedulerapi.TaintNodeUnschedulable,
+			Key:    v1.TaintNodeUnschedulable,
 			Effect: v1.TaintEffectNoSchedule,
 		})
 	}
@@ -588,7 +594,7 @@ func (nc *Controller) doNoScheduleTaintingPass(nodeName string) error {
 			return false
 		}
 		// Find unschedulable taint of node.
-		if t.Key == schedulerapi.TaintNodeUnschedulable {
+		if t.Key == v1.TaintNodeUnschedulable {
 			return true
 		}
 		// Find node condition taints of node.
@@ -779,22 +785,35 @@ func (nc *Controller) monitorNodeHealth() error {
 				nc.processNoTaintBaseEviction(node, &observedReadyCondition, gracePeriod)
 			}
 
-			// Report node event.
-			if currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue {
+			_, needsRetry := nc.nodesToRetry.Load(node.Name)
+			switch {
+			case currentReadyCondition.Status != v1.ConditionTrue && observedReadyCondition.Status == v1.ConditionTrue:
+				// Report node event only once when status changed.
 				nodeutil.RecordNodeStatusChange(nc.recorder, node, "NodeNotReady")
-				pods, err := listPodsFromNode(nc.kubeClient, node.Name)
-				if err != nil {
-					utilruntime.HandleError(fmt.Errorf("Unable to list pods from node %v: %v", node.Name, err))
+				fallthrough
+			case needsRetry && observedReadyCondition.Status != v1.ConditionTrue:
+				if err := nc.markPodsNotReady(node.Name); err != nil {
+					utilruntime.HandleError(err)
+					nc.nodesToRetry.Store(node.Name, struct{}{})
 					continue
-				}
-				if err = nodeutil.MarkPodsNotReady(nc.kubeClient, pods, node.Name); err != nil {
-					utilruntime.HandleError(fmt.Errorf("Unable to mark all pods NotReady on node %v: %v", node.Name, err))
 				}
 			}
 		}
+		nc.nodesToRetry.Delete(node.Name)
 	}
 	nc.handleDisruption(zoneToNodeConditions, nodes)
 
+	return nil
+}
+
+func (nc *Controller) markPodsNotReady(nodeName string) error {
+	pods, err := listPodsFromNode(nc.kubeClient, nodeName)
+	if err != nil {
+		return fmt.Errorf("unable to list pods from node %v: %v", nodeName, err)
+	}
+	if err = nodeutil.MarkPodsNotReady(nc.kubeClient, pods, nodeName); err != nil {
+		return fmt.Errorf("unable to mark all pods NotReady on node %v: %v", nodeName, err)
+	}
 	return nil
 }
 

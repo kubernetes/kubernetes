@@ -523,15 +523,22 @@ func (rsc *ReplicaSetController) manageReplicas(filteredPods []*v1.Pod, rs *apps
 		// event spam that those failures would generate.
 		successfulCreations, err := slowStartBatch(diff, controller.SlowStartInitialBatchSize, func() error {
 			err := rsc.podControl.CreatePodsWithControllerRef(rs.Namespace, &rs.Spec.Template, rs, metav1.NewControllerRef(rs, rsc.GroupVersionKind))
-			if err != nil && errors.IsTimeout(err) {
-				// Pod is created but its initialization has timed out.
-				// If the initialization is successful eventually, the
-				// controller will observe the creation via the informer.
-				// If the initialization fails, or if the pod keeps
-				// uninitialized for a long time, the informer will not
-				// receive any update, and the controller will create a new
-				// pod when the expectation expires.
-				return nil
+			if err != nil {
+				if errors.HasStatusCause(err, v1.NamespaceTerminatingCause) {
+					// if the namespace is being terminated, we don't have to do
+					// anything because any creation will fail
+					return nil
+				}
+				if errors.IsTimeout(err) {
+					// Pod is created but its initialization has timed out.
+					// If the initialization is successful eventually, the
+					// controller will observe the creation via the informer.
+					// If the initialization fails, or if the pod keeps
+					// uninitialized for a long time, the informer will not
+					// receive any update, and the controller will create a new
+					// pod when the expectation expires.
+					return nil
+				}
 			}
 			return err
 		})

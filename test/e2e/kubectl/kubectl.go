@@ -46,15 +46,19 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	genericregistry "k8s.io/apiserver/pkg/registry/generic/registry"
+	"k8s.io/client-go/dynamic"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubernetes/pkg/controller"
@@ -67,6 +71,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	"k8s.io/kubernetes/test/e2e/framework/testfiles"
 	"k8s.io/kubernetes/test/e2e/scheduling"
+	"k8s.io/kubernetes/test/integration/etcd"
 	testutils "k8s.io/kubernetes/test/utils"
 	"k8s.io/kubernetes/test/utils/crd"
 	imageutils "k8s.io/kubernetes/test/utils/image"
@@ -407,6 +412,82 @@ var _ = SIGDescribe("Kubectl client", func() {
 
 			ginkgo.By("validating guestbook app")
 			validateGuestbookApp(c, ns)
+		})
+	})
+
+	ginkgo.Describe("kubectl get output", func() {
+		ginkgo.It("should contain custom columns for each resource", func() {
+			randString := rand.String(10)
+
+			ignoredResources := map[string]bool{
+				// ignored for intentionally using standard fields.
+				// This assumption is based on a lack of TableColumnDefinition
+				// in pkg/printers/internalversion/printers.go
+				"ClusterRole": true,
+				"LimitRange":  true,
+				"PodPreset":   true,
+
+				// ignored temporarily while waiting for bug fix.
+				"ComponentStatus":    true,
+				"ClusterRoleBinding": true,
+				"ResourceQuota":      true,
+
+				// ignored because no test data exists.
+				// Do not add anything to this list, instead add fixtures in
+				// the test/integration/etcd package.
+				"BackendConfig":         true,
+				"NodeMetrics":           true,
+				"PodMetrics":            true,
+				"ScalingPolicy":         true,
+				"VolumeSnapshotClass":   true,
+				"VolumeSnapshotContent": true,
+				"VolumeSnapshot":        true,
+
+				// A CRD created by other e2e tests without any test data.
+				"Noxu": true,
+			}
+
+			apiGroups, err := c.Discovery().ServerPreferredResources()
+			framework.ExpectNoError(err)
+
+			testableResources := etcd.GetEtcdStorageDataForNamespace(f.Namespace.Name)
+
+			for _, group := range apiGroups {
+				for _, resource := range group.APIResources {
+					if !verbsContain(resource.Verbs, "get") || ignoredResources[resource.Kind] || strings.HasPrefix(resource.Name, "e2e-test") {
+						continue
+					}
+
+					// compute gvr
+					gv, err := schema.ParseGroupVersion(group.GroupVersion)
+					framework.ExpectNoError(err)
+					gvr := gv.WithResource(resource.Name)
+
+					// assert test data exists
+					testData := testableResources[gvr]
+					gomega.ExpectWithOffset(1, testData).ToNot(gomega.BeZero(), "No test data available for %s", gvr)
+
+					// create test resource
+					mapping := &meta.RESTMapping{
+						Resource:         gvr,
+						GroupVersionKind: gv.WithKind(resource.Kind),
+					}
+
+					if resource.Namespaced {
+						mapping.Scope = meta.RESTScopeNamespace
+					} else {
+						mapping.Scope = meta.RESTScopeRoot
+					}
+
+					client, obj, err := etcd.JSONToUnstructured(testData.Stub, f.Namespace.Name, mapping, f.DynamicClient)
+					framework.ExpectNoError(err)
+					if resource.Kind != "APIService" && resource.Kind != "CustomResourceDefinition" {
+						obj.SetName(obj.GetName() + randString)
+					}
+
+					createObjValidateOutputAndCleanup(client, obj, resource)
+				}
+			}
 		})
 	})
 
@@ -2481,4 +2562,44 @@ waitLoop:
 	}
 	// Reaching here means that one of more checks failed multiple times.  Assuming its not a race condition, something is broken.
 	framework.Failf("Timed out after %v seconds waiting for %s pods to reach valid state", framework.PodStartTimeout.Seconds(), testname)
+}
+
+// verbsContain returns true if the provided list of verbs contain the provided
+// verb string.
+func verbsContain(verbs metav1.Verbs, str string) bool {
+	for _, v := range verbs {
+		if v == str {
+			return true
+		}
+	}
+	return false
+}
+
+// deleteObj deletes an Object with the provided client and name.
+func deleteObj(client dynamic.ResourceInterface, name string) {
+	err := client.Delete(name, &metav1.DeleteOptions{})
+	framework.ExpectNoError(err)
+}
+
+// createObjValidateOutputAndCleanup creates an object using the provided client
+// and then verifies that the kubectl get output provides custom columns. Once
+// the test has completed, it deletes the object.
+func createObjValidateOutputAndCleanup(client dynamic.ResourceInterface, obj *unstructured.Unstructured, resource metav1.APIResource) {
+	_, err := client.Create(obj, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+	defer deleteObj(client, obj.GetName())
+
+	// get test resource
+	output := framework.RunKubectlOrDie("get", resource.Name, "--all-namespaces")
+	if output == "" {
+		framework.Failf("No stdout from kubectl get for %s (likely need to define test resources)", resource.Name)
+	}
+
+	splitOutput := strings.SplitN(output, "\n", 2)
+	fields := strings.Fields(splitOutput[0])
+	if resource.Namespaced {
+		framework.ExpectNotEqual(fields, []string{"NAMESPACE", "NAME", "CREATED", "AT"}, fmt.Sprintf("expected non-default fields for namespaced resource: %s", resource.Name))
+	} else {
+		framework.ExpectNotEqual(fields, []string{"NAME", "AGE"}, fmt.Sprintf("expected non-default fields for resource: %s", resource.Name))
+	}
 }
