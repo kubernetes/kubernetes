@@ -122,7 +122,7 @@ def debian_image_dependencies():
             digest = _digest(_DEBIAN_IPTABLES_DIGEST, arch),
             registry = "k8s.gcr.io",
             repository = "debian-iptables",
-            tag = "v12.0.0",  # ignored, but kept here for documentation
+            tag = "v12.0.1",  # ignored, but kept here for documentation
         )
 
         container_pull(
