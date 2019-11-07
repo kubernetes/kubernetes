@@ -34,7 +34,6 @@ import (
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/metrics"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
-	nodeinfosnapshot "k8s.io/kubernetes/pkg/scheduler/nodeinfo/snapshot"
 	schedutil "k8s.io/kubernetes/pkg/scheduler/util"
 )
 
@@ -59,7 +58,7 @@ const (
 // plugins.
 type framework struct {
 	registry              Registry
-	nodeInfoSnapshot      *nodeinfosnapshot.Snapshot
+	snapshotSharedLister  schedulerlisters.SharedLister
 	waitingPods           *waitingPodsMap
 	pluginNameToWeightMap map[string]int
 	queueSortPlugins      []QueueSortPlugin
@@ -106,9 +105,9 @@ func (f *framework) getExtensionPoints(plugins *config.Plugins) []extensionPoint
 }
 
 type frameworkOptions struct {
-	clientSet        clientset.Interface
-	informerFactory  informers.SharedInformerFactory
-	nodeInfoSnapshot *nodeinfosnapshot.Snapshot
+	clientSet            clientset.Interface
+	informerFactory      informers.SharedInformerFactory
+	snapshotSharedLister schedulerlisters.SharedLister
 }
 
 // Option for the framework.
@@ -128,16 +127,14 @@ func WithInformerFactory(informerFactory informers.SharedInformerFactory) Option
 	}
 }
 
-// WithNodeInfoSnapshot sets the NodeInfo Snapshot.
-func WithNodeInfoSnapshot(nodeInfoSnapshot *nodeinfosnapshot.Snapshot) Option {
+// WithSnapshotSharedLister sets the SharedLister of the snapshot.
+func WithSnapshotSharedLister(snapshotSharedLister schedulerlisters.SharedLister) Option {
 	return func(o *frameworkOptions) {
-		o.nodeInfoSnapshot = nodeInfoSnapshot
+		o.snapshotSharedLister = snapshotSharedLister
 	}
 }
 
-var defaultFrameworkOptions = frameworkOptions{
-	nodeInfoSnapshot: nodeinfosnapshot.NewEmptySnapshot(),
-}
+var defaultFrameworkOptions = frameworkOptions{}
 
 var _ Framework = &framework{}
 
@@ -150,7 +147,7 @@ func NewFramework(r Registry, plugins *config.Plugins, args []config.PluginConfi
 
 	f := &framework{
 		registry:              r,
-		nodeInfoSnapshot:      options.nodeInfoSnapshot,
+		snapshotSharedLister:  options.snapshotSharedLister,
 		pluginNameToWeightMap: make(map[string]int),
 		waitingPods:           newWaitingPodsMap(),
 		clientSet:             options.clientSet,
@@ -609,12 +606,7 @@ func (f *framework) RunPermitPlugins(
 // unchanged until a pod finishes "Reserve". There is no guarantee that the information
 // remains unchanged after "Reserve".
 func (f *framework) SnapshotSharedLister() schedulerlisters.SharedLister {
-	return f.nodeInfoSnapshot
-}
-
-// NodeInfoSnapshot returns the NodeInfo Snapshot handler.
-func (f *framework) NodeInfoSnapshot() *nodeinfosnapshot.Snapshot {
-	return f.nodeInfoSnapshot
+	return f.snapshotSharedLister
 }
 
 // IterateOverWaitingPods acquires a read lock and iterates over the WaitingPods map.

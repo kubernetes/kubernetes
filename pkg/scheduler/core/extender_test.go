@@ -554,6 +554,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 				predicates.EmptyPredicateMetadataProducer,
 				test.prioritizers,
 				priorities.EmptyPriorityMetadataProducer,
+				emptySnapshot,
 				emptyFramework,
 				extenders,
 				nil,
