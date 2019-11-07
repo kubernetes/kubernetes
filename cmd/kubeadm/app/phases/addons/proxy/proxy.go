@@ -129,8 +129,9 @@ func createKubeProxyAddon(configMapBytes, daemonSetbytes []byte, client clientse
 	if err := kuberuntime.DecodeInto(clientsetscheme.Codecs.UniversalDecoder(), daemonSetbytes, kubeproxyDaemonSet); err != nil {
 		return errors.Wrap(err, "unable to decode kube-proxy daemonset")
 	}
-	// propagate http/https proxy env vars
-	kubeproxyDaemonSet.Spec.Template.Spec.Containers[0].Env = kubeadmutil.GetProxyEnvVars()
+	// Propagate the http/https proxy host environment variables to the container
+	env := &kubeproxyDaemonSet.Spec.Template.Spec.Containers[0].Env
+	*env = append(*env, kubeadmutil.GetProxyEnvVars()...)
 
 	// Create the DaemonSet for kube-proxy or update it in case it already exists
 	return apiclient.CreateOrUpdateDaemonSet(client, kubeproxyDaemonSet)
