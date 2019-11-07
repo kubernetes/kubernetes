@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
@@ -40,7 +41,6 @@ import (
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 	"k8s.io/kubernetes/pkg/scheduler/util"
 )
@@ -107,16 +107,16 @@ func machine2PrioritizerExtender(pod *v1.Pod, nodes []*v1.Node) (*framework.Node
 	return &result, nil
 }
 
-func machine2Prioritizer(_ *v1.Pod, sharedLister schedulerlisters.SharedLister, nodes []*v1.Node) (framework.NodeScoreList, error) {
-	result := []framework.NodeScore{}
-	for _, node := range nodes {
-		score := 10
-		if node.Name == "machine2" {
-			score = 100
-		}
-		result = append(result, framework.NodeScore{Name: node.Name, Score: int64(score)})
+func machine2Prioritizer(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
+	node := nodeInfo.Node()
+	if node == nil {
+		return framework.NodeScore{}, errors.New("node not found")
 	}
-	return result, nil
+	score := 10
+	if node.Name == "machine2" {
+		score = 100
+	}
+	return framework.NodeScore{Name: node.Name, Score: int64(score)}, nil
 }
 
 type FakeExtender struct {
@@ -457,7 +457,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 		},
 		{
 			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Function: machine2Prioritizer, Weight: 20}},
+			prioritizers: []priorities.PriorityConfig{{Map: machine2Prioritizer, Weight: 20}},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{truePredicateExtender},
@@ -482,7 +482,7 @@ func TestGenericSchedulerWithExtenders(t *testing.T) {
 			// because of the errors from errorPredicateExtender and/or
 			// errorPrioritizerExtender.
 			predicates:   map[string]predicates.FitPredicate{"true": truePredicate},
-			prioritizers: []priorities.PriorityConfig{{Function: machine2Prioritizer, Weight: 1}},
+			prioritizers: []priorities.PriorityConfig{{Map: machine2Prioritizer, Weight: 1}},
 			extenders: []FakeExtender{
 				{
 					predicates:   []fitPredicate{errorPredicateExtender},
