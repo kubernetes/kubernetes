@@ -340,7 +340,7 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr
 		// TODO(liggitt): drop this once golang json parser limits stack depth (https://github.com/golang/go/issues/31789)
 		if len(p.patchBytes) > 1024*1024 {
 			v := []interface{}{}
-			if err := json.Unmarshal(p.patchBytes, v); err != nil {
+			if err := json.Unmarshal(p.patchBytes, &v); err != nil {
 				return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch: %v", err))
 			}
 		}
@@ -364,7 +364,7 @@ func (p *jsonPatcher) applyJSPatch(versionedJS []byte) (patchedJS []byte, retErr
 		// TODO(liggitt): drop this once golang json parser limits stack depth (https://github.com/golang/go/issues/31789)
 		if len(p.patchBytes) > 1024*1024 {
 			v := map[string]interface{}{}
-			if err := json.Unmarshal(p.patchBytes, v); err != nil {
+			if err := json.Unmarshal(p.patchBytes, &v); err != nil {
 				return nil, errors.NewBadRequest(fmt.Sprintf("error decoding patch: %v", err))
 			}
 		}
