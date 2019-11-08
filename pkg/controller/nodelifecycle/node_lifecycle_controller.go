@@ -789,7 +789,9 @@ func (nc *Controller) monitorNodeHealth() error {
 		nc.knownNodeSet[added[i].Name] = added[i]
 		nc.addPodEvictorForNewZone(added[i])
 		if nc.useTaintBasedEvictions {
-			nc.markNodeAsReachable(added[i])
+			if _, err = nc.markNodeAsReachable(added[i]); err != nil {
+				klog.Warningf("unable to mark node %s as reachable : %v", added[i].Name, err)
+			}
 		} else {
 			nc.cancelPodEviction(added[i])
 		}
