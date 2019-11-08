@@ -1245,6 +1245,12 @@ current-context: service-account-context
 EOF
 }
 
+function create-node-problem-detector-kubeconfig-from-kubelet {
+  echo "Creating node-problem-detector kubeconfig from /var/lib/kubelet/kubeconfig"
+  mkdir -p /var/lib/node-problem-detector
+  cp /var/lib/kubelet/kubeconfig /var/lib/node-problem-detector/kubeconfig
+}
+
 function create-master-etcd-auth {
   if [[ -n "${ETCD_CA_CERT:-}" && -n "${ETCD_PEER_KEY:-}" && -n "${ETCD_PEER_CERT:-}" ]]; then
     local -r auth_dir="/etc/srv/kubernetes"
@@ -2425,8 +2431,11 @@ EOF
     setup-addon-manifests "addons" "node-problem-detector"
   fi
   if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-    # Setup role binding for standalone node problem detector.
-    setup-addon-manifests "addons" "node-problem-detector/standalone" "node-problem-detector"
+    # Setup role binding(s) for standalone node problem detector.
+    if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
+      setup-addon-manifests "addons" "node-problem-detector/standalone"
+    fi
+    setup-addon-manifests "addons" "node-problem-detector/kubelet-user-standalone" "node-problem-detector"
   fi
   if echo "${ADMISSION_CONTROL:-}" | grep -q "LimitRanger"; then
     setup-addon-manifests "admission-controls" "limit-range" "gce"
@@ -2781,7 +2790,14 @@ function main() {
       create-kubeproxy-user-kubeconfig
     fi
     if [[ "${ENABLE_NODE_PROBLEM_DETECTOR:-}" == "standalone" ]]; then
-      create-node-problem-detector-kubeconfig ${KUBERNETES_MASTER_NAME}
+      if [[ -n "${NODE_PROBLEM_DETECTOR_TOKEN:-}" ]]; then
+        create-node-problem-detector-kubeconfig ${KUBERNETES_MASTER_NAME}
+      elif [[ -f "/var/lib/kubelet/kubeconfig" ]]; then
+        create-node-problem-detector-kubeconfig-from-kubelet
+      else
+        echo "Either NODE_PROBLEM_DETECTOR_TOKEN or /var/lib/kubelet/kubeconfig must be set"
+        exit 1
+      fi
     fi
   fi
 
