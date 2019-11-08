@@ -41,7 +41,7 @@ var (
 
 func parse(str string, semver bool) (*Version, error) {
 	parts := versionMatchRE.FindStringSubmatch(str)
-	if parts == nil {
+	if len(parts) < 3 {
 		return nil, fmt.Errorf("could not parse %q as version", str)
 	}
 	numbers, extra := parts[1], parts[2]
@@ -68,7 +68,7 @@ func parse(str string, semver bool) (*Version, error) {
 
 	if semver && extra != "" {
 		extraParts := extraMatchRE.FindStringSubmatch(extra)
-		if extraParts == nil {
+		if len(extraParts) < 3 {
 			return nil, fmt.Errorf("could not parse pre-release/metadata (%s) in version %q", extra, str)
 		}
 		v.preRelease, v.buildMetadata = extraParts[1], extraParts[2]
