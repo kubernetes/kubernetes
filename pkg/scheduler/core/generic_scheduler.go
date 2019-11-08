@@ -165,7 +165,7 @@ type genericScheduler struct {
 	disablePreemption        bool
 	percentageOfNodesToScore int32
 	enableNonPreempting      bool
-	lastProcessedNodeIndex   int
+	nextStartNodeIndex       int
 }
 
 // snapshot snapshots scheduler cache and node infos for all fit and priority
@@ -499,7 +499,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 		checkNode := func(i int) {
 			// We check the nodes starting from where we left off in the previous scheduling cycle,
 			// this is to make sure all nodes have the same chance of being examined across pods.
-			nodeInfo := g.nodeInfoSnapshot.NodeInfoList[(g.lastProcessedNodeIndex+i)%allNodes]
+			nodeInfo := g.nodeInfoSnapshot.NodeInfoList[(g.nextStartNodeIndex+i)%allNodes]
 			fits, failedPredicates, status, err := g.podFitsOnNode(
 				ctx,
 				state,
@@ -536,7 +536,7 @@ func (g *genericScheduler) findNodesThatFit(ctx context.Context, state *framewor
 		// are found.
 		workqueue.ParallelizeUntil(ctx, 16, allNodes, checkNode)
 		processedNodes := int(filteredLen) + len(filteredNodesStatuses) + len(failedPredicateMap)
-		g.lastProcessedNodeIndex = (g.lastProcessedNodeIndex + processedNodes) % allNodes
+		g.nextStartNodeIndex = (g.nextStartNodeIndex + processedNodes) % allNodes
 
 		filtered = filtered[:filteredLen]
 		if err := errCh.ReceiveError(); err != nil {
