@@ -157,7 +157,7 @@ func (w *KubeWaiter) WaitForHealthyKubelet(initalTimeout time.Duration, healthzE
 // WaitForKubeletAndFunc waits primarily for the function f to execute, even though it might take some time. If that takes a long time, and the kubelet
 // /healthz continuously are unhealthy, kubeadm will error out after a period of exponential backoff
 func (w *KubeWaiter) WaitForKubeletAndFunc(f func() error) error {
-	errorChan := make(chan error)
+	errorChan := make(chan error, 1)
 
 	go func(errC chan error, waiter Waiter) {
 		if err := waiter.WaitForHealthyKubelet(40*time.Second, fmt.Sprintf("http://localhost:%d/healthz", kubeadmconstants.KubeletHealthzPort)); err != nil {
