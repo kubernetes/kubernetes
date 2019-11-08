@@ -162,48 +162,6 @@ func TestSchedulerDefaults(t *testing.T) {
 			},
 		},
 		{
-			name: "empty spread constraints",
-			config: &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{
-				TopologySpreadConstraints: make([]corev1.TopologySpreadConstraint, 0),
-			},
-			expected: &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{
-				SchedulerName:                  pointer.StringPtr("default-scheduler"),
-				AlgorithmSource:                kubeschedulerconfigv1alpha1.SchedulerAlgorithmSource{Provider: pointer.StringPtr("DefaultProvider")},
-				HardPodAffinitySymmetricWeight: pointer.Int32Ptr(1),
-				TopologySpreadConstraints:      make([]corev1.TopologySpreadConstraint, 0),
-				HealthzBindAddress:             pointer.StringPtr("0.0.0.0:10251"),
-				MetricsBindAddress:             pointer.StringPtr("0.0.0.0:10251"),
-				DebuggingConfiguration: componentbaseconfig.DebuggingConfiguration{
-					EnableProfiling:           &enable,
-					EnableContentionProfiling: &enable,
-				},
-				LeaderElection: kubeschedulerconfigv1alpha1.KubeSchedulerLeaderElectionConfiguration{
-					LeaderElectionConfiguration: componentbaseconfig.LeaderElectionConfiguration{
-						LeaderElect:       pointer.BoolPtr(true),
-						LeaseDuration:     metav1.Duration{Duration: 15 * time.Second},
-						RenewDeadline:     metav1.Duration{Duration: 10 * time.Second},
-						RetryPeriod:       metav1.Duration{Duration: 2 * time.Second},
-						ResourceLock:      "endpointsleases",
-						ResourceNamespace: "",
-						ResourceName:      "",
-					},
-					LockObjectName:      "kube-scheduler",
-					LockObjectNamespace: "kube-system",
-				},
-				ClientConnection: componentbaseconfig.ClientConnectionConfiguration{
-					QPS:         50,
-					Burst:       100,
-					ContentType: "application/vnd.kubernetes.protobuf",
-				},
-				DisablePreemption:        pointer.BoolPtr(false),
-				PercentageOfNodesToScore: pointer.Int32Ptr(50),
-				BindTimeoutSeconds:       pointer.Int64Ptr(600),
-				PodInitialBackoffSeconds: pointer.Int64Ptr(1),
-				PodMaxBackoffSeconds:     pointer.Int64Ptr(10),
-				Plugins:                  nil,
-			},
-		},
-		{
 			name: "custom spread constraints",
 			config: &kubeschedulerconfigv1alpha1.KubeSchedulerConfiguration{
 				TopologySpreadConstraints: []corev1.TopologySpreadConstraint{

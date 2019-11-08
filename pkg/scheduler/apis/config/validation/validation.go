@@ -94,7 +94,7 @@ func validateTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint
 			f := field.Forbidden(p.Child("labelSelector"), "cluster-level constraint must not define a selector, as they are deduced for each Pod")
 			allErrs = append(allErrs, f)
 		}
-		if err := validateSpreadConstraintNotRepeat(p.Child("{topologyKey, whenUnsatisfiable}"), c, constraints[i+1:]); err != nil {
+		if err := validateSpreadConstraintNotRepeat(p, c, constraints[i+1:]); err != nil {
 			allErrs = append(allErrs, err)
 		}
 	}

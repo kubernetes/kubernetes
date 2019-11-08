@@ -56,8 +56,9 @@ type KubeSchedulerConfiguration struct {
 	// Label selectors must be empty, as they are deduced from the pods'
 	// membership in Services, Replication Controllers, Replica sets or Stateful
 	// sets.
-	// Omit to use the default: soft spreading among nodes and zones.
-	// Set to empty to disable.
+	// By default, it is set to soft pod spreading among nodes and zones.
+	// This is part of EvenPodsSpread feature, so it is only honored when the
+	// feature is enabled.
 	// +listType=atomic
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint `json:"topologySpreadConstraints"`
 

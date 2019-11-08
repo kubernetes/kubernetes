@@ -72,8 +72,7 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 		}
 	}
 
-	// Note that an empty list won't be parsed as nil.
-	if obj.TopologySpreadConstraints == nil {
+	if len(obj.TopologySpreadConstraints) == 0 {
 		obj.TopologySpreadConstraints = make([]corev1.TopologySpreadConstraint, len(defaultTopologySpreadConstraints))
 		for i := range defaultTopologySpreadConstraints {
 			obj.TopologySpreadConstraints[i] = *defaultTopologySpreadConstraints[i].DeepCopy()
