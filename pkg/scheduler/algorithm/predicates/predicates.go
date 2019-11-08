@@ -305,8 +305,9 @@ func getMaxVolumeFunc(filterName string) func(node *v1.Node) int {
 
 		var nodeInstanceType string
 		for k, v := range node.ObjectMeta.Labels {
-			if k == v1.LabelInstanceType {
+			if k == v1.LabelInstanceType || k == v1.LabelInstanceTypeStable {
 				nodeInstanceType = v
+				break
 			}
 		}
 		switch filterName {
