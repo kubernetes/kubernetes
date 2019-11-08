@@ -57,11 +57,13 @@ type KubeSchedulerConfiguration struct {
 	HardPodAffinitySymmetricWeight int32
 
 	// TopologySpreadConstraints is the cluster-level configuration for
-	// topology-based spreading.
+	// topology-based top spreading.
 	// Constraints are applied to pods that don't define any in their PodSpec.
 	// Label selectors must be empty, as they are deduced from the pods'
 	// membership in Services, Replication Controllers, Replica sets or Stateful
 	// sets.
+	// Omit to use the default: soft spreading among nodes and zones.
+	// Set to empty to disable.
 	TopologySpreadConstraints []corev1.TopologySpreadConstraint
 
 	// LeaderElection defines the configuration of leader election client.

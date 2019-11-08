@@ -28,19 +28,6 @@ import (
 	"k8s.io/utils/pointer"
 )
 
-var defaultTopologySpreadConstraints = []corev1.TopologySpreadConstraint{
-	{
-		MaxSkew:           1,
-		TopologyKey:       corev1.LabelHostname,
-		WhenUnsatisfiable: corev1.ScheduleAnyway,
-	},
-	{
-		MaxSkew:           1,
-		TopologyKey:       corev1.LabelZoneFailureDomain,
-		WhenUnsatisfiable: corev1.ScheduleAnyway,
-	},
-}
-
 func TestSchedulerDefaults(t *testing.T) {
 	enable := true
 	tests := []struct {

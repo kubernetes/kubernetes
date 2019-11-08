@@ -31,6 +31,19 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/apis/config"
 )
 
+var defaultTopologySpreadConstraints = []corev1.TopologySpreadConstraint{
+	{
+		MaxSkew:           1,
+		TopologyKey:       corev1.LabelHostname,
+		WhenUnsatisfiable: corev1.ScheduleAnyway,
+	},
+	{
+		MaxSkew:           1,
+		TopologyKey:       corev1.LabelZoneFailureDomain,
+		WhenUnsatisfiable: corev1.ScheduleAnyway,
+	},
+}
+
 func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
@@ -61,17 +74,9 @@ func SetDefaults_KubeSchedulerConfiguration(obj *kubeschedulerconfigv1alpha1.Kub
 
 	// Note that an empty list won't be parsed as nil.
 	if obj.TopologySpreadConstraints == nil {
-		obj.TopologySpreadConstraints = []corev1.TopologySpreadConstraint{
-			{
-				MaxSkew:           1,
-				TopologyKey:       corev1.LabelHostname,
-				WhenUnsatisfiable: corev1.ScheduleAnyway,
-			},
-			{
-				MaxSkew:           1,
-				TopologyKey:       corev1.LabelZoneFailureDomain,
-				WhenUnsatisfiable: corev1.ScheduleAnyway,
-			},
+		obj.TopologySpreadConstraints = make([]corev1.TopologySpreadConstraint, len(defaultTopologySpreadConstraints))
+		for i := range defaultTopologySpreadConstraints {
+			obj.TopologySpreadConstraints[i] = *defaultTopologySpreadConstraints[i].DeepCopy()
 		}
 	}
 
