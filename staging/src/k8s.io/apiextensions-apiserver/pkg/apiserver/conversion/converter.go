@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	autoscalingv1 "k8s.io/api/autoscaling/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apiextensionsfeatures "k8s.io/apiextensions-apiserver/pkg/features"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -84,7 +84,6 @@ func (m *CRConverterFactory) NewConverter(crd *apiextensions.CustomResourceDefin
 	// Determine whether we should expect to be asked to "convert" autoscaling/v1 Scale types
 	convertScale := false
 	if utilfeature.DefaultFeatureGate.Enabled(apiextensionsfeatures.CustomResourceSubresources) {
-		convertScale = crd.Spec.Subresources != nil && crd.Spec.Subresources.Scale != nil
 		for _, version := range crd.Spec.Versions {
 			if version.Subresources != nil && version.Subresources.Scale != nil {
 				convertScale = true

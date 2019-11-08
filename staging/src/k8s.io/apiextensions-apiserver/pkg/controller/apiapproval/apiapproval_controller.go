@@ -22,11 +22,10 @@ import (
 	"time"
 
 	"k8s.io/apiextensions-apiserver/pkg/apihelpers"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
-	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -133,7 +132,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) sync(key stri
 	}
 
 	// avoid repeated calculation for the same annotation
-	protectionAnnotationValue := inCustomResourceDefinition.Annotations[v1beta1.KubeAPIApprovedAnnotation]
+	protectionAnnotationValue := inCustomResourceDefinition.Annotations[apiextensions.KubeAPIApprovedAnnotation]
 	c.lastSeenProtectedAnnotationLock.Lock()
 	lastSeen, seenBefore := c.lastSeenProtectedAnnotation[inCustomResourceDefinition.Name]
 	c.lastSeenProtectedAnnotationLock.Unlock()
@@ -147,7 +146,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) sync(key stri
 		// because group is immutable, if we have no condition now, we have no need to remove a condition.
 		return nil
 	}
-	old := apiextensions.FindCRDCondition(inCustomResourceDefinition, apiextensions.KubernetesAPIApprovalPolicyConformant)
+	old := apihelpers.FindCRDCondition(inCustomResourceDefinition, apiextensions.KubernetesAPIApprovalPolicyConformant)
 
 	// don't attempt a write if all the condition details are the same
 	if old != nil && old.Status == cond.Status && old.Reason == cond.Reason && old.Message == cond.Message {
@@ -157,7 +156,7 @@ func (c *KubernetesAPIApprovalPolicyConformantConditionController) sync(key stri
 
 	// update condition
 	crd := inCustomResourceDefinition.DeepCopy()
-	apiextensions.SetCRDCondition(crd, *cond)
+	apihelpers.SetCRDCondition(crd, *cond)
 
 	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)
 	if apierrors.IsNotFound(err) || apierrors.IsConflict(err) {

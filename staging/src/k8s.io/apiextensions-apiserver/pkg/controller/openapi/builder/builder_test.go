@@ -24,8 +24,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	"k8s.io/apimachinery/pkg/util/diff"
 	"k8s.io/apimachinery/pkg/util/json"
@@ -352,12 +352,12 @@ func TestNewBuilder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var schema *structuralschema.Structural
 			if len(tt.schema) > 0 {
-				v1beta1Schema := &v1beta1.JSONSchemaProps{}
+				v1beta1Schema := &apiextensions.JSONSchemaProps{}
 				if err := json.Unmarshal([]byte(tt.schema), &v1beta1Schema); err != nil {
 					t.Fatal(err)
 				}
-				internalSchema := &apiextensions.JSONSchemaProps{}
-				v1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
+				internalSchema := &apiextensionsinternal.JSONSchemaProps{}
+				apiextensions.Convert_v1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
 				var err error
 				schema, err = structuralschema.NewStructural(internalSchema)
 				if err != nil {
@@ -371,8 +371,12 @@ func TestNewBuilder(t *testing.T) {
 
 			got := newBuilder(&apiextensions.CustomResourceDefinition{
 				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group:   "bar.k8s.io",
-					Version: "v1",
+					Group: "bar.k8s.io",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name: "v1",
+						},
+					},
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "foos",
 						Singular: "foo",
@@ -478,11 +482,11 @@ func TestCRDRouteParameterBuilder(t *testing.T) {
 				Versions: []apiextensions.CustomResourceDefinitionVersion{
 					{
 						Name: testCRDVersion,
+						Subresources: &apiextensions.CustomResourceSubresources{
+							Status: &apiextensions.CustomResourceSubresourceStatus{},
+							Scale:  &apiextensions.CustomResourceSubresourceScale{},
+						},
 					},
-				},
-				Subresources: &apiextensions.CustomResourceSubresources{
-					Status: &apiextensions.CustomResourceSubresourceStatus{},
-					Scale:  &apiextensions.CustomResourceSubresourceScale{},
 				},
 			},
 		}
@@ -629,31 +633,35 @@ func TestBuildSwagger(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var validation *apiextensions.CustomResourceValidation
 			if len(tt.schema) > 0 {
-				v1beta1Schema := &v1beta1.JSONSchemaProps{}
-				if err := json.Unmarshal([]byte(tt.schema), &v1beta1Schema); err != nil {
+				v1Schema := &apiextensions.JSONSchemaProps{}
+				if err := json.Unmarshal([]byte(tt.schema), &v1Schema); err != nil {
 					t.Fatal(err)
 				}
-				internalSchema := &apiextensions.JSONSchemaProps{}
-				v1beta1.Convert_v1beta1_JSONSchemaProps_To_apiextensions_JSONSchemaProps(v1beta1Schema, internalSchema, nil)
 				validation = &apiextensions.CustomResourceValidation{
-					OpenAPIV3Schema: internalSchema,
+					OpenAPIV3Schema: v1Schema,
 				}
+			}
+			if tt.preserveUnknownFields != nil && *tt.preserveUnknownFields {
+				validation.OpenAPIV3Schema.XPreserveUnknownFields = utilpointer.BoolPtr(true)
 			}
 
 			// TODO: mostly copied from the test above. reuse code to cleanup
 			got, err := BuildSwagger(&apiextensions.CustomResourceDefinition{
 				Spec: apiextensions.CustomResourceDefinitionSpec{
-					Group:   "bar.k8s.io",
-					Version: "v1",
+					Group: "bar.k8s.io",
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:   "v1",
+							Schema: validation,
+						},
+					},
 					Names: apiextensions.CustomResourceDefinitionNames{
 						Plural:   "foos",
 						Singular: "foo",
 						Kind:     "Foo",
 						ListKind: "FooList",
 					},
-					Scope:                 apiextensions.NamespaceScoped,
-					Validation:            validation,
-					PreserveUnknownFields: tt.preserveUnknownFields,
+					Scope: apiextensions.NamespaceScoped,
 				},
 			}, "v1", tt.opts)
 			if err != nil {

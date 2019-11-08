@@ -30,11 +30,13 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
-	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 )
 
 // ConditionController is maintaining the NonStructuralSchema condition.
@@ -87,25 +89,17 @@ func calculateCondition(in *apiextensions.CustomResourceDefinition) *apiextensio
 
 	allErrs := field.ErrorList{}
 
-	if in.Spec.Validation != nil && in.Spec.Validation.OpenAPIV3Schema != nil {
-		s, err := schema.NewStructural(in.Spec.Validation.OpenAPIV3Schema)
-		if err != nil {
-			cond.Reason = "StructuralError"
-			cond.Message = fmt.Sprintf("failed to check global validation schema: %v", err)
-			return cond
-		}
-
-		pth := field.NewPath("spec", "validation", "openAPIV3Schema")
-
-		allErrs = append(allErrs, schema.ValidateStructural(pth, s)...)
-	}
-
 	for i, v := range in.Spec.Versions {
 		if v.Schema == nil || v.Schema.OpenAPIV3Schema == nil {
 			continue
 		}
 
-		s, err := schema.NewStructural(v.Schema.OpenAPIV3Schema)
+		internalSchema := &apiextensionsinternal.CustomResourceValidation{}
+		if err := apiextensions.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(v.Schema, internalSchema, nil); err != nil {
+			klog.Errorf("failed to convert CRD validation to internal version: %v", err)
+			continue
+		}
+		s, err := schema.NewStructural(internalSchema.OpenAPIV3Schema)
 		if err != nil {
 			cond.Reason = "StructuralError"
 			cond.Message = fmt.Sprintf("failed to check validation schema for version %s: %v", v.Name, err)
@@ -147,7 +141,7 @@ func (c *ConditionController) sync(key string) error {
 
 	// check old condition
 	cond := calculateCondition(inCustomResourceDefinition)
-	old := apiextensions.FindCRDCondition(inCustomResourceDefinition, apiextensions.NonStructuralSchema)
+	old := apiextensionshelpers.FindCRDCondition(inCustomResourceDefinition, apiextensions.NonStructuralSchema)
 
 	if cond == nil && old == nil {
 		return nil
@@ -159,10 +153,10 @@ func (c *ConditionController) sync(key string) error {
 	// update condition
 	crd := inCustomResourceDefinition.DeepCopy()
 	if cond == nil {
-		apiextensions.RemoveCRDCondition(crd, apiextensions.NonStructuralSchema)
+		apiextensionshelpers.RemoveCRDCondition(crd, apiextensions.NonStructuralSchema)
 	} else {
 		cond.LastTransitionTime = metav1.NewTime(time.Now())
-		apiextensions.SetCRDCondition(crd, *cond)
+		apiextensionshelpers.SetCRDCondition(crd, *cond)
 	}
 
 	_, err = c.crdClient.CustomResourceDefinitions().UpdateStatus(crd)

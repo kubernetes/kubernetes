@@ -27,10 +27,11 @@ import (
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/internalclientset/typed/apiextensions/internalversion"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	client "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset/typed/apiextensions/v1"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 )
 
 // EstablishingController controls how and when CRD is established.
@@ -119,8 +120,8 @@ func (ec *EstablishingController) sync(key string) error {
 		return err
 	}
 
-	if !apiextensions.IsCRDConditionTrue(cachedCRD, apiextensions.NamesAccepted) ||
-		apiextensions.IsCRDConditionTrue(cachedCRD, apiextensions.Established) {
+	if !apiextensionshelpers.IsCRDConditionTrue(cachedCRD, apiextensions.NamesAccepted) ||
+		apiextensionshelpers.IsCRDConditionTrue(cachedCRD, apiextensions.Established) {
 		return nil
 	}
 
@@ -131,7 +132,7 @@ func (ec *EstablishingController) sync(key string) error {
 		Reason:  "InitialNamesAccepted",
 		Message: "the initial names have been accepted",
 	}
-	apiextensions.SetCRDCondition(crd, establishedCondition)
+	apiextensionshelpers.SetCRDCondition(crd, establishedCondition)
 
 	// Update server with new CRD condition.
 	_, err = ec.crdClient.CustomResourceDefinitions().UpdateStatus(crd)

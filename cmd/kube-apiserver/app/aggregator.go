@@ -28,7 +28,7 @@ import (
 
 	"k8s.io/klog"
 
-	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion"
+	apiextensionsinformers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -140,7 +140,7 @@ func createAggregatorServer(aggregatorConfig *aggregatorapiserver.Config, delega
 	autoRegistrationController := autoregister.NewAutoRegisterController(aggregatorServer.APIRegistrationInformers.Apiregistration().V1().APIServices(), apiRegistrationClient)
 	apiServices := apiServicesToRegister(delegateAPIServer, autoRegistrationController)
 	crdRegistrationController := crdregistration.NewCRDRegistrationController(
-		apiExtensionInformers.Apiextensions().InternalVersion().CustomResourceDefinitions(),
+		apiExtensionInformers.Apiextensions().V1().CustomResourceDefinitions(),
 		autoRegistrationController)
 
 	err = aggregatorServer.GenericAPIServer.AddPostStartHook("kube-apiserver-autoregistration", func(context genericapiserver.PostStartHookContext) error {
