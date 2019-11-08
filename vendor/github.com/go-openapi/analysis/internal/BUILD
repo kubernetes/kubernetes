@@ -8,7 +8,7 @@ go_library(
     ],
     importmap = "k8s.io/kubernetes/vendor/github.com/go-openapi/analysis/internal",
     importpath = "github.com/go-openapi/analysis/internal",
-    visibility = ["//visibility:public"],
+    visibility = ["//vendor/github.com/go-openapi/analysis:__subpackages__"],
 )
 
 filegroup(

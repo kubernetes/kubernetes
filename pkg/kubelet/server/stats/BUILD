@@ -70,6 +70,10 @@ go_test(
             "//pkg/kubelet/cm:go_default_library",
             "//vendor/github.com/google/gofuzz:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//pkg/kubelet/cm:go_default_library",
+            "//vendor/github.com/google/gofuzz:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/kubelet/cm:go_default_library",
             "//vendor/github.com/google/gofuzz:go_default_library",

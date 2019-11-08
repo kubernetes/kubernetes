@@ -58,6 +58,9 @@ go_test(
         "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
     ] + select({
+        "@io_bazel_rules_go//go/platform:android": [
+            "//vendor/golang.org/x/sys/unix:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//vendor/golang.org/x/sys/unix:go_default_library",
         ],

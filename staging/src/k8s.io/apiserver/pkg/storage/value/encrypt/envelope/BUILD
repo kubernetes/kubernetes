@@ -55,6 +55,11 @@ go_test(
             "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
             "//vendor/google.golang.org/grpc:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
+            "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",
+            "//vendor/google.golang.org/grpc:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//staging/src/k8s.io/apimachinery/pkg/util/uuid:go_default_library",
             "//staging/src/k8s.io/apiserver/pkg/storage/value/encrypt/envelope/v1beta1:go_default_library",

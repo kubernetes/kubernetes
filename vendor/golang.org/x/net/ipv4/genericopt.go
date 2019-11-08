@@ -11,7 +11,7 @@ func (c *genericOpt) TOS() (int, error) {
 	}
 	so, ok := sockOpts[ssoTOS]
 	if !ok {
-		return 0, errOpNoSupport
+		return 0, errNotImplemented
 	}
 	return so.GetInt(c.Conn)
 }
@@ -24,7 +24,7 @@ func (c *genericOpt) SetTOS(tos int) error {
 	}
 	so, ok := sockOpts[ssoTOS]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	return so.SetInt(c.Conn, tos)
 }
@@ -36,7 +36,7 @@ func (c *genericOpt) TTL() (int, error) {
 	}
 	so, ok := sockOpts[ssoTTL]
 	if !ok {
-		return 0, errOpNoSupport
+		return 0, errNotImplemented
 	}
 	return so.GetInt(c.Conn)
 }
@@ -49,7 +49,7 @@ func (c *genericOpt) SetTTL(ttl int) error {
 	}
 	so, ok := sockOpts[ssoTTL]
 	if !ok {
-		return errOpNoSupport
+		return errNotImplemented
 	}
 	return so.SetInt(c.Conn, ttl)
 }

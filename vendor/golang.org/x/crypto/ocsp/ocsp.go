@@ -63,7 +63,7 @@ func (r ResponseStatus) String() string {
 }
 
 // ResponseError is an error that may be returned by ParseResponse to indicate
-// that the response itself is an error, not just that its indicating that a
+// that the response itself is an error, not just that it's indicating that a
 // certificate is revoked, unknown, etc.
 type ResponseError struct {
 	Status ResponseStatus
@@ -486,6 +486,9 @@ func ParseResponseForCert(bytes []byte, cert, issuer *x509.Certificate) (*Respon
 	rest, err = asn1.Unmarshal(resp.Response.Response, &basicResp)
 	if err != nil {
 		return nil, err
+	}
+	if len(rest) > 0 {
+		return nil, ParseError("trailing data in OCSP response")
 	}
 
 	if n := len(basicResp.TBSResponseData.Responses); n == 0 || cert == nil && n > 1 {

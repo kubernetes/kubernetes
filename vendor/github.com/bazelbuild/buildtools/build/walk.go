@@ -24,13 +24,22 @@ package build
 //
 func Walk(v Expr, f func(x Expr, stk []Expr)) {
 	var stack []Expr
-	walk1(&v, &stack, func(x Expr, stk []Expr) Expr {
+	walk1(&v, &stack, func(x *Expr, stk []Expr) Expr {
+		f(*x, stk)
+		return nil
+	})
+}
+
+// WalkPointers is the same as Walk but calls the callback function with pointers to nodes.
+func WalkPointers(v Expr, f func(x *Expr, stk []Expr)) {
+	var stack []Expr
+	walk1(&v, &stack, func(x *Expr, stk []Expr) Expr {
 		f(x, stk)
 		return nil
 	})
 }
 
-// WalkAndUpdate walks the expression tree v, calling f on all subexpressions
+// Edit walks the expression tree v, calling f on all subexpressions
 // in a preorder traversal. If f returns a non-nil value, the tree is mutated.
 // The new value replaces the old one.
 //
@@ -39,97 +48,199 @@ func Walk(v Expr, f func(x Expr, stk []Expr)) {
 //
 func Edit(v Expr, f func(x Expr, stk []Expr) Expr) Expr {
 	var stack []Expr
-	return walk1(&v, &stack, f)
+	return walk1(&v, &stack, func(x *Expr, stk []Expr) Expr {
+		return f(*x, stk)
+	})
 }
 
-// walk1 is the actual implementation of Walk and WalkAndUpdate.
-// It has the same signature and meaning as Walk,
-// except that it maintains in *stack the current stack
-// of nodes. Using a pointer to a slice here ensures that
-// as the stack grows and shrinks the storage can be
-// reused for the next growth.
-func walk1(v *Expr, stack *[]Expr, f func(x Expr, stk []Expr) Expr) Expr {
+// EditChildren is similar to Edit but doesn't visit the initial node, instead goes
+// directly to its children.
+func EditChildren(v Expr, f func(x Expr, stk []Expr) Expr) {
+	stack := []Expr{v}
+	WalkOnce(v, func(x *Expr) {
+		walk1(x, &stack, func(x *Expr, stk []Expr) Expr {
+			return f(*x, stk)
+		})
+	})
+}
+
+// walk1 is a helper function for Walk, WalkWithPostfix, and Edit.
+func walk1(v *Expr, stack *[]Expr, f func(x *Expr, stk []Expr) Expr) Expr {
 	if v == nil {
 		return nil
 	}
 
-	if res := f(*v, *stack); res != nil {
+	if res := f(v, *stack); res != nil {
 		*v = res
 	}
 	*stack = append(*stack, *v)
-	switch v := (*v).(type) {
+
+	WalkOnce(*v, func(x *Expr) {
+		walk1(x, stack, f)
+	})
+
+	*stack = (*stack)[:len(*stack)-1]
+	return *v
+}
+
+// WalkOnce calls f on every child of v.
+func WalkOnce(v Expr, f func(x *Expr)) {
+	switch v := v.(type) {
 	case *File:
-		for _, stmt := range v.Stmt {
-			walk1(&stmt, stack, f)
+		for i := range v.Stmt {
+			f(&v.Stmt[i])
 		}
 	case *DotExpr:
-		walk1(&v.X, stack, f)
+		f(&v.X)
 	case *IndexExpr:
-		walk1(&v.X, stack, f)
-		walk1(&v.Y, stack, f)
+		f(&v.X)
+		f(&v.Y)
 	case *KeyValueExpr:
-		walk1(&v.Key, stack, f)
-		walk1(&v.Value, stack, f)
+		f(&v.Key)
+		f(&v.Value)
 	case *SliceExpr:
-		walk1(&v.X, stack, f)
+		f(&v.X)
 		if v.From != nil {
-			walk1(&v.From, stack, f)
+			f(&v.From)
 		}
 		if v.To != nil {
-			walk1(&v.To, stack, f)
+			f(&v.To)
 		}
 		if v.Step != nil {
-			walk1(&v.Step, stack, f)
+			f(&v.Step)
 		}
 	case *ParenExpr:
-		walk1(&v.X, stack, f)
+		f(&v.X)
 	case *UnaryExpr:
-		walk1(&v.X, stack, f)
+		f(&v.X)
 	case *BinaryExpr:
-		walk1(&v.X, stack, f)
-		walk1(&v.Y, stack, f)
+		f(&v.X)
+		f(&v.Y)
+	case *AssignExpr:
+		f(&v.LHS)
+		f(&v.RHS)
 	case *LambdaExpr:
-		for i := range v.Var {
-			walk1(&v.Var[i], stack, f)
+		for i := range v.Params {
+			f(&v.Params[i])
 		}
-		walk1(&v.Expr, stack, f)
+		for i := range v.Body {
+			f(&v.Body[i])
+		}
 	case *CallExpr:
-		walk1(&v.X, stack, f)
+		f(&v.X)
 		for i := range v.List {
-			walk1(&v.List[i], stack, f)
+			f(&v.List[i])
 		}
 	case *ListExpr:
 		for i := range v.List {
-			walk1(&v.List[i], stack, f)
+			f(&v.List[i])
 		}
 	case *SetExpr:
 		for i := range v.List {
-			walk1(&v.List[i], stack, f)
+			f(&v.List[i])
 		}
 	case *TupleExpr:
 		for i := range v.List {
-			walk1(&v.List[i], stack, f)
+			f(&v.List[i])
 		}
 	case *DictExpr:
 		for i := range v.List {
-			walk1(&v.List[i], stack, f)
+			f(&v.List[i])
 		}
-	case *ListForExpr:
-		walk1(&v.X, stack, f)
-		for _, c := range v.For {
-			for j := range c.For.Var {
-				walk1(&c.For.Var[j], stack, f)
-			}
-			walk1(&c.For.Expr, stack, f)
-			for _, i := range c.Ifs {
-				walk1(&i.Cond, stack, f)
-			}
+	case *Comprehension:
+		f(&v.Body)
+		for _, c := range v.Clauses {
+			f(&c)
 		}
+	case *IfClause:
+		f(&v.Cond)
+	case *ForClause:
+		f(&v.Vars)
+		f(&v.X)
 	case *ConditionalExpr:
-		walk1(&v.Then, stack, f)
-		walk1(&v.Test, stack, f)
-		walk1(&v.Else, stack, f)
+		f(&v.Then)
+		f(&v.Test)
+		f(&v.Else)
+	case *LoadStmt:
+		module := (Expr)(v.Module)
+		f(&module)
+		v.Module = module.(*StringExpr)
+		for i := range v.From {
+			from := (Expr)(v.From[i])
+			f(&from)
+			v.From[i] = from.(*Ident)
+			to := (Expr)(v.To[i])
+			f(&to)
+			v.To[i] = to.(*Ident)
+		}
+	case *DefStmt:
+		for i := range v.Params {
+			f(&v.Params[i])
+		}
+		for i := range v.Body {
+			f(&v.Body[i])
+		}
+	case *IfStmt:
+		f(&v.Cond)
+		for i := range v.True {
+			f(&v.True[i])
+		}
+		for i := range v.False {
+			f(&v.False[i])
+		}
+	case *ForStmt:
+		f(&v.Vars)
+		f(&v.X)
+		for i := range v.Body {
+			f(&v.Body[i])
+		}
+	case *ReturnStmt:
+		if v.Result != nil {
+			f(&v.Result)
+		}
 	}
+}
+
+// walkStatements is a helper function for WalkStatements
+func walkStatements(v Expr, stack *[]Expr, f func(x Expr, stk []Expr)) {
+	if v == nil {
+		return
+	}
+
+	f(v, *stack)
+	*stack = append(*stack, v)
+
+	traverse := func(x Expr) {
+		walkStatements(x, stack, f)
+	}
+
+	switch expr := v.(type) {
+	case *File:
+		for _, s := range expr.Stmt {
+			traverse(s)
+		}
+	case *DefStmt:
+		for _, s := range expr.Body {
+			traverse(s)
+		}
+	case *IfStmt:
+		for _, s := range expr.True {
+			traverse(s)
+		}
+		for _, s := range expr.False {
+			traverse(s)
+		}
+	case *ForStmt:
+		for _, s := range expr.Body {
+			traverse(s)
+		}
+	}
+
 	*stack = (*stack)[:len(*stack)-1]
-	return *v
+}
+
+// WalkStatements traverses sub statements (not all nodes)
+func WalkStatements(v Expr, f func(x Expr, stk []Expr)) {
+	var stack []Expr
+	walkStatements(v, &stack, f)
 }

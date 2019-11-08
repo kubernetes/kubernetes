@@ -105,6 +105,14 @@ go_library(
             "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
             "//vendor/k8s.io/utils/net:go_default_library",
         ],
+        "@io_bazel_rules_go//go/platform:ios": [
+            "//pkg/proxy/metrics:go_default_library",
+            "//pkg/util/dbus:go_default_library",
+            "//pkg/util/node:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/types:go_default_library",
+            "//staging/src/k8s.io/apimachinery/pkg/util/net:go_default_library",
+            "//vendor/k8s.io/utils/net:go_default_library",
+        ],
         "@io_bazel_rules_go//go/platform:linux": [
             "//pkg/proxy/metrics:go_default_library",
             "//pkg/util/dbus:go_default_library",
@@ -192,6 +200,9 @@ go_test(
             "//pkg/proxy/ipvs:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:freebsd": [
+            "//pkg/proxy/ipvs:go_default_library",
+        ],
+        "@io_bazel_rules_go//go/platform:ios": [
             "//pkg/proxy/ipvs:go_default_library",
         ],
         "@io_bazel_rules_go//go/platform:linux": [
