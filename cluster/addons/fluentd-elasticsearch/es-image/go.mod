@@ -1,5 +1,7 @@
 module fake/import/path
 
+go 1.13
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
