@@ -14,28 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package flexvolume
+package mount
 
-import (
-	"testing"
+// NewFakeExec returns a new FakeExec
+func NewFakeExec(run runHook) *FakeExec {
+	return &FakeExec{runHook: run}
+}
 
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/kubernetes/test/utils/harness"
-)
+// FakeExec for testing.
+type FakeExec struct {
+	runHook runHook
+}
+type runHook func(cmd string, args ...string) ([]byte, error)
 
-func TestTearDownAt(tt *testing.T) {
-	t := harness.For(tt)
-	defer t.Close()
-
-	mounter := mount.NewFakeMounter(nil)
-
-	plugin, rootDir := testPlugin(t)
-	plugin.runner = fakeRunner(
-		assertDriverCall(t, notSupportedOutput(), unmountCmd,
-			rootDir+"/mount-dir"),
-	)
-
-	u, _ := plugin.newUnmounterInternal("volName", types.UID("poduid"), mounter, plugin.runner)
-	u.TearDownAt(rootDir + "/mount-dir")
+// Run executes the command using the optional runhook, if given
+func (f *FakeExec) Run(cmd string, args ...string) ([]byte, error) {
+	if f.runHook != nil {
+		return f.runHook(cmd, args...)
+	}
+	return nil, nil
 }

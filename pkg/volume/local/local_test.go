@@ -570,7 +570,7 @@ func TestMountOptions(t *testing.T) {
 	}
 
 	// Wrap with FakeMounter.
-	fakeMounter := &mount.FakeMounter{}
+	fakeMounter := mount.NewFakeMounter(nil)
 	mounter.(*localVolumeMounter).mounter = fakeMounter
 
 	if err := mounter.SetUp(volume.MounterArgs{}); err != nil {

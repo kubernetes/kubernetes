@@ -93,10 +93,10 @@ func TestDoCleanupMountPoint(t *testing.T) {
 				t.Fatalf("failed to prepare test: %v", err)
 			}
 
-			fake := &FakeMounter{
-				MountPoints:      []MountPoint{mountPoint},
-				MountCheckErrors: map[string]error{mountPoint.Path: mountError},
-			}
+			fake := NewFakeMounter(
+				[]MountPoint{mountPoint},
+			)
+			fake.MountCheckErrors = map[string]error{mountPoint.Path: mountError}
 
 			err = doCleanupMountPoint(mountPoint.Path, fake, true, tt.corruptedMnt)
 			if tt.expectErr {

@@ -208,7 +208,7 @@ func TestSafeFormatAndMount(t *testing.T) {
 			return []byte(script.output), script.err
 		}
 
-		fakeMounter := ErrorMounter{&FakeMounter{}, 0, test.mountErrs}
+		fakeMounter := ErrorMounter{NewFakeMounter(nil), 0, test.mountErrs}
 		fakeExec := NewFakeExec(execCallback)
 		mounter := SafeFormatAndMount{
 			Interface: &fakeMounter,
