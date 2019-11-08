@@ -34,7 +34,6 @@ EXCLUDED_PATTERNS=(
   "verify-all.sh"                # this script calls the make rule and would cause a loop
   "verify-linkcheck.sh"          # runs in separate Jenkins job once per day due to high network usage
   "verify-*-dockerized.sh"       # Don't run any scripts that intended to be run dockerized
-  "verify-import-aliases.sh"     # to be run periodically by folks working on conformance tests
   )
 
 # Exclude typecheck in certain cases, if they're running in a separate job.
