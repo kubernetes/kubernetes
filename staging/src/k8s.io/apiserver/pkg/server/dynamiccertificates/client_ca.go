@@ -29,7 +29,7 @@ type CAContentProvider interface {
 	// the value.  By the time you get here, you should always be returning a value that won't fail.
 	CurrentCABundleContent() []byte
 	// VerifyOptions provides VerifyOptions for authenticators
-	VerifyOptions() x509.VerifyOptions
+	VerifyOptions() (x509.VerifyOptions, bool)
 }
 
 // dynamicCertificateContent holds the content that overrides the baseTLSConfig

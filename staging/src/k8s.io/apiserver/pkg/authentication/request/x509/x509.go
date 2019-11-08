@@ -83,8 +83,10 @@ func (f UserConversionFunc) User(chain []*x509.Certificate) (*authenticator.Resp
 }
 
 // VerifyOptionFunc is function which provides a shallow copy of the VerifyOptions to the authenticator.  This allows
-// for cases where the options (particularly the CAs) can change.
-type VerifyOptionFunc func() x509.VerifyOptions
+// for cases where the options (particularly the CAs) can change.  If the bool is false, then the returned VerifyOptions
+// are ignored and the authenticator will express "no opinion".  This allows a clear signal for cases where a CertPool
+// is eventually expected, but not currently present.
+type VerifyOptionFunc func() (x509.VerifyOptions, bool)
 
 // Authenticator implements request.Authenticator by extracting user info from verified client certificates
 type Authenticator struct {
@@ -111,7 +113,11 @@ func (a *Authenticator) AuthenticateRequest(req *http.Request) (*authenticator.R
 	}
 
 	// Use intermediates, if provided
-	optsCopy := a.verifyOptionsFn()
+	optsCopy, ok := a.verifyOptionsFn()
+	// if there are intentionally no verify options, then we cannot authenticate this request
+	if !ok {
+		return nil, false, nil
+	}
 	if optsCopy.Intermediates == nil && len(req.TLS.PeerCertificates) > 1 {
 		optsCopy.Intermediates = x509.NewCertPool()
 		for _, intermediate := range req.TLS.PeerCertificates[1:] {
@@ -169,7 +175,11 @@ func (a *Verifier) AuthenticateRequest(req *http.Request) (*authenticator.Respon
 	}
 
 	// Use intermediates, if provided
-	optsCopy := a.verifyOptionsFn()
+	optsCopy, ok := a.verifyOptionsFn()
+	// if there are intentionally no verify options, then we cannot authenticate this request
+	if !ok {
+		return nil, false, nil
+	}
 	if optsCopy.Intermediates == nil && len(req.TLS.PeerCertificates) > 1 {
 		optsCopy.Intermediates = x509.NewCertPool()
 		for _, intermediate := range req.TLS.PeerCertificates[1:] {
