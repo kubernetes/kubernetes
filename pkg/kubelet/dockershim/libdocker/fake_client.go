@@ -99,6 +99,7 @@ func NewFakeDockerClient() *FakeDockerClient {
 		Clock:        clock.RealClock{},
 		// default this to true, so that we trace calls, image pulls and container lifecycle
 		EnableTrace:         true,
+		ExecInspect:         &dockertypes.ContainerExecInspect{},
 		ImageInspects:       make(map[string]*dockertypes.ImageInspect),
 		ImageIDsNeedingAuth: make(map[string]dockertypes.AuthConfig),
 		RandGenerator:       rand.New(rand.NewSource(time.Now().UnixNano())),
