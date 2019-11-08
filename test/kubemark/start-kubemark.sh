@@ -149,10 +149,16 @@ function create-kube-hollow-node-resources {
   if [ "${NUM_NODES}" -gt 1000 ]; then
     proxy_cpu=50
   fi
-  proxy_mem_per_node=50
+  proxy_cpu=${KUBEMARK_HOLLOW_PROXY_MILLICPU:-$proxy_cpu}
+  proxy_mem_per_node=${KUBEMARK_HOLLOW_PROXY_MEM_PER_NODE_KB:-50}
   proxy_mem=$((100 * 1024 + proxy_mem_per_node*NUM_NODES))
-  sed -i'' -e "s@{{HOLLOW_PROXY_CPU}}@${proxy_cpu}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
-  sed -i'' -e "s@{{HOLLOW_PROXY_MEM}}@${proxy_mem}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+
+  sed -i'' -e "s@{{hollow_kubelet_millicpu}}@${KUBEMARK_HOLLOW_KUBELET_MILLICPU:-40}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{hollow_kubelet_mem_Ki}}@${KUBEMARK_HOLLOW_KUBELET_MEM_KB:-$((100*1024))}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{hollow_proxy_millicpu}}@${proxy_cpu}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{hollow_proxy_mem_Ki}}@${proxy_mem}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{npd_millicpu}}@${KUBEMARK_NPD_MILLICPU:-20}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
+  sed -i'' -e "s@{{npd_mem_Ki}}@${KUBEMARK_NPD_MEM_KB:-$((20*1024))}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s@{{kubemark_image_registry}}@${KUBEMARK_IMAGE_REGISTRY}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s@{{kubemark_image_tag}}@${KUBEMARK_IMAGE_TAG}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
   sed -i'' -e "s@{{master_ip}}@${MASTER_IP}@g" "${RESOURCE_DIRECTORY}/hollow-node.yaml"
