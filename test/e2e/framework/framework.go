@@ -24,7 +24,9 @@ package framework
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -276,6 +278,43 @@ func (f *Framework) BeforeEach() {
 	f.flakeReport = NewFlakeReport()
 }
 
+// printSummaries prints summaries of tests.
+func printSummaries(summaries []TestDataSummary, testBaseName string) {
+	now := time.Now()
+	for i := range summaries {
+		Logf("Printing summary: %v", summaries[i].SummaryKind())
+		switch TestContext.OutputPrintType {
+		case "hr":
+			if TestContext.ReportDir == "" {
+				Logf(summaries[i].PrintHumanReadable())
+			} else {
+				// TODO: learn to extract test name and append it to the kind instead of timestamp.
+				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
+				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
+					Logf("Failed to write file %v with test performance data: %v", filePath, err)
+				}
+			}
+		case "json":
+			fallthrough
+		default:
+			if TestContext.OutputPrintType != "json" {
+				Logf("Unknown output type: %v. Printing JSON", TestContext.OutputPrintType)
+			}
+			if TestContext.ReportDir == "" {
+				Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
+				Logf("Finished")
+			} else {
+				// TODO: learn to extract test name and append it to the kind instead of timestamp.
+				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
+				Logf("Writing to %s", filePath)
+				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
+					Logf("Failed to write file %v with test performance data: %v", filePath, err)
+				}
+			}
+		}
+	}
+}
+
 // AfterEach deletes the namespace, after reading its events.
 func (f *Framework) AfterEach() {
 	RemoveCleanupAction(f.cleanupHandle)
@@ -368,7 +407,7 @@ func (f *Framework) AfterEach() {
 		f.flakeReport = nil
 	}
 
-	PrintSummaries(f.TestSummaries, f.BaseName)
+	printSummaries(f.TestSummaries, f.BaseName)
 
 	// Check whether all nodes are ready after the test.
 	// This is explicitly done at the very end of the test, to avoid
