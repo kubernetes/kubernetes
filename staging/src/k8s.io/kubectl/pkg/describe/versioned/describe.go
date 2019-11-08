@@ -777,10 +777,11 @@ func describePodIPs(pod *corev1.Pod, w PrefixWriter, space string) {
 }
 
 func describeVolumes(volumes []corev1.Volume, w PrefixWriter, space string) {
-	if volumes == nil || len(volumes) == 0 {
+	if len(volumes) == 0 {
 		w.Write(LEVEL_0, "%sVolumes:\t<none>\n", space)
 		return
 	}
+
 	w.Write(LEVEL_0, "%sVolumes:\n", space)
 	for _, volume := range volumes {
 		nameIndent := ""
@@ -2426,7 +2427,6 @@ func describeIngressTLS(w PrefixWriter, ingTLS []networkingv1beta1.IngressTLS) {
 			w.Write(LEVEL_1, "%v terminates %v\n", t.SecretName, strings.Join(t.Hosts, ","))
 		}
 	}
-	return
 }
 
 // TODO: Move from annotations into Ingress status.
@@ -2435,7 +2435,6 @@ func describeIngressAnnotations(w PrefixWriter, annotations map[string]string) {
 	for k, v := range annotations {
 		w.Write(LEVEL_1, "%v:\t%s\n", k, v)
 	}
-	return
 }
 
 // ServiceDescriber generates information about a service.
@@ -2742,8 +2741,8 @@ func (d *ServiceAccountDescriber) Describe(namespace, name string, describerSett
 
 		for _, s := range secrets.Items {
 			if s.Type == corev1.SecretTypeServiceAccountToken {
-				name, _ := s.Annotations[corev1.ServiceAccountNameKey]
-				uid, _ := s.Annotations[corev1.ServiceAccountUIDKey]
+				name := s.Annotations[corev1.ServiceAccountNameKey]
+				uid := s.Annotations[corev1.ServiceAccountUIDKey]
 				if name == serviceAccount.Name && uid == string(serviceAccount.UID) {
 					tokens = append(tokens, s)
 				}
@@ -4324,7 +4323,7 @@ func printLabelsMultiline(w PrefixWriter, title string, labels map[string]string
 func printLabelsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, labels map[string]string, skip sets.String) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if labels == nil || len(labels) == 0 {
+	if len(labels) == 0 {
 		w.WriteLine("<none>")
 		return
 	}
@@ -4362,7 +4361,7 @@ func printNodeTaintsMultiline(w PrefixWriter, title string, taints []corev1.Tain
 func printTaintsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, taints []corev1.Taint) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if taints == nil || len(taints) == 0 {
+	if len(taints) == 0 {
 		w.WriteLine("<none>")
 		return
 	}
@@ -4393,7 +4392,7 @@ func printPodsMultiline(w PrefixWriter, title string, pods []corev1.Pod) {
 func printPodsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, pods []corev1.Pod) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if pods == nil || len(pods) == 0 {
+	if len(pods) == 0 {
 		w.WriteLine("<none>")
 		return
 	}
@@ -4424,7 +4423,7 @@ func printPodTolerationsMultiline(w PrefixWriter, title string, tolerations []co
 func printTolerationsMultilineWithIndent(w PrefixWriter, initialIndent, title, innerIndent string, tolerations []corev1.Toleration) {
 	w.Write(LEVEL_0, "%s%s:%s", initialIndent, title, innerIndent)
 
-	if tolerations == nil || len(tolerations) == 0 {
+	if len(tolerations) == 0 {
 		w.WriteLine("<none>")
 		return
 	}

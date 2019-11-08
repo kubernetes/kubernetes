@@ -706,7 +706,7 @@ func TestResourceErrors(t *testing.T) {
 			}
 
 			if buf.Len() > 0 {
-				t.Errorf("buffer should be empty: %s", string(buf.Bytes()))
+				t.Errorf("buffer should be empty: %s", buf.String())
 			}
 		})
 	}
