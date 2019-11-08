@@ -1760,6 +1760,52 @@ func TestUpdateDefaultLabels(t *testing.T) {
 				kubeletapis.LabelArch:           "new-arch",
 			},
 		},
+		{
+			name: "backfill required for new stable labels for os/arch/zones/regions/instance-type",
+			initialNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.LabelHostname:                "new-hostname",
+						v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
+						v1.LabelZoneRegionStable:        "new-zone-region",
+						v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
+						v1.LabelZoneRegion:              "new-zone-region",
+						v1.LabelInstanceTypeStable:      "new-instance-type",
+						v1.LabelInstanceType:            "new-instance-type",
+						kubeletapis.LabelOS:             "new-os",
+						kubeletapis.LabelArch:           "new-arch",
+						v1.LabelOSStable:                "new-os",
+						v1.LabelArchStable:              "new-arch",
+					},
+				},
+			},
+			existingNode: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						v1.LabelHostname:          "new-hostname",
+						v1.LabelZoneFailureDomain: "new-zone-failure-domain",
+						v1.LabelZoneRegion:        "new-zone-region",
+						v1.LabelInstanceType:      "new-instance-type",
+						kubeletapis.LabelOS:       "new-os",
+						kubeletapis.LabelArch:     "new-arch",
+					},
+				},
+			},
+			needsUpdate: true,
+			finalLabels: map[string]string{
+				v1.LabelHostname:                "new-hostname",
+				v1.LabelZoneFailureDomainStable: "new-zone-failure-domain",
+				v1.LabelZoneRegionStable:        "new-zone-region",
+				v1.LabelZoneFailureDomain:       "new-zone-failure-domain",
+				v1.LabelZoneRegion:              "new-zone-region",
+				v1.LabelInstanceTypeStable:      "new-instance-type",
+				v1.LabelInstanceType:            "new-instance-type",
+				kubeletapis.LabelOS:             "new-os",
+				kubeletapis.LabelArch:           "new-arch",
+				v1.LabelOSStable:                "new-os",
+				v1.LabelArchStable:              "new-arch",
+			},
+		},
 	}
 
 	for _, tc := range cases {
