@@ -36,7 +36,11 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fields": {"18":{"19":null}}
+        "fields": {
+          "18": {
+            "19": null
+          }
+        }
       }
     ]
   },
@@ -81,7 +85,11 @@
             "manager": "39",
             "operation": "4%a鯿r",
             "apiVersion": "40",
-            "fields": {"41":{"42":null}}
+            "fields": {
+              "41": {
+                "42": null
+              }
+            }
           }
         ]
       },
@@ -141,7 +149,11 @@
                 "manager": "66",
                 "operation": "\\%枅:=ǛƓɥ踓Ǻǧ湬淊kŪ",
                 "apiVersion": "67",
-                "fields": {"68":{"69":null}}
+                "fields": {
+                  "68": {
+                    "69": null
+                  }
+                }
               }
             ]
           },

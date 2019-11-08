@@ -9,7 +9,9 @@
   },
   "spec": {
     "volumes": [
-        "name": "shared-disk"
+      "name"
+      :
+      "shared-disk"
     ],
     "containers": [
       {

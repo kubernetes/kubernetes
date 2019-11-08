@@ -8,9 +8,11 @@
     }
   },
   "spec": {
-    "volumes": [{
+    "volumes": [
+      {
         "name": "shared-disk"
-    }],
+      }
+    ],
     "containers": [
       {
         "name": "apache-php",

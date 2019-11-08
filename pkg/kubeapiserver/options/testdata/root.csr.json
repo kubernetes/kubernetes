@@ -1,6 +1,6 @@
 {
-    "CN": "Root-CA",
-    "ca": {
-        "expiry": "876000h"
-    }
+  "CN": "Root-CA",
+  "ca": {
+    "expiry": "876000h"
+  }
 }

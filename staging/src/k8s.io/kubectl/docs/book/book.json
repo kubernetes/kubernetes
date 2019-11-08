@@ -1,5 +1,14 @@
 {
-  "plugins": ["mermaid-gb3","sequence-diagrams","theme-api", "panel", "copy-code-button", "insert-logo", "ga", "custom-favicon"],
+  "plugins": [
+    "mermaid-gb3",
+    "sequence-diagrams",
+    "theme-api",
+    "panel",
+    "copy-code-button",
+    "insert-logo",
+    "ga",
+    "custom-favicon"
+  ],
   "pluginsConfig": {
     "favicon": "favicon.ico",
     "ga": {
@@ -18,12 +27,12 @@
       "theme": "hand"
     },
     "toc": {
-            "addClass": true,
-            "className": "toc"
-        },
-     "selector": ".markdown-section h1, .markdown-section h2, .markdown-section h3, .markdown-section h4",
-     "position": "before-first",
-     "showByDefault": true
+      "addClass": true,
+      "className": "toc"
+    },
+    "selector": ".markdown-section h1, .markdown-section h2, .markdown-section h3, .markdown-section h4",
+    "position": "before-first",
+    "showByDefault": true
   },
   "gitbook": ">= 3.0.0",
   "author": "Phillip Wittrock",

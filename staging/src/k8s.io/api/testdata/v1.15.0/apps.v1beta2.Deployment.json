@@ -36,7 +36,11 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fields": {"18":{"19":null}}
+        "fields": {
+          "18": {
+            "19": null
+          }
+        }
       }
     ]
   },
@@ -92,7 +96,11 @@
             "manager": "44",
             "operation": "妻ƅTGS5Ǎ",
             "apiVersion": "45",
-            "fields": {"46":{"47":null}}
+            "fields": {
+              "46": {
+                "47": null
+              }
+            }
           }
         ]
       },
@@ -1058,7 +1066,6 @@
     "strategy": {
       "type": "闍ŏŃŋŏ}ŀ姳Ŭ尌eáNRǊ丧",
       "rollingUpdate": {
-        
       }
     },
     "minReadySeconds": 1173434715,

@@ -36,7 +36,11 @@
         "manager": "16",
         "operation": "鐊唊飙Ş-U圴÷a/ɔ}摁(湗Ć]",
         "apiVersion": "17",
-        "fields": {"18":{"19":null}}
+        "fields": {
+          "18": {
+            "19": null
+          }
+        }
       }
     ]
   },
@@ -81,7 +85,11 @@
           {
             "manager": "40",
             "apiVersion": "41",
-            "fields": {"42":{"43":null}}
+            "fields": {
+              "42": {
+                "43": null
+              }
+            }
           }
         ]
       },

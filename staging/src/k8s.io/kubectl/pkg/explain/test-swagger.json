@@ -1,8 +1,8 @@
 {
   "swagger": "2.0",
   "info": {
-   "title": "Kubernetes",
-   "version": "v1.9.0"
+    "title": "Kubernetes",
+    "version": "v1.9.0"
   },
   "paths": {},
   "definitions": {
@@ -77,11 +77,11 @@
     "CrdKind": {
       "x-kubernetes-group-version-kind": [
         {
-         "group": "",
-         "kind": "CrdKind",
-         "version": "v1"
+          "group": "",
+          "kind": "CrdKind",
+          "version": "v1"
         }
-       ]
+      ]
     }
   }
 }
