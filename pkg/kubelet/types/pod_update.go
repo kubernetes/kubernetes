@@ -20,10 +20,10 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/pkg/apis/scheduling"
 )
 
+// Configuration constants.
 const (
 	ConfigSourceAnnotationKey    = "kubernetes.io/config.source"
 	ConfigMirrorAnnotationKey    = v1.MirrorPodAnnotationKey
@@ -34,6 +34,7 @@ const (
 // PodOperation defines what changes will be made on a pod configuration.
 type PodOperation int
 
+// Collection of possible PodOperation values.
 const (
 	// This is the current pod configuration
 	SET PodOperation = iota
@@ -50,18 +51,18 @@ const (
 	RECONCILE
 	// Pods with the given ids have been restored from a checkpoint.
 	RESTORE
+)
 
-	// These constants identify the sources of pods
-	// Updates from a file
+// Constants to identify the sources of pods.
+const (
+	// FileSource updates from a file.
 	FileSource = "file"
-	// Updates from querying a web page
+	// HTTPSource updates from querying a web page.
 	HTTPSource = "http"
-	// Updates from Kubernetes API Server
+	// ApiserverSource updates from Kubernetes API Server.
 	ApiserverSource = "api"
-	// Updates from all sources
+	// AllSource updates from all sources.
 	AllSource = "*"
-
-	NamespaceDefault = metav1.NamespaceDefault
 )
 
 // PodUpdate defines an operation sent on the channel. You can add or remove single services by
@@ -79,7 +80,7 @@ type PodUpdate struct {
 	Source string
 }
 
-// Gets all validated sources from the specified sources.
+// GetValidatedSources gets all validated sources from the specified sources.
 func GetValidatedSources(sources []string) ([]string, error) {
 	validated := make([]string, 0, len(sources))
 	for _, source := range sources {

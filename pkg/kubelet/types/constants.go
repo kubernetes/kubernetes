@@ -16,15 +16,27 @@ limitations under the License.
 
 package types
 
+import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+// Defaults.
 const (
-	// system default DNS resolver configuration
+	// ResolvConfDefault defines the default DNS resolver configuration.
 	ResolvConfDefault = "/etc/resolv.conf"
 
-	// different container runtimes
-	DockerContainerRuntime = "docker"
-	RemoteContainerRuntime = "remote"
+	// NamespaceDefault defines the default namespace.
+	NamespaceDefault = metav1.NamespaceDefault
+)
 
-	// User visible keys for managing node allocatable enforcement on the node.
+// Container runtimes.
+const (
+	// DockerContainerRuntime defines the docker container runtime.
+	DockerContainerRuntime = "docker"
+	// RemoteContainerRuntime defines the remote container runtime.
+	RemoteContainerRuntime = "remote"
+)
+
+// User visible keys for managing node allocatable enforcement on the node.
+const (
 	NodeAllocatableEnforcementKey = "pods"
 	SystemReservedEnforcementKey  = "system-reserved"
 	KubeReservedEnforcementKey    = "kube-reserved"
