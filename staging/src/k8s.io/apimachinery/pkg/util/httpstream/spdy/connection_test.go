@@ -27,10 +27,11 @@ import (
 	"k8s.io/apimachinery/pkg/util/httpstream"
 )
 
-func runProxy(t *testing.T, backendUrl string, proxyUrl chan<- string, proxyDone chan<- struct{}) {
+func runProxy(t *testing.T, backendUrl string, proxyUrl chan<- string, proxyDone chan<- struct{}, errCh chan<- error) {
 	listener, err := net.Listen("tcp4", "localhost:0")
 	if err != nil {
-		t.Fatalf("error listening: %v", err)
+		errCh <- err
+		return
 	}
 	defer listener.Close()
 
@@ -67,10 +68,11 @@ func runProxy(t *testing.T, backendUrl string, proxyUrl chan<- string, proxyDone
 	proxyDone <- struct{}{}
 }
 
-func runServer(t *testing.T, backendUrl chan<- string, serverDone chan<- struct{}) {
+func runServer(t *testing.T, backendUrl chan<- string, serverDone chan<- struct{}, errCh chan<- error) {
 	listener, err := net.Listen("tcp4", "localhost:0")
 	if err != nil {
-		t.Fatalf("server: error listening: %v", err)
+		errCh <- err
+		return
 	}
 	defer listener.Close()
 
@@ -115,15 +117,29 @@ func runServer(t *testing.T, backendUrl chan<- string, serverDone chan<- struct{
 }
 
 func TestConnectionCloseIsImmediateThroughAProxy(t *testing.T) {
-	serverDone := make(chan struct{})
-	backendUrlChan := make(chan string)
-	go runServer(t, backendUrlChan, serverDone)
-	backendUrl := <-backendUrlChan
+	errCh := make(chan error)
 
-	proxyDone := make(chan struct{})
+	serverDone := make(chan struct{}, 1)
+	backendUrlChan := make(chan string)
+	go runServer(t, backendUrlChan, serverDone, errCh)
+
+	var backendUrl string
+	select {
+	case err := <-errCh:
+		t.Fatalf("server: error listening: %v", err)
+	case backendUrl = <-backendUrlChan:
+	}
+
+	proxyDone := make(chan struct{}, 1)
 	proxyUrlChan := make(chan string)
-	go runProxy(t, backendUrl, proxyUrlChan, proxyDone)
-	proxyUrl := <-proxyUrlChan
+	go runProxy(t, backendUrl, proxyUrlChan, proxyDone, errCh)
+
+	var proxyUrl string
+	select {
+	case err := <-errCh:
+		t.Fatalf("error listening: %v", err)
+	case proxyUrl = <-proxyUrlChan:
+	}
 
 	conn, err := net.Dial("tcp4", proxyUrl)
 	if err != nil {
