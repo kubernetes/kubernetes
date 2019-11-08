@@ -279,6 +279,12 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 			pluginConfig = append(pluginConfig, makePluginConfig(nodelabel.Name, args.NodeLabelArgs))
 			return
 		})
+	registry.RegisterPriority(serviceaffinity.Name,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, serviceaffinity.Name, &args.Weight)
+			pluginConfig = append(pluginConfig, makePluginConfig(serviceaffinity.Name, args.ServiceAffinityArgs))
+			return
+		})
 	return registry
 }
 
