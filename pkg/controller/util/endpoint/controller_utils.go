@@ -143,6 +143,12 @@ func ShouldPodBeInEndpoints(pod *v1.Pod) bool {
 	return true
 }
 
+// ShouldSetHostname returns true if the Hostname attribute should be set on an
+// Endpoints Address or EndpointSlice Endpoint.
+func ShouldSetHostname(pod *v1.Pod, svc *v1.Service) bool {
+	return len(pod.Spec.Hostname) > 0 && pod.Spec.Subdomain == svc.Name && svc.Namespace == pod.Namespace
+}
+
 // PodChanged returns two boolean values, the first returns true if the pod.
 // has changed, the second value returns true if the pod labels have changed.
 func PodChanged(oldPod, newPod *v1.Pod, endpointChanged EndpointsMatch) (bool, bool) {

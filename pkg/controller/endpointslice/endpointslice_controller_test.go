@@ -280,6 +280,7 @@ func TestSyncServiceFull(t *testing.T) {
 		Protocol: protoPtr(v1.ProtocolSCTP),
 		Port:     int32Ptr(int32(3456)),
 	}}, slice.Ports)
+
 	assert.ElementsMatch(t, []discovery.Endpoint{{
 		Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
 		Addresses:  []string{"1.2.3.4"},

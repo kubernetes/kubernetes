@@ -74,11 +74,17 @@ func TestNewEndpointSlice(t *testing.T) {
 
 func TestPodToEndpoint(t *testing.T) {
 	ns := "test"
+	svc, _ := newServiceAndEndpointMeta("foo", ns)
+	svcPublishNotReady, _ := newServiceAndEndpointMeta("publishnotready", ns)
+	svcPublishNotReady.Spec.PublishNotReadyAddresses = true
 
 	readyPod := newPod(1, ns, true, 1)
+	readyPodHostname := newPod(1, ns, true, 1)
+	readyPodHostname.Spec.Subdomain = svc.Name
+	readyPodHostname.Spec.Hostname = "example-hostname"
+
 	unreadyPod := newPod(1, ns, false, 1)
 	multiIPPod := newPod(1, ns, true, 1)
-
 	multiIPPod.Status.PodIPs = []v1.PodIP{{IP: "1.2.3.4"}, {IP: "1234::5678:0000:0000:9abc:def0"}}
 
 	node1 := &v1.Node{
@@ -95,12 +101,14 @@ func TestPodToEndpoint(t *testing.T) {
 		name                     string
 		pod                      *v1.Pod
 		node                     *v1.Node
+		svc                      *v1.Service
 		expectedEndpoint         discovery.Endpoint
 		publishNotReadyAddresses bool
 	}{
 		{
 			name: "Ready pod",
 			pod:  readyPod,
+			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -115,9 +123,9 @@ func TestPodToEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name:                     "Ready pod + publishNotReadyAddresses",
-			pod:                      readyPod,
-			publishNotReadyAddresses: true,
+			name: "Ready pod + publishNotReadyAddresses",
+			pod:  readyPod,
+			svc:  &svcPublishNotReady,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -134,6 +142,7 @@ func TestPodToEndpoint(t *testing.T) {
 		{
 			name: "Unready pod",
 			pod:  unreadyPod,
+			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(false)},
@@ -148,9 +157,9 @@ func TestPodToEndpoint(t *testing.T) {
 			},
 		},
 		{
-			name:                     "Unready pod + publishNotReadyAddresses",
-			pod:                      unreadyPod,
-			publishNotReadyAddresses: true,
+			name: "Unready pod + publishNotReadyAddresses",
+			pod:  unreadyPod,
+			svc:  &svcPublishNotReady,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -168,6 +177,7 @@ func TestPodToEndpoint(t *testing.T) {
 			name: "Ready pod + node labels",
 			pod:  readyPod,
 			node: node1,
+			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.5"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -189,6 +199,7 @@ func TestPodToEndpoint(t *testing.T) {
 			name: "Multi IP Ready pod + node labels",
 			pod:  multiIPPod,
 			node: node1,
+			svc:  &svc,
 			expectedEndpoint: discovery.Endpoint{
 				Addresses:  []string{"1.2.3.4", "1234::5678:0000:0000:9abc:def0"},
 				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
@@ -206,11 +217,34 @@ func TestPodToEndpoint(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Ready pod + hostname",
+			pod:  readyPodHostname,
+			node: node1,
+			svc:  &svc,
+			expectedEndpoint: discovery.Endpoint{
+				Addresses:  []string{"1.2.3.5"},
+				Conditions: discovery.EndpointConditions{Ready: utilpointer.BoolPtr(true)},
+				Hostname:   &readyPodHostname.Spec.Hostname,
+				Topology: map[string]string{
+					"kubernetes.io/hostname":        "node-1",
+					"topology.kubernetes.io/zone":   "us-central1-a",
+					"topology.kubernetes.io/region": "us-central1",
+				},
+				TargetRef: &v1.ObjectReference{
+					Kind:            "Pod",
+					Namespace:       ns,
+					Name:            readyPodHostname.Name,
+					UID:             readyPodHostname.UID,
+					ResourceVersion: readyPodHostname.ResourceVersion,
+				},
+			},
+		},
 	}
 
 	for _, testCase := range testCases {
 		t.Run(testCase.name, func(t *testing.T) {
-			endpoint := podToEndpoint(testCase.pod, testCase.node, testCase.publishNotReadyAddresses)
+			endpoint := podToEndpoint(testCase.pod, testCase.node, testCase.svc)
 			if !reflect.DeepEqual(testCase.expectedEndpoint, endpoint) {
 				t.Errorf("Expected endpoint: %v, got: %v", testCase.expectedEndpoint, endpoint)
 			}
