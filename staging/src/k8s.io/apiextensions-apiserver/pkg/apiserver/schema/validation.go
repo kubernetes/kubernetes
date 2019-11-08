@@ -308,11 +308,11 @@ func validateNestedValueValidation(v *NestedValueValidation, skipAnyOf, skipAllO
 	if len(v.ForbiddenExtensions.XListMapKeys) > 0 {
 		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-list-map-keys"), "must be empty to be structural"))
 	}
-	if v.ForbiddenExtensions.XListType != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-list-type"), "must be undefined to be structural"))
+	if len(v.ForbiddenExtensions.XListType) != 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-list-type"), "must be atomic to be structural"))
 	}
-	if v.ForbiddenExtensions.XMapType != nil {
-		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-map-type"), "must be undefined to be structural"))
+	if len(v.ForbiddenExtensions.XMapType) != 0 {
+		allErrs = append(allErrs, field.Forbidden(fldPath.Child("x-kubernetes-map-type"), "must be granular to be structural"))
 	}
 
 	// forbid reasoning about metadata because it can lead to metadata restriction we don't want

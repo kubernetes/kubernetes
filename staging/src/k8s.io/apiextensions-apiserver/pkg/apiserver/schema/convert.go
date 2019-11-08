@@ -245,8 +245,13 @@ func newExtensions(s *apiextensions.JSONSchemaProps) (*Extensions, error) {
 		XEmbeddedResource: s.XEmbeddedResource,
 		XIntOrString:      s.XIntOrString,
 		XListMapKeys:      s.XListMapKeys,
-		XListType:         s.XListType,
-		XMapType:          s.XMapType,
+	}
+
+	if s.XListType != nil && *s.XListType != "atomic" {
+		ret.XListType = *s.XListType
+	}
+	if s.XMapType != nil && *s.XMapType != "granular" {
+		ret.XMapType = *s.XMapType
 	}
 
 	if s.XPreserveUnknownFields != nil {

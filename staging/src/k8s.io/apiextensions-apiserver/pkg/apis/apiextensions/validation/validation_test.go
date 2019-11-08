@@ -4088,6 +4088,73 @@ func TestValidateCustomResourceDefinition(t *testing.T) {
 			},
 			enabledFeatures: []featuregate.Feature{features.CustomResourceDefaulting},
 		},
+
+		{
+			name: "invalid list-type atomic in structural schema",
+			resource: &apiextensions.CustomResourceDefinition{
+				ObjectMeta: metav1.ObjectMeta{Name: "plural.group.com"},
+				Spec: apiextensions.CustomResourceDefinitionSpec{
+					Group: "group.com",
+					Scope: apiextensions.ResourceScope("Cluster"),
+					Names: apiextensions.CustomResourceDefinitionNames{
+						Plural:   "plural",
+						Singular: "singular",
+						Kind:     "Plural",
+						ListKind: "PluralList",
+					},
+					Versions: []apiextensions.CustomResourceDefinitionVersion{
+						{
+							Name:    "version",
+							Served:  true,
+							Storage: true,
+						},
+					},
+					Validation: &apiextensions.CustomResourceValidation{
+						OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"atomic-array": {
+									Type:      "array",
+									XListType: strPtr("atomic"),
+									Not: &apiextensions.JSONSchemaProps{
+										// type left out, and cannot be defined in value validation
+										XListType: strPtr("atomic"),
+									},
+									Items: &apiextensions.JSONSchemaPropsOrArray{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:       "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+								},
+								"granular-map": {
+									Type:     "object",
+									XMapType: strPtr("granular"),
+									Not: &apiextensions.JSONSchemaProps{
+										// type left out, and cannot be defined in value validation
+										XMapType: strPtr("granular"),
+									},
+									AdditionalProperties: &apiextensions.JSONSchemaPropsOrBool{
+										Schema: &apiextensions.JSONSchemaProps{
+											Type:       "object",
+											Properties: map[string]apiextensions.JSONSchemaProps{},
+										},
+									},
+								},
+							},
+						},
+					},
+					PreserveUnknownFields: pointer.BoolPtr(false), // enforces structural
+				},
+				Status: apiextensions.CustomResourceDefinitionStatus{
+					StoredVersions: []string{"version"},
+				},
+			},
+			errors: []validationMatch{
+				required("spec", "validation", "openAPIV3Schema", "properties[granular-map]", "not", "type"),
+				required("spec", "validation", "openAPIV3Schema", "properties[atomic-array]", "not", "type"),
+			},
+		},
 	}
 
 	for _, tc := range tests {
