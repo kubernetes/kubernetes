@@ -45,7 +45,7 @@ var defaultTopologySpreadConstraints = []corev1.TopologySpreadConstraint{
 	},
 	{
 		MaxSkew:           1,
-		TopologyKey:       corev1.LabelZoneFailureDomain,
+		TopologyKey:       corev1.LabelZoneFailureDomainStable,
 		WhenUnsatisfiable: corev1.ScheduleAnyway,
 	},
 }

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+	metav1validation "k8s.io/apimachinery/pkg/apis/meta/v1/validation"
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -85,9 +86,11 @@ func validateTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint
 			f := p.Child("maxSkew")
 			allErrs = append(allErrs, field.Invalid(f, c.MaxSkew, "must be greater than zero"))
 		}
+		topologyKeyP := p.Child("topologyKey")
 		if len(c.TopologyKey) == 0 {
-			f := p.Child("topologyKey")
-			allErrs = append(allErrs, field.Required(f, "can not be empty"))
+			allErrs = append(allErrs, field.Required(topologyKeyP, "can not be empty"))
+		} else {
+			allErrs = append(allErrs, metav1validation.ValidateLabelName(c.TopologyKey, topologyKeyP)...)
 		}
 		if !supportedScheduleActions.Has(string(c.WhenUnsatisfiable)) {
 			f := p.Child("whenUnsatisfiable")
