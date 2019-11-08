@@ -1154,7 +1154,7 @@ func TestRegisterWithApiServer(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		kubelet.registerWithAPIServer()
-		done <- struct{}{}
+		close(done)
 	}()
 	select {
 	case <-time.After(wait.ForeverTestTimeout):

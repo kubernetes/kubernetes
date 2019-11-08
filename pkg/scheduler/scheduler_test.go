@@ -345,7 +345,7 @@ func TestSchedulerNoPhantomPodAfterExpire(t *testing.T) {
 
 	waitPodExpireChan := make(chan struct{})
 	timeout := make(chan struct{})
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 	go func() {
 		for {
 			select {

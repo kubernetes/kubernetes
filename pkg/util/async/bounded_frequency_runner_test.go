@@ -213,6 +213,7 @@ func Test_BoundedFrequencyRunnerNoBurst(t *testing.T) {
 	timer := newFakeTimer()
 	runner := construct("test-runner", obj.F, minInterval, maxInterval, 1, timer)
 	stop := make(chan struct{})
+	defer close(stop)
 
 	var upd timerUpdate
 
@@ -274,9 +275,6 @@ func Test_BoundedFrequencyRunnerNoBurst(t *testing.T) {
 	// Let minInterval pass
 	timer.advance(999 * time.Millisecond) // rel=1000ms
 	waitForRun("fourth run", t, timer, obj)
-
-	// Clean up.
-	stop <- struct{}{}
 }
 
 func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
@@ -284,6 +282,7 @@ func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
 	timer := newFakeTimer()
 	runner := construct("test-runner", obj.F, minInterval, maxInterval, 2, timer)
 	stop := make(chan struct{})
+	defer close(stop)
 
 	var upd timerUpdate
 
@@ -355,9 +354,6 @@ func Test_BoundedFrequencyRunnerBurst(t *testing.T) {
 	// Wait for maxInterval
 	timer.advance(10 * time.Second) // abs=15000ms, rel=10000ms
 	waitForRun("maxInterval", t, timer, obj)
-
-	// Clean up.
-	stop <- struct{}{}
 }
 
 func Test_BoundedFrequencyRunnerRetryAfter(t *testing.T) {
