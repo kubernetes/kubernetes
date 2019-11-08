@@ -714,7 +714,7 @@ func (dc *DisruptionController) buildDisruptedPodMap(pods []*v1.Pod, pdb *policy
 	result := make(map[string]metav1.Time)
 	var recheckTime *time.Time
 
-	if disruptedPods == nil || len(disruptedPods) == 0 {
+	if disruptedPods == nil {
 		return result, recheckTime
 	}
 	for _, pod := range pods {

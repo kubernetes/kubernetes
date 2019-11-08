@@ -44,5 +44,5 @@ type CAContentProvider interface {
 	// CurrentCABundleContent provides ca bundle byte content
 	CurrentCABundleContent() []byte
 	// VerifyOptions provides VerifyOptions for authenticators
-	VerifyOptions() x509.VerifyOptions
+	VerifyOptions() (x509.VerifyOptions, bool)
 }

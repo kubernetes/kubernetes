@@ -28,10 +28,11 @@ import (
 
 // PriorityMetadataFactory is a factory to produce PriorityMetadata.
 type PriorityMetadataFactory struct {
-	serviceLister     corelisters.ServiceLister
-	controllerLister  corelisters.ReplicationControllerLister
-	replicaSetLister  appslisters.ReplicaSetLister
-	statefulSetLister appslisters.StatefulSetLister
+	serviceLister         corelisters.ServiceLister
+	controllerLister      corelisters.ReplicationControllerLister
+	replicaSetLister      appslisters.ReplicaSetLister
+	statefulSetLister     appslisters.StatefulSetLister
+	hardPodAffinityWeight int32
 }
 
 // NewPriorityMetadataFactory creates a PriorityMetadataFactory.
@@ -40,12 +41,14 @@ func NewPriorityMetadataFactory(
 	controllerLister corelisters.ReplicationControllerLister,
 	replicaSetLister appslisters.ReplicaSetLister,
 	statefulSetLister appslisters.StatefulSetLister,
+	hardPodAffinityWeight int32,
 ) PriorityMetadataProducer {
 	factory := &PriorityMetadataFactory{
-		serviceLister:     serviceLister,
-		controllerLister:  controllerLister,
-		replicaSetLister:  replicaSetLister,
-		statefulSetLister: statefulSetLister,
+		serviceLister:         serviceLister,
+		controllerLister:      controllerLister,
+		replicaSetLister:      replicaSetLister,
+		statefulSetLister:     statefulSetLister,
+		hardPodAffinityWeight: hardPodAffinityWeight,
 	}
 	return factory.PriorityMetadata
 }
@@ -60,10 +63,15 @@ type priorityMetadata struct {
 	podFirstServiceSelector labels.Selector
 	totalNumNodes           int
 	podTopologySpreadMap    *podTopologySpreadMap
+	topologyScore           topologyPairToScore
 }
 
 // PriorityMetadata is a PriorityMetadataProducer.  Node info can be nil.
-func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, filteredNodes []*v1.Node, sharedLister schedulerlisters.SharedLister) interface{} {
+func (pmf *PriorityMetadataFactory) PriorityMetadata(
+	pod *v1.Pod,
+	filteredNodes []*v1.Node,
+	sharedLister schedulerlisters.SharedLister,
+) interface{} {
 	// If we cannot compute metadata, just return nil
 	if pod == nil {
 		return nil
@@ -85,6 +93,7 @@ func (pmf *PriorityMetadataFactory) PriorityMetadata(pod *v1.Pod, filteredNodes 
 		podFirstServiceSelector: getFirstServiceSelector(pod, pmf.serviceLister),
 		totalNumNodes:           totalNumNodes,
 		podTopologySpreadMap:    buildPodTopologySpreadMap(pod, filteredNodes, allNodes),
+		topologyScore:           buildTopologyPairToScore(pod, sharedLister, filteredNodes, pmf.hardPodAffinityWeight),
 	}
 }
 

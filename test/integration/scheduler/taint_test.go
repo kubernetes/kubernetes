@@ -85,6 +85,8 @@ func TestTaintNodeByCondition(t *testing.T) {
 	defer algorithmprovider.ApplyFeatureGates()()
 
 	context = initTestScheduler(t, context, false, nil)
+	defer cleanupTest(t, context)
+
 	cs := context.clientSet
 	informers := context.informerFactory
 	nsName := context.ns.Name
@@ -655,6 +657,8 @@ func TestTaintBasedEvictions(t *testing.T) {
 	for i, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			context := initTestMaster(t, "taint-based-evictions", admission)
+			defer cleanupTest(t, context)
+
 			// Build clientset and informers for controllers.
 			externalClientset := kubernetes.NewForConfigOrDie(&restclient.Config{
 				QPS:           -1,

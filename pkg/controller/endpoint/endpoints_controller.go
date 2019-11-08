@@ -427,11 +427,10 @@ func (e *EndpointController) syncService(key string) error {
 			klog.V(2).Infof("failed to find endpoint for service:%v with ClusterIP:%v on pod:%v with error:%v", service.Name, service.Spec.ClusterIP, pod.Name, err)
 			continue
 		}
-		epa := *ep
 
-		hostname := pod.Spec.Hostname
-		if len(hostname) > 0 && pod.Spec.Subdomain == service.Name && service.Namespace == pod.Namespace {
-			epa.Hostname = hostname
+		epa := *ep
+		if endpointutil.ShouldSetHostname(pod, service) {
+			epa.Hostname = pod.Spec.Hostname
 		}
 
 		// Allow headless service not to have ports.

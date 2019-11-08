@@ -170,6 +170,7 @@ func TestPriorityMetadata(t *testing.T) {
 		informerFactory.Core().V1().ReplicationControllers().Lister(),
 		informerFactory.Apps().V1().ReplicaSets().Lister(),
 		informerFactory.Apps().V1().StatefulSets().Lister(),
+		1,
 	)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -119,6 +119,7 @@ import (
 	"k8s.io/kubernetes/pkg/volume/util/volumepathhandler"
 	utilexec "k8s.io/utils/exec"
 	"k8s.io/utils/integer"
+	utilnet "k8s.io/utils/net"
 )
 
 const (
@@ -484,7 +485,7 @@ func NewMainKubelet(kubeCfg *kubeletconfiginternal.KubeletConfiguration,
 	httpClient := &http.Client{}
 	parsedNodeIP := net.ParseIP(nodeIP)
 	protocol := utilipt.ProtocolIpv4
-	if parsedNodeIP != nil && parsedNodeIP.To4() == nil {
+	if utilnet.IsIPv6(parsedNodeIP) {
 		klog.V(0).Infof("IPv6 node IP (%s), assume IPv6 operation", nodeIP)
 		protocol = utilipt.ProtocolIpv6
 	}

@@ -227,7 +227,7 @@ func TestNodeLabelScore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			state := framework.NewCycleState()
 			node := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "machine1", Labels: map[string]string{"foo": "", "bar": ""}}}
-			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithNodeInfoSnapshot(nodeinfosnapshot.NewSnapshot(nil, []*v1.Node{node})))
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(nodeinfosnapshot.NewSnapshot(nil, []*v1.Node{node})))
 			args := &runtime.Unknown{Raw: []byte(test.rawArgs)}
 			p, err := New(args, fh)
 			if err != nil {

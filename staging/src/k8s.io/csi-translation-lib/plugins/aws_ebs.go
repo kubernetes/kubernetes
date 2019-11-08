@@ -57,6 +57,10 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeInlineVolumeToCSI(vol
 		return nil, fmt.Errorf("volume is nil or AWS EBS not defined on volume")
 	}
 	ebsSource := volume.AWSElasticBlockStore
+	volumeHandle, err := KubernetesVolumeIDToEBSVolumeID(ebsSource.VolumeID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to translate Kubernetes ID to EBS Volume ID %v", err)
+	}
 	pv := &v1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{
 			// A.K.A InnerVolumeSpecName required to match for Unmount
@@ -66,7 +70,7 @@ func (t *awsElasticBlockStoreCSITranslator) TranslateInTreeInlineVolumeToCSI(vol
 			PersistentVolumeSource: v1.PersistentVolumeSource{
 				CSI: &v1.CSIPersistentVolumeSource{
 					Driver:       AWSEBSDriverName,
-					VolumeHandle: ebsSource.VolumeID,
+					VolumeHandle: volumeHandle,
 					ReadOnly:     ebsSource.ReadOnly,
 					FSType:       ebsSource.FSType,
 					VolumeAttributes: map[string]string{

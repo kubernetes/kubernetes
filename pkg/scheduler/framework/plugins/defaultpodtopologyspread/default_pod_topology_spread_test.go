@@ -343,7 +343,7 @@ func TestDefaultPodTopologySpreadScore(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeNodeList(test.nodes)
 			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
-			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithNodeInfoSnapshot(snapshot))
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 
 			mapFunction, reduceFunction := priorities.NewSelectorSpreadPriority(
 				fakelisters.ServiceLister(test.services),
@@ -356,7 +356,9 @@ func TestDefaultPodTopologySpreadScore(t *testing.T) {
 				fakelisters.ServiceLister(test.services),
 				fakelisters.ControllerLister(test.rcs),
 				fakelisters.ReplicaSetLister(test.rss),
-				fakelisters.StatefulSetLister(test.sss))
+				fakelisters.StatefulSetLister(test.sss),
+				1,
+			)
 			metaData := metaDataProducer(test.pod, nodes, snapshot)
 
 			state := framework.NewCycleState()
@@ -600,7 +602,7 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			nodes := makeLabeledNodeList(labeledNodes)
 			snapshot := nodeinfosnapshot.NewSnapshot(test.pods, nodes)
-			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithNodeInfoSnapshot(snapshot))
+			fh, _ := framework.NewFramework(nil, nil, nil, framework.WithSnapshotSharedLister(snapshot))
 
 			mapFunction, reduceFunction := priorities.NewSelectorSpreadPriority(
 				fakelisters.ServiceLister(test.services),
@@ -612,7 +614,9 @@ func TestZoneSelectorSpreadPriority(t *testing.T) {
 				fakelisters.ServiceLister(test.services),
 				fakelisters.ControllerLister(test.rcs),
 				fakelisters.ReplicaSetLister(test.rss),
-				fakelisters.StatefulSetLister(test.sss))
+				fakelisters.StatefulSetLister(test.sss),
+				1,
+			)
 			metaData := metaDataProducer(test.pod, nodes, snapshot)
 
 			plugin := &DefaultPodTopologySpread{

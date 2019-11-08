@@ -69,8 +69,7 @@ func (s endpointSet) Has(item *discovery.Endpoint) bool {
 
 // Returns an endpoint matching the hash if contained in the set.
 func (s endpointSet) Get(item *discovery.Endpoint) *discovery.Endpoint {
-	got, _ := s[hashEndpoint(item)]
-	return got
+	return s[hashEndpoint(item)]
 }
 
 // UnsortedList returns the slice with contents in random order.

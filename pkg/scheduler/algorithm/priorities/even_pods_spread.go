@@ -147,7 +147,7 @@ func CalculateEvenPodsSpreadPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo 
 		m = priorityMeta.podTopologySpreadMap
 	}
 	if m == nil {
-		return framework.NodeScore{}, nil
+		return framework.NodeScore{Name: node.Name, Score: 0}, nil
 	}
 
 	// no need to continue if the node is not qualified.

@@ -28,7 +28,11 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apiserver/pkg/server/dynamiccertificates"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/component-base/cli/flag"
 	"k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/test/integration/framework"
@@ -76,7 +80,7 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 	clientCAFilename := ""
 	frontProxyCAFilename := ""
 
-	_, kubeconfig := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
+	kubeClient, kubeconfig := framework.StartTestServer(t, stopCh, framework.TestServerSetup{
 		ModifyServerRunOptions: func(opts *options.ServerRunOptions) {
 			opts.GenericServerRunOptions.MaxRequestBodyBytes = 1024 * 1024
 			clientCAFilename = opts.Authentication.ClientCert.ClientCA
@@ -85,6 +89,17 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 		},
 	})
 	apiserverURL, err := url.Parse(kubeconfig.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// wait for request header info
+	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// wait for client cert info
+	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", "-----BEGIN CERTIFICATE-----", 1))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,6 +146,44 @@ MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=
 		if !strings.Contains(acceptableCAs[i], expectedCAs[i]) {
 			t.Errorf("expected %q, got %q", expectedCAs[i], acceptableCAs[i])
 		}
+	}
+
+	// wait for updated request header info that contains both
+	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "-----BEGIN CERTIFICATE-----", 2))
+	if err != nil {
+		t.Error(err)
+	}
+	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "requestheader-client-ca-file", "MnVCuBwfwDXCAiEAw/1TA+CjPq9JC5ek1ifR0FybTURjeQqYkKpve1dveps=", 1))
+	if err != nil {
+		t.Error(err)
+	}
+	// wait for updated client cert info that contains both
+	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", "-----BEGIN CERTIFICATE-----", 2))
+	if err != nil {
+		t.Error(err)
+	}
+	err = wait.PollImmediate(100*time.Millisecond, 30*time.Second, waitForConfigMapCAContent(t, kubeClient, "client-ca-file", "M++C29JwS3Hwbubg6WO3wjFjoEhpCwU6qRYUz3MRp4tHO4kxKXx+oQnUiFnR7vW0", 1))
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func waitForConfigMapCAContent(t *testing.T, kubeClient kubernetes.Interface, key, content string, count int) func() (bool, error) {
+	return func() (bool, error) {
+		clusterAuthInfo, err := kubeClient.CoreV1().ConfigMaps("kube-system").Get("extension-apiserver-authentication", metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+
+		ca := clusterAuthInfo.Data[key]
+		if strings.Count(ca, content) == count {
+			return true, nil
+		}
+		t.Log(ca)
+		return false, nil
 	}
 }
 

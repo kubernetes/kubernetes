@@ -3857,7 +3857,7 @@ function check-resources() {
 }
 
 # -----------------------------------------------------------------------------
-# Cluster specific test helpers used from hack/e2e.go
+# Cluster specific test helpers
 
 # Execute prior to running tests to build a release if required for env.
 #
@@ -3868,8 +3868,7 @@ function test-build-release() {
   "${KUBE_ROOT}/build/release.sh"
 }
 
-# Execute prior to running tests to initialize required structure. This is
-# called from hack/e2e.go only when running -up.
+# Execute prior to running tests to initialize required structure.
 #
 # Assumed vars:
 #   Variables from config.sh
@@ -3925,8 +3924,7 @@ function test-setup() {
   done
 }
 
-# Execute after running tests to perform any required clean-up. This is called
-# from hack/e2e.go
+# Execute after running tests to perform any required clean-up.
 function test-teardown() {
   detect-project
   echo "Shutting down test cluster in background."

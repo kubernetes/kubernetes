@@ -47,10 +47,10 @@ import (
 	extenderv1 "k8s.io/kubernetes/pkg/scheduler/apis/extender/v1"
 	frameworkplugins "k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	internalcache "k8s.io/kubernetes/pkg/scheduler/internal/cache"
 	internalqueue "k8s.io/kubernetes/pkg/scheduler/internal/queue"
-	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 )
 
@@ -83,14 +83,15 @@ func TestCreateFromConfig(t *testing.T) {
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
 	RegisterFitPredicate("PredicateTwo", PredicateFunc)
-	RegisterPriorityFunction("PriorityOne", PriorityFunc, 1)
-	RegisterPriorityFunction("PriorityTwo", PriorityFunc, 1)
+	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
+	RegisterPriorityMapReduceFunction("PriorityTwo", PriorityFunc, nil, 1)
 
 	configData = []byte(`{
 		"kind" : "Policy",
 		"apiVersion" : "v1",
 		"predicates" : [
 			{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["zone"]}}},
+			{"name" : "TestZoneAffinity", "argument" : {"serviceAffinity" : {"labels" : ["foo"]}}},
 			{"name" : "TestRequireZone", "argument" : {"labelsPresence" : {"labels" : ["zone"], "presence" : true}}},
 			{"name" : "TestNoFooLabel", "argument" : {"labelsPresence" : {"labels" : ["foo"], "presence" : false}}},
 			{"name" : "PredicateOne"},
@@ -98,6 +99,7 @@ func TestCreateFromConfig(t *testing.T) {
 		],
 		"priorities" : [
 			{"name" : "RackSpread", "weight" : 3, "argument" : {"serviceAntiAffinity" : {"label" : "rack"}}},
+			{"name" : "ZoneSpread", "weight" : 3, "argument" : {"serviceAntiAffinity" : {"label" : "zone"}}},
 			{"name" : "LabelPreference1", "weight" : 3, "argument" : {"labelPreference" : {"label" : "l1", "presence": true}}},
 			{"name" : "LabelPreference2", "weight" : 3, "argument" : {"labelPreference" : {"label" : "l2", "presence": false}}},
 			{"name" : "PriorityOne", "weight" : 2},
@@ -117,25 +119,33 @@ func TestCreateFromConfig(t *testing.T) {
 	}
 
 	// Verify that node label predicate/priority are converted to framework plugins.
-	if _, ok := findPlugin(nodelabel.Name, "FilterPlugin", conf); !ok {
-		t.Fatalf("NodeLabel plugin not exist in framework.")
-	}
-	nodeLabelScorePlugin, ok := findPlugin(nodelabel.Name, "ScorePlugin", conf)
-	if !ok {
-		t.Fatalf("NodeLabel plugin not exist in framework.")
-	}
-	if nodeLabelScorePlugin.Weight != 6 {
-		t.Errorf("Wrong weight. Got: %v, want: 6", nodeLabelScorePlugin.Weight)
-	}
-	// Verify that the policy config is converted to plugin config for node label predicate/priority.
-	nodeLabelConfig := findPluginConfig(nodelabel.Name, conf)
-	encoding, err := json.Marshal(nodeLabelConfig)
-	if err != nil {
-		t.Errorf("Failed to marshal %+v: %v", nodeLabelConfig, err)
-	}
-	want := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"],"presentLabelsPreference":["l1"],"absentLabelsPreference":["l2"]}}`
-	if string(encoding) != want {
-		t.Errorf("Config for NodeLabel plugin mismatch. got: %v, want: %v", string(encoding), want)
+	wantArgs := `{"Name":"NodeLabel","Args":{"presentLabels":["zone"],"absentLabels":["foo"],"presentLabelsPreference":["l1"],"absentLabelsPreference":["l2"]}}`
+	verifyPluginConvertion(t, nodelabel.Name, []string{"FilterPlugin", "ScorePlugin"}, conf, 6, wantArgs)
+	// Verify that service affinity custom predicate/priority is converted to framework plugin.
+	wantArgs = `{"Name":"ServiceAffinity","Args":{"labels":["zone","foo"],"antiAffinityLabelsPreference":["rack","zone"]}}`
+	verifyPluginConvertion(t, serviceaffinity.Name, []string{"FilterPlugin", "ScorePlugin"}, conf, 6, wantArgs)
+}
+
+func verifyPluginConvertion(t *testing.T, name string, extentionPoints []string, conf *Config, wantWeight int32, wantArgs string) {
+	for _, extensionPoint := range extentionPoints {
+		plugin, ok := findPlugin(name, extensionPoint, conf)
+		if !ok {
+			t.Fatalf("%q plugin does not exist in framework.", name)
+		}
+		if extensionPoint == "ScorePlugin" {
+			if plugin.Weight != wantWeight {
+				t.Errorf("Wrong weight. Got: %v, want: %v", plugin.Weight, wantWeight)
+			}
+		}
+		// Verify that the policy config is converted to plugin config.
+		pluginConfig := findPluginConfig(name, conf)
+		encoding, err := json.Marshal(pluginConfig)
+		if err != nil {
+			t.Errorf("Failed to marshal %+v: %v", pluginConfig, err)
+		}
+		if string(encoding) != wantArgs {
+			t.Errorf("Config for %v plugin mismatch. got: %v, want: %v", name, string(encoding), wantArgs)
+		}
 	}
 }
 
@@ -169,8 +179,8 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
 	RegisterFitPredicate("PredicateTwo", PredicateFunc)
-	RegisterPriorityFunction("PriorityOne", PriorityFunc, 1)
-	RegisterPriorityFunction("PriorityTwo", PriorityFunc, 1)
+	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
+	RegisterPriorityMapReduceFunction("PriorityTwo", PriorityFunc, nil, 1)
 
 	configData = []byte(`{
 		"kind" : "Policy",
@@ -225,7 +235,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
-	RegisterPriorityFunction("PriorityOne", PriorityFunc, 1)
+	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
 
 	RegisterAlgorithmProvider(DefaultProvider, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
@@ -260,7 +270,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
-	RegisterPriorityFunction("PriorityOne", PriorityFunc, 1)
+	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
 
 	RegisterAlgorithmProvider(DefaultProvider, sets.NewString("PredicateOne"), sets.NewString("PriorityOne"))
 
@@ -291,8 +301,8 @@ func PredicateFunc(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *sch
 	return true, nil, nil
 }
 
-func PriorityFunc(pod *v1.Pod, sharedLister schedulerlisters.SharedLister, nodes []*v1.Node) (framework.NodeScoreList, error) {
-	return []framework.NodeScore{}, nil
+func PriorityFunc(pod *v1.Pod, meta interface{}, nodeInfo *schedulernodeinfo.NodeInfo) (framework.NodeScore, error) {
+	return framework.NodeScore{}, nil
 }
 
 func TestDefaultErrorFunc(t *testing.T) {
@@ -782,9 +792,9 @@ func TestCreateWithFrameworkPlugins(t *testing.T) {
 	RegisterFitPredicate(predicateTwoName, PredicateFunc)
 	RegisterFitPredicate(predicateThreeName, PredicateFunc)
 	RegisterMandatoryFitPredicate(predicateFourName, PredicateFunc)
-	RegisterPriorityFunction(priorityOneName, PriorityFunc, 1)
-	RegisterPriorityFunction(priorityTwoName, PriorityFunc, 1)
-	RegisterPriorityFunction(priorityThreeName, PriorityFunc, 1)
+	RegisterPriorityMapReduceFunction(priorityOneName, PriorityFunc, nil, 1)
+	RegisterPriorityMapReduceFunction(priorityTwoName, PriorityFunc, nil, 1)
+	RegisterPriorityMapReduceFunction(priorityThreeName, PriorityFunc, nil, 1)
 
 	configData = []byte(`{
 		"kind" : "Policy",

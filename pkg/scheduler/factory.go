@@ -339,6 +339,10 @@ func (c *Configurator) CreateFromConfig(policy schedulerapi.Policy) (*Config, er
 		priorityKeys = provider.PriorityFunctionKeys
 	} else {
 		for _, priority := range policy.Priorities {
+			if priority.Name == priorities.EqualPriority {
+				klog.V(2).Infof("Skip registering priority: %s", priority.Name)
+				continue
+			}
 			klog.V(2).Infof("Registering priority: %s", priority.Name)
 			priorityKeys.Insert(RegisterCustomPriorityFunction(priority, c.configProducerArgs))
 		}
@@ -428,7 +432,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		pluginConfig,
 		framework.WithClientSet(c.client),
 		framework.WithInformerFactory(c.informerFactory),
-		framework.WithNodeInfoSnapshot(c.nodeInfoSnapshot),
+		framework.WithSnapshotSharedLister(c.nodeInfoSnapshot),
 	)
 	if err != nil {
 		klog.Fatalf("error initializing the scheduling framework: %v", err)
@@ -462,6 +466,7 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		predicateMetaProducer,
 		priorityConfigs,
 		priorityMetaProducer,
+		c.nodeInfoSnapshot,
 		framework,
 		extenders,
 		c.volumeBinder,

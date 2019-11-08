@@ -1,3 +1,4 @@
+# Apart from this line, only trailing comments are supported
 cmd/cloud-controller-manager/app/apis/config/v1alpha1
 cmd/kube-apiserver/app
 cmd/kubeadm/app/apis/kubeadm/v1beta1
@@ -103,7 +104,6 @@ pkg/controller/volume/events
 pkg/controller/volume/expand
 pkg/controller/volume/persistentvolume
 pkg/controller/volume/persistentvolume/config/v1alpha1
-pkg/controller/volume/persistentvolume/options
 pkg/credentialprovider
 pkg/features
 pkg/kubeapiserver
@@ -227,7 +227,7 @@ pkg/util/ebtables
 pkg/util/goroutinemap/exponentialbackoff
 pkg/util/iptables
 pkg/util/iptables/testing
-pkg/util/labels
+pkg/util/labels # See previous effort in PR #80685
 pkg/util/mount
 pkg/util/oom
 pkg/util/procfs
@@ -545,7 +545,6 @@ staging/src/k8s.io/sample-apiserver/pkg/registry/wardle/flunder
 test/e2e/common
 test/e2e/lifecycle/bootstrap
 test/e2e/storage/vsphere
-test/e2e_kubeadm
 test/e2e_node
 test/e2e_node/remote
 test/e2e_node/runner/remote

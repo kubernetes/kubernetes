@@ -1,12 +1,5 @@
 package(default_visibility = ["//visibility:public"])
 
-load(
-    "@io_bazel_rules_go//go:def.bzl",
-    "go_binary",
-    "go_library",
-    "go_test",
-)
-
 filegroup(
     name = "package-srcs",
     srcs = glob(["**"]),
@@ -53,24 +46,6 @@ test_suite(
         "verify-boilerplate",
         #        "verify-gofmt",
     ],
-)
-
-go_binary(
-    name = "hack",
-    embed = [":go_default_library"],
-)
-
-go_test(
-    name = "go_default_test",
-    srcs = ["e2e_test.go"],
-    data = glob(["testdata/**"]),
-    embed = [":go_default_library"],
-)
-
-go_library(
-    name = "go_default_library",
-    srcs = ["e2e.go"],
-    importpath = "k8s.io/kubernetes/hack",
 )
 
 sh_binary(

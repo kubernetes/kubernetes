@@ -36,6 +36,7 @@ import (
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/nodelabel"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/requestedtocapacityratio"
+	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/serviceaffinity"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulerlisters "k8s.io/kubernetes/pkg/scheduler/listers"
 	"k8s.io/kubernetes/pkg/scheduler/volumebinder"
@@ -81,7 +82,6 @@ type PriorityFunctionFactory2 func(PluginFactoryArgs) (priorities.PriorityMapFun
 
 // PriorityConfigFactory produces a PriorityConfig from the given function and weight
 type PriorityConfigFactory struct {
-	Function          PriorityFunctionFactory
 	MapReduceFunction PriorityFunctionFactory2
 	Weight            int64
 }
@@ -263,60 +263,73 @@ func RegisterFitPredicateFactory(name string, predicateFactory FitPredicateFacto
 
 // RegisterCustomFitPredicate registers a custom fit predicate with the algorithm registry.
 // Returns the name, with which the predicate was registered.
-func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, args *plugins.ConfigProducerArgs) string {
+func RegisterCustomFitPredicate(policy schedulerapi.PredicatePolicy, pluginArgs *plugins.ConfigProducerArgs) string {
 	var predicateFactory FitPredicateFactory
 	var ok bool
-	name := policy.Name
+	policyName := policy.Name
 
 	validatePredicateOrDie(policy)
 
 	// generate the predicate function, if a custom type is requested
 	if policy.Argument != nil {
 		if policy.Argument.ServiceAffinity != nil {
+			// We use the ServiceAffinity plugin name for all ServiceAffinity custom priorities.
+			// It may get called multiple times but we essentially only register one instance of ServiceAffinity predicate.
+			// This name is then used to find the registered plugin and run the plugin instead of the predicate.
+			policyName = predicates.CheckServiceAffinityPred
+
+			// map LabelsPresence policy to ConfigProducerArgs that's used to configure the ServiceAffinity plugin.
+			if pluginArgs.ServiceAffinityArgs == nil {
+				pluginArgs.ServiceAffinityArgs = &serviceaffinity.Args{}
+			}
+
+			pluginArgs.ServiceAffinityArgs.AffinityLabels = append(pluginArgs.ServiceAffinityArgs.AffinityLabels, policy.Argument.ServiceAffinity.Labels...)
+
 			predicateFactory = func(args PluginFactoryArgs) predicates.FitPredicate {
 				predicate, precomputationFunction := predicates.NewServiceAffinityPredicate(
 					args.NodeInfoLister,
 					args.PodLister,
 					args.ServiceLister,
-					policy.Argument.ServiceAffinity.Labels,
+					pluginArgs.ServiceAffinityArgs.AffinityLabels,
 				)
 
 				// Once we generate the predicate we should also Register the Precomputation
-				predicates.RegisterPredicateMetadataProducer(policy.Name, precomputationFunction)
+				predicates.RegisterPredicateMetadataProducer(policyName, precomputationFunction)
 				return predicate
 			}
 		} else if policy.Argument.LabelsPresence != nil {
-			// map LabelPresence policy to ConfigProducerArgs that's used to configure the NodeLabel plugin.
-			if args.NodeLabelArgs == nil {
-				args.NodeLabelArgs = &nodelabel.Args{}
-			}
-			if policy.Argument.LabelsPresence.Presence {
-				args.NodeLabelArgs.PresentLabels = append(args.NodeLabelArgs.PresentLabels, policy.Argument.LabelsPresence.Labels...)
-			} else {
-				args.NodeLabelArgs.AbsentLabels = append(args.NodeLabelArgs.AbsentLabels, policy.Argument.LabelsPresence.Labels...)
-			}
-			predicateFactory = func(_ PluginFactoryArgs) predicates.FitPredicate {
-				return predicates.NewNodeLabelPredicate(
-					args.NodeLabelArgs.PresentLabels,
-					args.NodeLabelArgs.AbsentLabels,
-				)
-			}
 			// We use the NodeLabel plugin name for all NodeLabel custom priorities.
 			// It may get called multiple times but we essentially only register one instance of NodeLabel predicate.
 			// This name is then used to find the registered plugin and run the plugin instead of the predicate.
-			name = nodelabel.Name
+			policyName = predicates.CheckNodeLabelPresencePred
+
+			// map LabelPresence policy to ConfigProducerArgs that's used to configure the NodeLabel plugin.
+			if pluginArgs.NodeLabelArgs == nil {
+				pluginArgs.NodeLabelArgs = &nodelabel.Args{}
+			}
+			if policy.Argument.LabelsPresence.Presence {
+				pluginArgs.NodeLabelArgs.PresentLabels = append(pluginArgs.NodeLabelArgs.PresentLabels, policy.Argument.LabelsPresence.Labels...)
+			} else {
+				pluginArgs.NodeLabelArgs.AbsentLabels = append(pluginArgs.NodeLabelArgs.AbsentLabels, policy.Argument.LabelsPresence.Labels...)
+			}
+			predicateFactory = func(_ PluginFactoryArgs) predicates.FitPredicate {
+				return predicates.NewNodeLabelPredicate(
+					pluginArgs.NodeLabelArgs.PresentLabels,
+					pluginArgs.NodeLabelArgs.AbsentLabels,
+				)
+			}
 		}
-	} else if predicateFactory, ok = fitPredicateMap[policy.Name]; ok {
+	} else if predicateFactory, ok = fitPredicateMap[policyName]; ok {
 		// checking to see if a pre-defined predicate is requested
-		klog.V(2).Infof("Predicate type %s already registered, reusing.", policy.Name)
-		return name
+		klog.V(2).Infof("Predicate type %s already registered, reusing.", policyName)
+		return policyName
 	}
 
 	if predicateFactory == nil {
-		klog.Fatalf("Invalid configuration: Predicate type not found for %s", policy.Name)
+		klog.Fatalf("Invalid configuration: Predicate type not found for %s", policyName)
 	}
 
-	return RegisterFitPredicateFactory(name, predicateFactory)
+	return RegisterFitPredicateFactory(policyName, predicateFactory)
 }
 
 // IsFitPredicateRegistered is useful for testing providers.
@@ -339,19 +352,6 @@ func RegisterPredicateMetadataProducer(producer predicates.PredicateMetadataProd
 	schedulerFactoryMutex.Lock()
 	defer schedulerFactoryMutex.Unlock()
 	predicateMetadataProducer = producer
-}
-
-// RegisterPriorityFunction registers a priority function with the algorithm registry. Returns the name,
-// with which the function was registered.
-// DEPRECATED
-// Use Map-Reduce pattern for priority functions.
-func RegisterPriorityFunction(name string, function priorities.PriorityFunction, weight int) string {
-	return RegisterPriorityConfigFactory(name, PriorityConfigFactory{
-		Function: func(PluginFactoryArgs) priorities.PriorityFunction {
-			return function
-		},
-		Weight: int64(weight),
-	})
 }
 
 // RegisterPriorityMapReduceFunction registers a priority function with the algorithm registry. Returns the name,
@@ -380,7 +380,7 @@ func RegisterPriorityConfigFactory(name string, pcf PriorityConfigFactory) strin
 
 // RegisterCustomPriorityFunction registers a custom priority function with the algorithm registry.
 // Returns the name, with which the priority function was registered.
-func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, args *plugins.ConfigProducerArgs) string {
+func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, configProducerArgs *plugins.ConfigProducerArgs) string {
 	var pcf *PriorityConfigFactory
 	name := policy.Name
 
@@ -389,49 +389,68 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, args *pl
 	// generate the priority function, if a custom priority is requested
 	if policy.Argument != nil {
 		if policy.Argument.ServiceAntiAffinity != nil {
+			// We use the ServiceAffinity plugin name for all ServiceAffinity custom priorities.
+			// It may get called multiple times but we essentially only register one instance of
+			// ServiceAffinity priority.
+			// This name is then used to find the registered plugin and run the plugin instead of the priority.
+			name = serviceaffinity.Name
+
+			if configProducerArgs.ServiceAffinityArgs == nil {
+				configProducerArgs.ServiceAffinityArgs = &serviceaffinity.Args{}
+			}
+			configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference = append(configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference, policy.Argument.ServiceAntiAffinity.Label)
+
+			weight := policy.Weight
+			schedulerFactoryMutex.RLock()
+			if existing, ok := priorityFunctionMap[name]; ok {
+				// If there are n ServiceAffinity priorities in the policy, the weight for the corresponding
+				// score plugin is n*(weight of each priority).
+				weight += existing.Weight
+			}
+			schedulerFactoryMutex.RUnlock()
 			pcf = &PriorityConfigFactory{
 				MapReduceFunction: func(args PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 					return priorities.NewServiceAntiAffinityPriority(
 						args.PodLister,
 						args.ServiceLister,
-						policy.Argument.ServiceAntiAffinity.Label,
+						configProducerArgs.ServiceAffinityArgs.AntiAffinityLabelsPreference,
 					)
 				},
-				Weight: policy.Weight,
+				Weight: weight,
 			}
 		} else if policy.Argument.LabelPreference != nil {
 			// We use the NodeLabel plugin name for all NodeLabel custom priorities.
 			// It may get called multiple times but we essentially only register one instance of NodeLabel priority.
 			// This name is then used to find the registered plugin and run the plugin instead of the priority.
 			name = nodelabel.Name
-			if args.NodeLabelArgs == nil {
-				args.NodeLabelArgs = &nodelabel.Args{}
+			if configProducerArgs.NodeLabelArgs == nil {
+				configProducerArgs.NodeLabelArgs = &nodelabel.Args{}
 			}
 			if policy.Argument.LabelPreference.Presence {
-				args.NodeLabelArgs.PresentLabelsPreference = append(args.NodeLabelArgs.PresentLabelsPreference, policy.Argument.LabelPreference.Label)
+				configProducerArgs.NodeLabelArgs.PresentLabelsPreference = append(configProducerArgs.NodeLabelArgs.PresentLabelsPreference, policy.Argument.LabelPreference.Label)
 			} else {
-				args.NodeLabelArgs.AbsentLabelsPreference = append(args.NodeLabelArgs.AbsentLabelsPreference, policy.Argument.LabelPreference.Label)
+				configProducerArgs.NodeLabelArgs.AbsentLabelsPreference = append(configProducerArgs.NodeLabelArgs.AbsentLabelsPreference, policy.Argument.LabelPreference.Label)
 			}
-			schedulerFactoryMutex.RLock()
 			weight := policy.Weight
+			schedulerFactoryMutex.RLock()
 			if existing, ok := priorityFunctionMap[name]; ok {
 				// If there are n NodeLabel priority configured in the policy, the weight for the corresponding
 				// priority is n*(weight of each priority in policy).
 				weight += existing.Weight
 			}
+			schedulerFactoryMutex.RUnlock()
 			pcf = &PriorityConfigFactory{
 				MapReduceFunction: func(_ PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction) {
 					return priorities.NewNodeLabelPriority(
-						args.NodeLabelArgs.PresentLabelsPreference,
-						args.NodeLabelArgs.AbsentLabelsPreference,
+						configProducerArgs.NodeLabelArgs.PresentLabelsPreference,
+						configProducerArgs.NodeLabelArgs.AbsentLabelsPreference,
 					)
 				},
 				Weight: weight,
 			}
-			schedulerFactoryMutex.RUnlock()
 		} else if policy.Argument.RequestedToCapacityRatioArguments != nil {
 			scoringFunctionShape, resources := buildScoringFunctionShapeFromRequestedToCapacityRatioArguments(policy.Argument.RequestedToCapacityRatioArguments)
-			args.RequestedToCapacityRatioArgs = &requestedtocapacityratio.Args{
+			configProducerArgs.RequestedToCapacityRatioArgs = &requestedtocapacityratio.Args{
 				FunctionShape:       scoringFunctionShape,
 				ResourceToWeightMap: resources,
 			}
@@ -449,7 +468,6 @@ func RegisterCustomPriorityFunction(policy schedulerapi.PriorityPolicy, args *pl
 		klog.V(2).Infof("Priority type %s already registered, reusing.", name)
 		// set/update the weight based on the policy
 		pcf = &PriorityConfigFactory{
-			Function:          existingPcf.Function,
 			MapReduceFunction: existingPcf.MapReduceFunction,
 			Weight:            policy.Weight,
 		}
@@ -579,21 +597,13 @@ func getPriorityFunctionConfigs(names sets.String, args PluginFactoryArgs) ([]pr
 		if !ok {
 			return nil, fmt.Errorf("invalid priority name %s specified - no corresponding function found", name)
 		}
-		if factory.Function != nil {
-			configs = append(configs, priorities.PriorityConfig{
-				Name:     name,
-				Function: factory.Function(args),
-				Weight:   factory.Weight,
-			})
-		} else {
-			mapFunction, reduceFunction := factory.MapReduceFunction(args)
-			configs = append(configs, priorities.PriorityConfig{
-				Name:   name,
-				Map:    mapFunction,
-				Reduce: reduceFunction,
-				Weight: factory.Weight,
-			})
-		}
+		mapFunction, reduceFunction := factory.MapReduceFunction(args)
+		configs = append(configs, priorities.PriorityConfig{
+			Name:   name,
+			Map:    mapFunction,
+			Reduce: reduceFunction,
+			Weight: factory.Weight,
+		})
 	}
 	if err := validateSelectedConfigs(configs); err != nil {
 		return nil, err

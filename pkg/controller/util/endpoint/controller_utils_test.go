@@ -81,16 +81,19 @@ func TestDetermineNeededServiceUpdates(t *testing.T) {
 			union: sets.NewString(),
 		},
 	}
-	for _, testCase := range testCases {
-		retval := determineNeededServiceUpdates(testCase.a, testCase.b, false)
-		if !retval.Equal(testCase.xor) {
-			t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, testCase.xor.List(), retval.List())
-		}
 
-		retval = determineNeededServiceUpdates(testCase.a, testCase.b, true)
-		if !retval.Equal(testCase.union) {
-			t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
-		}
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			retval := determineNeededServiceUpdates(testCase.a, testCase.b, false)
+			if !retval.Equal(testCase.xor) {
+				t.Errorf("%s (with podChanged=false): expected: %v  got: %v", testCase.name, testCase.xor.List(), retval.List())
+			}
+
+			retval = determineNeededServiceUpdates(testCase.a, testCase.b, true)
+			if !retval.Equal(testCase.union) {
+				t.Errorf("%s (with podChanged=true): expected: %v  got: %v", testCase.name, testCase.union.List(), retval.List())
+			}
+		})
 	}
 }
 
@@ -224,11 +227,73 @@ func TestShouldPodBeInEndpoints(t *testing.T) {
 			expected: true,
 		},
 	}
+
 	for _, test := range testCases {
-		result := ShouldPodBeInEndpoints(test.pod)
-		if result != test.expected {
-			t.Errorf("%s: expected : %t, got: %t", test.name, test.expected, result)
-		}
+		t.Run(test.name, func(t *testing.T) {
+			result := ShouldPodBeInEndpoints(test.pod)
+			if result != test.expected {
+				t.Errorf("expected: %t, got: %t", test.expected, result)
+			}
+		})
+	}
+}
+
+func TestShouldSetHostname(t *testing.T) {
+	testCases := map[string]struct {
+		pod      *v1.Pod
+		service  *v1.Service
+		expected bool
+	}{
+		"all matching": {
+			pod:      genSimplePod("ns", "foo", "svc-name"),
+			service:  genSimpleSvc("ns", "svc-name"),
+			expected: true,
+		},
+		"all matching, hostname not set": {
+			pod:      genSimplePod("ns", "", "svc-name"),
+			service:  genSimpleSvc("ns", "svc-name"),
+			expected: false,
+		},
+		"all set, different name/subdomain": {
+			pod:      genSimplePod("ns", "hostname", "subdomain"),
+			service:  genSimpleSvc("ns", "name"),
+			expected: false,
+		},
+		"all set, different namespace": {
+			pod:      genSimplePod("ns1", "hostname", "svc-name"),
+			service:  genSimpleSvc("ns2", "svc-name"),
+			expected: false,
+		},
+	}
+
+	for name, testCase := range testCases {
+		t.Run(name, func(t *testing.T) {
+			result := ShouldSetHostname(testCase.pod, testCase.service)
+			if result != testCase.expected {
+				t.Errorf("expected: %t, got: %t", testCase.expected, result)
+			}
+		})
+	}
+}
+
+func genSimplePod(namespace, hostname, subdomain string) *v1.Pod {
+	return &v1.Pod{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: namespace,
+		},
+		Spec: v1.PodSpec{
+			Hostname:  hostname,
+			Subdomain: subdomain,
+		},
+	}
+}
+
+func genSimpleSvc(namespace, name string) *v1.Service {
+	return &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
 	}
 }
 

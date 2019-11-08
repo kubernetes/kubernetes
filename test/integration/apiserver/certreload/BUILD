@@ -9,7 +9,11 @@ go_test(
     tags = ["integration"],
     deps = [
         "//cmd/kube-apiserver/app/options:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/api/errors:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
+        "//staging/src/k8s.io/apimachinery/pkg/util/wait:go_default_library",
         "//staging/src/k8s.io/apiserver/pkg/server/dynamiccertificates:go_default_library",
+        "//staging/src/k8s.io/client-go/kubernetes:go_default_library",
         "//staging/src/k8s.io/component-base/cli/flag:go_default_library",
         "//test/integration/framework:go_default_library",
     ],

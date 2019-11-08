@@ -38,3 +38,13 @@ func CollectAndCompare(c metrics.Collector, expected io.Reader, metricNames ...s
 func GatherAndCompare(g metrics.Gatherer, expected io.Reader, metricNames ...string) error {
 	return testutil.GatherAndCompare(g, expected, metricNames...)
 }
+
+// CustomCollectAndCompare registers the provided StableCollector with a newly created
+// registry. It then does the same as GatherAndCompare, gathering the
+// metrics from the pedantic Registry.
+func CustomCollectAndCompare(c metrics.StableCollector, expected io.Reader, metricNames ...string) error {
+	registry := metrics.NewKubeRegistry()
+	registry.CustomMustRegister(c)
+
+	return GatherAndCompare(registry, expected, metricNames...)
+}
