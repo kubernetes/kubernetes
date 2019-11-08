@@ -39,46 +39,34 @@ func WaitForStableCluster(c clientset.Interface, masterNodes sets.String) int {
 	timeout := 10 * time.Minute
 	startTime := time.Now()
 
-	allPods := getAllPods(c)
-	scheduledSystemPods, currentlyNotScheduledSystemPods := getSystemPods(c)
-	systemPods := scheduledSystemPods + currentlyNotScheduledSystemPods
-
-	// Wait for system pods to be scheduled, and for pods in all other namespaces to be deleted
-	for currentlyNotScheduledSystemPods != 0 || systemPods != allPods {
+	// Wait for all pods to be scheduled.
+	allScheduledPods, allNotScheduledPods := getFilteredPods(c, masterNodes, metav1.NamespaceAll)
+	for len(allNotScheduledPods) != 0 {
 		time.Sleep(2 * time.Second)
-
-		scheduledSystemPods, currentlyNotScheduledSystemPods := getSystemPods(c)
-		systemPods = scheduledSystemPods + currentlyNotScheduledSystemPods
-		allPods = getAllPods(c)
-
 		if startTime.Add(timeout).Before(time.Now()) {
+			framework.Logf("Timed out waiting for the following pods to schedule")
+			for _, p := range allNotScheduledPods {
+				framework.Logf("%v/%v", p.Namespace, p.Name)
+			}
 			framework.Failf("Timed out after %v waiting for stable cluster.", timeout)
 			break
 		}
+		allScheduledPods, allNotScheduledPods = getFilteredPods(c, masterNodes, metav1.NamespaceAll)
 	}
-	return scheduledSystemPods
+	return len(allScheduledPods)
 }
 
-// getAllPods lists all pods in the cluster, with succeeded and failed pods filtered out and returns the count
-func getAllPods(c clientset.Interface) int {
-	allPods, err := c.CoreV1().Pods(metav1.NamespaceAll).List(metav1.ListOptions{})
+// getFilteredPods lists scheduled and not scheduled pods in the given namespace, with succeeded and failed pods filtered out.
+func getFilteredPods(c clientset.Interface, masterNodes sets.String, ns string) (scheduledPods, notScheduledPods []v1.Pod) {
+	pods, err := c.CoreV1().Pods(ns).List(metav1.ListOptions{})
 	framework.ExpectNoError(err, "listing all pods in kube-system namespace while waiting for stable cluster")
 	// API server returns also Pods that succeeded. We need to filter them out.
-	currentPods := make([]v1.Pod, 0, len(allPods.Items))
-	for _, pod := range allPods.Items {
+	filteredPods := make([]v1.Pod, 0, len(pods.Items))
+	for _, pod := range pods.Items {
 		if pod.Status.Phase != v1.PodSucceeded && pod.Status.Phase != v1.PodFailed {
-			currentPods = append(currentPods, pod)
+			filteredPods = append(filteredPods, pod)
 		}
-
 	}
-	allPods.Items = currentPods
-	return len(allPods.Items)
-}
-
-// getSystemPods lists the pods in the kube-system namespace and returns the number of scheduled and unscheduled pods
-func getSystemPods(c clientset.Interface) (int, int) {
-	systemPods, err := c.CoreV1().Pods(metav1.NamespaceSystem).List(metav1.ListOptions{})
-	framework.ExpectNoError(err, "listing all pods in kube-system namespace while waiting for stable cluster")
-	scheduledSystemPods, currentlyNotScheduledSystemPods := e2epod.GetPodsScheduled(masterNodes, systemPods)
-	return len(scheduledSystemPods), len(currentlyNotScheduledSystemPods)
+	pods.Items = filteredPods
+	return e2epod.GetPodsScheduled(masterNodes, pods)
 }
