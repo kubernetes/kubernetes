@@ -7,7 +7,7 @@ go_library(
     importpath = "k8s.io/apiextensions-apiserver/pkg/registry/customresource/tableconvertor",
     visibility = ["//visibility:public"],
     deps = [
-        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions:go_default_library",
+        "//staging/src/k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/api/meta/table:go_default_library",
         "//staging/src/k8s.io/apimachinery/pkg/apis/meta/v1:go_default_library",
