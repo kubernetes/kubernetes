@@ -94,7 +94,7 @@ func validateTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint
 			f := field.Forbidden(p.Child("labelSelector"), "cluster-level constraint must not define a selector, as they are deduced for each Pod")
 			allErrs = append(allErrs, f)
 		}
-		if err := validateSpreadConstraintNotRepeat(p, c, constraints[i+1:]); err != nil {
+		if err := validateSpreadConstraintNotRepeat(fldPath, constraints, i); err != nil {
 			allErrs = append(allErrs, err)
 		}
 	}
@@ -122,13 +122,14 @@ func validateConstraintWhenUnsatisfiable(v v1.UnsatisfiableConstraintAction, p *
 	return nil
 }
 
-// validateSpreadConstraintNotRepeat tests that if `constraint` duplicates with `existingConstraintPairs`
-// on TopologyKey and WhenUnsatisfiable fields.
-func validateSpreadConstraintNotRepeat(fldPath *field.Path, constraint v1.TopologySpreadConstraint, restingConstraints []v1.TopologySpreadConstraint) *field.Error {
-	for _, restingConstraint := range restingConstraints {
-		if constraint.TopologyKey == restingConstraint.TopologyKey &&
-			constraint.WhenUnsatisfiable == restingConstraint.WhenUnsatisfiable {
-			return field.Duplicate(fldPath, fmt.Sprintf("{%v, %v}", constraint.TopologyKey, constraint.WhenUnsatisfiable))
+// validateSpreadConstraintNotRepeat tests that if `constraints[idx]` duplicates
+// with `constraints[idx+1:]` on TopologyKey and WhenUnsatisfiable fields.
+func validateSpreadConstraintNotRepeat(path *field.Path, constraints []v1.TopologySpreadConstraint, idx int) *field.Error {
+	c := &constraints[idx]
+	for i := idx + 1; i < len(constraints); i++ {
+		other := &constraints[i]
+		if c.TopologyKey == other.TopologyKey && c.WhenUnsatisfiable == other.WhenUnsatisfiable {
+			return field.Duplicate(path.Index(idx), path.Index(i))
 		}
 	}
 	return nil
