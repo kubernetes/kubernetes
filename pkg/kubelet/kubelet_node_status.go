@@ -150,6 +150,8 @@ func (kl *Kubelet) reconcileExtendedResource(initialNode, node *v1.Node) bool {
 func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool {
 	defaultLabels := []string{
 		v1.LabelHostname,
+		v1.LabelZoneFailureDomainStable,
+		v1.LabelZoneRegionStable,
 		v1.LabelZoneFailureDomain,
 		v1.LabelZoneRegion,
 		v1.LabelInstanceType,
@@ -342,10 +344,14 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 			if zone.FailureDomain != "" {
 				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomain, zone.FailureDomain)
 				node.ObjectMeta.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomainStable, zone.FailureDomain)
+				node.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable] = zone.FailureDomain
 			}
 			if zone.Region != "" {
 				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, zone.Region)
 				node.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
+				klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegionStable, zone.Region)
+				node.ObjectMeta.Labels[v1.LabelZoneRegionStable] = zone.Region
 			}
 		}
 	}

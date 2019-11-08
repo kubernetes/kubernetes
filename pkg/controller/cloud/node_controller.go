@@ -23,6 +23,7 @@ import (
 	"time"
 
 	v1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -41,6 +42,35 @@ import (
 	schedulerapi "k8s.io/kubernetes/pkg/scheduler/api"
 	nodeutil "k8s.io/kubernetes/pkg/util/node"
 )
+
+// labelReconcileInfo lists Node labels to reconcile, and how to reconcile them.
+// primaryKey and secondaryKey are keys of labels to reconcile.
+//   - If both keys exist, but their values don't match. Use the value from the
+//   primaryKey as the source of truth to reconcile.
+//   - If ensureSecondaryExists is true, and the secondaryKey does not
+//   exist, secondaryKey will be added with the value of the primaryKey.
+var labelReconcileInfo = []struct {
+	primaryKey            string
+	secondaryKey          string
+	ensureSecondaryExists bool
+}{
+	{
+		// Reconcile the beta and the GA zone label using the beta label as
+		// the source of truth
+		// TODO: switch the primary key to GA labels in v1.21
+		primaryKey:            v1.LabelZoneFailureDomain,
+		secondaryKey:          v1.LabelZoneFailureDomainStable,
+		ensureSecondaryExists: true,
+	},
+	{
+		// Reconcile the beta and the stable region label using the beta label as
+		// the source of truth
+		// TODO: switch the primary key to GA labels in v1.21
+		primaryKey:            v1.LabelZoneRegion,
+		secondaryKey:          v1.LabelZoneRegionStable,
+		ensureSecondaryExists: true,
+	},
+}
 
 var UpdateNodeSpecBackoff = wait.Backoff{
 	Steps:    20,
@@ -125,6 +155,63 @@ func (cnc *CloudNodeController) UpdateNodeStatus(ctx context.Context) {
 	for i := range nodes.Items {
 		cnc.updateNodeAddress(ctx, &nodes.Items[i], instances)
 	}
+
+	for _, node := range nodes.Items {
+		err = cnc.reconcileNodeLabels(node.Name)
+		if err != nil {
+			klog.Errorf("Error reconciling node labels for node %q, err: %v", node.Name, err)
+		}
+	}
+}
+
+// reconcileNodeLabels reconciles node labels transitioning from beta to GA
+func (cnc *CloudNodeController) reconcileNodeLabels(nodeName string) error {
+	node, err := cnc.nodeInformer.Lister().Get(nodeName)
+	if err != nil {
+		// If node not found, just ignore it.
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+
+		return err
+	}
+
+	if node.Labels == nil {
+		// Nothing to reconcile.
+		return nil
+	}
+
+	labelsToUpdate := map[string]string{}
+	for _, r := range labelReconcileInfo {
+		primaryValue, primaryExists := node.Labels[r.primaryKey]
+		secondaryValue, secondaryExists := node.Labels[r.secondaryKey]
+
+		if !primaryExists {
+			// The primary label key does not exist. This should not happen
+			// within our supported version skew range, when no external
+			// components/factors modifying the node object. Ignore this case.
+			continue
+		}
+		if secondaryExists && primaryValue != secondaryValue {
+			// Secondary label exists, but not consistent with the primary
+			// label. Need to reconcile.
+			labelsToUpdate[r.secondaryKey] = primaryValue
+
+		} else if !secondaryExists && r.ensureSecondaryExists {
+			// Apply secondary label based on primary label.
+			labelsToUpdate[r.secondaryKey] = primaryValue
+		}
+	}
+
+	if len(labelsToUpdate) == 0 {
+		return nil
+	}
+
+	if !cloudnodeutil.AddOrUpdateLabelsOnNode(cnc.kubeClient, labelsToUpdate, node) {
+		return fmt.Errorf("failed update labels for node %+v", node)
+	}
+
+	return nil
 }
 
 // UpdateNodeAddress updates the nodeAddress of a single node
@@ -298,10 +385,14 @@ func (cnc *CloudNodeController) initializeNode(ctx context.Context, node *v1.Nod
 			if zone.FailureDomain != "" {
 				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomain, zone.FailureDomain)
 				curNode.ObjectMeta.Labels[v1.LabelZoneFailureDomain] = zone.FailureDomain
+				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneFailureDomainStable, zone.FailureDomain)
+				curNode.ObjectMeta.Labels[v1.LabelZoneFailureDomainStable] = zone.FailureDomain
 			}
 			if zone.Region != "" {
 				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegion, zone.Region)
 				curNode.ObjectMeta.Labels[v1.LabelZoneRegion] = zone.Region
+				klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelZoneRegionStable, zone.Region)
+				curNode.ObjectMeta.Labels[v1.LabelZoneRegionStable] = zone.Region
 			}
 		}
 
