@@ -298,7 +298,7 @@ function Download-HelperScripts {
     return
   }
   MustDownload-File -OutFile ${env:K8S_DIR}\hns.psm1 `
-    -URLs "https://github.com/Microsoft/SDN/raw/master/Kubernetes/windows/hns.psm1"
+    -URLs "https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fconfig%2fsdn%2fmaster%2fhns.psm1?alt=media"
 }
 
 # Takes the Windows version string from the cluster bash scripts (e.g.
@@ -824,7 +824,7 @@ function Configure-HostNetworkingService {
 function Configure-GcePdTools {
   if (ShouldWrite-File ${env:K8S_DIR}\GetGcePdName.dll) {
     MustDownload-File -OutFile ${env:K8S_DIR}\GetGcePdName.dll `
-      -URLs "https://github.com/pjh/gce-tools/raw/master/GceTools/GetGcePdName/GetGcePdName.dll"
+      -URLs "https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fconfig%2fgce-tools%2fmaster%2fGetGcePdName%2fGetGcePdName.dll?alt=media"
   }
   if (-not (Test-Path $PsHome\profile.ps1)) {
     New-Item -path $PsHome\profile.ps1 -type file
@@ -1244,8 +1244,8 @@ function Install-LoggingAgent {
     return
   }
 
-  $url = ("https://dl.google.com/cloudagents/windows/" +
-          "StackdriverLogging-${STACKDRIVER_VERSION}.exe")
+  $url = ("https://www.googleapis.com/storage/v1/b/gke-release/o/winnode%2fstackdriver%2f" +
+          "StackdriverLogging-${STACKDRIVER_VERSION}.exe?alt=media")
   $tmp_dir = 'C:\stackdriver_tmp'
   New-Item $tmp_dir -ItemType 'directory' -Force | Out-Null
   $installer_file = "${tmp_dir}\StackdriverLogging-${STACKDRIVER_VERSION}.exe"
