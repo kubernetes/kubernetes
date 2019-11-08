@@ -49,6 +49,22 @@ var (
 		},
 		[]string{"resource"},
 	)
+	requestSize = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "etcd_request_size_bytes",
+			Help:           "Etcd request size in bytes for each operation and object type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"operation", "type"},
+	)
+	responseSize = compbasemetrics.NewHistogramVec(
+		&compbasemetrics.HistogramOpts{
+			Name:           "etcd_response_size_bytes",
+			Help:           "Etcd response size in bytes for each operation and object type.",
+			StabilityLevel: compbasemetrics.ALPHA,
+		},
+		[]string{"operation", "type"},
+	)
 
 	deprecatedEtcdRequestLatenciesSummary = compbasemetrics.NewSummaryVec(
 		&compbasemetrics.SummaryOpts{
@@ -68,6 +84,8 @@ func Register() {
 	registerMetrics.Do(func() {
 		legacyregistry.MustRegister(etcdRequestLatency)
 		legacyregistry.MustRegister(objectCounts)
+		legacyregistry.MustRegister(requestSize)
+		legacyregistry.MustRegister(responseSize)
 
 		// TODO(danielqsj): Remove the following metrics, they are deprecated
 		legacyregistry.MustRegister(deprecatedEtcdRequestLatenciesSummary)
@@ -83,6 +101,14 @@ func UpdateObjectCount(resourcePrefix string, count int64) {
 func RecordEtcdRequestLatency(verb, resource string, startTime time.Time) {
 	etcdRequestLatency.WithLabelValues(verb, resource).Observe(sinceInSeconds(startTime))
 	deprecatedEtcdRequestLatenciesSummary.WithLabelValues(verb, resource).Observe(sinceInMicroseconds(startTime))
+}
+
+func RecordEtcdRequestSize(verb, resource string, sizeInBytes uint64) {
+	requestSize.WithLabelValues(verb, resource).Observe(float64(sizeInBytes))
+}
+
+func RecordEtcdResponseSize(verb, resource string, sizeInBytes uint64) {
+	responseSize.WithLabelValues(verb, resource).Observe(float64(sizeInBytes))
 }
 
 // Reset resets the etcd_request_duration_seconds metric.
