@@ -57,7 +57,7 @@ type KubeSchedulerConfiguration struct {
 	HardPodAffinitySymmetricWeight int32
 
 	// TopologySpreadConstraints is the cluster-level configuration for
-	// topology-based top spreading.
+	// topology-based pod spreading.
 	// Constraints are applied to pods that don't define any in their PodSpec.
 	// Label selectors must be empty, as they are deduced from the pods'
 	// membership in Services, Replication Controllers, Replica sets or Stateful

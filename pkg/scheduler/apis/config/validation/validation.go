@@ -86,15 +86,9 @@ func validateTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint
 			f := p.Child("maxSkew")
 			allErrs = append(allErrs, field.Invalid(f, c.MaxSkew, "must be greater than zero"))
 		}
-		topologyKeyP := p.Child("topologyKey")
-		if len(c.TopologyKey) == 0 {
-			allErrs = append(allErrs, field.Required(topologyKeyP, "can not be empty"))
-		} else {
-			allErrs = append(allErrs, metav1validation.ValidateLabelName(c.TopologyKey, topologyKeyP)...)
-		}
-		if !supportedScheduleActions.Has(string(c.WhenUnsatisfiable)) {
-			f := p.Child("whenUnsatisfiable")
-			allErrs = append(allErrs, field.NotSupported(f, c.WhenUnsatisfiable, supportedScheduleActions.List()))
+		allErrs = append(allErrs, validateConstraintTopologyKey(c.TopologyKey, p.Child("topologyKey"))...)
+		if err := validateConstraintWhenUnsatisfiable(c.WhenUnsatisfiable, p.Child("whenUnsatisfiable")); err != nil {
+			allErrs = append(allErrs, err)
 		}
 		if c.LabelSelector != nil {
 			f := field.Forbidden(p.Child("labelSelector"), "cluster-level constraint must not define a selector, as they are deduced for each Pod")
@@ -105,6 +99,27 @@ func validateTopologySpreadConstraints(constraints []v1.TopologySpreadConstraint
 		}
 	}
 	return allErrs
+}
+
+func validateConstraintTopologyKey(v string, p *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+	if len(v) == 0 {
+		allErrs = append(allErrs, field.Required(p, "can not be empty"))
+	} else {
+		allErrs = append(allErrs, metav1validation.ValidateLabelName(v, p)...)
+	}
+	return allErrs
+}
+
+func validateConstraintWhenUnsatisfiable(v v1.UnsatisfiableConstraintAction, p *field.Path) *field.Error {
+	if len(v) == 0 {
+		return field.Required(p, "can not be empty")
+	}
+	if !supportedScheduleActions.Has(string(v)) {
+		f := p.Child("whenUnsatisfiable")
+		return field.NotSupported(f, v, supportedScheduleActions.List())
+	}
+	return nil
 }
 
 // validateSpreadConstraintNotRepeat tests that if `constraint` duplicates with `existingConstraintPairs`
