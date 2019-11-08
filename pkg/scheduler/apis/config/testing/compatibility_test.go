@@ -261,10 +261,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "InterPodAffinityPriority",   "weight": 2}
 		  ]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -285,6 +283,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "InterPodAffinity", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
 					{Name: "DefaultPodTopologySpread", Weight: 2},
@@ -327,10 +326,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			{"name": "MostRequestedPriority",   "weight": 2}
 		  ]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -351,6 +348,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "InterPodAffinity", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
@@ -404,10 +402,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -428,6 +424,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "InterPodAffinity", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
@@ -492,10 +489,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -516,6 +511,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "InterPodAffinity", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
@@ -581,10 +577,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"nodeCacheCapable": true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -606,6 +600,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "InterPodAffinity", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
@@ -674,10 +669,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -699,6 +692,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "InterPodAffinity", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
@@ -779,10 +773,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -804,6 +796,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "InterPodAffinity", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
@@ -886,10 +879,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -912,6 +903,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "InterPodAffinity", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
@@ -993,10 +985,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -1020,6 +1010,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "InterPodAffinity", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
@@ -1105,10 +1096,8 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 			"ignorable":true
 		  }]
 		}`,
-			wantPredicates: sets.NewString(),
-			wantPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			wantPredicates:   sets.NewString(),
+			wantPrioritizers: sets.NewString(),
 			wantPlugins: map[string][]config.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -1132,6 +1121,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 2},
 					{Name: "ImageLocality", Weight: 2},
+					{Name: "InterPodAffinity", Weight: 2},
 					{Name: "NodeResourcesLeastAllocated", Weight: 2},
 					{Name: "NodeResourcesMostAllocated", Weight: 2},
 					{Name: "NodeAffinity", Weight: 2},
@@ -1233,6 +1223,7 @@ func TestCompatibility_v1_Scheduler(t *testing.T) {
 	scoreToPriorityMap := map[string]string{
 		"DefaultPodTopologySpread":        "SelectorSpreadPriority",
 		"ImageLocality":                   "ImageLocalityPriority",
+		"InterPodAffinity":                "InterPodAffinityPriority",
 		"NodeAffinity":                    "NodeAffinityPriority",
 		"NodePreferAvoidPods":             "NodePreferAvoidPodsPriority",
 		"TaintToleration":                 "TaintTolerationPriority",
