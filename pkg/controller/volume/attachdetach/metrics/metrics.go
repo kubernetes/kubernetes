@@ -19,8 +19,6 @@ package metrics
 import (
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/apimachinery/pkg/labels"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	"k8s.io/component-base/metrics"
@@ -35,15 +33,17 @@ import (
 const pluginNameNotAvailable = "N/A"
 
 var (
-	inUseVolumeMetricDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", "storage_count", "attachable_volumes_in_use"),
+	inUseVolumeMetricDesc = metrics.NewDesc(
+		metrics.BuildFQName("", "storage_count", "attachable_volumes_in_use"),
 		"Measure number of volumes in use",
-		[]string{"node", "volume_plugin"}, nil)
+		[]string{"node", "volume_plugin"}, nil,
+		metrics.ALPHA, "")
 
-	totalVolumesMetricDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("", "attachdetach_controller", "total_volumes"),
+	totalVolumesMetricDesc = metrics.NewDesc(
+		metrics.BuildFQName("", "attachdetach_controller", "total_volumes"),
 		"Number of volumes in A/D Controller",
-		[]string{"plugin_name", "state"}, nil)
+		[]string{"plugin_name", "state"}, nil,
+		metrics.ALPHA, "")
 
 	forcedDetachMetricCounter = metrics.NewCounter(
 		&metrics.CounterOpts{
@@ -62,7 +62,7 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 	dsw cache.DesiredStateOfWorld,
 	pluginMgr *volume.VolumePluginMgr) {
 	registerMetrics.Do(func() {
-		legacyregistry.RawMustRegister(newAttachDetachStateCollector(pvcLister,
+		legacyregistry.CustomMustRegister(newAttachDetachStateCollector(pvcLister,
 			podLister,
 			pvLister,
 			asw,
@@ -73,6 +73,8 @@ func Register(pvcLister corelisters.PersistentVolumeClaimLister,
 }
 
 type attachDetachStateCollector struct {
+	metrics.BaseStableCollector
+
 	pvcLister       corelisters.PersistentVolumeClaimLister
 	podLister       corelisters.PodLister
 	pvLister        corelisters.PersistentVolumeLister
@@ -104,45 +106,37 @@ func newAttachDetachStateCollector(
 	asw cache.ActualStateOfWorld,
 	dsw cache.DesiredStateOfWorld,
 	pluginMgr *volume.VolumePluginMgr) *attachDetachStateCollector {
-	return &attachDetachStateCollector{pvcLister, podLister, pvLister, asw, dsw, pluginMgr}
+	return &attachDetachStateCollector{pvcLister: pvcLister, podLister: podLister, pvLister: pvLister, asw: asw, dsw: dsw, volumePluginMgr: pluginMgr}
 }
 
 // Check if our collector implements necessary collector interface
-var _ prometheus.Collector = &attachDetachStateCollector{}
+var _ metrics.StableCollector = &attachDetachStateCollector{}
 
-func (collector *attachDetachStateCollector) Describe(ch chan<- *prometheus.Desc) {
+func (collector *attachDetachStateCollector) DescribeWithStability(ch chan<- *metrics.Desc) {
 	ch <- inUseVolumeMetricDesc
 	ch <- totalVolumesMetricDesc
 }
 
-func (collector *attachDetachStateCollector) Collect(ch chan<- prometheus.Metric) {
+func (collector *attachDetachStateCollector) CollectWithStability(ch chan<- metrics.Metric) {
 	nodeVolumeMap := collector.getVolumeInUseCount()
 	for nodeName, pluginCount := range nodeVolumeMap {
 		for pluginName, count := range pluginCount {
-			metric, err := prometheus.NewConstMetric(inUseVolumeMetricDesc,
-				prometheus.GaugeValue,
+			ch <- metrics.NewLazyConstMetric(inUseVolumeMetricDesc,
+				metrics.GaugeValue,
 				float64(count),
 				string(nodeName),
 				pluginName)
-			if err != nil {
-				klog.Warningf("Failed to create metric : %v", err)
-			}
-			ch <- metric
 		}
 	}
 
 	stateVolumeMap := collector.getTotalVolumesCount()
 	for stateName, pluginCount := range stateVolumeMap {
 		for pluginName, count := range pluginCount {
-			metric, err := prometheus.NewConstMetric(totalVolumesMetricDesc,
-				prometheus.GaugeValue,
+			ch <- metrics.NewLazyConstMetric(totalVolumesMetricDesc,
+				metrics.GaugeValue,
 				float64(count),
 				pluginName,
 				string(stateName))
-			if err != nil {
-				klog.Warningf("Failed to create metric : %v", err)
-			}
-			ch <- metric
 		}
 	}
 }
