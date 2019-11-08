@@ -6760,6 +6760,132 @@ func TestValidateCustomResourceDefinitionValidation(t *testing.T) {
 			},
 			wantError: false,
 		},
+		{
+			name: "allowed list-type atomic",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("atomic"),
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "string",
+						},
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "allowed list-type atomic with non-atomic items",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("atomic"),
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type:       "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{},
+						},
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "allowed list-type set with scalar items",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("set"),
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "string",
+						},
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "invalid list-type set with unspecified map-type for map items",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("set"),
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "object",
+							Properties: map[string]apiextensions.JSONSchemaProps{
+								"foo": {Type: "string"},
+							},
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
+		{
+			name: "allowed list-type set with atomic list items",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("set"),
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type:      "array",
+							XListType: strPtr("atomic"),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "allowed list-type set with unspecified list-type in list items",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("set"),
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type: "array",
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantError: false,
+		},
+		{
+			name: "invalid list-type set with with non-atomic list items",
+			input: apiextensions.CustomResourceValidation{
+				OpenAPIV3Schema: &apiextensions.JSONSchemaProps{
+					Type:      "array",
+					XListType: strPtr("set"),
+					Items: &apiextensions.JSONSchemaPropsOrArray{
+						Schema: &apiextensions.JSONSchemaProps{
+							Type:      "array",
+							XListType: strPtr("set"),
+							Items: &apiextensions.JSONSchemaPropsOrArray{
+								Schema: &apiextensions.JSONSchemaProps{
+									Type: "string",
+								},
+							},
+						},
+					},
+				},
+			},
+			wantError: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
