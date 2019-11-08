@@ -70,19 +70,13 @@ type PredicateMetadataProducerFactory func(PluginFactoryArgs) predicates.Predica
 // FitPredicateFactory produces a FitPredicate from the given args.
 type FitPredicateFactory func(PluginFactoryArgs) predicates.FitPredicate
 
-// PriorityFunctionFactory produces a PriorityConfig from the given args.
-// DEPRECATED
-// Use Map-Reduce pattern for priority functions.
-type PriorityFunctionFactory func(PluginFactoryArgs) priorities.PriorityFunction
-
-// PriorityFunctionFactory2 produces map & reduce priority functions
+// PriorityFunctionFactory produces map & reduce priority functions
 // from a given args.
-// FIXME: Rename to PriorityFunctionFactory.
-type PriorityFunctionFactory2 func(PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction)
+type PriorityFunctionFactory func(PluginFactoryArgs) (priorities.PriorityMapFunction, priorities.PriorityReduceFunction)
 
 // PriorityConfigFactory produces a PriorityConfig from the given function and weight
 type PriorityConfigFactory struct {
-	MapReduceFunction PriorityFunctionFactory2
+	MapReduceFunction PriorityFunctionFactory
 	Weight            int64
 }
 

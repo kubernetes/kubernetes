@@ -19,7 +19,7 @@ package priorities
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	schedulernodeinfo "k8s.io/kubernetes/pkg/scheduler/nodeinfo"
 
@@ -43,7 +43,7 @@ func ResourceLimitsPriorityMap(pod *v1.Pod, meta interface{}, nodeInfo *schedule
 
 	// compute pod limits
 	var podLimits *schedulernodeinfo.Resource
-	if priorityMeta, ok := meta.(*priorityMetadata); ok {
+	if priorityMeta, ok := meta.(*priorityMetadata); ok && priorityMeta != nil {
 		// We were able to parse metadata, use podLimits from there.
 		podLimits = priorityMeta.podLimits
 	} else {

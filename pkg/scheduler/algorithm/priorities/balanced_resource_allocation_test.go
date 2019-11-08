@@ -409,9 +409,8 @@ func TestBalancedResourceAllocation(t *testing.T) {
 					info.TransientInfo.TransNodeInfo.RequestedVolumes = len(test.pod.Spec.Volumes)
 				}
 			}
-			function := priorityFunction(BalancedResourceAllocationMap, nil, nil)
 
-			list, err := function(test.pod, snapshot, test.nodes)
+			list, err := runMapReducePriority(BalancedResourceAllocationMap, nil, nil, test.pod, snapshot, test.nodes)
 
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)

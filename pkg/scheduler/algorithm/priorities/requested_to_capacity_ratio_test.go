@@ -241,7 +241,7 @@ func TestRequestedToCapacityRatio(t *testing.T) {
 		newPod := buildResourcesPod("", test.requested)
 
 		snapshot := nodeinfosnapshot.NewSnapshot(scheduledPods, nodes)
-		list, err := priorityFunction(RequestedToCapacityRatioResourceAllocationPriorityDefault().PriorityMap, nil, nil)(newPod, snapshot, nodes)
+		list, err := runMapReducePriority(RequestedToCapacityRatioResourceAllocationPriorityDefault().PriorityMap, nil, nil, newPod, snapshot, nodes)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
 		}
@@ -390,7 +390,7 @@ func TestResourceBinPackingSingleExtended(t *testing.T) {
 			functionShape, _ := NewFunctionShape([]FunctionShapePoint{{0, 0}, {100, 10}})
 			resourceToWeightMap := ResourceToWeightMap{v1.ResourceName("intel.com/foo"): 1}
 			prior := RequestedToCapacityRatioResourceAllocationPriority(functionShape, resourceToWeightMap)
-			list, err := priorityFunction(prior.PriorityMap, nil, nil)(test.pod, snapshot, test.nodes)
+			list, err := runMapReducePriority(prior.PriorityMap, nil, nil, test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -615,7 +615,7 @@ func TestResourceBinPackingMultipleExtended(t *testing.T) {
 			functionShape, _ := NewFunctionShape([]FunctionShapePoint{{0, 0}, {100, 10}})
 			resourceToWeightMap := ResourceToWeightMap{v1.ResourceName("intel.com/foo"): 3, v1.ResourceName("intel.com/bar"): 5}
 			prior := RequestedToCapacityRatioResourceAllocationPriority(functionShape, resourceToWeightMap)
-			list, err := priorityFunction(prior.PriorityMap, nil, nil)(test.pod, snapshot, test.nodes)
+			list, err := runMapReducePriority(prior.PriorityMap, nil, nil, test.pod, snapshot, test.nodes)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}

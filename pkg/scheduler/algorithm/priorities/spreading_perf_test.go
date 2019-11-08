@@ -98,8 +98,7 @@ func BenchmarkTestSelectorSpreadPriority(b *testing.B) {
 				meta := &priorityMetadata{
 					podSelectors: getSelectors(pod, ss.serviceLister, ss.controllerLister, ss.replicaSetLister, ss.statefulSetLister),
 				}
-				ttp := priorityFunction(ss.CalculateSpreadPriorityMap, ss.CalculateSpreadPriorityReduce, meta)
-				_, err := ttp(pod, snapshot, filteredNodes)
+				_, err := runMapReducePriority(ss.CalculateSpreadPriorityMap, ss.CalculateSpreadPriorityReduce, meta, pod, snapshot, filteredNodes)
 				if err != nil {
 					b.Fatal(err)
 				}
