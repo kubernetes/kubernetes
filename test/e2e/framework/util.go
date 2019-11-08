@@ -2363,20 +2363,6 @@ func GetClusterZones(c clientset.Interface) (sets.String, error) {
 	return zones, nil
 }
 
-// WaitForNodeHasTaintOrNot waits for a taint to be added/removed from the node until timeout occurs, whichever comes first.
-func WaitForNodeHasTaintOrNot(c clientset.Interface, nodeName string, taint *v1.Taint, wantTrue bool, timeout time.Duration) error {
-	if err := wait.PollImmediate(Poll, timeout, func() (bool, error) {
-		has, err := NodeHasTaint(c, nodeName, taint)
-		if err != nil {
-			return false, fmt.Errorf("Failed to check taint %s on node %s or not", taint.ToString(), nodeName)
-		}
-		return has == wantTrue, nil
-	}); err != nil {
-		return fmt.Errorf("expect node %v to have taint = %v within %v: %v", nodeName, wantTrue, timeout, err)
-	}
-	return nil
-}
-
 // GetFileModeRegex returns a file mode related regex which should be matched by the mounttest pods' output.
 // If the given mask is nil, then the regex will contain the default OS file modes, which are 0644 for Linux and 0775 for Windows.
 func GetFileModeRegex(filePath string, mask *int32) string {
