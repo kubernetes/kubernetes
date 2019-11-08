@@ -139,7 +139,7 @@ func podWithResources(id, desiredHost string, limits v1.ResourceList, requests v
 	return pod
 }
 
-func PredicateOne(pod *v1.Pod, meta predicates.PredicateMetadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
+func PredicateOne(pod *v1.Pod, meta predicates.Metadata, nodeInfo *schedulernodeinfo.NodeInfo) (bool, []predicates.PredicateFailureReason, error) {
 	return true, nil, nil
 }
 
@@ -152,7 +152,7 @@ type mockScheduler struct {
 	err    error
 }
 
-func (es mockScheduler) PredicateMetadataProducer() predicates.PredicateMetadataProducer {
+func (es mockScheduler) PredicateMetadataProducer() predicates.MetadataProducer {
 	return nil
 
 }
@@ -647,9 +647,9 @@ func setupTestScheduler(queuedPodStore *clientcache.FIFO, scache internalcache.C
 		scache,
 		internalqueue.NewSchedulingQueue(nil, nil),
 		predicateMap,
-		predicates.EmptyPredicateMetadataProducer,
+		predicates.EmptyMetadataProducer,
 		[]priorities.PriorityConfig{},
-		priorities.EmptyPriorityMetadataProducer,
+		priorities.EmptyMetadataProducer,
 		emptySnapshot,
 		emptyFramework,
 		[]algorithm.SchedulerExtender{},
@@ -698,9 +698,9 @@ func setupTestSchedulerLongBindingWithRetry(queuedPodStore *clientcache.FIFO, sc
 		scache,
 		internalqueue.NewSchedulingQueue(nil, nil),
 		predicateMap,
-		predicates.EmptyPredicateMetadataProducer,
+		predicates.EmptyMetadataProducer,
 		[]priorities.PriorityConfig{},
-		priorities.EmptyPriorityMetadataProducer,
+		priorities.EmptyMetadataProducer,
 		emptySnapshot,
 		emptyFramework,
 		[]algorithm.SchedulerExtender{},

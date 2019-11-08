@@ -177,7 +177,7 @@ type Configurator struct {
 	pluginConfigProducerRegistry *plugins.ConfigProducerRegistry
 	nodeInfoSnapshot             *nodeinfosnapshot.Snapshot
 
-	factoryArgs        *PluginFactoryArgs
+	factoryArgs        PluginFactoryArgs
 	configProducerArgs *plugins.ConfigProducerArgs
 }
 
@@ -265,7 +265,7 @@ func NewConfigFactory(args *ConfigFactoryArgs) *Configurator {
 		pluginConfigProducerRegistry:   args.PluginConfigProducerRegistry,
 		nodeInfoSnapshot:               nodeinfosnapshot.NewEmptySnapshot(),
 	}
-	c.factoryArgs = &PluginFactoryArgs{
+	c.factoryArgs = PluginFactoryArgs{
 		NodeInfoLister:                 c.nodeInfoSnapshot.NodeInfos(),
 		PodLister:                      c.nodeInfoSnapshot.Pods(),
 		ServiceLister:                  c.serviceLister,
@@ -405,12 +405,12 @@ func (c *Configurator) CreateFromKeys(predicateKeys, priorityKeys sets.String, e
 		return nil, err
 	}
 
-	priorityMetaProducer, err := getPriorityMetadataProducer(*c.factoryArgs)
+	priorityMetaProducer, err := getPriorityMetadataProducer(c.factoryArgs)
 	if err != nil {
 		return nil, err
 	}
 
-	predicateMetaProducer, err := c.GetPredicateMetadataProducer()
+	predicateMetaProducer, err := getPredicateMetadataProducer(c.factoryArgs)
 	if err != nil {
 		return nil, err
 	}
@@ -510,7 +510,7 @@ func getBinderFunc(client clientset.Interface, extenders []algorithm.SchedulerEx
 // as framework plugins. Specifically, a priority will run as a framework plugin if a plugin config producer was
 // registered for that priority.
 func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]priorities.PriorityConfig, *schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
-	allPriorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, *c.factoryArgs)
+	allPriorityConfigs, err := getPriorityFunctionConfigs(priorityKeys, c.factoryArgs)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -537,19 +537,13 @@ func (c *Configurator) getPriorityConfigs(priorityKeys sets.String) ([]prioritie
 	return priorityConfigs, &plugins, pluginConfig, nil
 }
 
-// GetPredicateMetadataProducer returns a function to build Predicate Metadata.
-// It is used by the scheduler and other components, such as k8s.io/autoscaler/cluster-autoscaler.
-func (c *Configurator) GetPredicateMetadataProducer() (predicates.PredicateMetadataProducer, error) {
-	return getPredicateMetadataProducer()
-}
-
 // getPredicateConfigs returns predicates configuration: ones that will run as fitPredicates and ones that will run
 // as framework plugins. Specifically, a predicate will run as a framework plugin if a plugin config producer was
 // registered for that predicate.
 // Note that the framework executes plugins according to their order in the Plugins list, and so predicates run as plugins
 // are added to the Plugins list according to the order specified in predicates.Ordering().
 func (c *Configurator) getPredicateConfigs(predicateKeys sets.String) (map[string]predicates.FitPredicate, *schedulerapi.Plugins, []schedulerapi.PluginConfig, error) {
-	allFitPredicates, err := getFitPredicateFunctions(predicateKeys, *c.factoryArgs)
+	allFitPredicates, err := getFitPredicateFunctions(predicateKeys, c.factoryArgs)
 	if err != nil {
 		return nil, nil, nil, err
 	}

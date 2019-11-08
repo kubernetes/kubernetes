@@ -172,7 +172,8 @@ func TestServiceAffinity(t *testing.T) {
 				predicate: predicate,
 			}
 
-			meta := predicates.GetPredicateMetadata(test.pod, snapshot)
+			factory := &predicates.MetadataProducerFactory{}
+			meta := factory.GetPredicateMetadata(test.pod, snapshot)
 			state := framework.NewCycleState()
 			state.Write(migration.PredicatesStateKey, &migration.PredicatesStateData{Reference: meta})
 
@@ -399,7 +400,7 @@ func TestServiceAffinityScore(t *testing.T) {
 				priorityMapFunction:    priorityMapFunction,
 				priorityReduceFunction: priorityReduceFunction,
 			}
-			metaDataProducer := priorities.NewPriorityMetadataFactory(
+			metaDataProducer := priorities.NewMetadataFactory(
 				fakelisters.ServiceLister(test.services),
 				fakelisters.ControllerLister(rcs),
 				fakelisters.ReplicaSetLister(rss),

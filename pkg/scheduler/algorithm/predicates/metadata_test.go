@@ -358,7 +358,8 @@ func TestPredicateMetadata_AddRemovePod(t *testing.T) {
 				s := nodeinfosnapshot.NewSnapshot(pods, test.nodes)
 				_, precompute := NewServiceAffinityPredicate(s.NodeInfos(), s.Pods(), fakelisters.ServiceLister(test.services), nil)
 				RegisterPredicateMetadataProducer("ServiceAffinityMetaProducer", precompute)
-				meta := GetPredicateMetadata(test.pendingPod, s)
+				factory := &MetadataProducerFactory{}
+				meta := factory.GetPredicateMetadata(test.pendingPod, s)
 				return meta.(*predicateMetadata), s.NodeInfoMap
 			}
 
