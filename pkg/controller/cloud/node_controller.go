@@ -70,6 +70,14 @@ var labelReconcileInfo = []struct {
 		secondaryKey:          v1.LabelZoneRegionStable,
 		ensureSecondaryExists: true,
 	},
+	{
+		// Reconcile the beta and the stable instance-type label using the beta label as
+		// the source of truth
+		// TODO: switch the primary key to GA labels in v1.21
+		primaryKey:            v1.LabelInstanceType,
+		secondaryKey:          v1.LabelInstanceTypeStable,
+		ensureSecondaryExists: true,
+	},
 }
 
 var UpdateNodeSpecBackoff = wait.Backoff{
@@ -375,6 +383,8 @@ func (cnc *CloudNodeController) initializeNode(ctx context.Context, node *v1.Nod
 		} else if instanceType != "" {
 			klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelInstanceType, instanceType)
 			curNode.ObjectMeta.Labels[v1.LabelInstanceType] = instanceType
+			klog.V(2).Infof("Adding node label from cloud provider: %s=%s", v1.LabelInstanceTypeStable, instanceType)
+			curNode.ObjectMeta.Labels[v1.LabelInstanceTypeStable] = instanceType
 		}
 
 		if zones, ok := cnc.cloud.Zones(); ok {
