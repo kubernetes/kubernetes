@@ -17,7 +17,6 @@ limitations under the License.
 package pod
 
 import (
-	"errors"
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
@@ -142,7 +141,7 @@ func (mc *basicMirrorClient) getNodeUID() (types.UID, error) {
 		return "", err
 	}
 	if node.UID == "" {
-		return "", errors.New("node UID unset")
+		return "", fmt.Errorf("UID unset for node %s", mc.nodeName)
 	}
 	return node.UID, nil
 }
