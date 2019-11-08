@@ -154,6 +154,7 @@ func (kl *Kubelet) updateDefaultLabels(initialNode, existingNode *v1.Node) bool 
 		v1.LabelZoneRegionStable,
 		v1.LabelZoneFailureDomain,
 		v1.LabelZoneRegion,
+		v1.LabelInstanceTypeStable,
 		v1.LabelInstanceType,
 		v1.LabelOSStable,
 		v1.LabelArchStable,
@@ -333,6 +334,8 @@ func (kl *Kubelet) initialNode(ctx context.Context) (*v1.Node, error) {
 		if instanceType != "" {
 			klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelInstanceType, instanceType)
 			node.ObjectMeta.Labels[v1.LabelInstanceType] = instanceType
+			klog.Infof("Adding node label from cloud provider: %s=%s", v1.LabelInstanceTypeStable, instanceType)
+			node.ObjectMeta.Labels[v1.LabelInstanceTypeStable] = instanceType
 		}
 		// If the cloud has zone information, label the node with the zone information
 		zones, ok := kl.cloud.Zones()
