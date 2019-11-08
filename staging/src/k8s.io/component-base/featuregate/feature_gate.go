@@ -25,6 +25,8 @@ import (
 	"sync/atomic"
 
 	"github.com/spf13/pflag"
+
+	"k8s.io/apimachinery/pkg/util/naming"
 	"k8s.io/klog"
 )
 
@@ -103,6 +105,8 @@ type MutableFeatureGate interface {
 
 // featureGate implements FeatureGate as well as pflag.Value for flag parsing.
 type featureGate struct {
+	featureGateName string
+
 	special map[Feature]func(map[Feature]FeatureSpec, map[Feature]bool, bool)
 
 	// lock guards writes to known, enabled, and reads/writes of closed
@@ -128,6 +132,10 @@ func setUnsetAlphaGates(known map[Feature]FeatureSpec, enabled map[Feature]bool,
 // Set, String, and Type implement pflag.Value
 var _ pflag.Value = &featureGate{}
 
+// internalPackages are packages that ignored when creating a name for featureGates. These packages are in the common
+// call chains, so they'd be unhelpful as names.
+var internalPackages = []string{"k8s.io/component-base/featuregate/feature_gate.go"}
+
 func NewFeatureGate() *featureGate {
 	known := map[Feature]FeatureSpec{}
 	for k, v := range defaultFeatures {
@@ -142,9 +150,10 @@ func NewFeatureGate() *featureGate {
 	enabledValue.Store(enabled)
 
 	f := &featureGate{
-		known:   knownValue,
-		special: specialFeatures,
-		enabled: enabledValue,
+		featureGateName: naming.GetNameFromCallsite(internalPackages...),
+		known:           knownValue,
+		special:         specialFeatures,
+		enabled:         enabledValue,
 	}
 	return f
 }
@@ -263,12 +272,16 @@ func (f *featureGate) Add(features map[Feature]FeatureSpec) error {
 	return nil
 }
 
-// Enabled returns true if the key is enabled.
+// Enabled returns true if the key is enabled.  If the key is not known, this call will panic.
 func (f *featureGate) Enabled(key Feature) bool {
 	if v, ok := f.enabled.Load().(map[Feature]bool)[key]; ok {
 		return v
 	}
-	return f.known.Load().(map[Feature]FeatureSpec)[key].Default
+	if v, ok := f.known.Load().(map[Feature]FeatureSpec)[key]; ok {
+		return v.Default
+	}
+
+	panic(fmt.Errorf("feature %q is not registered in FeatureGate %q", key, f.featureGateName))
 }
 
 // AddFlag adds a flag for setting global feature gates to the specified FlagSet.

@@ -37,7 +37,6 @@ import (
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog"
 
-	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	utilnet "k8s.io/utils/net"
 )
 
@@ -775,7 +774,7 @@ func (ss *scaleSet) EnsureHostInPool(service *v1.Service, nodeName types.NodeNam
 
 	var primaryIPConfiguration *compute.VirtualMachineScaleSetIPConfiguration
 	// Find primary network interface configuration.
-	if !utilfeature.DefaultFeatureGate.Enabled(IPv6DualStack) {
+	if !ss.Cloud.ipv6DualStackEnabled {
 		// Find primary IP configuration.
 		primaryIPConfiguration, err = getPrimaryIPConfigFromVMSSNetworkConfig(primaryNetworkInterfaceConfiguration)
 		if err != nil {
