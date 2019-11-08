@@ -25,9 +25,9 @@ import (
 	"sigs.k8s.io/yaml"
 	"testing"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver/conversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/runtime/serializer/protobuf"

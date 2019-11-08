@@ -20,8 +20,10 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // IsProtectedCommunityGroup returns whether or not a group specified for a CRD is protected for the community and needs
@@ -54,18 +56,205 @@ const (
 
 // GetAPIApprovalState returns the state of the API approval and reason for that state
 func GetAPIApprovalState(annotations map[string]string) (state APIApprovalState, reason string) {
-	annotation := annotations[v1beta1.KubeAPIApprovedAnnotation]
+	annotation := annotations[apiextensions.KubeAPIApprovedAnnotation]
 
 	// we use the result of this parsing in the switch/case below
 	url, annotationURLParseErr := url.ParseRequestURI(annotation)
 	switch {
 	case len(annotation) == 0:
-		return APIApprovalMissing, fmt.Sprintf("protected groups must have approval annotation %q, see https://github.com/kubernetes/enhancements/pull/1111", v1beta1.KubeAPIApprovedAnnotation)
+		return APIApprovalMissing, fmt.Sprintf("protected groups must have approval annotation %q, see https://github.com/kubernetes/enhancements/pull/1111", apiextensions.KubeAPIApprovedAnnotation)
 	case strings.HasPrefix(annotation, "unapproved"):
 		return APIApprovalBypassed, fmt.Sprintf("not approved: %q", annotation)
 	case annotationURLParseErr == nil && url != nil && len(url.Host) > 0 && len(url.Scheme) > 0:
 		return APIApproved, fmt.Sprintf("approved in %v", annotation)
 	default:
-		return APIApprovalInvalid, fmt.Sprintf("protected groups must have approval annotation %q with either a URL or a reason starting with \"unapproved\", see https://github.com/kubernetes/enhancements/pull/1111", v1beta1.KubeAPIApprovedAnnotation)
+		return APIApprovalInvalid, fmt.Sprintf("protected groups must have approval annotation %q with either a URL or a reason starting with \"unapproved\", see https://github.com/kubernetes/enhancements/pull/1111", apiextensions.KubeAPIApprovedAnnotation)
 	}
+}
+
+// SetCRDCondition sets the status condition. It either overwrites the existing one or creates a new one.
+func SetCRDCondition(crd *apiextensions.CustomResourceDefinition, newCondition apiextensions.CustomResourceDefinitionCondition) {
+	newCondition.LastTransitionTime = metav1.NewTime(time.Now())
+
+	existingCondition := FindCRDCondition(crd, newCondition.Type)
+	if existingCondition == nil {
+		crd.Status.Conditions = append(crd.Status.Conditions, newCondition)
+		return
+	}
+
+	if existingCondition.Status != newCondition.Status || existingCondition.LastTransitionTime.IsZero() {
+		existingCondition.LastTransitionTime = newCondition.LastTransitionTime
+	}
+
+	existingCondition.Status = newCondition.Status
+	existingCondition.Reason = newCondition.Reason
+	existingCondition.Message = newCondition.Message
+}
+
+// RemoveCRDCondition removes the status condition.
+func RemoveCRDCondition(crd *apiextensions.CustomResourceDefinition, conditionType apiextensions.CustomResourceDefinitionConditionType) {
+	newConditions := []apiextensions.CustomResourceDefinitionCondition{}
+	for _, condition := range crd.Status.Conditions {
+		if condition.Type != conditionType {
+			newConditions = append(newConditions, condition)
+		}
+	}
+	crd.Status.Conditions = newConditions
+}
+
+// FindCRDCondition returns the condition you're looking for or nil.
+func FindCRDCondition(crd *apiextensions.CustomResourceDefinition, conditionType apiextensions.CustomResourceDefinitionConditionType) *apiextensions.CustomResourceDefinitionCondition {
+	for i := range crd.Status.Conditions {
+		if crd.Status.Conditions[i].Type == conditionType {
+			return &crd.Status.Conditions[i]
+		}
+	}
+
+	return nil
+}
+
+// IsCRDConditionTrue indicates if the condition is present and strictly true.
+func IsCRDConditionTrue(crd *apiextensions.CustomResourceDefinition, conditionType apiextensions.CustomResourceDefinitionConditionType) bool {
+	return IsCRDConditionPresentAndEqual(crd, conditionType, apiextensions.ConditionTrue)
+}
+
+// IsCRDConditionFalse indicates if the condition is present and false.
+func IsCRDConditionFalse(crd *apiextensions.CustomResourceDefinition, conditionType apiextensions.CustomResourceDefinitionConditionType) bool {
+	return IsCRDConditionPresentAndEqual(crd, conditionType, apiextensions.ConditionFalse)
+}
+
+// IsCRDConditionPresentAndEqual indicates if the condition is present and equal to the given status.
+func IsCRDConditionPresentAndEqual(crd *apiextensions.CustomResourceDefinition, conditionType apiextensions.CustomResourceDefinitionConditionType, status apiextensions.ConditionStatus) bool {
+	for _, condition := range crd.Status.Conditions {
+		if condition.Type == conditionType {
+			return condition.Status == status
+		}
+	}
+	return false
+}
+
+// IsCRDConditionEquivalent returns true if the lhs and rhs are equivalent except for times.
+func IsCRDConditionEquivalent(lhs, rhs *apiextensions.CustomResourceDefinitionCondition) bool {
+	if lhs == nil && rhs == nil {
+		return true
+	}
+	if lhs == nil || rhs == nil {
+		return false
+	}
+
+	return lhs.Message == rhs.Message && lhs.Reason == rhs.Reason && lhs.Status == rhs.Status && lhs.Type == rhs.Type
+}
+
+// CRDHasFinalizer returns true if the finalizer is in the list.
+func CRDHasFinalizer(crd *apiextensions.CustomResourceDefinition, needle string) bool {
+	for _, finalizer := range crd.Finalizers {
+		if finalizer == needle {
+			return true
+		}
+	}
+
+	return false
+}
+
+// CRDRemoveFinalizer removes the finalizer if present.
+func CRDRemoveFinalizer(crd *apiextensions.CustomResourceDefinition, needle string) {
+	newFinalizers := []string{}
+	for _, finalizer := range crd.Finalizers {
+		if finalizer != needle {
+			newFinalizers = append(newFinalizers, finalizer)
+		}
+	}
+	crd.Finalizers = newFinalizers
+}
+
+// HasServedCRDVersion returns true if the given version is in the list of CRD's versions and the Served flag is set.
+func HasServedCRDVersion(crd *apiextensions.CustomResourceDefinition, version string) bool {
+	for _, v := range crd.Spec.Versions {
+		if v.Name == version {
+			return v.Served
+		}
+	}
+	return false
+}
+
+// GetCRDStorageVersion returns the storage version for given CRD.
+func GetCRDStorageVersion(crd *apiextensions.CustomResourceDefinition) (string, error) {
+	for _, v := range crd.Spec.Versions {
+		if v.Storage {
+			return v.Name, nil
+		}
+	}
+	// This should not happened if crd is valid
+	return "", fmt.Errorf("invalid apiextensions.CustomResourceDefinition, no storage version")
+}
+
+// IsStoredVersion returns whether the given version is the storage version of the CRD.
+func IsStoredVersion(crd *apiextensions.CustomResourceDefinition, version string) bool {
+	for _, v := range crd.Status.StoredVersions {
+		if version == v {
+			return true
+		}
+	}
+	return false
+}
+
+// GetSchemaForVersion returns the validation schema for the given version or nil.
+func GetSchemaForVersion(crd *apiextensions.CustomResourceDefinition, version string) (*apiextensions.CustomResourceValidation, error) {
+	for _, v := range crd.Spec.Versions {
+		if version == v.Name {
+			return v.Schema, nil
+		}
+	}
+	return nil, fmt.Errorf("version %s not found in apiextensions.CustomResourceDefinition: %v", version, crd.Name)
+}
+
+// GetSubresourcesForVersion returns the subresources for given version or nil.
+func GetSubresourcesForVersion(crd *apiextensions.CustomResourceDefinition, version string) (*apiextensions.CustomResourceSubresources, error) {
+	for _, v := range crd.Spec.Versions {
+		if version == v.Name {
+			return v.Subresources, nil
+		}
+	}
+	return nil, fmt.Errorf("version %s not found in apiextensions.CustomResourceDefinition: %v", version, crd.Name)
+}
+
+// HasPerVersionSchema returns true if a CRD uses per-version schema.
+func HasPerVersionSchema(versions []apiextensions.CustomResourceDefinitionVersion) bool {
+	for _, v := range versions {
+		if v.Schema != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// HasPerVersionSubresources returns true if a CRD uses per-version subresources.
+func HasPerVersionSubresources(versions []apiextensions.CustomResourceDefinitionVersion) bool {
+	for _, v := range versions {
+		if v.Subresources != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// HasPerVersionColumns returns true if a CRD uses per-version columns.
+func HasPerVersionColumns(versions []apiextensions.CustomResourceDefinitionVersion) bool {
+	for _, v := range versions {
+		if len(v.AdditionalPrinterColumns) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// HasVersionServed returns true if given CRD has given version served.
+func HasVersionServed(crd *apiextensions.CustomResourceDefinition, version string) bool {
+	for _, v := range crd.Spec.Versions {
+		if !v.Served || v.Name != version {
+			continue
+		}
+		return true
+	}
+	return false
 }

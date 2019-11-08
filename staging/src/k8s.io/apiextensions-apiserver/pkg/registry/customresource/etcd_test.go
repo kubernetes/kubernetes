@@ -39,7 +39,8 @@ import (
 	"k8s.io/apiserver/pkg/registry/rest"
 	etcd3testing "k8s.io/apiserver/pkg/storage/etcd3/testing"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apiserver"
 	"k8s.io/apiextensions-apiserver/pkg/crdserverscheme"
 	"k8s.io/apiextensions-apiserver/pkg/registry/customresource"
@@ -67,13 +68,13 @@ func newStorage(t *testing.T) (customresource.CustomResourceStorage, *etcd3testi
 	kind := schema.GroupVersionKind{Group: "mygroup.example.com", Version: "v1beta1", Kind: "Noxu"}
 
 	labelSelectorPath := ".status.labelSelector"
-	scale := &apiextensions.CustomResourceSubresourceScale{
+	scale := &apiextensionsinternal.CustomResourceSubresourceScale{
 		SpecReplicasPath:   ".spec.replicas",
 		StatusReplicasPath: ".status.replicas",
 		LabelSelectorPath:  &labelSelectorPath,
 	}
 
-	status := &apiextensions.CustomResourceSubresourceStatus{}
+	status := &apiextensionsinternal.CustomResourceSubresourceStatus{}
 
 	headers := []apiextensions.CustomResourceColumnDefinition{
 		{Name: "Age", Type: "date", JSONPath: ".metadata.creationTimestamp"},

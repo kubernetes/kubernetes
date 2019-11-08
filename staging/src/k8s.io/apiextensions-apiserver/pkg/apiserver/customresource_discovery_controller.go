@@ -34,9 +34,10 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 )
 
 type DiscoveryController struct {
@@ -86,7 +87,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 	foundVersion := false
 	foundGroup := false
 	for _, crd := range crds {
-		if !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+		if !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensions.Established) {
 			continue
 		}
 
@@ -126,7 +127,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 
 		verbs := metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "patch", "create", "update", "watch"})
 		// if we're terminating we don't allow some verbs
-		if apiextensions.IsCRDConditionTrue(crd, apiextensions.Terminating) {
+		if apiextensionshelpers.IsCRDConditionTrue(crd, apiextensions.Terminating) {
 			verbs = metav1.Verbs([]string{"delete", "deletecollection", "get", "list", "watch"})
 		}
 
@@ -141,7 +142,7 @@ func (c *DiscoveryController) sync(version schema.GroupVersion) error {
 			StorageVersionHash: storageVersionHash,
 		})
 
-		subresources, err := apiextensions.GetSubresourcesForVersion(crd, version.Version)
+		subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, version.Version)
 		if err != nil {
 			return err
 		}

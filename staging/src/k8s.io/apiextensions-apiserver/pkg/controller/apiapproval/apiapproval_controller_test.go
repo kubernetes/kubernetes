@@ -19,8 +19,7 @@ package apiapproval
 import (
 	"testing"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -89,7 +88,7 @@ func TestCalculateCondition(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			crd := &apiextensions.CustomResourceDefinition{
-				ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{v1beta1.KubeAPIApprovedAnnotation: test.annotationValue}},
+				ObjectMeta: metav1.ObjectMeta{Name: "foo", Annotations: map[string]string{apiextensions.KubeAPIApprovedAnnotation: test.annotationValue}},
 				Spec: apiextensions.CustomResourceDefinitionSpec{
 					Group: test.group,
 				},

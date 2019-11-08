@@ -26,7 +26,9 @@ import (
 	"github.com/go-openapi/spec"
 
 	v1 "k8s.io/api/autoscaling/v1"
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensionsinternal "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/validation"
 	structuralschema "k8s.io/apiextensions-apiserver/pkg/apiserver/schema"
 	openapiv2 "k8s.io/apiextensions-apiserver/pkg/controller/openapi/v2"
@@ -86,14 +88,18 @@ type Options struct {
 // BuildSwagger builds swagger for the given crd in the given version
 func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, opts Options) (*spec.Swagger, error) {
 	var schema *structuralschema.Structural
-	s, err := apiextensions.GetSchemaForVersion(crd, version)
+	s, err := apiextensionshelpers.GetSchemaForVersion(crd, version)
 	if err != nil {
 		return nil, err
 	}
 
 	if s != nil && s.OpenAPIV3Schema != nil {
-		if !validation.SchemaHasInvalidTypes(s.OpenAPIV3Schema) {
-			if ss, err := structuralschema.NewStructural(s.OpenAPIV3Schema); err == nil {
+		internalCRDSchema := &apiextensionsinternal.CustomResourceValidation{}
+		if err := apiextensions.Convert_v1_CustomResourceValidation_To_apiextensions_CustomResourceValidation(s, internalCRDSchema, nil); err != nil {
+			return nil, fmt.Errorf("failed converting CRD validation to internal version: %v", err)
+		}
+		if !validation.SchemaHasInvalidTypes(internalCRDSchema.OpenAPIV3Schema) {
+			if ss, err := structuralschema.NewStructural(internalCRDSchema.OpenAPIV3Schema); err == nil {
 				// skip non-structural schemas unless explicitly asked to produce swagger from them
 				if opts.AllowNonStructural || len(structuralschema.ValidateStructural(nil, ss)) == 0 {
 					schema = ss
@@ -151,7 +157,7 @@ func BuildSwagger(crd *apiextensions.CustomResourceDefinition, version string, o
 	routes = append(routes, b.buildRoute(root, "/{name}", "DELETE", "delete", "delete", status))
 	routes = append(routes, b.buildRoute(root, "/{name}", "PATCH", "patch", "patch", sample).Reads(patch))
 
-	subresources, err := apiextensions.GetSubresourcesForVersion(crd, version)
+	subresources, err := apiextensionshelpers.GetSubresourcesForVersion(crd, version)
 	if err != nil {
 		return nil, err
 	}
@@ -517,8 +523,7 @@ func newBuilder(crd *apiextensions.CustomResourceDefinition, version string, sch
 	}
 
 	// Pre-build schema with Kubernetes native properties
-	preserveUnknownFields := crd.Spec.PreserveUnknownFields != nil && *crd.Spec.PreserveUnknownFields
-	b.schema = b.buildKubeNative(schema, v2, preserveUnknownFields)
+	b.schema = b.buildKubeNative(schema, v2, crd.Spec.PreserveUnknownFields)
 	b.listSchema = b.buildListSchema()
 
 	return b

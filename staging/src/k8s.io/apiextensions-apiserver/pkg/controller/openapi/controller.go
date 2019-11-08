@@ -33,9 +33,10 @@ import (
 	"k8s.io/klog"
 	"k8s.io/kube-openapi/pkg/handler"
 
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions"
-	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/internalversion/apiextensions/internalversion"
-	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/internalversion"
+	apiextensionshelpers "k8s.io/apiextensions-apiserver/pkg/apihelpers"
+	apiextensions "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	informers "k8s.io/apiextensions-apiserver/pkg/client/informers/externalversions/apiextensions/v1"
+	listers "k8s.io/apiextensions-apiserver/pkg/client/listers/apiextensions/v1"
 	"k8s.io/apiextensions-apiserver/pkg/controller/openapi/builder"
 )
 
@@ -99,7 +100,7 @@ func (c *Controller) Run(staticSpec *spec.Swagger, openAPIService *handler.OpenA
 		return
 	}
 	for _, crd := range crds {
-		if !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+		if !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensions.Established) {
 			continue
 		}
 		newSpecs, changed, err := buildVersionSpecs(crd, nil)
@@ -163,7 +164,7 @@ func (c *Controller) sync(name string) error {
 	}
 
 	// do we have to remove all specs of this CRD?
-	if errors.IsNotFound(err) || !apiextensions.IsCRDConditionTrue(crd, apiextensions.Established) {
+	if errors.IsNotFound(err) || !apiextensionshelpers.IsCRDConditionTrue(crd, apiextensions.Established) {
 		if _, found := c.crdSpecs[name]; !found {
 			return nil
 		}
