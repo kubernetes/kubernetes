@@ -67,7 +67,7 @@ func FilterPodsByNamespace(pods []*v1.Pod, ns string) []*v1.Pod {
 
 // CreateSelectorFromLabels is used to define a selector that corresponds to the keys in a map.
 func CreateSelectorFromLabels(aL map[string]string) labels.Selector {
-	if aL == nil || len(aL) == 0 {
+	if len(aL) == 0 {
 		return labels.Everything()
 	}
 	return labels.Set(aL).AsSelector()
