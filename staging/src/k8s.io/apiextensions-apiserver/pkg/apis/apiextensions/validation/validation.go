@@ -794,6 +794,17 @@ func ValidateCustomResourceDefinitionOpenAPISchema(schema *apiextensions.JSONSch
 		} else {
 			allErrs = append(allErrs, field.Invalid(fldPath.Child("type"), schema.Type, "must be array if x-kubernetes-list-type is specified"))
 		}
+	} else if schema.XListType != nil && *schema.XListType == "set" && schema.Items != nil && schema.Items.Schema != nil { // by structural schema items are present
+		is := schema.Items.Schema
+		switch is.Type {
+		case "array":
+			if is.XListType != nil && *is.XListType != "atomic" { // atomic is the implicit default behaviour if unset, hence != atomic is wrong
+				allErrs = append(allErrs, field.Invalid(fldPath.Child("items").Child("x-kubernetes-list-type"), is.XListType, "must be atomic as item of a list with x-kubernetes-list-type=set"))
+			}
+		case "object":
+			// maps are granular, i.e. non-atomic in 1.16 (and get x-kubernetes-map-type in 1.17)
+			allErrs = append(allErrs, field.Invalid(fldPath.Child("items").Child("type"), is.Type, "must be a scalar or atomic type as item of a list with x-kubernetes-list-type=set"))
+		}
 	}
 
 	if schema.XListType != nil && *schema.XListType != "atomic" && *schema.XListType != "set" && *schema.XListType != "map" {
