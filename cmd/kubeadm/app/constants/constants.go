@@ -360,14 +360,12 @@ const (
 	// KubeletPort is the default port for the kubelet server on each host machine.
 	// May be overridden by a flag at startup.
 	KubeletPort = 10250
-	// InsecureSchedulerPort is the default port for the scheduler status server.
+	// KubeSchedulerPort is the default port for the scheduler status server.
 	// May be overridden by a flag at startup.
-	// Deprecated: use the secure KubeSchedulerPort instead.
-	InsecureSchedulerPort = 10251
-	// InsecureKubeControllerManagerPort is the default port for the controller manager status server.
+	KubeSchedulerPort = 10259
+	// KubeControllerManagerPort is the default port for the controller manager status server.
 	// May be overridden by a flag at startup.
-	// Deprecated: use the secure KubeControllerManagerPort instead.
-	InsecureKubeControllerManagerPort = 10252
+	KubeControllerManagerPort = 10257
 
 	// Mode* constants were copied from pkg/kubeapiserver/authorizer/modes
 	// to avoid kubeadm dependency on the internal module
