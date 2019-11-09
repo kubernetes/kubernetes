@@ -134,9 +134,15 @@ func (c *ReplicaCalculator) GetResourceReplicas(currentReplicas int32, targetUti
 		return currentReplicas, utilization, rawUtilization, timestamp, nil
 	}
 
+	newReplicas := int32(math.Ceil(newUsageRatio * float64(len(metrics))))
+	if (newUsageRatio < 1.0 && newReplicas > currentReplicas) || (newUsageRatio > 1.0 && newReplicas < currentReplicas) {
+		// return the current replicas if the change of metrics length would cause a change in scale direction
+		return currentReplicas, utilization, rawUtilization, timestamp, nil
+	}
+
 	// return the result, where the number of replicas considered is
 	// however many replicas factored into our calculation
-	return int32(math.Ceil(newUsageRatio * float64(len(metrics)))), utilization, rawUtilization, timestamp, nil
+	return newReplicas, utilization, rawUtilization, timestamp, nil
 }
 
 // GetRawResourceReplicas calculates the desired replica count based on a target resource utilization (as a raw milli-value)
