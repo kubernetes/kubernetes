@@ -228,7 +228,8 @@ type PluginConfig struct {
 const (
 	// DefaultPercentageOfNodesToScore defines the percentage of nodes of all nodes
 	// that once found feasible, the scheduler stops looking for more nodes.
-	DefaultPercentageOfNodesToScore = 50
+	// A value of 0 means adaptive, meaning the scheduler figures out a proper default.
+	DefaultPercentageOfNodesToScore = 0
 
 	// MaxCustomPriorityScore is the max score UtilizationShapePoint expects.
 	MaxCustomPriorityScore int64 = 10
