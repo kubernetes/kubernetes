@@ -17,7 +17,7 @@ limitations under the License.
 package devicemanager
 
 import (
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	"k8s.io/kubernetes/pkg/kubelet/lifecycle"
@@ -66,4 +66,9 @@ func (h *ManagerStub) GetWatcherHandler() pluginwatcher.PluginHandler {
 // GetDevices returns nil
 func (h *ManagerStub) GetDevices(_, _ string) []*podresourcesapi.ContainerDevices {
 	return nil
+}
+
+// ShouldResetExtendedResourceCapacity returns false
+func (h *ManagerStub) ShouldResetExtendedResourceCapacity() bool {
+	return false
 }

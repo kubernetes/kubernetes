@@ -19,7 +19,7 @@ package devicemanager
 import (
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	podresourcesapi "k8s.io/kubernetes/pkg/kubelet/apis/podresources/v1alpha1"
 	"k8s.io/kubernetes/pkg/kubelet/config"
 	kubecontainer "k8s.io/kubernetes/pkg/kubelet/container"
@@ -58,6 +58,11 @@ type Manager interface {
 
 	// GetDevices returns information about the devices assigned to pods and containers
 	GetDevices(podUID, containerName string) []*podresourcesapi.ContainerDevices
+
+	// ShouldResetExtendedResourceCapacity returns whether the extended resources should be reset or not,
+	// depending on the checkpoint file availability. Absence of the checkpoint file strongly indicates
+	// the node has been recreated.
+	ShouldResetExtendedResourceCapacity() bool
 }
 
 // DeviceRunContainerOptions contains the combined container runtime settings to consume its allocated devices.

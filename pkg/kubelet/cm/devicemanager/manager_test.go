@@ -27,7 +27,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -944,6 +944,45 @@ func TestDevicePreStartContainer(t *testing.T) {
 	as.Equal(len(runContainerOpts.Devices), len(expectedResp.Devices))
 	as.Equal(len(runContainerOpts.Mounts), len(expectedResp.Mounts))
 	as.Equal(len(runContainerOpts.Envs), len(expectedResp.Envs))
+}
+
+func TestResetExtendedResource(t *testing.T) {
+	as := assert.New(t)
+	tmpDir, err := ioutil.TempDir("", "checkpoint")
+	as.Nil(err)
+	ckm, err := checkpointmanager.NewCheckpointManager(tmpDir)
+	as.Nil(err)
+	testManager := &ManagerImpl{
+		endpoints:         make(map[string]endpointInfo),
+		healthyDevices:    make(map[string]sets.String),
+		unhealthyDevices:  make(map[string]sets.String),
+		allocatedDevices:  make(map[string]sets.String),
+		podDevices:        make(podDevices),
+		checkpointManager: ckm,
+	}
+
+	extendedResourceName := "domain.com/resource"
+	testManager.podDevices.insert("pod", "con", extendedResourceName,
+		constructDevices([]string{"dev1"}),
+		constructAllocResp(map[string]string{"/dev/dev1": "/dev/dev1"},
+			map[string]string{"/home/lib1": "/usr/lib1"}, map[string]string{}))
+
+	testManager.healthyDevices[extendedResourceName] = sets.NewString()
+	testManager.healthyDevices[extendedResourceName].Insert("dev1")
+	// checkpoint is present, indicating node hasn't been recreated
+	err = testManager.writeCheckpoint()
+	as.Nil(err)
+
+	as.False(testManager.ShouldResetExtendedResourceCapacity())
+
+	// checkpoint is absent, representing node recreation
+	ckpts, err := ckm.ListCheckpoints()
+	as.Nil(err)
+	for _, ckpt := range ckpts {
+		err = ckm.RemoveCheckpoint(ckpt)
+		as.Nil(err)
+	}
+	as.True(testManager.ShouldResetExtendedResourceCapacity())
 }
 
 func allocateStubFunc() func(devs []string) (*pluginapi.AllocateResponse, error) {
