@@ -31,12 +31,12 @@ import (
 	csrregistry "k8s.io/kubernetes/pkg/registry/certificates/certificates"
 )
 
-// REST implements a RESTStorage for CertificateSigningRequest
+// REST implements a RESTStorage for CertificateSigningRequest.
 type REST struct {
 	*genericregistry.Store
 }
 
-// NewREST returns a registry which will store CertificateSigningRequest in the given helper
+// NewREST returns a registry which will store CertificateSigningRequest in the given helper.
 func NewREST(optsGetter generic.RESTOptionsGetter) (*REST, *StatusREST, *ApprovalREST, error) {
 	store := &genericregistry.Store{
 		NewFunc:                  func() runtime.Object { return &certificates.CertificateSigningRequest{} },
@@ -80,6 +80,7 @@ type StatusREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new CertificateSigningRequest object.
 func (r *StatusREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }
@@ -103,6 +104,7 @@ type ApprovalREST struct {
 	store *genericregistry.Store
 }
 
+// New creates a new CertificateSigningRequest object.
 func (r *ApprovalREST) New() runtime.Object {
 	return &certificates.CertificateSigningRequest{}
 }
