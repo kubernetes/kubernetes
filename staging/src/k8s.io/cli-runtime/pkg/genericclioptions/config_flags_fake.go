@@ -96,7 +96,7 @@ type namespacedClientConfig struct {
 }
 
 func (c *namespacedClientConfig) Namespace() (string, bool, error) {
-	return c.namespace, false, nil
+	return c.namespace, true, nil
 }
 
 func (c *namespacedClientConfig) RawConfig() (clientcmdapi.Config, error) {
