@@ -79,7 +79,7 @@ func TestSetEnvLocal(t *testing.T) {
 }
 
 func TestSetEnvLocalNamespace(t *testing.T) {
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	tf := cmdtesting.NewTestFactory()
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{
