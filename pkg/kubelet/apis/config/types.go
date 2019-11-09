@@ -70,7 +70,7 @@ const (
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// KubeletConfiguration contains the configuration for the Kubelet
+// KubeletConfiguration contains the configuration for the Kubelet.
 type KubeletConfiguration struct {
 	metav1.TypeMeta
 
@@ -337,59 +337,73 @@ type KubeletConfiguration struct {
 	ReservedSystemCPUs string
 }
 
+// KubeletAuthorizationMode defines the possible ways to authorize the Kubelet.
 type KubeletAuthorizationMode string
 
 const (
-	// KubeletAuthorizationModeAlwaysAllow authorizes all authenticated requests
+	// KubeletAuthorizationModeAlwaysAllow authorizes all authenticated requests.
 	KubeletAuthorizationModeAlwaysAllow KubeletAuthorizationMode = "AlwaysAllow"
-	// KubeletAuthorizationModeWebhook uses the SubjectAccessReview API to determine authorization
+	// KubeletAuthorizationModeWebhook uses the SubjectAccessReview API to
+	// determine authorization.
 	KubeletAuthorizationModeWebhook KubeletAuthorizationMode = "Webhook"
 )
 
+// KubeletAuthorization contains the authorization for the Kubelet.
 type KubeletAuthorization struct {
-	// mode is the authorization mode to apply to requests to the kubelet server.
+	// Mode is the authorization mode to apply to requests to the kubelet server.
 	// Valid values are AlwaysAllow and Webhook.
 	// Webhook mode uses the SubjectAccessReview API to determine authorization.
 	Mode KubeletAuthorizationMode
 
-	// webhook contains settings related to Webhook authorization.
+	// Webhook contains settings related to Webhook authorization.
 	Webhook KubeletWebhookAuthorization
 }
 
+// KubeletWebhookAuthorization contains the Webhook authorization for the Kubelet.
 type KubeletWebhookAuthorization struct {
-	// cacheAuthorizedTTL is the duration to cache 'authorized' responses from the webhook authorizer.
+	// CacheAuthorizedTTL is the duration to cache 'authorized' responses
+	// from the webhook authorizer.
 	CacheAuthorizedTTL metav1.Duration
-	// cacheUnauthorizedTTL is the duration to cache 'unauthorized' responses from the webhook authorizer.
+	// CacheUnauthorizedTTL is the duration to cache 'unauthorized' responses
+	// from the webhook authorizer.
 	CacheUnauthorizedTTL metav1.Duration
 }
 
+// KubeletAuthentication contains the authentication for the Kubelet.
 type KubeletAuthentication struct {
-	// x509 contains settings related to x509 client certificate authentication
+	// X509 contains settings related to x509 client certificate authentication.
 	X509 KubeletX509Authentication
-	// webhook contains settings related to webhook bearer token authentication
+	// Webhook contains settings related to webhook bearer token authentication.
 	Webhook KubeletWebhookAuthentication
-	// anonymous contains settings related to anonymous authentication
+	// Anonymous contains settings related to anonymous authentication.
 	Anonymous KubeletAnonymousAuthentication
 }
 
+// KubeletX509Authentication contains the X509 authentication for the Kubelet.
 type KubeletX509Authentication struct {
-	// clientCAFile is the path to a PEM-encoded certificate bundle. If set, any request presenting a client certificate
-	// signed by one of the authorities in the bundle is authenticated with a username corresponding to the CommonName,
+	// ClientCAFile is the path to a PEM-encoded certificate bundle. If set,
+	// any request presenting a client certificate signed by one of the authorities
+	// in the bundle is authenticated with a username corresponding to the CommonName,
 	// and groups corresponding to the Organization in the client certificate.
 	ClientCAFile string
 }
 
+// KubeletWebhookAuthentication contains the Webhook authentication for the Kubelet.
 type KubeletWebhookAuthentication struct {
-	// enabled allows bearer token authentication backed by the tokenreviews.authentication.k8s.io API
+	// Enabled allows bearer token authentication backed by the
+	// tokenreviews.authentication.k8s.io API.
 	Enabled bool
-	// cacheTTL enables caching of authentication results
+	// CacheTTL enables caching of authentication results.
 	CacheTTL metav1.Duration
 }
 
+// KubeletAnonymousAuthentication contains the Anonymous authentication for the Kubelet.
 type KubeletAnonymousAuthentication struct {
-	// enabled allows anonymous requests to the kubelet server.
-	// Requests that are not rejected by another authentication method are treated as anonymous requests.
-	// Anonymous requests have a username of system:anonymous, and a group name of system:unauthenticated.
+	// Enabled allows anonymous requests to the kubelet server.
+	// Requests that are not rejected by another authentication method are
+	// treated as anonymous requests.
+	// Anonymous requests have a username of system:anonymous, and a group
+	// name of system:unauthenticated.
 	Enabled bool
 }
 
