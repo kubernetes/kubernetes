@@ -53,6 +53,7 @@ var (
 		&compbasemetrics.HistogramOpts{
 			Name:           "etcd_request_size_bytes",
 			Help:           "Etcd request size in bytes for each operation and object type.",
+			Buckets:        []float64{0, 64, 128, 256, 512, 1028, 2048, 4096, 8192, 16384, 32768, 65536, 1048576},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"operation", "type"},
@@ -61,6 +62,7 @@ var (
 		&compbasemetrics.HistogramOpts{
 			Name:           "etcd_response_size_bytes",
 			Help:           "Etcd response size in bytes for each operation and object type.",
+			Buckets:        []float64{0, 64, 128, 256, 512, 1028, 2048, 4096, 8192, 16384, 32768, 65536, 1048576},
 			StabilityLevel: compbasemetrics.ALPHA,
 		},
 		[]string{"operation", "type"},
