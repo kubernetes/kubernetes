@@ -209,6 +209,7 @@ pluginConfig:
 	defaultBindTimeoutSeconds := int64(600)
 	defaultPodInitialBackoffSeconds := int64(1)
 	defaultPodMaxBackoffSeconds := int64(10)
+	defaultPercentageOfNodesToScore := int32(0)
 
 	testcases := []struct {
 		name             string
@@ -281,7 +282,7 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: 50,
+				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
 				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
 				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
 				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
@@ -368,7 +369,7 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: 50,
+				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
 				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
 				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
 				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
@@ -433,7 +434,7 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: 50,
+				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
 				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
 				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
 				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
@@ -473,7 +474,7 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: 50,
+				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
 				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
 				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
 				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
@@ -555,7 +556,7 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: 50,
+				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
 				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
 				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
 				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
@@ -598,7 +599,7 @@ pluginConfig:
 					Burst:       100,
 					ContentType: "application/vnd.kubernetes.protobuf",
 				},
-				PercentageOfNodesToScore: 50,
+				PercentageOfNodesToScore: defaultPercentageOfNodesToScore,
 				BindTimeoutSeconds:       defaultBindTimeoutSeconds,
 				PodInitialBackoffSeconds: defaultPodInitialBackoffSeconds,
 				PodMaxBackoffSeconds:     defaultPodMaxBackoffSeconds,
