@@ -30,6 +30,7 @@ type kubenetNetworkPlugin struct {
 	network.NoopNetworkPlugin
 }
 
+// NewPlugin creates a blank version of NetworkPlugin when kublet is not supported
 func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
 	return &kubenetNetworkPlugin{}
 }

@@ -52,7 +52,10 @@ import (
 )
 
 const (
-	BridgeName    = "cbr0"
+	// BridgeName is the name of the interface used for the bridge
+	BridgeName = "cbr0"
+
+	// DefaultCNIDir is the directory that the CNI binaries will be searched for in
 	DefaultCNIDir = "/opt/cni/bin"
 
 	sysctlBridgeCallIPTables = "net/bridge/bridge-nf-call-iptables"
@@ -66,7 +69,8 @@ const (
 	zeroCIDRv6 = "::/0"
 	zeroCIDRv4 = "0.0.0.0/0"
 
-	NET_CONFIG_TEMPLATE = `{
+	// NetConfigTemplate is the default net config template
+	NetConfigTemplate = `{
   "cniVersion": "0.1.0",
   "name": "kubenet",
   "type": "bridge",
@@ -119,6 +123,7 @@ type kubenetNetworkPlugin struct {
 	podGateways       []net.IP
 }
 
+// NewPlugin creates a new instance of NetworkPlugin
 func NewPlugin(networkPluginDirs []string, cacheDir string) network.NetworkPlugin {
 	execer := utilexec.New()
 	iptInterface := utiliptables.New(execer, utiliptables.ProtocolIpv4)
@@ -270,7 +275,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 			return
 		}
 		// create list of ips and gateways
-		cidr.IP[len(cidr.IP)-1] += 1 // Set bridge address to first address in IPNet
+		cidr.IP[len(cidr.IP)-1]++ // Set bridge address to first address in IPNet
 		plugin.podCIDRs = append(plugin.podCIDRs, cidr)
 		plugin.podGateways = append(plugin.podGateways, cidr.IP)
 	}
@@ -278,7 +283,7 @@ func (plugin *kubenetNetworkPlugin) Event(name string, details map[string]interf
 	//setup hairpinMode
 	setHairpin := plugin.hairpinMode == kubeletconfig.HairpinVeth
 
-	json := fmt.Sprintf(NET_CONFIG_TEMPLATE, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, plugin.getRangesConfig(), plugin.getRoutesConfig())
+	json := fmt.Sprintf(NetConfigTemplate, BridgeName, plugin.mtu, network.DefaultInterfaceName, setHairpin, plugin.getRangesConfig(), plugin.getRoutesConfig())
 	klog.V(4).Infof("CNI network config set to %v", json)
 	plugin.netConfig, err = libcni.ConfFromBytes([]byte(json))
 	if err != nil {

@@ -17,5 +17,6 @@ limitations under the License.
 package kubenet
 
 const (
+	// KubenetPluginName is a constant for the plugin name
 	KubenetPluginName = "kubenet"
 )
