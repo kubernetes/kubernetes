@@ -20,9 +20,10 @@ import (
 	"context"
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/kubernetes/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/pkg/scheduler/algorithm/priorities"
 	"k8s.io/kubernetes/pkg/scheduler/framework/plugins/migration"
 	framework "k8s.io/kubernetes/pkg/scheduler/framework/v1alpha1"
 	"k8s.io/kubernetes/pkg/scheduler/nodeinfo"
@@ -30,10 +31,12 @@ import (
 
 // InterPodAffinity is a plugin that checks inter pod affinity
 type InterPodAffinity struct {
+	handle    framework.FrameworkHandle
 	predicate predicates.FitPredicate
 }
 
 var _ framework.FilterPlugin = &InterPodAffinity{}
+var _ framework.ScorePlugin = &InterPodAffinity{}
 
 // Name is the name of the plugin used in the plugin registry and configurations.
 const Name = "InterPodAffinity"
@@ -53,9 +56,36 @@ func (pl *InterPodAffinity) Filter(ctx context.Context, cycleState *framework.Cy
 	return migration.PredicateResultToFrameworkStatus(reasons, err)
 }
 
+// Score invoked at the Score extension point.
+// The "score" returned in this function is the matching number of pods on the `nodeName`,
+// it is normalized later.
+func (pl *InterPodAffinity) Score(ctx context.Context, state *framework.CycleState, pod *v1.Pod, nodeName string) (int64, *framework.Status) {
+	nodeInfo, err := pl.handle.SnapshotSharedLister().NodeInfos().Get(nodeName)
+	if err != nil {
+		return 0, framework.NewStatus(framework.Error, fmt.Sprintf("getting node %q from Snapshot: %v", nodeName, err))
+	}
+
+	meta := migration.PriorityMetadata(state)
+	s, err := priorities.CalculateInterPodAffinityPriorityMap(pod, meta, nodeInfo)
+	return s.Score, migration.ErrorToFrameworkStatus(err)
+}
+
+// NormalizeScore invoked after scoring all nodes.
+func (pl *InterPodAffinity) NormalizeScore(ctx context.Context, state *framework.CycleState, pod *v1.Pod, scores framework.NodeScoreList) *framework.Status {
+	meta := migration.PriorityMetadata(state)
+	err := priorities.CalculateInterPodAffinityPriorityReduce(pod, meta, pl.handle.SnapshotSharedLister(), scores)
+	return migration.ErrorToFrameworkStatus(err)
+}
+
+// ScoreExtensions of the Score plugin.
+func (pl *InterPodAffinity) ScoreExtensions() framework.ScoreExtensions {
+	return pl
+}
+
 // New initializes a new plugin and returns it.
 func New(_ *runtime.Unknown, h framework.FrameworkHandle) (framework.Plugin, error) {
 	return &InterPodAffinity{
+		handle:    h,
 		predicate: predicates.NewPodAffinityPredicate(h.SnapshotSharedLister().NodeInfos(), h.SnapshotSharedLister().Pods()),
 	}, nil
 }
