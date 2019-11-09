@@ -84,40 +84,52 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 			return nil
 		}
 		if cloud != nil {
-			nodeAddresses, err := nodeAddressesFunc()
+			cloudNodeAddresses, err := nodeAddressesFunc()
 			if err != nil {
 				return err
 			}
+
+			var nodeAddresses []v1.NodeAddress
+
+			// For every address supplied by the cloud provider that matches nodeIP, nodeIP is the enforced node address for
+			// that address Type (like InternalIP and ExternalIP), meaning other addresses of the same Type are discarded.
+			// See #61921 for more information: some cloud providers may supply secondary IPs, so nodeIP serves as a way to
+			// ensure that the correct IPs show up on a Node object.
 			if nodeIP != nil {
 				enforcedNodeAddresses := []v1.NodeAddress{}
 
 				nodeIPTypes := make(map[v1.NodeAddressType]bool)
-				for _, nodeAddress := range nodeAddresses {
+				for _, nodeAddress := range cloudNodeAddresses {
 					if nodeAddress.Address == nodeIP.String() {
 						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
 						nodeIPTypes[nodeAddress.Type] = true
 					}
 				}
-				if len(enforcedNodeAddresses) > 0 {
-					for _, nodeAddress := range nodeAddresses {
-						if !nodeIPTypes[nodeAddress.Type] && nodeAddress.Type != v1.NodeHostName {
-							enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
-						}
-					}
 
-					enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
-					node.Status.Addresses = enforcedNodeAddresses
-					return nil
+				// nodeIP must be among the addresses supplied by the cloud provider
+				if len(enforcedNodeAddresses) == 0 {
+					return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", nodeIP)
 				}
-				return fmt.Errorf("failed to get node address from cloud provider that matches ip: %v", nodeIP)
+
+				// nodeIP was found, now use all other addresses supplied by the cloud provider NOT of the same Type as nodeIP.
+				for _, nodeAddress := range cloudNodeAddresses {
+					if !nodeIPTypes[nodeAddress.Type] {
+						enforcedNodeAddresses = append(enforcedNodeAddresses, v1.NodeAddress{Type: nodeAddress.Type, Address: nodeAddress.Address})
+					}
+				}
+
+				nodeAddresses = enforcedNodeAddresses
+			} else {
+				// If nodeIP is unset, just use the addresses provided by the cloud provider as-is
+				nodeAddresses = cloudNodeAddresses
 			}
 
 			switch {
-			case len(nodeAddresses) == 0:
+			case len(cloudNodeAddresses) == 0:
 				// the cloud provider didn't specify any addresses
 				nodeAddresses = append(nodeAddresses, v1.NodeAddress{Type: v1.NodeHostName, Address: hostname})
 
-			case !hasAddressType(nodeAddresses, v1.NodeHostName) && hasAddressValue(nodeAddresses, hostname):
+			case !hasAddressType(cloudNodeAddresses, v1.NodeHostName) && hasAddressValue(cloudNodeAddresses, hostname):
 				// the cloud provider didn't specify an address of type Hostname,
 				// but the auto-detected hostname matched an address reported by the cloud provider,
 				// so we can add it and count on the value being verifiable via cloud provider metadata
