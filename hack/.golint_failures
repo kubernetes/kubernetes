@@ -234,7 +234,6 @@ pkg/util/procfs
 pkg/util/removeall
 pkg/util/rlimit
 pkg/util/selinux
-pkg/util/sysctl/testing
 pkg/util/taints
 pkg/volume
 pkg/volume/azure_dd

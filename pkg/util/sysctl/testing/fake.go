@@ -22,19 +22,20 @@ import (
 	"k8s.io/kubernetes/pkg/util/sysctl"
 )
 
-// fake is a map-backed implementation of sysctl.Interface, for testing/mocking
-type fake struct {
+// Fake is a map-backed implementation of sysctl.Interface, for testing/mocking.
+type Fake struct {
 	Settings map[string]int
 }
 
-func NewFake() *fake {
-	return &fake{
+// NewFake creates a fake sysctl implementation.
+func NewFake() *Fake {
+	return &Fake{
 		Settings: make(map[string]int),
 	}
 }
 
-// GetSysctl returns the value for the specified sysctl setting
-func (m *fake) GetSysctl(sysctl string) (int, error) {
+// GetSysctl returns the value for the specified sysctl setting.
+func (m *Fake) GetSysctl(sysctl string) (int, error) {
 	v, found := m.Settings[sysctl]
 	if !found {
 		return -1, os.ErrNotExist
@@ -42,10 +43,10 @@ func (m *fake) GetSysctl(sysctl string) (int, error) {
 	return v, nil
 }
 
-// SetSysctl modifies the specified sysctl flag to the new value
-func (m *fake) SetSysctl(sysctl string, newVal int) error {
+// SetSysctl modifies the specified sysctl flag to the new value.
+func (m *Fake) SetSysctl(sysctl string, newVal int) error {
 	m.Settings[sysctl] = newVal
 	return nil
 }
 
-var _ = sysctl.Interface(&fake{})
+var _ = sysctl.Interface(&Fake{})
