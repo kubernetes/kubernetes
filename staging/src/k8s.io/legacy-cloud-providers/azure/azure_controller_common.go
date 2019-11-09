@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-07-01/compute"
@@ -65,7 +66,9 @@ type controllerCommon struct {
 	location              string
 	storageEndpointSuffix string
 	resourceGroup         string
-	cloud                 *Cloud
+	// store disk URI when disk is in attaching or detaching process
+	diskAttachDetachMap sync.Map
+	cloud               *Cloud
 }
 
 // getNodeVMSet gets the VMSet interface based on config.VMType and the real virtual machine type.
@@ -151,6 +154,8 @@ func (c *controllerCommon) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 	}
 
 	klog.V(2).Infof("Trying to attach volume %q lun %d to node %q.", diskURI, lun, nodeName)
+	c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "attaching")
+	defer c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
 	return lun, vmset.AttachDisk(isManagedDisk, diskName, diskURI, nodeName, lun, cachingMode, diskEncryptionSetID)
 }
 
@@ -177,14 +182,18 @@ func (c *controllerCommon) DetachDisk(diskName, diskURI string, nodeName types.N
 
 	// make the lock here as small as possible
 	diskOpMutex.LockKey(instanceid)
+	c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "detaching")
 	resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
+	c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
 	diskOpMutex.UnlockKey(instanceid)
 
 	if c.cloud.CloudProviderBackoff && shouldRetryHTTPRequest(resp, err) {
 		klog.V(2).Infof("azureDisk - update backing off: detach disk(%s, %s), err: %v", diskName, diskURI, err)
 		retryErr := kwait.ExponentialBackoff(c.cloud.RequestBackoff(), func() (bool, error) {
 			diskOpMutex.LockKey(instanceid)
+			c.diskAttachDetachMap.Store(strings.ToLower(diskURI), "detaching")
 			resp, err := vmset.DetachDisk(diskName, diskURI, nodeName)
+			c.diskAttachDetachMap.Delete(strings.ToLower(diskURI))
 			diskOpMutex.UnlockKey(instanceid)
 			return c.cloud.processHTTPRetryResponse(nil, "", resp, err)
 		})
@@ -226,9 +235,13 @@ func (c *controllerCommon) GetDiskLun(diskName, diskURI string, nodeName types.N
 		if disk.Lun != nil && (disk.Name != nil && diskName != "" && strings.EqualFold(*disk.Name, diskName)) ||
 			(disk.Vhd != nil && disk.Vhd.URI != nil && diskURI != "" && strings.EqualFold(*disk.Vhd.URI, diskURI)) ||
 			(disk.ManagedDisk != nil && strings.EqualFold(*disk.ManagedDisk.ID, diskURI)) {
-			// found the disk
-			klog.V(2).Infof("azureDisk - find disk: lun %d name %q uri %q", *disk.Lun, diskName, diskURI)
-			return *disk.Lun, nil
+			if disk.ToBeDetached != nil && *disk.ToBeDetached {
+				klog.Warningf("azureDisk - find disk(ToBeDetached): lun %d name %q uri %q", *disk.Lun, diskName, diskURI)
+			} else {
+				// found the disk
+				klog.V(2).Infof("azureDisk - find disk: lun %d name %q uri %q", *disk.Lun, diskName, diskURI)
+				return *disk.Lun, nil
+			}
 		}
 	}
 	return -1, fmt.Errorf("cannot find Lun for disk %s", diskName)
