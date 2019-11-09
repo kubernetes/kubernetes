@@ -22,7 +22,6 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/gomega"
-	"github.com/prometheus/common/model"
 
 	v1 "k8s.io/api/core/v1"
 	storagev1 "k8s.io/api/storage/v1"
@@ -281,8 +280,8 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 
 		metricKey := "volume_operation_total_seconds_count"
 		dimensions := []string{"operation_name", "plugin_name"}
-		valid := hasValidMetrics(testutil.Metrics(controllerMetrics), metricKey, dimensions...)
-		framework.ExpectEqual(valid, true, "Invalid metric in P/V Controller metrics: %q", metricKey)
+		err = testutil.ValidateMetrics(testutil.Metrics(controllerMetrics), metricKey, dimensions...)
+		framework.ExpectNoError(err, "Invalid metric in P/V Controller metrics: %q", metricKey)
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
 		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
@@ -311,8 +310,8 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 		// Metrics should have dimensions plugin_name and state available
 		totalVolumesKey := "volume_manager_total_volumes"
 		dimensions := []string{"state", "plugin_name"}
-		valid := hasValidMetrics(testutil.Metrics(kubeMetrics), totalVolumesKey, dimensions...)
-		framework.ExpectEqual(valid, true, "Invalid metric in Volume Manager metrics: %q", totalVolumesKey)
+		err = testutil.ValidateMetrics(testutil.Metrics(kubeMetrics), totalVolumesKey, dimensions...)
+		framework.ExpectNoError(err, "Invalid metric in Volume Manager metrics: %q", totalVolumesKey)
 
 		framework.Logf("Deleting pod %q/%q", pod.Namespace, pod.Name)
 		framework.ExpectNoError(e2epod.DeletePodWithWait(c, pod))
@@ -439,7 +438,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 				// Concretely, we expect the difference of the updated values and original values for each
 				// test suit are equal to expectValues.
 				actualValues := calculateRelativeValues(originMetricValues[i],
-					getPVControllerMetrics(controllerMetrics, metric.name, metric.dimension))
+					testutil.GetMetricValuesForLabel(testutil.Metrics(controllerMetrics), metric.name, metric.dimension))
 				framework.ExpectEqual(actualValues, expectValues, "Wrong pv controller metric %s(%s): wanted %v, got %v",
 					metric.name, metric.dimension, expectValues, actualValues)
 			}
@@ -458,7 +457,7 @@ var _ = utils.SIGDescribe("[Serial] Volume metrics", func() {
 			framework.ExpectNoError(err, "Error getting c-m metricValues: %v", err)
 			for _, metric := range metrics {
 				originMetricValues = append(originMetricValues,
-					getPVControllerMetrics(controllerMetrics, metric.name, metric.dimension))
+					testutil.GetMetricValuesForLabel(testutil.Metrics(controllerMetrics), metric.name, metric.dimension))
 			}
 		})
 
@@ -694,26 +693,11 @@ func waitForPVControllerSync(metricsGrabber *metrics.Grabber, metricName, dimens
 			framework.Logf("Error fetching controller-manager metrics")
 			return false, err
 		}
-		return len(getPVControllerMetrics(updatedMetrics, metricName, dimension)) > 0, nil
+		return len(testutil.GetMetricValuesForLabel(testutil.Metrics(updatedMetrics), metricName, dimension)) > 0, nil
 	}
 	waitErr := wait.ExponentialBackoff(backoff, verifyMetricFunc)
 	framework.ExpectNoError(waitErr,
 		"Timeout error fetching pv controller metrics : %v", waitErr)
-}
-
-func getPVControllerMetrics(ms metrics.ControllerManagerMetrics, metricName, dimension string) map[string]int64 {
-	result := make(map[string]int64)
-	for method, samples := range ms {
-		if method != metricName {
-			continue
-		}
-		for _, sample := range samples {
-			count := int64(sample.Value)
-			dimensionName := string(sample.Metric[model.LabelName(dimension)])
-			result[dimensionName] = count
-		}
-	}
-	return result
 }
 
 func calculateRelativeValues(originValues, updatedValues map[string]int64) map[string]int64 {
@@ -730,26 +714,6 @@ func calculateRelativeValues(originValues, updatedValues map[string]int64) map[s
 		}
 	}
 	return relativeValues
-}
-
-func hasValidMetrics(metrics testutil.Metrics, metricKey string, dimensions ...string) bool {
-	var errCount int
-	framework.Logf("Looking for sample in metric %q", metricKey)
-	samples, ok := metrics[metricKey]
-	if !ok {
-		framework.Logf("Key %q was not found in metrics", metricKey)
-		return false
-	}
-	for _, sample := range samples {
-		framework.Logf("Found sample %q", sample.String())
-		for _, d := range dimensions {
-			if _, ok := sample.Metric[model.LabelName(d)]; !ok {
-				framework.Logf("Error getting dimension %q for metric %q, sample %q", d, metricKey, sample.String())
-				errCount++
-			}
-		}
-	}
-	return errCount == 0
 }
 
 func getStatesMetrics(metricKey string, givenMetrics testutil.Metrics) map[string]map[string]int64 {
@@ -775,8 +739,9 @@ func waitForADControllerStatesMetrics(metricsGrabber *metrics.Grabber, metricNam
 			framework.Skipf("Could not get controller-manager metrics - skipping")
 			return false, err
 		}
-		if !hasValidMetrics(testutil.Metrics(updatedMetrics), metricName, dimensions...) {
-			return false, fmt.Errorf("could not get valid metrics for %q", metricName)
+		err = testutil.ValidateMetrics(testutil.Metrics(updatedMetrics), metricName, dimensions...)
+		if err != nil {
+			return false, fmt.Errorf("could not get valid metrics: %v ", err)
 		}
 		states := getStatesMetrics(metricName, testutil.Metrics(updatedMetrics))
 		for _, name := range stateNames {
