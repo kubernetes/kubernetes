@@ -73,6 +73,11 @@ func ValidateFlowSchema(fs *flowcontrol.FlowSchema) field.ErrorList {
 	return allErrs
 }
 
+// ValidateFlowSchemaUpdate validates the update of flow-schema
+func ValidateFlowSchemaUpdate(old, fs *flowcontrol.FlowSchema) field.ErrorList {
+	return ValidateFlowSchema(fs)
+}
+
 // ValidateFlowSchemaSpec validates the content of flow-schema's spec
 func ValidateFlowSchemaSpec(spec *flowcontrol.FlowSchemaSpec, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
@@ -252,6 +257,11 @@ func ValidateFlowSchemaStatus(status *flowcontrol.FlowSchemaStatus, fldPath *fie
 	return allErrs
 }
 
+// ValidateFlowSchemaStatusUpdate validates the update of status for the flow-schema.
+func ValidateFlowSchemaStatusUpdate(old, fs *flowcontrol.FlowSchema) field.ErrorList {
+	return ValidateFlowSchemaStatus(&fs.Status, field.NewPath("status"))
+}
+
 // ValidateFlowSchemaCondition validates condition in the flow-schema's status.
 func ValidateFlowSchemaCondition(condition *flowcontrol.FlowSchemaCondition, fldPath *field.Path) field.ErrorList {
 	var allErrs field.ErrorList
@@ -267,6 +277,11 @@ func ValidatePriorityLevelConfiguration(pl *flowcontrol.PriorityLevelConfigurati
 	allErrs = append(allErrs, ValidatePriorityLevelConfigurationSpec(&pl.Spec, pl.Name, field.NewPath("spec"))...)
 	allErrs = append(allErrs, ValidatePriorityLevelConfigurationStatus(&pl.Status, field.NewPath("status"))...)
 	return allErrs
+}
+
+// ValidatePriorityLevelConfigurationUpdate validates the update of priority-level-configuration.
+func ValidatePriorityLevelConfigurationUpdate(old, pl *flowcontrol.PriorityLevelConfiguration) field.ErrorList {
+	return ValidatePriorityLevelConfiguration(pl)
 }
 
 // ValidatePriorityLevelConfigurationSpec validates priority-level-configuration's spec.
@@ -331,6 +346,11 @@ func ValidatePriorityLevelConfigurationStatus(status *flowcontrol.PriorityLevelC
 		allErrs = append(allErrs, ValidatePriorityLevelConfigurationCondition(&condition, fldPath.Child("conditions").Index(i))...)
 	}
 	return allErrs
+}
+
+// ValidatePriorityLevelConfigurationStatusUpdate validates the update of priority-level-configuration's status.
+func ValidatePriorityLevelConfigurationStatusUpdate(old, pl *flowcontrol.PriorityLevelConfiguration) field.ErrorList {
+	return ValidatePriorityLevelConfigurationStatus(&pl.Status, field.NewPath("status"))
 }
 
 // ValidatePriorityLevelConfigurationCondition validates condition in priority-level-configuration's status.
