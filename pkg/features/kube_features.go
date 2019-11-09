@@ -335,6 +335,7 @@ const (
 	// owner: @mtaufen
 	// alpha: v1.12
 	// beta:  v1.14
+	// GA: v1.17
 	//
 	// Kubelet uses the new Lease API to report node heartbeats,
 	// (Kube) Node Lifecycle Controller uses these heartbeats as a node health signal.
@@ -555,7 +556,7 @@ var defaultKubernetesFeatureGates = map[featuregate.Feature]featuregate.FeatureS
 	CSIBlockVolume:                 {Default: true, PreRelease: featuregate.Beta},
 	CSIInlineVolume:                {Default: true, PreRelease: featuregate.Beta},
 	RuntimeClass:                   {Default: true, PreRelease: featuregate.Beta},
-	NodeLease:                      {Default: true, PreRelease: featuregate.Beta},
+	NodeLease:                      {Default: true, PreRelease: featuregate.GA, LockToDefault: true},
 	SCTPSupport:                    {Default: false, PreRelease: featuregate.Alpha},
 	VolumeSnapshotDataSource:       {Default: false, PreRelease: featuregate.Alpha},
 	ProcMountType:                  {Default: false, PreRelease: featuregate.Alpha},

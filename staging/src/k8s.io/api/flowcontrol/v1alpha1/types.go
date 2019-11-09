@@ -259,7 +259,7 @@ type NonResourcePolicyRule struct {
 // FlowSchemaStatus represents the current state of a FlowSchema.
 type FlowSchemaStatus struct {
 	// `conditions` is a list of the current states of FlowSchema.
-	// +listType=associative
+	// +listType=map
 	// +listMapKey=type
 	// +optional
 	Conditions []FlowSchemaCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`
@@ -404,7 +404,7 @@ type PriorityLevelConfigurationConditionType string
 // PriorityLevelConfigurationStatus represents the current state of a "request-priority".
 type PriorityLevelConfigurationStatus struct {
 	// `conditions` is the current state of "request-priority".
-	// +listType=associative
+	// +listType=map
 	// +listMapKey=type
 	// +optional
 	Conditions []PriorityLevelConfigurationCondition `json:"conditions,omitempty" protobuf:"bytes,1,rep,name=conditions"`

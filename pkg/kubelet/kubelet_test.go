@@ -161,7 +161,7 @@ func newTestKubeletWithImageList(
 	kubelet.kubeClient = fakeKubeClient
 	kubelet.heartbeatClient = fakeKubeClient
 	kubelet.os = &containertest.FakeOS{}
-	kubelet.mounter = &mount.FakeMounter{}
+	kubelet.mounter = mount.NewFakeMounter(nil)
 	kubelet.hostutil = hostutil.NewFakeHostUtil(nil)
 	kubelet.subpather = &subpath.FakeSubpath{}
 

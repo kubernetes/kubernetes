@@ -106,6 +106,7 @@ func newNodeOptions() *nodeOptions {
 		kubeConfigPath: constants.GetKubeletKubeConfigPath(),
 		dryRun:         false,
 		renewCerts:     true,
+		etcdUpgrade:    true,
 	}
 }
 

@@ -118,7 +118,7 @@ message FlowSchemaSpec {
 // FlowSchemaStatus represents the current state of a FlowSchema.
 message FlowSchemaStatus {
   // `conditions` is a list of the current states of FlowSchema.
-  // +listType=associative
+  // +listType=map
   // +listMapKey=type
   // +optional
   repeated FlowSchemaCondition conditions = 1;
@@ -262,7 +262,7 @@ message PriorityLevelConfigurationSpec {
 // PriorityLevelConfigurationStatus represents the current state of a "request-priority".
 message PriorityLevelConfigurationStatus {
   // `conditions` is the current state of "request-priority".
-  // +listType=associative
+  // +listType=map
   // +listMapKey=type
   // +optional
   repeated PriorityLevelConfigurationCondition conditions = 1;

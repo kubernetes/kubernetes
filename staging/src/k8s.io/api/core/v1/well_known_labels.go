@@ -24,7 +24,8 @@ const (
 	LabelZoneFailureDomainStable = "topology.kubernetes.io/zone"
 	LabelZoneRegionStable        = "topology.kubernetes.io/region"
 
-	LabelInstanceType = "beta.kubernetes.io/instance-type"
+	LabelInstanceType       = "beta.kubernetes.io/instance-type"
+	LabelInstanceTypeStable = "node.kubernetes.io/instance-type"
 
 	LabelOSStable   = "kubernetes.io/os"
 	LabelArchStable = "kubernetes.io/arch"

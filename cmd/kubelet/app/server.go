@@ -576,13 +576,12 @@ func run(s *options.KubeletServer, kubeDeps *kubelet.Dependencies, stopCh <-chan
 		// make a separate client for heartbeat with throttling disabled and a timeout attached
 		heartbeatClientConfig := *clientConfig
 		heartbeatClientConfig.Timeout = s.KubeletConfiguration.NodeStatusUpdateFrequency.Duration
-		// if the NodeLease feature is enabled, the timeout is the minimum of the lease duration and status update frequency
-		if utilfeature.DefaultFeatureGate.Enabled(features.NodeLease) {
-			leaseTimeout := time.Duration(s.KubeletConfiguration.NodeLeaseDurationSeconds) * time.Second
-			if heartbeatClientConfig.Timeout > leaseTimeout {
-				heartbeatClientConfig.Timeout = leaseTimeout
-			}
+		// The timeout is the minimum of the lease duration and status update frequency
+		leaseTimeout := time.Duration(s.KubeletConfiguration.NodeLeaseDurationSeconds) * time.Second
+		if heartbeatClientConfig.Timeout > leaseTimeout {
+			heartbeatClientConfig.Timeout = leaseTimeout
 		}
+
 		heartbeatClientConfig.QPS = float32(-1)
 		kubeDeps.HeartbeatClient, err = clientset.NewForConfig(&heartbeatClientConfig)
 		if err != nil {

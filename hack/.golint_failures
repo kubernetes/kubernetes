@@ -193,6 +193,7 @@ pkg/registry/core/serviceaccount/storage
 pkg/registry/events/rest
 pkg/registry/extensions/controller/storage
 pkg/registry/extensions/rest
+pkg/registry/flowcontrol/rest
 pkg/registry/networking/networkpolicy/storage
 pkg/registry/networking/rest
 pkg/registry/node/rest

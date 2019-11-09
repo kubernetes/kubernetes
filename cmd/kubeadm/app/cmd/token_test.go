@@ -172,7 +172,7 @@ func TestRunCreateToken(t *testing.T) {
 				},
 			}
 
-			err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "")
+			err = RunCreateToken(&buf, fakeClient, "", cfg, tc.printJoin, "", "")
 			if tc.expectedError && err == nil {
 				t.Error("unexpected success")
 			} else if !tc.expectedError && err != nil {

@@ -28,7 +28,7 @@ func TestTearDownAt(tt *testing.T) {
 	t := harness.For(tt)
 	defer t.Close()
 
-	mounter := &mount.FakeMounter{}
+	mounter := mount.NewFakeMounter(nil)
 
 	plugin, rootDir := testPlugin(t)
 	plugin.runner = fakeRunner(

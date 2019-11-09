@@ -27,7 +27,7 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -234,11 +234,12 @@ func (fake *fakeDiskManager) ExpandImage(rbdExpander *rbdVolumeExpander, oldSize
 
 // checkMounterLog checks fakeMounter must have expected logs, and the last action msut equal to expectedAction.
 func checkMounterLog(t *testing.T, fakeMounter *mount.FakeMounter, expected int, expectedAction mount.FakeAction) {
-	if len(fakeMounter.Log) != expected {
-		t.Fatalf("fakeMounter should have %d logs, actual: %d", expected, len(fakeMounter.Log))
+	log := fakeMounter.GetLog()
+	if len(log) != expected {
+		t.Fatalf("fakeMounter should have %d logs, actual: %d", expected, len(log))
 	}
-	lastIndex := len(fakeMounter.Log) - 1
-	lastAction := fakeMounter.Log[lastIndex]
+	lastIndex := len(log) - 1
+	lastAction := log[lastIndex]
 	if !reflect.DeepEqual(expectedAction, lastAction) {
 		t.Fatalf("fakeMounter.Log[%d] should be %#v, not: %#v", lastIndex, expectedAction, lastAction)
 	}

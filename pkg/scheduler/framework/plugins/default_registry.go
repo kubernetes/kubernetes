@@ -241,6 +241,11 @@ func NewDefaultConfigProducerRegistry() *ConfigProducerRegistry {
 			plugins.Score = appendToPluginSet(plugins.Score, imagelocality.Name, &args.Weight)
 			return
 		})
+	registry.RegisterPriority(priorities.InterPodAffinityPriority,
+		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
+			plugins.Score = appendToPluginSet(plugins.Score, interpodaffinity.Name, &args.Weight)
+			return
+		})
 	registry.RegisterPriority(priorities.NodePreferAvoidPodsPriority,
 		func(args ConfigProducerArgs) (plugins config.Plugins, pluginConfig []config.PluginConfig) {
 			plugins.Score = appendToPluginSet(plugins.Score, nodepreferavoidpods.Name, &args.Weight)

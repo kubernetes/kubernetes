@@ -302,7 +302,7 @@ func newTestVolumeManager(tmpDir string, podManager kubepod.Manager, kubeClient 
 		kubeClient,
 		plugMgr,
 		&containertest.FakeRuntime{},
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		"",
 		fakeRecorder,

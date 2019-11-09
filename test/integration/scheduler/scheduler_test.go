@@ -129,9 +129,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"kind" : "Policy",
 				"apiVersion" : "v1"
 			}`,
-			expectedPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			expectedPrioritizers: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -152,6 +150,7 @@ func TestSchedulerCreationFromConfigMap(t *testing.T) {
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
+					{Name: "InterPodAffinity", Weight: 1},
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeAffinity", Weight: 1},
 					{Name: "NodePreferAvoidPods", Weight: 10000},
@@ -207,9 +206,7 @@ priorities:
 			policy: `apiVersion: v1
 kind: Policy
 `,
-			expectedPrioritizers: sets.NewString(
-				"InterPodAffinityPriority",
-			),
+			expectedPrioritizers: sets.NewString(),
 			expectedPlugins: map[string][]kubeschedulerconfig.Plugin{
 				"FilterPlugin": {
 					{Name: "NodeUnschedulable"},
@@ -230,6 +227,7 @@ kind: Policy
 				"ScorePlugin": {
 					{Name: "NodeResourcesBalancedAllocation", Weight: 1},
 					{Name: "ImageLocality", Weight: 1},
+					{Name: "InterPodAffinity", Weight: 1},
 					{Name: "NodeResourcesLeastAllocated", Weight: 1},
 					{Name: "NodeAffinity", Weight: 1},
 					{Name: "NodePreferAvoidPods", Weight: 10000},

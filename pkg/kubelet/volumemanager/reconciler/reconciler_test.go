@@ -84,7 +84,7 @@ func Test_Run_Positive_DoNothing(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -128,7 +128,7 @@ func Test_Run_Positive_VolumeAttachAndMount(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -206,7 +206,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabled(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -285,7 +285,7 @@ func Test_Run_Positive_VolumeAttachMountUnmountDetach(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -375,7 +375,7 @@ func Test_Run_Positive_VolumeUnmountControllerAttachEnabled(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -502,7 +502,7 @@ func Test_Run_Positive_VolumeAttachAndMap(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -608,7 +608,7 @@ func Test_Run_Positive_BlockVolumeMapControllerAttachEnabled(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -709,7 +709,7 @@ func Test_Run_Positive_BlockVolumeAttachMapUnmapDetach(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -823,7 +823,7 @@ func Test_Run_Positive_VolumeUnmapControllerAttachEnabled(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
@@ -1096,7 +1096,7 @@ func Test_Run_Positive_VolumeFSResizeControllerAttachEnabled(t *testing.T) {
 				asw,
 				hasAddedPods,
 				oex,
-				&mount.FakeMounter{},
+				mount.NewFakeMounter(nil),
 				hostutil.NewFakeHostUtil(nil),
 				volumePluginMgr,
 				kubeletPodsDir)
@@ -1278,7 +1278,7 @@ func Test_Run_Positive_VolumeMountControllerAttachEnabledRace(t *testing.T) {
 		asw,
 		hasAddedPods,
 		oex,
-		&mount.FakeMounter{},
+		mount.NewFakeMounter(nil),
 		hostutil.NewFakeHostUtil(nil),
 		volumePluginMgr,
 		kubeletPodsDir)
