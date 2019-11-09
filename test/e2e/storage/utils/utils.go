@@ -112,6 +112,36 @@ func isSudoPresent(nodeIP string, provider string) bool {
 	return false
 }
 
+// getHostAddress gets the node for a pod and returns the first
+// address. Returns an error if the node the pod is on doesn't have an
+// address.
+func getHostAddress(client clientset.Interface, p *v1.Pod) (string, error) {
+	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
+	if err != nil {
+		return "", err
+	}
+	// Try externalAddress first
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeExternalIP {
+			if address.Address != "" {
+				return address.Address, nil
+			}
+		}
+	}
+	// If no externalAddress found, try internalAddress
+	for _, address := range node.Status.Addresses {
+		if address.Type == v1.NodeInternalIP {
+			if address.Address != "" {
+				return address.Address, nil
+			}
+		}
+	}
+
+	// If not found, return error
+	return "", fmt.Errorf("No address for pod %v on node %v",
+		p.Name, p.Spec.NodeName)
+}
+
 // KubeletCommand performs `start`, `restart`, or `stop` on the kubelet running on the node of the target pod and waits
 // for the desired statues..
 // - First issues the command via `systemctl`
@@ -123,7 +153,7 @@ func KubeletCommand(kOp KubeletOpt, c clientset.Interface, pod *v1.Pod) {
 	systemctlPresent := false
 	kubeletPid := ""
 
-	nodeIP, err := framework.GetHostAddress(c, pod)
+	nodeIP, err := getHostAddress(c, pod)
 	framework.ExpectNoError(err)
 	nodeIP = nodeIP + ":22"
 
@@ -239,7 +269,7 @@ func TestKubeletRestartsAndRestoresMap(c clientset.Interface, f *framework.Frame
 // forceDelete is true indicating whether the pod is forcefully deleted.
 // checkSubpath is true indicating whether the subpath should be checked.
 func TestVolumeUnmountsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool, checkSubpath bool) {
-	nodeIP, err := framework.GetHostAddress(c, clientPod)
+	nodeIP, err := getHostAddress(c, clientPod)
 	framework.ExpectNoError(err)
 	nodeIP = nodeIP + ":22"
 
@@ -315,7 +345,7 @@ func TestVolumeUnmountsFromForceDeletedPod(c clientset.Interface, f *framework.F
 // TestVolumeUnmapsFromDeletedPodWithForceOption tests that a volume unmaps if the client pod was deleted while the kubelet was down.
 // forceDelete is true indicating whether the pod is forcefully deleted.
 func TestVolumeUnmapsFromDeletedPodWithForceOption(c clientset.Interface, f *framework.Framework, clientPod *v1.Pod, forceDelete bool) {
-	nodeIP, err := framework.GetHostAddress(c, clientPod)
+	nodeIP, err := getHostAddress(c, clientPod)
 	framework.ExpectNoError(err, "Failed to get nodeIP.")
 	nodeIP = nodeIP + ":22"
 

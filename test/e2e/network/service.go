@@ -120,6 +120,17 @@ func restartKubeProxy(host string) error {
 	return nil
 }
 
+// waitForApiserverUp waits for the kube-apiserver to be up.
+func waitForApiserverUp(c clientset.Interface) error {
+	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
+		body, err := c.CoreV1().RESTClient().Get().AbsPath("/healthz").Do().Raw()
+		if err == nil && string(body) == "ok" {
+			return nil
+		}
+	}
+	return fmt.Errorf("waiting for apiserver timed out")
+}
+
 var _ = SIGDescribe("Services", func() {
 	f := framework.NewDefaultFramework("services")
 
@@ -542,7 +553,7 @@ var _ = SIGDescribe("Services", func() {
 			framework.Failf("error restarting apiserver: %v", err)
 		}
 		ginkgo.By("Waiting for apiserver to come up by polling /healthz")
-		if err := framework.WaitForApiserverUp(cs); err != nil {
+		if err := waitForApiserverUp(cs); err != nil {
 			framework.Failf("error while waiting for apiserver up: %v", err)
 		}
 		framework.ExpectNoError(e2eservice.VerifyServeHostnameServiceUp(cs, ns, host, podNames1, svc1IP, servicePort))

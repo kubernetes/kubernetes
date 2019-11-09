@@ -31,7 +31,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -1640,21 +1639,6 @@ func RestartKubelet(host string) error {
 	return nil
 }
 
-// WaitForKubeletUp waits for the kubelet on the given host to be up.
-func WaitForKubeletUp(host string) error {
-	cmd := "curl http://localhost:" + strconv.Itoa(ports.KubeletReadOnlyPort) + "/healthz"
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		result, err := e2essh.SSH(cmd, host, TestContext.Provider)
-		if err != nil || result.Code != 0 {
-			e2essh.LogResult(result)
-		}
-		if result.Stdout == "ok" {
-			return nil
-		}
-	}
-	return fmt.Errorf("waiting for kubelet timed out")
-}
-
 // RestartApiserver restarts the kube-apiserver.
 func RestartApiserver(cs clientset.Interface) error {
 	// TODO: Make it work for all providers.
@@ -1697,17 +1681,6 @@ func sshRestartMaster() error {
 		return fmt.Errorf("couldn't restart apiserver: %v", err)
 	}
 	return nil
-}
-
-// WaitForApiserverUp waits for the kube-apiserver to be up.
-func WaitForApiserverUp(c clientset.Interface) error {
-	for start := time.Now(); time.Since(start) < time.Minute; time.Sleep(5 * time.Second) {
-		body, err := c.CoreV1().RESTClient().Get().AbsPath("/healthz").Do().Raw()
-		if err == nil && string(body) == "ok" {
-			return nil
-		}
-	}
-	return fmt.Errorf("waiting for apiserver timed out")
 }
 
 // waitForApiserverRestarted waits until apiserver's restart count increased.
@@ -1778,101 +1751,6 @@ func WaitForControllerManagerUp() error {
 		}
 	}
 	return fmt.Errorf("waiting for controller-manager timed out")
-}
-
-// GenerateMasterRegexp returns a regex for matching master node name.
-func GenerateMasterRegexp(prefix string) string {
-	return prefix + "(-...)?"
-}
-
-// WaitForMasters waits until the cluster has the desired number of ready masters in it.
-func WaitForMasters(masterPrefix string, c clientset.Interface, size int, timeout time.Duration) error {
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(20 * time.Second) {
-		nodes, err := c.CoreV1().Nodes().List(metav1.ListOptions{})
-		if err != nil {
-			Logf("Failed to list nodes: %v", err)
-			continue
-		}
-
-		// Filter out nodes that are not master replicas
-		e2enode.Filter(nodes, func(node v1.Node) bool {
-			res, err := regexp.Match(GenerateMasterRegexp(masterPrefix), ([]byte)(node.Name))
-			if err != nil {
-				Logf("Failed to match regexp to node name: %v", err)
-				return false
-			}
-			return res
-		})
-
-		numNodes := len(nodes.Items)
-
-		// Filter out not-ready nodes.
-		e2enode.Filter(nodes, func(node v1.Node) bool {
-			return e2enode.IsConditionSetAsExpected(&node, v1.NodeReady, true)
-		})
-
-		numReady := len(nodes.Items)
-
-		if numNodes == size && numReady == size {
-			Logf("Cluster has reached the desired number of masters %d", size)
-			return nil
-		}
-		Logf("Waiting for the number of masters %d, current %d, not ready master nodes %d", size, numNodes, numNodes-numReady)
-	}
-	return fmt.Errorf("timeout waiting %v for the number of masters to be %d", timeout, size)
-}
-
-// GetHostExternalAddress gets the node for a pod and returns the first External
-// address. Returns an error if the node the pod is on doesn't have an External
-// address.
-func GetHostExternalAddress(client clientset.Interface, p *v1.Pod) (externalAddress string, err error) {
-	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-	for _, address := range node.Status.Addresses {
-		if address.Type == v1.NodeExternalIP {
-			if address.Address != "" {
-				externalAddress = address.Address
-				break
-			}
-		}
-	}
-	if externalAddress == "" {
-		err = fmt.Errorf("No external address for pod %v on node %v",
-			p.Name, p.Spec.NodeName)
-	}
-	return
-}
-
-// GetHostAddress gets the node for a pod and returns the first
-// address. Returns an error if the node the pod is on doesn't have an
-// address.
-func GetHostAddress(client clientset.Interface, p *v1.Pod) (string, error) {
-	node, err := client.CoreV1().Nodes().Get(p.Spec.NodeName, metav1.GetOptions{})
-	if err != nil {
-		return "", err
-	}
-	// Try externalAddress first
-	for _, address := range node.Status.Addresses {
-		if address.Type == v1.NodeExternalIP {
-			if address.Address != "" {
-				return address.Address, nil
-			}
-		}
-	}
-	// If no externalAddress found, try internalAddress
-	for _, address := range node.Status.Addresses {
-		if address.Type == v1.NodeInternalIP {
-			if address.Address != "" {
-				return address.Address, nil
-			}
-		}
-	}
-
-	// If not found, return error
-	return "", fmt.Errorf("No address for pod %v on node %v",
-		p.Name, p.Spec.NodeName)
 }
 
 type extractRT struct {
@@ -2236,43 +2114,6 @@ func CreateEmptyFileOnPod(namespace string, podName string, filePath string) err
 	return err
 }
 
-// PrintSummaries prints summaries of tests.
-func PrintSummaries(summaries []TestDataSummary, testBaseName string) {
-	now := time.Now()
-	for i := range summaries {
-		Logf("Printing summary: %v", summaries[i].SummaryKind())
-		switch TestContext.OutputPrintType {
-		case "hr":
-			if TestContext.ReportDir == "" {
-				Logf(summaries[i].PrintHumanReadable())
-			} else {
-				// TODO: learn to extract test name and append it to the kind instead of timestamp.
-				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".txt")
-				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintHumanReadable()), 0644); err != nil {
-					Logf("Failed to write file %v with test performance data: %v", filePath, err)
-				}
-			}
-		case "json":
-			fallthrough
-		default:
-			if TestContext.OutputPrintType != "json" {
-				Logf("Unknown output type: %v. Printing JSON", TestContext.OutputPrintType)
-			}
-			if TestContext.ReportDir == "" {
-				Logf("%v JSON\n%v", summaries[i].SummaryKind(), summaries[i].PrintJSON())
-				Logf("Finished")
-			} else {
-				// TODO: learn to extract test name and append it to the kind instead of timestamp.
-				filePath := path.Join(TestContext.ReportDir, summaries[i].SummaryKind()+"_"+testBaseName+"_"+now.Format(time.RFC3339)+".json")
-				Logf("Writing to %s", filePath)
-				if err := ioutil.WriteFile(filePath, []byte(summaries[i].PrintJSON()), 0644); err != nil {
-					Logf("Failed to write file %v with test performance data: %v", filePath, err)
-				}
-			}
-		}
-	}
-}
-
 // DumpDebugInfo dumps debug info of tests.
 func DumpDebugInfo(c clientset.Interface, ns string) {
 	sl, _ := c.CoreV1().Pods(ns).List(metav1.ListOptions{LabelSelector: labels.Everything().String()})
@@ -2324,22 +2165,6 @@ func DsFromManifest(url string) (*appsv1.DaemonSet, error) {
 		return nil, fmt.Errorf("Failed to decode DaemonSet spec: %v", err)
 	}
 	return &ds, nil
-}
-
-// WaitForPersistentVolumeClaimDeleted waits for a PersistentVolumeClaim to be removed from the system until timeout occurs, whichever comes first.
-func WaitForPersistentVolumeClaimDeleted(c clientset.Interface, ns string, pvcName string, Poll, timeout time.Duration) error {
-	Logf("Waiting up to %v for PersistentVolumeClaim %s to be removed", timeout, pvcName)
-	for start := time.Now(); time.Since(start) < timeout; time.Sleep(Poll) {
-		_, err := c.CoreV1().PersistentVolumeClaims(ns).Get(pvcName, metav1.GetOptions{})
-		if err != nil {
-			if apierrs.IsNotFound(err) {
-				Logf("Claim %q in namespace %q doesn't exist in the system", pvcName, ns)
-				return nil
-			}
-			Logf("Failed to get claim %q in namespace %q, retrying in %v. Error: %v", pvcName, ns, Poll, err)
-		}
-	}
-	return fmt.Errorf("PersistentVolumeClaim %s is not removed from the system within %v", pvcName, timeout)
 }
 
 // GetClusterZones returns the values of zone label collected from all nodes.
