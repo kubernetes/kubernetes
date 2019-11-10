@@ -27,7 +27,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1.ValidatingWebhook) {
+func SetDefaultsValidatingWebhook(obj *admissionregistrationv1.ValidatingWebhook) {
 	if obj.FailurePolicy == nil {
 		policy := admissionregistrationv1.Fail
 		obj.FailurePolicy = &policy
@@ -50,7 +50,7 @@ func SetDefaults_ValidatingWebhook(obj *admissionregistrationv1.ValidatingWebhoo
 	}
 }
 
-func SetDefaults_MutatingWebhook(obj *admissionregistrationv1.MutatingWebhook) {
+func SetDefaultsMutatingWebhook(obj *admissionregistrationv1.MutatingWebhook) {
 	if obj.FailurePolicy == nil {
 		policy := admissionregistrationv1.Fail
 		obj.FailurePolicy = &policy
@@ -77,7 +77,7 @@ func SetDefaults_MutatingWebhook(obj *admissionregistrationv1.MutatingWebhook) {
 	}
 }
 
-func SetDefaults_Rule(obj *admissionregistrationv1.Rule) {
+func SetDefaultsRule(obj *admissionregistrationv1.Rule) {
 	if obj.Scope == nil {
 		s := admissionregistrationv1.AllScopes
 		obj.Scope = &s
@@ -85,7 +85,7 @@ func SetDefaults_Rule(obj *admissionregistrationv1.Rule) {
 }
 
 // SetDefaults_ServiceReference sets defaults for Webhook's ServiceReference
-func SetDefaults_ServiceReference(obj *admissionregistrationv1.ServiceReference) {
+func SetDefaultsServiceReference(obj *admissionregistrationv1.ServiceReference) {
 	if obj.Port == nil {
 		obj.Port = utilpointer.Int32Ptr(443)
 	}
