@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/validation"
@@ -32,6 +32,7 @@ import (
 const isNegativeErrorMsg string = `must be greater than or equal to 0`
 const isNotIntegerErrorMsg string = `must be an integer`
 
+// ValidateResourceRequirements validates ResourceRequirements and returns an ErrorList with any errors.
 func ValidateResourceRequirements(requirements *v1.ResourceRequirements, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	limPath := fldPath.Child("limits")
@@ -81,7 +82,7 @@ func validateContainerResourceName(value string, fldPath *field.Path) field.Erro
 	return allErrs
 }
 
-// ValidateResourceQuantityValue enforces that specified quantity is valid for specified resource
+// ValidateResourceQuantityValue enforces that specified quantity is valid for specified resource.
 func ValidateResourceQuantityValue(resource string, value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, ValidateNonnegativeQuantity(value, fldPath)...)
@@ -93,7 +94,7 @@ func ValidateResourceQuantityValue(resource string, value resource.Quantity, fld
 	return allErrs
 }
 
-// Validates that a Quantity is not negative
+// ValidateNonnegativeQuantity validates that a Quantity is not negative.
 func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value.Cmp(resource.Quantity{}) < 0 {
@@ -122,6 +123,7 @@ func validateResourceName(value string, fldPath *field.Path) field.ErrorList {
 	return allErrs
 }
 
+// ValidatePodLogOptions validates PodLogOptions and returns an ErrorList with any errors.
 func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if opts.TailLines != nil && *opts.TailLines < 0 {
@@ -141,6 +143,8 @@ func ValidatePodLogOptions(opts *v1.PodLogOptions) field.ErrorList {
 	return allErrs
 }
 
+// AccumulateUniqueHostPorts extracts each HostPort of each Container,
+// accumulating the results and returns an ErrorList with any errors.
 func AccumulateUniqueHostPorts(containers []v1.Container, accumulator *sets.String, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 

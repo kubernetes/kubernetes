@@ -92,22 +92,27 @@ func IsOvercommitAllowed(name v1.ResourceName) bool {
 		!IsHugePageResourceName(name)
 }
 
+// IsAttachableVolumeResourceName returns true if the resource has the
+// ResourceAttachableVolumesPrefix prefix.
 func IsAttachableVolumeResourceName(name v1.ResourceName) bool {
 	return strings.HasPrefix(string(name), v1.ResourceAttachableVolumesPrefix)
 }
 
-// Extended and Hugepages resources
+// IsScalarResourceName returns true if any of IsExtendedResourceName,
+// IsHugePageResourceName, IsPrefixedNativeResource or IsAttachableVolumeResourceName
+// returns true.
 func IsScalarResourceName(name v1.ResourceName) bool {
 	return IsExtendedResourceName(name) || IsHugePageResourceName(name) ||
 		IsPrefixedNativeResource(name) || IsAttachableVolumeResourceName(name)
 }
 
-// this function aims to check if the service's ClusterIP is set or not
-// the objective is not to perform validation here
+// IsServiceIPSet aims to check if the service's ClusterIP is set or not
+// the objective is not to perform validation here.
 func IsServiceIPSet(service *v1.Service) bool {
 	return service.Spec.ClusterIP != v1.ClusterIPNone && service.Spec.ClusterIP != ""
 }
 
+// LoadBalancerStatusEqual returns true if the LoadBalancerStatuses are equal.
 // TODO: make method on LoadBalancerStatus?
 func LoadBalancerStatusEqual(l, r *v1.LoadBalancerStatus) bool {
 	return ingressSliceEqual(l.Ingress, r.Ingress)
@@ -152,7 +157,8 @@ func GetAccessModesAsString(modes []v1.PersistentVolumeAccessMode) string {
 	return strings.Join(modesStr, ",")
 }
 
-// GetAccessModesAsString returns an array of AccessModes from a string created by GetAccessModesAsString
+// GetAccessModesFromString returns an array of PersistentVolumeAccessModes from a string
+// created by GetAccessModesAsString.
 func GetAccessModesFromString(modes string) []v1.PersistentVolumeAccessMode {
 	strmodes := strings.Split(modes, ",")
 	accessModes := []v1.PersistentVolumeAccessMode{}
@@ -170,7 +176,7 @@ func GetAccessModesFromString(modes string) []v1.PersistentVolumeAccessMode {
 	return accessModes
 }
 
-// removeDuplicateAccessModes returns an array of access modes without any duplicates
+// removeDuplicateAccessModes returns an array of access modes without any duplicates.
 func removeDuplicateAccessModes(modes []v1.PersistentVolumeAccessMode) []v1.PersistentVolumeAccessMode {
 	accessModes := []v1.PersistentVolumeAccessMode{}
 	for _, m := range modes {
@@ -256,7 +262,7 @@ func NodeSelectorRequirementsAsFieldSelector(nsm []v1.NodeSelectorRequirement) (
 	return fields.AndSelectors(selectors...), nil
 }
 
-// NodeSelectorRequirementKeysExistInNodeSelectorTerms checks if a NodeSelectorTerm with key is already specified in terms
+// NodeSelectorRequirementKeysExistInNodeSelectorTerms checks if a NodeSelectorTerm with key is already specified in terms.
 func NodeSelectorRequirementKeysExistInNodeSelectorTerms(reqs []v1.NodeSelectorRequirement, terms []v1.NodeSelectorTerm) bool {
 	for _, req := range reqs {
 		for _, term := range terms {
@@ -413,7 +419,8 @@ func TolerationsTolerateTaintsWithFilter(tolerations []v1.Toleration, taints []v
 	return true
 }
 
-// Returns true and list of Tolerations matching all Taints if all are tolerated, or false otherwise.
+// GetMatchingTolerations returns true and list of Tolerations matching all Taints if all are tolerated,
+// or false otherwise.
 func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (bool, []v1.Toleration) {
 	if len(taints) == 0 {
 		return true, []v1.Toleration{}
@@ -438,6 +445,7 @@ func GetMatchingTolerations(taints []v1.Taint, tolerations []v1.Toleration) (boo
 	return true, result
 }
 
+// GetAvoidPodsFromNodeAnnotations returns AvoidPods from annotations or an error if the JSON parsing fails.
 func GetAvoidPodsFromNodeAnnotations(annotations map[string]string) (v1.AvoidPods, error) {
 	var avoidPods v1.AvoidPods
 	if len(annotations) > 0 && annotations[v1.PreferAvoidPodsAnnotationKey] != "" {
