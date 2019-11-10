@@ -745,7 +745,9 @@ func TestPodContainerDeviceAllocation(t *testing.T) {
 				testCase.description, testCase.expErr, err)
 		}
 		runContainerOpts, err := testManager.GetDeviceRunContainerOptions(pod, &pod.Spec.Containers[0])
-		as.Nil(err)
+		if testCase.expErr == nil {
+			as.Nil(err)
+		}
 		if testCase.expectedContainerOptsLen == nil {
 			as.Nil(runContainerOpts)
 		} else {
