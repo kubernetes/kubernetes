@@ -70,17 +70,17 @@ func getDiskLinkByDevName(io ioHandler, devLinkPath, devName string) (string, er
 }
 
 func scsiHostRescan(io ioHandler, exec mount.Exec) {
-	scsi_path := "/sys/class/scsi_host/"
-	if dirs, err := io.ReadDir(scsi_path); err == nil {
+	scsipath := "/sys/class/scsi_host/"
+	if dirs, err := io.ReadDir(scsipath); err == nil {
 		for _, f := range dirs {
-			name := scsi_path + f.Name() + "/scan"
+			name := scsipath + f.Name() + "/scan"
 			data := []byte("- - -")
 			if err = io.WriteFile(name, data, 0666); err != nil {
 				klog.Warningf("failed to rescan scsi host %s", name)
 			}
 		}
 	} else {
-		klog.Warningf("failed to read %s, err %v", scsi_path, err)
+		klog.Warningf("failed to read %s, err %v", scsipath, err)
 	}
 }
 
