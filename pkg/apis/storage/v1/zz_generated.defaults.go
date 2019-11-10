@@ -38,7 +38,7 @@ func RegisterDefaults(scheme *runtime.Scheme) error {
 }
 
 func SetObjectDefaults_StorageClass(in *v1.StorageClass) {
-	SetDefaults_StorageClass(in)
+	SetDefaultsStorageClass(in)
 }
 
 func SetObjectDefaults_StorageClassList(in *v1.StorageClassList) {

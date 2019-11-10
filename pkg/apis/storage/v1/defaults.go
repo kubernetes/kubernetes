@@ -26,7 +26,7 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-func SetDefaults_StorageClass(obj *storagev1.StorageClass) {
+func SetDefaultsStorageClass(obj *storagev1.StorageClass) {
 	if obj.ReclaimPolicy == nil {
 		obj.ReclaimPolicy = new(v1.PersistentVolumeReclaimPolicy)
 		*obj.ReclaimPolicy = v1.PersistentVolumeReclaimDelete
