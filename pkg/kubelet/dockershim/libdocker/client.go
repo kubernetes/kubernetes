@@ -27,16 +27,21 @@ import (
 )
 
 const (
+	// MinimumDockerAPIVersion is the lower docker version acceptable
 	// https://docs.docker.com/engine/reference/api/docker_remote_api/
-	// docker version should be at least 1.13.1
+	// docker version should be at least this high
 	MinimumDockerAPIVersion = "1.26.0"
 
-	// Status of a container returned by ListContainers.
-	StatusRunningPrefix = "Up"
-	StatusCreatedPrefix = "Created"
-	StatusExitedPrefix  = "Exited"
+	// Constants for the prefix for a status of a container returned by ListContainers.
 
-	// Fake docker endpoint
+	// StatusRunningPrefix is the prefix that the status has when the a container is running
+	StatusRunningPrefix = "Up"
+	// StatusCreatedPrefix is the prefix that the status has when the a container is first created
+	StatusCreatedPrefix = "Created"
+	// StatusExitedPrefix is the prefix that the status has when the a container is exited
+	StatusExitedPrefix = "Exited"
+
+	// FakeDockerEndpoint is used to know when to return a fake docker client instead of a real one
 	FakeDockerEndpoint = "fake://"
 )
 

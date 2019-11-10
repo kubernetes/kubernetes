@@ -112,7 +112,6 @@ pkg/kubelet/config
 pkg/kubelet/container
 pkg/kubelet/container/testing
 pkg/kubelet/dockershim
-pkg/kubelet/dockershim/libdocker
 pkg/kubelet/dockershim/network
 pkg/kubelet/dockershim/network/cni/testing
 pkg/kubelet/dockershim/network/hostport

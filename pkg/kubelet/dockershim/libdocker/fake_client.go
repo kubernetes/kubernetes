@@ -33,10 +33,11 @@ import (
 	dockercontainer "github.com/docker/docker/api/types/container"
 	dockerimagetypes "github.com/docker/docker/api/types/image"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/clock"
 )
 
+// CalledDetail is a struct that stores the information aobut a call that's been made to the fake client
 type CalledDetail struct {
 	name      string
 	arguments []interface{}
@@ -90,6 +91,7 @@ const (
 	dockerNamePrefix = "/"
 )
 
+// NewFakeDockerClient creates a new instance of the fake docker client
 func NewFakeDockerClient() *FakeDockerClient {
 	return &FakeDockerClient{
 		// Docker's API version does not include the patch number.
@@ -106,6 +108,7 @@ func NewFakeDockerClient() *FakeDockerClient {
 	}
 }
 
+// WithClock sets the clock that's being used by the fake
 func (f *FakeDockerClient) WithClock(c clock.Clock) *FakeDockerClient {
 	f.Lock()
 	defer f.Unlock()
@@ -113,6 +116,7 @@ func (f *FakeDockerClient) WithClock(c clock.Clock) *FakeDockerClient {
 	return f
 }
 
+// WithVersion is a fake implementation of WithVersion for a real docker client
 func (f *FakeDockerClient) WithVersion(version, apiVersion string) *FakeDockerClient {
 	f.Lock()
 	defer f.Unlock()
@@ -120,6 +124,7 @@ func (f *FakeDockerClient) WithVersion(version, apiVersion string) *FakeDockerCl
 	return f
 }
 
+// WithTraceDisabled disables tracing for the fake
 func (f *FakeDockerClient) WithTraceDisabled() *FakeDockerClient {
 	f.Lock()
 	defer f.Unlock()
@@ -127,6 +132,7 @@ func (f *FakeDockerClient) WithTraceDisabled() *FakeDockerClient {
 	return f
 }
 
+// WithRandSource sets the random source that will be used by the fake
 func (f *FakeDockerClient) WithRandSource(source rand.Source) *FakeDockerClient {
 	f.Lock()
 	defer f.Unlock()
@@ -162,12 +168,14 @@ func (f *FakeDockerClient) appendContainerTrace(traceCategory string, containerN
 	}
 }
 
+// InjectError injects an error into the fake client to simulate an error in a real client
 func (f *FakeDockerClient) InjectError(fn string, err error) {
 	f.Lock()
 	defer f.Unlock()
 	f.Errors[fn] = err
 }
 
+// InjectErrors injects multiple errors into the fake client to simulate errors in a real client
 func (f *FakeDockerClient) InjectErrors(errs map[string]error) {
 	f.Lock()
 	defer f.Unlock()
@@ -176,12 +184,14 @@ func (f *FakeDockerClient) InjectErrors(errs map[string]error) {
 	}
 }
 
+// ClearErrors clears any errors that have been injected
 func (f *FakeDockerClient) ClearErrors() {
 	f.Lock()
 	defer f.Unlock()
 	f.Errors = map[string]error{}
 }
 
+// ClearCalls clears the calls that have been made to the fake
 func (f *FakeDockerClient) ClearCalls() {
 	f.Lock()
 	defer f.Unlock()
@@ -201,6 +211,7 @@ func (f *FakeDockerClient) getCalledNames() []string {
 	return names
 }
 
+// FakeContainer is a fake data type that represents a container
 // Because the new data type returned by engine-api is too complex to manually initialize, we need a
 // fake container which is easier to initialize.
 type FakeContainer struct {
@@ -244,6 +255,7 @@ func convertFakeContainer(f *FakeContainer) *dockertypes.ContainerJSON {
 	}
 }
 
+// SetFakeContainers adds fake containers to the fake client
 func (f *FakeDockerClient) SetFakeContainers(containers []*FakeContainer) {
 	f.Lock()
 	defer f.Unlock()
@@ -270,6 +282,7 @@ func (f *FakeDockerClient) SetFakeContainers(containers []*FakeContainer) {
 	}
 }
 
+// SetFakeRunningContainers adds fake containers to the client in the running state
 func (f *FakeDockerClient) SetFakeRunningContainers(containers []*FakeContainer) {
 	for _, c := range containers {
 		c.Running = true
@@ -277,6 +290,7 @@ func (f *FakeDockerClient) SetFakeRunningContainers(containers []*FakeContainer)
 	f.SetFakeContainers(containers)
 }
 
+// AssertCalls checks that a list of calls have been made to the fake client but does not check the arguments
 func (f *FakeDockerClient) AssertCalls(calls []string) (err error) {
 	f.Lock()
 	defer f.Unlock()
@@ -288,6 +302,7 @@ func (f *FakeDockerClient) AssertCalls(calls []string) (err error) {
 	return
 }
 
+// AssertCallDetails checks that a list of calls have been made and makes sure that the arguments match as well
 func (f *FakeDockerClient) AssertCallDetails(calls ...CalledDetail) (err error) {
 	f.Lock()
 	defer f.Unlock()
@@ -308,6 +323,7 @@ func (f *FakeDockerClient) idsToNames(ids []string) ([]string, error) {
 	return names, nil
 }
 
+// AssertCreatedByNameWithOrder checks that containers were created in a certain order by their names
 func (f *FakeDockerClient) AssertCreatedByNameWithOrder(created []string) error {
 	f.Lock()
 	defer f.Unlock()
@@ -321,6 +337,7 @@ func (f *FakeDockerClient) AssertCreatedByNameWithOrder(created []string) error 
 	return nil
 }
 
+// AssertCreatedByName checks that a set of containers were created by their names
 func (f *FakeDockerClient) AssertCreatedByName(created []string) error {
 	f.Lock()
 	defer f.Unlock()
@@ -332,6 +349,7 @@ func (f *FakeDockerClient) AssertCreatedByName(created []string) error {
 	return sortedStringSlicesEqual(created, actualCreated)
 }
 
+// AssertStoppedByName checks that a list of container were stopped by their names
 func (f *FakeDockerClient) AssertStoppedByName(stopped []string) error {
 	f.Lock()
 	defer f.Unlock()
@@ -342,6 +360,7 @@ func (f *FakeDockerClient) AssertStoppedByName(stopped []string) error {
 	return sortedStringSlicesEqual(stopped, actualStopped)
 }
 
+// AssertStopped checks that a list of container were stopped by their ids
 func (f *FakeDockerClient) AssertStopped(stopped []string) error {
 	f.Lock()
 	defer f.Unlock()
@@ -350,6 +369,7 @@ func (f *FakeDockerClient) AssertStopped(stopped []string) error {
 	return sortedStringSlicesEqual(stopped, actualStopped)
 }
 
+// AssertImagesPulled checks that a list a set of images were pulled
 func (f *FakeDockerClient) AssertImagesPulled(pulled []string) error {
 	f.Lock()
 	defer f.Unlock()
@@ -358,6 +378,7 @@ func (f *FakeDockerClient) AssertImagesPulled(pulled []string) error {
 	return sortedStringSlicesEqual(pulled, actualPulled)
 }
 
+// AssertImagesPulledMsgs checks that the messages from pulling image match whats expected
 func (f *FakeDockerClient) AssertImagesPulledMsgs(expected []string) error {
 	f.Lock()
 	defer f.Unlock()
@@ -656,6 +677,7 @@ func (f *FakeDockerClient) StopContainer(id string, timeout time.Duration) error
 	return nil
 }
 
+// RemoveContainer removes a container from the fake client
 func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.ContainerRemoveOptions) error {
 	f.Lock()
 	defer f.Unlock()
@@ -686,6 +708,7 @@ func (f *FakeDockerClient) RemoveContainer(id string, opts dockertypes.Container
 	return fmt.Errorf("container not stopped")
 }
 
+// UpdateContainerResources is the fake implementation of the same call in a real client
 func (f *FakeDockerClient) UpdateContainerResources(id string, updateConfig dockercontainer.UpdateConfig) error {
 	return nil
 }
@@ -700,11 +723,12 @@ func (f *FakeDockerClient) Logs(id string, opts dockertypes.ContainerLogsOptions
 }
 
 func (f *FakeDockerClient) isAuthorizedForImage(image string, auth dockertypes.AuthConfig) bool {
-	if reqd, exists := f.ImageIDsNeedingAuth[image]; !exists {
+	reqd, exists := f.ImageIDsNeedingAuth[image]
+	if !exists {
 		return true // no auth needed
-	} else {
-		return auth.Username == reqd.Username && auth.Password == reqd.Password
 	}
+
+	return auth.Username == reqd.Username && auth.Password == reqd.Password
 }
 
 // PullImage is a test-spy implementation of Interface.PullImage.
@@ -719,16 +743,17 @@ func (f *FakeDockerClient) PullImage(image string, auth dockertypes.AuthConfig, 
 			return ImageNotFoundError{ID: image}
 		}
 
-		authJson, _ := json.Marshal(auth)
+		authJSON, _ := json.Marshal(auth)
 		inspect := createImageInspectFromRef(image)
 		f.ImageInspects[image] = inspect
-		f.appendPulled(fmt.Sprintf("%s using %s", image, string(authJson)))
+		f.appendPulled(fmt.Sprintf("%s using %s", image, string(authJSON)))
 		f.Images = append(f.Images, *createImageFromImageInspect(*inspect))
 		f.ImagesPulled = append(f.ImagesPulled, image)
 	}
 	return err
 }
 
+// Version gets the version of the fake client
 func (f *FakeDockerClient) Version() (*dockertypes.Version, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -736,10 +761,12 @@ func (f *FakeDockerClient) Version() (*dockertypes.Version, error) {
 	return &v, f.popError("version")
 }
 
+// Info gets the client information stored in the the fake client
 func (f *FakeDockerClient) Info() (*dockertypes.Info, error) {
 	return &f.Information, nil
 }
 
+// CreateExec is a fake implentation of the same call in the real client, the call is stored in the fake with the name "create_exec"
 func (f *FakeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*dockertypes.IDResponse, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -748,6 +775,7 @@ func (f *FakeDockerClient) CreateExec(id string, opts dockertypes.ExecConfig) (*
 	return &dockertypes.IDResponse{ID: "12345678"}, nil
 }
 
+// StartExec is a fake implementation of the same call in the real client, the call is stored in the fake with the name "start_exec"
 func (f *FakeDockerClient) StartExec(startExec string, opts dockertypes.ExecStartCheck, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
@@ -755,6 +783,7 @@ func (f *FakeDockerClient) StartExec(startExec string, opts dockertypes.ExecStar
 	return nil
 }
 
+// AttachToContainer is a fake implemenattion of the call in the real client, the call is stored in the fake with the name "attach"
 func (f *FakeDockerClient) AttachToContainer(id string, opts dockertypes.ContainerAttachOptions, sopts StreamOptions) error {
 	f.Lock()
 	defer f.Unlock()
@@ -762,10 +791,12 @@ func (f *FakeDockerClient) AttachToContainer(id string, opts dockertypes.Contain
 	return nil
 }
 
+// InspectExec is a fake implemenattion of the same call in the real client
 func (f *FakeDockerClient) InspectExec(id string) (*dockertypes.ContainerExecInspect, error) {
 	return f.ExecInspect, f.popError("inspect_exec")
 }
 
+// ListImages is a fake implemenattion of the call in the real client, the call is stored in the fake with the name "list_images"
 func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dockertypes.ImageSummary, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -774,6 +805,7 @@ func (f *FakeDockerClient) ListImages(opts dockertypes.ImageListOptions) ([]dock
 	return f.Images, err
 }
 
+// RemoveImage is a fake implemenattion of the call in the real client, the call is stored in the fake with the name "remove_image"
 func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemoveOptions) ([]dockertypes.ImageDeleteResponseItem, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -790,6 +822,7 @@ func (f *FakeDockerClient) RemoveImage(image string, opts dockertypes.ImageRemov
 	return []dockertypes.ImageDeleteResponseItem{{Deleted: image}}, err
 }
 
+// InjectImages injects a set images into the fake client
 func (f *FakeDockerClient) InjectImages(images []dockertypes.ImageSummary) {
 	f.Lock()
 	defer f.Unlock()
@@ -799,6 +832,7 @@ func (f *FakeDockerClient) InjectImages(images []dockertypes.ImageSummary) {
 	}
 }
 
+// MakeImagesPrivate sets an given auth config for a list of docker images
 func (f *FakeDockerClient) MakeImagesPrivate(images []dockertypes.ImageSummary, auth dockertypes.AuthConfig) {
 	f.Lock()
 	defer f.Unlock()
@@ -807,6 +841,7 @@ func (f *FakeDockerClient) MakeImagesPrivate(images []dockertypes.ImageSummary, 
 	}
 }
 
+// ResetImages clears the stored images in the fake client
 func (f *FakeDockerClient) ResetImages() {
 	f.Lock()
 	defer f.Unlock()
@@ -815,6 +850,7 @@ func (f *FakeDockerClient) ResetImages() {
 	f.ImageIDsNeedingAuth = make(map[string]dockertypes.AuthConfig)
 }
 
+// InjectImageInspects injects images into the client created from a image inspect
 func (f *FakeDockerClient) InjectImageInspects(inspects []dockertypes.ImageInspect) {
 	f.Lock()
 	defer f.Unlock()
@@ -832,6 +868,7 @@ func (f *FakeDockerClient) updateContainerStatus(id, status string) {
 	}
 }
 
+// ResizeExecTTY is a fake implemenattion of the call in the real client, the call is stored in the fake with the name "resize_exec"
 func (f *FakeDockerClient) ResizeExecTTY(id string, height, width uint) error {
 	f.Lock()
 	defer f.Unlock()
@@ -839,6 +876,7 @@ func (f *FakeDockerClient) ResizeExecTTY(id string, height, width uint) error {
 	return nil
 }
 
+// ResizeContainerTTY is a fake implemenattion of the call in the real client, the call is stored in the fake with the name "resize_container"
 func (f *FakeDockerClient) ResizeContainerTTY(id string, height, width uint) error {
 	f.Lock()
 	defer f.Unlock()
@@ -883,6 +921,7 @@ func dockerTimestampToString(t time.Time) string {
 	return t.Format(time.RFC3339Nano)
 }
 
+// ImageHistory gets the history from an image stored in the fake client, the call is logged in the fake client with the name "image_history"
 func (f *FakeDockerClient) ImageHistory(id string) ([]dockerimagetypes.HistoryResponseItem, error) {
 	f.Lock()
 	defer f.Unlock()
@@ -891,6 +930,7 @@ func (f *FakeDockerClient) ImageHistory(id string) ([]dockerimagetypes.HistoryRe
 	return history, nil
 }
 
+// InjectImageHistory sets the history image map in the fake client
 func (f *FakeDockerClient) InjectImageHistory(data map[string][]dockerimagetypes.HistoryResponseItem) {
 	f.Lock()
 	defer f.Unlock()
@@ -903,10 +943,12 @@ type FakeDockerPuller struct {
 	client Interface
 }
 
+// Pull pulls\ an image from the fake client that stored in the fake puller
 func (f *FakeDockerPuller) Pull(image string, _ []v1.Secret) error {
 	return f.client.PullImage(image, dockertypes.AuthConfig{}, dockertypes.ImagePullOptions{})
 }
 
+// GetImageRef gets an image that's stored in the fake client by it's ref
 func (f *FakeDockerPuller) GetImageRef(image string) (string, error) {
 	_, err := f.client.InspectImageByRef(image)
 	if err != nil && IsImageNotFoundError(err) {
@@ -915,12 +957,14 @@ func (f *FakeDockerPuller) GetImageRef(image string) (string, error) {
 	return image, err
 }
 
+// InjectContainerStats sets the value for container stats that's stored inside the fake client
 func (f *FakeDockerClient) InjectContainerStats(data map[string]*dockertypes.StatsJSON) {
 	f.Lock()
 	defer f.Unlock()
 	f.ContainerStatsMap = data
 }
 
+// GetContainerStats returns the stored value for container stats and logs the call with the name "get_container_stats"
 func (f *FakeDockerClient) GetContainerStats(id string) (*dockertypes.StatsJSON, error) {
 	f.Lock()
 	defer f.Unlock()
