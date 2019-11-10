@@ -65,7 +65,7 @@ func TestCreate(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory := newConfigurator(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 	factory.Create()
 }
 
@@ -78,7 +78,7 @@ func TestCreateFromConfig(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory := newConfigurator(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
@@ -174,7 +174,7 @@ func TestCreateFromConfigWithHardPodAffinitySymmetricWeight(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory := newConfigurator(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	// Pre-register some predicate and priority functions
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
@@ -215,7 +215,7 @@ func TestCreateFromEmptyConfig(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory := newConfigurator(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	configData = []byte(`{}`)
 	if err := runtime.DecodeInto(scheme.Codecs.UniversalDecoder(), configData, &policy); err != nil {
@@ -232,7 +232,7 @@ func TestCreateFromConfigWithUnspecifiedPredicatesOrPriorities(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory := newConfigurator(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
 	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
@@ -267,7 +267,7 @@ func TestCreateFromConfigWithEmptyPredicatesOrPriorities(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	stopCh := make(chan struct{})
 	defer close(stopCh)
-	factory := newConfigFactory(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
+	factory := newConfigurator(client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh)
 
 	RegisterFitPredicate("PredicateOne", PredicateFunc)
 	RegisterPriorityMapReduceFunction("PriorityOne", PriorityFunc, nil, 1)
@@ -493,7 +493,7 @@ func TestInvalidHardPodAffinitySymmetricWeight(t *testing.T) {
 	client := fake.NewSimpleClientset()
 	// factory of "default-scheduler"
 	stopCh := make(chan struct{})
-	factory := newConfigFactory(client, -1, stopCh)
+	factory := newConfigurator(client, -1, stopCh)
 	defer close(stopCh)
 	_, err := factory.Create()
 	if err == nil {
@@ -524,7 +524,7 @@ func TestInvalidFactoryArgs(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			stopCh := make(chan struct{})
-			factory := newConfigFactory(client, test.hardPodAffinitySymmetricWeight, stopCh)
+			factory := newConfigurator(client, test.hardPodAffinitySymmetricWeight, stopCh)
 			defer close(stopCh)
 			_, err := factory.Create()
 			if err == nil {
@@ -535,41 +535,43 @@ func TestInvalidFactoryArgs(t *testing.T) {
 
 }
 
-func newConfigFactoryWithFrameworkRegistry(
+func newConfiguratorWithFrameworkRegistry(
 	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{},
 	registry framework.Registry, pluginConfigProducerRegistry *frameworkplugins.ConfigProducerRegistry) *Configurator {
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
-	return NewConfigFactory(&ConfigFactoryArgs{
+	configurator := &Configurator{
 		Client:                         client,
 		InformerFactory:                informerFactory,
-		NodeInformer:                   informerFactory.Core().V1().Nodes(),
-		PodInformer:                    informerFactory.Core().V1().Pods(),
-		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
-		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
-		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
-		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
-		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
-		ServiceInformer:                informerFactory.Core().V1().Services(),
-		PdbInformer:                    informerFactory.Policy().V1beta1().PodDisruptionBudgets(),
-		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-		CSINodeInformer:                informerFactory.Storage().V1beta1().CSINodes(),
+		NodeLister:                     informerFactory.Core().V1().Nodes().Lister(),
+		PodLister:                      informerFactory.Core().V1().Pods().Lister(),
+		PVLister:                       informerFactory.Core().V1().PersistentVolumes().Lister(),
+		PVCLister:                      informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+		ControllerLister:               informerFactory.Core().V1().ReplicationControllers().Lister(),
+		ReplicaSetLister:               informerFactory.Apps().V1().ReplicaSets().Lister(),
+		StatefulSetLister:              informerFactory.Apps().V1().StatefulSets().Lister(),
+		ServiceLister:                  informerFactory.Core().V1().Services().Lister(),
+		PdbLister:                      informerFactory.Policy().V1beta1().PodDisruptionBudgets().Lister(),
+		StorageClassLister:             informerFactory.Storage().V1().StorageClasses().Lister(),
+		CSINodeLister:                  informerFactory.Storage().V1beta1().CSINodes().Lister(),
 		HardPodAffinitySymmetricWeight: hardPodAffinitySymmetricWeight,
 		DisablePreemption:              disablePodPreemption,
 		PercentageOfNodesToScore:       schedulerapi.DefaultPercentageOfNodesToScore,
 		BindTimeoutSeconds:             bindTimeoutSeconds,
 		PodInitialBackoffSeconds:       podInitialBackoffDurationSeconds,
 		PodMaxBackoffSeconds:           podMaxBackoffDurationSeconds,
-		StopCh:                         stopCh,
+		StopEverything:                 stopCh,
 		Registry:                       registry,
 		Plugins:                        nil,
 		PluginConfig:                   []schedulerapi.PluginConfig{},
 		PluginConfigProducerRegistry:   pluginConfigProducerRegistry,
-	})
+	}
+	configurator.complete()
+	return configurator
 }
 
-func newConfigFactory(
+func newConfigurator(
 	client clientset.Interface, hardPodAffinitySymmetricWeight int32, stopCh <-chan struct{}) *Configurator {
-	return newConfigFactoryWithFrameworkRegistry(client, hardPodAffinitySymmetricWeight, stopCh,
+	return newConfiguratorWithFrameworkRegistry(client, hardPodAffinitySymmetricWeight, stopCh,
 		frameworkplugins.NewDefaultRegistry(&frameworkplugins.RegistryArgs{}), frameworkplugins.NewDefaultConfigProducerRegistry())
 }
 
@@ -679,7 +681,7 @@ func testGetBinderFunc(expectedBinderType, podName string, extenders []algorithm
 	}
 
 	f := &Configurator{}
-	binderFunc := getBinderFunc(f.client, extenders)
+	binderFunc := getBinderFunc(f.Client, extenders)
 	binder := binderFunc(pod)
 
 	binderType := fmt.Sprintf("%s", reflect.TypeOf(binder))
@@ -784,7 +786,7 @@ func TestCreateWithFrameworkPlugins(t *testing.T) {
 		},
 	}
 
-	factory := newConfigFactoryWithFrameworkRegistry(
+	factory := newConfiguratorWithFrameworkRegistry(
 		client, v1.DefaultHardPodAffinitySymmetricWeight, stopCh, registry, configProducerRegistry)
 
 	// Pre-register some predicate and priority functions

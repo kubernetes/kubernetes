@@ -294,20 +294,20 @@ func New(client clientset.Interface,
 	}
 
 	// Set up the configurator which can create schedulers from configs.
-	configurator := NewConfigFactory(&ConfigFactoryArgs{
+	configurator := &Configurator{
 		Client:                         client,
 		InformerFactory:                informerFactory,
-		PodInformer:                    podInformer,
-		NodeInformer:                   informerFactory.Core().V1().Nodes(),
-		PvInformer:                     informerFactory.Core().V1().PersistentVolumes(),
-		PvcInformer:                    informerFactory.Core().V1().PersistentVolumeClaims(),
-		ReplicationControllerInformer:  informerFactory.Core().V1().ReplicationControllers(),
-		ReplicaSetInformer:             informerFactory.Apps().V1().ReplicaSets(),
-		StatefulSetInformer:            informerFactory.Apps().V1().StatefulSets(),
-		ServiceInformer:                informerFactory.Core().V1().Services(),
-		PdbInformer:                    pdbInformer,
-		StorageClassInformer:           informerFactory.Storage().V1().StorageClasses(),
-		CSINodeInformer:                csiNodeInformer,
+		PodLister:                      podInformer.Lister(),
+		NodeLister:                     informerFactory.Core().V1().Nodes().Lister(),
+		PVLister:                       informerFactory.Core().V1().PersistentVolumes().Lister(),
+		PVCLister:                      informerFactory.Core().V1().PersistentVolumeClaims().Lister(),
+		ControllerLister:               informerFactory.Core().V1().ReplicationControllers().Lister(),
+		ReplicaSetLister:               informerFactory.Apps().V1().ReplicaSets().Lister(),
+		StatefulSetLister:              informerFactory.Apps().V1().StatefulSets().Lister(),
+		ServiceLister:                  informerFactory.Core().V1().Services().Lister(),
+		PdbLister:                      pdbInformer.Lister(),
+		StorageClassLister:             informerFactory.Storage().V1().StorageClasses().Lister(),
+		CSINodeLister:                  csiNodeInformer.Lister(),
 		VolumeBinder:                   volumeBinder,
 		SchedulerCache:                 schedulerCache,
 		HardPodAffinitySymmetricWeight: options.hardPodAffinitySymmetricWeight,
@@ -320,7 +320,8 @@ func New(client clientset.Interface,
 		PluginConfigProducerRegistry:   options.frameworkConfigProducerRegistry,
 		Plugins:                        options.frameworkPlugins,
 		PluginConfig:                   options.frameworkPluginConfig,
-	})
+	}
+	configurator.complete()
 	var config *Config
 	source := schedulerAlgorithmSource
 	switch {
