@@ -288,7 +288,7 @@ func (f *ConfigFlags) AddFlags(flags *pflag.FlagSet) {
 		flags.StringVarP(f.Namespace, flagNamespace, "n", *f.Namespace, "If present, the namespace scope for this CLI request")
 	}
 	if f.Context != nil {
-		flags.StringVar(f.Context, flagContext, *f.Context, "The name of the kubeconfig context to use")
+		flags.StringVarP(f.Context, flagContext, "x", *f.Context, "The name of the kubeconfig context to use")
 	}
 
 	if f.APIServer != nil {
