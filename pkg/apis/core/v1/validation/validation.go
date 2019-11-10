@@ -93,7 +93,7 @@ func ValidateResourceQuantityValue(resource string, value resource.Quantity, fld
 	return allErrs
 }
 
-// Validates that a Quantity is not negative
+// ValidateNonnegativeQuantity validates that a Quantity is not negative
 func ValidateNonnegativeQuantity(value resource.Quantity, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if value.Cmp(resource.Quantity{}) < 0 {

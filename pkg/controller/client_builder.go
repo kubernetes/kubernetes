@@ -105,7 +105,7 @@ type SAControllerClientBuilder struct {
 	Namespace string
 }
 
-// config returns a complete clientConfig for constructing clients.  This is separate in anticipation of composition
+// Config returns a complete clientConfig for constructing clients.  This is separate in anticipation of composition
 // which means that not all clientsets are known here
 func (b SAControllerClientBuilder) Config(name string) (*restclient.Config, error) {
 	sa, err := getOrCreateServiceAccount(b.CoreClient, b.Namespace, name)

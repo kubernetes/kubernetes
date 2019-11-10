@@ -112,7 +112,7 @@ func NonResourceURLMatches(rule *rbacv1.PolicyRule, requestedURL string) bool {
 	return false
 }
 
-// subjectsStrings returns users, groups, serviceaccounts, unknown for display purposes.
+// SubjectsStrings returns users, groups, serviceaccounts, unknown for display purposes.
 func SubjectsStrings(subjects []rbacv1.Subject) ([]string, []string, []string, []string) {
 	users := []string{}
 	groups := []string{}

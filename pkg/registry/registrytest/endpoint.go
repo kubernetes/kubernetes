@@ -30,7 +30,7 @@ import (
 	api "k8s.io/kubernetes/pkg/apis/core"
 )
 
-// Registry is an interface for things that know how to store endpoints.
+// EndpointRegistry is an interface for things that know how to store endpoints.
 type EndpointRegistry struct {
 	Endpoints *api.EndpointsList
 	Updates   []api.Endpoints
