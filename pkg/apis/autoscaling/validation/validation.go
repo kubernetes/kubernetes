@@ -30,6 +30,7 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+// ValidateScale validates a Scale and returns an ErrorList with any errors.
 func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 	allErrs := field.ErrorList{}
 	allErrs = append(allErrs, apivalidation.ValidateObjectMeta(&scale.ObjectMeta, true, apimachineryvalidation.NameIsDNSSubdomain, field.NewPath("metadata"))...)
@@ -41,7 +42,7 @@ func ValidateScale(scale *autoscaling.Scale) field.ErrorList {
 	return allErrs
 }
 
-// ValidateHorizontalPodAutoscaler can be used to check whether the given autoscaler name is valid.
+// ValidateHorizontalPodAutoscalerName can be used to check whether the given autoscaler name is valid.
 // Prefix indicates this name will be used as part of generation, in which case trailing dashes are allowed.
 var ValidateHorizontalPodAutoscalerName = apivalidation.ValidateReplicationControllerName
 
@@ -67,6 +68,8 @@ func validateHorizontalPodAutoscalerSpec(autoscaler autoscaling.HorizontalPodAut
 	return allErrs
 }
 
+// ValidateCrossVersionObjectReference validates a CrossVersionObjectReference and returns an
+// ErrorList with any errors.
 func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectReference, fldPath *field.Path) field.ErrorList {
 	allErrs := field.ErrorList{}
 	if len(ref.Kind) == 0 {
@@ -88,6 +91,8 @@ func ValidateCrossVersionObjectReference(ref autoscaling.CrossVersionObjectRefer
 	return allErrs
 }
 
+// ValidateHorizontalPodAutoscaler validates a HorizontalPodAutoscaler and returns an
+// ErrorList with any errors.
 func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMeta(&autoscaler.ObjectMeta, true, ValidateHorizontalPodAutoscalerName, field.NewPath("metadata"))
 
@@ -104,6 +109,8 @@ func ValidateHorizontalPodAutoscaler(autoscaler *autoscaling.HorizontalPodAutosc
 	return allErrs
 }
 
+// ValidateHorizontalPodAutoscalerUpdate validates an update to a HorizontalPodAutoscaler and returns an
+// ErrorList with any errors.
 func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&newAutoscaler.ObjectMeta, &oldAutoscaler.ObjectMeta, field.NewPath("metadata"))
 
@@ -121,11 +128,13 @@ func ValidateHorizontalPodAutoscalerUpdate(newAutoscaler, oldAutoscaler *autosca
 	return allErrs
 }
 
+// ValidateHorizontalPodAutoscalerStatusUpdate validates an update to status on a HorizontalPodAutoscaler and
+// returns an ErrorList with any errors.
 func ValidateHorizontalPodAutoscalerStatusUpdate(newAutoscaler, oldAutoscaler *autoscaling.HorizontalPodAutoscaler) field.ErrorList {
 	allErrs := apivalidation.ValidateObjectMetaUpdate(&newAutoscaler.ObjectMeta, &oldAutoscaler.ObjectMeta, field.NewPath("metadata"))
 	status := newAutoscaler.Status
 	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.CurrentReplicas), field.NewPath("status", "currentReplicas"))...)
-	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredReplicas), field.NewPath("status", "desiredReplicasa"))...)
+	allErrs = append(allErrs, apivalidation.ValidateNonnegativeField(int64(status.DesiredReplicas), field.NewPath("status", "desiredReplicas"))...)
 	return allErrs
 }
 
