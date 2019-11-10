@@ -230,8 +230,8 @@ spec:
       httpGet:
         host: 127.0.0.1
         path: /healthz
-        port: 10252
-        scheme: HTTP
+        port: 10257
+        scheme: HTTPS
       initialDelaySeconds: 15
       timeoutSeconds: 15
     name: kube-controller-manager
@@ -307,8 +307,8 @@ spec:
           httpGet:
             host: 127.0.0.1
             path: /healthz
-            port: 10252
-            scheme: HTTP
+            port: 10257
+            scheme: HTTPS
           initialDelaySeconds: 15
           timeoutSeconds: 15
         name: kube-controller-manager
@@ -379,8 +379,8 @@ spec:
       httpGet:
         host: 127.0.0.1
         path: /healthz
-        port: 10251
-        scheme: HTTP
+        port: 10259
+        scheme: HTTPS
       initialDelaySeconds: 15
       timeoutSeconds: 15
     name: kube-scheduler
@@ -431,8 +431,8 @@ spec:
           httpGet:
             host: 127.0.0.1
             path: /healthz
-            port: 10251
-            scheme: HTTP
+            port: 10259
+            scheme: HTTPS
           initialDelaySeconds: 15
           timeoutSeconds: 15
         name: kube-scheduler
