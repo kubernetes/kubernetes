@@ -26,13 +26,13 @@ func addDefaultingFuncs(scheme *runtime.Scheme) error {
 	return RegisterDefaults(scheme)
 }
 
-// SetDefaults_Deployment sets additional defaults compared to its counterpart
+// SetDefaultsDeployment sets additional defaults compared to its counterpart
 // in extensions. These addons are:
 // - MaxUnavailable during rolling update set to 25% (1 in extensions)
 // - MaxSurge value during rolling update set to 25% (1 in extensions)
 // - RevisionHistoryLimit set to 10 (not set in extensions)
 // - ProgressDeadlineSeconds set to 600s (not set in extensions)
-func SetDefaults_Deployment(obj *appsv1.Deployment) {
+func SetDefaultsDeployment(obj *appsv1.Deployment) {
 	// Set DeploymentSpec.Replicas to 1 if it is not set.
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
@@ -69,7 +69,7 @@ func SetDefaults_Deployment(obj *appsv1.Deployment) {
 	}
 }
 
-func SetDefaults_DaemonSet(obj *appsv1.DaemonSet) {
+func SetDefaultsDaemonSet(obj *appsv1.DaemonSet) {
 	updateStrategy := &obj.Spec.UpdateStrategy
 	if updateStrategy.Type == "" {
 		updateStrategy.Type = appsv1.RollingUpdateDaemonSetStrategyType
@@ -91,7 +91,7 @@ func SetDefaults_DaemonSet(obj *appsv1.DaemonSet) {
 	}
 }
 
-func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
+func SetDefaultsStatefulSet(obj *appsv1.StatefulSet) {
 	if len(obj.Spec.PodManagementPolicy) == 0 {
 		obj.Spec.PodManagementPolicy = appsv1.OrderedReadyPodManagement
 	}
@@ -119,7 +119,7 @@ func SetDefaults_StatefulSet(obj *appsv1.StatefulSet) {
 		*obj.Spec.RevisionHistoryLimit = 10
 	}
 }
-func SetDefaults_ReplicaSet(obj *appsv1.ReplicaSet) {
+func SetDefaultsReplicaSet(obj *appsv1.ReplicaSet) {
 	if obj.Spec.Replicas == nil {
 		obj.Spec.Replicas = new(int32)
 		*obj.Spec.Replicas = 1
