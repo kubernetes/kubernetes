@@ -35,7 +35,7 @@ import (
 
 // waitForPods waits for timeout duration, for pod_count.
 // If the timeout is hit, it returns the list of currently running pods.
-func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (runningPods []*v1.Pod) {
+func waitForPods(f *framework.Framework, podCount int, timeout time.Duration) (runningPods []*v1.Pod) {
 	for start := time.Now(); time.Since(start) < timeout; time.Sleep(10 * time.Second) {
 		podList, err := f.PodClient().List(metav1.ListOptions{})
 		if err != nil {
@@ -51,7 +51,7 @@ func waitForPods(f *framework.Framework, pod_count int, timeout time.Duration) (
 			runningPods = append(runningPods, &pod)
 		}
 		framework.Logf("Running pod count %d", len(runningPods))
-		if len(runningPods) >= pod_count {
+		if len(runningPods) >= podCount {
 			break
 		}
 	}
