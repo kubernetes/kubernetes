@@ -437,34 +437,34 @@ func (a *HorizontalController) computeStatusForResourceMetric(currentReplicas in
 			},
 		}
 		return replicaCountProposal, timestampProposal, metricNameProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
-	} else {
-		if metricSpec.Resource.Target.AverageUtilization == nil {
-			errMsg := "invalid resource metric source: neither a utilization target nor a value target was set"
-			err = fmt.Errorf(errMsg)
-			condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetResourceMetric", err)
-			return 0, time.Time{}, "", condition, fmt.Errorf(errMsg)
-		}
-		targetUtilization := *metricSpec.Resource.Target.AverageUtilization
-		var percentageProposal int32
-		var rawProposal int64
-		replicaCountProposal, percentageProposal, rawProposal, timestampProposal, err := a.replicaCalc.GetResourceReplicas(currentReplicas, targetUtilization, metricSpec.Resource.Name, hpa.Namespace, selector)
-		if err != nil {
-			condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetResourceMetric", err)
-			return 0, time.Time{}, "", condition, fmt.Errorf("failed to get %s utilization: %v", metricSpec.Resource.Name, err)
-		}
-		metricNameProposal = fmt.Sprintf("%s resource utilization (percentage of request)", metricSpec.Resource.Name)
-		*status = autoscalingv2.MetricStatus{
-			Type: autoscalingv2.ResourceMetricSourceType,
-			Resource: &autoscalingv2.ResourceMetricStatus{
-				Name: metricSpec.Resource.Name,
-				Current: autoscalingv2.MetricValueStatus{
-					AverageUtilization: &percentageProposal,
-					AverageValue:       resource.NewMilliQuantity(rawProposal, resource.DecimalSI),
-				},
-			},
-		}
-		return replicaCountProposal, timestampProposal, metricNameProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 	}
+
+	if metricSpec.Resource.Target.AverageUtilization == nil {
+		errMsg := "invalid resource metric source: neither a utilization target nor a value target was set"
+		err = fmt.Errorf(errMsg)
+		condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetResourceMetric", err)
+		return 0, time.Time{}, "", condition, fmt.Errorf(errMsg)
+	}
+	targetUtilization := *metricSpec.Resource.Target.AverageUtilization
+	var percentageProposal int32
+	var rawProposal int64
+	replicaCountProposal, percentageProposal, rawProposal, timestampProposal, err = a.replicaCalc.GetResourceReplicas(currentReplicas, targetUtilization, metricSpec.Resource.Name, hpa.Namespace, selector)
+	if err != nil {
+		condition = a.getUnableComputeReplicaCountCondition(hpa, "FailedGetResourceMetric", err)
+		return 0, time.Time{}, "", condition, fmt.Errorf("failed to get %s utilization: %v", metricSpec.Resource.Name, err)
+	}
+	metricNameProposal = fmt.Sprintf("%s resource utilization (percentage of request)", metricSpec.Resource.Name)
+	*status = autoscalingv2.MetricStatus{
+		Type: autoscalingv2.ResourceMetricSourceType,
+		Resource: &autoscalingv2.ResourceMetricStatus{
+			Name: metricSpec.Resource.Name,
+			Current: autoscalingv2.MetricValueStatus{
+				AverageUtilization: &percentageProposal,
+				AverageValue:       resource.NewMilliQuantity(rawProposal, resource.DecimalSI),
+			},
+		},
+	}
+	return replicaCountProposal, timestampProposal, metricNameProposal, autoscalingv2.HorizontalPodAutoscalerCondition{}, nil
 }
 
 // computeStatusForExternalMetric computes the desired number of replicas for the specified metric of type ExternalMetricSourceType.
