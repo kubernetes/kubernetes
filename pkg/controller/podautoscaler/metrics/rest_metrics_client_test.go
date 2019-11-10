@@ -156,7 +156,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 				}
 
 				return true, &metrics, nil
-			} else {
+			}
 				name := getForAction.GetName()
 				mapper := testrestmapper.TestOnlyStaticRESTMapper(legacyscheme.Scheme)
 				assert.NotNil(t, tc.singleObject, "should have only requested a single-object metric when we asked for metrics for a single object")
@@ -187,7 +187,7 @@ func (tc *restClientTestCase) prepareTestClient(t *testing.T) (*metricsfake.Clie
 							Value: *resource.NewMilliQuantity(int64(metricPoint.level), resource.DecimalSI),
 						},
 					},
-				}
+				
 
 				return true, metrics, nil
 			}
