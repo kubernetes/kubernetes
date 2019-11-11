@@ -1309,3 +1309,89 @@ func TestForwardingRuleCompositeEqual(t *testing.T) {
 		t.Errorf("Expected frcGA and frcBeta rules to be unequal, got true")
 	}
 }
+
+func TestEnsureInternalLoadBalancerCustomSubnet(t *testing.T) {
+	t.Parallel()
+
+	vals := DefaultTestClusterValues()
+	gce, err := fakeGCECloud(vals)
+	require.NoError(t, err)
+	gce.AlphaFeatureGate = NewAlphaFeatureGate([]string{AlphaFeatureILBCustomSubnet})
+
+	nodeNames := []string{"test-node-1"}
+	nodes, err := createAndInsertNodes(gce, nodeNames, vals.ZoneName)
+	require.NoError(t, err)
+	svc := fakeLoadbalancerService(string(LBTypeInternal))
+	status, err := createInternalLoadBalancer(gce, svc, nil, nodeNames, vals.ClusterName, vals.ClusterID, vals.ZoneName)
+	lbName := gce.GetLoadBalancerName(context.TODO(), "", svc)
+
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err := gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	if err != nil || fwdRule == nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if fwdRule.Subnetwork != "" {
+		t.Errorf("Unexpected subnet value %s in ILB ForwardingRule", fwdRule.Subnetwork)
+	}
+
+	// Change service to include the global access annotation and request static ip
+	requestedIP := "4.5.6.7"
+	svc.Annotations[ServiceAnnotationILBSubnet] = "test-subnet"
+	svc.Spec.LoadBalancerIP = requestedIP
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	if status.Ingress[0].IP != requestedIP {
+		t.Errorf("Reserved IP %s not propagated, Got %s", requestedIP, status.Ingress[0].IP)
+	}
+	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	if err != nil || fwdRule == nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if !strings.HasSuffix(fwdRule.Subnetwork, "test-subnet") {
+		t.Errorf("Unexpected subnet value %s in ILB ForwardingRule.", fwdRule.Subnetwork)
+	}
+
+	// Change to a different subnet
+	svc.Annotations[ServiceAnnotationILBSubnet] = "another-subnet"
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	if status.Ingress[0].IP != requestedIP {
+		t.Errorf("Reserved IP %s not propagated, Got %s", requestedIP, status.Ingress[0].IP)
+	}
+	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	if err != nil || fwdRule == nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if !strings.HasSuffix(fwdRule.Subnetwork, "another-subnet") {
+		t.Errorf("Unexpected subnet value %s in ILB ForwardingRule.", fwdRule.Subnetwork)
+	}
+	// remove the annotation - ILB should revert to default subnet.
+	delete(svc.Annotations, ServiceAnnotationILBSubnet)
+	status, err = gce.EnsureLoadBalancer(context.Background(), vals.ClusterName, svc, nodes)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assert.NotEmpty(t, status.Ingress)
+	fwdRule, err = gce.GetBetaRegionForwardingRule(lbName, gce.region)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	if fwdRule.Subnetwork != "" {
+		t.Errorf("Unexpected subnet value %s in ILB ForwardingRule.", fwdRule.Subnetwork)
+	}
+	// Delete the service
+	err = gce.EnsureLoadBalancerDeleted(context.Background(), vals.ClusterName, svc)
+	if err != nil {
+		t.Errorf("Unexpected error %v", err)
+	}
+	assertInternalLbResourcesDeleted(t, gce, svc, vals, true)
+}

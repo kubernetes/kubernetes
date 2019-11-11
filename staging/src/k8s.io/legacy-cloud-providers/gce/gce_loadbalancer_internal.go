@@ -58,6 +58,12 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBOptionsIgnored", "Internal LoadBalancer options are not supported with Legacy Networks.")
 		options = ILBOptions{}
 	}
+	if !g.AlphaFeatureGate.Enabled(AlphaFeatureILBCustomSubnet) {
+		if options.SubnetName != "" {
+			g.eventRecorder.Event(svc, v1.EventTypeWarning, "ILBCustomSubnetOptionIgnored", "Internal LoadBalancer CustomSubnet options ignored as the feature gate is disabled.")
+			options.SubnetName = ""
+		}
+	}
 
 	loadBalancerName := g.GetLoadBalancerName(context.TODO(), clusterName, svc)
 	sharedBackend := shareBackendService(svc)
@@ -98,23 +104,32 @@ func (g *Cloud) ensureInternalLoadBalancer(clusterName, clusterID string, svc *v
 		return nil, err
 	}
 
+	subnetworkURL := g.SubnetworkURL()
+	if g.AlphaFeatureGate.Enabled(AlphaFeatureILBCustomSubnet) {
+		// If this feature is enabled, changes to subnet annotation will be
+		// picked up and reflected in the forwarding rule.
+		// Removing the annotation will set the forwarding rule to use the default subnet.
+		if options.SubnetName != "" {
+			subnetworkURL = gceSubnetworkURL("", g.networkProjectID, g.region, options.SubnetName)
+		}
+	} else {
+		// TODO(84885) remove this once ILBCustomSubnet goes beta.
+		if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
+			// If the ILB already exists, continue using the subnet that it's already using.
+			// This is to support existing ILBs that were setup using the wrong subnet - https://github.com/kubernetes/kubernetes/pull/57861
+			subnetworkURL = existingFwdRule.Subnetwork
+		}
+	}
 	// Determine IP which will be used for this LB. If no forwarding rule has been established
 	// or specified in the Service spec, then requestedIP = "".
-	requestedIP := determineRequestedIP(svc, existingFwdRule)
-	ipToUse := requestedIP
+	ipToUse := ilbIPToUse(svc, existingFwdRule, subnetworkURL)
 
-	// If the ILB already exists, continue using the subnet that it's already using.
-	// This is to support existing ILBs that were setup using the wrong subnet.
-	subnetworkURL := g.SubnetworkURL()
-	if existingFwdRule != nil && existingFwdRule.Subnetwork != "" {
-		// external LBs have an empty Subnetwork field.
-		subnetworkURL = existingFwdRule.Subnetwork
-	}
+	klog.V(2).Infof("ensureInternalLoadBalancer(%v): Using subnet %s for LoadBalancer IP %s", loadBalancerName, options.SubnetName, ipToUse)
 
 	var addrMgr *addressManager
 	// If the network is not a legacy network, use the address manager
 	if !g.IsLegacyNetwork() {
-		addrMgr = newAddressManager(g, nm.String(), g.Region(), subnetworkURL, loadBalancerName, requestedIP, cloud.SchemeInternal)
+		addrMgr = newAddressManager(g, nm.String(), g.Region(), subnetworkURL, loadBalancerName, ipToUse, cloud.SchemeInternal)
 		ipToUse, err = addrMgr.HoldAddress()
 		if err != nil {
 			return nil, err
@@ -758,20 +773,27 @@ func getNameFromLink(link string) string {
 	return fields[len(fields)-1]
 }
 
-func determineRequestedIP(svc *v1.Service, fwdRule *compute.ForwardingRule) string {
+// ilbIPToUse determines which IP address needs to be used in the ForwardingRule. If an IP has been
+// specified by the user, that is used. If there is an existing ForwardingRule, the ip address from
+// that is reused. In case a subnetwork change is requested, the existing ForwardingRule IP is ignored.
+func ilbIPToUse(svc *v1.Service, fwdRule *compute.ForwardingRule, requestedSubnet string) string {
 	if svc.Spec.LoadBalancerIP != "" {
 		return svc.Spec.LoadBalancerIP
 	}
-
-	if fwdRule != nil {
-		return fwdRule.IPAddress
+	if fwdRule == nil {
+		return ""
 	}
-
-	return ""
+	if requestedSubnet != fwdRule.Subnetwork {
+		// reset ip address since subnet is being changed.
+		return ""
+	}
+	return fwdRule.IPAddress
 }
 
 func getILBOptions(svc *v1.Service) ILBOptions {
-	return ILBOptions{AllowGlobalAccess: GetLoadBalancerAnnotationAllowGlobalAccess(svc)}
+	return ILBOptions{AllowGlobalAccess: GetLoadBalancerAnnotationAllowGlobalAccess(svc),
+		SubnetName: GetLoadBalancerAnnotationSubnet(svc),
+	}
 }
 
 // forwardingRuleComposite is a composite type encapsulating both the GA and Beta ForwardingRules.
@@ -800,7 +822,8 @@ func (f *forwardingRuleComposite) Equal(other *forwardingRuleComposite) bool {
 		f.lbScheme == other.lbScheme &&
 		equalStringSets(f.ports, other.ports) &&
 		f.backendService == other.backendService &&
-		f.allowGlobalAccess == other.allowGlobalAccess
+		f.allowGlobalAccess == other.allowGlobalAccess &&
+		f.subnetwork == other.subnetwork
 }
 
 // toForwardingRuleComposite converts a compute beta or GA ForwardingRule into the composite type
