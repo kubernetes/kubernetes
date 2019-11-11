@@ -47,6 +47,8 @@ type BlockVolumePathHandler interface {
 	IsSymlinkExist(mapPath string) (bool, error)
 	// IsDeviceBindMountExist retruns true if specified bind mount exists
 	IsDeviceBindMountExist(mapPath string) (bool, error)
+	// IsFileExist retruns true if specified file exists
+	IsFileExist(mapPath string) (bool, error)
 	// GetDeviceBindMountRefs searches bind mounts under global map path
 	GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error)
 	// FindGlobalMapPathUUIDFromPod finds {pod uuid} symbolic link under globalMapPath
@@ -275,6 +277,24 @@ func (v VolumePathHandler) IsDeviceBindMountExist(mapPath string) (bool, error) 
 	}
 	// If file exits but it's not device, return fale and no error
 	return false, nil
+}
+
+// IsFileExist returns true if specified file exists.
+// If file doesn't exist, return false with no error.
+// On other cases, return false with error from Lstat().
+func (v VolumePathHandler) IsFileExist(mapPath string) (bool, error) {
+	_, err := os.Lstat(mapPath)
+	if err != nil {
+		// If file doesn't exist, return false and no error
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+
+		// Return error from Lstat()
+		return false, fmt.Errorf("failed to Lstat file %s: %v", mapPath, err)
+	}
+	// If file exits return true and no error
+	return true, nil
 }
 
 // GetDeviceBindMountRefs searches bind mounts under global map path

@@ -108,19 +108,18 @@ func (kl *Kubelet) makeBlockVolumes(pod *v1.Pod, container *v1.Container, podVol
 			klog.Errorf("Block volume cannot be satisfied for container %q, because the volume is missing or the volume mapper is nil: %+v", container.Name, device)
 			return nil, fmt.Errorf("cannot find volume %q to pass into container %q", device.Name, container.Name)
 		}
-		// Get a symbolic link associated to a block device under pod device path
 		dirPath, volName := vol.BlockVolumeMapper.GetPodDeviceMapPath()
-		symlinkPath := path.Join(dirPath, volName)
-		if islinkExist, checkErr := blkutil.IsSymlinkExist(symlinkPath); checkErr != nil {
+		volPath := path.Join(dirPath, volName)
+		if isFileExist, checkErr := blkutil.IsFileExist(volPath); checkErr != nil {
 			return nil, checkErr
-		} else if islinkExist {
+		} else if isFileExist {
 			// Check readOnly in PVCVolumeSource and set read only permission if it's true.
 			permission := "mrw"
 			if vol.ReadOnly {
 				permission = "r"
 			}
-			klog.V(4).Infof("Device will be attached to container %q. Path on host: %v", container.Name, symlinkPath)
-			devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: symlinkPath, PathInContainer: device.DevicePath, Permissions: permission})
+			klog.V(4).Infof("Device will be attached to container %q. Path on host: %v", container.Name, volPath)
+			devices = append(devices, kubecontainer.DeviceInfo{PathOnHost: volPath, PathInContainer: device.DevicePath, Permissions: permission})
 		}
 	}
 

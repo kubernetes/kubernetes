@@ -1119,6 +1119,11 @@ func (fv *FakeVolumePathHandler) IsDeviceBindMountExist(mapPath string) (bool, e
 	return true, nil
 }
 
+func (fv *FakeVolumePathHandler) IsFileExist(mapPath string) (bool, error) {
+	// nil is success, else error
+	return true, nil
+}
+
 func (fv *FakeVolumePathHandler) GetDeviceBindMountRefs(devPath string, mapPath string) ([]string, error) {
 	// nil is success, else error
 	return []string{}, nil
