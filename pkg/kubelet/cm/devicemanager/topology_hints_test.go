@@ -317,6 +317,39 @@ func TestGetTopologyHints(t *testing.T) {
 			},
 		},
 		{
+			description:   "Single device type, some allocated to container",
+			podUID:        "fakePod",
+			containerName: "fakeContainer",
+			request: map[string]string{
+				"testdevice": "1",
+			},
+			devices: map[string][]pluginapi.Device{
+				"testdevice": {
+					makeNUMADevice("Dev1", 0),
+					makeNUMADevice("Dev2", 1),
+				},
+			},
+			allocatedDevices: map[string]map[string]map[string][]string{
+				"fakePod": {
+					"fakeContainer": {
+						"testdevice": {"Dev1"},
+					},
+				},
+			},
+			expectedHints: map[string][]topologymanager.TopologyHint{
+				"testdevice": {
+					{
+						NUMANodeAffinity: makeSocketMask(0),
+						Preferred:        true,
+					},
+					{
+						NUMANodeAffinity: makeSocketMask(0, 1),
+						Preferred:        false,
+					},
+				},
+			},
+		},
+		{
 			description:   "Single device type, less already allocated to container than requested",
 			podUID:        "fakePod",
 			containerName: "fakeContainer",
