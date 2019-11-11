@@ -65,8 +65,12 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 	cloud cloudprovider.Interface, // typically Kubelet.cloud
 	nodeAddressesFunc func() ([]v1.NodeAddress, error), // typically Kubelet.cloudResourceSyncManager.NodeAddresses
 ) Setter {
+	preferIPv4 := nodeIP == nil || nodeIP.To4() != nil
+	isPreferredIPFamily := func(ip net.IP) bool { return (ip.To4() != nil) == preferIPv4 }
+	nodeIPSpecified := nodeIP != nil && !nodeIP.IsUnspecified()
+
 	return func(node *v1.Node) error {
-		if nodeIP != nil {
+		if nodeIPSpecified {
 			if err := validateNodeIPFunc(nodeIP); err != nil {
 				return fmt.Errorf("failed to validate nodeIP: %v", err)
 			}
@@ -74,7 +78,7 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 		}
 
 		if externalCloudProvider {
-			if nodeIP != nil {
+			if nodeIPSpecified {
 				if node.ObjectMeta.Annotations == nil {
 					node.ObjectMeta.Annotations = make(map[string]string)
 				}
@@ -101,7 +105,7 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 			// that address Type (like InternalIP and ExternalIP), meaning other addresses of the same Type are discarded.
 			// See #61921 for more information: some cloud providers may supply secondary IPs, so nodeIP serves as a way to
 			// ensure that the correct IPs show up on a Node object.
-			if nodeIP != nil {
+			if nodeIPSpecified {
 				enforcedNodeAddresses := []v1.NodeAddress{}
 
 				nodeIPTypes := make(map[v1.NodeAddressType]bool)
@@ -125,6 +129,23 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 				}
 
 				nodeAddresses = enforcedNodeAddresses
+			} else if nodeIP != nil {
+				// nodeIP is "0.0.0.0" or "::"; sort cloudNodeAddresses to
+				// prefer addresses of the matching family
+				sortedAddresses := make([]v1.NodeAddress, 0, len(cloudNodeAddresses))
+				for _, nodeAddress := range cloudNodeAddresses {
+					ip := net.ParseIP(nodeAddress.Address)
+					if ip == nil || isPreferredIPFamily(ip) {
+						sortedAddresses = append(sortedAddresses, nodeAddress)
+					}
+				}
+				for _, nodeAddress := range cloudNodeAddresses {
+					ip := net.ParseIP(nodeAddress.Address)
+					if ip != nil && !isPreferredIPFamily(ip) {
+						sortedAddresses = append(sortedAddresses, nodeAddress)
+					}
+				}
+				nodeAddresses = sortedAddresses
 			} else {
 				// If nodeIP is unset, just use the addresses provided by the cloud provider as-is
 				nodeAddresses = cloudNodeAddresses
@@ -168,12 +189,14 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 			var ipAddr net.IP
 			var err error
 
-			// 1) Use nodeIP if set
+			// 1) Use nodeIP if set (and not "0.0.0.0"/"::")
 			// 2) If the user has specified an IP to HostnameOverride, use it
-			// 3) Lookup the IP from node name by DNS and use the first valid IPv4 address.
-			//    If the node does not have a valid IPv4 address, use the first valid IPv6 address.
+			// 3) Lookup the IP from node name by DNS
 			// 4) Try to get the IP from the network interface used as default gateway
-			if nodeIP != nil {
+			//
+			// For steps 3 and 4, IPv4 addresses are preferred to IPv6 addresses
+			// unless nodeIP is "::", in which case it is reversed.
+			if nodeIPSpecified {
 				ipAddr = nodeIP
 			} else if addr := net.ParseIP(hostname); addr != nil {
 				ipAddr = addr
@@ -182,18 +205,17 @@ func NodeAddress(nodeIP net.IP, // typically Kubelet.nodeIP
 				addrs, _ = net.LookupIP(node.Name)
 				for _, addr := range addrs {
 					if err = validateNodeIPFunc(addr); err == nil {
-						if addr.To4() != nil {
+						if isPreferredIPFamily(addr) {
 							ipAddr = addr
 							break
-						}
-						if addr.To16() != nil && ipAddr == nil {
+						} else if ipAddr == nil {
 							ipAddr = addr
 						}
 					}
 				}
 
 				if ipAddr == nil {
-					ipAddr, err = utilnet.ChooseHostInterface()
+					ipAddr, err = utilnet.ResolveBindAddress(nodeIP)
 				}
 			}
 
