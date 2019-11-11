@@ -632,7 +632,9 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
     }`,
 			expectedCorefileData: `.:53 {
     errors
-    health
+    health {
+        lameduck 5s
+    }
     kubernetes cluster.local in-addr.arpa ip6.arpa {
         pods insecure
         fallthrough in-addr.arpa ip6.arpa
@@ -669,7 +671,9 @@ func TestCreateCoreDNSConfigMap(t *testing.T) {
     }`,
 			expectedCorefileData: `.:53 {
     errors
-    health
+    health {
+        lameduck 5s
+    }
     kubernetes cluster.local in-addr.arpa ip6.arpa {
         pods insecure
         fallthrough in-addr.arpa ip6.arpa

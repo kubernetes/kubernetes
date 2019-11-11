@@ -73,7 +73,7 @@ dependencies:
       match: k8s.gcr.io/coredns
 
   - name: "coredns-kubeadm"
-    version: 1.6.2
+    version: 1.6.5
     refPaths:
     - path: cmd/kubeadm/app/constants/constants.go
       match: CoreDNSVersion =
