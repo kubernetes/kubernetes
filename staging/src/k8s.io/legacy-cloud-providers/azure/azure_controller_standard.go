@@ -42,8 +42,7 @@ func (as *availabilitySet) AttachDisk(isManagedDisk bool, diskName, diskURI stri
 		return err
 	}
 
-	disks := make([]compute.DataDisk, len(*vm.StorageProfile.DataDisks))
-	copy(disks, *vm.StorageProfile.DataDisks)
+	disks := filterDetachingDisks(*vm.StorageProfile.DataDisks)
 
 	if isManagedDisk {
 		managedDisk := &compute.ManagedDiskParameters{ID: &diskURI}
@@ -117,8 +116,7 @@ func (as *availabilitySet) DetachDisk(diskName, diskURI string, nodeName types.N
 		return nil, err
 	}
 
-	disks := make([]compute.DataDisk, len(*vm.StorageProfile.DataDisks))
-	copy(disks, *vm.StorageProfile.DataDisks)
+	disks := filterDetachingDisks(*vm.StorageProfile.DataDisks)
 
 	bFoundDisk := false
 	for i, disk := range disks {
