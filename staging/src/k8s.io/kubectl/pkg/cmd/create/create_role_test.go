@@ -33,8 +33,9 @@ import (
 
 func TestCreateRole(t *testing.T) {
 	roleName := "my-role"
+	roleNamespace := "my-namespace"
 
-	tf := cmdtesting.NewTestFactory().WithNamespace("test")
+	tf := cmdtesting.NewTestFactory().WithNamespace(roleNamespace)
 	defer tf.Cleanup()
 
 	tf.Client = &fake.RESTClient{}
@@ -52,7 +53,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: roleNamespace,
 				},
 				Rules: []rbac.PolicyRule{
 					{
@@ -70,7 +72,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: roleNamespace,
 				},
 				Rules: []rbac.PolicyRule{
 					{
@@ -88,7 +91,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: roleNamespace,
 				},
 				Rules: []rbac.PolicyRule{
 					{
@@ -106,7 +110,8 @@ func TestCreateRole(t *testing.T) {
 			expectedRole: &rbac.Role{
 				TypeMeta: v1.TypeMeta{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "Role"},
 				ObjectMeta: v1.ObjectMeta{
-					Name: roleName,
+					Name:      roleName,
+					Namespace: roleNamespace,
 				},
 				Rules: []rbac.PolicyRule{
 					{
