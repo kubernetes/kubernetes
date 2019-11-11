@@ -58,9 +58,8 @@ After successful MountVolume for block volume, directory structure will be like 
   /var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/{specName}/dev/ ... Global map path
   /var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/{specName}/dev/{podUID} ... MapFile(Bind mount to publish Path)
   /var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/staging/{specName} ... Staging path
-  /var/lib/kubelet/plugins/kubernetes.io/csi/volumeDevices/publish/{specName}/{podUID} ... Publish path
   /var/lib/kubelet/pods/{podUID}/volumeDevices/kubernetes.io~csi/ ... Pod device map path
-  /var/lib/kubelet/pods/{podUID}/volumeDevices/kubernetes.io~csi/{specName} ... MapFile(Symlink to publish path)
+  /var/lib/kubelet/pods/{podUID}/volumeDevices/kubernetes.io~csi/{specName} ... MapFile == Publish path
 */
 
 package csi
@@ -115,9 +114,12 @@ func (m *csiBlockMapper) getStagingPath() string {
 }
 
 // getPublishPath returns a publish path for a file (on the node) that should be used on NodePublishVolume/NodeUnpublishVolume
+// The path will be {path}/{fileName} that is returned by GetPodDeviceMapPath, because CSI plugin will publish the volume to
+// pod device map path, directly.
 // Example: plugins/kubernetes.io/csi/volumeDevices/publish/{specName}/{podUID}
 func (m *csiBlockMapper) getPublishPath() string {
-	return filepath.Join(m.plugin.host.GetVolumeDevicePluginDir(CSIPluginName), "publish", m.specName, string(m.podUID))
+	path, fileName := m.GetPodDeviceMapPath()
+	return filepath.Join(path, fileName)
 }
 
 // GetPodDeviceMapPath returns pod's device file which will be mapped to a volume
