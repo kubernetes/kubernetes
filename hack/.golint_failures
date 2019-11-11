@@ -244,6 +244,7 @@ pkg/volume/util/volumepathhandler
 pkg/volume/vsphere_volume
 plugin/pkg/admission/eventratelimit/apis/eventratelimit/v1alpha1
 plugin/pkg/admission/limitranger
+plugin/pkg/admission/resourcequota/apis/resourcequota/v1
 plugin/pkg/admission/resourcequota/apis/resourcequota/v1alpha1
 plugin/pkg/admission/resourcequota/apis/resourcequota/v1beta1
 plugin/pkg/auth/authorizer/node
