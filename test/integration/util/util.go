@@ -47,10 +47,11 @@ func StartApiserver() (string, ShutdownFunc) {
 		h.M.GenericAPIServer.Handler.ServeHTTP(w, req)
 	}))
 
-	framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
+	_, _, closeFn := framework.RunAMasterUsingServer(framework.NewIntegrationTestMasterConfig(), s, h)
 
 	shutdownFunc := func() {
 		klog.Infof("destroying API server")
+		closeFn()
 		s.Close()
 		klog.Infof("destroyed API server")
 	}
