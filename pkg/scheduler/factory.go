@@ -147,7 +147,7 @@ type Configurator struct {
 
 	// RequiredDuringScheduling affinity is not symmetric, but there is an implicit PreferredDuringScheduling affinity rule
 	// corresponding to every RequiredDuringScheduling affinity rule.
-	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range 0-100.
+	// HardPodAffinitySymmetricWeight represents the weight of implicit PreferredDuringScheduling affinity rule, in the range [0-100].
 	hardPodAffinitySymmetricWeight int32
 
 	// Handles volume binding decisions
