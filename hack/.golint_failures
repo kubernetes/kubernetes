@@ -9,7 +9,6 @@ pkg/apis/admission
 pkg/apis/admissionregistration/v1
 pkg/apis/admissionregistration/v1beta1
 pkg/apis/admissionregistration/validation
-pkg/apis/apps
 pkg/apis/apps/v1
 pkg/apis/apps/v1beta1
 pkg/apis/apps/v1beta2
