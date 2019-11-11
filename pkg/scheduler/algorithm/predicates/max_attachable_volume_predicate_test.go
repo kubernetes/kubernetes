@@ -23,7 +23,7 @@ import (
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/api/storage/v1beta1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
@@ -1075,7 +1075,7 @@ func TestMaxVolumeFuncM4WithBothBetaAndStableLabels(t *testing.T) {
 	}
 }
 
-func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*schedulernodeinfo.NodeInfo, *v1beta1.CSINode) {
+func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int64, driverNames ...string) (*schedulernodeinfo.NodeInfo, *storagev1.CSINode) {
 	nodeInfo := schedulernodeinfo.NewNodeInfo(pods...)
 	node := &v1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "node-for-max-pd-test-1"},
@@ -1083,7 +1083,7 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 			Allocatable: v1.ResourceList{},
 		},
 	}
-	var csiNode *v1beta1.CSINode
+	var csiNode *storagev1.CSINode
 
 	addLimitToNode := func() {
 		for _, driver := range driverNames {
@@ -1092,10 +1092,10 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 	}
 
 	initCSINode := func() {
-		csiNode = &v1beta1.CSINode{
+		csiNode = &storagev1.CSINode{
 			ObjectMeta: metav1.ObjectMeta{Name: "csi-node-for-max-pd-test-1"},
-			Spec: v1beta1.CSINodeSpec{
-				Drivers: []v1beta1.CSINodeDriver{},
+			Spec: storagev1.CSINodeSpec{
+				Drivers: []storagev1.CSINodeDriver{},
 			},
 		}
 	}
@@ -1103,12 +1103,12 @@ func getNodeWithPodAndVolumeLimits(limitSource string, pods []*v1.Pod, limit int
 	addDriversCSINode := func(addLimits bool) {
 		initCSINode()
 		for _, driver := range driverNames {
-			driver := v1beta1.CSINodeDriver{
+			driver := storagev1.CSINodeDriver{
 				Name:   driver,
 				NodeID: "node-for-max-pd-test-1",
 			}
 			if addLimits {
-				driver.Allocatable = &v1beta1.VolumeNodeResources{
+				driver.Allocatable = &storagev1.VolumeNodeResources{
 					Count: utilpointer.Int32Ptr(int32(limit)),
 				}
 			}

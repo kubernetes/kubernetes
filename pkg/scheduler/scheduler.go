@@ -33,7 +33,7 @@ import (
 	"k8s.io/client-go/informers"
 	coreinformers "k8s.io/client-go/informers/core/v1"
 	policyv1beta1informers "k8s.io/client-go/informers/policy/v1beta1"
-	storagev1beta1informers "k8s.io/client-go/informers/storage/v1beta1"
+	storageinformers "k8s.io/client-go/informers/storage/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/events"
@@ -288,9 +288,9 @@ func New(client clientset.Interface,
 		pdbInformer = informerFactory.Policy().V1beta1().PodDisruptionBudgets()
 	}
 
-	var csiNodeInformer storagev1beta1informers.CSINodeInformer
+	var csiNodeInformer storageinformers.CSINodeInformer
 	if utilfeature.DefaultFeatureGate.Enabled(kubefeatures.CSINodeInfo) {
-		csiNodeInformer = informerFactory.Storage().V1beta1().CSINodes()
+		csiNodeInformer = informerFactory.Storage().V1().CSINodes()
 	}
 
 	// Set up the configurator which can create schedulers from configs.

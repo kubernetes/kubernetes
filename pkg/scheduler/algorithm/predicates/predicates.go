@@ -27,7 +27,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	storage "k8s.io/api/storage/v1"
-	v1beta1storage "k8s.io/api/storage/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,7 +35,6 @@ import (
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
 	corelisters "k8s.io/client-go/listers/core/v1"
 	storagelisters "k8s.io/client-go/listers/storage/v1"
-	v1beta1storagelisters "k8s.io/client-go/listers/storage/v1beta1"
 	volumehelpers "k8s.io/cloud-provider/volume/helpers"
 	csilibplugins "k8s.io/csi-translation-lib/plugins"
 	v1helper "k8s.io/kubernetes/pkg/apis/core/v1/helper"
@@ -225,7 +223,7 @@ type MaxPDVolumeCountChecker struct {
 	filter         VolumeFilter
 	volumeLimitKey v1.ResourceName
 	maxVolumeFunc  func(node *v1.Node) int
-	csiNodeLister  v1beta1storagelisters.CSINodeLister
+	csiNodeLister  storagelisters.CSINodeLister
 	pvLister       corelisters.PersistentVolumeLister
 	pvcLister      corelisters.PersistentVolumeClaimLister
 	scLister       storagelisters.StorageClassLister
@@ -244,7 +242,7 @@ type VolumeFilter struct {
 	// MatchProvisioner evaluates if the StorageClass provisioner matches the running predicate
 	MatchProvisioner func(sc *storage.StorageClass) (relevant bool)
 	// IsMigrated returns a boolean specifying whether the plugin is migrated to a CSI driver
-	IsMigrated func(csiNode *v1beta1storage.CSINode) bool
+	IsMigrated func(csiNode *storage.CSINode) bool
 }
 
 // NewMaxPDVolumeCountPredicate creates a predicate which evaluates whether a pod can fit based on the
@@ -257,7 +255,7 @@ type VolumeFilter struct {
 // The predicate looks for both volumes used directly, as well as PVC volumes that are backed by relevant volume
 // types, counts the number of unique volumes, and rejects the new pod if it would place the total count over
 // the maximum.
-func NewMaxPDVolumeCountPredicate(filterName string, csiNodeLister v1beta1storagelisters.CSINodeLister, scLister storagelisters.StorageClassLister,
+func NewMaxPDVolumeCountPredicate(filterName string, csiNodeLister storagelisters.CSINodeLister, scLister storagelisters.StorageClassLister,
 	pvLister corelisters.PersistentVolumeLister, pvcLister corelisters.PersistentVolumeClaimLister) FitPredicate {
 	var filter VolumeFilter
 	var volumeLimitKey v1.ResourceName
@@ -441,7 +439,7 @@ func (c *MaxPDVolumeCountChecker) predicate(pod *v1.Pod, meta Metadata, nodeInfo
 	}
 
 	var (
-		csiNode *v1beta1storage.CSINode
+		csiNode *storage.CSINode
 		err     error
 	)
 	if c.csiNodeLister != nil {
@@ -518,7 +516,7 @@ var EBSVolumeFilter = VolumeFilter{
 		return false
 	},
 
-	IsMigrated: func(csiNode *v1beta1storage.CSINode) bool {
+	IsMigrated: func(csiNode *storage.CSINode) bool {
 		return isCSIMigrationOn(csiNode, csilibplugins.AWSEBSInTreePluginName)
 	},
 }
@@ -546,7 +544,7 @@ var GCEPDVolumeFilter = VolumeFilter{
 		return false
 	},
 
-	IsMigrated: func(csiNode *v1beta1storage.CSINode) bool {
+	IsMigrated: func(csiNode *storage.CSINode) bool {
 		return isCSIMigrationOn(csiNode, csilibplugins.GCEPDInTreePluginName)
 	},
 }
@@ -574,7 +572,7 @@ var AzureDiskVolumeFilter = VolumeFilter{
 		return false
 	},
 
-	IsMigrated: func(csiNode *v1beta1storage.CSINode) bool {
+	IsMigrated: func(csiNode *storage.CSINode) bool {
 		return isCSIMigrationOn(csiNode, csilibplugins.AzureDiskInTreePluginName)
 	},
 }
@@ -603,7 +601,7 @@ var CinderVolumeFilter = VolumeFilter{
 		return false
 	},
 
-	IsMigrated: func(csiNode *v1beta1storage.CSINode) bool {
+	IsMigrated: func(csiNode *storage.CSINode) bool {
 		return isCSIMigrationOn(csiNode, csilibplugins.CinderInTreePluginName)
 	},
 }
