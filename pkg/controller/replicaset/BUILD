@@ -46,6 +46,7 @@ go_library(
 go_test(
     name = "go_default_test",
     srcs = [
+        "init_test.go",
         "replica_set_test.go",
         "replica_set_utils_test.go",
     ],
@@ -72,6 +73,7 @@ go_test(
         "//staging/src/k8s.io/client-go/tools/cache:go_default_library",
         "//staging/src/k8s.io/client-go/util/testing:go_default_library",
         "//staging/src/k8s.io/client-go/util/workqueue:go_default_library",
+        "//vendor/k8s.io/klog:go_default_library",
     ],
 )
 
