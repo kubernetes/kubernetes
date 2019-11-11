@@ -634,7 +634,7 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 			DesiredSize: volumeToMount.DesiredSizeLimit,
 		})
 		// Update actual state of world
-		markOpts := MarkVolumeMountedOpts{
+		markOpts := MarkVolumeOpts{
 			PodName:             volumeToMount.PodName,
 			PodUID:              volumeToMount.Pod.UID,
 			VolumeName:          volumeToMount.VolumeName,
@@ -653,7 +653,6 @@ func (og *operationGenerator) GenerateMountVolumeFunc(
 					klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeMountAsUncertain failed", t).Error())
 				}
 			case volumetypes.OperationFinished:
-				markOpts.VolumeMountState = VolumeNotMounted
 				t := actualStateOfWorld.MarkVolumeAsUnmounted(volumeToMount.PodName, volumeToMount.VolumeName)
 				if t != nil {
 					klog.Errorf(volumeToMount.GenerateErrorDetailed("MountVolume.MarkVolumeAsUnmounted failed", t).Error())
@@ -1021,7 +1020,7 @@ func (og *operationGenerator) GenerateMapVolumeFunc(
 			return volumeToMount.GenerateError("MapVolume.MarkVolumeAsMounted failed while expanding volume", resizeError)
 		}
 
-		markVolumeOpts := MarkVolumeMountedOpts{
+		markVolumeOpts := MarkVolumeOpts{
 			PodName:             volumeToMount.PodName,
 			PodUID:              volumeToMount.Pod.UID,
 			VolumeName:          volumeToMount.VolumeName,

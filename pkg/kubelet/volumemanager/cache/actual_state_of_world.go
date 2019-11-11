@@ -59,7 +59,7 @@ type ActualStateOfWorld interface {
 	// volume, reset the pod's remountRequired value.
 	// If a volume with the name volumeName does not exist in the list of
 	// attached volumes, an error is returned.
-	AddPodToVolume(operationexecutor.MarkVolumeMountedOpts) error
+	AddPodToVolume(operationexecutor.MarkVolumeOpts) error
 
 	// MarkRemountRequired marks each volume that is successfully attached and
 	// mounted for the specified pod as requiring remount (if the plugin for the
@@ -313,7 +313,6 @@ type mountedPod struct {
 	// volumeMountStateForPod stores state of volume mount for the pod. if it is:
 	//   - VolumeMounted: means volume for pod has been successfully mounted
 	//   - VolumeMountUncertain: means volume for pod may not be mounted, but it must be unmounted
-	//   - VolumeNotMounted: means volume for pod has not been mounted
 	volumeMountStateForPod operationexecutor.VolumeMountState
 }
 
@@ -332,7 +331,7 @@ func (asw *actualStateOfWorld) MarkVolumeAsDetached(
 	asw.DeleteVolume(volumeName)
 }
 
-func (asw *actualStateOfWorld) MarkVolumeAsMounted(markVolumeOpts operationexecutor.MarkVolumeMountedOpts) error {
+func (asw *actualStateOfWorld) MarkVolumeAsMounted(markVolumeOpts operationexecutor.MarkVolumeOpts) error {
 	return asw.AddPodToVolume(markVolumeOpts)
 }
 
@@ -360,7 +359,7 @@ func (asw *actualStateOfWorld) MarkDeviceAsUncertain(
 	return asw.SetDeviceMountState(volumeName, operationexecutor.DeviceMountUncertain, devicePath, deviceMountPath)
 }
 
-func (asw *actualStateOfWorld) MarkVolumeMountAsUncertain(markVolumeOpts operationexecutor.MarkVolumeMountedOpts) error {
+func (asw *actualStateOfWorld) MarkVolumeMountAsUncertain(markVolumeOpts operationexecutor.MarkVolumeOpts) error {
 	markVolumeOpts.VolumeMountState = operationexecutor.VolumeMountUncertain
 	return asw.AddPodToVolume(markVolumeOpts)
 }
@@ -428,7 +427,7 @@ func (asw *actualStateOfWorld) addVolume(
 	return nil
 }
 
-func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.MarkVolumeMountedOpts) error {
+func (asw *actualStateOfWorld) AddPodToVolume(markVolumeOpts operationexecutor.MarkVolumeOpts) error {
 	podName := markVolumeOpts.PodName
 	podUID := markVolumeOpts.PodUID
 	volumeName := markVolumeOpts.VolumeName

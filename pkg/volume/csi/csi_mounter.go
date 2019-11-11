@@ -126,6 +126,7 @@ func (c *csiMountMgr) setupUtil(dir string, mounterArgs volume.MounterArgs) (vol
 
 	csi, err := c.csiClientGetter.Get()
 	if err != nil {
+		opExitStatus = volumetypes.OperationStateNoChange
 		return opExitStatus, errors.New(log("mounter.SetUpAt failed to get CSI client: %v", err))
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), csiTimeout)

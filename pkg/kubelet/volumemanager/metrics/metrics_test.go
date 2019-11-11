@@ -78,7 +78,7 @@ func TestMetricCollection(t *testing.T) {
 		t.Fatalf("MarkVolumeAsAttached failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	markVolumeOpts := operationexecutor.MarkVolumeMountedOpts{
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
 		PodName:             podName,
 		PodUID:              pod.UID,
 		VolumeName:          generatedVolumeName,

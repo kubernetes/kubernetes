@@ -640,7 +640,7 @@ func (rc *reconciler) updateStates(volumesNeedUpdate map[v1.UniqueVolumeName]*re
 			klog.Errorf("Could not add volume information to actual state of world: %v", err)
 			continue
 		}
-		markVolumeOpts := operationexecutor.MarkVolumeMountedOpts{
+		markVolumeOpts := operationexecutor.MarkVolumeOpts{
 			PodName:             volume.podName,
 			PodUID:              types.UID(volume.podName),
 			VolumeName:          volume.volumeName,

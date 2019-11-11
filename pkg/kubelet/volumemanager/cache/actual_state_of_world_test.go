@@ -221,7 +221,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeNewNode(t *testing.T) {
 	}
 
 	// Act
-	markVolumeOpts := operationexecutor.MarkVolumeMountedOpts{
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
 		PodName:             podName,
 		PodUID:              pod.UID,
 		VolumeName:          generatedVolumeName,
@@ -295,7 +295,7 @@ func Test_AddPodToVolume_Positive_ExistingVolumeExistingNode(t *testing.T) {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	markVolumeOpts := operationexecutor.MarkVolumeMountedOpts{
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
 		PodName:             podName,
 		PodUID:              pod.UID,
 		VolumeName:          generatedVolumeName,
@@ -402,7 +402,7 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	markVolumeOpts1 := operationexecutor.MarkVolumeMountedOpts{
+	markVolumeOpts1 := operationexecutor.MarkVolumeOpts{
 		PodName:             podName1,
 		PodUID:              pod1.UID,
 		VolumeName:          generatedVolumeName1,
@@ -428,7 +428,7 @@ func Test_AddTwoPodsToVolume_Positive(t *testing.T) {
 		t.Fatalf("NewBlockVolumeMapper failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	markVolumeOpts2 := operationexecutor.MarkVolumeMountedOpts{
+	markVolumeOpts2 := operationexecutor.MarkVolumeOpts{
 		PodName:             podName2,
 		PodUID:              pod2.UID,
 		VolumeName:          generatedVolumeName1,
@@ -513,7 +513,7 @@ func Test_AddPodToVolume_Negative_VolumeDoesntExist(t *testing.T) {
 	}
 
 	// Act
-	markVolumeOpts := operationexecutor.MarkVolumeMountedOpts{
+	markVolumeOpts := operationexecutor.MarkVolumeOpts{
 		PodName:             podName,
 		PodUID:              pod.UID,
 		VolumeName:          volumeName,
@@ -632,7 +632,7 @@ func TestUncertainVolumeMounts(t *testing.T) {
 		t.Fatalf("NewMounter failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	markVolumeOpts1 := operationexecutor.MarkVolumeMountedOpts{
+	markVolumeOpts1 := operationexecutor.MarkVolumeOpts{
 		PodName:             podName1,
 		PodUID:              pod1.UID,
 		VolumeName:          generatedVolumeName1,

@@ -855,7 +855,7 @@ func reconcileASW(asw cache.ActualStateOfWorld, dsw cache.DesiredStateOfWorld, t
 		if err != nil {
 			t.Fatalf("Unexpected error when MarkVolumeAsAttached: %v", err)
 		}
-		markVolumeOpts := operationexecutor.MarkVolumeMountedOpts{
+		markVolumeOpts := operationexecutor.MarkVolumeOpts{
 			PodName:             volumeToMount.PodName,
 			PodUID:              volumeToMount.Pod.UID,
 			VolumeName:          volumeToMount.VolumeName,

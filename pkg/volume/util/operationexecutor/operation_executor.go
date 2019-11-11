@@ -160,8 +160,8 @@ func NewOperationExecutor(
 	}
 }
 
-// MarkVolumeMountedOpts is an struct to pass arguments to MountVolume functions
-type MarkVolumeMountedOpts struct {
+// MarkVolumeOpts is an struct to pass arguments to MountVolume functions
+type MarkVolumeOpts struct {
 	PodName             volumetypes.UniquePodName
 	PodUID              types.UID
 	VolumeName          v1.UniqueVolumeName
@@ -177,13 +177,13 @@ type MarkVolumeMountedOpts struct {
 // state of the world cache after successful mount/unmount.
 type ActualStateOfWorldMounterUpdater interface {
 	// Marks the specified volume as mounted to the specified pod
-	MarkVolumeAsMounted(markVolumeOpts MarkVolumeMountedOpts) error
+	MarkVolumeAsMounted(markVolumeOpts MarkVolumeOpts) error
 
 	// Marks the specified volume as unmounted from the specified pod
 	MarkVolumeAsUnmounted(podName volumetypes.UniquePodName, volumeName v1.UniqueVolumeName) error
 
 	// MarkVolumeMountAsUncertain marks state of volume mount for the pod uncertain
-	MarkVolumeMountAsUncertain(markVolumeOpts MarkVolumeMountedOpts) error
+	MarkVolumeMountAsUncertain(markVolumeOpts MarkVolumeOpts) error
 
 	// Marks the specified volume as having been globally mounted.
 	MarkDeviceAsMounted(volumeName v1.UniqueVolumeName, devicePath, deviceMountPath string) error
@@ -397,9 +397,6 @@ const (
 
 	// VolumeMountUncertain means volume may or may not be mounted in pods' local path
 	VolumeMountUncertain VolumeMountState = "VolumeMountUncertain"
-
-	// VolumeNotMounted means volume has not been mounted in pod's local path
-	VolumeNotMounted VolumeMountState = "VolumeNotMounted"
 )
 
 // GenerateMsgDetailed returns detailed msgs for volumes to mount
