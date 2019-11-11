@@ -42,7 +42,7 @@ func TestMetricCollection(t *testing.T) {
 		t.Fatalf("AddOrUpdatePlugin failed. Expected: <no error> Actual: <%v>", err)
 	}
 
-	metricCollector := &totalPluginsCollector{asw, dsw}
+	metricCollector := &totalPluginsCollector{asw: asw, dsw: dsw}
 
 	// Check if getPluginCount returns correct data
 	count := metricCollector.getPluginCount()
